@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Polykrom</title>
+<meta name="description" content="Open-source parametric CAD in pure Rust for parts that have to work: model, check stress on the part, and design with an AI companion that uses the same commands you do.">
+<meta property="og:title" content="Polykrom">
+<meta property="og:description" content="Open-source parametric CAD for parts that have to work.">
+<meta property="og:image" content="https://cad.polykrom.app/screens/polykrom.png">
+<meta name="theme-color" content="#111214">
+<link rel="icon" href="mark.svg" type="image/svg+xml">
+<style>
+/* Layout: one column of bands, each with its own inner width; the hero leads with the mark and the product. */
+@font-face { font-family: "Atkinson Hyperlegible Next"; src: url("fonts/AtkinsonHyperlegibleNext-Variable.ttf") format("truetype"); font-weight: 200 800; font-display: swap; }
+@font-face { font-family: "Atkinson Hyperlegible Mono"; src: url("fonts/AtkinsonHyperlegibleMono-Regular.ttf") format("truetype"); font-weight: 400; font-display: swap; }
+:root {
+  --bg: #111214; --panel: #18191c; --raised: #202125; --rule: #2c2d33;
+  --fg: #e8e8ec; --muted: #9b9ca6; --cyan: #3fcad3; --indigo: #8b8bf0;
+  --ln: #dcdde3; --a1: #9fe3e8; --a2: #22b8c4; --a3: #45d3dc; --gp: #18191c;
+  --ui: "Atkinson Hyperlegible Next", system-ui, "Segoe UI", sans-serif;
+  --mono: "Atkinson Hyperlegible Mono", ui-monospace, Menlo, monospace;
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: light) { :root {
+  --bg: #f6f6f8; --panel: #ffffff; --raised: #ececf0; --rule: #dcdce3;
+  --fg: #1b1c21; --muted: #5d5e69; --cyan: #0d8a94; --indigo: #4f4fc9;
+  --ln: #26272d; --a1: #bfeef1; --a2: #1aa5b0; --a3: #0b7f88; --gp: #ffffff; color-scheme: light } }
+* { box-sizing: border-box }
+html { -webkit-text-size-adjust: 100% }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 400 17px/1.6 var(--ui) }
+a { color: var(--cyan) }
+.band { padding-left: max(20px, env(safe-area-inset-left)); padding-right: max(20px, env(safe-area-inset-right)) }
+.in { max-width: 1120px; margin: 0 auto }
+nav.band { padding-block: 18px; border-bottom: 1px solid var(--rule) }
+nav .in { display: flex; align-items: center; gap: 22px; flex-wrap: wrap }
+nav .brand { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 19px; color: var(--fg); text-decoration: none; margin-right: auto }
+nav .brand svg { width: 26px; height: 26px }
+nav a.l { color: var(--muted); text-decoration: none; font-weight: 500 } nav a.l:hover { color: var(--fg) }
+header.band { padding-block: 72px 40px }
+header .in { display: grid; grid-template-columns: 1.05fr 1fr; gap: 48px; align-items: center }
+h1 { font-weight: 800; font-size: clamp(38px, 6vw, 64px); line-height: 1.02; letter-spacing: -0.025em; margin: 0 0 18px; text-wrap: balance }
+h1 em { font-style: normal; color: var(--cyan) }
+.lede { font-size: 19px; color: var(--muted); max-width: 34em; margin: 0 0 28px }
+.cta { display: flex; gap: 12px; flex-wrap: wrap }
+.btn { display: inline-flex; align-items: center; gap: 8px; padding: 12px 20px; border-radius: 10px; font-weight: 700; text-decoration: none; border: 1px solid var(--rule); color: var(--fg); background: var(--panel) }
+.btn.go { background: var(--cyan); color: #06292c; border-color: transparent }
+.btn:focus-visible { outline: 3px solid var(--indigo); outline-offset: 2px }
+.note { font-size: 14px; color: var(--muted); margin-top: 14px }
+.gem { width: min(100%, 380px); justify-self: center }
+.shot.band { padding-block: 8px 72px }
+.shot img { width: 100%; height: auto; display: block; border-radius: 14px; border: 1px solid var(--rule); box-shadow: 0 30px 80px -30px rgba(0, 0, 0, .55) }
+section.band { padding-block: 64px; border-top: 1px solid var(--rule) }
+h2 { font-weight: 800; font-size: clamp(26px, 3.4vw, 36px); letter-spacing: -0.015em; margin: 0 0 12px; text-wrap: balance }
+.sub { color: var(--muted); max-width: 40em; margin: 0 0 32px }
+.three { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px }
+.card { background: var(--panel); border: 1px solid var(--rule); border-radius: 14px; padding: 22px; display: grid; gap: 10px; align-content: start; min-width: 0 }
+.card svg { width: 44px; height: 44px; --ln: var(--fg) }
+.card h3 { margin: 0; font-size: 20px }
+.card p { margin: 0; color: var(--muted); font-size: 16px }
+.card ul { margin: 0; padding-left: 18px; color: var(--muted); font-size: 15.5px }
+.num { font-family: var(--mono); font-variant-numeric: tabular-nums; color: var(--fg) }
+.icons { display: grid; grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); gap: 16px 8px; margin-top: 8px }
+.icons svg { width: 40px; height: 40px; display: block; margin: 0 auto }
+.icons figure { margin: 0; text-align: center; font-size: 11px; color: var(--muted) }
+pre { font-family: var(--mono); font-size: 14.5px; background: var(--panel); border: 1px solid var(--rule); border-radius: 12px; padding: 16px 18px; overflow-x: auto; margin: 0 }
+.split { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; align-items: start }
+.split > * { min-width: 0 }
+footer.band { padding-block: 40px 56px; border-top: 1px solid var(--rule); color: var(--muted); font-size: 15px }
+footer .in { display: grid; gap: 8px }
+@media (max-width: 860px) { header .in, .split { grid-template-columns: 1fr } .three { grid-template-columns: 1fr } .gem { width: 220px; order: -1 } header.band { padding-block: 40px 24px } }
+@media (prefers-reduced-motion: no-preference) { .gem polygon { transition: transform .4s } }
+</style>
+</head>
+<body>
+<nav class="band"><div class="in">
+  <a class="brand" href="./">{{MARK}}Polykrom</a>
+  <a class="l" href="app/">Open in browser</a>
+  <a class="l" href="docs/">Docs</a>
+  <a class="l" href="https://github.com/wckdboy/polykrom">GitHub</a>
+</div></nav>
+
+<header class="band"><div class="in">
+  <div>
+    <h1>CAD for parts that <em>have to work</em>.</h1>
+    <p class="lede">Polykrom is open-source parametric CAD in pure Rust. Model a part, check the stress on it before you make it, and work with an AI companion that uses the same commands you do.</p>
+    <div class="cta">
+      <a class="btn go" href="app/">Open in your browser</a>
+      <a class="btn" href="https://github.com/wckdboy/polykrom">Build the desktop app</a>
+    </div>
+    <p class="note">MIT OR Apache-2.0. The browser version models and exports; stress analysis runs in the desktop app.</p>
+  </div>
+  <div class="gem">{{GEM}}</div>
+</div></header>
+
+<div class="shot band"><div class="in">
+  <img src="screens/polykrom.png" width="1600" height="996" alt="Polykrom with a sensor enclosure open: the design browser on the left, the model in the viewport, the timeline below.">
+</div></div>
+
+<section class="band"><div class="in">
+  <h2>Model, check, and design with a companion</h2>
+  <p class="sub">One program for the whole loop from an idea to a part you can trust.</p>
+  <div class="three">
+    <div class="card">{{ICON:extrude}}<h3>Model</h3>
+      <ul><li>Sketches with a constraint solver and dimensions driven by parameters</li><li>Extrude, revolve, sweep, loft, fillet, shell, holes, threads, patterns</li><li>Assemblies with joints and motion; sheet metal and plastic parts</li><li>STEP, IGES, 3MF, STL, OBJ, glTF and URDF</li></ul></div>
+    <div class="card">{{ICON:analysis_stress}}<h3>Check</h3>
+      <p>Static stress on the part: pick the held faces and the loaded ones, and read the peak stress, the deflection and the safety factor against the material's yield.</p>
+      <p>Checked against beam theory: a 200 mm cantilever bends within <span class="num">2%</span> of P L³ / 3 E I.</p></div>
+    <div class="card">{{ICON:agent_chat}}<h3>Design with a companion</h3>
+      <p>An AI agent drives Polykrom through the same commands as the menus, over the Model Context Protocol, and checks what it built by measuring it.</p>
+      <p>Asked for a steel arm that carries <span class="num">500 N</span> at a safety factor of two, an agent designed a hollow tube that passed an independent check: <span class="num">SF 2.17</span>, <span class="num">0.165 mm</span>, <span class="num">198 g</span>.</p></div>
+  </div>
+</div></section>
+
+<section class="band"><div class="in split">
+  <div>
+    <h2>Your agent, your tools</h2>
+    <p class="sub">Polykrom is an MCP server. Point Claude Code, or any MCP client, at it and ask for a part. Headless, it runs its own design; with <code>--connect</code> it drives the open app so you can watch.</p>
+  </div>
+<pre>claude mcp add polykrom -- polykrom-cli mcp
+
+&gt; Make an aluminium L-bracket, 80 × 40 × 50 mm,
+  5 mm thick, with two Ø8 holes, and tell me its mass.</pre>
+</div></section>
+
+<section class="band"><div class="in">
+  <h2>Drawn to be read at a glance</h2>
+  <p class="sub">Polykrom has its own icon language, Facet: each tool is a line drawing with one coloured facet, the face the command makes. The colour says what kind of work it is.</p>
+  <div class="icons">{{STRIP}}</div>
+</div></section>
+
+<footer class="band"><div class="in">
+  <div>Polykrom is a fork of <a href="https://github.com/tangency-labs/solidcraft">SolidCraft</a> by the SolidCraft contributors, and keeps its history. Fixes that help both go upstream. Stress analysis runs <a href="https://github.com/wckdboy/nightfall">Nightfall</a>'s verified solver as a separate program.</div>
+  <div>MIT OR Apache-2.0 · <a href="https://github.com/wckdboy/polykrom">Source</a> · <a href="docs/">Docs</a> · <a href="https://github.com/wckdboy/polykrom/issues">Issues</a></div>
+</div></footer>
+</body>
+</html>

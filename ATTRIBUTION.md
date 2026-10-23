@@ -471,6 +471,7 @@ Editable drawing code, native projects and shipped exports are collected under `
 | assets/icons/ui/design/tools/icon_palette.py | SolidCraft contributors | Original shared semantic icon palette resolver for repository tools | MIT OR Apache-2.0 |
 | assets/icons/ui/design/tools/icon_status.py | SolidCraft contributors | icon lint, status page or preview tool (standard-library Python), original SolidCraft code | MIT OR Apache-2.0 |
 | assets/styles/ui/tools/krom_palette.py | Polykrom contributors | one-time migration of the palette to Polykrom's graphite and cyan (standard-library Python), original Polykrom code | MIT OR Apache-2.0 |
+| site/screens/polykrom.png | Polykrom contributors | screenshot of Polykrom with an original sensor enclosure design, for cad.polykrom.app | MIT OR Apache-2.0 |
 | assets/icons/ui/design/tools/lint_icons.py | SolidCraft contributors | icon lint, status page or preview tool (standard-library Python), original SolidCraft code | MIT OR Apache-2.0 |
 | assets/icons/ui/design/tools/preview.py | SolidCraft contributors | icon lint, status page or preview tool (standard-library Python), original SolidCraft code | MIT OR Apache-2.0 |
 | assets/icons/ui/design/tools/review_state.py | SolidCraft contributors | icon review state helper (standard-library Python), original SolidCraft code | MIT OR Apache-2.0 |

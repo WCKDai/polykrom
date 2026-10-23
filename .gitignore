@@ -10,3 +10,6 @@ __pycache__/
 
 # cargo-mutants output (docs/mutation-testing.md)
 mutants.out*/
+
+# Wrangler cache (account details); never commit it.
+.wrangler/
