@@ -75,6 +75,7 @@ mod i18n_ui_tests;
 pub mod icon_svg;
 pub mod icons;
 pub mod inference;
+pub mod inspector;
 pub mod install;
 pub mod issue_report;
 pub mod joint_drag;
@@ -488,6 +489,8 @@ pub struct SolveApp {
     pub agent: agent_cursor::AgentCursor,
     /// The agent chat panel (docs/design/in-app-agent-chat.md).
     pub agent_chat: agent_chat::AgentChat,
+    /// The selection's properties and checks.
+    pub inspector: inspector::Inspector,
     pending_shots: Vec<(u64, Option<String>, std::sync::mpsc::Sender<Value>, f64)>,
     queued_shots: Vec<(u64, f64, u32)>,
     shot_token: u64,
@@ -596,6 +599,7 @@ impl SolveApp {
             synthetic_mods: egui::Modifiers::default(),
             control_rx: None,
             agent_chat: Default::default(),
+            inspector: Default::default(),
             control_held: Default::default(),
             control_job: None,
             control_answering: Vec::new(),
@@ -758,6 +762,7 @@ impl SolveApp {
         let r = self.session.execute(id, &params).map_err(|e| e.to_string());
         self.big_operation |= now_ms() - t0 >= recovery_ui::BIG_OPERATION_MS;
         if let Ok(v) = &r {
+            self.inspector.record(id, v, &mut self.session);
             if id == "view.layout" {
                 let layout =
                     if v.get("mode").and_then(Value::as_str) == Some("compact") { shell::LayoutMode::Docked } else { shell::LayoutMode::Floating };
@@ -1679,6 +1684,7 @@ impl SolveApp {
         if floating {
             agent_chat::show(self, ui);
         }
+        inspector::show(self, ui);
         Container::new(ui.ctx(), Surface::Viewport)
             .central()
             .frame(Container::new(ui.ctx(), Surface::Viewport).edge_frame(egui::Color32::TRANSPARENT))
