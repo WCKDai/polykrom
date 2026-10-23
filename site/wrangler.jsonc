@@ -1,0 +1,17 @@
+// cad.polykrom.app: the landing page, the browser app (/app/) and the book (/docs/).
+// Build with `python3 site/build.py` (after `trunk build --release` and `cargo xtask book`),
+// then deploy with `npx wrangler deploy --config site/wrangler.jsonc`.
+{
+  "name": "polykrom-cad-site",
+  "compatibility_date": "2026-10-19",
+  "main": "worker.js",
+  "assets": {
+    "directory": "../dist/site",
+    "binding": "ASSETS",
+    "not_found_handling": "404-page",
+    "run_worker_first": ["/app/*.wasm"]
+  },
+  "routes": [
+    { "pattern": "cad.polykrom.app", "custom_domain": true }
+  ]
+}
