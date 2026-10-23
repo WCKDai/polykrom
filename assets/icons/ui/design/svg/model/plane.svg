@@ -1,11 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <title>Plane</title>
-  <path d="M8 33.87L32 47.87L32 54.87L8 40.87Z" fill="#b8c3cf"/>
-  <path d="M32 47.87L56 33.87L56 40.87L32 54.87Z" fill="#8e9faf"/>
-  <path d="M8 33.87L32 19.87L56 33.87L32 47.87Z" fill="#e2e8ef"/>
-  <path d="M8 33.87L32 19.87L56 33.87L56 40.87L32 54.87L8 40.87Z" fill="none" stroke="#34465b" stroke-width="2.55" stroke-linejoin="round" stroke-linecap="round"/>
-  <path d="M32 47.87L8 33.87" fill="none" stroke="#34465b" stroke-width="2.55" stroke-linejoin="round" stroke-linecap="round"/>
-  <path d="M32 47.87L56 33.87" fill="none" stroke="#34465b" stroke-width="2.55" stroke-linejoin="round" stroke-linecap="round"/>
-  <path d="M32 47.87L32 54.87" fill="none" stroke="#34465b" stroke-width="2.55" stroke-linejoin="round" stroke-linecap="round"/>
-  <path d="M8 21.87L32 7.87L56 21.87L32 35.87Z" fill="#b9ddf8" stroke="#236ead" stroke-width="2.55" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="0.1 5"/>
+  <title>Offset Plane</title>
+  <path d="M32 25.35L58.6 38.65L32 51.95L5.4 38.65Z" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M32 12.05L58.6 25.35L32 38.65L5.4 25.35Z" fill="#b9ddf8"/>
+  <path d="M32 12.05L58.6 25.35L32 38.65L5.4 25.35Z" fill="none" stroke="#236ead" stroke-width="3.4" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M32 38.17L32 32.3" fill="none" stroke="#236ead" stroke-width="4.4" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M32 26.3L35.85 33.3L28.15 33.3Z" fill="#236ead"/>
 </svg>

@@ -166,6 +166,10 @@ fn icon_data() -> Result<(), String> {
     println!("cargo:rerun-if-changed={}", root.display());
     for fam in ["model", "small", "flat", "workspace"] {
         let dir = svg_dir.join(fam);
+        // Small optical variants are optional: the set may have none.
+        if fam == "small" && !dir.exists() {
+            continue;
+        }
         let mut files: Vec<_> =
             std::fs::read_dir(&dir).map_err(|e| format!("{}: {e}", dir.display()))?.filter_map(Result::ok).map(|e| e.path()).collect();
         files.sort();

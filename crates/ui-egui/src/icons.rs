@@ -255,7 +255,7 @@ mod tests {
                     }
                     let image = textures.get(&texture).unwrap();
                     let look = Look { dark, accent: expected_accent, vision };
-                    for role in ["ink", "passive-2", "passive-3", "active-1", "active-2", "active-3"] {
+                    for role in ["line", "active-2", "active-3"] {
                         assert!(image.pixels.contains(&icon_svg::role_colour(role, look)), "{accent:?}/{role}, {dark}/{vision:?}");
                     }
                     let alpha: Vec<_> = image.pixels.iter().map(|pixel| pixel.a()).collect();

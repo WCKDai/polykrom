@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
   <title>Equal</title>
-  <path d="M15.2 24.8L48.8 24.8" fill="none" stroke="#236ead" stroke-width="4.25" stroke-linejoin="round" stroke-linecap="round"/>
-  <path d="M15.2 39.2L48.8 39.2" fill="none" stroke="#236ead" stroke-width="4.25" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M10 16L54 16M10 48L54 48" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M22 27L42 27M22 37L42 37" fill="none" stroke="#236ead" stroke-width="4.4" stroke-linejoin="round" stroke-linecap="round"/>
 </svg>

@@ -1,6 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
   <title>Fold</title>
-  <path d="M14 44L36 44L50 20" fill="none" stroke="#34465b" stroke-width="11.4" stroke-linejoin="round" stroke-linecap="round"/>
-  <path d="M14 44L36 44" fill="none" stroke="#b8c3cf" stroke-width="6.3" stroke-linejoin="round" stroke-linecap="round"/>
-  <path d="M36 44L50 20" fill="none" stroke="#328bd3" stroke-width="6.3" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M6 46L30 46" fill="none" stroke="currentColor" stroke-width="4.4" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M30 46L48 20" fill="none" stroke="#236ead" stroke-width="4.4" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M30 46L54 46" fill="none" stroke="#6f879c" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="3 3.2"/>
+  <path d="M45.94 44.61A16 16 0 0 0 43.57 37.52" fill="none" stroke="#236ead" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M40.28 33.74L46.71 36.11L41.73 40.44Z" fill="#236ead"/>
 </svg>

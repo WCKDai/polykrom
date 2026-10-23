@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <title>Connected agent</title>
-  <path d="M25 7L25 24M39 7L39 24" fill="none" stroke="currentColor" stroke-width="5" stroke-linejoin="round" stroke-linecap="round"/>
-  <path d="M16 25L48 25L48 31Q48 41 38 41L36 41L36 47L28 47L28 41L26 41Q16 41 16 31Z" fill="currentColor" stroke="currentColor" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>
-  <path d="M32 47L32 57" fill="none" stroke="currentColor" stroke-width="4.25" stroke-linejoin="round" stroke-linecap="round"/>
+  <title>Connected Agent</title>
+  <path d="M26 22L22 18A9 9 0 0 0 9 31L15 37A9 9 0 0 0 28 37" fill="none" stroke="currentColor" stroke-width="4.4" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M38 42L42 46A9 9 0 0 0 55 33L49 27A9 9 0 0 0 36 27" fill="none" stroke="currentColor" stroke-width="4.4" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M32 24L38 35L26 35Z" fill="currentColor"/>
 </svg>

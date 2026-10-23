@@ -1,10 +1,10 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <title>Three-point rectangle</title>
-  <path d="M8.2 36.3L40.4 9.3L55.8 27.7L23.6 54.7Z" fill="#b9ddf8" stroke="#236ead" stroke-width="4.25" stroke-linejoin="round" stroke-linecap="round"/>
-  <circle cx="8.2" cy="36.3" r="5.8" fill="#ffffff"/>
-  <circle cx="8.2" cy="36.3" r="3.4" fill="#236ead"/>
-  <circle cx="40.4" cy="9.3" r="5.8" fill="#ffffff"/>
-  <circle cx="40.4" cy="9.3" r="3.4" fill="#236ead"/>
-  <circle cx="55.8" cy="27.7" r="5.8" fill="#ffffff"/>
-  <circle cx="55.8" cy="27.7" r="3.4" fill="#236ead"/>
+  <title>Three-Point Rectangle</title>
+  <path d="M10 38L36 12L54 30L28 56Z" fill="none" stroke="#236ead" stroke-width="4.4" stroke-linejoin="round" stroke-linecap="round"/>
+  <circle cx="10" cy="38" r="4.4" fill="#236ead"/>
+  <circle cx="10" cy="38" r="1.98" fill="#ffffff"/>
+  <circle cx="36" cy="12" r="4.4" fill="#236ead"/>
+  <circle cx="36" cy="12" r="1.98" fill="#ffffff"/>
+  <circle cx="54" cy="30" r="4.4" fill="#236ead"/>
+  <circle cx="54" cy="30" r="1.98" fill="#ffffff"/>
 </svg>

@@ -1,11 +1,9 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <title>Axis through edge</title>
-  <path d="M16.25 20.6L36 32L36 54.8L16.25 43.4Z" fill="#b8c3cf"/>
-  <path d="M55.75 20.6L36 32L36 54.8L55.75 43.4Z" fill="#8e9faf"/>
-  <path d="M36 9.2L55.75 20.6L36 32L16.25 20.6Z" fill="#e2e8ef"/>
-  <path d="M36 9.2L55.75 20.6L55.75 43.4L36 54.8L16.25 43.4L16.25 20.6Z" fill="none" stroke="#34465b" stroke-width="2.55" stroke-linejoin="round" stroke-linecap="round"/>
-  <path d="M16.25 20.6L36 32L55.75 20.6" fill="none" stroke="#34465b" stroke-width="2.55" stroke-linejoin="round" stroke-linecap="round"/>
-  <path d="M36 32L36 54.8" fill="none" stroke="#34465b" stroke-width="2.55" stroke-linejoin="round" stroke-linecap="round"/>
-  <path d="M10.2 17.1L42.06 35.5" fill="none" stroke="#ffffff" stroke-width="6.45" stroke-linejoin="round" stroke-linecap="round"/>
-  <path d="M10.2 17.1L42.06 35.5" fill="none" stroke="#236ead" stroke-width="4.25" stroke-linejoin="round" stroke-linecap="round"/>
+  <title>Axis Through Edge</title>
+  <path d="M32 18.9L53.6 29.7L53.6 42.3L32 53.1L10.4 42.3L10.4 29.7Z" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M10.4 29.7L32 40.5L53.6 29.7" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M32 40.5L32 53.1" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M61.16 25.92L24.44 44.28" fill="none" stroke="#236ead" stroke-width="4.4" stroke-linejoin="round" stroke-linecap="round"/>
+  <circle cx="61.16" cy="25.92" r="2.6" fill="#236ead"/>
+  <circle cx="24.44" cy="44.28" r="2.6" fill="#236ead"/>
 </svg>

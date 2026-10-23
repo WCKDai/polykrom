@@ -1,17 +1,10 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <title>Split body</title>
-  <path d="M29.77 12.68L47.62 22.98L47.62 43.59L29.77 33.28Z" fill="#b8c3cf"/>
-  <path d="M56.54 17.83L47.62 22.98L47.62 43.59L56.54 38.44Z" fill="#8e9faf"/>
-  <path d="M38.69 7.53L56.54 17.83L47.62 22.98L29.77 12.68Z" fill="#e2e8ef"/>
-  <path d="M38.69 7.53L56.54 17.83L56.54 38.44L47.62 43.59L29.77 33.28L29.77 12.68Z" fill="none" stroke="#34465b" stroke-width="2.55" stroke-linejoin="round" stroke-linecap="round"/>
-  <path d="M29.77 12.68L47.62 22.98L56.54 17.83" fill="none" stroke="#34465b" stroke-width="2.55" stroke-linejoin="round" stroke-linecap="round"/>
-  <path d="M47.62 22.98L47.62 43.59" fill="none" stroke="#34465b" stroke-width="2.55" stroke-linejoin="round" stroke-linecap="round"/>
-  <path d="M20.85 38.44L43.15 51.32L43.15 25.56L20.85 12.68Z" fill="#b9ddf8"/>
-  <path d="M20.85 38.44L43.15 51.32L43.15 25.56L20.85 12.68Z" fill="none" stroke="#236ead" stroke-width="3.19" stroke-linejoin="round" stroke-linecap="round"/>
-  <path d="M7.46 25.56L25.31 35.86L25.31 56.47L7.46 46.16Z" fill="#b8c3cf"/>
-  <path d="M34.23 30.71L25.31 35.86L25.31 56.47L34.23 51.32Z" fill="#8e9faf"/>
-  <path d="M16.38 20.41L34.23 30.71L25.31 35.86L7.46 25.56Z" fill="#e2e8ef"/>
-  <path d="M16.38 20.41L34.23 30.71L34.23 51.32L25.31 56.47L7.46 46.16L7.46 25.56Z" fill="none" stroke="#34465b" stroke-width="2.55" stroke-linejoin="round" stroke-linecap="round"/>
-  <path d="M7.46 25.56L25.31 35.86L34.23 30.71" fill="none" stroke="#34465b" stroke-width="2.55" stroke-linejoin="round" stroke-linecap="round"/>
-  <path d="M25.31 35.86L25.31 56.47" fill="none" stroke="#34465b" stroke-width="2.55" stroke-linejoin="round" stroke-linecap="round"/>
+  <title>Split Body</title>
+  <path d="M27 18L37.2 23.1L37.2 36.7L16.8 46.9L6.6 41.8L6.6 28.2Z" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M6.6 28.2L16.8 33.3L37.2 23.1" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M16.8 33.3L16.8 46.9" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M57.4 22.2L37 32.4L37 46L57.4 35.8Z" fill="#328bd3"/>
+  <path d="M47.2 17.1L57.4 22.2L57.4 35.8L37 46L26.8 40.9L26.8 27.3Z" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M26.8 27.3L37 32.4L57.4 22.2" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M37 32.4L37 46" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linejoin="round" stroke-linecap="round"/>
 </svg>

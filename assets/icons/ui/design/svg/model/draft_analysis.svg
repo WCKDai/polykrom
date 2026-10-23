@@ -1,5 +1,10 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <title>Draft analysis</title>
-  <path d="M8 56L8 8L56 8L56 56" fill="none" stroke="#8e9faf" stroke-width="3.2" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="0.1 5.5"/>
-  <path d="M8 56L56 56L44 8L20 8Z" fill="#328bd3" stroke="#34465b" stroke-width="2.55" stroke-linejoin="round" stroke-linecap="round"/>
+  <title>Draft Analysis</title>
+  <path d="M13 22.5L32 32L32 55L8 43Z" fill="#328bd3"/>
+  <path d="M51 22.5L32 32L32 55L56 43Z" fill="#236ead"/>
+  <path d="M32 13L51 22.5L32 32L13 22.5Z" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M13 22.5L32 32L32 55L8 43Z" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M51 22.5L32 32L32 55L56 43Z" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M52 8L52 17" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M52 22L48.7 16L55.3 16Z" fill="currentColor"/>
 </svg>

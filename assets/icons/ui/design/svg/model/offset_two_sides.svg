@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <title>Two independent offset sides</title>
-  <path d="M8 56L8 40A32 32 0 0 1 40 8L56 8" fill="none" stroke="#236ead" stroke-width="4.25" stroke-linejoin="round" stroke-linecap="round"/>
-  <path d="M24 56L24 40A16 16 0 0 1 40 24L56 24" fill="none" stroke="#8e9faf" stroke-width="4.25" stroke-linejoin="round" stroke-linecap="round"/>
-  <path d="M34 56L34 40A6 6 0 0 1 40 34L56 34" fill="none" stroke="#236ead" stroke-width="4.25" stroke-linejoin="round" stroke-linecap="round"/>
+  <title>Offset Two Sides</title>
+  <path d="M10 52L10 30A20 20 0 0 1 30 10L54 10" fill="none" stroke="#236ead" stroke-width="4.4" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M20 52L20 32A12 12 0 0 1 32 20L54 20" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M30 52L30 34A4 4 0 0 1 34 30L54 30" fill="none" stroke="#236ead" stroke-width="4.4" stroke-linejoin="round" stroke-linecap="round"/>
 </svg>

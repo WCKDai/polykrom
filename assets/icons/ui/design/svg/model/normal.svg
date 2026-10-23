@@ -1,4 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <title>Normal line</title>
-  <path d="M11 53L53 11" fill="none" stroke="#236ead" stroke-width="4.25" stroke-linejoin="round" stroke-linecap="round"/>
+  <title>Normal Line</title>
+  <path d="M6 46C20 30 44 30 58 46" fill="none" stroke="currentColor" stroke-width="4.4" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M32 34L32 15" fill="none" stroke="#236ead" stroke-width="4.4" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M32 8L36.4 16L27.6 16Z" fill="#236ead"/>
+  <circle cx="32" cy="34" r="4" fill="#236ead"/>
+  <circle cx="32" cy="34" r="1.8" fill="#ffffff"/>
 </svg>

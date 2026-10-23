@@ -753,11 +753,11 @@ mod tests {
     }
 
     #[test]
-    fn accepted_badges_and_environment_sun_have_transparent_holes() {
+    fn badges_highlights_and_point_centres_have_transparent_holes() {
         for dark in [false, true] {
             let look = Look { dark, accent: None, vision: crate::theme::ColorVision::Off };
             assert_eq!(role_colour("gap", look), egui::Color32::TRANSPARENT);
-            for (id, x, y) in [("contact_new", 48, 48), ("environment_map", 45, 19), ("line_mid", 35, 28)] {
+            for (id, x, y) in [("contact_new", 48, 48), ("render_image", 28, 30), ("line_mid", 32, 32)] {
                 let pm = render(doc_for(id, 64).unwrap(), look, 64).unwrap();
                 assert_eq!(pm.pixel(x, y).unwrap().alpha(), 0, "{id}: GAP must not be a painted theme colour");
             }
@@ -999,7 +999,7 @@ mod tests {
                         );
                         if id == "delete" && px == 64 {
                             let image = egui::ColorImage::from_rgba_premultiplied([64, 64], tinted.data());
-                            for role in ["ink", "active-2", "active-3"] {
+                            for role in ["line", "active-2"] {
                                 assert!(
                                     image.pixels.contains(&role_colour(role, look)),
                                     "{role}, dark={dark}/{vision:?}: retain separate face and outline colours"

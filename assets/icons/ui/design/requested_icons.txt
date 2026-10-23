@@ -1,6 +1,7 @@
 accessibility	false
 activate	false
 align	false
+analysis_stress	false
 appearance	false
 arc3	false
 arc_center	false

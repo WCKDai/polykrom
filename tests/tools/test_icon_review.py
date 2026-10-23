@@ -101,10 +101,10 @@ class IconReviewTest(unittest.TestCase):
 
     def test_inline_clips_and_masks_are_scoped_to_each_preview_and_dashes_use_guides(self):
         with review_fixture() as (root, design, get, post):
-            for name in ('environment_map', 'new', 'draft', 'bounding_solid', 'extend'):
+            for name in ('zebra', 'new', 'polygon', 'bounding_solid', 'extend'):
                 shutil.copy2(TOOLS.parent / f'svg/model/{name}.svg', design / f'svg/model/{name}.svg')
             with (design / 'aliases.toml').open('a') as aliases:
-                aliases.write('surface_env={master="environment_map",accent="surface"}\n')
+                aliases.write('surface_zebra={master="zebra",accent="surface"}\n')
             page = get('/')
             fragments = re.findall(r'<svg\b.*?</svg>', page, re.S)
             seen = set()
@@ -124,11 +124,11 @@ class IconReviewTest(unittest.TestCase):
                     if id(node) in mask_nodes and stroke == 'black': continue
                     self.assertTrue(any(role in stroke for role in ('roles-guide-', 'active-3-')), stroke)
                 self.assertNotIn('var(--icon-palette-roles-gap-', svg)
-            self.assertIn('review-environment_map-off-dark-full-disc-env', page)
+            self.assertIn('review-zebra-off-dark-full-zebra', page)
             def card(icon): return page.split('data-id="' + icon + '"', 1)[1].split('<div class="meta">', 1)[0]
             self.assertIn('stroke="var(--icon-palette-roles-active-3-', card('bounding_solid'))
             self.assertIn('stroke="var(--icon-palette-accents-sketch-active-3-', card('extend'))
-            self.assertIn('stroke="var(--icon-palette-roles-guide-', card('draft'))
+            self.assertIn('stroke="var(--icon-palette-roles-guide-', card('polygon'))
 
     def test_live_palette_tokens_save_only_display_colours_and_reject_stale_or_invalid_changes(self):
         with review_fixture() as (root, design, get, post):
@@ -344,8 +344,8 @@ assert review_state.load()['notes'] == {}
     def test_style_reference_page_uses_repository_bases(self):
         with review_fixture() as (root, design, get, post):
             page = get('/guide')
-            self.assertIn('Canonical grey cube', page)
-            self.assertIn('Canonical grey slab', page)
+            self.assertIn('Standard part', page)
+            self.assertIn('Standard plate', page)
             self.assertIn('Standard projection', page)
             self.assertIn('STYLE_GUIDE.md', page)
 
@@ -355,7 +355,7 @@ assert review_state.load()['notes'] == {}
             # the real helper constants and emits an editable starter SVG.
             (root / 'ATTRIBUTION.md').write_text('# Attribution\n', encoding='utf-8')
             command = [sys.executable, '-B', str(design / 'tools/author/new_icon.py')]
-            first = subprocess.run(command + ['fresh_shape', '--base', 'cube'], capture_output=True, text=True)
+            first = subprocess.run(command + ['fresh_shape', '--base', 'part'], capture_output=True, text=True)
             self.assertEqual(first.returncode, 0, first.stderr)
             artwork = design / 'svg/model/fresh_shape.svg'
             self.assertTrue(artwork.exists())

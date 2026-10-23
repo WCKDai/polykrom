@@ -1,8 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
   <title>Drive</title>
-  <path d="M46.14 15.15A22 22 0 1 1 19.38 13.98" fill="none" stroke="#236ead" stroke-width="4.25" stroke-linejoin="round" stroke-linecap="round"/>
-  <path d="M23.8 10.88L19.3 20.14L13.56 11.95Z" fill="#236ead"/>
-  <path d="M23 32A9 9 0 1 0 41 32A9 9 0 1 0 23 32Z" fill="#328bd3"/>
-  <path d="M23 32A9 9 0 1 0 41 32A9 9 0 1 0 23 32Z" fill="none" stroke="#34465b" stroke-width="2.55" stroke-linejoin="round" stroke-linecap="round"/>
-  <circle cx="32" cy="32" r="3" fill="#34465b"/>
+  <path d="M22 32A10 10 0 1 0 42 32A10 10 0 1 0 22 32Z" fill="#328bd3" stroke="currentColor" stroke-width="4.4" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M13.81 42.5A21 21 0 1 1 52.68 35.65" fill="none" stroke="#236ead" stroke-width="4.4" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M50.19 42.5L48.61 32.35L57.92 35.74Z" fill="#236ead"/>
 </svg>

@@ -1,8 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <title>Distance and angle sketch chamfer</title>
-  <path d="M12 36L12 12L42 12" fill="none" stroke="#6f879c" stroke-width="2.55" stroke-linejoin="round" stroke-linecap="round"/>
-  <path d="M12 54L12 36L42 12L54 12" fill="none" stroke="#236ead" stroke-width="4.25" stroke-linejoin="round" stroke-linecap="round"/>
-  <path d="M12 25A11 11 0 0 1 20.59 29.13" fill="none" stroke="currentColor" stroke-width="2.55" stroke-linejoin="round" stroke-linecap="round"/>
-  <circle cx="12" cy="54" r="3.07" fill="#236ead"/>
-  <circle cx="54" cy="12" r="3.07" fill="#236ead"/>
+  <title>Chamfer by Distance and Angle</title>
+  <path d="M12 52L12 32M32 12L52 12" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M12 32L32 12" fill="none" stroke="#236ead" stroke-width="4.4" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M12 32L12 12L32 12" fill="none" stroke="#6f879c" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="3 3.2"/>
+  <path d="M12 46A14 14 0 0 1 22 22" fill="none" stroke="#236ead" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/>
 </svg>

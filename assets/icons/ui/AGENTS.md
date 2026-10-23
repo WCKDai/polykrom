@@ -7,10 +7,12 @@ actual previews in both themes. Do this before choosing geometry or detail.
 1. Check `design/review.json`. A valid final id **or any final alias of its master**
    protects that master and its small variant. Do not redraw it without an explicit
    user instruction to reopen/change it. Do not edit accepted hashes to make lint pass.
-2. Choose the category in the guide. Use `tools/author/bases.py` for a standard
-   grey cube or slab. Match its exact projection, shading, weight and footprint.
-   Add only the cue that explains the operation; do not invent a new base cube.
-3. Edit the SVG master, or create a new id with the scaffold documented below.
+2. Choose the category in the guide. Draw in Facet with `tools/author/facet.py`: start a
+   part from `frame()` (or `bases.part` / `bases.plate`), keep its projection, weights and
+   footprint, and add only the facet and the cue that explain the operation.
+3. Edit the icon's function in `tools/author/facet_icons.py` and write it with
+   `python3 -B facet_icons.py write ID` (the SVG is generated; never hand-edit it), or create
+   a new id with the scaffold documented below.
    Reuse an alias when both meaning and shape are shared. Give different operations
    distinct drawings. Wire command, timeline and relevant browser assignments.
 4. Every new master, alias and detected reference appears automatically on the

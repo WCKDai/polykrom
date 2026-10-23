@@ -1,10 +1,11 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <title>Axis perpendicular to face</title>
-  <path d="M32 6L32 58" fill="none" stroke="#ffffff" stroke-width="6.45" stroke-linejoin="round" stroke-linecap="round"/>
-  <path d="M32 6L32 58" fill="none" stroke="#236ead" stroke-width="4.25" stroke-linejoin="round" stroke-linecap="round"/>
-  <path d="M29.66 19.95L54.6 34.35L34.34 46.05L9.4 31.65Z" fill="#e2e8ef" stroke="#34465b" stroke-width="2.55" stroke-linejoin="round" stroke-linecap="round"/>
-  <path d="M32 6L32 33" fill="none" stroke="#ffffff" stroke-width="6.45" stroke-linejoin="round" stroke-linecap="round"/>
-  <path d="M32 6L32 33" fill="none" stroke="#236ead" stroke-width="4.25" stroke-linejoin="round" stroke-linecap="round"/>
-  <path d="M32 27.6L36.68 30.3L36.68 35.7" fill="none" stroke="#ffffff" stroke-width="4.05" stroke-linejoin="round" stroke-linecap="round"/>
-  <path d="M32 27.6L36.68 30.3L36.68 35.7" fill="none" stroke="currentColor" stroke-width="2.55" stroke-linejoin="round" stroke-linecap="round"/>
+  <title>Axis Normal to Face</title>
+  <path d="M32 27.6L53.6 38.4L32 49.2L10.4 38.4Z" fill="#b9ddf8"/>
+  <path d="M32 27.6L53.6 38.4L53.6 45.6L32 56.4L10.4 45.6L10.4 38.4Z" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M10.4 38.4L32 49.2L53.6 38.4" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M32 49.2L32 56.4" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M32 40.4L32 8.4" fill="none" stroke="#236ead" stroke-width="4.4" stroke-linejoin="round" stroke-linecap="round"/>
+  <circle cx="32" cy="40.4" r="2.6" fill="#236ead"/>
+  <circle cx="32" cy="8.4" r="2.6" fill="#236ead"/>
+  <path d="M38 35.4L38 29.4L32 29.4" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/>
 </svg>

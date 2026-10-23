@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
   <title>Favorite</title>
-  <path d="M32 10.29L39.64 23.77L54.83 26.87L44.36 38.31L46.11 53.71L32 47.29L17.89 53.71L19.64 38.31L9.17 26.87L24.36 23.77Z" fill="#328bd3"/>
-  <path d="M32 10.29L39.64 23.77L54.83 26.87L44.36 38.31L46.11 53.71L32 47.29L17.89 53.71L19.64 38.31L9.17 26.87L24.36 23.77Z" fill="none" stroke="#34465b" stroke-width="2.55" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M32 12L37.58 26.31L52.92 27.2L41.04 36.94L44.93 51.8L32 43.5L19.07 51.8L22.96 36.94L11.08 27.2L26.42 26.31Z" fill="#328bd3"/>
+  <path d="M32 12L37.58 26.31L52.92 27.2L41.04 36.94L44.93 51.8L32 43.5L19.07 51.8L22.96 36.94L11.08 27.2L26.42 26.31Z" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linejoin="round" stroke-linecap="round"/>
 </svg>

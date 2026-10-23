@@ -12,7 +12,7 @@ use super::CommandSpec;
 use crate::params::bad;
 use crate::{Result, Session};
 
-pub static COMMANDS: &[CommandSpec] = &[CommandSpec::new("analysis.static_stress", "Static Stress", static_stress).icon("compute").noundo().params(
+pub static COMMANDS: &[CommandSpec] = &[CommandSpec::new("analysis.static_stress", "Static Stress", static_stress).icon("analysis_stress").noundo().params(
     "body?: name (default: the only body); fixed: [[x,y,z]…] a point inside each face held in place (body_topology gives each face's point); \
      loads: [{faces: [[x,y,z]…], force?: [fx,fy,fz] N (the total, spread over the faces by area), pressure?: MPa (into the faces)}]; \
      material?: a built-in material (default: the body's; Oak and the default material have no elastic data); youngs_modulus_mpa?, \

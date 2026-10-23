@@ -1,4 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <title>Stop response</title>
-  <path d="M20 17L44 17A3 3 0 0 1 47 20L47 44A3 3 0 0 1 44 47L20 47A3 3 0 0 1 17 44L17 20A3 3 0 0 1 20 17Z" fill="currentColor"/>
+  <title>Stop</title>
+  <path d="M21 16L43 16A5 5 0 0 1 48 21L48 43A5 5 0 0 1 43 48L21 48A5 5 0 0 1 16 43L16 21A5 5 0 0 1 21 16Z" fill="currentColor"/>
+  <path d="M21 16L43 16A5 5 0 0 1 48 21L48 43A5 5 0 0 1 43 48L21 48A5 5 0 0 1 16 43L16 21A5 5 0 0 1 21 16Z" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linejoin="round" stroke-linecap="round"/>
 </svg>
