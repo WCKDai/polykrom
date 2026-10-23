@@ -43,15 +43,17 @@ pub fn rgba(size: usize) -> Result<Vec<u8>, String> {
             }
         }
     };
-    // Facets, the same as the toolbar mark: six dark corners, three mid sides, a light centre.
-    let (light, mid, dark) = ([96, 158, 236], [58, 136, 238], [55, 108, 197]);
+    // Facets, the same as the toolbar mark: six corners and three mids, each its own colour of
+    // the brand range (theme `logo_facets`), around a pale centre.
+    let corners: [[u8; 3]; 6] = [[65, 70, 194], [26, 143, 171], [19, 116, 140], [94, 54, 168], [116, 66, 196], [53, 58, 166]];
+    let mids: [[u8; 3]; 3] = [[46, 196, 214], [90, 110, 232], [139, 98, 234]];
     for (k, near) in [(0, 0), (1, 1), (2, 1), (3, 2), (4, 2), (5, 0)] {
-        fill(&[h[k], h[(k + 1) % 6], t[near]], dark);
+        fill(&[h[k], h[(k + 1) % 6], t[near]], corners[k]);
     }
-    fill(&[t[0], t[1], h[1]], mid);
-    fill(&[t[1], t[2], h[3]], mid);
-    fill(&[t[2], t[0], h[5]], mid);
-    fill(&[t[0], t[1], t[2]], light);
+    fill(&[t[0], t[1], h[1]], mids[0]);
+    fill(&[t[1], t[2], h[3]], mids[1]);
+    fill(&[t[2], t[0], h[5]], mids[2]);
+    fill(&[t[0], t[1], t[2]], [201, 246, 250]);
     // White seams, a fortieth of the height wide: a rectangle per segment, a disc at each end.
     let w = n as f32 / 80.0;
     let white = [255, 255, 255];

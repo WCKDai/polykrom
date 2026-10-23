@@ -130,7 +130,7 @@ fn every_scene_colour_comes_from_its_palette_and_appearances_stay() {
     new_body(&mut s, "Picked", 20.);
     new_body(&mut s, "Plain", 40.);
     // Exactly the default body colour, as an appearance: the design's, so it stays.
-    s.execute("appearance.assign", &json!({"bodies": ["Grey"], "color": "#b0bac6"})).unwrap();
+    s.execute("appearance.assign", &json!({"bodies": ["Grey"], "color": "#b8b8be"})).unwrap();
     s.execute("appearance.assign", &json!({"body": "Plain", "faces": [[45, 5, 10]], "color": "#00ff00"})).unwrap();
     s.execute("sketch.create", &json!({"plane": "XY"})).unwrap();
     s.execute("sketch.line", &json!({"points": [[0, -20], [30, -20]]})).unwrap();
@@ -202,8 +202,8 @@ fn a_see_through_appearance_reaches_the_scene() {
         s.execute("solid.box", &json!({"length": 10, "width": 10, "height": 10, "corner": [x, 0, 0], "operation": "new_body", "body_name": name}))
             .unwrap();
     }
-    s.execute("appearance.assign", &json!({"bodies": ["Target"], "color": "#b0bac6", "opacity": 0.3})).unwrap();
-    s.execute("appearance.assign", &json!({"bodies": ["Picked"], "color": "#b0bac6", "opacity": 0.3})).unwrap();
+    s.execute("appearance.assign", &json!({"bodies": ["Target"], "color": "#b8b8be", "opacity": 0.3})).unwrap();
+    s.execute("appearance.assign", &json!({"bodies": ["Picked"], "color": "#b8b8be", "opacity": 0.3})).unwrap();
     s.selection = vec![Sel::Body { name: "Picked".into() }];
     let cam = home_camera(&s);
     let sc = scene(&s, &cam);

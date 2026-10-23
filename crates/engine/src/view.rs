@@ -13,10 +13,10 @@ use crate::{Sel, Session};
 /// Colours (shared with the GPU viewport).
 pub mod colors {
     use solidcraft_render::Rgb;
-    pub const BODY: Rgb = Rgb(176, 186, 198);
-    pub const BODY_SELECTED: Rgb = Rgb(110, 170, 235);
-    pub const EDGE: Rgb = Rgb(40, 44, 52);
-    pub const SKETCH: Rgb = Rgb(30, 90, 200);
+    pub const BODY: Rgb = Rgb(184, 184, 190);
+    pub const BODY_SELECTED: Rgb = Rgb(20, 140, 165);
+    pub const EDGE: Rgb = Rgb(43, 43, 48);
+    pub const SKETCH: Rgb = Rgb(61, 79, 209);
     pub const SKETCH_DONE: Rgb = Rgb(20, 20, 20);
     pub const SKETCH_CONSTRUCTION: Rgb = Rgb(230, 130, 40);
     pub const SKETCH_FIXED: Rgb = Rgb(20, 20, 20);
@@ -28,13 +28,13 @@ pub mod colors {
     /// Linked geometry whose reference was lost.
     pub const SKETCH_LOST: Rgb = Rgb(200, 60, 90);
     pub const PROFILE: Rgb = Rgb(255, 196, 120);
-    pub const GRID: Rgb = Rgb(196, 202, 212);
-    pub const GRID_MAJOR: Rgb = Rgb(170, 178, 190);
+    pub const GRID: Rgb = Rgb(201, 201, 207);
+    pub const GRID_MAJOR: Rgb = Rgb(177, 177, 182);
     pub const AXIS_X: Rgb = Rgb(220, 60, 60);
     pub const AXIS_Y: Rgb = Rgb(60, 170, 60);
     pub const AXIS_Z: Rgb = Rgb(60, 100, 230);
-    pub const BG_TOP: Rgb = Rgb(240, 243, 247);
-    pub const BG_BOTTOM: Rgb = Rgb(203, 210, 221);
+    pub const BG_TOP: Rgb = Rgb(242, 242, 247);
+    pub const BG_BOTTOM: Rgb = Rgb(209, 209, 215);
     /// What the section cap is tinted toward.
     pub const SECTION_CAP: Rgb = solidcraft_render::SECTION_CAP;
 }

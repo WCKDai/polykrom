@@ -2253,7 +2253,7 @@ mod header_report_tests {
             2.0 * (1400.0 - crate::titlebar::WIDTH - RIGHT_GROUP - center.x)
         };
         let (en, ru) = (width_in("en"), width_in("ru"));
-        assert!((en - 114.34375).abs() < 0.05, "Plex Sans report button width: {en}");
+        assert!((en - 114.21875).abs() < 0.05, "Atkinson Hyperlegible Next report button width: {en}");
         // "Сообщить об ошибке" needs more than the English button's 114 px.
         assert!(ru > en + 10.0, "{ru}");
     }

@@ -523,6 +523,7 @@ const NO_MEANING: &[(&str, &str)] = &[
     // Not a colour, or the end of a mark that is measured elsewhere.
     ("analysis.hatch", "a flag: stripes on the failing faces"),
     ("logo[3]", "the mark's white edge"),
+    ("logo_facets", "the mark's polychrome facets: brand colours, read as one shape"),
     // Icon colours that are a shade of a measured one, or one mark alone.
     ("icons.highlight", "white ink on viewport markers and the agent pointer"),
     ("icons.agent", "the agent's pointer, alone"),
@@ -593,12 +594,10 @@ fn pairs(t: &Tokens) -> Vec<(String, Rgb8, Rgb8)> {
 /// Pairs under the floor that the tables leave as they are (decided for #778). Each is close to
 /// the floor for normal vision too, and construction and centerline lines also differ by their
 /// dash patterns.
-fn left_as_they_are(mode: ColorVision, dark: bool) -> BTreeSet<String> {
+fn left_as_they_are(mode: ColorVision, _dark: bool) -> BTreeSet<String> {
     let mut v = vec!["sketch lines: sketch_construction vs sketch_centerline"];
     if mode == ColorVision::Tritan {
         v.push("sketch lines: sketch_lost vs sketch_centerline");
-        v.push(if dark { "timeline: hover vs accent_soft" } else { "timeline: timeline_item vs accent_soft" });
-        v.push("selection: sel_face vs preview_add");
     }
     v.into_iter().map(String::from).collect()
 }

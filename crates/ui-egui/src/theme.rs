@@ -526,8 +526,12 @@ pub struct Tokens {
     pub continuity: [Color32; 4],
     pub analysis: AnalysisColors,
     pub icons: IconColors,
-    /// The Polykrom mark on the application bar: light, mid and dark faces, and its edge.
+    /// The Polykrom mark on the application bar: its light centre, a mid and a deep tone of the
+    /// brand ramp, and the seams between facets.
     pub logo: [Color32; 4],
+    /// The mark's polychrome facets: the three mid facets (upper right, bottom, upper left), then
+    /// the six corner facets clockwise from the top.
+    pub logo_facets: [Color32; 9],
 }
 
 impl Tokens {
@@ -679,7 +683,7 @@ mod tests {
             ("SURFACE", [0xa45000, 0xa45000, 0xfbebd8], [0xb26a14, 0xe0914a, 0x45331e]),
             ("MESH", [0xe0b200, 0x8a6d00, 0xfff8dc], [0xc6a800, 0xd4b726, 0x41391a]),
             ("FORM", [0x7349cd, 0x7349cd, 0xeee8fa], [0x8a6fcc, 0xb39bee, 0x372f4f]),
-            ("SHEET METAL", [0x1e6f96, 0x1e6f96, 0xe1f0f7], [0x2a7fa8, 0x4fb3d9, 0x1f3a47]),
+            ("SHEET METAL", [0x0e747e, 0x0e747e, 0xe0f1f3], [0x128590, 0x4bb7c3, 0x1d3c3f]),
             ("RENDER", [0xa8326e, 0xa8326e, 0xf8e6ef], [0xc8588f, 0xe074ae, 0x402336]),
         ] {
             for (t, values) in [(super::Tokens::light(), light), (super::Tokens::dark(), dark)] {
@@ -689,8 +693,8 @@ mod tests {
             let accent = super::TabAccent::for_tab(&super::Tokens::light(), tab);
             assert_eq!(accent.ink != accent.color, tab == "MESH", "only light Mesh separates ink from fill");
         }
-        // These existing Model values intentionally take precedence over the board's proposal.
-        for (t, values) in [(super::Tokens::light(), [0x2678da, 0x1a507f, 0xd6e6fa]), (super::Tokens::dark(), [0x3a88ee, 0x9cc7f5, 0x2a466e])] {
+        // Polykrom's cyan Model accent.
+        for (t, values) in [(super::Tokens::light(), [0x048a95, 0x0b585f, 0xa9d9e3]), (super::Tokens::dark(), [0x139ba7, 0x88d1d9, 0x0e5870])] {
             let [color, ink, soft] = values.map(rgb);
             assert_eq!(super::TabAccent::for_tab(&t, "MODEL"), super::TabAccent { color, ink, soft });
         }

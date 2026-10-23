@@ -115,7 +115,7 @@ fn a_body_drawn_see_through_is_the_picture_of_the_same_appearance_assigned() {
     let dir = Scratch::new();
     let plain = dir.script("plain.json", &[]);
     let assigned =
-        dir.script("assigned.json", &[json!({"command": "appearance.assign", "params": {"bodies": ["Target"], "color": "#b0bac6", "opacity": 0.3}})]);
+        dir.script("assigned.json", &[json!({"command": "appearance.assign", "params": {"bodies": ["Target"], "color": "#b8b8be", "opacity": 0.3}})]);
     let solid = dir.snapshot(&plain, "solid.png", &[]);
     let see_through = dir.snapshot(&plain, "see-through.png", &["--body", "Target:opacity=0.3"]);
     assert_differs(&see_through, &solid, "--body opacity was ignored");
@@ -148,7 +148,7 @@ fn a_tool_shows_through_the_bodies_around_it() {
     let by_script = dir.script(
         "by-script.json",
         &[
-            json!({"command": "appearance.assign", "params": {"bodies": ["Target"], "color": "#b0bac6", "opacity": 0.3}}),
+            json!({"command": "appearance.assign", "params": {"bodies": ["Target"], "color": "#b8b8be", "opacity": 0.3}}),
             json!({"command": "appearance.assign", "params": {"bodies": ["Tool"], "color": "#e8542c", "opacity": 1.0}}),
         ],
     );

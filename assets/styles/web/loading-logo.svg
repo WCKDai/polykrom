@@ -2,18 +2,6 @@
   <title id="t">Polykrom</title>
   <desc id="d">The Polykrom gem assembles: six dark corner facets, three mid facets and the light centre each grow into place, then the seams between them open and the name settles underneath.</desc>
   <defs>
-    <linearGradient id="light" x1="512" y1="285" x2="512" y2="615" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#6cb8ff"/>
-      <stop offset="1" stop-color="#3d8ef2"/>
-    </linearGradient>
-    <linearGradient id="mid" x1="512" y1="65" x2="512" y2="945" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#3f9cff"/>
-      <stop offset="1" stop-color="#1f6fe0"/>
-    </linearGradient>
-    <linearGradient id="dark" x1="512" y1="65" x2="512" y2="945" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#1d63c6"/>
-      <stop offset="1" stop-color="#124596"/>
-    </linearGradient>
     <mask id="seams" maskUnits="userSpaceOnUse" x="0" y="0" width="1024" height="1100">
       <rect width="1024" height="1100" fill="#fff"/>
       <g class="seam" stroke="#000" stroke-width="18" stroke-linecap="round">
@@ -33,7 +21,7 @@
     </mask>
   </defs>
   <style>
-    :root { --word: #15499e; }
+    :root { --word: #3a3fae; }
     .word { font: 700 64px ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; fill: var(--word); letter-spacing: .02em; }
     /* base styles are the finished logo, so reduced-motion shows it whole */
     polygon { transform-box: view-box; }
@@ -67,16 +55,16 @@
   </style>
   <g class="all">
     <g mask="url(#seams)">
-      <polygon class="f0" points="512.0,65.0 893.1,285.0 512.0,285.0" fill="url(#dark)"/>
-      <polygon class="f1" points="893.1,285.0 893.1,725.0 702.5,615.0" fill="url(#dark)"/>
-      <polygon class="f2" points="893.1,725.0 512.0,945.0 702.5,615.0" fill="url(#dark)"/>
-      <polygon class="f3" points="512.0,945.0 130.9,725.0 321.5,615.0" fill="url(#dark)"/>
-      <polygon class="f4" points="130.9,725.0 130.9,285.0 321.5,615.0" fill="url(#dark)"/>
-      <polygon class="f5" points="130.9,285.0 512.0,65.0 512.0,285.0" fill="url(#dark)"/>
-      <polygon class="f6" points="512.0,285.0 702.5,615.0 893.1,285.0" fill="url(#mid)"/>
-      <polygon class="f7" points="702.5,615.0 321.5,615.0 512.0,945.0" fill="url(#mid)"/>
-      <polygon class="f8" points="321.5,615.0 512.0,285.0 130.9,285.0" fill="url(#mid)"/>
-      <polygon class="f9" points="512.0,285.0 702.5,615.0 321.5,615.0" fill="url(#light)"/>
+      <polygon class="f0" points="512.0,65.0 893.1,285.0 512.0,285.0" fill="#4146c2"/>
+      <polygon class="f1" points="893.1,285.0 893.1,725.0 702.5,615.0" fill="#1a8fab"/>
+      <polygon class="f2" points="893.1,725.0 512.0,945.0 702.5,615.0" fill="#13748c"/>
+      <polygon class="f3" points="512.0,945.0 130.9,725.0 321.5,615.0" fill="#5e36a8"/>
+      <polygon class="f4" points="130.9,725.0 130.9,285.0 321.5,615.0" fill="#7442c4"/>
+      <polygon class="f5" points="130.9,285.0 512.0,65.0 512.0,285.0" fill="#353aa6"/>
+      <polygon class="f6" points="512.0,285.0 702.5,615.0 893.1,285.0" fill="#2ec4d6"/>
+      <polygon class="f7" points="702.5,615.0 321.5,615.0 512.0,945.0" fill="#5a6ee8"/>
+      <polygon class="f8" points="321.5,615.0 512.0,285.0 130.9,285.0" fill="#8b62ea"/>
+      <polygon class="f9" points="512.0,285.0 702.5,615.0 321.5,615.0" fill="#c9f6fa"/>
     </g>
     <text class="word name" x="512" y="1058" text-anchor="middle">Polykrom</text>
   </g>

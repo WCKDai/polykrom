@@ -99,18 +99,20 @@ pub(crate) fn breadcrumb(p: &egui::Painter, c: egui::Pos2, col: Color32) {
 }
 
 pub(crate) fn brand_mark(p: &egui::Painter, c: Pos2) {
-    brand_mark_styled(p, c, 20.0, crate::theme::Tokens::get().logo, true);
+    let t = crate::theme::Tokens::get();
+    brand_mark_styled(p, c, 20.0, t.logo[0], t.logo_facets, true);
 }
 
 /// The same original mark as a single quiet silhouette, without face seams or outlines.
 pub(crate) fn brand_mark_silhouette(p: &egui::Painter, c: Pos2, height: f32, ink: Color32) {
-    brand_mark_styled(p, c, height, [ink; 4], false);
+    brand_mark_styled(p, c, height, ink, [ink; 9], false);
 }
 
 /// Polykrom's mark: a faceted gem, a regular hexagon (pointy top) tiled like a polyhedron seen
-/// down its axis. A light centre triangle, three mid-tone facets on its sides reaching the
-/// alternate corners, and six dark corner facets. Original geometry; `height` is corner to corner.
-fn brand_mark_styled(p: &egui::Painter, c: Pos2, height: f32, colours: [Color32; 4], edges: bool) {
+/// down its axis. A light centre triangle, three mid facets on its sides reaching the alternate
+/// corners, and six corner facets, each in its own colour of the brand's cyan-to-violet range
+/// (`facets`: the mids, then the corners clockwise from the top). `height` is corner to corner.
+fn brand_mark_styled(p: &egui::Painter, c: Pos2, height: f32, centre: Color32, facets: [Color32; 9], edges: bool) {
     let r = height / 2.0;
     // Hexagon corners from the top, clockwise; the centre triangle points up at half the radius.
     let corner = |k: f32| {
@@ -123,19 +125,18 @@ fn brand_mark_styled(p: &egui::Painter, c: Pos2, height: f32, colours: [Color32;
     };
     let h: [Pos2; 6] = [corner(0.0), corner(1.0), corner(2.0), corner(3.0), corner(4.0), corner(5.0)];
     let t: [Pos2; 3] = [inner(0.0), inner(1.0), inner(2.0)];
-    let [light, mid, dark, _] = colours;
     let tri = |col: Color32, a: Pos2, b: Pos2, d: Pos2| {
         p.add(egui::Shape::convex_polygon(vec![a, b, d], col, Stroke::NONE));
     };
-    // Six dark corner facets: each hexagon side with the nearest centre-triangle corner.
+    // Six corner facets: each hexagon side with the nearest centre-triangle corner.
     for (k, near) in [(0, 0), (1, 1), (2, 1), (3, 2), (4, 2), (5, 0)] {
-        tri(dark, h[k], h[(k + 1) % 6], t[near]);
+        tri(facets[3 + k], h[k], h[(k + 1) % 6], t[near]);
     }
     // Three mid facets: each side of the centre triangle with the corner across from it.
-    tri(mid, t[0], t[1], h[1]);
-    tri(mid, t[1], t[2], h[3]);
-    tri(mid, t[2], t[0], h[5]);
-    tri(light, t[0], t[1], t[2]);
+    tri(facets[0], t[0], t[1], h[1]);
+    tri(facets[1], t[1], t[2], h[3]);
+    tri(facets[2], t[2], t[0], h[5]);
+    tri(centre, t[0], t[1], t[2]);
     if !edges {
         return;
     }
