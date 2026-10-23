@@ -119,7 +119,7 @@ pub const WGPU_BACKEND_ENV: &str = "WGPU_BACKEND";
 /// On Windows, D3D12 comes first, then Vulkan, then OpenGL, and only the first one with a
 /// hardware adapter is started at all. wgpu would otherwise start Vulkan, D3D12 and OpenGL
 /// together and prefer Vulkan, and starting Vulkan loads every installed Vulkan driver: Intel's
-/// (`igvk64.dll`) crashed SolidCraft at startup that way, inside the driver, before anything
+/// (`igvk64.dll`) crashed Polykrom at startup that way, inside the driver, before anything
 /// could be reported. D3D12 is Windows' own graphics API, the one its drivers are tested with.
 /// `has_hardware(backends)` says whether those backends have an adapter that isn't software
 /// (it is only asked about the backends being tried, one at a time).
@@ -191,15 +191,15 @@ pub fn has_hardware_adapter(backends: eframe::wgpu::Backends) -> bool {
 
 /// The message shown when no window could be opened at all.
 pub fn no_window_message(error: &str, settings: Option<&Path>) -> String {
-    let folder = settings.map(|d| d.display().to_string()).unwrap_or_else(|| "the SolidCraft settings folder".into());
+    let folder = settings.map(|d| d.display().to_string()).unwrap_or_else(|| "the Polykrom settings folder".into());
     format!(
-        "SolidCraft could not open its window.\n\n{error}\n\n\
+        "Polykrom could not open its window.\n\n{error}\n\n\
          The software renderer was tried too. Things to try:\n\
          - Install or update the graphics driver (on Windows, from the GPU maker's site rather than Windows Update).\n\
          - Over Remote Desktop or in a virtual machine, enable 3D acceleration or run it on the machine itself.\n\
          - Start it once with `solidcraft --safe-mode`.\n\
          - Rename the settings folder: {folder}\n\n\
-         More: https://docs.solidcraft.io/guide/troubleshooting.html"
+         More: https://github.com/wckdboy/polykrom/blob/main/docs/book/src/guide/troubleshooting.md"
     )
 }
 
@@ -322,8 +322,8 @@ mod tests {
 
     #[test]
     fn the_message_names_the_settings_folder_and_safe_mode() {
-        let m = no_window_message("no adapter", Some(Path::new("/x/SolidCraft")));
-        assert!(m.contains("no adapter") && m.contains("/x/SolidCraft") && m.contains("--safe-mode"));
+        let m = no_window_message("no adapter", Some(Path::new("/x/Polykrom")));
+        assert!(m.contains("no adapter") && m.contains("/x/Polykrom") && m.contains("--safe-mode"));
     }
 
     #[test]

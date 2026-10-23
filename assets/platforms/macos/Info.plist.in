@@ -7,11 +7,11 @@
   <key>CFBundleDevelopmentRegion</key>
   <string>en</string>
   <key>CFBundleDisplayName</key>
-  <string>SolidCraft</string>
+  <string>Polykrom</string>
   <key>CFBundleName</key>
-  <string>SolidCraft</string>
+  <string>Polykrom</string>
   <key>CFBundleExecutable</key>
-  <string>SolidCraft</string>
+  <string>Polykrom</string>
   <key>CFBundleIdentifier</key>
   <string>ai.storyteller.solidcraft</string>
   <key>CFBundleInfoDictionaryVersion</key>
@@ -27,9 +27,9 @@
   <key>SolidCraftVersion</key>
   <string>@VERSION@</string>
   <key>CFBundleIconFile</key>
-  <string>SolidCraft</string>
+  <string>Polykrom</string>
   <key>CFBundleIconName</key>
-  <string>SolidCraft</string>
+  <string>Polykrom</string>
   <key>LSApplicationCategoryType</key>
   <string>public.app-category.graphics-design</string>
   <!-- Must match MACOSX_DEPLOYMENT_TARGET in package.sh. -->
@@ -43,7 +43,7 @@
   <array>
     <dict>
       <key>CFBundleTypeName</key>
-      <string>SolidCraft design</string>
+      <string>Polykrom design</string>
       <key>CFBundleTypeExtensions</key>
       <!-- solvecraft: designs saved before the rename (compatibility shim, docs/compatibility.md). -->
       <array><string>solidcraft</string><string>solvecraft</string></array>

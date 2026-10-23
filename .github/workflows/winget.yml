@@ -1,5 +1,5 @@
 # Publishing a GitHub release (not a prerelease) opens a pull request at microsoft/winget-pkgs
-# that adds the new version of bherbruck.SolidCraft, so `winget install bherbruck.SolidCraft`
+# that adds the new version of wckdboy.Polykrom, so `winget install wckdboy.Polykrom`
 # and `winget upgrade` get it. Komac (https://github.com/russellbanks/Komac) downloads the three
 # versioned MSIs, reads their product codes and copies the rest from the previous manifest.
 # Skipped until the owner adds the WINGET_TOKEN secret, and while the package isn't in
@@ -23,7 +23,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  PACKAGE_ID: bherbruck.SolidCraft
+  PACKAGE_ID: wckdboy.Polykrom
   KOMAC_VERSION: 2.16.0
   KOMAC_SHA256: 7d2707fa6210f2789a3702de49fbd150b736dbf426ee0b9bc8e098736f9fd82d
 
@@ -47,7 +47,7 @@ jobs:
             v[0-9]*.[0-9]*.[0-9]*) ;;
             *) echo "::error::Unexpected tag '$TAG'"; exit 1 ;;
           esac
-          if ! gh api "repos/microsoft/winget-pkgs/contents/manifests/b/bherbruck/SolidCraft" --silent; then
+          if ! gh api "repos/microsoft/winget-pkgs/contents/manifests/w/wckdboy/Polykrom" --silent; then
             echo "$PACKAGE_ID isn't in winget-pkgs yet: nothing to update."
             exit 0
           fi

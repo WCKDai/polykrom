@@ -1,4 +1,4 @@
-//! The SolidCraft egui front end.
+//! The Polykrom egui front end.
 //!
 //! A thin shell over [`solidcraft_engine::Session`]: panels read engine state and act through
 //! commands ([`SolveApp::run`]). Nothing here owns design data. The layout follows the familiar
@@ -453,7 +453,7 @@ pub struct SolveApp {
     pub stand_up_occurrence: Option<u64>,
     /// The anti-aliasing sample counts the graphics device supports (empty without a GPU).
     pub msaa_supported: Vec<u32>,
-    /// Settings put back at start because they kept SolidCraft from starting, one line each,
+    /// Settings put back at start because they kept Polykrom from starting, one line each,
     /// shown until dismissed (`prefs::show_reset_notice`).
     pub settings_reset: Vec<prefs::SettingReset>,
     /// The last command was a big operation: autosave after it.
@@ -1895,7 +1895,7 @@ mod picker_test_support;
 #[cfg(test)]
 mod test_support;
 
-/// A SolidCraft design file (`.solidcraft`, or a design saved as JSON), as opposed to a STEP or
+/// A Polykrom design file (`.solidcraft`, or a design saved as JSON), as opposed to a STEP or
 /// mesh file.
 fn is_design_path(path: &str) -> bool {
     let ext = std::path::Path::new(path).extension().and_then(|e| e.to_str()).unwrap_or("").to_ascii_lowercase();

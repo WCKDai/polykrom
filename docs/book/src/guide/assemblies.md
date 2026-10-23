@@ -8,7 +8,7 @@ faded.
 
 A component is placed by its **occurrences**. Paste creates another instance of the same
 component, and **Paste New** creates an independent copy. Move an occurrence with the move
-triad, then **Capture Position** to keep it or **Revert** to put it back. SolidCraft asks before
+triad, then **Capture Position** to keep it or **Revert** to put it back. Polykrom asks before
 the next command if a move wasn't captured. **Ground** fixes an occurrence in place.
 
 Paste New copies nested component definitions, sketches, feature histories and generated

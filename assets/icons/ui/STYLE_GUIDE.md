@@ -1,4 +1,4 @@
-# SolidCraft UI icon specification
+# Polykrom UI icon specification
 
 This is the binding specification for new and revised icons. Use it with the
 actual SVG references in `design/references.toml`; `http://127.0.0.1:8770/guide`
@@ -203,7 +203,7 @@ whole set, especially final artwork, when adding one icon.
 7. Leave the icon Open. The owner uses the review page to finalise the exact
    artwork revision. Do not add acceptance hashes or copy another icon's hash.
 
-All artwork must be original SolidCraft work or an explicitly licensed resource
+All artwork must be original Polykrom work or an explicitly licensed resource
 with provenance. Commercial CAD artwork, screenshots and extracted assets are
 forbidden even as hidden references. This guide and the local finished set provide
 all required visual context for future agents.

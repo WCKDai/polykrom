@@ -125,7 +125,7 @@ full `FeatureKind::Plugin` when `evaluate` lands.
 
 ## Relationship to craft-libs
 
-Plugin **document model and eval** stay in SolidCraft (`crates/doc`, `crates/engine`). craft-libs
+Plugin **document model and eval** stay in Polykrom (`crates/doc`, `crates/engine`). craft-libs
 provides worker/broker hosting only ([web-runtime.md](web-runtime.md)). Neutral serde types
 (`VersionedParams`, `PluginDisplay`) may move to a shared crate later if multiple apps need them;
 CAD plugins remain SolidCraft-specific.

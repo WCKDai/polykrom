@@ -59,7 +59,7 @@ them. The format is specified in [`docs/formats/3mf-face-tags.md`](https://githu
 
 **File → Export URDF…** (`file.export` with a `.urdf` path) writes the assembly for robot
 simulators and ROS: a link per component placement with its mesh, mass and inertia, and the
-assembly's joints, so the parts move in the simulator as they do in SolidCraft. The meshes are
+assembly's joints, so the parts move in the simulator as they do in Polykrom. The meshes are
 written as STL files next to the `.urdf`. See [`docs/urdf.md`](https://github.com/bherbruck/solidcraft/blob/main/docs/urdf.md).
 
 Saves are atomic: a crash at any moment leaves either the old file or the new one, and the
@@ -95,7 +95,7 @@ is available. Missing or incompatible pictures use the usual thumbnail generatio
 The default `cache: false` omits the portable thumbnail too.
 The repository's `docs/design-container.md` describes limits and encoding details.
 
-Designs are saved in the newest format this version of SolidCraft knows (`"format": "solidcraft/N"`
+Designs are saved in the newest format this version of Polykrom knows (`"format": "solidcraft/N"`
 in the file). It opens designs of every older format and upgrades them as they open; a design
 from a newer version asks you to update instead of being guessed at. Development (nightly) builds
 save a format number no release reads yet.
@@ -149,12 +149,12 @@ none, and is saved exactly as before:
 }
 ```
 
-- **SolidCraft's keys are unprefixed** and hold text. Every other unprefixed key is reserved for
-  later SolidCraft versions.
+- **Polykrom's keys are unprefixed** and hold text. Every other unprefixed key is reserved for
+  later Polykrom versions.
 - **Other tools keep their data under one reverse-DNS key** of their own (`com.example.tool`:
   two or more dot-separated labels of letters, digits, `-` and `_`), holding an object. A tool
   writes only under its own key and leaves the others alone.
-- **SolidCraft keeps every key as it is** through open, edit and save, in both the container
+- **Polykrom keeps every key as it is** through open, edit and save, in both the container
   and plain JSON, and never checks what another tool wrote: a well-known key holding something
   other than text (`"author": 42`) is kept, reads as absent, and never stops the design from
   opening. Typing over it in Design Properties replaces it.

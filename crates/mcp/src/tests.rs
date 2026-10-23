@@ -1432,7 +1432,7 @@ fn batch_falls_back_while_the_agent_cursor_is_shown() {
 #[test]
 fn batch_does_not_resend_after_a_transport_error() {
     let (b, body, is_error) =
-        recorded_batch(Err("SolidCraft at 127.0.0.1:1: timed out".into()), json!({"commands": [{"command": "a.one"}, {"command": "a.two"}]}));
+        recorded_batch(Err("Polykrom at 127.0.0.1:1: timed out".into()), json!({"commands": [{"command": "a.one"}, {"command": "a.two"}]}));
     assert_eq!(methods(&b), ["engine.batch"]);
     assert!(is_error);
     assert!(body.as_str().is_some_and(|t| t.contains("may have run") && t.contains("timed out")), "{body}");
@@ -1509,8 +1509,8 @@ fn a_bridge_made_before_the_app_runs_connects_once_it_does() {
     let port = std::net::TcpListener::bind("127.0.0.1:0").unwrap().local_addr().unwrap().port();
     let addr = format!("127.0.0.1:{port}");
     let mut remote = crate::Remote::new(&addr, Some("0123456789abcdef0123456789abcdef"));
-    // Still "connected to the SolidCraft app", which the skills read as bridged.
-    assert!(remote.describe().starts_with("connected to the SolidCraft app") && remote.describe().contains("not running"), "{}", remote.describe());
+    // Still "connected to the Polykrom app", which the skills read as bridged.
+    assert!(remote.describe().starts_with("connected to the Polykrom app") && remote.describe().contains("not running"), "{}", remote.describe());
     let e = remote.call("engine.execute", json!({"command": "inspect.measure"})).unwrap_err();
     assert!(e.starts_with(crate::backend::NOT_RUNNING) && e.contains(&format!("solidcraft --control {port}")), "{e}");
     let batch = crate::call_tool(&mut remote, "batch", &json!({"commands": [{"command": "solid.box"}]}));

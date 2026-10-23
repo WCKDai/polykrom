@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build an electronics enclosure in a running SolidCraft over MCP, one command at a time.
+"""Build an electronics enclosure in a running Polykrom over MCP, one command at a time.
 
     solidcraft --control 7878 &
     python3 examples/demo/enclosure_mcp.py --port 7878

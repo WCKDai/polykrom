@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build and package SolidCraft for Linux (<arch> is x86_64 or aarch64):
+# Build and package Polykrom for Linux (<arch> is x86_64 or aarch64):
 #
 #   $DIST/solidcraft-<version>-linux-<arch>.AppImage        any distro with glibc >= the build host's
 #   $DIST/solidcraft-<version>-linux-<arch>.AppImage.zsync  delta updates (needs zsyncmake)
@@ -38,10 +38,10 @@ case "$ARCH" in
   aarch64 | arm64) ARCH=aarch64; DEB_ARCH=arm64 ;;
   *) echo "unsupported architecture $ARCH" >&2; exit 2 ;;
 esac
-export SOLIDCRAFT_MAINTAINER="${SOLIDCRAFT_MAINTAINER:-${SOLVECRAFT_MAINTAINER:-SolidCraft contributors <https://github.com/bherbruck/solidcraft>}}"  # SOLVECRAFT_*: compatibility shim, see docs/compatibility.md
+export SOLIDCRAFT_MAINTAINER="${SOLIDCRAFT_MAINTAINER:-${SOLVECRAFT_MAINTAINER:-Polykrom contributors <https://github.com/bherbruck/solidcraft>}}"  # SOLVECRAFT_*: compatibility shim, see docs/compatibility.md
 BASENAME="solidcraft-$VERSION-linux-$ARCH"
 
-echo "==> SolidCraft $VERSION for Linux $ARCH ($FORMATS)"
+echo "==> Polykrom $VERSION for Linux $ARCH ($FORMATS)"
 
 if [ "$SKIP_BUILD" = 0 ]; then
   if [ -n "${CROSS_TARGET:-}" ]; then
@@ -147,7 +147,7 @@ if has appimage; then
     # Compatibility shim (docs/compatibility.md): AppImages from before the rename look for
     # `solvecraft-*-linux-$ARCH.AppImage.zsync` in the latest release. The same .zsync under that
     # name (its URL is the new AppImage's file name, relative to the release) updates them to
-    # SolidCraft.
+    # Polykrom.
     cp "$OUT.zsync" "$DIST/solvecraft-$VERSION-linux-$ARCH.AppImage.zsync"
     echo "wrote $DIST/solvecraft-$VERSION-linux-$ARCH.AppImage.zsync (legacy update alias)"
   else

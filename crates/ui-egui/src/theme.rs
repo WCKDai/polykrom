@@ -526,7 +526,7 @@ pub struct Tokens {
     pub continuity: [Color32; 4],
     pub analysis: AnalysisColors,
     pub icons: IconColors,
-    /// The SolidCraft mark on the application bar: light, mid and dark faces, and its edge.
+    /// The Polykrom mark on the application bar: light, mid and dark faces, and its edge.
     pub logo: [Color32; 4],
 }
 

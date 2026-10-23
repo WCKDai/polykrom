@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-# SolidCraft in the browser as a container: the static site (the one packaging/web/package.sh
+# Polykrom in the browser as a container: the static site (the one packaging/web/package.sh
 # zips) served by nginx on port 8080, as an unprivileged user. From the repository root:
 #
 #   docker build -f packaging/docker/Dockerfile -t solidcraft-web .

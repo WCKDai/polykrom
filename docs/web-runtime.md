@@ -1,10 +1,10 @@
 # Browser runtime (design)
 
-Design note for SolidCraft in the browser: tiered storage, worker offload, GPU jobs, and
+Design note for Polykrom in the browser: tiered storage, worker offload, GPU jobs, and
 agent control that stay aligned with the desktop app, the control channel, and
 [MCP](mcp.md). Implementation lives primarily in
 [craft-libs](https://github.com/storytold/craft-libs) (`craft-tier-store`, `craft-worker-host`,
-`craft-gpu`, `craft-runtime`); SolidCraft wires those crates into
+`craft-gpu`, `craft-runtime`); Polykrom wires those crates into
 [`apps/solidcraft-web`](../apps/solidcraft-web) and [`files.rs`](../apps/solidcraft-web/src/files.rs)
 rather than growing a second stack here.
 
@@ -18,7 +18,7 @@ The wasm app today ([`getting-started`](../docs/book/src/guide/getting-started.m
 the origin private file system (OPFS) behind virtual `/opfs/` paths, with optional File System
 Access import/export. That works for small and medium designs but hits three walls:
 
-| Wall | Symptom in SolidCraft |
+| Wall | Symptom in Polykrom |
 |------|------------------------|
 | Quota | Large STEP imports and container blobs compete with autosave and cache in OPFS |
 | Main thread | Open, save, and timeline evaluation run synchronously on the UI thread with egui |
@@ -68,7 +68,7 @@ On **desktop**, the same `BlobStore` and job envelopes apply: warm/cold map to n
 [`solidcraft-cli mcp`](mcp.md) and wasmtime plugin hosts ([#1221](https://github.com/bherbruck/solidcraft/issues/1221))
 call the same `run(command, args)` JSON.
 
-## Mapping SolidCraft today
+## Mapping Polykrom today
 
 | Today | Target |
 |-------|--------|
@@ -80,7 +80,7 @@ call the same `run(command, args)` JSON.
 
 ## craft-libs crates (reference)
 
-These names follow the craft-libs performance platform design; SolidCraft depends on them as
+These names follow the craft-libs performance platform design; Polykrom depends on them as
 published from storytold/craft-libs after cloud contracts land (#48, #52).
 
 | Crate | Role |
@@ -92,7 +92,7 @@ published from storytold/craft-libs after cloud contracts land (#48, #52).
 | `craft-gpu-providers` | Shared readback/composite helpers extracted from Craft app gpu crates |
 | `craft-runtime` | Facade: tier store + worker host + optional `cloud-delegate` hooks |
 
-Generic runtime code must not depend on SolidCraft crates. SolidCraft registers app-specific
+Generic runtime code must not depend on Polykrom crates. Polykrom registers app-specific
 providers and key namespaces only.
 
 ## GPU and the viewport
@@ -132,7 +132,7 @@ Static wasm apps on `craft.quasarke.net` ship `craft-worker-host.js` (brotli-pre
 the app bundle. Prefer one global runtime worker per origin once message routing and wasm size are
 budgeted; per-app worker URLs are acceptable for pilots. CSP must allow `worker-src` / SharedWorker.
 
-## Phasing (SolidCraft)
+## Phasing (Polykrom)
 
 1. **Document and track** (this file); no user-visible change.
 2. **Tier-store wiring:** replace ad-hoc OPFS glue with `craft-tier-store` keys; keep on-disk layout.
@@ -146,7 +146,7 @@ budgeted; per-app worker URLs are acceptable for pilots. CSP must allow `worker-
 - Moving egui/viewport WebGPU into SharedWorker
 - Second non-wgpu GPU backend in craft-libs
 - **Implementing** parametric `FeatureKind::Plugin` (designed in [plugins.md](plugins.md); follows craft-runtime wiring)
-- Duplicating `craft-cloud` or embedding `craft-nextcloud` in SolidCraft wasm
+- Duplicating `craft-cloud` or embedding `craft-nextcloud` in Polykrom wasm
 
 ## Tests
 

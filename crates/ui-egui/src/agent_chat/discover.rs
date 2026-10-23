@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
 
-/// An agent SolidCraft knows how to start in ACP mode.
+/// An agent Polykrom knows how to start in ACP mode.
 pub struct Known {
     pub id: &'static str,
     pub name: &'static str,

@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <title>Polykrom gem</title>
+  <defs>
+    <linearGradient id="light" x1="512" y1="292" x2="512" y2="622" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#6cb8ff"/>
+      <stop offset="1" stop-color="#3d8ef2"/>
+    </linearGradient>
+    <linearGradient id="mid" x1="512" y1="72" x2="512" y2="952" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#3f9cff"/>
+      <stop offset="1" stop-color="#1f6fe0"/>
+    </linearGradient>
+    <linearGradient id="dark" x1="512" y1="72" x2="512" y2="952" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#1d63c6"/>
+      <stop offset="1" stop-color="#124596"/>
+    </linearGradient>
+    <mask id="seams" maskUnits="userSpaceOnUse" x="0" y="0" width="1024" height="1024">
+      <rect width="1024" height="1024" fill="#fff"/>
+      <g stroke="#000" stroke-width="18" stroke-linecap="round">
+      <line x1="512.0" y1="292.0" x2="702.5" y2="622.0"/>
+      <line x1="702.5" y1="622.0" x2="321.5" y2="622.0"/>
+      <line x1="321.5" y1="622.0" x2="512.0" y2="292.0"/>
+      <line x1="893.1" y1="292.0" x2="512.0" y2="292.0"/>
+      <line x1="893.1" y1="292.0" x2="702.5" y2="622.0"/>
+      <line x1="512.0" y1="952.0" x2="702.5" y2="622.0"/>
+      <line x1="512.0" y1="952.0" x2="321.5" y2="622.0"/>
+      <line x1="130.9" y1="292.0" x2="321.5" y2="622.0"/>
+      <line x1="130.9" y1="292.0" x2="512.0" y2="292.0"/>
+      <line x1="512.0" y1="72.0" x2="512.0" y2="292.0"/>
+      <line x1="893.1" y1="732.0" x2="702.5" y2="622.0"/>
+      <line x1="130.9" y1="732.0" x2="321.5" y2="622.0"/>
+      </g>
+    </mask>
+  </defs>
+  <g mask="url(#seams)">
+    <polygon points="512.0,72.0 893.1,292.0 512.0,292.0" fill="url(#dark)"/>
+    <polygon points="893.1,292.0 893.1,732.0 702.5,622.0" fill="url(#dark)"/>
+    <polygon points="893.1,732.0 512.0,952.0 702.5,622.0" fill="url(#dark)"/>
+    <polygon points="512.0,952.0 130.9,732.0 321.5,622.0" fill="url(#dark)"/>
+    <polygon points="130.9,732.0 130.9,292.0 321.5,622.0" fill="url(#dark)"/>
+    <polygon points="130.9,292.0 512.0,72.0 512.0,292.0" fill="url(#dark)"/>
+    <polygon points="512.0,292.0 702.5,622.0 893.1,292.0" fill="url(#mid)"/>
+    <polygon points="702.5,622.0 321.5,622.0 512.0,952.0" fill="url(#mid)"/>
+    <polygon points="321.5,622.0 512.0,292.0 130.9,292.0" fill="url(#mid)"/>
+    <polygon points="512.0,292.0 702.5,622.0 321.5,622.0" fill="url(#light)"/>
+  </g>
+</svg>

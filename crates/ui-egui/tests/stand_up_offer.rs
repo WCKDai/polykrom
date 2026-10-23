@@ -18,9 +18,9 @@ fn opened_from(programs: &str, prepare: impl FnOnce(&mut Harness)) -> Harness {
     let path = src.dir.join("tall_in_y.step").to_string_lossy().into_owned();
     src.app.run("solid.box", json!({"length": 10, "width": 40, "height": 5})).unwrap();
     src.app.run("file.export", json!({"path": path})).unwrap();
-    // Another program's file: SolidCraft's own exports already have Z up (#5150).
+    // Another program's file: Polykrom's own exports already have Z up (#5150).
     let text = std::fs::read_to_string(&path).unwrap();
-    std::fs::write(&path, text.replace("'SolidCraft','SolidCraft'", programs)).unwrap();
+    std::fs::write(&path, text.replace("'Polykrom','Polykrom'", programs)).unwrap();
     let mut h = Harness::new();
     prepare(&mut h);
     h.app.open_path(&path);
@@ -97,7 +97,7 @@ fn a_solidworks_header_stands_the_file_up_with_undo() {
 
 #[test]
 fn a_solidcraft_header_is_left_alone() {
-    let h = opened_from("'SolidCraft','SolidCraft'", |_| {});
+    let h = opened_from("'Polykrom','Polykrom'", |_| {});
     assert!(h.app.stand_up.is_none(), "no offer");
     assert!(!h.app.status_undo);
     assert!((height(&h) - 5.0).abs() < 1e-6, "not turned: {}", height(&h));

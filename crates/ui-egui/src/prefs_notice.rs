@@ -1,4 +1,4 @@
-//! The notice for settings put back at start because they would keep SolidCraft from starting
+//! The notice for settings put back at start because they would keep Polykrom from starting
 //! on this computer (`SolveApp::settings_reset`), shown until dismissed.
 
 use crate::SolveApp;

@@ -1,6 +1,6 @@
 //! The model cache: a design's evaluated timeline (every feature's result and the state after
 //! it, [`SavedModel`]), saved with it so opening need not evaluate it again. Bodies use
-//! SolidCraft's exact native B-rep encoding; the key ties the cache to the exact document, build
+//! Polykrom's exact native B-rep encoding; the key ties the cache to the exact document, build
 //! and platform that computed it (docs/design-container.md).
 use super::*;
 use solidcraft_doc::{ModelState, SavedModel};

@@ -1,6 +1,6 @@
 [package]
 name = "solidcraft-ui-egui"
-description = "SolidCraft user interface (egui + wgpu): the swappable front end"
+description = "Polykrom user interface (egui + wgpu): the swappable front end"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

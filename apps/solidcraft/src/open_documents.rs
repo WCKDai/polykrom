@@ -1,9 +1,9 @@
 //! macOS: files opened from Finder (double-click, Open With, a drop on the Dock icon) or with
-//! `open -a SolidCraft file` (#997).
+//! `open -a Polykrom file` (#997).
 //!
 //! macOS doesn't pass these on the command line: AppKit hands them to the application delegate's
 //! `application:openURLs:`, and when the delegate has no such method it asks `NSDocumentController`,
-//! which fails with "SolidCraft cannot open files in the … format" because SolidCraft isn't an
+//! which fails with "Polykrom cannot open files in the … format" because Polykrom isn't an
 //! `NSDocument` app. winit 0.30's delegate doesn't implement the method, so [`install`] adds it to
 //! the delegate's class when the app is about to finish launching: after winit set the delegate and
 //! before AppKit delivers the files the app was launched with. The handler queues the paths and

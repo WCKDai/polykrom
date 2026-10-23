@@ -36,7 +36,7 @@ pub fn restart_on_software(after_recent_loss: bool, cpu_renderer: bool) -> bool 
 /// renderer.
 pub fn note(software: bool) -> String {
     let mut note = String::from(
-        "The graphics device was reset (the graphics driver stopped responding), so SolidCraft closed and started again. Unsaved changes were kept for recovery.",
+        "The graphics device was reset (the graphics driver stopped responding), so Polykrom closed and started again. Unsaved changes were kept for recovery.",
     );
     if software {
         note.push_str(" This start uses software rendering, which doesn't depend on the graphics driver.");
@@ -44,7 +44,7 @@ pub fn note(software: bool) -> String {
     note
 }
 
-/// Start SolidCraft again with the same arguments, the loss stamped at `lost_at`, on the software
+/// Start Polykrom again with the same arguments, the loss stamped at `lost_at`, on the software
 /// renderer when `software`.
 pub fn restart(software: bool, lost_at: u64) {
     let Ok(exe) = std::env::current_exe() else { return };

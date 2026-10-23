@@ -1,9 +1,9 @@
 ---
 name: solidcraft-editing
-description: Use when changing, fixing or extending an existing SolidCraft design through its MCP server - a .solidcraft file or the design open in the app. Typical requests: resize it, move a cut, change a hole or standoff, add a fillet or chamfer, make a fixed value parametric, or a feature shows an error after a change or after the app crashed.
+description: Use when changing, fixing or extending an existing Polykrom design through its MCP server - a .solidcraft file or the design open in the app. Typical requests: resize it, move a cut, change a hole or standoff, add a fillet or chamfer, make a fixed value parametric, or a feature shows an error after a change or after the app crashed.
 ---
 
-# SolidCraft editing
+# Polykrom editing
 
 ## Overview
 Edit an existing design through its parameters instead of rebuilding it. Every sketch dimension and feature input is already a parameter (`d1`, `d2`, ...), so most edits are a `parameters.change` each, sent together in one batch. Map the design with a few compact calls rather than walking the timeline one feature at a time. For command shapes and traps, use `reference.md` from the `solidcraft-modeling` skill.

@@ -128,7 +128,7 @@ impl Locale {
         interpolate(self.text(id), args)
     }
 
-    /// The default names SolidCraft gives (`Untitled` for a new design, `Sketch1`, `Body2`,
+    /// The default names Polykrom gives (`Untitled` for a new design, `Sketch1`, `Body2`,
     /// `Component3`), translated.
     fn default_name(self, text: &str) -> Option<String> {
         if text == "Untitled" {

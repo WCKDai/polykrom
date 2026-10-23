@@ -4,7 +4,7 @@
 //! either is linked. The body goes as STEP, its supports and loads as points on its faces; the
 //! answer is the largest von Mises stress and displacement, the reactions that balance the loads
 //! and, for a material with a known yield strength, the safety factor. Desktop only: set
-//! `SOLIDCRAFT_NIGHTFALL` to Nightfall's `nf`.
+//! `POLYKROM_NIGHTFALL` to Nightfall's `nf`.
 
 use serde_json::{Value, json};
 
@@ -20,7 +20,7 @@ pub static COMMANDS: &[CommandSpec] = &[CommandSpec::new("analysis.static_stress
      true (three meshes, each finer by 1.5: the convergence order of each result); budget_s?: seconds (default 600) → max_von_mises_mpa, \
      max_displacement_mm, yield_mpa and safety_factor (yield / max_von_mises) when the yield is known, applied_n and reaction_n (they \
      balance), material {name, youngs_modulus_mpa, poisson_ratio}, mesh {size_mm, nodes, tetrahedra}, runs (every mesh), convergence_order?, \
-     solver, mesher. Linear and small-strain: past yield the stress is not the part's. Needs SOLIDCRAFT_NIGHTFALL (Nightfall's nf), desktop only",
+     solver, mesher. Linear and small-strain: past yield the stress is not the part's. Needs POLYKROM_NIGHTFALL (Nightfall's nf), desktop only",
 )];
 
 /// Typical room-temperature properties of the built-in materials (public handbook values):
@@ -41,8 +41,9 @@ const ELASTIC: [(&str, f64, f64, Option<f64>); 12] = [
     ("Glass", 70_000.0, 0.22, None),
 ];
 
-/// The environment variable naming Nightfall's `nf`.
-const NF: &str = "SOLIDCRAFT_NIGHTFALL";
+/// The environment variable naming Nightfall's `nf`, after the prefix: `POLYKROM_NIGHTFALL`,
+/// or `SOLIDCRAFT_NIGHTFALL` from before the rename.
+const NF: &str = "NIGHTFALL";
 /// Most support and load points one call takes.
 const MAX_POINTS: usize = 1000;
 
@@ -111,9 +112,9 @@ mod native {
     use crate::{Result, Session};
 
     pub(super) fn run(cmd: &str, s: &mut Session, p: &Value) -> Result<Value> {
-        let nf = std::env::var_os(NF)
+        let nf = crate::geom::env::var_os(NF)
             .filter(|v| !v.is_empty())
-            .ok_or_else(|| bad(cmd, "not available: set SOLIDCRAFT_NIGHTFALL to Nightfall's nf (it solves the analysis)"))?;
+            .ok_or_else(|| bad(cmd, "not available: set POLYKROM_NIGHTFALL to Nightfall's nf (it solves the analysis)"))?;
         let st = s.world_state();
         let body = match str_(p, "body") {
             Some(name) => st.body(name).ok_or_else(|| bad(cmd, format!("no body named {name}")))?,
@@ -154,7 +155,7 @@ mod native {
         let coarse = size > 1.5 * fine;
         let spec = study_spec(cmd, p, e, nu, size)?;
         let budget = Duration::from_secs_f64(num(p, "budget_s").filter(|b| *b > 0.0 && b.is_finite()).unwrap_or(600.0).min(86_400.0));
-        let step = solidcraft_kernel::step_export(&[&body.body], "SolidCraft").map_err(|e| bad(cmd, format!("STEP export: {e}")))?;
+        let step = solidcraft_kernel::step_export(&[&body.body], "Polykrom").map_err(|e| bad(cmd, format!("STEP export: {e}")))?;
 
         let dir = scratch(cmd)?;
         let result = solve(cmd, &nf, &dir, &step, &spec, size, bool_(p, "refine").unwrap_or(false), budget);

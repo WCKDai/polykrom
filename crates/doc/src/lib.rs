@@ -1,4 +1,4 @@
-//! The SolidCraft document: user and model parameters, and a parametric timeline of features
+//! The Polykrom document: user and model parameters, and a parametric timeline of features
 //! (sketches, extrudes, revolves, fillets, primitives, combines…). Evaluating the timeline with
 //! the kernel produces the model (bodies and solved sketches). Evaluation is incremental: a
 //! feature is recomputed only when it, a parameter it uses, or an earlier feature changed.

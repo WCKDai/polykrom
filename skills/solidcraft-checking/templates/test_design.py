@@ -1,4 +1,4 @@
-"""Regression test for a SolidCraft design. One session walks the parameters through the cases in
+"""Regression test for a Polykrom design. One session walks the parameters through the cases in
 order, as edits in the app do, and compares a body after each case with frozen values.
 Copy next to the design, then fill in DESIGN, BODY and CASES. Needs solidcraft-cli on PATH."""
 
@@ -13,7 +13,7 @@ import pytest
 
 DESIGN = Path(__file__).parent / "design.json"
 BODY = "Body"
-# SolidCraft measures a tessellation, and its volume and area error depends on the shape. Measure it
+# Polykrom measures a tessellation, and its volume and area error depends on the shape. Measure it
 # for this design: run.py's BODY volume against the OCCT volume compare_step.py prints for the
 # design's own STEP export (compared with itself). Set REL to about 3 times that error.
 REL = 2e-4

@@ -1,6 +1,6 @@
 [package]
 name = "solidcraft-io"
-description = "SolidCraft file formats: designs (JSON), STL, OBJ, STEP, IGES, 3MF and glTF, and FreeCAD/Rhino import"
+description = "Polykrom file formats: designs (JSON), STL, OBJ, STEP, IGES, 3MF and glTF, and FreeCAD/Rhino import"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

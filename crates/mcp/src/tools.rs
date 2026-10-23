@@ -241,7 +241,7 @@ pub fn tool_definitions() -> Vec<Value> {
         tool(
             "crash_reports",
             "Crash reports",
-            "SolidCraft's crash reports on this computer (the app's when connected to it). Without `id`: the list, newest \
+            "Polykrom's crash reports on this computer (the app's when connected to it). Without `id`: the list, newest \
              first (id, kind, time, message, command, count, version, path, replayable). With `id`: the whole report: \
              message, location, backtrace, app version and commit, system, the command that crashed and the recent ones, \
              and design_path / replay_path when it can be replayed: `solidcraft-cli crashes replay <id>`, or \

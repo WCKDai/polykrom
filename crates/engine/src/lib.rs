@@ -1,4 +1,4 @@
-//! The SolidCraft engine.
+//! The Polykrom engine.
 //!
 //! Every user-visible action is a command with a stable, dotted, lower-case id
 //! (`solid.extrude`, `sketch.create`, `solid.fillet`, `timeline.rollback`). Commands take JSON

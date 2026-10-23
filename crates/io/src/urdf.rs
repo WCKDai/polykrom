@@ -1,13 +1,13 @@
 //! URDF robot description of a design's components and joints (#719, docs/urdf.md): a link per
 //! placement of a component (plus `base_link` for the root and what is grounded), a joint chain
-//! per SolidCraft joint, meshes in metres next to the `.urdf`, and each link's mass, centre of
+//! per Polykrom joint, meshes in metres next to the `.urdf`, and each link's mass, centre of
 //! mass and inertia from its bodies and their materials.
 //!
 //! Frames follow the joint kinematics `T_B · F_b = T_A · F_a · M(q) · Flip` (`doc::joints`).
 //! Every constant is taken from world transforms at the current state, so `Flip` never appears:
 //! with the child on B its link frame is `L = T_A · F_a · M(q)`; with the child on A it is
 //! `L = T_A · F_a` and the parent-side joint frame `L · M(q)`, the chain inverted (reversed, axes
-//! negated, so each URDF value still equals SolidCraft's).
+//! negated, so each URDF value still equals Polykrom's).
 
 use std::collections::{BTreeMap, BTreeSet, HashSet, VecDeque};
 
@@ -92,7 +92,7 @@ pub struct UrdfJoint {
     pub axis: Vec3,
     /// (lower, upper): radians or mm; `None` for a revolute without limit (`continuous`).
     pub limit: Option<(f64, f64)>,
-    /// The SolidCraft joint and the index of its value this step follows.
+    /// The Polykrom joint and the index of its value this step follows.
     pub source: Option<(u64, usize)>,
 }
 
@@ -706,7 +706,7 @@ fn write_xml(model: &UrdfModel, name: &str, options: &UrdfOptions) -> String {
     let effort = options.effort.filter(|x| x.is_finite() && *x > 0.0).unwrap_or(DEFAULT_EFFORT);
     let velocity = options.velocity.filter(|x| x.is_finite() && *x > 0.0).unwrap_or(DEFAULT_VELOCITY);
     let prefix = attr(&options.mesh_prefix);
-    let mut s = String::from("<?xml version=\"1.0\"?>\n<!-- Exported by SolidCraft; units: m, kg, rad -->\n");
+    let mut s = String::from("<?xml version=\"1.0\"?>\n<!-- Exported by Polykrom; units: m, kg, rad -->\n");
     s += &format!("<robot name=\"{}\">\n", attr(name));
     for l in &model.links {
         s += &format!("  <link name=\"{}\">\n", attr(&l.name));

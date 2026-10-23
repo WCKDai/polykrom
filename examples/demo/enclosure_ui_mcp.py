@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Demo v2/v3: build an electronics enclosure in a running SolidCraft the way a person would,
+"""Demo v2/v3: build an electronics enclosure in a running Polykrom the way a person would,
 with the parametric steps sent over MCP.
 
 --story pi (default, the 0.8 README demo): a case for a Raspberry Pi 4, from a sketch dimensioned

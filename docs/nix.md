@@ -1,4 +1,4 @@
-# SolidCraft with Nix
+# Polykrom with Nix
 
 The flake supports `x86_64-linux`, `aarch64-linux` and `aarch64-darwin`. Enable Nix's `nix-command`
 and `flakes` experimental features. The committed `flake.lock` pins nixpkgs and
@@ -35,7 +35,7 @@ nix profile install github:bherbruck/solidcraft#solidcraft
 solidcraft --sample
 ```
 
-On Linux, this installs the SolidCraft desktop entry, MIME definition and generated icon
+On Linux, this installs the Polykrom desktop entry, MIME definition and generated icon
 sizes alongside the commands. On macOS the package contains the binaries only; for a bundled
 `SolidCraft.app`, use the release `.dmg`. NixOS/Home Manager can instead put the flake's
 `packages.${system}.solidcraft` in `environment.systemPackages`/`home.packages`.

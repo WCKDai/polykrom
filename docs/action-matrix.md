@@ -62,7 +62,7 @@ lists which still fail; skip `action_matrix_` to leave out the matrix itself).
   and saved by `examples/demo/enclosure_ui_mcp.py --story pi-0.6 --save`;
   `demo/pi-case-0.8`: the 0.8 README demo's case (`--story pi`), with a rounded rim, engraved
   text and a PETG material;
-  `demo/logo-up-down-join`: the SolidCraft logo as it was reported in #954, one sketch extruded
+  `demo/logo-up-down-join`: the Polykrom logo as it was reported in #954, one sketch extruded
   up and down and joined.
 - `typical/*`: [`tests/action_matrix/designs`](../tests/action_matrix/designs/), parts made the
   ordinary way: a stacked extrude, a filleted and shelled box, a revolved knob, a plate with a

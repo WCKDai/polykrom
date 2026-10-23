@@ -49,7 +49,7 @@ pub fn default_dir() -> Option<PathBuf> {
     Some(dir)
 }
 
-/// SolidCraft's per-user data folder (the recovery folder's parent unless
+/// Polykrom's per-user data folder (the recovery folder's parent unless
 /// `SOLIDCRAFT_RECOVERY_DIR` moves that): `%LOCALAPPDATA%\SolidCraft`,
 /// `~/Library/Application Support/SolidCraft`, or `$XDG_DATA_HOME/solidcraft`
 /// (`~/.local/share/solidcraft`).

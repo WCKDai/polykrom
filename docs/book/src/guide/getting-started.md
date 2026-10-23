@@ -2,7 +2,7 @@
 
 The desktop executable is `solidcraft`, the CLI is `solidcraft-cli`, and designs are saved as
 `.solidcraft`. Designs, settings and setups from builds released under the previous product name keep
-working (see the [compatibility notes](https://github.com/bherbruck/solidcraft/blob/main/docs/compatibility.md)).
+working (see the [compatibility notes](https://github.com/wckdboy/polykrom/blob/main/docs/compatibility.md)).
 
 ## Desktop
 
@@ -25,7 +25,7 @@ cargo run --release -p solidcraft -- --sample   # opens with a sample part
 Open the release `.dmg` and drag `SolidCraft.app` onto Applications.
 
 When updating from a build released under the previous product name, follow the
-[macOS upgrade notes](https://github.com/bherbruck/solidcraft/blob/main/docs/compatibility.md#macos) so you replace it rather than install a second copy.
+[macOS upgrade notes](https://github.com/wckdboy/polykrom/blob/main/docs/compatibility.md#macos) so you replace it rather than install a second copy.
 
 ### Linux AppImage
 
@@ -33,14 +33,14 @@ The first time you open the AppImage it adds a menu entry and icons under `~/.lo
 (`applications/ai.storyteller.solidcraft.desktop`, `icons/hicolor`), so the desktop shows the
 right name and icon. It adds nothing if [appimaged](https://github.com/probonopd/go-appimage)
 already made an entry for the file, or if a launcher such as Gear Lever or AppImageLauncher
-started it (and removes the entry SolidCraft added before). To
+started it (and removes the entry Polykrom added before). To
 turn it off for good, create an empty file `~/.local/share/solidcraft/no-desktop-integration`, or
 start the AppImage with `SOLIDCRAFT_NO_DESKTOP_INTEGRATION=1`.
 
 ### Linux Flatpak
 
 Install Flatpak using your distribution's package manager. For an installation that receives
-updates, add Flathub for the required Freedesktop runtime and the SolidCraft application feed
+updates, add Flathub for the required Freedesktop runtime and the Polykrom application feed
 to the same user installation:
 
 ```sh
@@ -50,17 +50,17 @@ flatpak install --user solidcraft ai.storyteller.solidcraft
 flatpak run ai.storyteller.solidcraft
 ```
 
-A SolidCraft remote added before the project moved to `docs.solidcraft.io` (from
+A Polykrom remote added before the project moved to `docs.solidcraft.io` (from
 `bherbruck.github.io`) no longer finds updates. Point it at the new address, then update:
 `flatpak remote-modify --user --url=https://docs.solidcraft.io/flatpak/repo/ solidcraft` and
 `flatpak update --user`.
 
 Releases up to 0.7 used the application ID `ai.storyteller.solvecraft`. If you installed one
-of those from the SolidCraft remote, `flatpak update --user` reports it as end-of-life and offers
+of those from the Polykrom remote, `flatpak update --user` reports it as end-of-life and offers
 to replace it with `ai.storyteller.solidcraft`; accept, and your settings and autosaves move with
 it. If you installed a `.flatpak` bundle, install the new bundle, launch it once (it copies your
 settings), then run `flatpak uninstall --user ai.storyteller.solvecraft` (see the
-[compatibility notes](https://github.com/bherbruck/solidcraft/blob/main/docs/compatibility.md#linux-app-id)).
+[compatibility notes](https://github.com/wckdboy/polykrom/blob/main/docs/compatibility.md#linux-app-id)).
 
 Alternatively, download the release's `.flatpak` file for your architecture and run
 `flatpak install --user ./solidcraft-VERSION-linux-ARCH.flatpak`. The bundle supplies the
@@ -75,7 +75,7 @@ On Ubuntu and other distributions with snapd:
 
 ```sh
 sudo snap install solidcraft
-solidcraft                # or open SolidCraft from the app menu
+solidcraft                # or open Polykrom from the app menu
 solidcraft.cli --version  # the CLI, for scripts and `solidcraft.cli mcp`
 ```
 
@@ -87,7 +87,7 @@ doesn't update automatically.
 
 ## Web
 
-The same app runs in the browser: [open SolidCraft on the web](../app/) (`?sample` opens the sample
+The same app runs in the browser: [open Polykrom on the web](../app/) (`?sample` opens the sample
 part, `?webgl` forces WebGL2 where WebGPU is missing or misbehaves; the browser remembers it until
 `?webgpu`, and an app installed from Chrome or Edge starts with it too). Designs are saved in the
 browser's private file storage, which needs HTTPS or localhost.
@@ -100,9 +100,9 @@ launch gets the latest published build (the browser downloads it once when it ch
 when the network doesn't answer within a few seconds, or when a new build can't be downloaded
 whole, the kept copy starts (and the download carries on for the next launch).
 
-Browsers that can install web apps add **Install app…** to the File menu: it installs SolidCraft
+Browsers that can install web apps add **Install app…** to the File menu: it installs Polykrom
 as an app with its own window and launcher icon, working offline like the page. In Chrome, Edge
-and other Chromium browsers it shows the browser's install prompt, and once SolidCraft is
+and other Chromium browsers it shows the browser's install prompt, and once Polykrom is
 installed the item is gone. Safari has no such prompt, so the item shows its steps instead:
 Share › Add to Home Screen on iPhone and iPad, File › Add to Dock on a Mac (Safari 17 or later).
 
@@ -306,12 +306,13 @@ and Z is up.
 
 ## Name and compatibility
 
-SolidCraft was renamed from an earlier working name. Since 0.5.0 everything uses the new
-name: the `solidcraft` and `solidcraft-cli` programs, `.solidcraft` designs, `SOLIDCRAFT_*`
+Polykrom is a fork of [SolidCraft](https://github.com/tangency-labs/solidcraft), which was
+itself renamed from an earlier working name (SolveCraft). Since SolidCraft 0.5.0 the internals
+use the SolidCraft name, and Polykrom keeps them for now: the `solidcraft` and `solidcraft-cli` programs, `.solidcraft` designs, `SOLIDCRAFT_*`
 environment variables, settings folders and the `solidcraft` MCP server. Upgrading keeps
 working: designs, settings, recovery files, environment variables and CLI/MCP setups from
 earlier builds carry over. Every compatibility shim is listed in the
-[compatibility notes](https://github.com/bherbruck/solidcraft/blob/main/docs/compatibility.md).
+[compatibility notes](https://github.com/wckdboy/polykrom/blob/main/docs/compatibility.md).
 
-Use the SolidCraft documentation and web-app URLs. GitHub redirects links to the renamed
+Use the Polykrom documentation and web-app URLs. GitHub redirects links to the renamed
 repository; old-name Pages and Flatpak URLs are not maintained as permanent aliases.

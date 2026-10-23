@@ -1,5 +1,5 @@
 //! The API backend (desktop only): a model behind an OpenAI-compatible chat completions endpoint
-//! (Ollama, LM Studio, OpenAI, any URL the user gives). SolidCraft runs the tool loop itself, with
+//! (Ollama, LM Studio, OpenAI, any URL the user gives). Polykrom runs the tool loop itself, with
 //! the same tools the ACP agents get: it starts the same MCP server (`solidcraft-cli mcp
 //! --connect` to the chat's own endpoint) and is its client, so every tool call passes the same
 //! gate, limits and folder checks. The key, when there is one, comes from the system keychain for
@@ -191,7 +191,7 @@ impl Worker {
 
     /// One MCP request to the server; its `result`.
     fn mcp_call(&mut self, method: &str, params: Value) -> Result<Value, String> {
-        let Some(m) = self.mcp.as_ref() else { return Err("no SolidCraft tools in this session".into()) };
+        let Some(m) = self.mcp.as_ref() else { return Err("no Polykrom tools in this session".into()) };
         self.next += 1;
         let id = self.next;
         m.send(&json!({"jsonrpc": "2.0", "id": id, "method": method, "params": params}));
@@ -214,9 +214,9 @@ impl Worker {
                     }
                     return Ok(v.get("result").cloned().unwrap_or(Value::Null));
                 }
-                Ok(FromAgent::Exited(_)) => return Err("the SolidCraft tools stopped".into()),
+                Ok(FromAgent::Exited(_)) => return Err("the Polykrom tools stopped".into()),
                 Err(std::sync::mpsc::RecvTimeoutError::Timeout) if std::time::Instant::now() < deadline => {}
-                Err(_) => return Err("the SolidCraft tools did not answer".into()),
+                Err(_) => return Err("the Polykrom tools did not answer".into()),
             }
         }
     }
@@ -578,7 +578,7 @@ mod tests {
     }
 
     /// A scripted endpoint: one answer with a tool call, then a plain answer. The loop runs the
-    /// tool (here without SolidCraft tools: an unknown tool fails) and reports the turn's end.
+    /// tool (here without Polykrom tools: an unknown tool fails) and reports the turn's end.
     #[test]
     fn the_tool_loop_runs_calls_and_ends_the_turn() {
         let answers = std::sync::Mutex::new(vec![

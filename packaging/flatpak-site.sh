@@ -87,20 +87,20 @@ for arch in x86_64 aarch64; do
   fi
   test "$(ostree --repo="$repo_dir" show --print-metadata-key=ostree.endoflife-rebase "$legacy_ref")" = "'app/$app_id/$arch/stable'"
 done
-flatpak build-update-repo --title="SolidCraft" --comment='Official SolidCraft releases' \
-  --description='Official Flatpak repository for SolidCraft' \
+flatpak build-update-repo --title="Polykrom" --comment='Official Polykrom releases' \
+  --description='Official Flatpak repository for Polykrom' \
   --homepage="https://github.com/$GITHUB_REPOSITORY" --default-branch=stable "$repo_dir"
 test -s "$repo_dir/summary"
 cat >"$site/flatpak/solidcraft.flatpakrepo" <<META
 [Flatpak Repo]
-Title=SolidCraft
-Comment=Official SolidCraft releases
-Description=Official Flatpak repository for SolidCraft
+Title=Polykrom
+Comment=Official Polykrom releases
+Description=Official Flatpak repository for Polykrom
 Url=$base_url/flatpak/repo/
 Homepage=https://github.com/$GITHUB_REPOSITORY
 META
 cat >"$site/flatpak/index.html" <<HTML
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>SolidCraft Flatpak repository</title></head><body><main><h1>SolidCraft Flatpak repository</h1><p>Latest published release: <strong>$tag</strong></p><p><a href="solidcraft.flatpakrepo">Add the SolidCraft repository</a></p><p>Flathub provides the required Freedesktop runtime. Add both remotes to the same user installation:</p><pre>flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Polykrom Flatpak repository</title></head><body><main><h1>Polykrom Flatpak repository</h1><p>Latest published release: <strong>$tag</strong></p><p><a href="solidcraft.flatpakrepo">Add the Polykrom repository</a></p><p>Flathub provides the required Freedesktop runtime. Add both remotes to the same user installation:</p><pre>flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
 flatpak remote-add --user --if-not-exists solidcraft $base_url/flatpak/solidcraft.flatpakrepo
 flatpak install --user solidcraft $published_id
 flatpak run $published_id</pre></main></body></html>

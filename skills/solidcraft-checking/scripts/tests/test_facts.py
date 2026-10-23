@@ -1,4 +1,4 @@
-"""SolidCraft behaviour that SKILL.md states, and the facts behind the corrections in
+"""Polykrom behaviour that SKILL.md states, and the facts behind the corrections in
 solidcraft-modeling. A failure here means the skill text is out of date."""
 
 import json

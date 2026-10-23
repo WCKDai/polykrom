@@ -138,7 +138,7 @@ encoded bodies shrink about fourfold (an imported assembly) to tenfold (modelled
 for a few tens of milliseconds.
 
 `cache/bodies.bin` holds every distinct body once, in
-[SolidCraft's native B-rep encoding](native-brep.md), as contiguous slices. The
+[Polykrom's native B-rep encoding](native-brep.md), as contiguous slices. The
 encoding is exact: a decoded body is the body that was saved, number for number
 (procedural intersection curves, placed revolutions and planes are stored as the
 kernel holds them, never refitted). Identical bodies share one slice (keyed by the

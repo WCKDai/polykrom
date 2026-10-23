@@ -1,4 +1,4 @@
-//! SolidCraft's GPU work: the viewport's render pipelines ([`view`]), pictures drawn with them
+//! Polykrom's GPU work: the viewport's render pipelines ([`view`]), pictures drawn with them
 //! offscreen ([`capture`]), and display tessellation plans evaluated in a compute shader.
 //!
 //! Plan evaluation: the surface point and normal at every vertex's parameters, in a compute

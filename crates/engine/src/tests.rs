@@ -880,7 +880,7 @@ fn registry_is_consistent() {
     assert!(!find_command("sketch.line").unwrap().info(&s).enabled);
 }
 
-/// Only SolidCraft's own dotted ids name commands; other ids are unknown commands.
+/// Only Polykrom's own dotted ids name commands; other ids are unknown commands.
 #[test]
 fn only_own_ids_name_commands() {
     for old in ["Extrude", "SketchCreate", "FusionFilletEdgesCommand"] {

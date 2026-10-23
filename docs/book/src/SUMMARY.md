@@ -15,8 +15,8 @@
 - [Import and export](guide/files.md)
 - [Keyboard shortcuts](guide/shortcuts.md)
 - [Updates and privacy](guide/updates.md)
-- [Troubleshooting: SolidCraft won't start](guide/troubleshooting.md)
-- [Driving SolidCraft with an AI agent (MCP)](guide/mcp.md)
+- [Troubleshooting: Polykrom won't start](guide/troubleshooting.md)
+- [Driving Polykrom with an AI agent (MCP)](guide/mcp.md)
 - [Agent chat](guide/agent-chat.md)
 
 # Developer guide

@@ -1,4 +1,4 @@
-# SolidCraft mechanism reference for agents
+# Polykrom mechanism reference for agents
 
 These are the shapes of the commands an assembly needs, so an agent rarely has to call `list_commands`. All of them run through the `execute` tool or a `batch`. The worked example below runs in CI (`mechanisms_skill_example_moves_as_documented` in `crates/mcp/src/tests.rs`).
 

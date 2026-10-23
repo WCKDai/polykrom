@@ -284,9 +284,9 @@ fn step_replies_include_originating_system() -> std::result::Result<(), Box<dyn 
     source.execute("solid.box", &json!({"length": 10, "width": 40, "height": 5}))?;
     source.execute("file.export", &json!({"path": path.to_string_lossy()}))?;
     let text = std::fs::read_to_string(&path)?;
-    assert!(text.contains("'SolidCraft','SolidCraft'"));
-    for system in ["SolidCraft", "Example CAD"] {
-        std::fs::write(&path, text.replace("'SolidCraft','SolidCraft'", &format!("'SolidCraft','{system}'")))?;
+    assert!(text.contains("'Polykrom','Polykrom'"));
+    for system in ["Polykrom", "Example CAD"] {
+        std::fs::write(&path, text.replace("'Polykrom','Polykrom'", &format!("'Polykrom','{system}'")))?;
         for command in ["file.insert_step", "doc.open"] {
             let reply = Session::default().execute(command, &json!({"path": path.to_string_lossy()}))?;
             assert_eq!(reply.get("system").and_then(Value::as_str), Some(system), "{command}: {reply}");
@@ -296,7 +296,7 @@ fn step_replies_include_originating_system() -> std::result::Result<(), Box<dyn 
     Ok(())
 }
 
-/// A header naming SolidWorks says the file has Y up; SolidCraft's own says Z; anything else
+/// A header naming SolidWorks says the file has Y up; Polykrom's own says Z; anything else
 /// says nothing (synthetic headers only).
 #[test]
 fn step_replies_name_a_y_up_exporter() -> std::result::Result<(), Box<dyn std::error::Error>> {
@@ -307,9 +307,11 @@ fn step_replies_name_a_y_up_exporter() -> std::result::Result<(), Box<dyn std::e
     source.execute("solid.box", &json!({"length": 10, "width": 40, "height": 5}))?;
     source.execute("file.export", &json!({"path": path.to_string_lossy()}))?;
     let text = std::fs::read_to_string(&path)?;
-    let header = "'SolidCraft','SolidCraft'";
+    let header = "'Polykrom','Polykrom'";
     assert!(text.contains(header));
     for (preprocessor, system, want) in [
+        ("Polykrom", "Polykrom", Some(("z", "Polykrom"))),
+        // Files SolidCraft wrote, before Polykrom, have Z up too.
         ("SolidCraft", "SolidCraft", Some(("z", "SolidCraft"))),
         ("SolidWorks 2021", "SolidWorks 2021", Some(("y", "SolidWorks"))),
         ("Example CAD", "SOLIDWORKS 2019", Some(("y", "SolidWorks"))),

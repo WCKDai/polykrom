@@ -1,6 +1,6 @@
 [package]
 name = "solidcraft-engine"
-description = "SolidCraft engine: the session, the command registry (everything is a command), undo/redo and selection"
+description = "Polykrom engine: the session, the command registry (everything is a command), undo/redo and selection"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

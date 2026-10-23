@@ -76,7 +76,7 @@ fn close(a: &Mat, b: &Mat) -> bool {
     a.iter().flatten().zip(b.iter().flatten()).all(|(x, y)| (x - y).abs() < 1e-9)
 }
 
-/// Every placement's link, composed at the design's current joint values, sits where SolidCraft
+/// Every placement's link, composed at the design's current joint values, sits where Polykrom
 /// places it.
 fn assert_fk(m: &UrdfModel, s: &Session, what: &str) {
     let vals = joints::joint_values(&s.doc.assembly);
@@ -89,7 +89,7 @@ fn assert_fk(m: &UrdfModel, s: &Session, what: &str) {
         }
         let Some((_, _, want)) = placements.iter().find(|p| p.1 == l.path) else { panic!("{what}: {} has no placement", l.name) };
         let got = mat_mul(f, &l.mesh_origin);
-        assert!(close(&got, want), "{what}: {} at {got:?}, SolidCraft has {want:?}", l.name);
+        assert!(close(&got, want), "{what}: {} at {got:?}, Polykrom has {want:?}", l.name);
         seen += 1;
     }
     assert_eq!(seen, placements.len() - 1, "{what}: a link per placement");
@@ -182,7 +182,7 @@ fn urdf_forward_kinematics_match_the_assembly() {
             let p = package(&s);
             let what = format!("{kind} (B grounded: {b_grounded})");
             assert_fk(&p.model, &s, &what);
-            // The same URDF follows SolidCraft to other values.
+            // The same URDF follows Polykrom to other values.
             run(&mut s, "joint.drive", json!({"joint": "J", "values": second}));
             assert_fk(&p.model, &s, &what);
             let moving = p.model.joints.iter().filter(|j| j.step != Step::Fixed).count();

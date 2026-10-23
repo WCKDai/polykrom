@@ -15,7 +15,7 @@ use crate::ui_kit;
 pub enum Offer {
     /// Its own install prompt (`InstallApp::prompt`).
     Prompt,
-    /// No prompt a page can show: SolidCraft shows these steps (Safari).
+    /// No prompt a page can show: Polykrom shows these steps (Safari).
     Steps(Steps),
 }
 

@@ -1,6 +1,6 @@
-# Contributing to SolidCraft
+# Contributing to Polykrom
 
-SolidCraft is an open-source parametric 3D CAD app written in pure Rust.
+Polykrom is an open-source parametric 3D CAD app written in pure Rust.
 You sketch on a plane, constrain the sketch, turn profiles into solids, and
 change a parameter to watch the timeline rebuild. It runs as a desktop app (Windows, Linux), in
 the browser (wasm + WebGPU/WebGL2), headless from a CLI, and as an MCP server that AI agents can
@@ -9,6 +9,11 @@ model with.
 Help is welcome, whether that's a one-line fix or owning a whole area. This page covers how to
 build it, how the code is laid out, the few rules that aren't negotiable, and where help is
 needed most.
+
+Polykrom is a fork of [SolidCraft](https://github.com/tangency-labs/solidcraft). The process
+below is SolidCraft's; for Polykrom, open issues and PRs on
+[wckdboy/polykrom](https://github.com/wckdboy/polykrom), and send fixes that also apply to
+SolidCraft upstream under its own rules.
 
 Before choosing a task, check the [command inventory](docs/features.md) and
 [roadmap](ROADMAP.md) for implemented capabilities and current priorities.
@@ -31,13 +36,13 @@ build you also need `rustup target add wasm32-unknown-unknown` and [`trunk`](htt
 ([documentation](https://trunk-rs.github.io/trunk/)).
 
 ```sh
-git clone https://github.com/tangency-labs/solidcraft && cd solidcraft
+git clone https://github.com/wckdboy/polykrom && cd polykrom
 cargo run --release -p solidcraft -- --sample      # desktop app with a sample part
 cargo xtask test                                   # unit, engine and UI-scenario tests
 cargo xtask ci                                     # everything a PR must pass (see below)
 ```
 
-SolidCraft is the product, repository, Cargo package and executable name.
+Polykrom is the product, repository, Cargo package and executable name.
 Build the desktop app with `cargo build --release -p solidcraft`, or the CLI with
 `cargo build --release -p solidcraft-cli`. Run the CLI with
 `cargo run --release -p solidcraft-cli -- commands` (or `target/release/solidcraft-cli commands`
@@ -103,13 +108,13 @@ The [architecture page](docs/architecture.md) has the layer table. The short ver
 
 ## Rules that aren't negotiable
 
-1. **Independent.** SolidCraft is independent. Behaviour is designed from public
+1. **Independent.** Polykrom is independent. Behaviour is designed from public
    documentation, general CAD conventions and user feedback. Reference tests use analytic values
    and open-source tools. We don't drive, script, automate or extract data from commercial CAD
    products, and we never copy another product's code, icons, artwork, help text, tooltips,
    templates or materials. Command ids are our own (`solid.fillet`).
 2. **No GPL/LGPL/AGPL code, not even reading it.** That rules out OpenCASCADE, FreeCAD
-   (including planegcs), SolveSpace, CadQuery/OCP, LibreCAD and QCAD. SolidCraft is
+   (including planegcs), SolveSpace, CadQuery/OCP, LibreCAD and QCAD. Polykrom is
    MIT OR Apache-2.0, and its solver and blends are written from the maths. (Running an
    open-source application to get reference values for a test is fine; reading its source is
    not.) Permissive
@@ -222,7 +227,7 @@ A pull request that makes an action pass should record it with `cargo xtask acti
 one that makes a passing action fail fails the sample every CI run checks.
 
 **The reference tests** live in [`tests/oracle/`](tests/oracle/), each a `recipe.json`
-in our own format with an `expected.json` beside it. SolidCraft rebuilds the recipe and compares
+in our own format with an `expected.json` beside it. Polykrom rebuilds the recipe and compares
 body count, volume, area, centre of mass and bounding box (and, where there is a `reference.stl`,
 the surface itself). Expected values are either worked out in closed form
 (`tools/oracle-analytic/`) or computed by building the same recipe in FreeCAD, run as a separate
@@ -230,7 +235,7 @@ program (`tools/freecad-oracle/`); each file says which. The generated
 [reference test report](docs/oracle.md) has the current case count and results. The reference-test
 CI job runs `cargo xtask oracle` during full validation; pull-request runs skip it. A case that
 fails because of a known bug names its issue in `expected.json` (`"known_failure": "#123"`);
-never change an expected value to match SolidCraft's output.
+never change an expected value to match Polykrom's output.
 
 ## Changing the design file format
 
@@ -335,7 +340,7 @@ Re-run only a job that runner trouble cancelled, with "Re-run failed jobs". Whil
 active, follow an open PR through its status changes; at handoff, clearly identify anything
 still awaiting merge.
 
-Much of SolidCraft so far was written by AI coding agents (Claude) working in parallel, each
+Much of Polykrom so far was written by AI coding agents (Claude) working in parallel, each
 owning one area, with a human setting direction and reporting bugs. Their working notes are in
 [AGENTS.md](AGENTS.md). Human contributors are just as welcome. Use whatever tools you like, as
 long as the change meets the rules above.
@@ -395,4 +400,4 @@ unchanged. The initial switch to sorted rows is a one-time larger diff.
 ## Licence
 
 By contributing you agree that your contribution is licensed as MIT OR Apache-2.0, like the rest
-of SolidCraft. SolidCraft isn't affiliated with any CAD vendor; product names are trademarks of their owners (see NOTICE).
+of Polykrom. Polykrom isn't affiliated with any CAD vendor; product names are trademarks of their owners (see NOTICE).

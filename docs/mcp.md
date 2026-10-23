@@ -1,6 +1,6 @@
-# SolidCraft and AI agents (MCP)
+# Polykrom and AI agents (MCP)
 
-SolidCraft speaks the [Model Context Protocol](https://modelcontextprotocol.io) over stdio
+Polykrom speaks the [Model Context Protocol](https://modelcontextprotocol.io) over stdio
 (JSON-RPC 2.0, one message per line; protocol revisions 2025-06-18, 2025-03-26 and 2024-11-05).
 An agent models exactly like a person does: every tool runs engine commands, the same ones the
 toolbar, palette, scripts and control channel use, and never opens a dialog.
@@ -37,7 +37,7 @@ variable: command-line arguments are visible to other users in the process list)
 A bridged server starts even when no app listens on that port yet, so an MCP client that
 launches it before the app (or after the app was closed) keeps its tools. The server's
 instructions then say the app was not running, and every tool call answers with an error that
-starts `no SolidCraft app is listening at HOST:PORT` and says how to start it
+starts `no Polykrom app is listening at HOST:PORT` and says how to start it
 (`solidcraft --control PORT`). The first call after the app starts connects to it, reading that
 launch's token. When the app quits or crashes mid-session, the next call says the same; a call
 that was running when it went away says the app did not answer and may have quit or crashed,
@@ -66,7 +66,7 @@ Tool calls read, write and delete files only inside the server's folders:
   hidden folder. Home itself, a folder above it (`/`, `/home`, `/Users`, a drive's root),
   hidden folders such as `~/.config` and folders elsewhere don't count. Hidden files and folders
   inside the design's folder (`.env`, `.git`) are out of reach too;
-- SolidCraft's own recovery folder, so `doc.recovery_list`, `doc.recover` and
+- Polykrom's own recovery folder, so `doc.recovery_list`, `doc.recover` and
   `doc.recovery_discard` work out of the box (discarding deletes only real recovery entries);
 - the server's own scratch folder (a new private `solidcraft-mcp-*` folder in the temporary
   folder), where `screenshot` without a `path` goes;
@@ -143,7 +143,7 @@ Claude Desktop (`claude_desktop_config.json`), bridged to a running app:
 [`skills/`](https://github.com/bherbruck/solidcraft/tree/main/skills) holds four [Agent Skills](https://agentskills.io) for agents that model through this server:
 - `solidcraft-modeling` covers building a new part.
 - `solidcraft-editing` covers changing an existing design.
-- `solidcraft-checking` adds checks for errors SolidCraft does not report, regression tests and porting, next to the other two.
+- `solidcraft-checking` adds checks for errors Polykrom does not report, regression tests and porting, next to the other two.
 - `solidcraft-mechanisms` covers assemblies: joints placed by world coordinates, motion links, closed loops such as actuators, contact sets and motion studies, checked against analytic values.
 
 They cover the workflow, the command shapes, how to verify with `measure`, and the known traps. With them an agent builds a part in a few `batch` calls and reads far less output. To install them for Claude Code, copy the folders into `~/.claude/skills/`; [skills/README.md](https://github.com/bherbruck/solidcraft/blob/main/skills/README.md) has the details.

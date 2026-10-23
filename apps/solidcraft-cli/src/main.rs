@@ -1,4 +1,4 @@
-//! SolidCraft headless command line.
+//! Polykrom headless command line.
 //!
 //! ```text
 //! solidcraft-cli run <script.json|design.solidcraft|part.step|mesh.3mf> [--in design|part.step|mesh.3mf] [--out FILE]... [--save FILE] [--quiet] [--results] [--timings] [--profile] [--json-out FILE] [--allow-errors]
@@ -15,10 +15,10 @@
 //! solidcraft-cli mcp [--in design|script] [--connect HOST:PORT [--token T]] [--allow-path DIR]... [--allow-any-path]
 //!                    [--param-check off|warn|strict]
 //!                                                             MCP server on stdio (docs/mcp.md)
-//! solidcraft-cli licences                                     SolidCraft's licence and the third-party licences
+//! solidcraft-cli licences                                     Polykrom's licence and the third-party licences
 //! solidcraft-cli icon --out F.png|F.ico [--size N]             the app icon (packaging; drawn, not a file)
 //!
-//! --debug (with any command)                                  SolidCraft's debug log on stderr (or RUST_LOG=LEVEL)
+//! --debug (with any command)                                  Polykrom's debug log on stderr (or RUST_LOG=LEVEL)
 //! ```
 #![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::unimplemented, clippy::todo, clippy::unreachable)]
 #![forbid(unsafe_code)]
@@ -85,7 +85,7 @@ const USAGE: &str = "usage:
        lands on: gpu, gpu-software, or the CPU rasterizer (auto with no adapter, or cpu); the policy defaults
        to SOLIDCRAFT_GPU, else auto; exits with an error when hardware or software finds no such adapter)
   solidcraft-cli icon --out icon.png [--size 256] | --out icon.ico
-  --debug, with any command: what SolidCraft logs (why a body has no display plan, why a save left its
+  --debug, with any command: what Polykrom logs (why a body has no display plan, why a save left its
       model cache out), on stderr; RUST_LOG=error|warn|info|debug|trace sets one level for every crate
 ";
 
@@ -491,7 +491,7 @@ fn cmd_snapshot(args: &[String]) -> Result<(), String> {
     Ok(())
 }
 
-/// The app icon: the SolidCraft logo, drawn in code on a transparent background
+/// The app icon: the Polykrom logo, drawn in code on a transparent background
 /// (so packages need no committed image). `.ico` holds the Windows sizes as PNGs.
 fn cmd_icon(args: &[String]) -> Result<(), String> {
     let out = flag(args, "--out").ok_or("icon needs --out FILE.png or FILE.ico")?;
@@ -586,7 +586,7 @@ fn cmd_mcp(args: &[String]) -> Result<(), String> {
             let mut remote = solidcraft_mcp::Remote::new(addr, flag(args, "--token"));
             if let Err(e) = remote.try_connect() {
                 eprintln!(
-                    "solidcraft mcp: no SolidCraft app at {addr} yet ({e}); start it with `solidcraft --control {port}` \
+                    "solidcraft mcp: no Polykrom app at {addr} yet ({e}); start it with `solidcraft --control {port}` \
                      (or SOLIDCRAFT_CONTROL_PORT={port}), tool calls connect once it runs"
                 );
             }

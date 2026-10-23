@@ -5,14 +5,14 @@
   <id>ai.storyteller.solidcraft</id>
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>MIT OR Apache-2.0</project_license>
-  <name>SolidCraft</name>
+  <name>Polykrom</name>
   <summary>Independent parametric 3D CAD</summary>
   <developer id="io.github.bherbruck">
-    <name>SolidCraft contributors</name>
+    <name>Polykrom contributors</name>
   </developer>
   <description>
     <p>
-      SolidCraft is an open-source parametric 3D CAD application written in Rust. Sketch on a
+      Polykrom is an open-source parametric 3D CAD application written in Rust. Sketch on a
       plane, constrain and dimension the sketch, turn profiles into solids on a feature
       timeline, and change a parameter to watch the timeline rebuild.
     </p>

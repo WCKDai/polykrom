@@ -385,7 +385,7 @@ fn permission_modes_decide_what_asks() {
     let _ = std::fs::remove_dir_all(&dir);
 }
 
-/// The agent's own questions: SolidCraft's tools are allowed (its gate checks them), an earlier
+/// The agent's own questions: Polykrom's tools are allowed (its gate checks them), an earlier
 /// "Always allow" answers by itself, and both leave a note; anything else is asked.
 #[test]
 fn the_agents_own_questions_are_answered_by_the_mode_or_asked() {

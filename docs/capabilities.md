@@ -5,7 +5,7 @@ The full feature summary, moved out of the README. The commands by area are in [
 **Status: early but usable for simple parts.** 75 of 76 public reference parts
 match their analytic or FreeCAD-computed volume, area, centre of mass and bounding box
 ([oracle.md](oracle.md)); the other is a tracked bug.
-These checks do not establish complete geometric or workflow equivalence. The commands SolidCraft has
+These checks do not establish complete geometric or workflow equivalence. The commands Polykrom has
 are listed by area in [features.md](features.md); status and plans are in [ROADMAP.md](../ROADMAP.md).
 Open work and known bugs are in [GitHub issues](https://github.com/tangency-labs/solidcraft/issues),
 and help is welcome: see [CONTRIBUTING.md](../CONTRIBUTING.md).

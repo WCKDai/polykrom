@@ -1,6 +1,6 @@
-# SolidCraft roadmap
+# Polykrom roadmap
 
-Status as of **2026-10-14**. SolidCraft supports parametric modelling (sketch →
+Status as of **2026-10-14**. Polykrom supports parametric modelling (sketch →
 features → parametric timeline) as an open, pure-Rust, agent-drivable application.
 
 ## At a glance
@@ -263,8 +263,8 @@ completed drawings publish atomically. The browser still exports synchronously.
   anywhere. See [crash reports](docs/crash-reports.md).
 - Agent chat (off by default, desktop): a side panel that drives a coding agent the user
   already has (Claude Code through its ACP adapter, Codex, Gemini CLI, OpenCode, Grok Build, …) over the
-  Agent Client Protocol, under the user's own login; SolidCraft stores no keys. The agent works
-  through SolidCraft's MCP tools on a gated endpoint of its own: file actions wait for Allow or
+  Agent Client Protocol, under the user's own login; Polykrom stores no keys. The agent works
+  through Polykrom's MCP tools on a gated endpoint of its own: file actions wait for Allow or
   Deny, crash reports are off limits, 24 changes per message, one undo step per message, and
   the agent's whole process group ends with the panel or the app. Docks left or right,
   minimises to a strip. Grok Build discovery includes `~/.grok/bin` and reuses the user's

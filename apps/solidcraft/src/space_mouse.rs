@@ -59,7 +59,7 @@ const REPORT_BUFFER_BYTES: usize = 4096 + 1;
 
 /// The mapping used when no 3DxWare profile is found: what the driver applies by default in
 /// object mode. On Linux there is no 3DxWare (#1172); on Windows 3DxWare has no profile for
-/// SolidCraft until one is made, and the raw axes swap roll and spin (#1380).
+/// Polykrom until one is made, and the raw axes swap roll and spin (#1380).
 fn without_profile() -> DriverMapping {
     DriverMapping::object_mode()
 }
@@ -564,14 +564,14 @@ fn reader(ctx: Context, shared: Arc<Mutex<Reading>>, drivers: Arc<Drivers>) {
     }
 }
 
-/// macOS: the 3Dconnexion driver gives the device to its own clients only, so SolidCraft registers
+/// macOS: the 3Dconnexion driver gives the device to its own clients only, so Polykrom registers
 /// as one. Without the driver (or with its helper not running) the HID reader above takes over.
 #[cfg(target_os = "macos")]
 fn start_driver_client(ctx: &Context, shared: &Arc<Mutex<Reading>>) {
     use solidcraft_3dx_client::Event;
     let (ctx, shared) = (ctx.clone(), Arc::clone(shared));
     let started = solidcraft_3dx_client::start(
-        "SolidCraft",
+        "Polykrom",
         move |event| match event {
             Event::DeviceAdded => {
                 DRIVER_CONNECTED.store(true, Ordering::Relaxed);

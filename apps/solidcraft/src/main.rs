@@ -1,4 +1,4 @@
-//! SolidCraft desktop app.
+//! Polykrom desktop app.
 //!
 //! Usage: `solidcraft [--control <port>] [--sample] [--crash-log] [--safe-mode] [design.solidcraft | part.step]`
 //!
@@ -190,7 +190,7 @@ impl App {
         let Some(gpu) = self.gpu.as_mut().filter(|g| g.lost_at.is_none() && g.lost.is_lost()) else { return };
         let reason = gpu.lost.reason().unwrap_or_default();
         log::error!("graphics: the device was lost ({reason}); closing to start again");
-        eprintln!("SolidCraft graphics: the device was lost ({reason}); starting again");
+        eprintln!("Polykrom graphics: the device was lost ({reason}); starting again");
         solidcraft_engine::crash::phase(&format!("graphics device lost: {reason}"));
         gpu.lost_at = Some(device_lost::now_secs());
         self.solve.quit_requested = true;
@@ -242,7 +242,7 @@ fn services(cc: &eframe::CreationContext<'_>) -> Services {
                         "GLTF",
                     ],
                 )
-                .add_filter("SolidCraft design (container or JSON)", &[io::DESIGN_EXT, io::LEGACY_DESIGN_EXT, "json"])
+                .add_filter("Polykrom design (container or JSON)", &[io::DESIGN_EXT, io::LEGACY_DESIGN_EXT, "json"])
                 .add_filter("STEP", &["step", "stp", "STEP", "STP"])
                 .add_filter("IGES", &["igs", "iges", "IGS", "IGES"])
                 .add_filter("FreeCAD and Rhino", &["FCStd", "fcstd", "3dm", "3DM"])
@@ -278,9 +278,9 @@ fn services(cc: &eframe::CreationContext<'_>) -> Services {
             let dialog = parent.clone().set_file_name(name);
             let dialog = if exts == [io::DESIGN_EXT, "json"] {
                 if name.ends_with(".json") {
-                    dialog.add_filter("Plain JSON design", &["json"]).add_filter("SolidCraft container", &[io::DESIGN_EXT])
+                    dialog.add_filter("Plain JSON design", &["json"]).add_filter("Polykrom container", &[io::DESIGN_EXT])
                 } else {
-                    dialog.add_filter("SolidCraft container", &[io::DESIGN_EXT]).add_filter("Plain JSON design", &["json"])
+                    dialog.add_filter("Polykrom container", &[io::DESIGN_EXT]).add_filter("Plain JSON design", &["json"])
                 }
             } else {
                 dialog.add_filter("File", exts)
@@ -369,7 +369,7 @@ fn agent_http(r: &solidcraft_ui_egui::agent_chat::backend::HttpRequest) -> Resul
         .http_status_as_error(false)
         .timeout_global(Some(Duration::from_secs(r.timeout_s.clamp(1, 900))))
         .timeout_connect(Some(Duration::from_secs(10)))
-        .user_agent("SolidCraft")
+        .user_agent("Polykrom")
         .max_redirects(0)
         .build()
         .into();
@@ -392,7 +392,7 @@ fn agent_http(r: &solidcraft_ui_egui::agent_chat::backend::HttpRequest) -> Resul
     Ok((status, body))
 }
 
-/// API keys in the system keychain (service "SolidCraft agent chat", one entry per agent).
+/// API keys in the system keychain (service "SolidCraft agent chat", one entry per agent; the name stays until the settings migration).
 struct Keychain;
 
 impl Keychain {
@@ -434,7 +434,7 @@ fn http_call(url: &str, timeout: std::time::Duration) -> Result<ureq::http::Resp
         .http_status_as_error(false)
         .timeout_global(Some(timeout))
         .timeout_connect(Some(Duration::from_secs(5)))
-        .user_agent("SolidCraft-update-check")
+        .user_agent("Polykrom-update-check")
         .max_redirects(3)
         .build()
         .into();
@@ -544,7 +544,7 @@ fn app_viewport() -> Result<egui::ViewportBuilder, eframe::Error> {
     let icon =
         egui::IconData { rgba: app_icon::rgba(64).map_err(|e| eframe::Error::AppCreation(std::io::Error::other(e).into()))?, width: 64, height: 64 };
     Ok(egui::ViewportBuilder::default()
-        .with_title("SolidCraft")
+        .with_title("Polykrom")
         .with_icon(icon)
         .with_inner_size([1600.0, 1000.0])
         .with_min_inner_size([960.0, 600.0])
@@ -678,6 +678,7 @@ fn main() -> eframe::Result {
     let starting = settings.clone();
     mark("run_native");
     let result = eframe::run_native(
+        // The settings folder keeps the SolidCraft name until it moves with a migration.
         "SolidCraft",
         options,
         Box::new(move |cc| {
@@ -696,7 +697,7 @@ fn main() -> eframe::Result {
             {
                 app.native_resize_border = CUSTOM_TITLEBAR && native_frame::install(cc);
                 if CUSTOM_TITLEBAR && !app.native_resize_border {
-                    eprintln!("SolidCraft window: no native resize border; egui edge zones instead");
+                    eprintln!("Polykrom window: no native resize border; egui edge zones instead");
                 }
             }
             app.integrated_titlebar = cfg!(target_os = "macos");
@@ -711,7 +712,7 @@ fn main() -> eframe::Result {
                 lost_at: None,
             });
             if let Some(rs) = &cc.wgpu_render_state {
-                eprintln!("SolidCraft graphics: {:?}, MSAA {}x (requested {}x)", rs.adapter.get_info().backend, rs.msaa_samples, samples);
+                eprintln!("Polykrom graphics: {:?}, MSAA {}x (requested {}x)", rs.adapter.get_info().backend, rs.msaa_samples, samples);
                 solidcraft_engine::crash::phase("viewport pipelines (shader compile)");
                 app.set_wgpu(rs, depth_bits, STENCIL_BITS, rs.msaa_samples);
                 solidcraft_ui_egui::gpu::install_picture_renderer(rs);
@@ -817,7 +818,7 @@ fn wgpu_options(cpu: bool, preference: Option<&str>) -> eframe::egui_wgpu::WgpuC
     if let eframe::egui_wgpu::WgpuSetup::CreateNew(setup) = &mut options.wgpu_setup {
         let env_set = std::env::var(startup::WGPU_BACKEND_ENV).is_ok_and(|v| !v.trim().is_empty());
         if let Some(backends) = startup::choose_backends(cfg!(target_os = "windows"), env_set, cpu, preference, startup::has_hardware_adapter) {
-            eprintln!("SolidCraft graphics: starting {backends:?}");
+            eprintln!("Polykrom graphics: starting {backends:?}");
             setup.instance_descriptor.backends = backends;
         }
         if cpu {
@@ -838,9 +839,9 @@ fn wgpu_options(cpu: bool, preference: Option<&str>) -> eframe::egui_wgpu::WgpuC
 /// the software renderer, else a message box saying what failed instead of a silent exit.
 fn no_window(error: eframe::Error, tried_cpu: bool, settings: Option<&std::path::Path>) -> eframe::Result {
     log::error!("the window could not open: {error}");
-    eprintln!("SolidCraft: the window could not open: {error}");
+    eprintln!("Polykrom: the window could not open: {error}");
     if !tried_cpu && let Ok(exe) = std::env::current_exe() {
-        eprintln!("SolidCraft: trying again with the software renderer ({}=cpu)", startup::RENDERER_ENV);
+        eprintln!("Polykrom: trying again with the software renderer ({}=cpu)", startup::RENDERER_ENV);
         match std::process::Command::new(exe).args(std::env::args_os().skip(1)).env(startup::RENDERER_ENV, "cpu").status() {
             Ok(status) if status.success() => return Ok(()),
             // The second try showed its own message.
@@ -850,7 +851,7 @@ fn no_window(error: eframe::Error, tried_cpu: bool, settings: Option<&std::path:
     }
     let _ = rfd::MessageDialog::new()
         .set_level(rfd::MessageLevel::Error)
-        .set_title("SolidCraft could not start")
+        .set_title("Polykrom could not start")
         .set_description(startup::no_window_message(&error.to_string(), settings))
         .set_buttons(rfd::MessageButtons::Ok)
         .show();

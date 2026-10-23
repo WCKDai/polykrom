@@ -1,7 +1,7 @@
 [book]
-title = "SolidCraft"
+title = "Polykrom"
 description = "An open-source parametric 3D CAD application in pure Rust: user guide and developer guide."
-authors = ["SolidCraft contributors"]
+authors = ["Polykrom contributors"]
 language = "en"
 src = "src"
 

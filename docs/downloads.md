@@ -1,13 +1,15 @@
 # Downloads
 
-Every platform and package. The links point at the latest release.
+Every platform and package. The links point at the latest release. Polykrom has not published a
+release yet: until it does, build from source ([building](building.md)).
 
 - **Windows:** download and run the [installer][windows-msi].
   Also for [ARM64][windows-arm64-msi] and [32-bit][windows-x86-msi] PCs, or as a
   [portable zip][windows-portable] that runs without installing.
   With [WinGet](https://learn.microsoft.com/windows/package-manager/winget/):
-  `winget install bherbruck.SolidCraft`.
-- **macOS:** open the [disk image][macos-dmg] and drag SolidCraft into Applications
+  `winget install wckdboy.Polykrom`.
+- **macOS:** open the [disk image][macos-dmg] and drag the app (still named SolidCraft.app
+  until the second rename stage) into Applications
   (Apple silicon and Intel).
 - **Linux:** download the [AppImage][linux-appimage], allow it to run as a program and open it.
   Or install the [.deb][linux-deb] (Ubuntu, Debian, Mint) or [.rpm][linux-rpm] (Fedora,
@@ -18,11 +20,11 @@ Every platform and package. The links point at the latest release.
 
 
 The downloads aren't signed yet. On Windows, if SmartScreen warns you, choose **More info**, then
-**Run anyway**. On macOS, the first time, right-click SolidCraft in Applications and choose **Open**.
+**Run anyway**. On macOS, the first time, right-click Polykrom in Applications and choose **Open**.
 
-**On SolidCraft 0.11 to 0.14?** Its **Update now** can't install 0.15.0 or later, because the
+**On Polykrom 0.11 to 0.14?** Its **Update now** can't install 0.15.0 or later, because the
 releases moved to a new address. Download the new version once from the links above; after that,
-updating from inside SolidCraft works again ([details](https://docs.solidcraft.io/guide/updates.html#updating-from-011-to-014)).
+updating from inside Polykrom works again ([details](https://docs.solidcraft.io/guide/updates.html#updating-from-011-to-014)).
 
 Older versions, checksums and other formats are on the [releases page](https://github.com/tangency-labs/solidcraft/releases).
 Install details, upgrading from earlier builds and building from source are in

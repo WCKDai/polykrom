@@ -1,9 +1,9 @@
 //! Agent chat: a side panel that talks to a coding agent the user already has (Claude Code,
 //! Codex, Antigravity, OpenCode, …) over the Agent Client Protocol, and gives that agent
-//! SolidCraft's MCP server, bridged to this window, as its way to read and change the open design
+//! Polykrom's MCP server, bridged to this window, as its way to read and change the open design
 //! (docs/agent-chat.md, docs/design/in-app-agent-chat.md).
 //!
-//! Desktop only: the agent is a child process. Off unless turned on in Preferences. SolidCraft
+//! Desktop only: the agent is a child process. Off unless turned on in Preferences. Polykrom
 //! never handles the agent's credentials: an agent that needs a login says so, and the panel
 //! shows the agent's own login command for the user to run.
 //!
@@ -217,7 +217,7 @@ pub enum Item {
         options: Vec<PermissionOption>,
         answer: Option<String>,
     },
-    /// A request of the agent's that SolidCraft holds for the user (files, replacing the design,
+    /// A request of the agent's that Polykrom holds for the user (files, replacing the design,
     /// or any change while the mode is "ask"); `tool`: what "Always allow" remembers.
     Approval {
         id: u64,
@@ -702,7 +702,7 @@ pub(crate) fn assistant_tip(mark: AssistantMark) -> String {
     format!("{} (Ctrl+Shift+A) — {state}", tr("ui.assistant"))
 }
 
-/// Whether a permission question is about one of SolidCraft's own tools (which SolidCraft's own
+/// Whether a permission question is about one of Polykrom's own tools (which Polykrom's own
 /// gate checks): the agents name MCP tools after their server.
 fn solidcraft_tool(title: &str) -> bool {
     title.to_ascii_lowercase().contains("solidcraft")
@@ -722,7 +722,7 @@ fn find_cli() -> Option<std::path::PathBuf> {
         .or_else(|| discover::find_in("solidcraft-cli", &discover::search_dirs()))
 }
 
-/// The agent's working folder: an empty folder of SolidCraft's own, so an agent's own file tools
+/// The agent's working folder: an empty folder of Polykrom's own, so an agent's own file tools
 /// (where it has them) see nothing of the user's.
 fn working_dir() -> std::path::PathBuf {
     let d = solidcraft_engine::recovery::data_dir()
@@ -1210,8 +1210,8 @@ pub fn answer_permission(app: &mut SolveApp, index: usize, option: Option<&str>)
     app.agent_chat.answer(index, option);
 }
 
-/// The agent asks before running something of its own. SolidCraft's own tools are checked by
-/// SolidCraft's gate, so they're allowed here (no double question); otherwise the mode or an
+/// The agent asks before running something of its own. Polykrom's own tools are checked by
+/// Polykrom's gate, so they're allowed here (no double question); otherwise the mode or an
 /// earlier "always allow" may answer, and the chat says so; otherwise the user is asked.
 fn on_permission(app: &mut SolveApp, key: u64, title: String, options: Vec<PermissionOption>) {
     let agent = app.agent_chat.running_id.clone();

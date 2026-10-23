@@ -197,7 +197,7 @@ def probe(gl_saved_four=False):
     statistics = frame_statistics(base64.b64decode(lines[4], validate=True))
     if (capture["result"]["width"], capture["result"]["height"]) != (statistics["width"], statistics["height"]):
         raise ValueError("presented-frame dimensions disagree")
-    if gl_saved_four and "SolidCraft graphics: Gl, MSAA 1x (requested 4x)" not in result.stderr:
+    if gl_saved_four and "Polykrom graphics: Gl, MSAA 1x (requested 4x)" not in result.stderr:
         raise ValueError("forced GL did not apply the safe sample count")
     mode = "GL saved 4x" if gl_saved_four else "default backend"
     print(f"Flatpak desktop PASS: {mode}, renderer={renderer}, box=6000 mm³, frame={statistics}")

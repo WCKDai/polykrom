@@ -268,7 +268,7 @@ pub fn export(name: &str, base: Base, t: &Tokens) -> Value {
     json!({"format": FORMAT, "name": name, "base": base, "colors": colors})
 }
 
-/// The theme files that come with SolidCraft (original files; Gruvbox, Tokyo Night, Solarized, Nord, Nosferatu and Catppuccin map open-source palettes, MIT).
+/// The theme files that come with Polykrom (original files; Gruvbox, Tokyo Night, Solarized, Nord, Nosferatu and Catppuccin map open-source palettes, MIT).
 const BUILTIN: [(&str, &str); 20] = [
     ("gruvbox-dark", include_str!("../../../assets/styles/ui/themes/gruvbox-dark.json")),
     ("gruvbox-dark-hard", include_str!("../../../assets/styles/ui/themes/gruvbox-dark-hard.json")),

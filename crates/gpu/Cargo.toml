@@ -1,6 +1,6 @@
 [package]
 name = "solidcraft-gpu"
-description = "SolidCraft GPU rendering: the viewport's render pipelines, offscreen captures, and display tessellation plans evaluated in a compute shader"
+description = "Polykrom GPU rendering: the viewport's render pipelines, offscreen captures, and display tessellation plans evaluated in a compute shader"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

@@ -104,13 +104,16 @@ fn read_step(path: &str, names: solidcraft_io::StepNames) -> Result<solidcraft_i
 }
 
 /// Which way is up in a STEP or IGES file, from the program its header names: `("y", name)` for
-/// an exporter whose files have Y up, `("z", name)` for SolidCraft's own (its STEP and IGES exports both name it), else `None`. Only
+/// an exporter whose files have Y up, `("z", name)` for Polykrom's own and SolidCraft's, which
+/// Polykrom comes from (their STEP and IGES exports name them), else `None`. Only
 /// SolidWorks is listed as Y up: its STEP and IGES writers are well known to keep that program's
 /// Y-up front view, and its name is in FILE_NAME (originating system, preprocessor version) and
 /// often FILE_DESCRIPTION. Programs we aren't sure of stay unknown, so the file is only offered.
 fn exporter_up(import: &solidcraft_kernel::StepImport) -> Option<(&'static str, &'static str)> {
-    if import.system.trim().starts_with("SolidCraft") {
-        return Some(("z", "SolidCraft"));
+    for own in ["Polykrom", "SolidCraft"] {
+        if import.system.trim().starts_with(own) {
+            return Some(("z", own));
+        }
     }
     let named = [&import.system, &import.preprocessor, &import.description].iter().any(|h| h.to_ascii_lowercase().contains("solidworks"));
     named.then_some(("y", "SolidWorks"))
