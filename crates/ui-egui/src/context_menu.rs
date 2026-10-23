@@ -724,6 +724,13 @@ fn occurrence_items(app: &SolveApp, path: &[u64]) -> Vec<Item> {
                 item.enabled = !placement.grounded && app.session.held_by_rigid_group(placement.occurrence).is_none();
             }
             "ui.properties" => item.params = Some(json!({"occurrence": placement.occurrence, "path": path})),
+            "ui.turnUpAxis" => {
+                for child in &mut item.children {
+                    if let Some(params) = child.params.as_mut() {
+                        params["occurrence"] = json!(placement.occurrence);
+                    }
+                }
+            }
             "occurrence.copy" => item.params = Some(json!({"occurrence": placement.occurrence, "translate": [10,10,0]})),
             "component.create" => item.params = Some(json!({"parent": placement.component, "parent_path": path})),
             "component.paste_new" => {
@@ -750,6 +757,19 @@ fn occurrence_items(app: &SolveApp, path: &[u64]) -> Vec<Item> {
     entries
 }
 
+/// "Turn Up Axis": a quarter turn about X of a component's occurrence for a file saved with the
+/// other axis up, one `occurrence.move` (one undo step).
+fn turn_up_axis(occurrence: u64, enabled: bool) -> Item {
+    let mut item = act("ui.turnUpAxis", "Turn Up Axis", "move").on(enabled);
+    item.children = [("Y up \u{2192} Z up", "90 deg"), ("Z up \u{2192} Y up", "-90 deg")]
+        .into_iter()
+        .map(|(label, angle)| {
+            act("occurrence.move", label, "move").with(json!({"occurrence": occurrence, "axis": [1, 0, 0], "angle": angle})).on(enabled)
+        })
+        .collect();
+    item
+}
+
 fn component_items(app: &SolveApp, id: u64) -> Vec<Item> {
     let doc = &app.session.doc;
     let occ = doc.occurrence_of(id);
@@ -772,6 +792,7 @@ fn component_items(app: &SolveApp, id: u64) -> Vec<Item> {
                 .with(json!({ "occurrence": oid }))
                 .on(!grounded && occ.is_some() && app.session.held_by_rigid_group(oid).is_none()),
         );
+        v.push(turn_up_axis(oid, !grounded && occ.is_some() && app.session.held_by_rigid_group(oid).is_none()));
         v.push(cmd(app, "component.capture_position", "Capture Position").on(!app.session.pending_moves.is_empty()));
         v.push(cmd(app, "component.revert_position", "Revert Position").on(!app.session.pending_moves.is_empty()));
         // An imported assembly moves as one until its rigid group is released.

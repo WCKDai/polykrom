@@ -452,6 +452,8 @@ pub struct SolveApp {
     pub stand_up: Option<Vec<String>>,
     /// The placement of the component that file came in as: the offer turns it.
     pub stand_up_occurrence: Option<u64>,
+    /// The file's header names an exporter that saves Y up (SolidWorks): the offer says so.
+    pub stand_up_reason: bool,
     /// The anti-aliasing sample counts the graphics device supports (empty without a GPU).
     pub msaa_supported: Vec<u32>,
     /// Settings put back at start because they kept SolidCraft from starting, one line each,
@@ -585,6 +587,7 @@ impl SolveApp {
             recoverable: Vec::new(),
             stand_up: None,
             stand_up_occurrence: None,
+            stand_up_reason: false,
             msaa_supported: Vec::new(),
             settings_reset: Vec::new(),
             big_operation: false,
