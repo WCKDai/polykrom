@@ -36,7 +36,8 @@ pub const INTERFERENCE_DOC: &str = "study: id|name; occurrences?: [ids or names]
      pairs (checked), samples (taken), truncated (the work budget ran out; checked_to: the last step checked), stopped_at, \
      stopped_by_loop; static_overlaps: [{a, b, depth_mm}] (pairs that overlap at the first sample and keep their placement \
      to each other all through it, such as a pin pressed into its block or a thread in its tapped hole: no motion of the study \
-     changes them, so they are not collisions and do not make it unclear; inspect.clearance measures them), pairs_moving_together \
+     changes them, so they are not collisions and do not make it unclear; inspect.clearance measures them; only when every sample \
+     was checked: a check that stopped early keeps them in collisions), pairs_moving_together \
      (pairs that keep their placement to each other: each is tested once). The study plays as motion.play plays it but contact sets do not stop it, on a copy (the design is not \
      changed). Parts are tested at the samples only: one that passes wholly through another between two samples is missed";
 
@@ -421,10 +422,12 @@ pub(super) fn interference(s: &mut Session, p: &Value) -> Result<Value> {
     if truncated && checked == 0 {
         return Err(bad(cmd, "the check ran out of its work budget before its first step: check fewer parts (occurrences, against)"));
     }
-    // Pairs that overlap at the first sample and keep their placement to each other through the
-    // samples checked: no motion of the study changes them, so they are not its collisions.
+    // Pairs that overlap at the first sample and keep their placement to each other through every
+    // sample: no motion of the study changes them, so they are not its collisions. A check that
+    // stopped early has not seen the rest of the motion, so its overlaps all stay collisions.
     let together = geometry.member_pairs().difference(&moved).count();
-    let fixed: Vec<(u64, u64)> = found.keys().filter(|k| !moved.contains(k)).copied().collect();
+    let whole = !truncated && checked == n;
+    let fixed: Vec<(u64, u64)> = if whole { found.keys().filter(|k| !moved.contains(k)).copied().collect() } else { Vec::new() };
     let static_overlaps: Vec<Value> =
         fixed.iter().filter_map(|k| found.remove(k)).map(|c| json!({"a": c.names.0, "b": c.names.1, "depth_mm": c.depth})).collect();
     let mut list: Vec<(&(u64, u64), &Collision)> = found.iter().collect();
