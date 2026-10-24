@@ -299,14 +299,22 @@ impl Harness {
         if tx.send(req).is_err() {
             return (json!({"ok": false, "error": "the request queue is closed"}), 0);
         }
-        for n in 1..=3000 {
+        // A file load answers from a background thread, which a busy machine can hold up far
+        // longer than a fixed count of headless frames: wait on the clock, as `settle` does.
+        let began = std::time::Instant::now();
+        let mut n = 0;
+        while began.elapsed() < std::time::Duration::from_secs(120) {
             self.frame();
+            n += 1;
             if let Ok(v) = rx.try_recv() {
                 self.settle();
                 return (v, n);
             }
+            if !self.app.file_load.idle() {
+                std::thread::sleep(std::time::Duration::from_millis(1));
+            }
         }
-        (json!({"ok": false, "error": "no answer in 3000 frames"}), 3000)
+        (json!({"ok": false, "error": format!("no answer in {n} frames")}), n)
     }
 
     pub fn call(&mut self, method: &str, params: Value) -> Value {
