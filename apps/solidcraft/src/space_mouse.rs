@@ -1748,6 +1748,10 @@ mod tests {
         use std::path::{Path, PathBuf};
 
         pub const IDS: (u16, u16) = (0x046d, 0xc62b);
+        /// How long a test waits for the reader thread to do what it should. Passing tests finish
+        /// as soon as it has, so a long wait costs nothing there and keeps a busy CI runner, which
+        /// can hold the thread up for seconds, from failing them (#82).
+        pub const WAIT: Duration = Duration::from_secs(20);
 
         #[derive(Default)]
         pub struct World {
@@ -1858,9 +1862,9 @@ mod tests {
                 self.shared.lock().unwrap().device.map(Source::key)
             }
 
-            /// Waits (up to three seconds) until the device being read has this key.
+            /// Waits (up to [`WAIT`]) until the device being read has this key.
             pub fn reads(&self, key: &str) {
-                let until = Instant::now() + Duration::from_secs(3);
+                let until = Instant::now() + WAIT;
                 while self.key().as_deref() != Some(key) {
                     assert!(Instant::now() < until, "still reading {:?}, not {key}", self.key());
                     // Only while the daemon is what is wanted: a daemon that streams without a pause is not
@@ -1946,7 +1950,7 @@ mod tests {
         let reader = Running::start(SpaceMouseDriver::Automatic, fake.clone());
         reader.reads("spacenavd");
         // Wait for a probe by the read (the second open), which refreshes the failure.
-        let until = Instant::now() + Duration::from_secs(3);
+        let until = Instant::now() + machine::WAIT;
         while fake.world().opens < 2 {
             assert!(Instant::now() < until, "the read never tried the device again");
             std::thread::sleep(Duration::from_millis(2));
@@ -1973,7 +1977,7 @@ mod tests {
         *fake.world() = machine::World { device: true, daemon: true, openable: false, ..Default::default() };
         let reader = Running::start(SpaceMouseDriver::Automatic, fake.clone());
         reader.reads("spacenavd");
-        let until = Instant::now() + Duration::from_secs(3);
+        let until = Instant::now() + machine::WAIT;
         // Records keep coming every 2 ms until the read has probed the device a second time.
         while fake.world().opens < 2 {
             assert!(Instant::now() < until, "the busy read never tried the device again");
@@ -2001,7 +2005,7 @@ mod tests {
         let fake = Fake::default();
         *fake.world() = machine::World { device: true, daemon: false, openable: false, ..Default::default() };
         let reader = Running::start(SpaceMouseDriver::Automatic, fake.clone());
-        let until = Instant::now() + Duration::from_secs(3);
+        let until = Instant::now() + machine::WAIT;
         while fake.world().opens < 1 {
             assert!(Instant::now() < until);
             std::thread::sleep(Duration::from_millis(2));
@@ -2050,7 +2054,7 @@ mod tests {
         };
         // Button 1 goes down on the daemon and stays down.
         fake.daemon_sends([1, 0, 0, 0, 0, 0, 0, 0]);
-        let until = Instant::now() + Duration::from_secs(3);
+        let until = Instant::now() + machine::WAIT;
         let on_daemon = loop {
             let seen = mouse.buttons();
             if seen.down != 0 {
@@ -2110,7 +2114,7 @@ mod tests {
                 if let Some(x) = record {
                     reader.shared.lock().unwrap().arrived = false;
                     fake.daemon_sends([0, x, 0, 0, 0, 0, 0, 8]);
-                    let until = Instant::now() + Duration::from_secs(3);
+                    let until = Instant::now() + machine::WAIT;
                     while !reader.shared.lock().unwrap().arrived {
                         assert!(Instant::now() < until, "the record never arrived");
                         std::thread::sleep(Duration::from_millis(1));
@@ -2236,7 +2240,7 @@ mod tests {
         let fake = Fake::default();
         *fake.world() = machine::World { device: false, daemon: true, openable: true, ..Default::default() };
         let reader = Running::start(SpaceMouseDriver::Automatic, fake.clone());
-        let until = Instant::now() + Duration::from_secs(3);
+        let until = Instant::now() + machine::WAIT;
         // The daemon streams without a pause from the start.
         while reader.key().as_deref() != Some("spacenavd") {
             assert!(Instant::now() < until, "the daemon is never read");
@@ -2332,7 +2336,7 @@ mod tests {
             let ctx = Context::default();
             ctx.run_ui(egui::RawInput::default(), |_| {}).textures_delta.clear();
             let settle = |mouse: &mut SpaceMouse, app: &mut SolveApp, want: &str| {
-                let until = Instant::now() + Duration::from_secs(3);
+                let until = Instant::now() + machine::WAIT;
                 loop {
                     // A daemon that streams without a pause is not left until it pauses, so it is only fed
                     // while it is the reader that is awaited.
