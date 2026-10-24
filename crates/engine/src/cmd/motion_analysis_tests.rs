@@ -167,6 +167,32 @@ fn interference_names_the_step_two_parts_start_to_collide() {
     assert!(r["clear"] == true && r["collisions"] == json!([]), "{r}");
 }
 
+/// A part fixed overlapping A (a pin pressed into it, a thread in its tapped hole) overlaps it
+/// at every step, and no motion of the study changes that: it is listed under static_overlaps,
+/// tested once, and is not a collision of the motion. B's pass through A still is.
+#[test]
+fn a_fixed_overlap_is_static_not_a_collision_of_the_motion() {
+    let mut s = rail();
+    run(&mut s, "component.create", json!({"name": "P"}));
+    run(&mut s, "solid.box", json!({"length": 4, "width": 4, "height": 4, "corner": [-3, 3, 3]}));
+    run(&mut s, "component.activate", json!({"component": "root"}));
+    let p = occ(&s, "P");
+    run(&mut s, "occurrence.ground", json!({"occurrence": p, "grounded": true}));
+    run(&mut s, "motion.study", json!({"name": "Push", "steps": 15, "keys": [{"joint": "Rail", "points": [[0, 10], [15, -5]]}]}));
+    let r = run(&mut s, "motion.interference", json!({"study": "Push"}));
+    let names = |v: &Value| {
+        v.as_array().into_iter().flatten().map(|c| format!("{}-{}", c["a"].as_str().unwrap_or(""), c["b"].as_str().unwrap_or(""))).collect::<Vec<_>>()
+    };
+    assert_eq!(names(&r["collisions"]), ["A:1-B:1"], "{r}");
+    assert_eq!(names(&r["static_overlaps"]), ["A:1-P:1"], "{r}");
+    assert!((r["static_overlaps"][0]["depth_mm"].as_f64().unwrap_or(0.0) - 1.0).abs() < 0.05, "{r}");
+    assert!(r["clear"] == false && r["pairs_moving_together"] == 1 && r["pairs"] == 3, "{r}");
+    // Pushed only to touching, the motion is clear; the fixed overlap is still listed.
+    run(&mut s, "motion.study", json!({"study": "Push", "keys": [{"joint": "Rail", "points": [[0, 10], [15, 0]]}]}));
+    let r = run(&mut s, "motion.interference", json!({"study": "Push"}));
+    assert!(r["clear"] == true && names(&r["static_overlaps"]) == ["A:1-P:1"], "{r}");
+}
+
 /// A number names a study by its id first, text by its name first: a study may be named like
 /// another's id.
 #[test]
