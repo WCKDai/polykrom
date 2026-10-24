@@ -214,7 +214,13 @@ pub fn paint(app: &SolveApp, ctx: &egui::Context) {
                             painter.circle_filled(end, 3.0, t.accent.gamma_multiply(fade));
                         }
                         let mid = pos2((p.x + q.x) / 2.0, (p.y + q.y) / 2.0 - 10.0);
-                        painter.text(mid, Align2::CENTER_BOTTOM, format!("{mm:.3} mm"), FontId::proportional(t.font_small), t.text.gamma_multiply(fade));
+                        painter.text(
+                            mid,
+                            Align2::CENTER_BOTTOM,
+                            format!("{mm:.3} mm"),
+                            FontId::proportional(t.font_small),
+                            t.text.gamma_multiply(fade),
+                        );
                     }
                 }
             }
