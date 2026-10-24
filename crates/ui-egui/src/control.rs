@@ -100,6 +100,8 @@ fn key_from(name: &str) -> Option<egui::Key> {
 /// camera the command asked for.
 fn execute(app: &mut SolveApp, id: &str, params: Value) -> Result<Value, String> {
     let r = app.run(id, params);
+    // Listed and its inspection drawn, so a person can follow along (#78).
+    crate::agent_activity::record(app, id, &r);
     if r.is_ok()
         && !matches!(id, "view.layout" | "view.navigate" | "view.ambient_occlusion" | "view.graphics_preset" | "view.history_layout")
         && app.session.active_sketch.is_none()
@@ -1161,6 +1163,29 @@ mod tests {
         app.ui.show_origin = true;
         assert!(shot(&mut app, json!({})) == all);
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// An agent's commands are listed for the person watching, and its inspection is drawn (#78):
+    /// a batch's steps each get an entry, a clearance check its overlaps' boxes, and a failed
+    /// command says it failed.
+    #[test]
+    fn an_agents_commands_and_inspections_are_shown_as_it_works() {
+        let mut h = crate::scenario::Harness::new();
+        batch(
+            &mut h,
+            json!({"commands": [
+                {"command": "solid.box", "params": {"length": 20, "width": 20, "height": 20, "body_name": "A"}},
+                {"command": "solid.box", "params": {"length": 20, "width": 20, "height": 20, "corner": [10, 0, 0], "operation": "new", "body_name": "B"}},
+            ]}),
+        );
+        h.call("engine.execute", json!({"command": "inspect.clearance", "params": {}}));
+        h.call("engine.execute", json!({"command": "nope.nothing", "params": {}}));
+        let feed = &h.app.agent_feed;
+        assert_eq!(feed.entries.len(), 4, "{:?}", feed.entries);
+        let check = &feed.entries[2];
+        assert!(check.ok && check.outcome.contains('1'), "{check:?}");
+        assert!(!feed.entries[3].ok, "{:?}", feed.entries[3]);
+        assert!(matches!(feed.marks.as_slice(), [crate::agent_activity::Mark::Region { .. }]), "{:?}", feed.marks);
     }
 
     fn batch(h: &mut crate::scenario::Harness, params: serde_json::Value) -> serde_json::Value {

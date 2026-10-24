@@ -379,6 +379,12 @@ impl SolveApp {
             let language = crate::i18n::Locale::for_language(&self.preferences.language);
             self.session.echo(language.format("ui.command_done", &[("command", job.label.as_str())]));
         }
+        // Listed and its inspection drawn for the person following along, as commands that run
+        // here are (#78).
+        if let Some(id) = executed(&job.req.params).and_then(|(command, _)| spec_id(command)) {
+            let result = if reply["ok"] == true { Ok(reply["result"].clone()) } else { Err(reply["error"].as_str().unwrap_or_default().to_string()) };
+            crate::agent_activity::record(self, id, &result);
+        }
         let _ = job.req.reply.send(reply);
     }
 

@@ -34,6 +34,37 @@ solidcraft --control 7878 &
 solidcraft-cli mcp --connect 127.0.0.1:7878
 ```
 
+### Following along
+
+Bridged, everything the agent does happens in the window you have open, so you can watch it work:
+
+- The model changes on screen as each command runs, and new bodies are framed by the view.
+- An **Agent** list in the viewport's bottom-right corner names each command the agent runs, with
+  its outcome:
+  - "Extrude · done";
+  - "Clearance · 2 overlaps, 1 closer than the clearance";
+  - "Motion Interference · clear";
+  - "Sweep Joint · stops at 33.14";
+  - "failed: …" in the warning colour.
+
+  It fades when the agent has been quiet for half a minute.
+- An inspection's result is drawn on the model for 45 seconds, or until the next one:
+  - each overlap or collision as its box in the interference colour;
+  - each pair closer than the clearance as a line between the nearest points, with the
+    distance in mm.
+- With the **agent cursor** on (View settings on the navigation bar, or the agent calling
+  `ui.agent_cursor {show: true}`), a second pointer acts every command out first: it glides to
+  the command's toolbar button and to each face, edge or point it picks. "Follow camera" turns
+  the view to each new sketch.
+
+To work this way with Claude Code, start the app and add the server once:
+
+```sh
+claude mcp add polykrom -- /path/to/solidcraft-cli mcp --allow-path ~/Polykrom-Agent
+```
+
+With no `--connect`, the server finds the running app (and runs headless when none does).
+
 ### The app listens by default
 
 The desktop app opens its control channel at start-up on `127.0.0.1:27878` (or the next free port
