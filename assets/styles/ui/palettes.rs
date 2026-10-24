@@ -232,18 +232,8 @@ impl Tokens {
             ],
             analysis: AnalysisColors::DEFAULT,
             icons: IconColors { highlight: Color32::WHITE, agent: Color32::from_rgb(168, 85, 247), marker_halo: Color32::from_black_alpha(150) },
-            logo: [Color32::from_rgb(201, 246, 250), Color32::from_rgb(46, 196, 214), Color32::from_rgb(65, 70, 194), Color32::WHITE],
-            logo_facets: [
-                Color32::from_rgb(46, 196, 214),
-                Color32::from_rgb(90, 110, 232),
-                Color32::from_rgb(139, 98, 234),
-                Color32::from_rgb(65, 70, 194),
-                Color32::from_rgb(26, 143, 171),
-                Color32::from_rgb(19, 116, 140),
-                Color32::from_rgb(94, 54, 168),
-                Color32::from_rgb(116, 66, 196),
-                Color32::from_rgb(53, 58, 166),
-            ],
+            // The brand's lime (#CCFF00) on the dark application bar, in both palettes.
+            logo: [Color32::from_rgb(0xCC, 0xFF, 0x00), Color32::TRANSPARENT],
         }
     }
     pub const fn dark() -> Tokens {

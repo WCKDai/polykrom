@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" shape-rendering="crispEdges">
+  <title>Polykrom p</title>
+  <rect x="256.000" y="256.000" width="426.667" height="85.333" fill="#CCFF00"/>
+  <rect x="256.000" y="341.333" width="170.667" height="85.333" fill="#CCFF00"/>
+  <rect x="597.333" y="341.333" width="170.667" height="85.333" fill="#CCFF00"/>
+  <rect x="256.000" y="426.667" width="170.667" height="85.333" fill="#CCFF00"/>
+  <rect x="597.333" y="426.667" width="170.667" height="85.333" fill="#CCFF00"/>
+  <rect x="256.000" y="512.000" width="426.667" height="85.333" fill="#CCFF00"/>
+  <rect x="256.000" y="597.333" width="170.667" height="85.333" fill="#CCFF00"/>
+  <rect x="256.000" y="682.667" width="170.667" height="85.333" fill="#CCFF00"/>
+</svg>

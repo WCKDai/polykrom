@@ -98,55 +98,46 @@ pub(crate) fn breadcrumb(p: &egui::Painter, c: egui::Pos2, col: Color32) {
     p.line_segment([pos2(c.x + 1.5, c.y), pos2(c.x - 1.5, c.y + 3.0)], s);
 }
 
+/// Polykrom's letter in the WCKD family (autobot-www `brand/kit.json`): a lowercase p in whole
+/// pixels, six cells tall with two-cell strokes like every brand's letter, the bowl in the top
+/// four rows and the stem dropping through the last two.
+pub(crate) const P_GLYPH: [&str; 6] = ["#####.", "##..##", "##..##", "#####.", "##....", "##...."];
+
+/// The mark on the application bar: the p in the brand's lime on the bar (`logo`).
 pub(crate) fn brand_mark(p: &egui::Painter, c: Pos2) {
     let t = crate::theme::Tokens::get();
-    brand_mark_styled(p, c, 20.0, t.logo[0], t.logo_facets, true);
+    brand_mark_styled(p, c, 18.0, t.logo[0], t.logo[1]);
 }
 
-/// The same original mark as a single quiet silhouette, without face seams or outlines.
+/// The same mark as a single quiet silhouette.
 pub(crate) fn brand_mark_silhouette(p: &egui::Painter, c: Pos2, height: f32, ink: Color32) {
-    brand_mark_styled(p, c, height, ink, [ink; 9], false);
+    brand_mark_styled(p, c, height, ink, Color32::TRANSPARENT);
 }
 
-/// Polykrom's mark: a faceted gem, a regular hexagon (pointy top) tiled like a polyhedron seen
-/// down its axis. A light centre triangle, three mid facets on its sides reaching the alternate
-/// corners, and six corner facets, each in its own colour of the brand's cyan-to-violet range
-/// (`facets`: the mids, then the corners clockwise from the top). `height` is corner to corner.
-fn brand_mark_styled(p: &egui::Painter, c: Pos2, height: f32, centre: Color32, facets: [Color32; 9], edges: bool) {
-    let r = height / 2.0;
-    // Hexagon corners from the top, clockwise; the centre triangle points up at half the radius.
-    let corner = |k: f32| {
-        let a = std::f32::consts::FRAC_PI_2 - k * std::f32::consts::FRAC_PI_3;
-        pos2(c.x + r * a.cos(), c.y - r * a.sin())
-    };
-    let inner = |k: f32| {
-        let a = std::f32::consts::FRAC_PI_2 - k * 2.0 * std::f32::consts::FRAC_PI_3;
-        pos2(c.x + 0.5 * r * a.cos(), c.y - 0.5 * r * a.sin())
-    };
-    let h: [Pos2; 6] = [corner(0.0), corner(1.0), corner(2.0), corner(3.0), corner(4.0), corner(5.0)];
-    let t: [Pos2; 3] = [inner(0.0), inner(1.0), inner(2.0)];
-    let tri = |col: Color32, a: Pos2, b: Pos2, d: Pos2| {
-        p.add(egui::Shape::convex_polygon(vec![a, b, d], col, Stroke::NONE));
-    };
-    // Six corner facets: each hexagon side with the nearest centre-triangle corner.
-    for (k, near) in [(0, 0), (1, 1), (2, 1), (3, 2), (4, 2), (5, 0)] {
-        tri(facets[3 + k], h[k], h[(k + 1) % 6], t[near]);
+/// The p `height` tall (rounded to whole screen pixels per cell, as the kit asks), centred on
+/// `c`, in `ink`, on a square of `ground` one cell wider all round unless the ground is clear.
+fn brand_mark_styled(p: &egui::Painter, c: Pos2, height: f32, ink: Color32, ground: Color32) {
+    let cell = (height / 6.0).round().max(1.0);
+    let side = 6.0 * cell;
+    let origin = pos2((c.x - side / 2.0).round(), (c.y - side / 2.0).round());
+    if ground.a() > 0 {
+        p.rect_filled(Rect::from_min_size(origin - egui::vec2(cell, cell), egui::vec2(side + 2.0 * cell, side + 2.0 * cell)), cell, ground);
     }
-    // Three mid facets: each side of the centre triangle with the corner across from it.
-    tri(facets[0], t[0], t[1], h[1]);
-    tri(facets[1], t[1], t[2], h[3]);
-    tri(facets[2], t[2], t[0], h[5]);
-    tri(centre, t[0], t[1], t[2]);
-    if !edges {
-        return;
-    }
-    // Seams in the bar's colour, so the facets read as separate planes.
-    let seam = Stroke::new((height / 40.0).max(0.6), crate::theme::Tokens::get().app_bar);
-    for (a, b) in [(t[0], t[1]), (t[1], t[2]), (t[2], t[0])] {
-        p.line_segment([a, b], seam);
-    }
-    for (k, near) in [(1, 0), (1, 1), (3, 1), (3, 2), (5, 2), (5, 0), (0, 0), (2, 1), (4, 2)] {
-        p.line_segment([h[k], t[near]], seam);
+    for (y, row) in P_GLYPH.iter().enumerate() {
+        let mut x = 0;
+        let bytes = row.as_bytes();
+        while x < bytes.len() {
+            if bytes.get(x) != Some(&b'#') {
+                x += 1;
+                continue;
+            }
+            let start = x;
+            while bytes.get(x) == Some(&b'#') {
+                x += 1;
+            }
+            let at = origin + egui::vec2(start as f32 * cell, y as f32 * cell);
+            p.rect_filled(Rect::from_min_size(at, egui::vec2((x - start) as f32 * cell, cell)), 0.0, ink);
+        }
     }
 }
 
