@@ -642,4 +642,12 @@ fn a_threaded_shank_in_its_tapped_hole_is_engagement_not_overlap() {
             "Ø{hole} threaded {threaded}: {r}"
         );
     }
+    // A thin rod run down the threaded shank's axis is centred there and smaller than the ring,
+    // but it is the shank's core, not its thread: a clash.
+    let mut s = Session::default();
+    run(&mut s, "solid.cylinder", json!({"radius": 3, "height": 16, "base": [0, 0, -2], "operation": "new", "body_name": "Screw"}));
+    run(&mut s, "solid.thread", json!({"face": [3, 0, 5], "designation": "M6"}));
+    run(&mut s, "solid.cylinder", json!({"radius": 1, "height": 10, "base": [0, 0, 0], "operation": "new", "body_name": "Rod"}));
+    let r = run(&mut s, "inspect.clearance", json!({}));
+    assert_eq!((r["overlaps"].as_array().map(Vec::len), r["threaded"].as_array().map(Vec::len)), (Some(1), Some(0)), "core rod: {r}");
 }

@@ -432,12 +432,13 @@ fn clearance(s: &mut Session, p: &Value) -> Result<Value> {
     }))
 }
 
-/// One pair: its overlap when the meshes meet or one holds the other, otherwise its distance
-/// when it may be closer than `gap`.
 /// The cosmetic thread of `a` or `b` an overlap is the engagement of, and the engaged length: the
-/// overlap is centred on the thread's axis, lies within its threaded length and is no bigger than
-/// the ring between its major diameter and a little under its minor one (a shank at the major
-/// diameter in a hole tapped at the drill size shares just that ring with the part around it).
+/// overlap is centred on the thread's axis and lies within its threaded length; the holed body (the
+/// other one for a thread on a shank, the threaded one for a tapped hole) has a hole wall on that
+/// axis along the whole overlap, between the thread's major diameter and a little under its minor
+/// one; and the overlap is no bigger than the ring between that wall and the major diameter (a shank
+/// at the major diameter in a hole tapped at the drill size shares just that ring with the part
+/// around it, where a rod down the axis shares its core).
 pub(super) fn engagement<'t>(
     threads: &'t [solidcraft_doc::ThreadInfo],
     a: &solidcraft_doc::ModelBody,
@@ -465,11 +466,36 @@ pub(super) fn engagement<'t>(
         if lo < start - slack || hi > end + slack || hi <= lo {
             return None;
         }
-        let ring = std::f64::consts::PI * (outer * outer - inner * inner) * (hi - lo);
+        let holed = if t.internal == owns(a, t) { a } else { b };
+        let wall = hole_wall(&holed.body, t, (lo, hi), (inner - slack, outer), slack)?;
+        let ring = std::f64::consts::PI * (outer * outer - wall * wall) * (hi - lo);
         (volume <= ring * 1.02).then_some((t, hi - lo))
     })
 }
 
+/// The radius of a hole wall of `body` on the thread's axis, with a radius in `radii`, running
+/// along the axis over `lo..hi` (measured from the thread's axis point).
+fn hole_wall(body: &solidcraft_kernel::Body, t: &solidcraft_doc::ThreadInfo, (lo, hi): (f64, f64), radii: (f64, f64), slack: f64) -> Option<f64> {
+    let u = *t.axis;
+    let across = |p: solidcraft_geom::Vec3| {
+        let off = p - t.axis_point;
+        (off - u * off.dot(u)).len()
+    };
+    (0..body.face_count()).find_map(|i| {
+        let solidcraft_kernel::FaceSurface::Cylinder { origin, axis, radius } = solidcraft_kernel::face_surface(body, i)? else { return None };
+        if axis.dot(u).abs() < 1.0 - 1e-6 || across(origin) > slack || radius < radii.0 || radius > radii.1 {
+            return None;
+        }
+        // The face itself, found from a point on it halfway along: a hole, over the whole overlap.
+        let c = solidcraft_kernel::cylinder_face_at(body, t.axis_point + u * ((lo + hi) / 2.0) + u.any_perp() * radius)?;
+        let (base, sign) = ((c.axis_point - t.axis_point).dot(u), c.axis.dot(u).signum());
+        let (s0, s1) = (base + sign * c.start, base + sign * c.end);
+        (c.internal && (c.radius - radius).abs() < slack && s0.min(s1) <= lo + slack && s0.max(s1) >= hi - slack).then_some(radius)
+    })
+}
+
+/// One pair: its overlap when the meshes meet or one holds the other, otherwise its distance
+/// when it may be closer than `gap`.
 fn measure_pair(
     (ba, ka): (&solidcraft_doc::ModelBody, &solidcraft_kernel::Body),
     a: &DistanceShape,
