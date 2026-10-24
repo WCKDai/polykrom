@@ -78,10 +78,26 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends mesa-vulkan-drivers libvulkan1
-      # The gate's own profile (cargo xtask ci): optimized enough for the kernel's property tests,
-      # which take hours unoptimized.
+      - uses: taiki-e/install-action@1168f6810a3cb30a3514bf5756a3b7f0422c6df8 # v2.87.28 (upstream's pin)
+        with:
+          tool: cargo-nextest
+      # The gate's own profile (cargo xtask ci), run by nextest as upstream's CI runs it: pull requests
+      # skip the heavy tests (default-filter in .config/nextest.toml) but still run the robustness
+      # goldens, all but the slowest seeds; pushes to main run every test.
       - name: Test
-        run: cargo test --locked --profile ci ${{ matrix.args }}
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          SLOW_SEEDS: 81|45|20|24|95|02|57|40|18|48|32|46|85|61|77|34|14
+        run: |
+          base='all()'
+          if [ "$EVENT_NAME" = pull_request ]; then
+            base="default() | (package(solidcraft-engine) & test(/^tests::robustness_goldens::/) & not test(/^tests::robustness_goldens::seed_($SLOW_SEEDS)\$/))"
+          fi
+          cargo nextest run --locked --cargo-profile ci --profile ci --no-tests=pass --ignore-default-filter -E "$base" ${{ matrix.args }}
+      # nextest does not run doc tests: the rest part runs them.
+      - name: Doc tests
+        if: matrix.part == 'rest'
+        run: cargo test --locked --profile ci --doc --workspace
 
   site:
     name: Site viewer tests
