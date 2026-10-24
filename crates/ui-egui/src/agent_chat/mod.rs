@@ -35,6 +35,7 @@ pub mod paste;
 #[cfg(not(target_arch = "wasm32"))]
 mod process;
 pub mod settings;
+pub mod wire;
 
 use std::sync::Arc;
 use std::sync::mpsc::{Receiver, Sender};
@@ -780,7 +781,14 @@ pub fn connect(app: &mut SolveApp, ctx: &egui::Context) {
         agents::Kind::Acp => acp_client::AcpBackend::start(&entry.argv, start).map(|b| Box::new(b) as Box<dyn ChatBackend>),
         agents::Kind::Api => match http {
             Some(http) => api_client::ApiBackend::start(
-                api_client::ApiConfig { name: entry.name.clone(), base_url: entry.base_url.clone(), model: entry.model.clone(), key, http },
+                api_client::ApiConfig {
+                    name: entry.name.clone(),
+                    wire: entry.wire,
+                    base_url: entry.base_url.clone(),
+                    model: entry.model.clone(),
+                    key,
+                    http,
+                },
                 start,
             )
             .map(|b| Box::new(b) as Box<dyn ChatBackend>),

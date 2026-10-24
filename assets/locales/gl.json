@@ -1253,7 +1253,6 @@
   "ui.ai_add": "Engadir",
   "ui.ai_add_agent": "Engadir axente…",
   "ui.ai_add_agent_title": "Engadir axente",
-  "ui.ai_add_api": "API compatible con OpenAI",
   "ui.ai_add_custom": "Orde personalizada",
   "ui.ai_add_installed": "Axente instalado",
   "ui.ai_add_installed_note": "Unha entrada propia para un axente instalado, por exemplo con outros argumentos. Os axentes instalados lístanse por si sós.",

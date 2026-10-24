@@ -1253,7 +1253,6 @@
   "ui.ai_add": "Přidat",
   "ui.ai_add_agent": "Přidat agenta…",
   "ui.ai_add_agent_title": "Přidat agenta",
-  "ui.ai_add_api": "API kompatibilní s OpenAI",
   "ui.ai_add_custom": "Vlastní příkaz",
   "ui.ai_add_installed": "Nainstalovaný agent",
   "ui.ai_add_installed_note": "Vlastní položka pro nainstalovaného agenta, například s jinými argumenty. Nainstalovaní agenti se v seznamu zobrazují sami.",

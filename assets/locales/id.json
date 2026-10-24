@@ -1252,7 +1252,6 @@
   "ui.ai_add": "Tambah",
   "ui.ai_add_agent": "Tambah agen…",
   "ui.ai_add_agent_title": "Tambah agen",
-  "ui.ai_add_api": "API kompatibel OpenAI",
   "ui.ai_add_custom": "Perintah kustom",
   "ui.ai_add_installed": "Agen terpasang",
   "ui.ai_add_installed_note": "Entri Anda sendiri untuk agen terpasang, misalnya dengan argumen lain. Agen terpasang terdaftar dengan sendirinya.",

@@ -1253,7 +1253,6 @@
   "ui.ai_add": "Tambah",
   "ui.ai_add_agent": "Tambah ejen…",
   "ui.ai_add_agent_title": "Tambah ejen",
-  "ui.ai_add_api": "API serasi OpenAI",
   "ui.ai_add_custom": "Arahan tersuai",
   "ui.ai_add_installed": "Ejen yang dipasang",
   "ui.ai_add_installed_note": "Tambah tetapan tersuai untuk ejen yang dipasang, contohnya untuk menggunakan argumen lain. Ejen yang dipasang sudah disenaraikan secara automatik.",

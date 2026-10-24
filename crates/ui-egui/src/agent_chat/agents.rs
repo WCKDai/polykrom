@@ -1,9 +1,12 @@
 //! The agents the chat can use: the installed ones it finds by itself (Claude Code, Codex,
-//! Antigravity, OpenCode, …) and the ones the user adds (another ACP command, or an
-//! OpenAI-compatible endpoint such as Ollama, LM Studio or OpenAI). Also the permission modes.
+//! Antigravity, OpenCode, …) and the ones the user adds (another ACP command, or a model API:
+//! Anthropic, Gemini, or any OpenAI-compatible endpoint such as OpenAI, OpenRouter or Ollama).
+//! Also the permission modes.
 //! Preferences only: no design data, no keys (those are in the system keychain).
 
 use serde::{Deserialize, Serialize};
+
+pub use super::wire::Wire;
 
 /// How much the agent may do without asking.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -45,7 +48,7 @@ pub enum Kind {
     /// A program that speaks the Agent Client Protocol.
     #[default]
     Acp,
-    /// An OpenAI-compatible chat completions endpoint.
+    /// A model API ([`Wire`]).
     Api,
 }
 
@@ -58,7 +61,8 @@ pub struct AgentConfig {
     pub kind: Kind,
     /// ACP: the command line.
     pub command: String,
-    /// API: the endpoint (`…/v1`) and model.
+    /// API: how to speak to it, the endpoint (`…/v1`) and model.
+    pub wire: Wire,
     pub base_url: String,
     pub model: String,
     /// API: a key is stored for it in the system keychain.
@@ -78,6 +82,7 @@ pub struct Entry {
     pub login: &'static str,
     /// Found installed (not added by the user).
     pub found: bool,
+    pub wire: Wire,
     pub base_url: String,
     pub model: String,
     pub key: bool,
@@ -93,6 +98,7 @@ impl Entry {
             version: None,
             login: "",
             found: false,
+            wire: c.wire,
             base_url: c.base_url.clone(),
             model: c.model.clone(),
             key: c.key,
@@ -123,6 +129,7 @@ pub fn entries(app: &crate::SolveApp) -> Vec<Entry> {
             version: f.version.clone(),
             login: f.login.id(),
             found: true,
+            wire: Wire::OpenAi,
             base_url: String::new(),
             model: String::new(),
             key: false,
@@ -162,11 +169,35 @@ pub fn new_id(p: &crate::prefs::Prefs, prefix: &str) -> String {
     (1..).map(|n| format!("{prefix}-{n}")).find(|id| !p.agents.iter().any(|a| &a.id == id)).unwrap_or_else(|| prefix.to_string())
 }
 
-/// OpenAI-compatible endpoints people use: name, base URL, whether it needs a key.
-pub const API_PRESETS: &[(&str, &str, bool)] = &[
-    ("Ollama", "http://localhost:11434/v1", false),
-    ("LM Studio", "http://localhost:1234/v1", false),
-    ("OpenAI", "https://api.openai.com/v1", true),
+/// A model provider the Add agent dialog offers.
+pub struct Provider {
+    pub name: &'static str,
+    pub wire: Wire,
+    pub base_url: &'static str,
+    /// It needs a key.
+    pub key: bool,
+    /// The model it starts with (empty: pick one after Test).
+    pub model: &'static str,
+    /// Where to get a key.
+    pub keys_at: &'static str,
+}
+
+const fn provider(name: &'static str, wire: Wire, base_url: &'static str, key: bool, model: &'static str, keys_at: &'static str) -> Provider {
+    Provider { name, wire, base_url, key, model, keys_at }
+}
+
+/// The providers people use, hosted first, then the ones on this computer.
+pub const PROVIDERS: &[Provider] = &[
+    provider("Anthropic", Wire::Anthropic, "https://api.anthropic.com/v1", true, "claude-opus-5-5", "https://platform.claude.com/settings/keys"),
+    provider("OpenAI", Wire::OpenAi, "https://api.openai.com/v1", true, "", "https://platform.openai.com/api-keys"),
+    provider("Google Gemini", Wire::Gemini, "https://generativelanguage.googleapis.com/v1beta", true, "", "https://aistudio.google.com/apikey"),
+    provider("OpenRouter", Wire::OpenAi, "https://openrouter.ai/api/v1", true, "", "https://openrouter.ai/settings/keys"),
+    provider("Mistral", Wire::OpenAi, "https://api.mistral.ai/v1", true, "", "https://console.mistral.ai/api-keys"),
+    provider("xAI", Wire::OpenAi, "https://api.x.ai/v1", true, "", "https://console.x.ai"),
+    provider("DeepSeek", Wire::OpenAi, "https://api.deepseek.com/v1", true, "deepseek-chat", "https://platform.deepseek.com/api_keys"),
+    provider("Groq", Wire::OpenAi, "https://api.groq.com/openai/v1", true, "", "https://console.groq.com/keys"),
+    provider("Ollama", Wire::OpenAi, "http://localhost:11434/v1", false, "", ""),
+    provider("LM Studio", Wire::OpenAi, "http://localhost:1234/v1", false, "", ""),
 ];
 
 /// Whether a key may be sent to `url`: only over HTTPS, or to this computer.
@@ -230,5 +261,18 @@ mod tests {
         assert_eq!(new_id(&p, "api"), "api-2");
         assert_eq!(normalize_url(" http://localhost:11434/v1/ ").as_deref(), Ok("http://localhost:11434/v1"));
         assert!(normalize_url("localhost:11434").is_err());
+    }
+
+    #[test]
+    fn providers_send_keys_only_where_it_is_safe() {
+        for p in PROVIDERS {
+            assert!(normalize_url(p.base_url).is_ok(), "{}", p.name);
+            assert!(!p.key || key_safe_for(p.base_url), "{} needs a key over HTTPS", p.name);
+            assert!(p.keys_at.is_empty() || p.keys_at.starts_with("https://"), "{}", p.name);
+        }
+        // An agent saved before there were wires speaks chat completions.
+        let old: AgentConfig =
+            serde_json::from_str(r#"{"id": "api-1", "kind": "api", "base_url": "http://localhost:11434/v1", "model": "m"}"#).unwrap();
+        assert_eq!(old.wire, Wire::OpenAi);
     }
 }

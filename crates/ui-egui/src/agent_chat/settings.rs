@@ -1,9 +1,9 @@
 //! Settings → AI: the master switch, the agents (found and added, each with Test, Default and,
 //! for added ones, Remove), permissions (global and per agent, and the "always allow" answers),
-//! and the panel. Plus the Add agent dialog: an installed ACP agent, a custom command, or an
-//! OpenAI-compatible endpoint (whose key goes to the system keychain).
+//! and the panel. Plus the Add agent dialog: an installed ACP agent, a custom command, or a model
+//! API (a provider preset or any URL; its key goes to the system keychain).
 
-use super::agents::{self, AgentConfig, Kind, Mode};
+use super::agents::{self, AgentConfig, Kind, Mode, Wire};
 use super::*;
 use crate::ui_kit;
 
@@ -23,6 +23,7 @@ pub struct AddState {
     pub command: String,
     pub installed: usize,
     pub preset: usize,
+    pub wire: Wire,
     pub base_url: String,
     pub model: String,
     pub key: String,
@@ -30,11 +31,41 @@ pub struct AddState {
     test: Option<Test>,
 }
 
+impl AddState {
+    /// Take on a provider preset (`None`: a URL of the user's own).
+    fn pick(&mut self, preset: Option<&agents::Provider>) {
+        self.test = None;
+        self.error = None;
+        // A key typed for one provider is never sent to, or stored for, another.
+        self.key.clear();
+        match preset {
+            Some(p) => {
+                self.name = p.name.to_string();
+                self.wire = p.wire;
+                self.base_url = p.base_url.to_string();
+                self.model = p.model.to_string();
+            }
+            None => self.base_url.clear(),
+        }
+    }
+
+    /// The models the last successful Test listed.
+    fn models(&self) -> &[String] {
+        match &self.test {
+            Some(Test::Done(Ok((_, models)))) => models,
+            _ => &[],
+        }
+    }
+}
+
 /// A connection test running or done.
 pub enum Test {
-    Running(std::sync::mpsc::Receiver<Result<String, String>>),
-    Done(Result<String, String>),
+    Running(std::sync::mpsc::Receiver<TestResult>),
+    Done(TestResult),
 }
+
+/// What a test found (and, for an API, its models), or why it failed.
+pub type TestResult = Result<(String, Vec<String>), String>;
 
 impl Test {
     fn poll(&mut self) {
@@ -55,12 +86,9 @@ pub struct State {
 
 /// Open the Add agent dialog.
 pub fn open_add(app: &mut SolveApp) {
-    let preset = agents::API_PRESETS.first();
-    app.agent_chat.settings.add = Some(AddState {
-        base_url: preset.map(|p| p.1.to_string()).unwrap_or_default(),
-        name: preset.map(|p| p.0.to_string()).unwrap_or_default(),
-        ..Default::default()
-    });
+    let mut s = AddState::default();
+    s.pick(agents::PROVIDERS.first());
+    app.agent_chat.settings.add = Some(s);
 }
 
 /// Run a connection test in the background (it starts the agent briefly, or asks the endpoint
@@ -72,14 +100,14 @@ fn start_test(app: &SolveApp, e: &agents::Entry, key: Option<String>) -> Test {
         Kind::Acp => {
             let argv = e.argv.clone();
             std::thread::spawn(move || {
-                let _ = tx.send(super::acp_client::test_agent(&argv, &working_dir()));
+                let _ = tx.send(super::acp_client::test_agent(&argv, &working_dir()).map(|line| (line, Vec::new())));
             });
         }
         Kind::Api => {
             let Some(http) = app.services.agent_http.clone() else { return Test::Done(Err(tr("ui.ai_no_http").to_string())) };
-            let (url, model) = (e.base_url.clone(), e.model.clone());
+            let (wire, url, model) = (e.wire, e.base_url.clone(), e.model.clone());
             std::thread::spawn(move || {
-                let _ = tx.send(super::api_client::test_endpoint(&http, &url, key.as_deref(), &model));
+                let _ = tx.send(super::api_client::test_endpoint(&http, wire, &url, key.as_deref(), &model));
             });
         }
     }
@@ -91,7 +119,7 @@ fn test_line(ui: &mut egui::Ui, test: &Option<&Test>) {
         Some(Test::Running(_)) => {
             ui_kit::text(ui, tr("ui.ai_testing"), ui_kit::Text::Note("testing"));
         }
-        Some(Test::Done(Ok(message))) => {
+        Some(Test::Done(Ok((message, _)))) => {
             ui_kit::text(ui, message, ui_kit::Text::Report("test_ok", false));
         }
         Some(Test::Done(Err(error))) => {
@@ -394,6 +422,10 @@ pub fn dialog(app: &mut SolveApp, ctx: &egui::Context) {
                     s.kind = *kind;
                     s.error = None;
                     s.test = None;
+                    if s.kind == AddKind::Api {
+                        // Not the name the Installed page filled in: the provider's.
+                        s.pick(agents::PROVIDERS.get(s.preset));
+                    }
                 }
                 for (_, key) in kinds {
                     if let Some(at) = crate::scenario::handle_at(&format!("dialog:{}:{}", tr("ui.ai_preset"), tr(key))) {
@@ -443,38 +475,66 @@ pub fn dialog(app: &mut SolveApp, ctx: &egui::Context) {
                     ui_kit::text(ui, tr("ui.agent_chat_custom_hint"), ui_kit::Text::Note("custom"));
                 }
                 AddKind::Api => {
-                    let presets: Vec<_> = agents::API_PRESETS.iter().map(|p| p.0).chain(std::iter::once(tr("ui.ai_custom_url"))).collect();
-                    ui_kit::row(ui, tr("ui.ai_preset"), |ui| {
+                    let custom = tr("ui.ai_custom_url");
+                    let presets: Vec<&str> = agents::PROVIDERS.iter().map(|p| p.name).chain(std::iter::once(custom)).collect();
+                    let provider = agents::PROVIDERS.get(s.preset);
+                    ui_kit::row(ui, tr("ui.ai_provider"), |ui| {
                         ui_kit::dropdown_menu(ui, "sc_ai_add_preset", presets.get(s.preset).copied().unwrap_or_default(), |ui| {
                             for (index, preset) in presets.iter().enumerate() {
                                 if ui_kit::list_picker(ui, preset, preset, s.preset == index).clicked() {
                                     s.preset = index;
-                                    if let Some((name, url, _)) = agents::API_PRESETS.get(index) {
-                                        s.base_url = url.to_string();
-                                        s.name = name.to_string();
-                                    } else {
-                                        s.base_url.clear();
-                                    }
+                                    s.pick(agents::PROVIDERS.get(index));
                                 }
                             }
                         });
                     });
+                    // A preset knows how its API speaks; a URL of the user's own is asked.
+                    if provider.is_none() {
+                        ui_kit::row(ui, tr("ui.ai_wire"), |ui| {
+                            let mut selected = Wire::ALL.iter().position(|w| *w == s.wire).unwrap_or(0);
+                            let labels = Wire::ALL.map(Wire::label);
+                            if ui_kit::segmented(ui, &mut selected, &labels, ui_kit::Segments { compact: true, ..Default::default() })
+                                && let Some(w) = Wire::ALL.get(selected)
+                            {
+                                s.wire = *w;
+                                s.test = None;
+                            }
+                        });
+                    }
                     ui_kit::row(ui, tr("ui.ai_name"), |ui| {
                         ui_kit::text_field(ui, &mut s.name, "");
                     });
                     ui_kit::row(ui, tr("ui.ai_base_url"), |ui| {
                         ui_kit::text_field(ui, &mut s.base_url, tr("ui.ai_url_hint"));
                     });
+                    if provider.is_none_or(|p| p.key) {
+                        ui_kit::row(ui, tr("ui.ai_key"), |ui| {
+                            ui.add_enabled_ui(has_keychain, |ui| {
+                                let hint = tr(if provider.is_some() { "ui.ai_key_required_hint" } else { "ui.ai_key_hint" });
+                                let r = ui_kit::password_field(ui, egui::Id::new("sc_ai_add_key"), &mut s.key, hint);
+                                crate::scenario::publish_target("ai_add:key", r.rect);
+                            });
+                        });
+                        ui_kit::text(ui, tr(if has_keychain { "ui.ai_key_note" } else { "ui.ai_no_keychain" }), ui_kit::Text::Note("keychain"));
+                        if let Some(url) = provider.map(|p| p.keys_at).filter(|u| !u.is_empty())
+                            && ui_kit::button(ui, tr("ui.ai_get_key"), ui_kit::Button::Small).on_hover_text(url).clicked()
+                        {
+                            ui.ctx().open_url(egui::OpenUrl::new_tab(url));
+                        }
+                    }
+                    let models = s.models().to_vec();
                     ui_kit::row(ui, tr("ui.ai_model"), |ui| {
                         ui_kit::text_field(ui, &mut s.model, tr("ui.ai_model_hint"));
+                        if !models.is_empty() {
+                            ui_kit::dropdown_menu(ui, "sc_ai_add_models", tr("ui.ai_pick_model"), |ui| {
+                                for m in &models {
+                                    if ui_kit::list_picker(ui, m, m, s.model == *m).clicked() {
+                                        s.model = m.clone();
+                                    }
+                                }
+                            });
+                        }
                     });
-                    ui_kit::row(ui, tr("ui.ai_key"), |ui| {
-                        ui.add_enabled_ui(has_keychain, |ui| {
-                            let r = ui_kit::password_field(ui, egui::Id::new("sc_ai_add_key"), &mut s.key, tr("ui.ai_key_hint"));
-                            crate::scenario::publish_target("ai_add:key", r.rect);
-                        });
-                    });
-                    ui_kit::text(ui, tr(if has_keychain { "ui.ai_key_note" } else { "ui.ai_no_keychain" }), ui_kit::Text::Note("keychain"));
                     if ui_kit::button(ui, tr("ui.ai_test"), ui_kit::Button::Normal).clicked() {
                         test = true;
                     }
@@ -502,6 +562,7 @@ pub fn dialog(app: &mut SolveApp, ctx: &egui::Context) {
                 version: None,
                 login: "",
                 found: false,
+                wire: s.wire,
                 base_url: url.clone().unwrap_or_default(),
                 model: s.model.trim().to_string(),
                 key: false,
@@ -552,6 +613,7 @@ fn add_agent(app: &mut SolveApp) -> Result<(), String> {
         }
         AddKind::Api => {
             c.kind = Kind::Api;
+            c.wire = s.wire;
             c.base_url = agents::normalize_url(&s.base_url)?;
             c.model = s.model.trim().to_string();
             if c.model.is_empty() {

@@ -1253,7 +1253,6 @@
   "ui.ai_add": "Dodaj",
   "ui.ai_add_agent": "Dodaj agenta…",
   "ui.ai_add_agent_title": "Dodaj agenta",
-  "ui.ai_add_api": "API zgodne z OpenAI",
   "ui.ai_add_custom": "Polecenie niestandardowe",
   "ui.ai_add_installed": "Zainstalowany agent",
   "ui.ai_add_installed_note": "Własny wpis dla zainstalowanego agenta, na przykład z innymi argumentami. Zainstalowane agenty są wyświetlane automatycznie.",

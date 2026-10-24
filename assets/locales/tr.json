@@ -1252,7 +1252,6 @@
   "ui.ai_add": "Ekle",
   "ui.ai_add_agent": "Ajan ekle…",
   "ui.ai_add_agent_title": "Ajan ekle",
-  "ui.ai_add_api": "OpenAI uyumlu API",
   "ui.ai_add_custom": "Özel komut",
   "ui.ai_add_installed": "Yüklü ajan",
   "ui.ai_add_installed_note": "Yüklü bir ajan için ayrı bir giriş (örneğin farklı argümanlarla). Yüklü ajanlar kendiliğinden görünür.",

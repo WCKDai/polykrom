@@ -1253,7 +1253,6 @@
   "ui.ai_add": "Tilføj",
   "ui.ai_add_agent": "Tilføj agent…",
   "ui.ai_add_agent_title": "Tilføj agent",
-  "ui.ai_add_api": "OpenAI-kompatibel API",
   "ui.ai_add_custom": "Brugerdefineret kommando",
   "ui.ai_add_installed": "Installeret agent",
   "ui.ai_add_installed_note": "Din egen opsætning af en installeret agent, f.eks. med andre argumenter. Installerede agenter vises automatisk.",

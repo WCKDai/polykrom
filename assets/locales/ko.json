@@ -1257,7 +1257,6 @@
   "ui.ai_add": "추가",
   "ui.ai_add_agent": "에이전트 추가…",
   "ui.ai_add_agent_title": "에이전트 추가",
-  "ui.ai_add_api": "OpenAI 호환 API",
   "ui.ai_add_custom": "사용자 지정 명령",
   "ui.ai_add_installed": "설치된 에이전트",
   "ui.ai_add_installed_note": "설치된 에이전트에 대한 별도 항목(예: 다른 인수로 실행). 설치된 에이전트는 자동으로 표시됩니다.",

@@ -1253,7 +1253,6 @@
   "ui.ai_add": "Adicionar",
   "ui.ai_add_agent": "Adicionar agente…",
   "ui.ai_add_agent_title": "Adicionar agente",
-  "ui.ai_add_api": "API compatível com OpenAI",
   "ui.ai_add_custom": "Comando personalizado",
   "ui.ai_add_installed": "Agente instalado",
   "ui.ai_add_installed_note": "Uma entrada própria para um agente instalado, por exemplo com outros argumentos. Os agentes instalados são listados por si mesmos.",

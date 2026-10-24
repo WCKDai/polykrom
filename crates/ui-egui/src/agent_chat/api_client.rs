@@ -1,5 +1,6 @@
-//! The API backend (desktop only): a model behind an OpenAI-compatible chat completions endpoint
-//! (Ollama, LM Studio, OpenAI, any URL the user gives). Polykrom runs the tool loop itself, with
+//! The API backend (desktop only): a model behind a provider's API, spoken natively
+//! ([`Wire`]: OpenAI-compatible chat completions, Anthropic Messages or Google Gemini) at the
+//! provider's URL or any the user gives (Ollama, LM Studio, …). Polykrom runs the tool loop itself, with
 //! the same tools the ACP agents get: it starts the same MCP server (`solidcraft-cli mcp
 //! --connect` to the chat's own endpoint) and is its client, so every tool call passes the same
 //! gate, limits and folder checks. The key, when there is one, comes from the system keychain for
@@ -17,6 +18,8 @@ use serde_json::{Value, json};
 use super::acp::ModelInfo;
 use super::backend::{ChatBackend, Event, HttpFn, HttpRequest, PromptPart, StartContext, ToolStatus};
 use super::process::{AgentProcess, FromAgent, ProcessHandle};
+pub use super::wire::http_error;
+use super::wire::{self, Wire};
 
 /// Model requests for one message, at most (each answer with tool calls is one).
 pub const MAX_REQUESTS_PER_TURN: usize = 24;
@@ -36,6 +39,7 @@ const HIDDEN_TOOLS: &[&str] = &["crash_reports"];
 
 pub struct ApiConfig {
     pub name: String,
+    pub wire: Wire,
     pub base_url: String,
     pub model: String,
     pub key: Option<String>,
@@ -80,6 +84,7 @@ impl ApiBackend {
                 mcp,
                 next: 0,
                 tools: Vec::new(),
+                instructions: String::new(),
                 history: Vec::new(),
                 events: ev_tx,
                 wake,
@@ -143,6 +148,8 @@ struct Worker {
     next: u64,
     /// The MCP tools as OpenAI function tools.
     tools: Vec<Value>,
+    /// The MCP server's instructions: how to model with its tools.
+    instructions: String,
     history: Vec<Value>,
     events: Sender<Event>,
     wake: Arc<dyn Fn() + Send + Sync>,
@@ -161,10 +168,10 @@ impl Worker {
         if let Err(e) = self.start_mcp() {
             self.emit(Event::Error(e));
         }
-        self.history.push(json!({"role": "system", "content": super::acp::SYSTEM_NOTE}));
+        self.history.push(json!({"role": "system", "content": system_prompt(&self.instructions)}));
         self.emit(Event::Ready { agent: format!("{} · {}", self.cfg.name, self.cfg.model), images: true });
         // The endpoint's models for the picker; an endpoint that does not list them shows none.
-        if let Ok(list) = model_list(&self.cfg.http, &self.cfg.base_url, self.cfg.key.as_deref()) {
+        if let Ok(list) = model_list(&self.cfg.http, self.cfg.wire, &self.cfg.base_url, self.cfg.key.as_deref()) {
             let mut available = list;
             if !self.cfg.model.is_empty() && !available.iter().any(|m| m.id == self.cfg.model) {
                 available.insert(0, ModelInfo { id: self.cfg.model.clone(), name: self.cfg.model.clone(), description: String::new() });
@@ -225,10 +232,11 @@ impl Worker {
         if self.mcp.is_none() {
             return Ok(());
         }
-        self.mcp_call(
+        let init = self.mcp_call(
             "initialize",
-            json!({"protocolVersion": "2025-06-18", "capabilities": {}, "clientInfo": {"name": "solidcraft-agent-chat", "version": env!("CARGO_PKG_VERSION")}}),
+            json!({"protocolVersion": "2025-06-18", "capabilities": {}, "clientInfo": {"name": "polykrom-agent-chat", "version": env!("CARGO_PKG_VERSION")}}),
         )?;
+        self.instructions = init.get("instructions").and_then(Value::as_str).unwrap_or("").chars().take(8000).collect();
         if let Some(m) = &self.mcp {
             m.send(&json!({"jsonrpc": "2.0", "method": "notifications/initialized"}));
         }
@@ -272,7 +280,7 @@ impl Worker {
                     return;
                 }
             };
-            let msg = reply.pointer("/choices/0/message").cloned().unwrap_or(Value::Null);
+            let msg = reply;
             if let Some(text) = msg.get("content").and_then(Value::as_str).filter(|t| !t.is_empty()) {
                 self.emit(Event::Text { thought: false, text: text.to_string() });
             }
@@ -280,6 +288,9 @@ impl Worker {
             let mut kept = json!({"role": "assistant", "content": msg.get("content").cloned().unwrap_or(Value::Null)});
             if !calls.is_empty() {
                 kept["tool_calls"] = Value::Array(calls.clone());
+            }
+            if let Some(n) = msg.get(wire::NATIVE) {
+                kept[wire::NATIVE] = n.clone();
             }
             self.history.push(kept);
             if calls.is_empty() {
@@ -323,50 +334,47 @@ impl Worker {
                     status: Some(if failed { ToolStatus::Failed } else { ToolStatus::Completed }),
                     output: Some(shown),
                 });
-                self.history.push(json!({"role": "tool", "tool_call_id": id, "content": text}));
+                let mut answer = json!({"role": "tool", "tool_call_id": id, "content": text});
+                if failed {
+                    answer[wire::FAILED] = json!(true);
+                }
+                self.history.push(answer);
             }
         }
         self.emit(Event::Text { thought: false, text: format!("\n({})", crate::i18n::tr("ui.ai_request_limit")) });
         self.emit(Event::TurnEnded { reason: "max_turn_requests".into() });
     }
 
+    /// One model request: the assistant message it answers with.
     fn request(&self) -> Result<Value, String> {
-        let mut body = json!({"model": self.cfg.model, "messages": self.history});
-        if !self.tools.is_empty() {
-            body["tools"] = Value::Array(self.tools.clone());
-            if self.no_reasoning.get() {
+        let wire = self.cfg.wire;
+        let build = |no_reasoning: bool| {
+            let mut r = wire.request(&self.cfg.base_url, &self.cfg.model, self.cfg.key.as_deref(), &self.history, &self.tools, REQUEST_TIMEOUT_S);
+            if no_reasoning && !self.tools.is_empty() && wire == Wire::OpenAi {
+                let mut body: Value = r.body.as_deref().and_then(|b| serde_json::from_slice(b).ok()).unwrap_or(Value::Null);
                 body["reasoning_effort"] = json!("none");
+                r.body = Some(body.to_string().into_bytes());
             }
-        }
-        let (status, v) = self.post(&body)?;
+            r
+        };
+        let (status, v) = self.post(build(self.no_reasoning.get()))?;
         // Some OpenAI models refuse function tools on this endpoint unless the reasoning effort is
         // "none" (HTTP 400 naming `reasoning_effort`): ask again once with it, and keep it for the
         // next requests.
-        let refused = status == 400 && !self.tools.is_empty() && !self.no_reasoning.get() && http_error(status, &v).contains("reasoning_effort");
+        let refused = wire == Wire::OpenAi
+            && status == 400
+            && !self.tools.is_empty()
+            && !self.no_reasoning.get()
+            && http_error(status, &v).contains("reasoning_effort");
         if refused {
             self.no_reasoning.set(true);
-            body["reasoning_effort"] = json!("none");
-            let (status, v) = self.post(&body)?;
-            return if status == 200 { Ok(v) } else { Err(http_error(status, &v)) };
+            let (status, v) = self.post(build(true))?;
+            return wire.reply(status, &v);
         }
-        if status != 200 {
-            return Err(http_error(status, &v));
-        }
-        Ok(v)
+        wire.reply(status, &v)
     }
 
-    fn post(&self, body: &Value) -> Result<(u16, Value), String> {
-        let mut headers = vec![("Content-Type".to_string(), "application/json".to_string())];
-        if let Some(k) = &self.cfg.key {
-            headers.push(("Authorization".into(), format!("Bearer {k}")));
-        }
-        let req = HttpRequest {
-            method: "POST",
-            url: format!("{}/chat/completions", self.cfg.base_url),
-            headers,
-            body: Some(body.to_string().into_bytes()),
-            timeout_s: REQUEST_TIMEOUT_S,
-        };
+    fn post(&self, req: HttpRequest) -> Result<(u16, Value), String> {
         // The request runs on a thread of its own so that Stop does not wait for the model: a
         // cancelled one is abandoned (the host's own timeout ends it) and its answer dropped.
         let (tx, rx) = channel();
@@ -386,23 +394,6 @@ impl Worker {
         };
         Ok((status, serde_json::from_slice(&bytes).unwrap_or(Value::Null)))
     }
-}
-
-/// An endpoint's refusal as people read it.
-pub fn http_error(status: u16, body: &Value) -> String {
-    let detail =
-        body.pointer("/error/message").or_else(|| body.get("error")).and_then(Value::as_str).unwrap_or("").chars().take(300).collect::<String>();
-    let what = match status {
-        401 | 403 => crate::i18n::tr("ui.ai_http_key"),
-        404 => crate::i18n::tr("ui.ai_http_not_found"),
-        429 => crate::i18n::tr("ui.ai_http_busy"),
-        _ => "",
-    };
-    format!(
-        "HTTP {status}{}{}",
-        if what.is_empty() { String::new() } else { format!(": {what}") },
-        if detail.is_empty() { String::new() } else { format!(" ({detail})") }
-    )
 }
 
 /// A tool call's arguments as an object: the JSON text a model sends (or an object, for servers
@@ -512,45 +503,39 @@ fn tool_title(name: &str, args: &Value) -> String {
     }
 }
 
-/// `GET {base_url}/models`: the model ids, in the order the endpoint lists them.
-fn model_ids(http: &HttpFn, base_url: &str, headers: Vec<(String, String)>) -> Result<Vec<String>, String> {
-    let req = HttpRequest { method: "GET", url: format!("{base_url}/models"), headers, body: None, timeout_s: 15 };
-    let (status, bytes) = http(&req)?;
+/// The provider's model ids, in the order it lists them.
+fn model_ids(http: &HttpFn, wire: Wire, base_url: &str, key: Option<&str>) -> Result<Vec<String>, String> {
+    if key.is_some() && !super::agents::key_safe_for(base_url) {
+        return Err(crate::i18n::tr("ui.ai_key_needs_https").to_string());
+    }
+    let (status, bytes) = http(&wire.models_request(base_url, key))?;
     let v: Value = serde_json::from_slice(&bytes).unwrap_or(Value::Null);
     if status != 200 {
         return Err(http_error(status, &v));
     }
-    Ok(v.get("data")
-        .and_then(Value::as_array)
-        .map(|a| a.iter().take(500).filter_map(|m| m.get("id").and_then(Value::as_str).map(String::from)).collect())
-        .unwrap_or_default())
+    Ok(wire.model_ids(&v))
 }
 
-/// The endpoint's models for the picker.
-pub fn model_list(http: &HttpFn, base_url: &str, key: Option<&str>) -> Result<Vec<ModelInfo>, String> {
-    let mut headers = Vec::new();
-    if let Some(k) = key {
-        if !super::agents::key_safe_for(base_url) {
-            return Err(crate::i18n::tr("ui.ai_key_needs_https").to_string());
-        }
-        headers.push(("Authorization".to_string(), format!("Bearer {k}")));
-    }
-    Ok(model_ids(http, base_url, headers)?.into_iter().map(|id| ModelInfo { name: id.clone(), id, description: String::new() }).collect())
+/// The provider's models for the picker.
+pub fn model_list(http: &HttpFn, wire: Wire, base_url: &str, key: Option<&str>) -> Result<Vec<ModelInfo>, String> {
+    Ok(model_ids(http, wire, base_url, key)?.into_iter().map(|id| ModelInfo { name: id.clone(), id, description: String::new() }).collect())
 }
 
-/// Ask an endpoint for its models (Test connection): how many, and whether `model` is one.
-pub fn test_endpoint(http: &HttpFn, base_url: &str, key: Option<&str>, model: &str) -> Result<String, String> {
-    let mut headers = Vec::new();
-    if let Some(k) = key {
-        if !super::agents::key_safe_for(base_url) {
-            return Err(crate::i18n::tr("ui.ai_key_needs_https").to_string());
-        }
-        headers.push(("Authorization".to_string(), format!("Bearer {k}")));
+/// Ask a provider for its models (Test connection): what to tell the user, and the model ids.
+pub fn test_endpoint(http: &HttpFn, wire: Wire, base_url: &str, key: Option<&str>, model: &str) -> Result<(String, Vec<String>), String> {
+    let ids = model_ids(http, wire, base_url, key)?;
+    let found = model.is_empty() || ids.iter().any(|m| m == model);
+    let line =
+        crate::i18n::format(if found { "ui.ai_test_ok" } else { "ui.ai_test_no_model" }, &[("count", &ids.len().to_string()), ("model", model)]);
+    Ok((line, ids))
+}
+
+/// The system prompt: how to work inside Polykrom, then the tools' own instructions.
+fn system_prompt(instructions: &str) -> String {
+    if instructions.is_empty() {
+        return super::acp::SYSTEM_NOTE.to_string();
     }
-    let ids = model_ids(http, base_url, headers)?;
-    let ids: Vec<&str> = ids.iter().map(String::as_str).collect();
-    let found = model.is_empty() || ids.contains(&model);
-    Ok(crate::i18n::format(if found { "ui.ai_test_ok" } else { "ui.ai_test_no_model" }, &[("count", &ids.len().to_string()), ("model", model)]))
+    format!("{}\n\n{instructions}", super::acp::SYSTEM_NOTE)
 }
 
 #[cfg(test)]
@@ -595,7 +580,7 @@ mod tests {
             let a = answers.lock().unwrap().pop().unwrap_or(json!({}));
             Ok((200, a.to_string().into_bytes()))
         });
-        let cfg = ApiConfig { name: "Test".into(), base_url: "http://localhost:1/v1".into(), model: "m".into(), key: None, http };
+        let cfg = ApiConfig { name: "Test".into(), wire: Wire::OpenAi, base_url: "http://localhost:1/v1".into(), model: "m".into(), key: None, http };
         let ctx = StartContext { cwd: std::env::temp_dir(), bridge: None, tools: None, wake: Box::new(|| {}) };
         let mut b = ApiBackend::start(cfg, ctx).unwrap();
         b.prompt(&[PromptPart::Text("measure it".into())]);
@@ -613,6 +598,59 @@ mod tests {
         let sent = seen.lock().unwrap();
         assert_eq!(sent.len(), 2);
         assert_eq!(sent[1]["messages"].as_array().unwrap().last().unwrap()["role"], "tool");
+        b.shutdown(true);
+    }
+
+    /// The same loop against Claude's Messages API: the key goes in `x-api-key`, the tool's
+    /// failure goes back as an error result next to the thinking it answered, and the model list
+    /// comes from `/models`.
+    #[test]
+    fn the_tool_loop_speaks_anthropic_messages() {
+        let answers = std::sync::Mutex::new(vec![
+            json!({"stop_reason": "end_turn", "content": [{"type": "text", "text": "Done."}]}),
+            json!({"stop_reason": "tool_use", "content": [
+                {"type": "thinking", "thinking": "measure first", "signature": "s1"},
+                {"type": "tool_use", "id": "toolu_1", "name": "measure", "input": {}}]}),
+        ]);
+        let seen = Arc::new(std::sync::Mutex::new(Vec::<HttpRequest>::new()));
+        let log = seen.clone();
+        let http: HttpFn = Arc::new(move |r: &HttpRequest| {
+            log.lock().unwrap().push(r.clone());
+            if r.method == "GET" {
+                return Ok((200, json!({"data": [{"id": "claude-opus-5-5"}]}).to_string().into_bytes()));
+            }
+            let a = answers.lock().unwrap().pop().unwrap_or(json!({}));
+            Ok((200, a.to_string().into_bytes()))
+        });
+        let cfg = ApiConfig {
+            name: "Claude".into(),
+            wire: Wire::Anthropic,
+            base_url: "https://api.anthropic.com/v1".into(),
+            model: "claude-opus-5-5".into(),
+            key: Some("sk-ant".into()),
+            http,
+        };
+        let ctx = StartContext { cwd: std::env::temp_dir(), bridge: None, tools: None, wake: Box::new(|| {}) };
+        let mut b = ApiBackend::start(cfg, ctx).unwrap();
+        b.prompt(&[PromptPart::Text("measure it".into())]);
+        let mut events = Vec::new();
+        let start = std::time::Instant::now();
+        while !events.iter().any(|e| matches!(e, Event::TurnEnded { .. })) && start.elapsed() < Duration::from_secs(10) {
+            events.extend(b.poll());
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        assert!(events.iter().any(|e| matches!(e, Event::Models { current, .. } if current == "claude-opus-5-5")), "{events:?}");
+        assert!(events.iter().any(|e| matches!(e, Event::Text { text, .. } if text == "Done.")), "{events:?}");
+        let sent = seen.lock().unwrap();
+        let posts: Vec<&HttpRequest> = sent.iter().filter(|r| r.method == "POST").collect();
+        assert_eq!(posts.len(), 2);
+        assert!(posts.iter().all(|r| r.url == "https://api.anthropic.com/v1/messages"));
+        assert!(posts[0].headers.iter().any(|(k, v)| k == "x-api-key" && v == "sk-ant"));
+        let second: Value = serde_json::from_slice(posts[1].body.as_deref().unwrap()).unwrap();
+        let m = second["messages"].as_array().unwrap();
+        assert_eq!(m[1]["content"][0]["signature"], "s1", "the thinking goes back with its signature");
+        assert_eq!(m[2]["content"][0]["tool_use_id"], "toolu_1");
+        assert_eq!(m[2]["content"][0]["is_error"], true, "no Polykrom tools here: the call failed");
         b.shutdown(true);
     }
 
@@ -641,7 +679,7 @@ mod tests {
             }
             Ok((200, json!({"choices": [{"message": {"role": "assistant", "content": "Steered."}}]}).to_string().into_bytes()))
         });
-        let cfg = ApiConfig { name: "Test".into(), base_url: "http://localhost:1/v1".into(), model: "m".into(), key: None, http };
+        let cfg = ApiConfig { name: "Test".into(), wire: Wire::OpenAi, base_url: "http://localhost:1/v1".into(), model: "m".into(), key: None, http };
         let ctx = StartContext { cwd: std::env::temp_dir(), bridge: None, tools: None, wake: Box::new(|| {}) };
         let mut b = ApiBackend::start(cfg, ctx).unwrap();
         let wait = |b: &mut ApiBackend, events: &mut Vec<Event>| {
@@ -688,7 +726,7 @@ mod tests {
             log.lock().unwrap().push(serde_json::from_slice(r.body.as_deref().unwrap_or(b"null")).unwrap());
             Ok((200, json!({"choices": [{"message": {"role": "assistant", "content": "ok"}}]}).to_string().into_bytes()))
         });
-        let cfg = ApiConfig { name: "Test".into(), base_url: "http://localhost:1/v1".into(), model: "m".into(), key: None, http };
+        let cfg = ApiConfig { name: "Test".into(), wire: Wire::OpenAi, base_url: "http://localhost:1/v1".into(), model: "m".into(), key: None, http };
         let ctx = StartContext { cwd: std::env::temp_dir(), bridge: None, tools: None, wake: Box::new(|| {}) };
         let mut b = ApiBackend::start(cfg, ctx).unwrap();
         let run = |b: &mut ApiBackend, f: &dyn Fn(&mut ApiBackend), want: usize| {
@@ -726,7 +764,8 @@ mod tests {
             log.lock().unwrap().push(serde_json::from_slice(r.body.as_deref().unwrap_or(b"null")).unwrap());
             Ok((200, json!({"choices": [{"message": {"role": "assistant", "content": "ok"}}]}).to_string().into_bytes()))
         });
-        let cfg = ApiConfig { name: "Test".into(), base_url: "http://localhost:1/v1".into(), model: "local".into(), key: None, http };
+        let cfg =
+            ApiConfig { name: "Test".into(), wire: Wire::OpenAi, base_url: "http://localhost:1/v1".into(), model: "local".into(), key: None, http };
         let ctx = StartContext { cwd: std::env::temp_dir(), bridge: None, tools: None, wake: Box::new(|| {}) };
         let mut b = ApiBackend::start(cfg, ctx).unwrap();
         let mut events = Vec::new();
@@ -775,7 +814,7 @@ mod tests {
             log.lock().unwrap().push(serde_json::from_slice(r.body.as_deref().unwrap_or(b"null")).unwrap());
             Ok((200, answers.lock().unwrap().pop().unwrap_or(json!({})).to_string().into_bytes()))
         });
-        let cfg = ApiConfig { name: "Test".into(), base_url: "http://localhost:1/v1".into(), model: "m".into(), key: None, http };
+        let cfg = ApiConfig { name: "Test".into(), wire: Wire::OpenAi, base_url: "http://localhost:1/v1".into(), model: "m".into(), key: None, http };
         let ctx = StartContext { cwd: std::env::temp_dir(), bridge: None, tools: None, wake: Box::new(|| {}) };
         let mut b = ApiBackend::start(cfg, ctx).unwrap();
         b.prompt(&[PromptPart::Text("go".into())]);
@@ -800,8 +839,9 @@ mod tests {
     #[test]
     fn keys_never_go_over_plain_http_to_another_computer() {
         let http: HttpFn = Arc::new(|_: &HttpRequest| Ok((200, b"{}".to_vec())));
-        assert!(test_endpoint(&http, "http://10.0.0.2:11434/v1", Some("k"), "m").is_err());
-        let cfg = ApiConfig { name: "x".into(), base_url: "http://10.0.0.2/v1".into(), model: "m".into(), key: Some("k".into()), http };
+        assert!(test_endpoint(&http, Wire::OpenAi, "http://10.0.0.2:11434/v1", Some("k"), "m").is_err());
+        let cfg =
+            ApiConfig { name: "x".into(), wire: Wire::OpenAi, base_url: "http://10.0.0.2/v1".into(), model: "m".into(), key: Some("k".into()), http };
         let ctx = StartContext { cwd: std::env::temp_dir(), bridge: None, tools: None, wake: Box::new(|| {}) };
         assert!(ApiBackend::start(cfg, ctx).is_err());
     }
@@ -817,13 +857,21 @@ mod tests {
             let (status, v) = answers.lock().unwrap().pop().expect("no request beyond the script");
             Ok((status, v.to_string().into_bytes()))
         });
-        let cfg = ApiConfig { name: "Test".into(), base_url: "http://localhost:1/v1".into(), model: "m".into(), key: Some("sk-secret".into()), http };
+        let cfg = ApiConfig {
+            name: "Test".into(),
+            wire: Wire::OpenAi,
+            base_url: "http://localhost:1/v1".into(),
+            model: "m".into(),
+            key: Some("sk-secret".into()),
+            http,
+        };
         let (events, _rx) = channel();
         let w = Worker {
             cfg,
             mcp: None,
             next: 0,
             tools: vec![json!({"type": "function", "function": {"name": "measure"}})],
+            instructions: String::new(),
             history: vec![json!({"role": "user", "content": "hi"})],
             events,
             wake: Arc::new(|| {}),
@@ -843,8 +891,8 @@ mod tests {
     fn a_refusal_of_tools_with_reasoning_effort_is_replayed_once_with_none() {
         let ok = json!({"choices": [{"message": {"role": "assistant", "content": "Done."}}]});
         let (w, seen) = scripted_worker(vec![refusal(), (200, ok.clone()), (200, ok.clone())]);
-        assert_eq!(w.request().unwrap(), ok);
-        assert_eq!(w.request().unwrap(), ok);
+        assert_eq!(w.request().unwrap(), ok["choices"][0]["message"]);
+        assert_eq!(w.request().unwrap(), ok["choices"][0]["message"]);
         let sent = seen.lock().unwrap();
         assert_eq!(sent.len(), 3);
         assert!(sent[0].get("reasoning_effort").is_none());

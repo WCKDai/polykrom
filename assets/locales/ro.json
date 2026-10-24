@@ -1252,7 +1252,6 @@
   "ui.ai_add": "Adaugă",
   "ui.ai_add_agent": "Adaugă agent…",
   "ui.ai_add_agent_title": "Adaugă agent",
-  "ui.ai_add_api": "API compatibil OpenAI",
   "ui.ai_add_custom": "Comandă personalizată",
   "ui.ai_add_installed": "Agent instalat",
   "ui.ai_add_installed_note": "O intrare proprie pentru un agent instalat, de exemplu cu alte argumente. Agenții instalați sunt listați automat.",

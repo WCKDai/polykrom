@@ -1253,7 +1253,6 @@
   "ui.ai_add": "Thêm",
   "ui.ai_add_agent": "Thêm AI Agent…",
   "ui.ai_add_agent_title": "Thêm AI Agent",
-  "ui.ai_add_api": "API tương thích OpenAI",
   "ui.ai_add_custom": "Lệnh tùy chỉnh",
   "ui.ai_add_installed": "Tác tử đã cài đặt",
   "ui.ai_add_installed_note": "Mục riêng của bạn cho một tác tử đã cài đặt, ví dụ với các tham số bổ sung. Các tác tử đã cài đặt sẽ được liệt kê riêng.",

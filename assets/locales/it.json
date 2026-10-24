@@ -1256,7 +1256,6 @@
   "ui.ai_add": "Aggiungi",
   "ui.ai_add_agent": "Aggiungi agente…",
   "ui.ai_add_agent_title": "Aggiungi agente",
-  "ui.ai_add_api": "API compatibile con OpenAI",
   "ui.ai_add_custom": "Comando personalizzato",
   "ui.ai_add_installed": "Agente installato",
   "ui.ai_add_installed_note": "Una voce personalizzata per un agente installato, ad esempio con argomenti diversi. Gli agenti installati vengono elencati automaticamente.",

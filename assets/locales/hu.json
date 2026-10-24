@@ -1252,7 +1252,6 @@
   "ui.ai_add": "Hozzáadás",
   "ui.ai_add_agent": "Ügynök hozzáadása…",
   "ui.ai_add_agent_title": "Ügynök hozzáadása",
-  "ui.ai_add_api": "OpenAI-kompatibilis API",
   "ui.ai_add_custom": "Egyéni parancs",
   "ui.ai_add_installed": "Telepített ügynök",
   "ui.ai_add_installed_note": "Saját bejegyzés egy telepített ügynökhöz, például más argumentumokkal. A telepített ügynökök maguktól megjelennek.",

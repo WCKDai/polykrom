@@ -1252,7 +1252,6 @@
   "ui.ai_add": "新增",
   "ui.ai_add_agent": "新增代理…",
   "ui.ai_add_agent_title": "新增代理",
-  "ui.ai_add_api": "OpenAI 相容 API",
   "ui.ai_add_custom": "自訂命令",
   "ui.ai_add_installed": "已安裝的代理",
   "ui.ai_add_installed_note": "為已安裝的代理新增一個自己的項目，例如使用其他參數。已安裝的代理會自動列出。",

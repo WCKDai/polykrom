@@ -1252,7 +1252,6 @@
   "ui.ai_add": "Toevoegen",
   "ui.ai_add_agent": "Agent toevoegen…",
   "ui.ai_add_agent_title": "Agent toevoegen",
-  "ui.ai_add_api": "OpenAI-compatibele API",
   "ui.ai_add_custom": "Aangepaste opdracht",
   "ui.ai_add_installed": "Geïnstalleerde agent",
   "ui.ai_add_installed_note": "Een eigen item voor een geïnstalleerde agent, bijvoorbeeld met andere argumenten. Geïnstalleerde agents worden vanzelf weergegeven.",

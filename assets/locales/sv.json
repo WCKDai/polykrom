@@ -1252,7 +1252,6 @@
   "ui.ai_add": "Lägg till",
   "ui.ai_add_agent": "Lägg till agent…",
   "ui.ai_add_agent_title": "Lägg till agent",
-  "ui.ai_add_api": "OpenAI-kompatibelt API",
   "ui.ai_add_custom": "Eget kommando",
   "ui.ai_add_installed": "Installerad agent",
   "ui.ai_add_installed_note": "En egen post för en installerad agent, till exempel med andra argument. Installerade agenter listas av sig själva.",
