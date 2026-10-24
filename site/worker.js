@@ -1,16 +1,19 @@
-// cad.polykrom.app. Static files are served as they are, except the app's wasm module: it is
-// larger than Cloudflare's 25 MiB limit for one file, so it is stored gzip-compressed as
-// NAME.wasm.gz and served here as NAME.wasm with Content-Encoding: gzip, which browsers decode.
+// cad.polykrom.app. Static files are served as they are, except two stored gzip-compressed as
+// NAME.gz and served here as NAME with Content-Encoding: gzip, which browsers decode: the app's
+// wasm module (larger than Cloudflare's 25 MiB limit for one file) and a showcase's mesh pack
+// (binary, which Cloudflare does not compress on the way).
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
-    if (url.pathname.startsWith("/app/") && url.pathname.endsWith(".wasm")) {
+    const wasm = url.pathname.startsWith("/app/") && url.pathname.endsWith(".wasm");
+    const pack = url.pathname.endsWith("/meshes.bin");
+    if (wasm || pack) {
       const gz = await env.ASSETS.fetch(new Request(new URL(url.pathname + ".gz", url), request));
       if (gz.ok) {
         return new Response(gz.body, {
           status: 200,
           headers: {
-            "Content-Type": "application/wasm",
+            "Content-Type": wasm ? "application/wasm" : "application/octet-stream",
             "Content-Encoding": "gzip",
             "Cache-Control": "public, max-age=31536000, immutable",
           },

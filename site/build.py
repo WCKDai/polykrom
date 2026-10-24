@@ -65,6 +65,8 @@ def main():
     shutil.copy2(ROOT / 'site' / '404.html', OUT / '404.html')
     (OUT / 'mark.svg').write_text(gem(100, False).replace('role="img" aria-label="Polykrom"', 'xmlns="http://www.w3.org/2000/svg"'))
     shutil.copytree(ROOT / 'site' / 'screens', OUT / 'screens')
+    # The showcases' 3D viewer, shared by their pages.
+    shutil.copytree(ROOT / 'site' / 'shared', OUT / 'shared')
     for f in ('atkinson-hyperlegible-next/AtkinsonHyperlegibleNext-Variable.ttf', 'atkinson-hyperlegible-mono/AtkinsonHyperlegibleMono-Regular.ttf'):
         shutil.copy2(ROOT / 'assets' / 'fonts' / f, OUT / 'fonts')
     for src, dst in ((ROOT / 'dist' / 'web', 'app'), (ROOT / 'target' / 'book', 'docs')):
@@ -74,6 +76,64 @@ def main():
             print('note: %s is missing, so /%s/ is not in this build' % (src.relative_to(ROOT), dst))
     precompress(OUT / 'app')
     kestrel()
+    so101()
+
+
+# The SO-101 showcase design: LeRobot's arm (TheRobotStudio SO-ARM100, Apache-2.0, commit a758567c)
+# as the agent left it. It is 10 MB, so it lives on the media branch, pinned by its hash.
+SO101_URL = 'https://raw.githubusercontent.com/wckdboy/polykrom/66e346a6/so101.polykrom'
+SO101_SHA256 = 'b8d6e9c87f12d318e46c2128f35b028b0dc978579312d5b977ba8b9a8df79edb'
+SO101_LICENSE_URL = 'https://raw.githubusercontent.com/wckdboy/polykrom/66e346a6/so101-SO-ARM100-LICENSE.txt'
+
+
+def so101():
+    """The SO-101 showcase: its page in site/so101; the design fetched (and checked) from the media
+    branch; the URDF, a mesh pack for the viewer, the motion data, the GIF and a poster made from it
+    by the CLI, so they always match it."""
+    import hashlib, json, os, subprocess, tempfile, urllib.request, zipfile
+    out = OUT / 'so101'
+    shutil.copytree(ROOT / 'site' / 'so101', out)
+    cli = Path(os.environ.get('POLYKROM_CLI', ROOT / 'target' / 'release' / 'solidcraft-cli'))
+    if not cli.exists():
+        print('note: %s is missing, so the SO-101 showcase has no model in this build' % cli)
+        return
+    cache = ROOT / 'target' / 'showcase-cache'
+    cache.mkdir(parents=True, exist_ok=True)
+    design = cache / ('so101-%s.polykrom' % SO101_SHA256[:12])
+    if not design.exists():
+        data = urllib.request.urlopen(SO101_URL, timeout=120).read()
+        if hashlib.sha256(data).hexdigest() != SO101_SHA256:
+            sys.exit('so101.polykrom from the media branch does not match its pinned hash')
+        design.write_bytes(data)
+    shutil.copy2(design, out / 'so101.polykrom')
+    (out / 'SO-ARM100-LICENSE.txt').write_bytes(urllib.request.urlopen(SO101_LICENSE_URL, timeout=60).read())
+    with tempfile.TemporaryDirectory() as tmp:
+        urdf = Path(tmp) / 'urdf'
+        urdf.mkdir()
+        script = {'commands': [
+            {'command': 'file.export', 'params': {'path': str(urdf / 'so101.urdf')}},
+            {'command': 'motion.plot', 'params': {'study': 'Pick and Place'}},
+            {'command': 'motion.export_animation', 'params': {'study': 'Pick and Place', 'path': str(out / 'so101.gif'), 'width': 800, 'height': 500}},
+        ]}
+        sc, res = Path(tmp) / 'so101.json', Path(tmp) / 'so101.out.json'
+        sc.write_text(json.dumps(script))
+        subprocess.run([str(cli), 'run', str(sc), '--in', str(design), '--quiet', '--results', '--json-out', str(res)], check=True)
+        plot = json.loads(res.read_text())[1]
+        (out / 'motion.json').write_text(json.dumps({'steps': plot['steps'], 'joints': [
+            {'name': j['name'], 'unit': j['unit'], 'value': [round(v, 4) for v in j['value']]} for j in plot['joints']]}, separators=(',', ':')))
+        sys.path.insert(0, str(ROOT / 'site'))
+        import meshpack
+        (out / 'urdf').mkdir()
+        shutil.copy2(urdf / 'so101.urdf', out / 'urdf' / 'so101.urdf')
+        meshpack.pack(urdf, out / 'meshes.bin', out / 'meshes.json')
+        # Served gzip-compressed by worker.js (Cloudflare does not compress binary files).
+        import gzip
+        (out / 'meshes.bin.gz').write_bytes(gzip.compress((out / 'meshes.bin').read_bytes(), 9))
+        (out / 'meshes.bin').unlink()
+        with zipfile.ZipFile(out / 'so101-urdf.zip', 'w', zipfile.ZIP_DEFLATED) as z:
+            for f in sorted(urdf.iterdir()):
+                z.write(f, 'so101/' + f.name)
+    subprocess.run([str(cli), 'snapshot', '--in', str(design), '--out', str(out / 'so101-poster.png'), '--width', '1200', '--height', '630', '--view', 'iso', '--no-grid'], check=True)
 
 
 def kestrel():

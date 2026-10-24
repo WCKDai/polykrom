@@ -3,6 +3,7 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { STLLoader } from "three/addons/loaders/STLLoader.js";
+import { toCreasedNormals } from "three/addons/utils/BufferGeometryUtils.js";
 
 const safe = (n) => n.replace(/[^A-Za-z0-9_]/g, "_");
 const nums = (s, d = "0 0 0") => (s || d).trim().split(/\s+/).map(Number);
@@ -63,6 +64,22 @@ export function buildRobot(xml, visual = () => {}) {
   return { links, joints, roots, set };
 }
 
+/** One mesh of a pack (meshpack.py): 16-bit positions within the mesh's box, shared vertices,
+ * 16- or 32-bit indices. Returned with creased normals, so hard edges stay sharp. */
+export function packedGeometry(buffer, m) {
+  const q = new Uint16Array(buffer, m.pos, m.verts * 3);
+  const pos = new Float32Array(m.verts * 3);
+  for (let i = 0; i < pos.length; i++) {
+    const k = i % 3;
+    pos[i] = m.min[k] + (q[i] / 65535) * (m.max[k] - m.min[k]);
+  }
+  const idx = m.wide ? new Uint32Array(buffer, m.idx, m.count) : new Uint16Array(buffer, m.idx, m.count);
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+  geo.setIndex(new THREE.BufferAttribute(m.wide ? new Uint32Array(idx) : new Uint16Array(idx), 1));
+  return geo;
+}
+
 /** Motion-study tracks (motion.plot's joints, degrees and millimetres) as URDF values per step. */
 export function tracks(motion) {
   const ts = (motion?.joints || []).map((t) => ({ name: safe(t.name), k: t.unit === "deg" ? Math.PI / 180 : 0.001, v: t.value }));
@@ -77,7 +94,7 @@ export function tracks(motion) {
   return { steps, at };
 }
 
-export async function mount(root, { urdf, motion, onStep, colors = {} }) {
+export async function mount(root, { urdf, motion, onStep, colors = {}, pack, camera: view }) {
   const css = getComputedStyle(document.documentElement);
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
@@ -86,9 +103,9 @@ export async function mount(root, { urdf, motion, onStep, colors = {} }) {
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(35, 1, 0.005, 20);
   camera.up.set(0, 0, 1);
-  camera.position.set(0.55, -0.62, 0.42);
+  camera.position.set(...(view?.position || [0.55, -0.62, 0.42]));
   const controls = new OrbitControls(camera, renderer.domElement);
-  controls.target.set(0.03, 0, 0.16);
+  controls.target.set(...(view?.target || [0.03, 0, 0.16]));
   controls.enableDamping = true;
   scene.add(new THREE.HemisphereLight(0xdfe9f2, 0x2a2b31, 1.6));
   const key = new THREE.DirectionalLight(0xffffff, 2.2);
@@ -107,6 +124,8 @@ export async function mount(root, { urdf, motion, onStep, colors = {} }) {
   const xml = new DOMParser().parseFromString(await (await fetch(base)).text(), "application/xml");
   const loader = new STLLoader();
   const loads = [];
+  // A pack (one file for every mesh) when the page gives one, else one STL per mesh.
+  const packed = pack ? await Promise.all([fetch(pack.bin).then((r) => r.arrayBuffer()), fetch(pack.json).then((r) => r.json())]) : null;
   const robot = buildRobot(xml, (link, v, f) => {
     const mesh = kid(kid(v, "geometry"), "mesh");
     // The part's material look when the page gives one (by link), else the URDF's colour.
@@ -115,8 +134,10 @@ export async function mount(root, { urdf, motion, onStep, colors = {} }) {
     const [r, gg, b] = nums(c && c.getAttribute("rgba"), "0.7 0.72 0.76 1");
     const mat = new THREE.MeshStandardMaterial(look ? { ...look, color: new THREE.Color(look.color) } : { color: new THREE.Color(r, gg, b), metalness: 0.35, roughness: 0.45 });
     const url = new URL(mesh.getAttribute("filename").replace(/^package:\/\/[^/]+\//, ""), base);
-    loads.push(loader.loadAsync(url.href).then((geo) => {
-      geo.computeVertexNormals();
+    const file = mesh.getAttribute("filename").split("/").pop();
+    const entry = packed && packed[1].meshes[file];
+    const geometry = entry ? Promise.resolve(toCreasedNormals(packedGeometry(packed[0], entry), Math.PI / 6)) : loader.loadAsync(url.href).then((g) => (g.computeVertexNormals(), g));
+    loads.push(geometry.then((geo) => {
       const m = new THREE.Mesh(geo, mat);
       const [sx, sy, sz] = nums(mesh.getAttribute("scale"), "1 1 1");
       m.scale.set(sx, sy, sz);
