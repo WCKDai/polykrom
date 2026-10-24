@@ -59,6 +59,7 @@ pub(crate) mod motion;
 mod parts;
 mod script;
 mod section;
+mod tri_tree;
 pub(crate) use measure_sel::measure_items;
 #[cfg(test)]
 mod kernel_heal_tests;
