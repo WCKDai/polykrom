@@ -19,7 +19,8 @@ fn body<'a>(m: &'a Value, name: &str) -> &'a Value {
 #[test]
 fn measurements_are_kept_until_the_body_changes_or_moves() {
     let mut s = Session::default();
-    let c = run(&mut s, "component.create", json!({"name": "Block"}));
+    // Free, so it can be moved (a design's first part is grounded by default).
+    let c = run(&mut s, "component.create", json!({"name": "Block", "grounded": false}));
     run(&mut s, "solid.box", json!({"length": 20, "width": 10, "height": 5, "corner": [0, 0, 0], "body_name": "B"}));
     run(&mut s, "component.activate", json!({"component": "root"}));
     let first = run(&mut s, "inspect.measure", json!({}));
