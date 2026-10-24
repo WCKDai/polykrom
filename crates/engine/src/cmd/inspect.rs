@@ -53,6 +53,13 @@ pub static COMMANDS: &[CommandSpec] = &[
         .params("command: a command id. Returns {id, label, params, input, output} (and param_warnings in the warn parameter-check mode): the command's parameter documentation and, once the command has a typed contract, the JSON Schemas (2020-12) of its parameters and of a successful result (null otherwise). Read-only."),
 ];
 
+/// Body measurements kept between calls, by [`solidcraft_doc::ModelBody::geometry_key`].
+#[derive(Default)]
+pub(crate) struct MeasureCache(std::collections::HashMap<u64, Value>);
+
+/// Bodies [`MeasureCache`] keeps; it starts over when full.
+const MAX_MEASURED: usize = 20_000;
+
 pub fn measure_json(b: &solidcraft_doc::ModelBody) -> Value {
     match solidcraft_kernel::measure(&b.body) {
         Ok(m) => json!({
@@ -78,12 +85,36 @@ fn measure(s: &mut Session, p: &Value) -> Result<Value> {
     let want = string_list(p, "bodies");
     let st = s.world_state();
     let selected: Vec<_> = st.bodies.iter().filter(|b| want.is_empty() || want.contains(&b.name)).collect();
-    // Each body is measured on its own: on all cores, in body order.
-    let mut bodies: Vec<Value> = solidcraft_kernel::map_on_threads(&selected, 16, |b| measure_json(b))
-        .into_iter()
-        .zip(&selected)
-        .map(|(m, b)| m.unwrap_or_else(|| json!({"name": b.name, "error": "measuring this body failed"})))
-        .collect();
+    // Bodies measured before and unchanged since (same geometry, same place) come from the cache;
+    // the rest are measured, each on its own, on all cores, and kept.
+    let known: Vec<Option<Value>> = {
+        let cache = s.measure_cache.lock().ok();
+        selected.iter().map(|b| b.geometry_key().and_then(|k| cache.as_ref()?.0.get(&k).cloned())).collect()
+    };
+    let todo: Vec<&&solidcraft_doc::ModelBody> = selected.iter().zip(&known).filter(|(_, k)| k.is_none()).map(|(b, _)| b).collect();
+    let mut fresh = solidcraft_kernel::map_on_threads(&todo, 16, |b| measure_json(b)).into_iter();
+    let mut bodies: Vec<Value> = Vec::with_capacity(selected.len());
+    for (b, k) in selected.iter().zip(known) {
+        let v = match k {
+            Some(mut v) => {
+                v["name"] = json!(b.name);
+                v
+            }
+            None => {
+                let v = fresh.next().flatten().unwrap_or_else(|| json!({"name": b.name, "error": "measuring this body failed"}));
+                if v.get("error").is_none()
+                    && let (Some(key), Ok(mut cache)) = (b.geometry_key(), s.measure_cache.lock())
+                {
+                    if cache.0.len() >= MAX_MEASURED {
+                        cache.0.clear();
+                    }
+                    cache.0.insert(key, v.clone());
+                }
+                v
+            }
+        };
+        bodies.push(v);
+    }
     // Mass from each body's material.
     for (b, body) in bodies.iter_mut().zip(selected) {
         if let Some(v) = b["volume_mm3"].as_f64() {
@@ -644,3 +675,7 @@ fn material_list(s: &mut Session, _p: &Value) -> Result<Value> {
     );
     Ok(json!({"materials": built_in.chain(user).collect::<Vec<_>>()}))
 }
+
+#[cfg(test)]
+#[path = "measure_cache_tests.rs"]
+mod measure_cache_tests;

@@ -45,7 +45,7 @@ pub use view_dxf::sketch::exportable as view_dxf_exportable;
 mod component_link;
 mod config;
 mod file;
-mod inspect;
+pub(crate) mod inspect;
 mod interference;
 pub(crate) mod joints;
 mod libraries;
