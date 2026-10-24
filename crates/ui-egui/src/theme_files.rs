@@ -356,6 +356,15 @@ fn colors_for_key(key: &str, value: &Value, len: usize) -> Result<Vec<Color32>, 
     {
         return colors_of(&Value::Array(colors.iter().take(len).cloned().collect()), len);
     }
+    // Polykrom's mark adds a fourth tone, its seams. A three-face logo (SolidCraft's themes and
+    // exports) sets the faces; the seams keep the base theme's.
+    if key == "logo"
+        && len == 4
+        && let Value::Array(colors) = value
+        && colors.len() == 3
+    {
+        return colors_of(value, 3);
+    }
     colors_of(value, len)
 }
 
@@ -464,8 +473,9 @@ pub fn resolve(theme: &ThemeFile) -> Tokens {
     for (k, v) in &theme.colors {
         if let Some(s) = slot(&mut t, k)
             && let Ok(c) = colors_for_key(k, v, s.len())
+            && let Some(head) = s.get_mut(..c.len())
         {
-            s.copy_from_slice(&c);
+            head.copy_from_slice(&c);
         }
     }
     for (key, value) in &theme.radii {

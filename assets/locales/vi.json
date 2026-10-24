@@ -1176,7 +1176,7 @@
   "ui.3d_mouse_not_calibrated": "Chưa hiệu chuẩn",
   "ui.3d_mouse_offer": "Hiệu chuẩn chuột 3D sẽ sửa các trục bị hoán đổi hoặc đảo ngược và chỉnh tốc độ cũng như cảm giác.",
   "ui.3d_mouse_offer_never": "Không hiện lại",
-  "ui.3d_mouse_offer_swap": "Chuyển sang Hidraw (điều khiển trực tiếp)",
+  "ui.3d_mouse_offer_swap": "Dùng Hidraw (điều khiển trực tiếp)",
   "ui.3d_mouse_reading": "Giá trị đọc",
   "ui.3d_mouse_reset_axes": "Đặt lại phép gán trục",
   "ui.3d_mouse_reset_view": "Đặt lại khung nhìn",
