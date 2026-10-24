@@ -73,6 +73,32 @@ def main():
         else:
             print('note: %s is missing, so /%s/ is not in this build' % (src.relative_to(ROOT), dst))
     precompress(OUT / 'app')
+    kestrel()
+
+
+def kestrel():
+    """The Kestrel showcase. Its page and data are in site/kestrel. The files it shows (the URDF and
+    its meshes, the GIF, the BOM and a poster) are made here from kestrel.polykrom by Polykrom's CLI,
+    so they always match the design (POLYKROM_CLI, else target/release/solidcraft-cli)."""
+    import json, os, subprocess, tempfile
+    src, out = ROOT / 'site' / 'kestrel', OUT / 'kestrel'
+    shutil.copytree(src, out)
+    cli = Path(os.environ.get('POLYKROM_CLI', ROOT / 'target' / 'release' / 'solidcraft-cli'))
+    if not cli.exists():
+        print('note: %s is missing, so the Kestrel downloads and animation are not in this build' % cli)
+        return
+    design = out / 'kestrel.polykrom'
+    (out / 'urdf').mkdir()
+    script = {'commands': [
+        {'command': 'file.export', 'params': {'path': str(out / 'urdf' / 'kestrel.urdf')}},
+        {'command': 'assembly.bom', 'params': {'path': str(out / 'kestrel-bom.csv')}},
+        {'command': 'motion.export_animation', 'params': {'study': 'Pick and Place', 'path': str(out / 'kestrel.gif'), 'width': 800, 'height': 500}},
+    ]}
+    with tempfile.TemporaryDirectory() as tmp:
+        sc = Path(tmp) / 'kestrel.json'
+        sc.write_text(json.dumps(script))
+        subprocess.run([str(cli), 'run', str(sc), '--in', str(design), '--quiet'], check=True)
+        subprocess.run([str(cli), 'snapshot', '--in', str(design), '--out', str(out / 'kestrel-poster.png'), '--width', '1200', '--height', '630', '--view', 'iso', '--no-grid'], check=True)
 
 
 def precompress(app):

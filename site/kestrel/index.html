@@ -1,0 +1,301 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Kestrel · Polykrom</title>
+<meta name="description" content="A desktop pick-and-place robot arm designed in Polykrom by an AI agent: assemblies, gear and motion links, library hardware, fitment sweeps, a motion study, FEA, URDF. Verified independently, with what this version can't do yet.">
+<meta property="og:title" content="Kestrel, built by an AI in Polykrom">
+<meta property="og:description" content="Assemblies, joints, gears, fitment, motion, stress and URDF, from plain-language specs. Every number verified, every shortfall listed.">
+<meta property="og:image" content="https://cad.polykrom.app/kestrel/kestrel-poster.png">
+<meta name="theme-color" content="#111214">
+<link rel="icon" href="../mark.svg" type="image/svg+xml">
+<script type="importmap">
+{"imports": {"three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}
+</script>
+<style>
+@font-face { font-family: "Atkinson Hyperlegible Next"; src: url("../fonts/AtkinsonHyperlegibleNext-Variable.ttf") format("truetype"); font-weight: 200 800; font-display: swap; }
+@font-face { font-family: "Atkinson Hyperlegible Mono"; src: url("../fonts/AtkinsonHyperlegibleMono-Regular.ttf") format("truetype"); font-weight: 400; font-display: swap; }
+:root {
+  --bg: #111214; --panel: #18191c; --raised: #202125; --rule: #2c2d33;
+  --fg: #e8e8ec; --muted: #9b9ca6; --cyan: #3fcad3; --indigo: #8b8bf0; --amber: #e8b04a; --ok: #5fcf8a;
+  --ui: "Atkinson Hyperlegible Next", system-ui, "Segoe UI", sans-serif;
+  --mono: "Atkinson Hyperlegible Mono", ui-monospace, Menlo, monospace;
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: light) { :root {
+  --bg: #f6f6f8; --panel: #ffffff; --raised: #ececf0; --rule: #dcdce3;
+  --fg: #1b1c21; --muted: #5d5e69; --cyan: #0d8a94; --indigo: #4f4fc9; --amber: #a66b00; --ok: #1f8a4c; color-scheme: light } }
+* { box-sizing: border-box }
+html { -webkit-text-size-adjust: 100% }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 400 17px/1.6 var(--ui) }
+a { color: var(--cyan) }
+.band { padding-left: max(20px, env(safe-area-inset-left)); padding-right: max(20px, env(safe-area-inset-right)) }
+.in { max-width: 1160px; margin: 0 auto }
+nav.band { padding-block: 18px; border-bottom: 1px solid var(--rule) }
+nav .in { display: flex; align-items: center; gap: 22px; flex-wrap: wrap }
+nav .brand { font-weight: 800; font-size: 19px; color: var(--fg); text-decoration: none; margin-right: auto }
+nav a.l { color: var(--muted); text-decoration: none; font-weight: 500 } nav a.l:hover { color: var(--fg) }
+header.band { padding-block: 56px 20px }
+.kicker { font-family: var(--mono); font-size: 13px; letter-spacing: .08em; text-transform: uppercase; color: var(--cyan); margin: 0 0 10px }
+h1 { font-weight: 800; font-size: clamp(36px, 5.6vw, 60px); line-height: 1.03; letter-spacing: -0.025em; margin: 0 0 16px; text-wrap: balance }
+h1 em { font-style: normal; color: var(--cyan) }
+.lede { font-size: 19px; color: var(--muted); max-width: 44em; margin: 0 }
+.viewer.band { padding-block: 28px 12px }
+.stage3d { position: relative; height: min(68vh, 620px); min-height: 360px; border: 1px solid var(--rule); border-radius: 16px; overflow: hidden;
+  background: radial-gradient(120% 90% at 50% 30%, var(--raised), var(--bg)) }
+.stage3d canvas { display: block; width: 100%; height: 100% }
+.hud { position: absolute; left: 14px; right: 14px; bottom: 12px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap;
+  background: color-mix(in srgb, var(--panel) 82%, transparent); backdrop-filter: blur(8px); border: 1px solid var(--rule); border-radius: 12px; padding: 10px 12px }
+.hud button { font: 700 14px var(--ui); color: var(--bg); background: var(--cyan); border: 0; border-radius: 8px; padding: 7px 14px; cursor: pointer; min-width: 72px }
+.hud input[type=range] { flex: 1 1 200px; accent-color: var(--cyan); min-width: 0 }
+.hud .read { font-family: var(--mono); font-size: 13px; color: var(--muted); display: flex; gap: 14px; flex-wrap: wrap; font-variant-numeric: tabular-nums }
+.hud .read b { color: var(--fg); font-weight: 400 }
+.loading { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); font-family: var(--mono); font-size: 14px }
+.caption { color: var(--muted); font-size: 14px; margin: 10px 0 0 }
+.stats { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px; margin: 28px 0 0 }
+.stat { background: var(--panel); border: 1px solid var(--rule); border-radius: 12px; padding: 14px 16px; min-width: 0 }
+.stat .n { font-family: var(--mono); font-size: 26px; font-variant-numeric: tabular-nums; line-height: 1.1 }
+.stat .t { color: var(--muted); font-size: 13.5px }
+section.band { padding-block: 64px; border-top: 1px solid var(--rule) }
+h2 { font-weight: 800; font-size: clamp(26px, 3.4vw, 36px); letter-spacing: -0.015em; margin: 0 0 12px; text-wrap: balance }
+h3 { margin: 0; font-size: 19px }
+.sub { color: var(--muted); max-width: 46em; margin: 0 0 30px }
+.stages { display: grid; gap: 14px; counter-reset: s }
+.st { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 22px; background: var(--panel); border: 1px solid var(--rule); border-radius: 14px; padding: 20px 22px }
+.st .meta { font-family: var(--mono); font-size: 13px; color: var(--muted); display: grid; gap: 4px; align-content: start }
+.st .meta .name { font-family: var(--ui); font-size: 18px; font-weight: 800; color: var(--fg) }
+.st .body { display: grid; gap: 10px; min-width: 0 }
+.st .ask { color: var(--muted); font-size: 15px; border-left: 3px solid var(--rule); padding-left: 12px; margin: 0 }
+.st ul { margin: 0; padding-left: 18px; display: grid; gap: 4px }
+.tag { display: inline-block; font-family: var(--mono); font-size: 12px; padding: 1px 8px; border-radius: 999px; border: 1px solid var(--rule); color: var(--muted); margin-right: 6px }
+.tag.v { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 45%, var(--rule)) }
+.tag.w { color: var(--amber); border-color: color-mix(in srgb, var(--amber) 45%, var(--rule)) }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px }
+.grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px }
+.card { background: var(--panel); border: 1px solid var(--rule); border-radius: 14px; padding: 20px; display: grid; gap: 8px; align-content: start; min-width: 0 }
+.card p { margin: 0; color: var(--muted); font-size: 15.5px }
+.card ul { margin: 0; padding-left: 18px; color: var(--muted); font-size: 15px }
+.num { font-family: var(--mono); font-variant-numeric: tabular-nums; color: var(--fg) }
+figure { margin: 0 } figure img { width: 100%; height: auto; display: block; border-radius: 12px; border: 1px solid var(--rule) }
+figcaption { color: var(--muted); font-size: 14px; margin-top: 8px }
+.short { display: grid; gap: 12px }
+.gap { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 18px; background: var(--panel); border: 1px solid var(--rule); border-left: 3px solid var(--amber); border-radius: 12px; padding: 16px 18px }
+.gap .area { font-family: var(--mono); font-size: 13px; color: var(--amber); text-transform: uppercase; letter-spacing: .06em }
+.gap p { margin: 0 } .gap p + p { color: var(--muted); font-size: 15px; margin-top: 6px }
+table { width: 100%; border-collapse: collapse; font-size: 15px }
+th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--rule); vertical-align: top }
+th { color: var(--muted); font-weight: 500; font-size: 13.5px }
+td.n { font-family: var(--mono); text-align: right; font-variant-numeric: tabular-nums }
+.scroll { overflow-x: auto }
+.dl { display: flex; gap: 10px; flex-wrap: wrap }
+.btn { display: inline-flex; align-items: center; gap: 8px; padding: 11px 18px; border-radius: 10px; font-weight: 700; text-decoration: none; border: 1px solid var(--rule); color: var(--fg); background: var(--panel) }
+.btn.go { background: var(--cyan); color: #06292c; border-color: transparent }
+footer.band { padding-block: 40px 56px; border-top: 1px solid var(--rule); color: var(--muted); font-size: 15px }
+@media (max-width: 900px) { .stats { grid-template-columns: repeat(3, minmax(0, 1fr)) } .st, .gap { grid-template-columns: 1fr } .grid2, .grid3 { grid-template-columns: 1fr } }
+@media (max-width: 480px) { .stats { grid-template-columns: repeat(2, minmax(0, 1fr)) } }
+</style>
+</head>
+<body>
+<nav class="band"><div class="in">
+  <a class="brand" href="../">Polykrom</a>
+  <a class="l" href="../app/">Open in browser</a>
+  <a class="l" href="../docs/">Docs</a>
+  <a class="l" href="https://github.com/wckdboy/polykrom/blob/main/docs/ROADMAP.md">Roadmap</a>
+  <a class="l" href="https://github.com/wckdboy/polykrom">GitHub</a>
+</div></nav>
+
+<header class="band"><div class="in">
+  <p class="kicker">Showcase · Kestrel</p>
+  <h1>A robot arm, designed by an <em>AI agent</em> in Polykrom, then checked by everything but its word.</h1>
+  <p class="lede">Seven plain-language briefs, one agent, Polykrom's MCP tools and nothing else. Kestrel is a desktop pick-and-place arm: a gear-driven turntable, shoulder and elbow, a coupled parallel gripper, standard hardware from the library, a motion study, a stress study and a robot description for simulators. Every number below was re-measured on the saved design by an independent script. The last section lists what this version can't do yet.</p>
+</div></header>
+
+<div class="viewer band"><div class="in">
+  <div class="stage3d" id="stage" aria-label="Kestrel in 3D, playing its pick-and-place motion study">
+    <div class="loading" id="loading">Loading Kestrel…</div>
+    <div class="hud">
+      <button id="play" type="button">Pause</button>
+      <input id="scrub" type="range" min="0" max="120" step="0.1" value="0" aria-label="Motion study step">
+      <div class="read"><span>step <b id="r-step">0</b></span><span>yaw <b id="r-yaw">0°</b></span><span>shoulder <b id="r-sh">0°</b></span><span>elbow <b id="r-el">0°</b></span><span>grip <b id="r-jaw">40 mm</b></span></div>
+    </div>
+  </div>
+  <p class="caption">Live: the URDF Polykrom exported (one mesh per part, joints in metres) driven by the motion study's recorded joint values. Drag to orbit, scroll to zoom.</p>
+  <div class="stats">
+    <div class="stat"><div class="n">7</div><div class="t">briefs, one agent</div></div>
+    <div class="stat"><div class="n">21</div><div class="t">bodies in 21 parts</div></div>
+    <div class="stat"><div class="n">6+2</div><div class="t">joints + gear &amp; jaw links</div></div>
+    <div class="stat"><div class="n">1.54 kg</div><div class="t">from real materials</div></div>
+    <div class="stat"><div class="n" id="s-min">28 min</div><div class="t">agent time, all stages</div></div>
+    <div class="stat"><div class="n" id="s-cost">$10</div><div class="t">model cost, all stages</div></div>
+  </div>
+</div></div>
+
+<section class="band"><div class="in">
+  <h2>How it was built</h2>
+  <p class="sub">Each stage was one request to Claude Code running headless with Polykrom's MCP server as its only tool. It had no file system, no shell and no help. After each stage, a separate script opened the saved <code>.polykrom</code> file and replayed drives, sweeps and measurements to confirm the claims.</p>
+  <div class="stages" id="stages">
+    <article class="st">
+      <div class="meta"><span class="name">1. Base and yaw drive</span><span>81 s + 96 s first try</span><span>18 tool calls</span><span>$0.72</span></div>
+      <div class="body">
+        <p class="ask">A Ø180 aluminium base with a bearing seat, a NEMA 17 motor, a 20 mm pinion and a 100 mm turntable gear, coupled 5:1.</p>
+        <ul><li><span class="tag v">verified</span>Volumes within 5 mm³ of hand calculations</li><li><span class="tag v">verified</span>Pinion 360° → turntable −72.000°, gear link ratio −0.2</li><li><span class="tag v">verified</span>No interference over a full pinion turn</li><li><span class="tag w">noted</span>First attempt: it caught three errors in the brief and stopped (below)</li><li><span class="tag w">noted</span>Default sweep step too costly; re-ran at 5°</li></ul>
+      </div>
+    </article>
+    <article class="st">
+      <div class="meta"><span class="name">2. Shoulder, upper arm, forearm</span><span>327 s</span><span>39 tool calls</span><span>$1.50</span></div>
+      <div class="body">
+        <p class="ask">A yoke on the turntable, a 140 mm upper arm with lightening holes, a 120 mm forearm, and steel pins in 8.2 mm bores.</p>
+        <ul><li><span class="tag v">verified</span>0.100 mm radial clearance on all four pin fits</li><li><span class="tag v">verified</span>Joint limits from contact sweeps: shoulder −114.9…+114.5°, elbow −77.4…+257.4°</li><li><span class="tag v">verified</span>No interference at rest or at each limit</li><li><span class="tag w">noted</span>Whole-assembly sweeps hit the collision budget, so it swept part pairs one at a time</li><li><span class="tag w">noted</span>Combined limits collide (reported, not fixable with per-joint limits)</li></ul>
+      </div>
+    </article>
+    <article class="st">
+      <div class="meta"><span class="name">3. Parallel gripper</span><span>84 s</span><span>22 tool calls</span><span>$0.83</span></div>
+      <div class="body">
+        <p class="ask">A PLA wrist with two nylon jaws on sliders, coupled by a motion link.</p>
+        <ul><li><span class="tag v">verified</span>Jaw L 15 mm → Jaw R 15 mm, gap 40 → 10.0 mm</li><li><span class="tag v">verified</span>No collisions over the full travel</li><li><span class="tag w">noted</span>It set the link ratio to +1, not the −1 we suggested, because its slider axes point inwards</li></ul>
+      </div>
+    </article>
+    <article class="st">
+      <div class="meta"><span class="name">4. Hardware, materials, BOM</span><span>238 s</span><span>47 tool calls</span><span>$2.18</span></div>
+      <div class="body">
+        <p class="ask">A 608 bearing, four ISO 4762 M4×12 screws and four ISO 7089 washers from the library, with real materials on every body.</p>
+        <ul><li><span class="tag v">verified</span>21 bodies, all Aluminium, Steel, PLA or Nylon</li><li><span class="tag v">verified</span>1,645 g total, 430 g moving</li><li><span class="tag v">verified</span>Only overlaps: four 20.9 mm³ thread bands</li><li><span class="tag v">verified</span>15-line BOM</li><li><span class="tag w">noted</span>It caught a fourth error in the brief: the cheeks covered the screw holes</li><li><span class="tag w">noted</span>Library parts needed their material, name and orientation fixed by hand</li></ul>
+      </div>
+    </article>
+    <article class="st">
+      <div class="meta"><span class="name">5. Pick-and-place motion</span><span>195 s</span><span>27 tool calls</span><span>$1.14</span></div>
+      <div class="body">
+        <p class="ask">A 120-step study: swing 90° through the gear train, reach down, grip, lift, return, release.</p>
+        <ul><li><span class="tag v">verified</span>Lowest tool point 42.9 mm above the table, 182.9 mm reach (motion.trace)</li><li><span class="tag v">verified</span>No collisions between moving parts</li><li><span class="tag v">verified</span>GIF and URDF exported (22 links)</li><li><span class="tag w">noted</span>All-pairs collision check ran out of budget, so it checked in groups</li><li><span class="tag w">noted</span>URDF lacks gear and jaw couplings (no mimic tags)</li></ul>
+      </div>
+    </article>
+    <article class="st">
+      <div class="meta"><span class="name">6. Is the arm strong enough?</span><span>50 s</span><span>9 tool calls</span><span>$0.50</span></div>
+      <div class="body">
+        <p class="ask">Static stress on the upper arm, held at the shoulder, with 40 N square to it at the elbow.</p>
+        <ul><li><span class="tag v">verified</span>SF 43.4, 0.034 mm deflection (re-run independently: 43.40, 0.034)</li><li><span class="tag v">verified</span>Converged over three meshes; hand calculation agrees</li><li><span class="tag w">noted</span>It noted the arm was about 15× oversized but didn&#x27;t change it unasked</li></ul>
+      </div>
+    </article>
+    <article class="st">
+      <div class="meta"><span class="name">7. Make it light</span><span>612 s</span><span>55 tool calls</span><span>$2.65</span></div>
+      <div class="body">
+        <p class="ask">Lighten the upper arm while keeping SF ≥ 3 and deflection &lt; 0.2 mm, without touching its fits.</p>
+        <ul><li><span class="tag v">verified</span>181.8 g → 73.3 g (−60%) in six FEA iterations</li><li><span class="tag v">verified</span>SF 10.7, 0.128 mm deflection (re-run independently: 10.75, 0.128)</li><li><span class="tag v">verified</span>All fits and limits re-checked</li><li><span class="tag w">noted</span>Found that the elbow&#x27;s −77.4° limit (from stage 2) now collides with the gripper at −67.7°</li><li><span class="tag w">noted</span>Kernel refused 1 mm fillets on the web edges</li></ul>
+      </div>
+    </article>
+  </div>
+</div></section>
+
+<section class="band"><div class="in">
+  <h2>It caught four mistakes in our own brief</h2>
+  <p class="sub">The briefs were written quickly, on purpose, the way people actually ask. The agent built what was asked, measured it, and reported where the brief couldn't work. It never quietly changed the design to hide a problem.</p>
+  <div class="grid2">
+    <div class="card"><h3>The motor didn't fit</h3><p>A 42.3 mm NEMA 17 centred 60 mm out reaches <span class="num">81.15 mm</span>, past the 66 mm inside wall of a Ø140 base. It found the overlap (<span class="num">6,194 mm³</span>) and offered three fixes. We enlarged the base.</p></div>
+    <div class="card"><h3>The bearing seat broke through</h3><p>A 7 mm pocket in a 4 mm top is a hole, not a seat. We added a hub under it.</p></div>
+    <div class="card"><h3>Tapped holes went right through</h3><p>8 mm deep in an 8 mm disc. They became 6 mm, leaving <span class="num">5.2 mm</span> of thread engaged for the M4 screws.</p></div>
+    <div class="card"><h3>The cheeks covered the screw holes</h3><p>Half of each yoke-plate hole sat under a cheek, so no screw head could seat. It shortened the cheeks from 40 to 28 mm, checked that the arm still clears them, and explained the alternative.</p></div>
+  </div>
+</div></section>
+
+<section class="band"><div class="in">
+  <h2>What it exercised</h2>
+  <p class="sub">One small robot touches most of the app.</p>
+  <div class="grid3">
+    <div class="card"><h3>Parametric parts</h3><ul><li>Shells, pockets, holes, circular hole patterns</li><li>Rounded links with lightening holes</li><li>Gear blanks with bores and spigots</li></ul></div>
+    <div class="card"><h3>Assemblies</h3><ul><li>21 components, one grounded</li><li>Rigid, revolute and slider joints</li><li>A gear link (pitch radii 10 and 50: ratio −0.2) and a jaw motion link</li></ul></div>
+    <div class="card"><h3>Standard hardware</h3><ul><li>608 bearing in its seat</li><li>4 × ISO 4762 M4×12, 4 × ISO 7089 M4</li><li>Bill of materials as CSV</li></ul></div>
+    <div class="card"><h3>Fit and clearance</h3><ul><li><span class="num">0.1 mm</span> radial pin clearances, measured</li><li>Joint limits from contact sweeps: shoulder <span class="num">−114.9°…+114.5°</span>, elbow <span class="num">−77.4°…+257.4°</span></li><li>Interference across all 21 bodies</li></ul></div>
+    <div class="card"><h3>Motion</h3><ul><li>A 120-step pick-and-place study</li><li>Collision checks over the study</li><li>A tool-tip trace (lowest point <span class="num">42.9 mm</span>, reach <span class="num">182.9 mm</span>)</li><li>A GIF of the cycle</li></ul></div>
+    <div class="card"><h3>Engineering output</h3><ul><li>Static stress on the upper arm (MFEM, via Nightfall)</li><li>Mass from materials: <span class="num">1,645 g</span>, <span class="num">430 g</span> moving</li><li>URDF with masses, inertias and limits</li></ul></div>
+  </div>
+</div></section>
+
+<section class="band" id="stress"><div class="in">
+  <h2>Is the upper arm strong enough?</h2>
+  <p class="sub">The brief asked for SF ≥ 3 and less than 0.2 mm deflection, with 40 N square to the arm at the elbow, its worst case. The first result was SF 43. So in stage 7 the agent was asked to make it as light as it reasonably could without touching any fit. It ran the solver after every change.</p>
+  <div class="scroll"><table>
+    <thead><tr><th>#</th><th>Change</th><th style="text-align:right">Mass (g)</th><th style="text-align:right">Safety factor</th><th style="text-align:right">Deflection (mm)</th></tr></thead>
+    <tbody>
+      <tr><td>0</td><td>As built in stage 2</td><td class="n">181.8</td><td class="n">43.4</td><td class="n">0.034</td></tr>
+      <tr><td>1</td><td>Pockets from both sides: 4 mm flanges and web</td><td class="n">119.1</td><td class="n">46.0</td><td class="n">0.042</td></tr>
+      <tr><td>2</td><td>Flanges and web 2.5 mm</td><td class="n">97.3</td><td class="n">42.0</td><td class="n">0.054</td></tr>
+      <tr><td>3</td><td>Mid-section thinned to 12 mm</td><td class="n">85.2</td><td class="n">19.2</td><td class="n">0.075</td></tr>
+      <tr><td>4</td><td>Mid-section 8 mm</td><td class="n">79.2</td><td class="n">11.1</td><td class="n">0.097</td></tr>
+      <tr><td>5</td><td>Mid-section 6 mm, five Ø14 web holes</td><td class="n">73.3</td><td class="n">10.5</td><td class="n">0.129</td></tr>
+      <tr><td>6</td><td>R1 fillets at the pocket steps (final)</td><td class="n">73.3</td><td class="n">10.7</td><td class="n">0.128</td></tr>
+    </tbody>
+  </table></div>
+  <p class="caption">Linear static FEA through Nightfall (Netgen mesh, MFEM solve). The final run was converged over three meshes down to 0.89 mm: deflection 0.1281 / 0.1283 / 0.1284 mm. The fillets were added because the peak stress kept rising with mesh refinement at the sharp steps. An independent re-run of the saved part gave SF 10.75, 25.7 MPa peak and 0.128 mm. The fits stayed exactly as they were: Ø8.200 holes at 140.000 mm, R12 ends, full 20 mm thickness at the pins.</p>
+</div></section>
+
+<section class="band"><div class="in">
+  <h2>The cycle, as Polykrom renders it</h2>
+  <p class="sub">The animation the agent exported with <code>motion.export_animation</code>: 121 frames from the headless renderer.</p>
+  <figure><img src="kestrel.gif" alt="Kestrel swings 90 degrees, reaches down, closes its gripper, lifts and returns" width="800" height="500" loading="lazy"></figure>
+</div></section>
+
+<section class="band" id="short"><div class="in">
+  <h2>Where this version falls short</h2>
+  <p class="sub">Found by building Kestrel, not by guessing. Several were fixed the same day; the rest are on the <a href="https://github.com/wckdboy/polykrom/blob/main/docs/ROADMAP.md">roadmap</a>.</p>
+  <div class="short">
+    <div class="gap"><div class="area">Fit sweeps</div><div><p>A joint sweep can't turn a pin in a hole with 0.1 mm of clearance. It runs out of its collision budget, even for that one pair.</p><p>That's exactly the fit a sweep exists to check. The agent swept the other part pairs one at a time and checked the pins statically instead. → <a href="https://github.com/wckdboy/polykrom/issues/25">#25</a></p></div></div>
+    <div class="gap"><div class="area">Motion checks</div><div><p>Checking a 21-body study for collisions, all pairs at once, stops at step 0.</p><p>The work budget runs out, and any part that overlaps from the start (a thread in a tapped hole) eats it. The agent split the check into groups and sampled arm-against-base every 4th step. Pairs that touch at the start should be set aside, as joint sweeps already do. → <a href="https://github.com/wckdboy/polykrom/issues/25">#25</a></p></div></div>
+    <div class="gap"><div class="area">Limits</div><div><p>Joint limits are per joint, and nothing re-checks them when the assembly changes.</p><p>Each limit is safe on its own, but shoulder +114.5° with elbow −77.4° drives the forearm 2,661 mm³ into the yoke. There are no coupled limits or reachable-workspace check yet.</p><p>The elbow's −77.4° limit was swept in stage 2, before the gripper existed. Once the gripper was on, the wrist hit the upper arm at −67.7°. Polykrom didn't flag the stale limit; the agent found it in stage 7. It is the one value we changed by hand after the build. → <a href="https://github.com/wckdboy/polykrom/issues/25">#25</a></p></div></div>
+    <div class="gap"><div class="area">Kernel</div><div><p>The kernel refused 1 mm fillets along the upper arm's web-to-flange edges, so those stay sharp.</p><p>Contact checks that run on meshes also raised a false 0.022 mm "contact" on a pin with a true 0.100 mm gap, from the mesh's 0.16 mm chord tolerance. The exact check was right. → <a href="https://github.com/wckdboy/polykrom/issues/25">#25</a></p></div></div>
+    <div class="gap"><div class="area">Parts library</div><div><p>Library parts arrive with a placeholder material and bodies named Body1–9.</p><p>The 608 bearing seated facing out of its pocket and had to be flipped. It is a solid envelope, so in steel it weighs 18 g against a real bearing's 12 g. The screws seated on the plate rather than on their washers and were raised 0.8 mm by hand. → <a href="https://github.com/wckdboy/polykrom/issues/43">#43</a></p></div></div>
+    <div class="gap"><div class="area">Simulators</div><div><p>The URDF has no <code>&lt;mimic&gt;</code> tags.</p><p>The gear between pinion and turntable, and the link between the jaws, are lost in simulators. Effort and velocity limits fall back to defaults because parts don't carry actuator specs yet. → <a href="https://github.com/wckdboy/polykrom/issues/27">#27</a></p></div></div>
+    <div class="gap"><div class="area">Results on the part</div><div><p>Stress comes back as numbers, not colours on the part.</p><p>Nightfall now writes the surface field. Drawing it on the body is in progress. → <a href="https://github.com/wckdboy/polykrom/issues/29">#29</a></p></div></div>
+    <div class="gap"><div class="area">Gears</div><div><p>Gears are pitch-diameter blanks, not teeth.</p><p>The kinematics are exact, but there's no tooth contact or backlash to check. → <a href="https://github.com/wckdboy/polykrom/issues/26">#26</a></p></div></div>
+    <div class="gap"><div class="area">Visuals</div><div><p>The exported animation is flat grey.</p><p>The headless renderer ignores material appearance, so the 3D view above is the better picture. → <a href="https://github.com/wckdboy/polykrom/issues/33">#33</a></p></div></div>
+    <div class="gap"><div class="area">Fixed today</div><div><p>Building the earlier test assemblies found three bugs, all fixed:</p><ul><li>A screw couldn't seat on a washer that was itself seated: the insert mixed up world and part coordinates.</li><li>A joint's named face could resolve on another part modelled at the same local coordinates.</li><li>An occurrence couldn't be named by its component.</li></ul><p>→ <a href="https://github.com/wckdboy/polykrom/issues/17">#17</a></p></div></div>
+  </div>
+</div></section>
+
+<section class="band"><div class="in">
+  <h2>Take it apart yourself</h2>
+  <p class="sub">The design, the robot description, the bill of materials and the agent's own reports.</p>
+  <div class="dl">
+    <a class="btn go" href="kestrel.polykrom" download>kestrel.polykrom</a>
+    <a class="btn" href="urdf/kestrel.urdf" download>URDF</a>
+    <a class="btn" href="kestrel-bom.csv" download>BOM (CSV)</a>
+    <a class="btn" href="build.json" download>Build log (JSON)</a>
+  </div>
+</div></section>
+
+<footer class="band"><div class="in">
+  <div>Built 2026-10-24 with Polykrom (Facet build) and Claude, through Polykrom's MCP server. Stress solved with <a href="https://github.com/wckdboy/nightfall">Nightfall</a> (MFEM, Netgen).</div>
+  <div>Polykrom is open source under Apache-2.0 and grew out of SolidCraft.</div>
+</div></footer>
+
+<script type="module">
+import { mount } from "./viewer.js";
+const $ = (id) => document.getElementById(id);
+const motion = await (await fetch("motion.json")).json();
+const track = (n) => (motion.joints.find((j) => j.name === n) || { value: [0] }).value;
+const yaw = track("Yaw"), sh = track("Shoulder"), el = track("Elbow"), jaw = track("Jaw L Slide");
+const at = (v, s) => { const i = Math.floor(s), f = s - i; const a = v[Math.min(i, v.length - 1)], b = v[Math.min(i + 1, v.length - 1)]; return a + (b - a) * f; };
+let scrubbing = false;
+try {
+  const looks = await (await fetch("looks.json")).json();
+  const v = await mount($("stage"), { urdf: "urdf/kestrel.urdf", motion, colors: looks, onStep(s, n) {
+    if (!scrubbing) $("scrub").value = s;
+    $("r-step").textContent = Math.round(s);
+    $("r-yaw").textContent = at(yaw, s).toFixed(0) + "°";
+    $("r-sh").textContent = at(sh, s).toFixed(0) + "°";
+    $("r-el").textContent = at(el, s).toFixed(0) + "°";
+    $("r-jaw").textContent = (40 - 2 * at(jaw, s)).toFixed(0) + " mm";
+  } });
+  $("loading").remove();
+  $("scrub").max = v.steps;
+  const label = () => { $("play").textContent = v.playing ? "Pause" : "Play"; };
+  label();
+  $("play").onclick = () => { v.play(!v.playing); label(); };
+  $("scrub").oninput = (e) => { scrubbing = true; v.play(false); label(); v.seek(+e.target.value); scrubbing = false; };
+} catch (e) {
+  $("loading").textContent = "The 3D view needs WebGL. The animation below shows the same cycle.";
+  console.error(e);
+}
+</script>
+</body>
+</html>
