@@ -10,6 +10,7 @@
 use crate::ui_kit::{Container, Surface};
 
 pub mod access;
+pub mod agent_activity;
 pub mod agent_chat;
 pub mod agent_cursor;
 pub mod bom_panel;
@@ -513,6 +514,8 @@ pub struct SolveApp {
     control_answering: Vec<control_job::ControlJob>,
     /// The agent cursor acting out control requests.
     pub agent: agent_cursor::AgentCursor,
+    /// What an agent ran and found, shown so a person can follow along (#78).
+    pub agent_feed: agent_activity::Feed,
     /// The agent chat panel (docs/design/in-app-agent-chat.md).
     pub agent_chat: agent_chat::AgentChat,
     /// The selection's properties and checks.
@@ -632,6 +635,7 @@ impl SolveApp {
             control_job: None,
             control_answering: Vec::new(),
             agent: Default::default(),
+            agent_feed: Default::default(),
             pending_shots: Vec::new(),
             queued_shots: Vec::new(),
             shot_token: 0,
@@ -1664,6 +1668,7 @@ impl SolveApp {
             issue_report::show(self, ui.ctx());
         }
         if !self.home.open {
+            agent_activity::paint(self, ui.ctx());
             agent_cursor::paint(self, ui.ctx());
         }
         if self.file_picker_busy() {
