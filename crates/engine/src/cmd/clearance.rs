@@ -20,7 +20,7 @@ use crate::{Result, Session};
 
 pub static COMMANDS: &[CommandSpec] = &[CommandSpec::new("inspect.clearance", "Clearance", clearance).icon("interference").noundo().params(
     "bodies?: [names] (default: every solid body, in world placement, but those in `against`; mesh bodies are not measured); against?: [names] (only pairs with one body in `bodies` and the other here); \
-     min_volume?: mm³ (default 0.01: smaller overlaps count as contact); clearance?: mm (default 0: report pairs closer than this); \
+     min_volume?: mm³ (default 0.01: smaller overlaps count as contact); budget_s?: seconds (default 240, at most 86400: pairs not started by then are listed in unchecked as \"not checked: the time budget … ran out\"); clearance?: mm (default 0: report pairs closer than this); \
      nearest?: n (each body of `bodies` gets its n nearest others); skip_within?: \"occurrence\" (pairs of bodies of one occurrence) | \
      \"component\" (pairs of bodies inside one placed component, its subcomponents included) | null; tolerance?: mm (default 1e-6: a gap \
      below it is contact, 0) → overlaps: [{a, b, volume_mm3, area_mm2, bbox, center}]; near: [{a, b, distance_mm, from, to, overlap_mm3?: \
@@ -47,6 +47,10 @@ enum SkipWithin {
 
 /// Most pairs [`PairCache`] keeps; it starts over when full.
 const MAX_CACHED: usize = 2 * MAX_PAIRS;
+/// Seconds a call may take by default, and at most (`budget_s`).
+const DEFAULT_BUDGET_S: f64 = 240.0;
+const MAX_BUDGET_S: f64 = 86_400.0;
+
 /// The kernel's tries at intersecting a pin with its hole on one cylinder (each about a second
 /// on real parts; a plain pin on its axis needs one or two).
 const PIN_ATTEMPTS: usize = 4;
@@ -66,6 +70,32 @@ struct PairResult {
     unchecked: Option<String>,
 }
 
+impl PairResult {
+    /// This result for another placement of the same two parts: its points moved by `m`.
+    fn moved(&self, m: &solidcraft_doc::Mat) -> PairResult {
+        let at = |v: solidcraft_geom::Vec3| solidcraft_doc::apply_point(m, v);
+        let boxed = |b: &Aabb3| {
+            let mut out = Aabb3::EMPTY;
+            for k in 0..8 {
+                let x = if k & 1 == 0 { b.min.x } else { b.max.x };
+                let y = if k & 2 == 0 { b.min.y } else { b.max.y };
+                let z = if k & 4 == 0 { b.min.z } else { b.max.z };
+                out.add(at(solidcraft_geom::Vec3::new(x, y, z)));
+            }
+            out
+        };
+        PairResult {
+            overlap: self.overlap.map(|(v, a, b, c)| (v, a, if b.is_empty() { b } else { boxed(&b) }, at(c))),
+            distance: self.distance.clone().map(|mut d| {
+                d.from = at(d.from);
+                d.to = at(d.to);
+                d
+            }),
+            unchecked: self.unchecked.clone(),
+        }
+    }
+}
+
 fn clearance(s: &mut Session, p: &Value) -> Result<Value> {
     let cmd = "inspect.clearance";
     let started = web_time::Instant::now();
@@ -82,6 +112,14 @@ fn clearance(s: &mut Session, p: &Value) -> Result<Value> {
     let gap = param("clearance", 0.0, MAX_CLEARANCE)?;
     let tolerance = param("tolerance", 1e-6, 1.0)?;
     let nearest = param("nearest", 0.0, MAX_NEAREST as f64)?.floor() as usize;
+    let budget = match p.get("budget_s") {
+        None | Some(Value::Null) => DEFAULT_BUDGET_S,
+        Some(_) => match num(p, "budget_s") {
+            Some(v) if v > 0.0 && v <= MAX_BUDGET_S => v,
+            _ => return Err(bad(cmd, format!("`budget_s` must be a number of seconds above 0, at most {MAX_BUDGET_S}"))),
+        },
+    };
+    let deadline = std::time::Duration::from_secs_f64(budget);
     let skip = match p.get("skip_within") {
         None | Some(Value::Null) => SkipWithin::Nothing,
         Some(_) => match str_(p, "skip_within") {
@@ -223,12 +261,58 @@ fn clearance(s: &mut Session, p: &Value) -> Result<Value> {
         close.iter().map(|&(i, j)| cache.as_ref().and_then(|c| c.0.get(&cache_key(i, j)?)).cloned().map(Ok)).collect()
     };
     let todo: Vec<usize> = (0..close.len()).filter(|&k| results.get(k).is_some_and(Option::is_none)).collect();
-    let reused = close.len() - todo.len();
+    let mut reused = close.len() - todo.len();
+    // Placements of one part (six copies of a servo) repeat its inner pairs: a pair of the same two
+    // definitions placed the same way relative to each other comes to the same, so one is measured
+    // and the others take its result, moved to where they are.
+    let mut first: HashMap<(u64, u64, Vec<i64>), usize> = HashMap::new();
+    let mut copies: Vec<(usize, usize, solidcraft_doc::Mat)> = Vec::new();
+    let todo: Vec<usize> = todo
+        .into_iter()
+        .filter(|&k| {
+            let Some(&(i, j)) = close.get(k) else { return true };
+            let (Some(a), Some(b)) = (solid.get(i), solid.get(j)) else { return true };
+            let (Some(ka), Some(kb), Some(inv_a)) = (a.definition_key(), b.definition_key(), solidcraft_doc::mat_inverse(&a.source_transform)) else {
+                return true;
+            };
+            let relative = solidcraft_doc::mat_mul(&inv_a, &b.source_transform);
+            let key = (ka, kb, relative.iter().flatten().map(|v| (v * 1e6).round() as i64).collect::<Vec<_>>());
+            match first.get(&key).copied() {
+                Some(rep) => {
+                    let moved = close
+                        .get(rep)
+                        .and_then(|&(ri, _)| solid.get(ri))
+                        .and_then(|r| solidcraft_doc::mat_inverse(&r.source_transform))
+                        .map(|inv| solidcraft_doc::mat_mul(&a.source_transform, &inv));
+                    match moved {
+                        Some(m) => {
+                            copies.push((k, rep, m));
+                            false
+                        }
+                        None => true,
+                    }
+                }
+                None => {
+                    first.insert(key, k);
+                    true
+                }
+            }
+        })
+        .collect();
+    reused += copies.len();
     // A body in many pairs is cut down to each pair's region from the same mesh of it.
     let kept: Vec<std::sync::OnceLock<Option<solidcraft_kernel::Body>>> = (0..n).map(|_| std::sync::OnceLock::new()).collect();
     let kept_body = |i: usize| kept.get(i)?.get_or_init(|| solid.get(i).map(|b| b.body.keeping_meshes())).as_ref();
     let measured = solidcraft_kernel::map_with_local_pools(&todo, usize::MAX, |&k| {
         let Some(&(i, j)) = close.get(k) else { return Ok(PairResult::default()) };
+        // A pair not started by the time the budget is spent is listed, not measured (one under
+        // way finishes: a kernel boolean can't be stopped part way).
+        if started.elapsed() > deadline {
+            return Ok(PairResult {
+                unchecked: Some(format!("not checked: the time budget of {budget} s ran out (budget_s)")),
+                ..PairResult::default()
+            });
+        }
         let (Some(a), Some(b)) = (shape(i), shape(j)) else { return Ok(PairResult::default()) };
         let (Some(ba), Some(bb)) = (solid.get(i), solid.get(j)) else { return Ok(PairResult::default()) };
         let (Some(ka), Some(kb)) = (kept_body(i), kept_body(j)) else { return Ok(PairResult::default()) };
@@ -251,6 +335,12 @@ fn clearance(s: &mut Session, p: &Value) -> Result<Value> {
     for (k, r) in todo.into_iter().zip(measured) {
         if let Some(slot) = results.get_mut(k) {
             *slot = Some(r);
+        }
+    }
+    for (k, rep, m) in copies {
+        let moved = results.get(rep).and_then(|r| r.as_ref()).and_then(|r| r.as_ref().ok()).map(|r| r.moved(&m));
+        if let (Some(slot), Some(r)) = (results.get_mut(k), moved) {
+            *slot = Some(Ok(r));
         }
     }
     let results = results.into_iter().map(|r| r.unwrap_or_else(|| Ok(PairResult::default())));
