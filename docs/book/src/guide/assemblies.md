@@ -89,6 +89,15 @@ pairs whose meshes stay apart without intersecting them, intersects the rest in 
 returns after `budget_s` seconds (default 240) at most, listing the pairs it had no time for as
 not checked.
 
+A screw in a tapped hole is usually modelled with its shank at the thread's major diameter and
+the hole at the tap drill, so the two share the thread's ring. Both commands list such an overlap
+under `threaded` (`{a, b, thread, engaged_mm, volume_mm3}`) rather than as a clash when one of the
+bodies carries a cosmetic thread (`solid.thread`; library screws have one) and the overlap is
+centred on its axis, lies within its threaded length and is no bigger than the ring between its
+major diameter and a little under its minor one. An M6 shank in a 4 mm hole is still a clash.
+`inspect.interference {method: "mesh"}` has no volume to tell by: a hit no deeper than a thread
+of either body carries `thread` and a note instead.
+
 Mesh bodies (STL, 3MF and OBJ imports) are not checked by either command: each is listed in
 `unchecked` as `{a: name, b: null, reason: "mesh body: not checked"}`, so `count: 0` or an empty
 `overlaps` is not mistaken for "no overlap" when a mesh body was in the design.

@@ -612,3 +612,34 @@ fn a_spent_budget_lists_pairs_as_unchecked() {
     assert!(unchecked.iter().any(|u| u["reason"].as_str().unwrap_or("").contains("time budget")), "{r}");
     assert!(s.execute("inspect.clearance", &json!({"budget_s": 0})).is_err());
 }
+
+#[test]
+fn a_threaded_shank_in_its_tapped_hole_is_engagement_not_overlap() {
+    // An M6 shank (Ø6, a cosmetic M6 thread on it) through a 10 mm plate. Tapped at the 5 mm
+    // drill it shares the thread's ring with the plate: π (3² − 2.5²) × 10 = 86.39 mm³. In a 4 mm
+    // hole, or without its thread, the shared part is a clash.
+    let shared = |hole: f64, threaded: bool| {
+        let mut s = Session::default();
+        run(&mut s, "solid.box", json!({"length": 20, "width": 20, "height": 10, "corner": [-10, -10, 0], "operation": "new", "body_name": "Plate"}));
+        run(&mut s, "solid.cylinder", json!({"radius": hole / 2.0, "height": 12, "base": [0, 0, -1], "operation": "cut", "targets": ["Plate"]}));
+        run(&mut s, "solid.cylinder", json!({"radius": 3, "height": 16, "base": [0, 0, -2], "operation": "new", "body_name": "Screw"}));
+        if threaded {
+            run(&mut s, "solid.thread", json!({"face": [3, 0, 5], "designation": "M6"}));
+        }
+        run(&mut s, "inspect.clearance", json!({}))
+    };
+    let r = shared(5.0, true);
+    assert_eq!(r["overlaps"], json!([]), "{r}");
+    let t = &r["threaded"][0];
+    assert_eq!((pair(t), t["thread"].as_str()), (["Plate".to_string(), "Screw".to_string()], Some("M6")), "{r}");
+    let ring = std::f64::consts::PI * (9.0 - 6.25) * 10.0;
+    assert!((f(&t["volume_mm3"]) - ring).abs() < 1e-3 * ring && (f(&t["engaged_mm"]) - 10.0).abs() < 1e-3, "{r}");
+    for (hole, threaded) in [(4.0, true), (5.0, false)] {
+        let r = shared(hole, threaded);
+        assert_eq!(
+            (r["overlaps"].as_array().map(Vec::len), r["threaded"].as_array().map(Vec::len)),
+            (Some(1), Some(0)),
+            "Ø{hole} threaded {threaded}: {r}"
+        );
+    }
+}
