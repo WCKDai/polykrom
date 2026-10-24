@@ -11,7 +11,7 @@ use solidcraft_kernel::Body;
 
 use super::CommandSpec;
 use super::joints::{cannot_move, effective_values, joint_id, occurrence_id, resolve_holding, value};
-use super::tri_tree::TriTree;
+pub(super) use super::tri_tree::TriTree;
 use crate::params::{bad, bool_, str_, vec3};
 use crate::{EngineError, Result, Session};
 
@@ -200,6 +200,44 @@ pub(super) fn mesh_overlap_counted(ma: &solidcraft_geom::Mesh, mb: &solidcraft_g
     let (ta, tb) = (TriTree::new(tris(ma)), TriTree::new(tris(mb)));
     *work += ta.tris().len() + tb.tris().len();
     let depth = deepest(ma, &tb, bb, tol, work).max(deepest(mb, &ta, ba, tol, work));
+    (depth > tol).then_some(depth)
+}
+
+/// The triangle tree a contact check asks about `m`.
+pub(super) fn tree_of(m: &solidcraft_geom::Mesh) -> TriTree {
+    TriTree::new(tris(m))
+}
+
+/// [`mesh_overlap_counted`] for two bodies kept in their own frames with their trees built
+/// once: each one's points are moved into the other's frame (`fa`, `fb`: their frames in the
+/// world) and asked of the other's tree. A rigid move keeps every distance, so the depth is the
+/// one the placed meshes give, without building a tree per sample.
+pub(super) fn overlap_framed(
+    (ma, ta, fa): (&solidcraft_geom::Mesh, &TriTree, &Mat),
+    (mb, tb, fb): (&solidcraft_geom::Mesh, &TriTree, &Mat),
+    tol: f64,
+    work: &mut usize,
+) -> Option<f64> {
+    let (ia, ib) = (solidcraft_doc::mat_inverse(fa)?, solidcraft_doc::mat_inverse(fb)?);
+    let moved = |m: &solidcraft_geom::Mesh, to: &Mat| solidcraft_geom::Mesh {
+        positions: m.positions.iter().map(|p| solidcraft_doc::apply_point(to, *p)).collect(),
+        triangles: m.triangles.clone(),
+        ..solidcraft_geom::Mesh::default()
+    };
+    let (a_in_b, b_in_a) = (moved(ma, &solidcraft_doc::mat_mul(&ib, fa)), moved(mb, &solidcraft_doc::mat_mul(&ia, fb)));
+    *work += ma.positions.len() + mb.positions.len();
+    let (ba, bb) = (ta.bounds(), tb.bounds());
+    let ab = a_in_b.bounds();
+    if ab.max.x < bb.min.x + tol
+        || bb.max.x < ab.min.x + tol
+        || ab.max.y < bb.min.y + tol
+        || bb.max.y < ab.min.y + tol
+        || ab.max.z < bb.min.z + tol
+        || bb.max.z < ab.min.z + tol
+    {
+        return None;
+    }
+    let depth = deepest(&a_in_b, tb, bb, tol, work).max(deepest(&b_in_a, ta, ba, tol, work));
     (depth > tol).then_some(depth)
 }
 
