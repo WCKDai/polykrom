@@ -410,6 +410,25 @@ fn closest(a: &Geo, b: &Geo) -> Option<(Vec3, Vec3)> {
     }
 }
 
+/// A face or edge picked by its `point` alone gets the `index` a selection carries: the face
+/// nearest the point (an edge's index is resolved from the point anyway, by `edge_index`).
+fn with_index(st: &solidcraft_doc::ModelState, value: &Value) -> Value {
+    let mut v = value.clone();
+    let kind = v.get("type").and_then(Value::as_str).map(str::to_string);
+    if v.get("index").is_some() || !matches!(kind.as_deref(), Some("face" | "edge")) {
+        return v;
+    }
+    let (Some(body), Some(point)) = (v.get("body").and_then(Value::as_str), v.get("point").and_then(crate::params::vec3)) else { return v };
+    let index = match kind.as_deref() {
+        Some("face") => st.body(body).and_then(|b| solidcraft_doc::appearance::nearest_face(b, point)).map(|(_, f)| f),
+        _ => Some(0),
+    };
+    if let Some(i) = index {
+        v["index"] = json!(i);
+    }
+    v
+}
+
 /// `inspect.measure` with `items` (one or two selections).
 pub(crate) fn measure_items(s: &Session, items: &Value) -> Result<Value> {
     let cmd = "inspect.measure";
@@ -420,7 +439,7 @@ pub(crate) fn measure_items(s: &Session, items: &Value) -> Result<Value> {
     let st = s.world_state();
     let mut sels = Vec::new();
     for value in list {
-        let mut sel = serde_json::from_value::<Sel>(value.clone()).map_err(|e| bad(cmd, e.to_string()))?;
+        let mut sel = serde_json::from_value::<Sel>(with_index(&st, value)).map_err(|e| bad(cmd, e.to_string()))?;
         // Two kernel halves of one visible item are one measurement target.
         match &mut sel {
             Sel::Edge { body, index, point } => {

@@ -75,7 +75,20 @@ fn component(s: &Session, p: &Value, k: &str, cmd: &str) -> Result<u64> {
 
 fn occurrence(s: &Session, p: &Value, cmd: &str) -> Result<u64> {
     let kk = key(p.get("occurrence")).ok_or_else(|| bad(cmd, "`occurrence` must be an id or name"))?;
-    s.doc.occurrences.iter().find(|o| o.id.to_string() == kk || o.name == kk).map(|o| o.id).ok_or_else(|| bad(cmd, format!("no occurrence `{kk}`")))
+    if let Some(o) = s.doc.occurrences.iter().find(|o| o.id.to_string() == kk || o.name == kk) {
+        return Ok(o.id);
+    }
+    // A component's name stands for its placement when it has exactly one (`Fork` for `Fork:1`).
+    let placed: Vec<&solidcraft_doc::Occurrence> =
+        s.doc.find_component(&kk).map(|c| s.doc.occurrences.iter().filter(|o| o.component == c).collect()).unwrap_or_default();
+    match placed.as_slice() {
+        [one] => Ok(one.id),
+        [] => Err(bad(cmd, format!("no occurrence `{kk}`"))),
+        many => {
+            let names: Vec<&str> = many.iter().take(8).map(|o| o.name.as_str()).collect();
+            Err(bad(cmd, format!("component `{kk}` is placed {} times: name one occurrence ({})", many.len(), names.join(", "))))
+        }
+    }
 }
 
 fn translation(t: Vec3) -> Mat {

@@ -32,7 +32,15 @@ and dimension (`sketch.dimension {entities, value}`; values may name parameters)
 (`solid.extrude {distance, operation?: new|join|cut|intersect}`, `solid.revolve`, `solid.fillet {edges: [[x,y,z] point on \
 edge], radius}`, `solid.chamfer`, patterns, mirror, primitives). Use `batch` for several steps at once, \
 `list_commands` for ids and parameter docs, `describe_command` for a command's schemas, `inspect_design` / `measure` to verify, `body_topology` to find edge points, \
-`set_parameter` to drive the design and `screenshot` to look at it.";
+`set_parameter` to drive the design and `screenshot` to look at it. \
+Assemblies: make each part a component (`component.create {name}`, model inside it, then `component.activate {component: root}`), \
+ground one (`occurrence.ground {occurrence, grounded: true}`) and join the others with `joint.create {type, a, b, limits?}`: each origin is \
+an occurrence plus a point or circle on it in world coordinates, and a joint moves about or along its origin's z (a slider's origin z \
+points along its travel). Give bodies real materials (`material.list`, `material.assign {bodies, material}`) so mass and stress are right. \
+Check fits with `inspect.clearance` and `inspect.interference`, find how far a joint can move with `joint.sweep {joint, from, to}`, \
+run mechanisms with `motion.study {name, steps, keys}`, check them with `motion.interference` and record them with \
+`motion.export_animation {study, path}`; check strength with `analysis.static_stress`. Before modelling, state the numbers the result \
+must meet (sizes, volume, mass, clearances, travel); before saying it is done, check each with `measure` or the inspect commands.";
 
 pub struct Server {
     backend: Box<dyn Backend>,

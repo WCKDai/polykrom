@@ -74,6 +74,18 @@ fn measure(s: &mut Session, items: Vec<Value>) -> Value {
     run(s, "inspect.measure", json!({ "items": items }))
 }
 
+/// A face picked by a point on it, without its index (how agents name faces), measures the same.
+#[test]
+fn faces_picked_by_a_point_alone_measure_like_full_selections() {
+    let mut s = Session::default();
+    plate(&mut s);
+    let b = body(&s);
+    let items = vec![json!({"type": "face", "body": b, "point": [18, 20, 5]}), json!({"type": "face", "body": b, "point": [41, 20, 5]})];
+    let r = measure(&mut s, items);
+    assert!(close(&r["center_distance"], 30.0, 1e-9), "{r}");
+    assert!(close(&r["min"], 23.0, 1e-9), "{r}");
+}
+
 #[test]
 fn two_holes_measure_centre_to_centre_with_min_and_max() {
     let mut s = Session::default();

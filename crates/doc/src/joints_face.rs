@@ -33,7 +33,18 @@ fn gone(name: &str) -> DocError {
 /// The face called `name` nearest `pick` (an error when it is gone: a joint must not quietly
 /// attach elsewhere).
 pub(super) fn named_face<'a>(doc: &Document, st: &'a ModelState, pick: Vec3, name: &str) -> Result<NamedFace<'a>> {
-    let hit = crate::name_lookup::locate_face(st, name, pick).ok_or_else(|| gone(name))?;
+    named_face_in(doc, st, None, pick, name)
+}
+
+/// [`named_face`] looked for first among the bodies of `component` (where the pick's coordinates
+/// belong), then anywhere: parts each modelled at their own origin share coordinates, so a face of
+/// another part can sit at the same point under the same name.
+pub(super) fn named_face_in<'a>(doc: &Document, st: &'a ModelState, component: Option<u64>, pick: Vec3, name: &str) -> Result<NamedFace<'a>> {
+    let own = component.and_then(|c| crate::name_lookup::locate_face_among(st, |b| doc.model_body_component(b) == c, name, pick));
+    let hit = match own {
+        Some(h) => h,
+        None => crate::name_lookup::locate_face(st, name, pick).ok_or_else(|| gone(name))?,
+    };
     let body = st.bodies.get(hit.body).ok_or_else(|| gone(name))?;
     let Some(offset) = doc.model_body_offset(body).copied() else {
         return Ok(NamedFace { body, face: hit.face, point: hit.point, offset: IDENTITY });
@@ -168,8 +179,8 @@ impl Round {
 /// A circle-centre snap's cylinder found through its named face (`None`: the snap names no
 /// face, or the face is not a cylinder any more; the caller looks by point, as older builds
 /// did). The end is the one whose rim meets the face called `end`, else the one nearer `pick`.
-pub(super) fn named_round(doc: &Document, st: &ModelState, pick: Vec3, face: &str, end: Option<&str>) -> Result<Option<Round>> {
-    let nf = named_face(doc, st, pick, face)?;
+pub(super) fn named_round(doc: &Document, st: &ModelState, component: u64, pick: Vec3, face: &str, end: Option<&str>) -> Result<Option<Round>> {
+    let nf = named_face_in(doc, st, Some(component), pick, face)?;
     let Some(own) = nf.own_cylinder() else { return Ok(None) };
     let chosen = end.and_then(|name| end_named(nf.body, nf.face, &own, name)).unwrap_or_else(|| end_by_pick(&nf, &own));
     Ok(Some(Round::at(placed(&nf.offset, own), chosen)))

@@ -430,16 +430,32 @@ fn insert(s: &mut Session, p: &Value) -> Result<Value> {
     Ok(out)
 }
 
-/// A point on the cylindrical wall of the hole at `a`, a little in from the picked rim.
+/// A point on the cylindrical wall of the hole at `a`, a little in from the picked rim. `a` is in
+/// world coordinates and so is the answer; each body is tested where its occurrences place it, so a
+/// hole in a placed part (a seated washer, a bracket moved into position) is found too.
 fn hole_wall(s: &Session, a: Vec3) -> Option<Vec3> {
     let st = s.model.state();
     let dirs = [Vec3::Z * -1.0, Vec3::Z, Vec3::X, Vec3::X * -1.0, Vec3::Y, Vec3::Y * -1.0];
+    let places: Vec<(&_, solidcraft_doc::Mat)> = st
+        .bodies
+        .iter()
+        .flat_map(|b| {
+            let comp = s.doc.model_body_component(b);
+            let ts: Vec<solidcraft_doc::Mat> = if comp == 0 {
+                vec![solidcraft_doc::IDENTITY]
+            } else {
+                s.doc.occurrences.iter().filter(|o| o.component == comp).map(|o| solidcraft_doc::joints::occurrence_world(&s.doc, o.id)).collect()
+            };
+            ts.into_iter().filter_map(move |t| solidcraft_doc::mat_inverse(&t).map(|inv| (b, inv)))
+        })
+        .collect();
     for step in [0.2, 0.5, 1.0, 2.0] {
-        for b in &st.bodies {
+        for (b, inv) in &places {
             for d in dirs {
                 let q = a + d * step;
-                if let Some(c) = solidcraft_doc::kernel::cylinder_face_at(&b.body, q) {
-                    let v = q - c.axis_point;
+                let local = solidcraft_doc::apply_point(inv, q);
+                if let Some(c) = solidcraft_doc::kernel::cylinder_face_at(&b.body, local) {
+                    let v = local - c.axis_point;
                     let along = v.dot(c.axis);
                     let on_wall = ((v - c.axis * along).len() - c.radius).abs() < 1e-3 && along > c.start && along < c.end;
                     if on_wall {
@@ -574,6 +590,31 @@ mod tests {
         let (lo, hi) = bbox(&s, "SHCS M8x25");
         assert!((hi.z - 18.0).abs() < 1e-6 && (lo.z + 15.0).abs() < 1e-6, "{lo:?} {hi:?}");
         assert!(s.model.state().threads.iter().any(|t| t.designation == "M8" && (t.pitch - 1.25).abs() < 1e-9));
+    }
+
+    /// A screw seats on a washer that is itself seated in the hole: the pick is in world
+    /// coordinates, the washer's hole in its placed component's.
+    #[test]
+    fn a_screw_seats_on_a_seated_washer() {
+        let mut s = Session::default();
+        run(&mut s, "solid.box", json!({"length": 40, "width": 30, "height": 10, "body_name": "Plate"}));
+        run(&mut s, "solid.hole", json!({"position": [20, 15, 10], "diameter": 6.4}));
+        let l = run(&mut s, "parts.library", json!({"family": "washer"}));
+        let m6 = l["sizes"].as_array().and_then(|a| a.iter().find(|x| x["size"] == "M6")).cloned().unwrap_or_default();
+        let (inner, t) = (m6["inner"].as_f64().unwrap_or(0.0), m6["thickness"].as_f64().unwrap_or(0.0));
+        run(&mut s, "parts.insert", json!({"family": "washer", "size": "M6", "at": [23.2, 15, 10]}));
+        let (lo, hi) = bbox(&s, "Washer M6");
+        assert!((lo.z - 10.0).abs() < 1e-6 && (hi.z - 10.0 - t).abs() < 1e-6, "the washer sits on the plate: {lo:?} {hi:?}");
+        // The washer's top rim, picked in world coordinates.
+        let r = run(
+            &mut s,
+            "parts.insert",
+            json!({"family": "socket_head_cap_screw", "size": "M6", "length": 16, "at": [20.0 + inner / 2.0, 15, 10.0 + t]}),
+        );
+        assert!(r["joint"].is_number(), "{r}");
+        let (lo, hi) = bbox(&s, "SHCS M6x16");
+        assert!((hi.z - (10.0 + t + 6.0)).abs() < 1e-6 && (lo.z - (10.0 + t - 16.0)).abs() < 1e-6, "the head sits on the washer: {lo:?} {hi:?}");
+        assert!(((lo.x + hi.x) / 2.0 - 20.0).abs() < 1e-6 && ((lo.y + hi.y) / 2.0 - 15.0).abs() < 1e-6, "on the hole's axis");
     }
 
     #[test]
