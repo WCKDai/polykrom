@@ -3,7 +3,7 @@
 //! joint values and a point's path with their velocities and accelerations; `motion.interference`
 //! answers the pairs of parts that pass through each other along the way.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 
 use serde_json::{Value, json};
@@ -34,7 +34,10 @@ pub const INTERFERENCE_DOC: &str = "study: id|name; occurrences?: [ids or names]
      depth_mm (how far into each other, the most at deepest_step), volume_mm3 (their overlap there; null when it was not \
      cheap to work out)}], clear, \
      pairs (checked), samples (taken), truncated (the work budget ran out; checked_to: the last step checked), stopped_at, \
-     stopped_by_loop. The study plays as motion.play plays it but contact sets do not stop it, on a copy (the design is not \
+     stopped_by_loop; static_overlaps: [{a, b, depth_mm}] (pairs that overlap at the first sample and keep their placement \
+     to each other all through it, such as a pin pressed into its block or a thread in its tapped hole: no motion of the study \
+     changes them, so they are not collisions and do not make it unclear; inspect.clearance measures them), pairs_moving_together \
+     (pairs that keep their placement to each other: each is tested once). The study plays as motion.play plays it but contact sets do not stop it, on a copy (the design is not \
      changed). Parts are tested at the samples only: one that passes wholly through another between two samples is missed";
 
 /// Most samples a plot or an interference check takes: each is a solve.
@@ -364,6 +367,12 @@ pub(super) fn interference(s: &mut Session, p: &Value) -> Result<Value> {
     let geometry = checked_pairs(s, p, cmd)?;
     let mut found: BTreeMap<(u64, u64), Collision> = BTreeMap::new();
     let (mut work, mut checked, mut truncated) = (0usize, 0usize, false);
+    // The bodies' frames and what met at the first sample, and the member pairs whose placement
+    // relative to each other has changed since. A pair in its first placement meets as it did
+    // then (a pin pressed into its block, a thread in its tapped hole): it is not tested again.
+    let mut first: Option<(Vec<Mat>, Vec<(Member, Member, f64)>)> = None;
+    let mut moved: BTreeSet<(u64, u64)> = BTreeSet::new();
+    let key = |a: &Member, b: &Member| (a.0.min(b.0), a.0.max(b.0));
     let stop = play(s, &m, n, false, |t, k| {
         // Placing the meshes is work too, also where nothing comes near.
         work = work.saturating_add(geometry.vertex_count());
@@ -371,7 +380,9 @@ pub(super) fn interference(s: &mut Session, p: &Value) -> Result<Value> {
             truncated = true;
             return Ok(false);
         }
-        let hits: Vec<(Member, Member, f64)> = match geometry.hits(t, &mut work, MAX_WORK, true) {
+        let frames = geometry.frames(t)?;
+        let unmoved = first.as_ref().map(|(base, _)| geometry.unmoved(base, &frames)).unwrap_or_default();
+        let mut hits: Vec<(Member, Member, f64)> = match geometry.hits_except(t, &mut work, MAX_WORK, true, &unmoved) {
             Ok(h) => h,
             Err(_) if work > MAX_WORK => {
                 truncated = true;
@@ -379,6 +390,13 @@ pub(super) fn interference(s: &mut Session, p: &Value) -> Result<Value> {
             }
             Err(e) => return Err(e),
         };
+        match &first {
+            None => first = Some((frames, hits.clone())),
+            Some((_, at_first)) => {
+                moved.extend(geometry.member_pairs().difference(&unmoved));
+                hits.extend(at_first.iter().filter(|(a, b, _)| unmoved.contains(&key(a, b))).cloned());
+            }
+        }
         checked = k + 1;
         for ((a, an), (b, bn), depth) in hits {
             // Each pair once, the older occurrence (the lower id) first.
@@ -403,6 +421,12 @@ pub(super) fn interference(s: &mut Session, p: &Value) -> Result<Value> {
     if truncated && checked == 0 {
         return Err(bad(cmd, "the check ran out of its work budget before its first step: check fewer parts (occurrences, against)"));
     }
+    // Pairs that overlap at the first sample and keep their placement to each other through the
+    // samples checked: no motion of the study changes them, so they are not its collisions.
+    let together = geometry.member_pairs().difference(&moved).count();
+    let fixed: Vec<(u64, u64)> = found.keys().filter(|k| !moved.contains(k)).copied().collect();
+    let static_overlaps: Vec<Value> =
+        fixed.iter().filter_map(|k| found.remove(k)).map(|c| json!({"a": c.names.0, "b": c.names.1, "depth_mm": c.depth})).collect();
     let mut list: Vec<(&(u64, u64), &Collision)> = found.iter().collect();
     list.sort_by_key(|(_, c)| c.samples.first().copied().unwrap_or(usize::MAX));
     let mut booleans = MAX_BOOLEANS;
@@ -418,7 +442,8 @@ pub(super) fn interference(s: &mut Session, p: &Value) -> Result<Value> {
         })
         .collect();
     let mut out = json!({"study": m.name, "steps": m.steps, "clear": collisions.is_empty(), "collisions": collisions,
-        "pairs": geometry.pair_count(), "samples": checked, "truncated": truncated});
+        "static_overlaps": static_overlaps, "pairs": geometry.pair_count(), "pairs_moving_together": together, "samples": checked,
+        "truncated": truncated});
     if truncated {
         out["checked_to"] = json!(checked.checked_sub(1).map(|k| step_of(&m, k, n)));
     }

@@ -54,6 +54,15 @@ pub(crate) struct ContactMesh {
 #[derive(Default)]
 pub(crate) struct ContactMeshes(HashMap<u64, ContactMesh>);
 
+/// Whether bodies `a` and `b` have the same placement relative to each other in `now` as in `base`.
+fn same_relative(base: &[Mat], now: &[Mat], a: usize, b: usize) -> bool {
+    let relative = |f: &[Mat]| -> Option<Mat> { Some(mat_mul(&solidcraft_doc::mat_inverse(f.get(a)?)?, f.get(b)?)) };
+    match (relative(base), relative(now)) {
+        (Some(x), Some(y)) => x.iter().flatten().zip(y.iter().flatten()).all(|(p, q)| (p - q).abs() <= 1e-9 * (1.0 + p.abs())),
+        _ => false,
+    }
+}
+
 /// Tessellate `body` for contact checks and measure how thin it is.
 fn contact_mesh(body: &solidcraft_doc::ModelBody) -> Result<ContactMesh> {
     let tolerance = (body.body.size() * 1e-3).max(1e-3);
@@ -231,16 +240,10 @@ impl ContactGeometry {
     /// riding on a bracket no longer makes a long sweep take thousands of samples. Returns how
     /// many pairs were set aside.
     pub(super) fn drop_rigid_pairs(&mut self, start: &Session, poses: &[Session]) -> Result<usize> {
-        let frames = |s: &Session| -> Result<Vec<Mat>> { self.bodies.iter().map(|b| Self::frame(b, s)).collect() };
-        let base = frames(start)?;
-        let after: Vec<Vec<Mat>> = poses.iter().map(frames).collect::<Result<_>>()?;
-        let relative = |f: &[Mat], a: usize, b: usize| -> Option<Mat> { Some(mat_mul(&solidcraft_doc::mat_inverse(f.get(a)?)?, f.get(b)?)) };
-        let same = |x: &Mat, y: &Mat| x.iter().flatten().zip(y.iter().flatten()).all(|(p, q)| (p - q).abs() <= 1e-9 * (1.0 + p.abs()));
+        let base = self.frames(start)?;
+        let after: Vec<Vec<Mat>> = poses.iter().map(|s| self.frames(s)).collect::<Result<_>>()?;
         let before = self.pairs.len();
-        self.pairs.retain(|(a, b, _, _)| {
-            let Some(r0) = relative(&base, *a, *b) else { return true };
-            after.iter().any(|f| relative(f, *a, *b).is_none_or(|r| !same(&r0, &r)))
-        });
+        self.pairs.retain(|(a, b, _, _)| after.iter().any(|f| !same_relative(&base, f, *a, *b)));
         let used: BTreeSet<usize> = self.pairs.iter().flat_map(|(a, b, _, _)| [*a, *b]).collect();
         let thinnest = used.iter().filter_map(|i| self.bodies.get(*i)).map(|b| b.thickness).fold(f64::INFINITY, f64::min);
         if thinnest.is_finite() {
@@ -249,8 +252,32 @@ impl ContactGeometry {
         Ok(before - self.pairs.len())
     }
 
+    /// Each body's frame in `s`.
+    pub(super) fn frames(&self, s: &Session) -> Result<Vec<Mat>> {
+        self.bodies.iter().map(|b| Self::frame(b, s)).collect()
+    }
+
+    /// The member pairs (lower id first) whose bodies all have, in `now`, the placements relative
+    /// to each other they have in `base`: whatever they met in `base` they meet the same way now.
+    pub(super) fn unmoved(&self, base: &[Mat], now: &[Mat]) -> BTreeSet<(u64, u64)> {
+        let (mut all, mut moved) = (BTreeSet::new(), BTreeSet::new());
+        for (a, b, oa, ob) in &self.pairs {
+            let key = (oa.0.min(ob.0), oa.0.max(ob.0));
+            all.insert(key);
+            if !same_relative(base, now, *a, *b) {
+                moved.insert(key);
+            }
+        }
+        all.difference(&moved).copied().collect()
+    }
+
     pub(super) fn pair_count(&self) -> usize {
-        self.pairs.iter().map(|(_, _, a, b)| (a.0.min(b.0), a.0.max(b.0))).collect::<BTreeSet<_>>().len()
+        self.member_pairs().len()
+    }
+
+    /// The member pairs checked (lower id first).
+    pub(super) fn member_pairs(&self) -> BTreeSet<(u64, u64)> {
+        self.pairs.iter().map(|(_, _, a, b)| (a.0.min(b.0), a.0.max(b.0))).collect()
     }
 
     fn frame(body: &CachedBody, s: &Session) -> Result<Mat> {
@@ -341,6 +368,18 @@ impl ContactGeometry {
     /// first two bodies found go (every pair, or the first found when `all` is false). `work`
     /// adds up the cost, refused past `budget`.
     pub(super) fn hits(&self, s: &Session, work: &mut usize, budget: usize, all: bool) -> Result<Vec<(Member, Member, f64)>> {
+        self.hits_except(s, work, budget, all, &BTreeSet::new())
+    }
+
+    /// [`ContactGeometry::hits`], but the member pairs in `skip` (lower id first) are not tested.
+    pub(super) fn hits_except(
+        &self,
+        s: &Session,
+        work: &mut usize,
+        budget: usize,
+        all: bool,
+        skip: &BTreeSet<(u64, u64)>,
+    ) -> Result<Vec<(Member, Member, f64)>> {
         let mut out: Vec<(Member, Member, f64)> = Vec::new();
         // The member pairs found so far (lower id first).
         let mut found: BTreeSet<(u64, u64)> = BTreeSet::new();
@@ -365,7 +404,8 @@ impl ContactGeometry {
             .collect();
         for (a, b, oa, ob) in &self.pairs {
             // Members already found colliding need no more of their bodies tested.
-            if found.contains(&(oa.0.min(ob.0), oa.0.max(ob.0))) {
+            let key = (oa.0.min(ob.0), oa.0.max(ob.0));
+            if found.contains(&key) || skip.contains(&key) {
                 continue;
             }
             let (Some(fa), Some(fb), Some(ba), Some(bb)) = (frames.get(*a), frames.get(*b), self.bodies.get(*a), self.bodies.get(*b)) else {
