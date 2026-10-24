@@ -177,3 +177,20 @@ fn placements_of_one_part_reuse_its_inner_pairs() {
         assert!((h["volume_mm3"].as_f64().unwrap() - 500.0).abs() < 1e-6, "{h}");
     }
 }
+
+/// `method: mesh` answers from the meshes: the overlapping pair and how deep, no boolean, no
+/// volume; an unknown method is refused.
+#[test]
+fn the_mesh_method_finds_overlaps_without_a_boolean() {
+    let mut s = Session::default();
+    run(&mut s, "solid.box", json!({"length": 20, "width": 10, "height": 10, "corner": [0, 0, 0], "body_name": "A"}));
+    run(&mut s, "solid.box", json!({"length": 10, "width": 10, "height": 10, "corner": [17, 0, 0], "operation": "new", "body_name": "B"}));
+    run(&mut s, "solid.box", json!({"length": 10, "width": 10, "height": 10, "corner": [60, 0, 0], "operation": "new", "body_name": "Far"}));
+    let r = run(&mut s, "inspect.interference", json!({"method": "mesh"}));
+    assert_eq!(r["method"], "mesh");
+    assert_eq!(r["count"], 1, "{r}");
+    let hit = &r["interferences"][0];
+    assert!((f(&hit["depth_mm"]) - 3.0).abs() < 1e-6, "A reaches 3 mm into B: {hit}");
+    assert!(hit.get("volume_mm3").is_none());
+    assert!(s.execute("inspect.interference", &json!({"method": "fast"})).is_err());
+}

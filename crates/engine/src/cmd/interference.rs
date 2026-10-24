@@ -20,7 +20,7 @@ use solidcraft_geom::{Aabb3, Mesh, Vec3};
 use solidcraft_kernel::Body;
 use solidcraft_kernel::profile::KernelTimes;
 
-use crate::params::{bad, num, string_list};
+use crate::params::{bad, num, str_, string_list};
 use crate::{Result, Session};
 
 /// Most pairs with overlapping bounding boxes one call intersects.
@@ -74,6 +74,11 @@ pub(super) fn interference(s: &mut Session, p: &Value) -> Result<Value> {
         },
     };
     let budget = std::time::Duration::from_secs_f64(budget_s);
+    let mesh_only = match str_(p, "method") {
+        None | Some("exact") => false,
+        Some("mesh") => true,
+        Some(other) => return Err(bad(cmd, format!("`method` is exact or mesh, not `{other}`"))),
+    };
     let want = string_list(p, "bodies");
     let st = s.world_state();
     let (meshes_left, bodies): (Vec<&solidcraft_doc::ModelBody>, Vec<&solidcraft_doc::ModelBody>) =
@@ -131,6 +136,9 @@ pub(super) fn interference(s: &mut Session, p: &Value) -> Result<Value> {
         let margin = MESH_MARGIN * (chords.get(i).copied().unwrap_or(0.0) + chords.get(j).copied().unwrap_or(0.0));
         Ok(!meshes_apart(ma, sa, mb, sb, margin))
     });
+    if mesh_only {
+        return Ok(by_meshes(&bodies, &meshes, &pairs, &need_exact, skipped, &meshes_left, started));
+    }
     let mut jobs = Vec::new();
     let mut cleared = 0usize;
     // Placements of one part (six copies of a servo) give their inner pairs again and again: a
@@ -240,6 +248,36 @@ pub(super) fn interference(s: &mut Session, p: &Value) -> Result<Value> {
         "threads": threads, "boolean_ms": round_ms(boolean_ms), "tessellate_ms": round_ms(tessellate_ms),
         "slowest": slowest, "ms": round_ms(started.elapsed().as_secs_f64() * 1000.0),
     }))
+}
+
+/// `method: mesh`: the pairs the meshes did not clear are checked on the meshes (points and
+/// edges of each inside the other, through a triangle tree) rather than by an exact boolean:
+/// which pairs pass into each other and how deep, in seconds even on hundreds of imported parts,
+/// within the meshes' chord tolerance and without the overlap's volume.
+fn by_meshes(
+    bodies: &[&solidcraft_doc::ModelBody],
+    meshes: &[Arc<Mesh>],
+    pairs: &[(usize, usize)],
+    need_exact: &[solidcraft_kernel::Result<bool>],
+    skipped: usize,
+    meshes_left: &[&solidcraft_doc::ModelBody],
+    started: web_time::Instant,
+) -> Value {
+    let checks: Vec<(usize, usize)> = pairs.iter().zip(need_exact).filter(|(_, e)| e.as_ref().map_or(true, |x| *x)).map(|(p, _)| *p).collect();
+    let found = solidcraft_kernel::map_with_local_pools(&checks, usize::MAX, |&(i, j)| {
+        let (Some(ma), Some(mb), Some(a), Some(b)) = (meshes.get(i), meshes.get(j), bodies.get(i), bodies.get(j)) else { return Ok(None) };
+        let tol = 1e-4 * a.body.size().max(b.body.size()).max(1.0);
+        Ok(super::motion::mesh_overlap_counted(ma, mb, tol, &mut 0).map(|d| (a.name.clone(), b.name.clone(), d)))
+    });
+    let hits: Vec<Value> =
+        found.into_iter().filter_map(|r| r.ok().flatten()).map(|(a, b, d)| json!({"a": a, "b": b, "depth_mm": d, "method": "mesh"})).collect();
+    let unchecked: Vec<Value> = meshes_left.iter().map(|b| json!({"a": b.name, "b": null, "reason": MESH_NOT_CHECKED})).collect();
+    json!({
+        "interferences": hits, "count": hits.len(), "checked": bodies.len(), "unchecked": unchecked, "method": "mesh",
+        "truncated": skipped > 0, "skipped_pairs": skipped, "pairs_candidate": pairs.len(),
+        "pairs_cleared": pairs.len() - checks.len(), "pairs_intersected": checks.len(),
+        "ms": round_ms(started.elapsed().as_secs_f64() * 1000.0),
+    })
 }
 
 /// A hit found for one placement of a pair, for another placement: its names, and its centre
