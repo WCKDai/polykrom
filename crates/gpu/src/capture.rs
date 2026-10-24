@@ -277,10 +277,28 @@ impl Capturer {
         device
             .poll(wgpu::PollType::Wait { submission_index: Some(submission), timeout: Some(TIMEOUT) })
             .map_err(|e| GpuError::Render(format!("waiting for the picture: {e}")))?;
-        match rx.try_recv() {
+        let mapped = rx.try_recv().map_err(drop);
+        // The map can be answered a poll after the submission it waited for, or by another poll of
+        // this shared device: poll again until it is (#84). Only the browser cannot wait.
+        #[cfg(not(target_arch = "wasm32"))]
+        let mapped = mapped.or_else(|()| {
+            let until = std::time::Instant::now() + TIMEOUT;
+            loop {
+                let _ = device.poll(wgpu::PollType::Poll);
+                match rx.recv_timeout(std::time::Duration::from_millis(2)) {
+                    Ok(r) => break Ok(r),
+                    Err(_) if std::time::Instant::now() < until => {}
+                    Err(_) => break Err(()),
+                }
+            }
+        });
+        match mapped {
             Ok(Ok(())) => {}
             Ok(Err(e)) => return Err(GpuError::Render(format!("reading the picture back: {e}"))),
-            Err(_) => return Err(GpuError::Unsupported("reading a picture back without waiting for the browser".into())),
+            #[cfg(not(target_arch = "wasm32"))]
+            Err(()) => return Err(GpuError::Render(format!("the picture was not read back within {} s", TIMEOUT.as_secs()))),
+            #[cfg(target_arch = "wasm32")]
+            Err(()) => return Err(GpuError::Unsupported("reading a picture back without waiting for the browser".into())),
         }
         let data = slice.get_mapped_range().map_err(|e| GpuError::Render(format!("reading the picture back: {e}")))?;
         let mut rgba = Vec::with_capacity((row as usize) * (height as usize));
