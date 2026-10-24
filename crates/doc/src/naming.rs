@@ -229,6 +229,23 @@ pub fn face_name_exact(b: &ModelBody, index: usize) -> bool {
     names(b).verified(index)
 }
 
+/// Prepare only names not yet known before a lookup reads several bodies. A ready cell is
+/// shared by snapshots and poses: dispatching threads just to read it costs more than a lookup.
+pub(crate) fn warm_names<'a>(bodies: impl Iterator<Item = &'a ModelBody>) {
+    let bodies: Vec<_> = bodies.filter(|b| b.names.names.get().is_none()).collect();
+    #[cfg(test)]
+    tests::record_warm_jobs(bodies.len());
+    match bodies.as_slice() {
+        [] => {}
+        [body] => {
+            let _ = names(body);
+        }
+        _ => solidcraft_kernel::for_each_on_threads(&bodies, 16, |b| {
+            let _ = names(b);
+        }),
+    }
+}
+
 /// A body's names, with what finding them again needs: from the history of the feature that
 /// made it where it reports one, else from geometry (unverified).
 pub(crate) fn names(b: &ModelBody) -> Arc<Names> {
@@ -788,6 +805,48 @@ pub fn face_name_at_body(body: &ModelBody, point: Vec3) -> Option<String> {
     face_names(body).get(index).filter(|name| !name.is_empty()).cloned()
 }
 
+/// The names the faces of `imported` have in `part`, by body, then face (empty where not known):
+/// `imported` are the bodies read back from the STEP text `part`'s solid bodies were written to
+/// (a linked design), where they stand in it. Each takes the names of the solid of `part` that
+/// most of its faces lie on, face by face: the same geometry, so a point well inside a face lies
+/// on the face it was written from (and on a face of another solid only where two touch). Of
+/// solids that hold as many (two alike in one place), the one the file names it after.
+pub fn carried_face_names(part: &ModelState, imported: &[solidcraft_kernel::ImportedBody]) -> Vec<Vec<String>> {
+    let solids: Vec<&ModelBody> = part.bodies.iter().filter(|b| !b.body.is_mesh()).collect();
+    let indices: Vec<OnceLock<Option<FaceIndex>>> = solids.iter().map(|_| OnceLock::new()).collect();
+    imported
+        .iter()
+        .map(|read| {
+            let probe = ModelBody::new(String::new(), read.body.clone(), 0);
+            let points: Vec<Option<Vec3>> = face_spots(&probe).into_iter().map(|s| s.map(|s| s.point)).collect();
+            let best = solids
+                .iter()
+                .zip(&indices)
+                .filter_map(|(b, index)| {
+                    let tol = (b.body.size() * 2e-3).max(1e-3);
+                    let near = b.outline_bounds().inflated(tol);
+                    if !points.iter().flatten().any(|p| near.contains(*p)) {
+                        return None;
+                    }
+                    // Like face_name_at_body, a body too large to index is left unnamed.
+                    let index = index
+                        .get_or_init(|| {
+                            let mesh = b.mesh();
+                            (mesh.triangles.len() <= 2_000_000 && face_count(b) <= 50_000).then(|| FaceIndex::new(&mesh, face_count(b)))
+                        })
+                        .as_ref()?;
+                    let hits: Vec<Option<usize>> = points.iter().map(|p| p.and_then(|p| index.face_at(p, tol))).collect();
+                    Some((hits.iter().flatten().count(), *b, hits))
+                })
+                .filter(|(n, ..)| *n > 0)
+                .max_by_key(|(n, b, _)| (*n, b.name == read.name));
+            let Some((_, b, hits)) = best else { return Vec::new() };
+            let names = face_names(b);
+            hits.into_iter().map(|h| h.and_then(|i| names.get(i).cloned()).unwrap_or_default()).collect()
+        })
+        .collect()
+}
+
 /// Where a face is, for a script: a point that lies on it and picks it, and the plane, cylinder,
 /// cone, sphere or torus it is part of (when it is one).
 #[derive(Clone, Copy, Debug)]
@@ -872,6 +931,85 @@ pub fn face_on_body(body: &ModelBody, name: &str, p: Vec3) -> Option<(usize, Vec
 
 #[cfg(test)]
 mod tests {
+    thread_local! {
+        static WARM_JOBS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+    }
+
+    pub(super) fn record_warm_jobs(n: usize) {
+        WARM_JOBS.with(|jobs| jobs.set(jobs.get() + n));
+    }
+
+    fn take_warm_jobs() -> usize {
+        WARM_JOBS.with(|jobs| jobs.replace(0))
+    }
+
+    fn lookup_bodies() -> ModelState {
+        let body = solidcraft_kernel::box_solid(Vec3::ZERO, Vec3::new(4., 2., 1.)).unwrap();
+        let mut st = ModelState::default();
+        st.bodies = (0..13).map(|i| ModelBody::new(format!("Part{i}"), body.clone(), i + 1)).collect();
+        st
+    }
+
+    fn same_hit(a: &FaceHit, b: &FaceHit) {
+        assert_eq!((a.body, a.face, a.point), (b.body, b.face, b.point));
+        assert_eq!((a.split, a.merged, a.verified, a.on_point, a.legacy), (b.split, b.merged, b.verified, b.on_point, b.legacy));
+    }
+
+    #[test]
+    fn cached_face_lookups_schedule_no_name_warmup() {
+        let st = lookup_bodies();
+        for b in &st.bodies {
+            let _ = face_names(b);
+        }
+        let name = face_names(&st.bodies[0])[0].clone();
+        let picked = locate_face(&st, &name, Vec3::ZERO).unwrap();
+        let unique = locate_one(&st, None, &name).unwrap();
+        take_warm_jobs();
+        // The two public lookup paths used by picked origins and named-face commands.
+        for _ in 0..145 {
+            same_hit(&locate_face(&st, &name, Vec3::ZERO).unwrap(), &picked);
+            same_hit(&locate_one(&st, None, &name).unwrap(), &unique);
+        }
+        assert!(locate_face(&st, "absent:face:0", Vec3::ZERO).is_none());
+        assert!(locate_one(&st, None, "absent:face:0").is_err());
+        assert_eq!(take_warm_jobs(), 0, "cached names must not dispatch preparation work");
+    }
+
+    #[test]
+    fn face_lookup_warms_only_cold_and_invalidated_names() {
+        // Exercise both entry points as the first reader of a partly named model.
+        for picked in [false, true] {
+            let mut st = lookup_bodies();
+            let name = face_names(&st.bodies[0])[0].clone();
+            let lookup = |st: &ModelState, name: &str| {
+                if picked { locate_face(st, name, Vec3::ZERO).unwrap() } else { locate_one(st, None, name).unwrap() }
+            };
+            take_warm_jobs();
+            let hit = lookup(&st, &name);
+            assert_eq!(take_warm_jobs(), 12, "only the other bodies need names");
+            let snapshot = st.clone();
+            same_hit(&lookup(&snapshot, &name), &hit);
+            assert_eq!(take_warm_jobs(), 0, "snapshots share ready names");
+
+            st.bodies[0].name = "Renamed".into();
+            st.bodies[0].names = st.bodies[0].names.renamed();
+            let renamed = lookup(&st, "Renamed:face:0");
+            same_hit(&renamed, &hit);
+            assert_eq!(take_warm_jobs(), 1, "a rename invalidates only its own names");
+            assert!(locate_face(&st, &name, Vec3::ZERO).is_none());
+            same_hit(&lookup(&snapshot, &name), &hit);
+            assert_eq!(take_warm_jobs(), 0, "the retained snapshot stays ready");
+
+            let source = st.bodies[1].clone();
+            st.bodies[1].names = NameCell::same(&source);
+            same_hit(&lookup(&st, "Renamed:face:0"), &renamed);
+            assert_eq!(take_warm_jobs(), 1, "a lazy moved copy is prepared once");
+            assert!(Arc::ptr_eq(&names(&st.bodies[1]), &names(&source)));
+            same_hit(&lookup(&st, "Renamed:face:0"), &renamed);
+            assert_eq!(take_warm_jobs(), 0);
+        }
+    }
+
     /// Pieces lying almost level along the sort axis must keep the order they arrived in, whatever
     /// the low bits of their centres do. The centre is the mean of a tessellated boundary, so those
     /// bits depend on where the loop's polyline starts and can differ between processes — which is
