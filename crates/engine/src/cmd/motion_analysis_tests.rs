@@ -227,6 +227,38 @@ fn a_pin_turning_in_its_bore_at_a_clearance_is_not_a_collision() {
     }
 }
 
+/// A ring seated line to line in a 200 mm link's Ø22 bore (both grounded) and a pin turning in
+/// the ring's Ø8 bore touch but share nothing: the meshes, a fifth of a millimetre off on the
+/// link, make them look 0.1 mm into each other. The exact check makes them mesh contacts, not a
+/// static overlap or a collision.
+#[test]
+fn parts_seated_line_to_line_are_mesh_contacts_not_static_overlaps() {
+    let mut s = Session::default();
+    run(&mut s, "component.create", json!({"name": "Link"}));
+    run(&mut s, "solid.box", json!({"length": 200, "width": 30, "height": 7, "corner": [-15, -15, 0]}));
+    run(&mut s, "solid.cylinder", json!({"radius": 11, "height": 9, "base": [0, 0, -1], "operation": "cut"}));
+    run(&mut s, "component.activate", json!({"component": "root"}));
+    run(&mut s, "component.create", json!({"name": "Ring"}));
+    run(&mut s, "solid.cylinder", json!({"radius": 11, "height": 7, "base": [0, 0, 0], "operation": "new"}));
+    run(&mut s, "solid.cylinder", json!({"radius": 4, "height": 9, "base": [0, 0, -1], "operation": "cut"}));
+    run(&mut s, "component.activate", json!({"component": "root"}));
+    run(&mut s, "component.create", json!({"name": "Pin"}));
+    run(&mut s, "solid.cylinder", json!({"radius": 4, "height": 20, "base": [0, 0, -5], "operation": "new"}));
+    run(&mut s, "component.activate", json!({"component": "root"}));
+    for name in ["Link", "Ring"] {
+        let o = occ(&s, name);
+        run(&mut s, "occurrence.ground", json!({"occurrence": o, "grounded": true}));
+    }
+    pin(&mut s, "revolute", "Turn", "Ring", "Pin", Vec3::ZERO, Vec3::Z);
+    run(&mut s, "motion.study", json!({"name": "Spin", "steps": 36, "keys": [{"joint": "Turn", "points": [[0, 0], [36, 360]]}]}));
+    let r = run(&mut s, "motion.interference", json!({"study": "Spin"}));
+    let pairs = |v: &Value| {
+        v.as_array().into_iter().flatten().map(|c| format!("{}-{}", c["a"].as_str().unwrap_or(""), c["b"].as_str().unwrap_or(""))).collect::<Vec<_>>()
+    };
+    assert!(r["clear"] == true && r["static_overlaps"] == json!([]), "{r}");
+    assert!(pairs(&r["mesh_contacts"]).contains(&"Link:1-Ring:1".to_string()), "{r}");
+}
+
 /// A number names a study by its id first, text by its name first: a study may be named like
 /// another's id.
 #[test]
