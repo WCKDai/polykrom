@@ -1697,3 +1697,12 @@ fn select_keeps_only_the_paths_asked_for() {
     let m = tool(&mut s, "execute", json!({"command": "inspect.measure", "params": {}, "select": [1]}));
     assert_eq!(m["body_count"], 2, "{m}");
 }
+
+/// A tool's name given to execute as a command points at the tool (#69).
+#[test]
+fn execute_with_a_tool_name_points_at_the_tool() {
+    let mut s = server();
+    let r = call(&mut s, 1, "tools/call", json!({"name": "execute", "arguments": {"command": "list_commands"}}));
+    let text = r["result"]["content"][0]["text"].as_str().unwrap_or_default();
+    assert!(r["result"]["isError"] == true && text.contains("is a tool, not a command"), "{r}");
+}

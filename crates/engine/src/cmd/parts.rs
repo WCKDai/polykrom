@@ -575,6 +575,20 @@ mod tests {
     }
 
     #[test]
+    fn each_library_screw_carries_its_own_thread() {
+        // Both are built at the origin; the second one's thread must not land on the first.
+        let mut s = Session::default();
+        for name in ["A", "B"] {
+            run(&mut s, "parts.insert", json!({"family": "socket_head_cap_screw", "size": "M6", "length": 16, "name": name}));
+        }
+        let st = s.model.state();
+        let owners: Vec<Option<u64>> = st.threads.iter().map(|t| st.body(&t.body).map(|b| s.doc.model_body_component(b))).collect();
+        let comps: Vec<Option<u64>> = st.threads.iter().map(|t| s.doc.features.iter().find(|f| f.id == t.feature).map(|f| f.component)).collect();
+        assert_eq!(st.threads.len(), 2, "{:?}", st.threads);
+        assert_eq!(owners, comps, "each thread on its own part's body: {:?}", st.threads);
+    }
+
+    #[test]
     fn dimensions_follow_the_standard_tables() {
         let l = run(&mut Session::default(), "parts.library", json!({"family": "socket_head_cap_screw"}));
         let m6 = l["sizes"].as_array().and_then(|a| a.iter().find(|x| x["size"] == "M6")).cloned().unwrap_or_default();

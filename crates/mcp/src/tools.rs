@@ -416,6 +416,10 @@ fn dispatch(b: &mut dyn Backend, name: &str, a: &Map<String, Value>) -> Result<V
         }
         "execute" => {
             let id = str_arg(a, "command").ok_or("`command` is required")?;
+            // A tool's name given as a command (`execute {command: "list_commands"}`): say so.
+            if tool_definitions().iter().any(|t| t["name"] == id) {
+                return Err(format!("`{id}` is a tool, not a command: call the {id} tool itself"));
+            }
             let v = exec(b, id, a.get("params").cloned().filter(Value::is_object).unwrap_or(json!({})))?;
             let v = if a.get("verbose").and_then(Value::as_bool).unwrap_or(true) { v } else { compact(v) };
             Ok(selected(v, a.get("select")))
