@@ -98,6 +98,7 @@ pub fn tool_definitions() -> Vec<Value> {
                     "command": string("Command id (see list_commands)"),
                     "params": {"type": "object", "description": "The command's parameters"},
                     "verbose": {"type": "boolean", "description": "false: omit the full feature body list and sketch ids repeated outside `created`; keep created_bodies, changed_bodies and removed_bodies (default true)"},
+                    "select": {"type": "array", "items": {"type": "string"}, "description": "Only these parts of the result: dotted paths, * for every item of a list (e.g. [\"total.mass_g\", \"bodies.*.name\", \"bodies.*.mass_g\"]). Paths that match nothing are listed in missing_paths. Keeps replies on large designs small"},
                 }),
                 &["command"],
             ),
@@ -115,7 +116,7 @@ pub fn tool_definitions() -> Vec<Value> {
                     "commands": {
                         "type": "array",
                         "description": "Steps: [{\"command\": id, \"params\": {...}}, ...]",
-                        "items": {"type": "object", "properties": {"command": {"type": "string"}, "params": {"type": "object"}}, "required": ["command"]},
+                        "items": {"type": "object", "properties": {"command": {"type": "string"}, "params": {"type": "object"}, "select": {"type": "array", "items": {"type": "string"}, "description": "This step's result only at these dotted paths (as execute's select)"}}, "required": ["command"]},
                     },
                     "rollback": {"type": "boolean", "description": "Undo completed steps when one fails (default true)"},
                     "timings": {"type": "boolean", "description": "Add `timings`: [{index, command, ms}] for every step run (the failing one included) and `total_ms` (default false)"},
@@ -416,7 +417,8 @@ fn dispatch(b: &mut dyn Backend, name: &str, a: &Map<String, Value>) -> Result<V
         "execute" => {
             let id = str_arg(a, "command").ok_or("`command` is required")?;
             let v = exec(b, id, a.get("params").cloned().filter(Value::is_object).unwrap_or(json!({})))?;
-            Ok(if a.get("verbose").and_then(Value::as_bool).unwrap_or(true) { v } else { compact(v) })
+            let v = if a.get("verbose").and_then(Value::as_bool).unwrap_or(true) { v } else { compact(v) };
+            Ok(selected(v, a.get("select")))
         }
         "inspect_design" => {
             let measure = a.get("measure").and_then(Value::as_bool).unwrap_or(true);
@@ -545,6 +547,76 @@ impl Undo {
 
 /// `batch`: run steps in order, stop at the first failure and (by default) go back to the
 /// design as it was before the batch.
+/// A result cut down to the dotted `select` paths (`*` for every item of a list), merged into one
+/// value shaped like the result; paths that match nothing are listed in `missing_paths`. No
+/// `select` (or one that is not a list of strings) leaves the result whole.
+fn selected(v: Value, select: Option<&Value>) -> Value {
+    let Some(paths) = select.and_then(Value::as_array).filter(|p| !p.is_empty()) else { return v };
+    let paths: Vec<&str> = paths.iter().filter_map(Value::as_str).collect();
+    let mut out = Value::Null;
+    let mut missing = Vec::new();
+    for path in paths {
+        let segs: Vec<&str> = path.split('.').filter(|s| !s.is_empty()).collect();
+        match take(&v, &segs) {
+            Some(part) => merge(&mut out, part),
+            None => missing.push(path),
+        }
+    }
+    if !missing.is_empty() {
+        if out.is_null() {
+            out = json!({});
+        }
+        if let Some(o) = out.as_object_mut() {
+            o.insert("missing_paths".into(), json!(missing));
+        }
+    }
+    out
+}
+
+/// The part of `v` at `segs`, in the shape it has in `v`.
+fn take(v: &Value, segs: &[&str]) -> Option<Value> {
+    let Some((first, rest)) = segs.split_first() else { return Some(v.clone()) };
+    match (first, v) {
+        (&"*", Value::Array(items)) => {
+            let parts: Vec<Value> = items.iter().map(|x| take(x, rest).unwrap_or(Value::Null)).collect();
+            parts.iter().any(|p| !p.is_null()).then_some(Value::Array(parts))
+        }
+        (key, Value::Object(o)) => o.get(*key).and_then(|x| take(x, rest)).map(|x| json!({ *key: x })),
+        (index, Value::Array(items)) => index.parse::<usize>().ok().and_then(|i| items.get(i)).and_then(|x| take(x, rest)).map(|x| {
+            // An index keeps its place: the items before it are null.
+            let i = index.parse::<usize>().unwrap_or(0);
+            let mut list = vec![Value::Null; i];
+            list.push(x);
+            Value::Array(list)
+        }),
+        _ => None,
+    }
+}
+
+/// Fold `add` into `into`: objects key by key, lists item by item.
+fn merge(into: &mut Value, add: Value) {
+    match (into, add) {
+        (Value::Object(a), Value::Object(b)) => {
+            for (k, v) in b {
+                merge(a.entry(k).or_insert(Value::Null), v);
+            }
+        }
+        (Value::Array(a), Value::Array(b)) => {
+            for (i, v) in b.into_iter().enumerate() {
+                match a.get_mut(i) {
+                    Some(slot) => merge(slot, v),
+                    None => a.push(v),
+                }
+            }
+        }
+        (slot, add) => {
+            if !add.is_null() || slot.is_null() {
+                *slot = add;
+            }
+        }
+    }
+}
+
 fn batch(b: &mut dyn Backend, a: &Map<String, Value>) -> Value {
     let Some(steps) = a.get("commands").and_then(Value::as_array) else {
         return text_result(&json!("`commands` must be an array of {command, params}"), true);
@@ -559,14 +631,23 @@ fn batch(b: &mut dyn Backend, a: &Map<String, Value>) -> Value {
     // An app that runs batches itself answers the whole batch in one request, so one frame
     // (#743). One too long for a control line goes step by step: the app would refuse it unrun.
     // The margin covers the envelope and the `allow_paths` the backend adds.
-    let mut params = json!({"commands": steps, "rollback": rollback});
+    // Each step's `select` is applied here, to its result: the app is sent the steps without it.
+    let selects: Vec<Option<Value>> = steps.iter().map(|st| st.get("select").cloned()).collect();
+    let sent: Vec<Value> = steps
+        .iter()
+        .map(|st| match st.as_object() {
+            Some(o) => Value::Object(o.iter().filter(|(k, _)| k.as_str() != "select").map(|(k, v)| (k.clone(), v.clone())).collect()),
+            None => st.clone(),
+        })
+        .collect();
+    let mut params = json!({"commands": sent, "rollback": rollback});
     if timed && let Some(o) = params.as_object_mut() {
         o.insert("timings".into(), Value::Bool(true));
         o.insert("profile".into(), Value::Bool(profile));
     }
     if params.to_string().len() + 64 * 1024 <= solidcraft_engine::MAX_LINE {
         match b.call("engine.batch", params) {
-            Ok(r) => return batch_reply(&r, rollback, verbose),
+            Ok(r) => return batch_reply(&r, rollback, verbose, &selects),
             // Older apps and the headless session, or the app wants the steps one by one.
             Err(e) if e.starts_with("unknown method") || e.starts_with("engine.batch unavailable") => {}
             // Never sent: no app to send it to.
@@ -594,7 +675,7 @@ fn batch(b: &mut dyn Backend, a: &Map<String, Value>) -> Value {
             rows.push(took.to_json(i, command.unwrap_or_default()));
         }
         match r {
-            Ok(v) => results.push(if verbose { v } else { compact(v) }),
+            Ok(v) => results.push(selected(if verbose { v } else { compact(v) }, selects.get(i).and_then(Option::as_ref))),
             Err(e) => {
                 let (rolled_back, undone) = start.rollback(b, i);
                 let reply = json!({
@@ -624,9 +705,15 @@ fn with_timings(mut reply: Value, timed: bool, rows: Vec<Value>, total_ms: f64) 
 }
 
 /// The `batch` reply from the app's `engine.batch` answer, shaped as the per-step path shapes it.
-fn batch_reply(r: &Value, rollback: bool, verbose: bool) -> Value {
-    let results: Vec<Value> =
-        r["results"].as_array().cloned().unwrap_or_default().into_iter().map(|v| if verbose { v } else { compact(v) }).collect();
+fn batch_reply(r: &Value, rollback: bool, verbose: bool, selects: &[Option<Value>]) -> Value {
+    let results: Vec<Value> = r["results"]
+        .as_array()
+        .cloned()
+        .unwrap_or_default()
+        .into_iter()
+        .enumerate()
+        .map(|(i, v)| selected(if verbose { v } else { compact(v) }, selects.get(i).and_then(Option::as_ref)))
+        .collect();
     let (mut reply, error) = match r.get("failed").filter(|f| !f.is_null()) {
         None => (json!({"ok": true, "completed": results.len(), "results": results}), false),
         Some(failed) => {
