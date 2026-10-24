@@ -40,7 +40,7 @@ pub const INTERFERENCE_DOC: &str = "study: id|name; occurrences?: [ids or names]
      was checked: a check that stopped early keeps them in collisions), pairs_moving_together \
      (pairs that keep their placement to each other: each is tested once); mesh_contacts: [{a, b, depth_mm}] (pairs the meshes \
      found no deeper into each other than their chord tolerance, such as a pin turning in its bore at a small clearance, and \
-     the exact check where they went deepest found sharing nothing: not collisions). The study plays as motion.play plays it but contact sets do not stop it, on a copy (the design is not \
+     the exact check where they went deepest found them sharing less than 0.01 mm³: not collisions). The study plays as motion.play plays it but contact sets do not stop it, on a copy (the design is not \
      changed). Parts are tested at the samples only: one that passes wholly through another between two samples is missed";
 
 /// Most samples a plot or an interference check takes: each is a solve.
@@ -51,6 +51,9 @@ const MAX_SERIES: usize = 256;
 const MAX_WORK: usize = 500_000_000;
 /// Most colliding pairs whose overlap volume is worked out, and most body booleans that takes.
 const MAX_VOLUMES: usize = 16;
+/// Less shared than this (mm³) is contact, not overlap: inspect.clearance's default min_volume.
+/// Fixed, not scaled with the design: a large assembly's real overlaps stay collisions.
+const CONTACT_MM3: f64 = 0.01;
 const MAX_BOOLEANS: usize = 64;
 
 /// How many samples `p` asks for (`min`…`MAX_SAMPLES`, default the study's steps + 1).
@@ -442,10 +445,10 @@ pub(super) fn interference(s: &mut Session, p: &Value) -> Result<Value> {
     // the bore meshed inside its surface) is checked exactly where it went deepest: with nothing
     // shared there, it is a contact of the meshes, not a collision.
     let mut booleans = MAX_BOOLEANS;
-    let (slack, nothing) = (2.0 * geometry.chord(), 1e-9 * geometry.scale().powi(3));
+    let slack = 2.0 * geometry.chord();
     let volumes: BTreeMap<(u64, u64), Option<f64>> =
         found.iter().filter(|(_, c)| c.depth <= slack).map(|(k, c)| (*k, shared_volume(s, &c.at_deepest, k.0, k.1, &mut booleans))).collect();
-    let mesh_only: Vec<(u64, u64)> = volumes.iter().filter(|(_, v)| v.is_some_and(|v| v <= nothing)).map(|(k, _)| *k).collect();
+    let mesh_only: Vec<(u64, u64)> = volumes.iter().filter(|(_, v)| v.is_some_and(|v| v < CONTACT_MM3)).map(|(k, _)| *k).collect();
     let mesh_contacts: Vec<Value> =
         mesh_only.iter().filter_map(|k| found.remove(k)).map(|c| json!({"a": c.names.0, "b": c.names.1, "depth_mm": c.depth})).collect();
     let mut list: Vec<(&(u64, u64), &Collision)> = found.iter().collect();
