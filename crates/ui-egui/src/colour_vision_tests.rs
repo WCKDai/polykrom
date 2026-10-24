@@ -748,11 +748,13 @@ fn each_mode_changes_only_its_table() {
     let mut red_green_light =
         red_green_both.into_iter().filter(|name| !["surface_accent", "mesh_accent", "form_accent"].contains(name)).collect::<Vec<_>>();
     red_green_light.extend(["sketch_projected", "sketch_locked", "timeline_item_error", "construction_geom", "glyph_text", "form_success"]);
+    // The dark selection's lime is deepened for a weak red sense (#91).
+    let red_green_dark = red_green_both.into_iter().chain(["body_selected"]).collect::<Vec<_>>();
     for (dark, mode, want) in [
         (false, ColorVision::Protan, set(&red_green_light)),
-        (true, ColorVision::Protan, set(&red_green_both)),
+        (true, ColorVision::Protan, set(&red_green_dark)),
         (false, ColorVision::Deutan, set(&red_green_light)),
-        (true, ColorVision::Deutan, set(&red_green_both)),
+        (true, ColorVision::Deutan, set(&red_green_dark)),
         (
             false,
             ColorVision::Tritan,

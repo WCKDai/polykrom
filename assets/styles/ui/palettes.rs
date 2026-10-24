@@ -20,12 +20,12 @@ impl Tokens {
             file_surface: Color32::WHITE,
             file_border: Color32::from_rgb(228, 228, 234),
             file_image_tint: Color32::WHITE,
-            file_rail: Color32::from_rgb(11, 120, 130),
+            file_rail: Color32::from_rgb(28, 28, 30),
             file_rail_ink: Color32::WHITE,
-            file_rail_hover: Color32::from_rgb(16, 128, 139),
-            file_primary: Color32::from_rgb(223, 242, 244),
-            file_primary_ink: Color32::from_rgb(11, 88, 95),
-            file_primary_border: Color32::from_rgb(18, 151, 163),
+            file_rail_hover: Color32::from_rgb(48, 48, 52),
+            file_primary: Color32::from_rgb(240, 252, 204),
+            file_primary_ink: Color32::from_rgb(54, 84, 8),
+            file_primary_border: Color32::from_rgb(77, 124, 15),
             file_recovery: Color32::from_rgb(255, 246, 229),
             file_recovery_ink: Color32::from_rgb(122, 74, 5),
             file_recovery_border: Color32::from_rgb(240, 210, 154),
@@ -106,8 +106,10 @@ impl Tokens {
             border: Color32::from_rgb(211, 211, 217),
             text: Color32::from_rgb(41, 41, 46),
             text_dim: Color32::from_rgb(115, 115, 120),
-            accent: Color32::from_rgb(4, 138, 149),
-            accent_soft: Color32::from_rgb(169, 217, 227),
+            // Polykrom's lime (#CCFF00) can't be text or a line on a light surface (about 1.1:1),
+            // so the light palette's accent is the deep lime that stays legible there (#91).
+            accent: Color32::from_rgb(77, 124, 15),
+            accent_soft: Color32::from_rgb(160, 206, 44),
             sketch_accent: icon_primary(crate::icon_svg::SKETCH_PRIMARY[0]),
             // Icon palette active-3 ramps; these accents have no compiled constants yet.
             surface_accent: Color32::from_rgb(164, 80, 0),
@@ -139,7 +141,7 @@ impl Tokens {
             warning: Color32::from_rgb(222, 150, 30),
             icon: Color32::from_rgb(77, 77, 82),
             timeline: Color32::from_rgb(234, 234, 240),
-            hover: Color32::from_rgb(214, 237, 241),
+            hover: Color32::from_rgb(240, 240, 243),
             sel_face: Color32::from_rgb(0, 122, 140),
             sel_edge: Color32::from_rgb(24, 149, 161),
             sel_edge_rim: Color32::from_rgb(91, 205, 217),
@@ -147,9 +149,9 @@ impl Tokens {
             hover_edge_halo: Color32::from_rgb(203, 203, 203),
             hover_face_lift: 40,
             sel_profile: Color32::from_rgb(6, 99, 108),
-            sel_profile_edge: Color32::from_rgb(19, 126, 136),
+            sel_profile_edge: Color32::from_rgb(77, 124, 15),
             hover_profile: Color32::from_rgba_unmultiplied_const(75, 129, 253, 48),
-            hover_profile_edge: Color32::from_rgb(9, 156, 168),
+            hover_profile_edge: Color32::from_rgb(104, 160, 20),
             sel_vertex: Color32::from_rgb(20, 124, 134),
             origin_plane: Color32::from_rgba_unmultiplied_const(249, 184, 134, 94),
             origin_plane_edge: Color32::from_rgba_unmultiplied_const(214, 140, 84, 200),
@@ -175,7 +177,7 @@ impl Tokens {
             viewport_bottom: Color32::from_rgb(209, 209, 215),
             grid: Color32::from_rgb(201, 201, 207),
             grid_major: Color32::from_rgb(177, 177, 182),
-            body_selected: Color32::from_rgb(20, 140, 165),
+            body_selected: Color32::from_rgb(110, 170, 0),
             sketch: Color32::from_rgb(61, 79, 209),
             sketch_fixed: Color32::from_rgb(20, 20, 20),
             sketch_point: Color32::BLACK,
@@ -186,7 +188,7 @@ impl Tokens {
             section_cap: Color32::from_rgb(214, 128, 72),
             dialog_bg: Color32::from_rgb(251, 251, 251),
             dialog_border: Color32::from_rgb(218, 218, 224),
-            chip: Color32::from_rgb(4, 138, 149),
+            chip: Color32::from_rgb(77, 124, 15),
             profile_fill: Color32::from_rgba_unmultiplied_const(255, 196, 120, 70),
             glyph_bg: Color32::WHITE,
             glyph_edge: Color32::from_rgb(190, 110, 100),
@@ -205,8 +207,8 @@ impl Tokens {
             control_fill: Color32::from_rgb(255, 255, 255),
             control_border: Color32::from_rgb(201, 202, 207),
             dialog_label: Color32::from_rgb(51, 74, 76),
-            selected_ink: Color32::from_rgb(11, 88, 95),
-            selected_bg: Color32::from_rgb(229, 243, 245),
+            selected_ink: Color32::from_rgb(54, 84, 8),
+            selected_bg: Color32::from_rgb(240, 252, 204),
             timeline_item: Color32::WHITE,
             timeline_item_error: Color32::from_rgb(250, 220, 220),
             timeline_marker: Color32::from_rgb(75, 75, 80),
@@ -273,11 +275,11 @@ impl Tokens {
         t.file_background = Color32::from_rgb(34, 34, 39);
         t.file_surface = Color32::from_rgb(42, 43, 47);
         t.file_border = Color32::from_rgb(68, 68, 73);
-        t.file_rail = Color32::from_rgb(0, 89, 96);
-        t.file_rail_hover = Color32::from_rgb(6, 109, 118);
-        t.file_primary = Color32::from_rgb(8, 53, 58);
-        t.file_primary_ink = Color32::from_rgb(136, 209, 217);
-        t.file_primary_border = Color32::from_rgb(19, 155, 167);
+        t.file_rail = Color32::from_rgb(24, 24, 27);
+        t.file_rail_hover = Color32::from_rgb(44, 44, 49);
+        t.file_primary = Color32::from_rgb(38, 47, 10);
+        t.file_primary_ink = Color32::from_rgb(220, 255, 120);
+        t.file_primary_border = Color32::from_rgb(204, 255, 0);
         t.file_recovery = Color32::from_rgb(67, 51, 28);
         t.file_recovery_ink = Color32::from_rgb(245, 204, 137);
         t.file_recovery_border = Color32::from_rgb(115, 88, 43);
@@ -288,8 +290,13 @@ impl Tokens {
         t.border = Color32::from_rgb(68, 68, 73);
         t.text = Color32::from_rgb(225, 225, 231);
         t.text_dim = Color32::from_rgb(154, 154, 160);
-        t.accent = Color32::from_rgb(19, 155, 167);
-        t.accent_soft = Color32::from_rgb(14, 88, 112);
+        // Polykrom's lime, with ink on it (#91).
+        t.accent = Color32::from_rgb(204, 255, 0);
+        t.on_accent = Color32::from_rgb(17, 17, 17);
+        t.sel_profile_edge = Color32::from_rgb(204, 255, 0);
+        t.hover_profile_edge = Color32::from_rgb(222, 255, 110);
+        t.body_selected = Color32::from_rgb(204, 255, 0);
+        t.accent_soft = Color32::from_rgb(100, 120, 0);
         t.sketch_accent = icon_primary(crate::icon_svg::SKETCH_PRIMARY[1]);
         t.surface_accent = Color32::from_rgb(149, 104, 45);
         t.mesh_accent = Color32::from_rgb(133, 113, 0);
@@ -319,8 +326,8 @@ impl Tokens {
         t.control_fill = Color32::from_rgb(31, 31, 35);
         t.control_border = Color32::from_rgb(81, 81, 86);
         t.dialog_label = t.text;
-        t.selected_ink = Color32::from_rgb(136, 209, 217);
-        t.selected_bg = Color32::from_rgb(1, 80, 87);
+        t.selected_ink = Color32::from_rgb(235, 255, 180);
+        t.selected_bg = Color32::from_rgb(44, 55, 10);
         t.construction_geom = icon_primary(crate::icon_svg::CONSTRUCTION_PRIMARY[1]);
         t.error = Color32::from_rgb(240, 100, 96);
         t.warning = Color32::from_rgb(236, 170, 70);
@@ -345,7 +352,7 @@ impl Tokens {
         t.profile_fill = Color32::from_rgba_unmultiplied_const(120, 150, 200, 40);
         t.dialog_bg = Color32::from_rgb(42, 43, 47);
         t.dialog_border = Color32::from_rgb(68, 68, 73);
-        t.chip = Color32::from_rgb(17, 115, 125);
+        t.chip = Color32::from_rgb(170, 214, 0);
         t.glyph_bg = Color32::from_rgb(49, 49, 54);
         t.glyph_edge = Color32::from_rgb(200, 130, 120);
         t.glyph_text = icon_primary(crate::icon_svg::CONSTRAINT_PRIMARY[1]);
@@ -388,6 +395,11 @@ impl Tokens {
         t.form_success_fill = if dark { Color32::from_rgb(44, 57, 67) } else { Color32::from_rgb(227, 227, 246) };
         if !dark {
             t.form_success = Color32::from_rgb(39, 88, 78);
+        }
+        // The lime of a selected body and the yellow of a preview read as one yellow to a weak
+        // red sense: a deeper lime keeps them apart (#91).
+        if dark {
+            t.body_selected = Color32::from_rgb(120, 170, 0);
         }
         t.construction_geom = icon_primary(crate::icon_svg::CONSTRUCTION_RED_GREEN[dark as usize]);
         t.glyph_text = icon_primary(crate::icon_svg::CONSTRAINT_RED_GREEN[dark as usize]);
