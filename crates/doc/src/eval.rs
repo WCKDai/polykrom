@@ -371,19 +371,30 @@ fn format_thread(d: f64, p: f64) -> String {
 /// The automatic ISO metric designation for a cylindrical face, using the same fit check as
 /// a thread feature without an explicit size. This query does not change the model.
 pub fn suggested_thread(st: &ModelState, p: Vec3) -> Result<String> {
-    thread_on(st, 0, p, None, None, false).map(|t| t.designation)
+    thread_on(st, None, 0, p, None, None, false).map(|t| t.designation)
 }
 
 /// A cosmetic thread on the cylindrical face at `p`. A `turned` (modelled) thread also fits a
-/// shaft thicker than it, which it turns down to its major diameter first.
-fn thread_on(st: &ModelState, feature: u64, p: Vec3, designation: Option<&str>, length: Option<f64>, turned: bool) -> Result<ThreadInfo> {
-    let (body, cyl) = st
+/// shaft thicker than it, which it turns down to its major diameter first. With `owner` (the
+/// document and the feature's component) a body of that component comes first: parts built at the
+/// same place (library screws, each at its own origin) each get their own thread.
+fn thread_on(
+    st: &ModelState,
+    owner: Option<(&Document, u64)>,
+    feature: u64,
+    p: Vec3,
+    designation: Option<&str>,
+    length: Option<f64>,
+    turned: bool,
+) -> Result<ThreadInfo> {
+    let other = |b: &ModelBody| owner.is_some_and(|(doc, comp)| doc.model_body_component(b) != comp);
+    let (_, body, cyl) = st
         .bodies
         .iter()
-        .filter_map(|b| kernel::cylinder_face_at(&b.body, p).map(|c| (b.name.clone(), c)))
+        .filter_map(|b| kernel::cylinder_face_at(&b.body, p).map(|c| (other(b), b.name.clone(), c)))
         .min_by(|a, b| {
             let dist = |c: &kernel::CylinderFace| ((p - c.axis_point - c.axis * (p - c.axis_point).dot(c.axis)).len() - c.radius).abs();
-            dist(&a.1).total_cmp(&dist(&b.1))
+            a.0.cmp(&b.0).then(dist(&a.2).total_cmp(&dist(&b.2)))
         })
         .ok_or_else(|| DocError::Invalid("no cylindrical face there to thread".into()))?;
     let dia = cyl.radius * 2.0;
@@ -5883,7 +5894,7 @@ fn eval_feature(doc: &Document, vals: &BTreeMap<String, Value>, f: &Feature, st:
                 let r = val(vals, diameter, Kind::Length)? / 2.0;
                 for p in spots {
                     let wall = p + dir.any_perp() * r + dir * (r * 0.5);
-                    let t = thread_on(st, f.id, wall, Some(d), None, false)?;
+                    let t = thread_on(st, Some((doc, f.component)), f.id, wall, Some(d), None, false)?;
                     st.threads.push(t);
                 }
             }
@@ -5894,7 +5905,7 @@ fn eval_feature(doc: &Document, vals: &BTreeMap<String, Value>, f: &Feature, st:
                 Some(e) => Some(val(vals, e, Kind::Length)?),
                 None => None,
             };
-            let t = thread_on(st, f.id, face.0, designation.as_deref(), l, *modeled)?;
+            let t = thread_on(st, Some((doc, f.component)), f.id, face.0, designation.as_deref(), l, *modeled)?;
             if !*modeled {
                 st.threads.push(t);
                 return Ok(());
