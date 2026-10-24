@@ -1643,8 +1643,8 @@ fn dialog_takes_body(app: &SolveApp) -> bool {
     app.dialog.as_ref().and_then(|d| d.active_input()).is_some_and(|i| i.accept & crate::selection::BODIES != 0)
 }
 
-/// A browser click on a plane or axis: it goes to the open dialog's input if that takes it,
-/// otherwise it becomes the selection.
+/// Browser picks go only into compatible active dialog inputs. Outside a dialog, planes and
+/// axes become the selection; body rows use the ordinary Ctrl/Shift-aware selection path.
 fn pick_from_browser(app: &mut SolveApp, x: Sel) {
     if let Sel::Body { .. } = &x
         && dialog_takes_body(app)
@@ -2045,12 +2045,10 @@ fn entry_row(
             app.edit_sketch(id);
         }
     } else if r.clicked {
-        if folder == "construction" {
+        if folder == "construction" || (folder == "bodies" && app.dialog.is_some()) {
             if let Some(s) = e.sel.clone() {
                 pick_from_browser(app, s);
             }
-        } else if let Some(s) = e.sel.clone().filter(|s| matches!(s, Sel::Body { .. }) && dialog_takes_body(app)) {
-            pick_from_browser(app, s);
         } else {
             click_select(app, ui, e.row_key.clone(), e.sel.clone());
         }
