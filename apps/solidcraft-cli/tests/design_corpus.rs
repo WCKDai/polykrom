@@ -1,4 +1,4 @@
-//! Designs saved by older SolidCraft builds (tests/corpus, see its README) open and evaluate as
+//! Designs saved by older Polykrom builds (tests/corpus, see its README) open and evaluate as
 //! they did when they were saved; damaged and hostile design files never panic.
 
 use std::path::{Path, PathBuf};

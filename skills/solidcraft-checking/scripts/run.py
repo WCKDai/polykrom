@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run a SolidCraft command script and print a short report: a failure, feature warnings,
+"""Run a Polykrom command script and print a short report: a failure, feature warnings,
 sketches that are not fully constrained, and body measurements. A document.inspect inside the
 script reports that state too, its lines prefixed with its step; the end state comes last."""
 

@@ -1,4 +1,4 @@
-//! SolidCraft MCP server.
+//! Polykrom MCP server.
 //!
 //! JSON-RPC 2.0 over stdio (newline-delimited), implementing the MCP lifecycle, tools and
 //! resources. Tools map onto the control-channel methods (`engine.execute`, `document.inspect`,
@@ -11,6 +11,7 @@
 
 mod backend;
 mod server;
+mod skill_reference;
 mod tools;
 
 pub use backend::{Backend, Headless, Remote};

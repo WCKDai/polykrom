@@ -1,10 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
   <title>Body</title>
-  <path d="M8 19L32 33L32 59L8 45Z" fill="#b8c3cf"/>
-  <path d="M32 33L56 19L56 45L32 59Z" fill="#8e9faf"/>
-  <path d="M8 19L32 5L56 19L32 33Z" fill="#e2e8ef"/>
-  <path d="M8 19L32 5L56 19L56 45L32 59L8 45Z" fill="none" stroke="#34465b" stroke-width="2.55" stroke-linejoin="round" stroke-linecap="round"/>
-  <path d="M32 33L8 19" fill="none" stroke="#34465b" stroke-width="2.55" stroke-linejoin="round" stroke-linecap="round"/>
-  <path d="M32 33L56 19" fill="none" stroke="#34465b" stroke-width="2.55" stroke-linejoin="round" stroke-linecap="round"/>
-  <path d="M32 33L32 59" fill="none" stroke="#34465b" stroke-width="2.55" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M32 11L56 23L32 35L8 23Z" fill="#b9ddf8"/>
+  <path d="M8 23L32 35L32 53L8 41Z" fill="#b9ddf8"/>
+  <path d="M32 11L56 23L56 41L32 53L8 41L8 23Z" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M8 23L32 35L56 23" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M32 35L32 53" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linejoin="round" stroke-linecap="round"/>
 </svg>

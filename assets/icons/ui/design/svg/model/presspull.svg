@@ -1,17 +1,11 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <title>Press pull</title>
-  <path d="M3 36.75L32 53.49L32 61.1L3 44.36Z" fill="#b8c3cf"/>
-  <path d="M61 36.75L32 53.49L32 61.1L61 44.36Z" fill="#8e9faf"/>
-  <path d="M32 20.01L61 36.75L32 53.49L3 36.75Z" fill="#e2e8ef"/>
-  <path d="M32 20.01L61 36.75L61 44.36L32 61.1L3 44.36L3 36.75Z" fill="none" stroke="#34465b" stroke-width="2.55" stroke-linejoin="round" stroke-linecap="round"/>
-  <path d="M3 36.75L32 53.49L61 36.75" fill="none" stroke="#34465b" stroke-width="2.55" stroke-linejoin="round" stroke-linecap="round"/>
-  <path d="M32 53.49L32 61.1" fill="none" stroke="#34465b" stroke-width="2.55" stroke-linejoin="round" stroke-linecap="round"/>
-  <path d="M16.18 27.62L32 36.75L32 45.88L16.18 36.75Z" fill="#328bd3"/>
-  <path d="M47.82 27.62L32 36.75L32 45.88L47.82 36.75Z" fill="#236ead"/>
-  <path d="M32 18.48L47.82 27.62L32 36.75L16.18 27.62Z" fill="#b9ddf8"/>
-  <path d="M32 18.48L47.82 27.62L47.82 36.75L32 45.88L16.18 36.75L16.18 27.62Z" fill="none" stroke="#34465b" stroke-width="2.55" stroke-linejoin="round" stroke-linecap="round"/>
-  <path d="M16.18 27.62L32 36.75L47.82 27.62" fill="none" stroke="#34465b" stroke-width="2.55" stroke-linejoin="round" stroke-linecap="round"/>
-  <path d="M32 36.75L32 45.88" fill="none" stroke="#34465b" stroke-width="2.55" stroke-linejoin="round" stroke-linecap="round"/>
-  <path d="M32 9.62L32 24.62" fill="none" stroke="#236ead" stroke-width="4.25" stroke-linejoin="round" stroke-linecap="round"/>
-  <path d="M32 1.62L37 10.62L27 10.62Z" fill="#236ead"/>
+  <title>Press Pull</title>
+  <path d="M32 24.8L54.8 36.2L32 47.6L9.2 36.2Z" fill="#328bd3"/>
+  <path d="M32 24.8L54.8 36.2L54.8 43.8L32 55.2L9.2 43.8L9.2 36.2Z" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M9.2 36.2L32 47.6L54.8 36.2" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M32 47.6L32 55.2" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M32 33.2L32 19.7" fill="none" stroke="#236ead" stroke-width="4.4" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M32 12.2L36.67 20.7L27.32 20.7Z" fill="#236ead"/>
+  <path d="M46 16.2L46 26.2" fill="none" stroke="#236ead" stroke-width="3.6" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M46 32.2L42.15 25.2L49.85 25.2Z" fill="#236ead"/>
 </svg>

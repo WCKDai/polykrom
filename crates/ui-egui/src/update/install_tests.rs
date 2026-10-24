@@ -5,7 +5,8 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 /// A key pair made with `minisign -G -W` for these tests, and its signature of [`SIGNED_SUMS`]
-/// with the trusted comment "SolidCraft v9.9.9".
+/// with the trusted comment "SolidCraft v9.9.9" (a fixture signed before Polykrom; the text is
+/// what was signed).
 const TEST_KEY: &str = "RWSnDqhIJ/zGKMSbsGUl4/prZLXqi3PwpEeY/D8gvdsEUeZRO9yWCoSM";
 const SIGNED_SUMS: &str = "aaaa  solidcraft-linux-x86_64.AppImage\n";
 const SIGNATURE: &str = "untrusted comment: signature from minisign secret key\nRUSnDqhIJ/zGKEyvbowsT8vEGvdv2OL9Rwv4bo2m7pJC54t2UQWXjU0+V7ayPB0Okk1teY53qZSTugz2Dnko35A3Xc1jdNFZCwU=\ntrusted comment: SolidCraft v9.9.9\npCRA0RNYxyt4SSqLbfI3p00xsCE4Rt8ixJWAQfoyb226cz/XdS7A2PRdG7hFmRmfg4h6zmtIt3iRLSKjk6RsAQ==\n";

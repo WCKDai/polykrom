@@ -367,7 +367,9 @@ fn a_pin_seated_line_to_line_in_its_bushing_is_measured() {
         }
         let started = std::time::Instant::now();
         let r = run(&mut s, "inspect.clearance", json!({"bodies": ["Pin"], "against": ["Bush"], "min_volume": 0.01, "clearance": 1e-6}));
-        assert!(started.elapsed().as_secs_f64() < 30.0, "sunk {sunk}: {:?}", started.elapsed());
+        // A guard against a hang (the boolean once took minutes here), not a timing: about 9 s
+        // alone, it ran past 30 s while the whole suite shares the cores.
+        assert!(started.elapsed().as_secs_f64() < 120.0, "sunk {sunk}: {:?}", started.elapsed());
         if fillet {
             assert!(r["unchecked"][0]["reason"].as_str().is_some_and(|w| w.contains("pin on one cylinder")), "{r}");
             continue;
@@ -573,4 +575,79 @@ fn a_pin_through_a_d_bore_of_its_size_overlaps_the_flat() {
     assert_eq!(res["unchecked"].as_array().map(Vec::len), Some(0), "{res}");
     assert_eq!(overlaps.len(), 1, "{res}");
     assert!((f(&overlaps[0]["volume_mm3"]) - want).abs() < 0.05 * want, "{want} {res}");
+}
+
+/// Copies of one part repeat its inner pairs: each is measured once, and the copy takes the result
+/// at its own place (its overlap's centre, its nearest points).
+#[test]
+fn placements_of_one_part_reuse_their_inner_pairs() {
+    let mut s = Session::default();
+    let c = run(&mut s, "component.create", json!({"name": "Servo"}));
+    cube(&mut s, "Case", 10.0, [0.0, 0.0, 0.0]);
+    cube(&mut s, "Gear", 10.0, [8.0, 0.0, 0.0]);
+    cube(&mut s, "Board", 10.0, [0.0, 0.0, 11.0]);
+    run(&mut s, "component.activate", json!({"component": "root"}));
+    run(&mut s, "occurrence.copy", json!({"component": c["component"], "translate": [0, 50, 0]}));
+    let r = run(&mut s, "inspect.clearance", json!({"clearance": 2}));
+    assert!(f(&r["pairs_reused"]) >= 2.0, "{r}");
+    let mut centres: Vec<f64> = r["overlaps"].as_array().unwrap().iter().map(|o| f(&o["center"][1])).collect();
+    centres.sort_by(f64::total_cmp);
+    assert_eq!(centres.len(), 2, "{r}");
+    assert!((centres[0] - 5.0).abs() < 1e-6 && (centres[1] - 55.0).abs() < 1e-6, "{centres:?}");
+    let near: Vec<&Value> = r["near"].as_array().unwrap().iter().filter(|n| (f(&n["distance_mm"]) - 1.0).abs() < 1e-6).collect();
+    assert_eq!(near.len(), 4, "the case and the gear 1 mm under the board, in each placement: {r}");
+    let at_copy = near.iter().filter(|n| (f(&n["from"][1]) - 50.0).abs() < 1e-6 && (f(&n["to"][1]) - 50.0).abs() < 1e-6).count();
+    assert_eq!(at_copy, 2, "the copy's nearest points are at the copy: {r}");
+}
+
+/// A budget too small for the work lists the pairs it did not reach rather than running on.
+#[test]
+fn a_spent_budget_lists_pairs_as_unchecked() {
+    let mut s = Session::default();
+    for k in 0..6 {
+        cube(&mut s, &format!("C{k}"), 10.0, [k as f64 * 9.0, 0.0, 0.0]);
+    }
+    let r = run(&mut s, "inspect.clearance", json!({"budget_s": 1e-9}));
+    let unchecked = r["unchecked"].as_array().unwrap();
+    assert!(unchecked.iter().any(|u| u["reason"].as_str().unwrap_or("").contains("time budget")), "{r}");
+    assert!(s.execute("inspect.clearance", &json!({"budget_s": 0})).is_err());
+}
+
+#[test]
+fn a_threaded_shank_in_its_tapped_hole_is_engagement_not_overlap() {
+    // An M6 shank (Ø6, a cosmetic M6 thread on it) through a 10 mm plate. Tapped at the 5 mm
+    // drill it shares the thread's ring with the plate: π (3² − 2.5²) × 10 = 86.39 mm³. In a 4 mm
+    // hole, or without its thread, the shared part is a clash.
+    let shared = |hole: f64, threaded: bool| {
+        let mut s = Session::default();
+        run(&mut s, "solid.box", json!({"length": 20, "width": 20, "height": 10, "corner": [-10, -10, 0], "operation": "new", "body_name": "Plate"}));
+        run(&mut s, "solid.cylinder", json!({"radius": hole / 2.0, "height": 12, "base": [0, 0, -1], "operation": "cut", "targets": ["Plate"]}));
+        run(&mut s, "solid.cylinder", json!({"radius": 3, "height": 16, "base": [0, 0, -2], "operation": "new", "body_name": "Screw"}));
+        if threaded {
+            run(&mut s, "solid.thread", json!({"face": [3, 0, 5], "designation": "M6"}));
+        }
+        run(&mut s, "inspect.clearance", json!({}))
+    };
+    let r = shared(5.0, true);
+    assert_eq!(r["overlaps"], json!([]), "{r}");
+    let t = &r["threaded"][0];
+    assert_eq!((pair(t), t["thread"].as_str()), (["Plate".to_string(), "Screw".to_string()], Some("M6")), "{r}");
+    let ring = std::f64::consts::PI * (9.0 - 6.25) * 10.0;
+    assert!((f(&t["volume_mm3"]) - ring).abs() < 1e-3 * ring && (f(&t["engaged_mm"]) - 10.0).abs() < 1e-3, "{r}");
+    for (hole, threaded) in [(4.0, true), (5.0, false)] {
+        let r = shared(hole, threaded);
+        assert_eq!(
+            (r["overlaps"].as_array().map(Vec::len), r["threaded"].as_array().map(Vec::len)),
+            (Some(1), Some(0)),
+            "Ø{hole} threaded {threaded}: {r}"
+        );
+    }
+    // A thin rod run down the threaded shank's axis is centred there and smaller than the ring,
+    // but it is the shank's core, not its thread: a clash.
+    let mut s = Session::default();
+    run(&mut s, "solid.cylinder", json!({"radius": 3, "height": 16, "base": [0, 0, -2], "operation": "new", "body_name": "Screw"}));
+    run(&mut s, "solid.thread", json!({"face": [3, 0, 5], "designation": "M6"}));
+    run(&mut s, "solid.cylinder", json!({"radius": 1, "height": 10, "base": [0, 0, 0], "operation": "new", "body_name": "Rod"}));
+    let r = run(&mut s, "inspect.clearance", json!({}));
+    assert_eq!((r["overlaps"].as_array().map(Vec::len), r["threaded"].as_array().map(Vec::len)), (Some(1), Some(0)), "core rod: {r}");
 }

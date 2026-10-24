@@ -128,7 +128,7 @@ impl Locale {
         interpolate(self.text(id), args)
     }
 
-    /// The default names SolidCraft gives (`Untitled` for a new design, `Sketch1`, `Body2`,
+    /// The default names Polykrom gives (`Untitled` for a new design, `Sketch1`, `Body2`,
     /// `Component3`), translated.
     fn default_name(self, text: &str) -> Option<String> {
         if text == "Untitled" {
@@ -498,6 +498,17 @@ mod tests {
             let id = format!("nav.{}.help", preset.id);
             assert_eq!(english.text(&id), preset.help, "{id}");
         }
+    }
+
+    #[test]
+    fn missing_sheet_metal_guidance_uses_the_message_catalog() {
+        let _scope = scope("ja");
+        let message = "there is no sheet metal body: start one with Flange > Base, or turn a plate into sheet metal with Convert to Sheet Metal (pick its large flat face)";
+        let error = format!("invalid parameters for `sheet.flange`: {message}");
+        let translated = tr("sheet.no_body");
+        assert_ne!(translated, "sheet.no_body");
+        assert_ne!(translated, message);
+        assert_eq!(crate::friendly_error("sheet.flange", &error), format!("{}: {translated}", tr_label("Flange")));
     }
 
     #[test]

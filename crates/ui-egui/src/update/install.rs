@@ -2,19 +2,19 @@
 //! installation, verify it, and put it in place.
 //!
 //! Verification is never skipped. The package's SHA-256 must match the release's
-//! `SHA256SUMS.txt`, fetched over HTTPS from the same release. When SolidCraft is built with an
+//! `SHA256SUMS.txt`, fetched over HTTPS from the same release. When Polykrom is built with an
 //! update signing key ([`PUBLIC_KEY`]), `SHA256SUMS.txt.minisig` must also be a valid minisign
 //! signature by that key whose trusted comment names the release, so a compromised download host
 //! alone can't push a package. Anything that doesn't verify is deleted and nothing is replaced.
 //!
 //! What "put in place" means per installation:
 //! - AppImage: the new AppImage is written next to the old one and renamed over it (atomic on
-//!   one file system; the running copy keeps its old inode), then SolidCraft offers a restart.
-//! - Windows installer: the `.msi` is started with `msiexec /i … /passive` as SolidCraft exits.
+//!   one file system; the running copy keeps its old inode), then Polykrom offers a restart.
+//! - Windows installer: the `.msi` is started with `msiexec /i … /passive` as Polykrom exits.
 //! - Windows portable `.zip` / standalone `.exe`: the running `solidcraft.exe` is renamed to
 //!   `solidcraft.exe.old` (Windows allows renaming a running executable), the new one takes its
-//!   name, and SolidCraft offers a restart; the `.old` file is deleted at the next start.
-//! - macOS: the `.dmg` is verified and opened; the user drags the app to Applications. SolidCraft
+//!   name, and Polykrom offers a restart; the `.old` file is deleted at the next start.
+//! - macOS: the `.dmg` is verified and opened; the user drags the app to Applications. Polykrom
 //!   is ad-hoc signed and not notarized, so replacing the bundle in place would install code the
 //!   system can't vouch for without the user seeing it.
 //! - Flatpak, Snap, `.deb`, `.rpm`, `.tar.gz`: never replaced; the window shows the command.
@@ -75,9 +75,9 @@ pub fn method(kind: &InstallKind, exe: Option<&Path>) -> Option<Method> {
 /// What to do once the package is verified and in place.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Outcome {
-    /// The new version replaced this one: start `program` after SolidCraft exits.
+    /// The new version replaced this one: start `program` after Polykrom exits.
     Restart(PathBuf),
-    /// Start this installer (program, arguments) after SolidCraft exits.
+    /// Start this installer (program, arguments) after Polykrom exits.
     Installer(PathBuf, Vec<String>),
     /// The disk image was opened for the user.
     Opened(PathBuf),
@@ -131,7 +131,7 @@ pub fn relaunch_after(installer: &Path, args: &[String], exe: &Path) -> (PathBuf
 pub fn verify_signature(sums: &[u8], signature: &str, key: &str, tag: &str) -> Result<(), String> {
     let key = minisign_verify::PublicKey::from_base64(key.trim()).map_err(|e| format!("update signing key: {e}"))?;
     let sig = minisign_verify::Signature::decode(signature).map_err(|e| format!("{SUMS_SIG}: {e}"))?;
-    key.verify(sums, &sig, false).map_err(|e| format!("{SUMS} isn't signed by SolidCraft's release key: {e}"))?;
+    key.verify(sums, &sig, false).map_err(|e| format!("{SUMS} isn't signed by Polykrom's release key: {e}"))?;
     // The comment is covered by the signature: an older release's signed list can't stand in.
     let comment = sig.trusted_comment();
     if !comment.split_whitespace().any(|w| w == tag) {

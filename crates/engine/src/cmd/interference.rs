@@ -10,16 +10,17 @@
 //! rather than holding the call. The shared part is measured as `solidcraft_kernel::measure`
 //! measures it (its mass properties alone).
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use serde_json::{Value, json};
+use solidcraft_doc::Mat;
 use solidcraft_geom::mesh_distance::TriangleSet;
 use solidcraft_geom::{Aabb3, Mesh, Vec3};
 use solidcraft_kernel::Body;
 use solidcraft_kernel::profile::KernelTimes;
 
-use crate::params::{bad, num, string_list};
+use crate::params::{bad, num, str_, string_list};
 use crate::{Result, Session};
 
 /// Most pairs with overlapping bounding boxes one call intersects.
@@ -73,6 +74,11 @@ pub(super) fn interference(s: &mut Session, p: &Value) -> Result<Value> {
         },
     };
     let budget = std::time::Duration::from_secs_f64(budget_s);
+    let mesh_only = match str_(p, "method") {
+        None | Some("exact") => false,
+        Some("mesh") => true,
+        Some(other) => return Err(bad(cmd, format!("`method` is exact or mesh, not `{other}`"))),
+    };
     let want = string_list(p, "bodies");
     let st = s.world_state();
     let (meshes_left, bodies): (Vec<&solidcraft_doc::ModelBody>, Vec<&solidcraft_doc::ModelBody>) =
@@ -130,14 +136,42 @@ pub(super) fn interference(s: &mut Session, p: &Value) -> Result<Value> {
         let margin = MESH_MARGIN * (chords.get(i).copied().unwrap_or(0.0) + chords.get(j).copied().unwrap_or(0.0));
         Ok(!meshes_apart(ma, sa, mb, sb, margin))
     });
+    if mesh_only {
+        return Ok(by_meshes(&bodies, &st.threads, &meshes, &pairs, &need_exact, skipped, &meshes_left, started));
+    }
     let mut jobs = Vec::new();
     let mut cleared = 0usize;
+    // Placements of one part (six copies of a servo) give their inner pairs again and again: a
+    // pair of the same two definitions placed the same way relative to each other has the same
+    // answer, so it is intersected once and the others take its answer, moved to where they are.
+    let mut first: HashMap<(u64, u64, Vec<i64>), (usize, usize)> = HashMap::new();
+    let mut reused: Vec<(usize, usize, Mat)> = Vec::new();
     for (k, (&(i, j), exact)) in pairs.iter().zip(need_exact).enumerate() {
         if !exact.unwrap_or(true) {
             cleared += 1;
             continue;
         }
         let (Some(a), Some(b)) = (bodies.get(i), bodies.get(j)) else { continue };
+        if let (Some(ka), Some(kb), Some(inv_a)) = (a.definition_key(), b.definition_key(), solidcraft_doc::mat_inverse(&a.source_transform)) {
+            let relative = solidcraft_doc::mat_mul(&inv_a, &b.source_transform);
+            let key = (ka, kb, relative.iter().flatten().map(|v| (v * 1e6).round() as i64).collect::<Vec<_>>());
+            match first.get(&key) {
+                Some(&(orig, orig_body)) => {
+                    // From where the first pair's a is to where this one's is.
+                    let moved = bodies
+                        .get(orig_body)
+                        .and_then(|o| solidcraft_doc::mat_inverse(&o.source_transform))
+                        .map(|inv| solidcraft_doc::mat_mul(&a.source_transform, &inv));
+                    if let Some(moved) = moved {
+                        reused.push((k, orig, moved));
+                        continue;
+                    }
+                }
+                None => {
+                    first.insert(key, (k, i));
+                }
+            }
+        }
         jobs.push(Job {
             pair: k,
             a: a.body.clone(),
@@ -147,16 +181,33 @@ pub(super) fn interference(s: &mut Session, p: &Value) -> Result<Value> {
         });
     }
     let intersected = jobs.len();
+    let names_of = |k: usize| pairs.get(k).and_then(|&(i, j)| Some((bodies.get(i)?.name.clone(), bodies.get(j)?.name.clone())));
     jobs.sort_by(|x, y| y.cost.cmp(&x.cost).then(x.pair.cmp(&y.pair)));
 
     let left = budget.saturating_sub(started.elapsed());
     let waited = web_time::Instant::now();
-    let (done, threads) = run_jobs(jobs, left);
+    let (mut done, threads) = run_jobs(jobs, left);
+    // The reused pairs take the answer of the pair they repeat, at their own place.
+    let answers: HashMap<(String, String), usize> = done.iter().enumerate().map(|(n, (names, _))| (names.clone(), n)).collect();
+    for (k, orig, moved) in &reused {
+        let (Some(names), Some(orig_names)) = (names_of(*k), names_of(*orig)) else { continue };
+        let copy = answers.get(&orig_names).and_then(|&n| done.get(n)).and_then(|(_, d)| d.as_ref()).map(|d| Done {
+            outcome: match &d.outcome {
+                Outcome::Hit(v) => Outcome::Hit(moved_hit(v, &names, moved)),
+                Outcome::Clear => Outcome::Clear,
+                Outcome::Unchecked(r) => Outcome::Unchecked(r.clone()),
+            },
+            note: d.note.clone(),
+            ms: 0.0,
+            kernel: KernelTimes::default(),
+        });
+        done.push((names, copy));
+    }
     let waited_ms = waited.elapsed().as_secs_f64() * 1000.0;
 
     // Mesh bodies are not intersected: say so, rather than let `count: 0` read as "no overlap".
     let mut unchecked: Vec<Value> = meshes_left.iter().map(|b| json!({"a": b.name, "b": null, "reason": MESH_NOT_CHECKED})).collect();
-    let (mut hits, mut timed) = (Vec::new(), Vec::new());
+    let (mut hits, mut timed, mut threaded) = (Vec::new(), Vec::new(), Vec::new());
     let (mut not_checked, mut boolean_ms, mut tessellate_ms) = (0usize, 0.0, 0.0);
     for ((a, b), d) in done {
         let Some(d) = d else {
@@ -175,7 +226,10 @@ pub(super) fn interference(s: &mut Session, p: &Value) -> Result<Value> {
             unchecked.push(json!({"a": a, "b": b, "reason": reason}));
         }
         match d.outcome {
-            Outcome::Hit(v) => hits.push(v),
+            Outcome::Hit(v) => match engaged(&st.threads, &bodies, &v) {
+                Some(t) => threaded.push(t),
+                None => hits.push(v),
+            },
             Outcome::Clear => {}
             Outcome::Unchecked(reason) => unchecked.push(json!({"a": a, "b": b, "reason": reason})),
         }
@@ -190,13 +244,91 @@ pub(super) fn interference(s: &mut Session, p: &Value) -> Result<Value> {
     timed.sort_by(|x, y| y.0.total_cmp(&x.0));
     let slowest: Vec<Value> = timed.into_iter().take(SLOWEST).map(|t| t.1).collect();
     Ok(json!({
-        "interferences": hits, "count": hits.len(), "checked": bodies.len(), "unchecked": unchecked,
+        "interferences": hits, "count": hits.len(), "threaded": threaded, "checked": bodies.len(), "unchecked": unchecked,
         "truncated": skipped > 0, "skipped_pairs": skipped,
-        "pairs_candidate": pairs.len(), "pairs_cleared": cleared, "pairs_intersected": intersected,
+        "pairs_candidate": pairs.len(), "pairs_cleared": cleared, "pairs_intersected": intersected, "pairs_reused": reused.len(),
         "pairs_not_checked": not_checked, "budget_s": budget_s, "budget_exceeded": not_checked > 0,
         "threads": threads, "boolean_ms": round_ms(boolean_ms), "tessellate_ms": round_ms(tessellate_ms),
         "slowest": slowest, "ms": round_ms(started.elapsed().as_secs_f64() * 1000.0),
     }))
+}
+
+/// `method: mesh`: the pairs the meshes did not clear are checked on the meshes (points and
+/// edges of each inside the other, through a triangle tree) rather than by an exact boolean:
+/// which pairs pass into each other and how deep, in seconds even on hundreds of imported parts,
+/// within the meshes' chord tolerance and without the overlap's volume.
+#[allow(clippy::too_many_arguments)]
+fn by_meshes(
+    bodies: &[&solidcraft_doc::ModelBody],
+    threads: &[solidcraft_doc::ThreadInfo],
+    meshes: &[Arc<Mesh>],
+    pairs: &[(usize, usize)],
+    need_exact: &[solidcraft_kernel::Result<bool>],
+    skipped: usize,
+    meshes_left: &[&solidcraft_doc::ModelBody],
+    started: web_time::Instant,
+) -> Value {
+    let checks: Vec<(usize, usize)> = pairs.iter().zip(need_exact).filter(|(_, e)| e.as_ref().map_or(true, |x| *x)).map(|(p, _)| *p).collect();
+    let found = solidcraft_kernel::map_with_local_pools(&checks, usize::MAX, |&(i, j)| {
+        let (Some(ma), Some(mb), Some(a), Some(b)) = (meshes.get(i), meshes.get(j), bodies.get(i), bodies.get(j)) else { return Ok(None) };
+        let tol = 1e-4 * a.body.size().max(b.body.size()).max(1.0);
+        Ok(super::motion::mesh_overlap_counted(ma, mb, tol, &mut 0).map(|d| (a, b, d)))
+    });
+    let hits: Vec<Value> = found
+        .into_iter()
+        .filter_map(|r| r.ok().flatten())
+        .map(|(a, b, d)| {
+            let mut hit = json!({"a": a.name, "b": b.name, "depth_mm": d, "method": "mesh"});
+            // No deeper than a thread of either: likely its engagement, which the exact check tells.
+            let owns = |t: &solidcraft_doc::ThreadInfo| [a, b].iter().any(|m| m.name == t.body || m.definition_name() == t.body);
+            if let Some(t) = threads.iter().find(|t| owns(t) && d <= 0.625 * t.pitch + 0.02 * t.major_diameter) {
+                hit["thread"] = json!(t.designation);
+                hit["note"] = json!("no deeper than this thread: likely its engagement (method exact lists engagement under threaded)");
+            }
+            hit
+        })
+        .collect();
+    let unchecked: Vec<Value> = meshes_left.iter().map(|b| json!({"a": b.name, "b": null, "reason": MESH_NOT_CHECKED})).collect();
+    json!({
+        "interferences": hits, "count": hits.len(), "checked": bodies.len(), "unchecked": unchecked, "method": "mesh",
+        "truncated": skipped > 0, "skipped_pairs": skipped, "pairs_candidate": pairs.len(),
+        "pairs_cleared": pairs.len() - checks.len(), "pairs_intersected": checks.len(),
+        "ms": round_ms(started.elapsed().as_secs_f64() * 1000.0),
+    })
+}
+
+/// A hit that is a cosmetic thread's engagement ([`super::clearance::engagement`]), as listed under
+/// `threaded`.
+fn engaged(threads: &[solidcraft_doc::ThreadInfo], bodies: &[&solidcraft_doc::ModelBody], v: &Value) -> Option<Value> {
+    let body = |k: &str| v.get(k).and_then(Value::as_str).and_then(|n| bodies.iter().find(|b| b.name == n));
+    let point = |p: Option<&Value>| -> Option<Vec3> { Some(Vec3::new(p?.get(0)?.as_f64()?, p?.get(1)?.as_f64()?, p?.get(2)?.as_f64()?)) };
+    let (a, b, volume) = (body("a")?, body("b")?, v.get("volume_mm3")?.as_f64()?);
+    let bbox = Aabb3 { min: point(v.pointer("/bbox/min"))?, max: point(v.pointer("/bbox/max"))? };
+    let (t, length) = super::clearance::engagement(threads, a, b, volume, &bbox, point(v.get("center"))?)?;
+    Some(json!({"a": a.name, "b": b.name, "thread": t.designation, "engaged_mm": length, "volume_mm3": volume}))
+}
+
+/// A hit found for one placement of a pair, for another placement: its names, and its centre
+/// and box moved by `m`.
+fn moved_hit(v: &Value, (a, b): &(String, String), m: &Mat) -> Value {
+    let mut out = v.clone();
+    out["a"] = json!(a);
+    out["b"] = json!(b);
+    let point = |p: &Value| -> Option<Vec3> { Some(Vec3::new(p.get(0)?.as_f64()?, p.get(1)?.as_f64()?, p.get(2)?.as_f64()?)) };
+    if let Some(c) = v.get("center").and_then(point) {
+        out["center"] = json!(solidcraft_doc::apply_point(m, c));
+    }
+    if let (Some(lo), Some(hi)) = (v.pointer("/bbox/min").and_then(point), v.pointer("/bbox/max").and_then(point)) {
+        let mut b = Aabb3::EMPTY;
+        for k in 0..8 {
+            let x = if k & 1 == 0 { lo.x } else { hi.x };
+            let y = if k & 2 == 0 { lo.y } else { hi.y };
+            let z = if k & 4 == 0 { lo.z } else { hi.z };
+            b.add(solidcraft_doc::apply_point(m, Vec3::new(x, y, z)));
+        }
+        out["bbox"] = json!({"min": b.min, "max": b.max});
+    }
+    out
 }
 
 fn round_ms(ms: f64) -> f64 {

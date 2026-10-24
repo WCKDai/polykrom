@@ -1,4 +1,4 @@
-# Releasing SolidCraft
+# Releasing Polykrom
 
 Releases are deliberate operations that an agent can complete end to end. Development lands
 on `main`; pushing the selected commit to `release` builds all packages and creates a **draft**
@@ -8,7 +8,9 @@ version bump and no patch release for every merge.
 
 ## Names and deployment
 
-Every release asset, binary, installer product name and package uses the SolidCraft name
+Release titles, installer product names and everything a person reads use the Polykrom name.
+Asset, binary and package file names keep SolidCraft's stable names until the second rename
+stage, because the updater picks assets by them
 (`solidcraft-<version>-linux-<arch>.AppImage`, `SolidCraft-<version>-windows-x64.exe`,
 `solidcraft-cli` archives, …). The old name survives only in the shims listed in
 [compatibility.md](compatibility.md) (the end-of-life Flatpak refs of the old Linux app ID, the legacy `.zsync` and `.flatpakrepo`
@@ -70,7 +72,7 @@ deployment. The stable Flatpak repository is not automatically updated with nigh
    `cargo update --workspace --offline` to refresh the workspace packages' versions in
    `Cargo.lock` (it changes only our own crates, never dependency versions, and needs no
    network). Inspect the diff: only `version = ` lines of workspace crates should change.
-   SolidCraft does not currently implement `cargo xtask version set`.
+   Polykrom does not currently implement `cargo xtask version set`.
 3. Fix the design format number: run `scripts/fold-format-pending.sh`. It moves the pending
    format changes (`crates/doc/src/format/pending/*.rs`) into the next `crates/doc/src/format/v<N>/`
    folder, so the release writes and reads that number for good, and does nothing when nothing
@@ -101,7 +103,7 @@ fast-forward fails, inspect and resolve the divergence through the normal review
 Find the `release.yml` Actions run for the recorded SHA and `release` branch, and monitor that
 specific run. The workflow builds Linux (both architectures, including Flatpak), macOS,
 Windows, FreeBSD, and web packages. Once every required job succeeds it creates a draft
-`SolidCraft v<version>` with the artifacts, `SHA256SUMS.txt`, install notes, and generated changes.
+`Polykrom v<version>` with the artifacts, `SHA256SUMS.txt`, install notes, and generated changes.
 
 A second push with the same untagged version can rebuild and replace that draft's complete
 asset set. Existing release notes are preserved on rebuild; refresh their changes section if
@@ -213,8 +215,8 @@ connect with `sudo snap connect solidcraft:removable-media` (getting-started.md)
 
 ## WinGet (Windows Package Manager)
 
-SolidCraft is in [winget-pkgs](https://github.com/microsoft/winget-pkgs) as
-`bherbruck.SolidCraft` (`winget install bherbruck.SolidCraft`). Publishing a non-prerelease
+Polykrom is in [winget-pkgs](https://github.com/microsoft/winget-pkgs) as
+`wckdboy.Polykrom` (`winget install wckdboy.Polykrom`). Publishing a non-prerelease
 GitHub release runs `winget.yml`, which uses [Komac](https://github.com/russellbanks/Komac)
 (a pinned, checksum-verified binary) to open a pull request at microsoft/winget-pkgs from the
 owner's fork `bherbruck/winget-pkgs`. It submits the three versioned MSIs
@@ -253,7 +255,7 @@ matches the release's `SHA256SUMS.txt`, fetched over HTTPS. That protects agains
 tampered downloads in transit, but not against someone who can upload release assets. Signing
 the checksum list closes that gap: once `PUBLIC_KEY` in `crates/ui-egui/src/update/install.rs`
 is set, the app also requires `SHA256SUMS.txt.minisig`, a [minisign](https://jedisct1.github.io/minisign/)
-signature by that key whose trusted comment names the release (`SolidCraft v<version>`), and
+signature by that key whose trusted comment names the release (`Polykrom v<version>`), and
 refuses to update in place otherwise. The release workflow signs the list when the
 `UPDATE_SIGNING_KEY` secret exists, and fails when the app expects signatures but the secret is
 missing.

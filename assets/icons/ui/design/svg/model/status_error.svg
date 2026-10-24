@@ -1,6 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
   <title>Error</title>
-  <path d="M8 32A24 24 0 1 0 56 32A24 24 0 1 0 8 32Z" fill="#b9ddf8"/>
-  <path d="M8 32A24 24 0 1 0 56 32A24 24 0 1 0 8 32Z" fill="none" stroke="#236ead" stroke-width="4.25" stroke-linejoin="round" stroke-linecap="round"/>
-  <path d="M23 23L41 41M41 23L23 41" fill="none" stroke="#236ead" stroke-width="4.25" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M23.2 10.75L40.8 10.75L53.25 23.2L53.25 40.8L40.8 53.25L23.2 53.25L10.75 40.8L10.75 23.2Z" fill="#328bd3"/>
+  <path d="M24 24L40 40M40 24L24 40" fill="none" stroke="#ffffff" stroke-width="5" stroke-linejoin="round" stroke-linecap="round"/>
 </svg>

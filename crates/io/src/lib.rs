@@ -11,6 +11,7 @@ mod design;
 mod design_metadata;
 mod dxf;
 mod dxf_out;
+pub mod formats;
 pub use design::{
     DesignCompression, DesignContainerReader, DesignPreview, THUMBNAIL_SIZE, is_design_container, read_design_file, read_design_geometry,
     read_design_preview, read_design_thumbnail, read_design_thumbnail_file, write_design_container, write_design_container_with_cache,
@@ -44,15 +45,18 @@ pub use urdf::{UrdfOptions, UrdfPackage, urdf};
 use solidcraft_doc::{Document, Metadata, ModelState};
 use solidcraft_geom::{Mesh, Vec3};
 
-/// Design file extension.
-pub const DESIGN_EXT: &str = "solidcraft";
-/// The design extension of earlier releases. Compatibility shim (docs/compatibility.md): such
-/// files still open everywhere a design opens; new designs are saved as [`DESIGN_EXT`].
+/// Design file extension: Polykrom saves `.polykrom`.
+pub const DESIGN_EXT: &str = "polykrom";
+/// The extension SolidCraft, which Polykrom is forked from, saves. Its designs are the same
+/// container and open everywhere a design opens (docs/compatibility.md).
+pub const SOLIDCRAFT_DESIGN_EXT: &str = "solidcraft";
+/// The design extension of SolidCraft's earliest releases (SolveCraft). Compatibility shim
+/// (docs/compatibility.md): such files still open everywhere a design opens.
 pub const LEGACY_DESIGN_EXT: &str = "solvecraft";
 /// Every extension a design file may have, current first.
-pub const DESIGN_EXTS: [&str; 2] = [DESIGN_EXT, LEGACY_DESIGN_EXT];
+pub const DESIGN_EXTS: [&str; 3] = [DESIGN_EXT, SOLIDCRAFT_DESIGN_EXT, LEGACY_DESIGN_EXT];
 
-/// Is this a design file name (`.solidcraft`, or the legacy extension), any case?
+/// Is this a design file name (`.polykrom`, `.solidcraft` or the legacy extension), any case?
 pub fn is_design_path(path: &str) -> bool {
     std::path::Path::new(path)
         .extension()
@@ -64,7 +68,7 @@ pub const MAX_DESIGN_BYTES: usize = 256 << 20;
 
 #[derive(Debug, thiserror::Error)]
 pub enum IoError {
-    #[error("unsupported format `{0}` (use stl, obj, step, 3mf, urdf or solidcraft)")]
+    #[error("unsupported format `{0}` (use stl, obj, step, 3mf, urdf or polykrom)")]
     Format(String),
     #[error("nothing to export: the design has no bodies")]
     Empty,
@@ -344,7 +348,7 @@ impl Format {
             "3mf" => Format::ThreeMf,
             "3mf-tagged" => Format::ThreeMfTagged,
             "urdf" => Format::Urdf,
-            "solidcraft" | "solvecraft" | "json" => Format::Design,
+            "polykrom" | "solidcraft" | "solvecraft" | "json" => Format::Design,
             _ => return Err(IoError::Format(ext)),
         })
     }
@@ -364,7 +368,7 @@ fn weld_eps(b: &solidcraft_kernel::Body) -> f64 {
 pub fn stl_binary(meshes: &[Mesh], name: &str) -> Vec<u8> {
     let n: usize = meshes.iter().map(|m| m.triangles.len()).sum();
     let mut out = Vec::with_capacity(84 + n * 50);
-    let mut header = format!("SolidCraft STL {name}").into_bytes();
+    let mut header = format!("Polykrom STL {name}").into_bytes();
     header.resize(80, b' ');
     out.extend_from_slice(&header);
     out.extend_from_slice(&u32::try_from(n).unwrap_or(u32::MAX).to_le_bytes());
@@ -404,7 +408,7 @@ pub fn stl_ascii(meshes: &[Mesh], name: &str) -> String {
 
 /// Wavefront OBJ, one object per body.
 pub fn obj(meshes: &[(String, Mesh)]) -> String {
-    let mut s = String::from("# SolidCraft OBJ export (mm)\n");
+    let mut s = String::from("# Polykrom OBJ export (mm)\n");
     let mut base = 1usize;
     for (name, m) in meshes {
         s += &format!("o {}\n", name.replace(char::is_whitespace, "_"));
@@ -775,7 +779,7 @@ mod tests {
         };
         let x = model_xml(export_with_metadata(&m.state(), &[], Format::ThreeMf, "t", &meta).unwrap());
         for want in [
-            "<metadata name=\"Application\">SolidCraft</metadata>\n <metadata name=\"Title\">ACME &lt;enclosures&gt;</metadata>",
+            "<metadata name=\"Application\">Polykrom</metadata>\n <metadata name=\"Title\">ACME &lt;enclosures&gt;</metadata>",
             "<metadata name=\"Designer\">Jane O&apos;Brien</metadata>",
             "<metadata name=\"Description\">Vented Gehäuse\nfor a Pi</metadata>",
             "<metadata name=\"LicenseTerms\">CC-BY-4.0</metadata>",
@@ -788,7 +792,7 @@ mod tests {
         }
         // Without properties the files are as they always were.
         let plain = String::from_utf8(export(&m.state(), &[], Format::Step, "t").unwrap()).unwrap();
-        assert!(plain.contains("FILE_DESCRIPTION(('SolidCraft model'),'2;1');\nFILE_NAME('t.step','',(''),(''),"));
+        assert!(plain.contains("FILE_DESCRIPTION(('Polykrom model'),'2;1');\nFILE_NAME('t.step','',(''),(''),"));
         assert!(!model_xml(export(&m.state(), &[], Format::ThreeMf, "t").unwrap()).contains("Title"));
     }
 
@@ -886,7 +890,7 @@ mod tests {
         assert_eq!(names(&text, StepNames::Solid), ["Cut-Extrude3", "Boss-Extrude1", "Boss-Extrude1"]);
         assert_eq!(names(&text, StepNames::Product), ["Plate", "Post", "Post"]);
         assert_eq!(names(&text, StepNames::Instance), ["Plate-1", "Post-1", "Post-2"]);
-        // Meaningful solid names survive automatic naming, including SolidCraft exports.
+        // Meaningful solid names survive automatic naming, including Polykrom exports.
         assert_eq!(step_import_feature(text.as_bytes(), "frame.step").unwrap().body_names, names(&text, StepNames::Solid));
         let generic = text.replace("'Cut-Extrude3'", "'Body1'").replace("'Boss-Extrude1'", "'Body 2 (3)'");
         assert_eq!(step_import_feature(generic.as_bytes(), "frame.step").unwrap().body_names, ["Plate", "Post", "Post"]);
@@ -1068,7 +1072,7 @@ mod tests {
                 assert!(exact.contains(&attr(l, k).to_bits()), "{l}");
             }
         }
-        // Any 3MF reader opens it: SolidCraft's own ignores the tags and gets a closed mesh.
+        // Any 3MF reader opens it: Polykrom's own ignores the tags and gets a closed mesh.
         let f = mesh_import_feature(&bytes, "tagged.3mf").unwrap();
         let mut d2 = Document::new("m");
         let id = d2.add_feature(f.kind, Some(&f.name)).unwrap();

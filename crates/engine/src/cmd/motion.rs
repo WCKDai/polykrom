@@ -10,7 +10,8 @@ use solidcraft_geom::{Aabb3, Vec3};
 use solidcraft_kernel::Body;
 
 use super::CommandSpec;
-use super::joints::{cannot_move, effective_values, joint_id, occurrence_id, resolve_holding, value};
+use super::joints::{cannot_move, effective_values, joint_id, occurrence_id, place_holding, value};
+pub(super) use super::tri_tree::TriTree;
 use crate::params::{bad, bool_, str_, vec3};
 use crate::{EngineError, Result, Session};
 
@@ -18,6 +19,8 @@ use crate::{EngineError, Result, Session};
 mod analysis;
 #[path = "motion_animation.rs"]
 mod animation;
+#[path = "motion_trace.rs"]
+pub(crate) mod associative;
 #[path = "contact_sweep.rs"]
 pub(crate) mod contact_sweep;
 #[path = "motion_sweep.rs"]
@@ -76,9 +79,14 @@ pub static COMMANDS: &[CommandSpec] = &[
     )),
     CommandSpec::new("motion.trace.keep", "Keep Motion Trace", keep_trace).icon("trace").params(concat!(
         trace_doc!(),
-        "; name? (default Motion TraceN) - keeps the trace as a 3D sketch spline through its points (a new sketch with 3D Sketch \
-         on, in the root component, where no joint moves it; a fixed curve, it does not follow later changes) → sketch, name, curves, points"
+        "; name? (default Motion TraceN); auto_update?: bool (default true); point_ref?: joint origin snap - keeps the trace as a \
+         root 3D sketch spline. Associative curves follow mechanism and driving-input edits; false keeps a fixed curve. \
+         point_ref retains a geometry snap; otherwise point is retained in component coordinates → sketch, name, curves, points"
     )),
+    CommandSpec::new("motion.trace.edit", "Edit Motion Trace", associative::edit).icon("trace").params(
+        "sketch: id|name; joint? with from and to, or study?; index?; samples? (2…500); auto_update?: false to detach. \
+         Edits a saved associative trace's driving conditions in one undo step",
+    ),
     CommandSpec::new("motion.plot", "Plot Motion Study", analysis::plot).icon("graph").noundo().params(analysis::PLOT_DOC),
     CommandSpec::new("motion.interference", "Motion Interference", analysis::interference).icon("interference").noundo().params(analysis::INTERFERENCE_DOC),
     CommandSpec::new("joint.sweep", "Sweep Joint", sweep::sweep).icon("interference").params(sweep::SWEEP_DOC),
@@ -181,6 +189,11 @@ fn overlap(a: &Body, b: &Body) -> Option<f64> {
 }
 
 fn mesh_overlap(ma: &solidcraft_geom::Mesh, mb: &solidcraft_geom::Mesh, tol: f64) -> Option<f64> {
+    mesh_overlap_counted(ma, mb, tol, &mut 0)
+}
+
+/// [`mesh_overlap`], adding the triangles it tests to `work` (what contact budgets limit).
+pub(super) fn mesh_overlap_counted(ma: &solidcraft_geom::Mesh, mb: &solidcraft_geom::Mesh, tol: f64, work: &mut usize) -> Option<f64> {
     let (ba, bb) = (ma.bounds(), mb.bounds());
     if ba.max.x < bb.min.x + tol
         || bb.max.x < ba.min.x + tol
@@ -191,7 +204,47 @@ fn mesh_overlap(ma: &solidcraft_geom::Mesh, mb: &solidcraft_geom::Mesh, tol: f64
     {
         return None;
     }
-    let depth = deepest(ma, mb, tol).max(deepest(mb, ma, tol));
+    let (ta, tb) = (TriTree::new(tris(ma)), TriTree::new(tris(mb)));
+    *work += ta.tris().len() + tb.tris().len();
+    let depth = deepest(ma, &tb, bb, tol, work).max(deepest(mb, &ta, ba, tol, work));
+    (depth > tol).then_some(depth)
+}
+
+/// The triangle tree a contact check asks about `m`.
+pub(super) fn tree_of(m: &solidcraft_geom::Mesh) -> TriTree {
+    TriTree::new(tris(m))
+}
+
+/// [`mesh_overlap_counted`] for two bodies kept in their own frames with their trees built
+/// once: each one's points are moved into the other's frame (`fa`, `fb`: their frames in the
+/// world) and asked of the other's tree. A rigid move keeps every distance, so the depth is the
+/// one the placed meshes give, without building a tree per sample.
+pub(super) fn overlap_framed(
+    (ma, ta, fa): (&solidcraft_geom::Mesh, &TriTree, &Mat),
+    (mb, tb, fb): (&solidcraft_geom::Mesh, &TriTree, &Mat),
+    tol: f64,
+    work: &mut usize,
+) -> Option<f64> {
+    let (ia, ib) = (solidcraft_doc::mat_inverse(fa)?, solidcraft_doc::mat_inverse(fb)?);
+    let moved = |m: &solidcraft_geom::Mesh, to: &Mat| solidcraft_geom::Mesh {
+        positions: m.positions.iter().map(|p| solidcraft_doc::apply_point(to, *p)).collect(),
+        triangles: m.triangles.clone(),
+        ..solidcraft_geom::Mesh::default()
+    };
+    let (a_in_b, b_in_a) = (moved(ma, &solidcraft_doc::mat_mul(&ib, fa)), moved(mb, &solidcraft_doc::mat_mul(&ia, fb)));
+    *work += ma.positions.len() + mb.positions.len();
+    let (ba, bb) = (ta.bounds(), tb.bounds());
+    let ab = a_in_b.bounds();
+    if ab.max.x < bb.min.x + tol
+        || bb.max.x < ab.min.x + tol
+        || ab.max.y < bb.min.y + tol
+        || bb.max.y < ab.min.y + tol
+        || ab.max.z < bb.min.z + tol
+        || bb.max.z < ab.min.z + tol
+    {
+        return None;
+    }
+    let depth = deepest(&a_in_b, tb, bb, tol, work).max(deepest(&b_in_a, ta, ba, tol, work));
     (depth > tol).then_some(depth)
 }
 
@@ -199,10 +252,13 @@ fn tris(m: &solidcraft_geom::Mesh) -> Vec<[Vec3; 3]> {
     m.triangles.iter().filter_map(|t| m.tri(t)).collect()
 }
 
-/// The deepest any sample point of `a` lies inside `b` (0 if none).
-fn deepest(a: &solidcraft_geom::Mesh, b: &solidcraft_geom::Mesh, tol: f64) -> f64 {
-    let tb = tris(b);
-    let bx = b.bounds();
+/// How far `p` is from the surface `tb` (its nearest triangle).
+fn surface_distance(p: Vec3, tb: &TriTree, work: &mut usize) -> f64 {
+    tb.nearest(p, work, |[a, b, c]| closest(p, *a, *b, *c).dist(p))
+}
+
+/// The deepest any sample point of `a` lies inside `b` (0 if none); `bx` is b's box.
+fn deepest(a: &solidcraft_geom::Mesh, tb: &TriTree, bx: Aabb3, tol: f64, work: &mut usize) -> f64 {
     let mut pts: Vec<Vec3> = a.positions.clone();
     let mut edges: Vec<(Vec3, Vec3)> = Vec::new();
     for [p, q, r] in tris(a) {
@@ -220,13 +276,13 @@ fn deepest(a: &solidcraft_geom::Mesh, b: &solidcraft_geom::Mesh, tol: f64) -> f6
         {
             continue;
         }
-        let d = tb.iter().map(|[a, b, c]| closest(p, *a, *b, *c).dist(p)).fold(f64::MAX, f64::min);
-        if d > tol.max(best) && inside(p, &tb) {
+        let d = surface_distance(p, tb, work);
+        if d > tol.max(best) && inside_tree(p, tb, work) {
             best = d;
         }
     }
     for (p, q) in edges.into_iter().take(200_000) {
-        best = best.max(crossing(p, q, &tb, bx, tol));
+        best = best.max(crossing(p, q, tb, bx, tol, work));
     }
     best
 }
@@ -236,7 +292,7 @@ fn deepest(a: &solidcraft_geom::Mesh, b: &solidcraft_geom::Mesh, tol: f64) -> f6
 /// lie inside, deeper than `tol`, as elsewhere in the check). Two plates crossing each other's
 /// faces put no vertex, mid-edge or triangle centre of either inside the other — the chord an
 /// edge cuts is how that crossing is seen (#3323).
-fn crossing(p: Vec3, q: Vec3, tb: &[[Vec3; 3]], bx: Aabb3, tol: f64) -> f64 {
+fn crossing(p: Vec3, q: Vec3, tb: &TriTree, bx: Aabb3, tol: f64, work: &mut usize) -> f64 {
     if p.x.max(q.x) < bx.min.x - tol
         || p.x.min(q.x) > bx.max.x + tol
         || p.y.max(q.y) < bx.min.y - tol
@@ -254,7 +310,12 @@ fn crossing(p: Vec3, q: Vec3, tb: &[[Vec3; 3]], bx: Aabb3, tol: f64) -> f64 {
     // Where the edge crosses the surface, along the edge. A crossing at a vertex or along an
     // edge shared by two triangles is found twice (or more); merges of neighbours leave the
     // entry and exit of each chord as one pair each.
-    let mut hits: Vec<f64> = tb.iter().filter_map(|t| contact_sweep::segment_hits_triangle(p, q, t)).map(|h| (h - p).dot(d) / len2).collect();
+    let mut hits: Vec<f64> = Vec::new();
+    tb.along(p, q, false, PAD, work, |t| {
+        if let Some(h) = contact_sweep::segment_hits_triangle(p, q, t) {
+            hits.push((h - p).dot(d) / len2);
+        }
+    });
     if hits.len() < 2 {
         return 0.0;
     }
@@ -266,42 +327,54 @@ fn crossing(p: Vec3, q: Vec3, tb: &[[Vec3; 3]], bx: Aabb3, tol: f64) -> f64 {
             break;
         }
         let m = p + d * ((pair[0] + pair[1]) * 0.5);
-        let deep = tb.iter().map(|[a, b, c]| closest(m, *a, *b, *c).dist(m)).fold(f64::MAX, f64::min);
-        if deep > tol.max(best) && inside(m, tb) {
+        let deep = surface_distance(m, tb, work);
+        if deep > tol.max(best) && inside_tree(m, tb, work) {
             best = deep;
         }
     }
     best
 }
 
+/// How far past a box a segment or ray is still tested against what is in it (mm): the
+/// crossing and ray tests run on triangles, a box only rules them out.
+const PAD: f64 = 1e-6;
+
+/// The fixed skew direction of the parity ray (no axis-aligned edge hits).
+// Fixed ray coordinates, not an approximation used to compute Euler's constant.
+#[allow(clippy::approx_constant)]
+const RAY: Vec3 = Vec3::new(0.577_215_664_9, 0.327_118_441_9, 0.751_891_438_7);
+
+/// Whether the parity ray from `p` crosses triangle abc (ahead of `p`).
+fn ray_hit(p: Vec3, [a, b, c]: &[Vec3; 3]) -> bool {
+    let (e1, e2) = (*b - *a, *c - *a);
+    let h = RAY.cross(e2);
+    let det = e1.dot(h);
+    if det.abs() < 1e-14 {
+        return false;
+    }
+    let f = 1.0 / det;
+    let sv = p - *a;
+    let u = f * sv.dot(h);
+    if !(0.0..=1.0).contains(&u) {
+        return false;
+    }
+    let q = sv.cross(e1);
+    let v = f * RAY.dot(q);
+    if v < 0.0 || u + v > 1.0 {
+        return false;
+    }
+    f * e2.dot(q) > 0.0
+}
+
 /// Ray parity along a skew direction (no axis-aligned edge hits).
 fn inside(p: Vec3, tris: &[[Vec3; 3]]) -> bool {
-    // Fixed ray coordinates, not an approximation used to compute Euler's constant.
-    #[allow(clippy::approx_constant)]
-    let dir = Vec3::new(0.577_215_664_9, 0.327_118_441_9, 0.751_891_438_7);
-    let mut n = 0;
-    for [a, b, c] in tris {
-        let (e1, e2) = (*b - *a, *c - *a);
-        let h = dir.cross(e2);
-        let det = e1.dot(h);
-        if det.abs() < 1e-14 {
-            continue;
-        }
-        let f = 1.0 / det;
-        let sv = p - *a;
-        let u = f * sv.dot(h);
-        if !(0.0..=1.0).contains(&u) {
-            continue;
-        }
-        let q = sv.cross(e1);
-        let v = f * dir.dot(q);
-        if v < 0.0 || u + v > 1.0 {
-            continue;
-        }
-        if f * e2.dot(q) > 0.0 {
-            n += 1;
-        }
-    }
+    tris.iter().filter(|t| ray_hit(p, t)).count() % 2 == 1
+}
+
+/// [`inside`] through the tree: only the triangles whose box the ray passes are tested.
+fn inside_tree(p: Vec3, tb: &TriTree, work: &mut usize) -> bool {
+    let mut n = 0usize;
+    tb.along(p, p + RAY, true, PAD, work, |t| n += usize::from(ray_hit(p, t)));
     n % 2 == 1
 }
 
@@ -370,7 +443,7 @@ fn drive_with_contact(s: &mut Session, want: &[(u64, Vec<f64>)], given: &BTreeSe
                 j.values = q;
             }
         }
-        resolve_holding(s, &held)
+        place_holding(s, &held)
     };
     // Loops already open at the start stay as they are; a loop the motion opens stops it.
     let open_at_start: BTreeSet<u64> = set(s, 0.0).conflicts.iter().map(|c| c.0).collect();
@@ -881,7 +954,16 @@ fn trace(s: &mut Session, p: &Value) -> Result<Value> {
 /// world, which no joint moves) with 3D Sketch on and the spline through the trace's points.
 fn keep_trace(s: &mut Session, p: &Value) -> Result<Value> {
     let cmd = "motion.trace.keep";
-    let (mut points, mut out) = sample_trace(s, p, cmd)?;
+    let source = if bool_(p, "auto_update") != Some(false) { Some(associative::source(s, p, cmd)?) } else { None };
+    let (mut points, out) = sample_trace(s, p, cmd)?;
+    finish_trace(&mut points);
+    if points.len() < 2 {
+        return Err(bad(cmd, "the point does not move: there is no trace to keep"));
+    }
+    keep_sampled_trace(s, p, cmd, points, out, source)
+}
+
+fn finish_trace(points: &mut Vec<Vec3>) {
     // Where the motion stood still (at a limit or a stop), one fit point.
     points.dedup_by(|a, b| a.dist(*b) < 1e-6);
     // A full cycle comes back to where it started (to the loop solver's tolerance): the spline
@@ -896,9 +978,16 @@ fn keep_trace(s: &mut Session, p: &Value) -> Result<Value> {
         }
         points.push(first);
     }
-    if points.len() < 2 {
-        return Err(bad(cmd, "the point does not move: there is no trace to keep"));
-    }
+}
+
+fn keep_sampled_trace(
+    s: &mut Session,
+    p: &Value,
+    cmd: &str,
+    points: Vec<Vec3>,
+    mut out: Value,
+    source: Option<solidcraft_doc::motion::MotionTrace>,
+) -> Result<Value> {
     let name = match str_(p, "name").map(str::trim).filter(|n| !n.is_empty()) {
         Some(n) => n.to_string(),
         None => (1..=s.doc.features.len() + 1).map(|k| format!("Motion Trace{k}")).find(|n| s.doc.find_feature(n).is_none()).unwrap_or_default(),
@@ -919,15 +1008,27 @@ fn keep_trace(s: &mut Session, p: &Value) -> Result<Value> {
     s.revision += 1;
     let (made, spline) = made?;
     let sketch = made.get("sketch").cloned().unwrap_or(Value::Null);
-    out["sketch"] = sketch;
+    out["sketch"] = sketch.clone();
     out["name"] = made.get("name").cloned().unwrap_or(Value::Null);
     out["curves"] = spline.get("curves").cloned().unwrap_or(Value::Null);
     out["points"] = json!(points.len());
+    if let Some(mut source) = source {
+        source.sketch = sketch.as_u64().ok_or_else(|| bad(cmd, "trace sketch is missing"))?;
+        source.wire = spline
+            .get("curves")
+            .and_then(Value::as_array)
+            .and_then(|v| v.first())
+            .and_then(Value::as_str)
+            .ok_or_else(|| bad(cmd, "trace curve is missing"))?
+            .to_string();
+        associative::remember(s, &source);
+        s.doc_mut().assembly.traces.push(source);
+    }
     Ok(out)
 }
 
 fn list_studies(s: &mut Session, _p: &Value) -> Result<Value> {
-    Ok(json!({"studies": s.doc.assembly.studies}))
+    Ok(json!({"studies": s.doc.assembly.studies, "traces": associative::list(s)}))
 }
 
 fn delete_study(s: &mut Session, p: &Value) -> Result<Value> {
@@ -1050,3 +1151,7 @@ pub fn world_point(s: &Session, occurrence: u64, p: Vec3) -> Vec3 {
 #[cfg(test)]
 #[path = "motion_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "systems_tests.rs"]
+mod systems_tests;

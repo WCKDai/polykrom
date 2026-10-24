@@ -379,6 +379,15 @@ const SHADED: [&str; 2] = ["analysis.draft", "analysis.access"];
 /// Tokens no colour vision mode needs to keep apart, and why. A new token fails
 /// `every_token_is_measured_or_carries_no_meaning` until it is in a group above or here.
 const NO_MEANING: &[(&str, &str)] = &[
+    ("borders.primary", "structural chrome: hierarchy uses width, pattern and placement, not hue"),
+    ("borders.secondary", "structural chrome: hierarchy uses width, pattern and placement, not hue"),
+    ("borders.secondary_dotted", "structural chrome: hierarchy uses width, pattern and placement, not hue"),
+    ("borders.tertiary", "structural chrome: hierarchy uses width, pattern and placement, not hue"),
+    ("borders.container", "structural chrome: hierarchy uses width, pattern and placement, not hue"),
+    ("borders.control", "structural chrome: hierarchy uses width, pattern and placement, not hue"),
+    ("borders.primary_inset", "structural chrome: hierarchy uses width, pattern and placement, not hue"),
+    ("borders.bevel", "structural chrome: hierarchy uses width, pattern and placement, not hue"),
+    ("icon_palette", "optional SVG palette; actual roles and theme contrast are guarded in icon and theme tests"),
     ("file_dim", "File view secondary text, WCAG guarded in theme tests"),
     ("file_recovery_well", "decorative recovery icon ground"),
     ("file_action_height", "layout dimension"),
@@ -520,16 +529,17 @@ const NO_MEANING: &[(&str, &str)] = &[
     ("cube_border", "labelled"),
     ("cube_text", "labelled"),
     ("cube_hover", "hover highlight"),
-    // Not a colour, or the end of a mark that is measured elsewhere.
+    // Not a colour.
     ("analysis.hatch", "a flag: stripes on the failing faces"),
     ("logo[3]", "the mark's white edge"),
+    ("logo_facets", "the mark's polychrome facets: brand colours, read as one shape"),
     // Icon colours that are a shade of a measured one, or one mark alone.
     ("icons.highlight", "white ink on viewport markers and the agent pointer"),
     ("icons.agent", "the agent's pointer, alone"),
     ("icons.marker_halo", "a dark halo under a marker"),
 ];
 
-/// Every token field, by path (`sketch`, `analysis.draft`, `logo[3]`…): the arrays of distinct
+/// Every token field, by path (`sketch`, `analysis.draft`, `triad`…): the arrays of distinct
 /// meanings by element where only some elements are measured.
 fn token_fields(t: &Tokens) -> BTreeSet<String> {
     let text = format!("{t:#?}");
@@ -565,7 +575,7 @@ fn every_token_is_measured_or_carries_no_meaning() {
     for t in [Tokens::light(), Tokens::dark()] {
         let measured: BTreeSet<&str> =
             groups(&t).iter().flat_map(|g| g.members.iter().chain(&g.grounds).map(|(n, _)| field_of(n))).chain(SHADED).collect();
-        // An element of an array (`logo[3]`) is listed for the record; its array is measured.
+        // An element of an array (`triad[0]`) is listed for the record; its array is measured.
         let listed: BTreeSet<&str> = NO_MEANING.iter().map(|(n, _)| field_of(n)).collect();
         let fields = token_fields(&t);
         let unplaced: Vec<&String> = fields.iter().filter(|f| !measured.contains(f.as_str()) && !listed.contains(f.as_str())).collect();
@@ -593,12 +603,10 @@ fn pairs(t: &Tokens) -> Vec<(String, Rgb8, Rgb8)> {
 /// Pairs under the floor that the tables leave as they are (decided for #778). Each is close to
 /// the floor for normal vision too, and construction and centerline lines also differ by their
 /// dash patterns.
-fn left_as_they_are(mode: ColorVision, dark: bool) -> BTreeSet<String> {
+fn left_as_they_are(mode: ColorVision, _dark: bool) -> BTreeSet<String> {
     let mut v = vec!["sketch lines: sketch_construction vs sketch_centerline"];
     if mode == ColorVision::Tritan {
         v.push("sketch lines: sketch_lost vs sketch_centerline");
-        v.push(if dark { "timeline: hover vs accent_soft" } else { "timeline: timeline_item vs accent_soft" });
-        v.push("selection: sel_face vs preview_add");
     }
     v.into_iter().map(String::from).collect()
 }
@@ -916,7 +924,7 @@ fn saved_preferences_load_the_mode_and_a_bad_one_loads_as_off() {
         assert_eq!(v["color_vision"], mode.id());
         assert_eq!(serde_json::from_value::<Prefs>(v).unwrap(), p);
     }
-    // A value this version doesn't know (a later SolidCraft's mode, a hand edit) is Off, and the
+    // A value this version doesn't know (a later Polykrom's mode, a hand edit) is Off, and the
     // rest of the preferences still load.
     for bad in [json!("achromat"), json!("PROTAN"), json!(""), json!(3), json!(null), json!(true), json!({"protan": 1}), json!(["tritan"])] {
         let p: Prefs = serde_json::from_value(json!({"theme": "light", "color_vision": bad})).unwrap();

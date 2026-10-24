@@ -1,6 +1,6 @@
 //! Design properties (#1015): the design's optional top-level `metadata` object.
 //!
-//! SolidCraft reads a few well-known, unprefixed text keys from it (project, part number,
+//! Polykrom reads a few well-known, unprefixed text keys from it (project, part number,
 //! revision, author, organization, description, licence) and keeps every other key exactly as
 //! it was through open, edit and save. Other tools keep their own data under one reverse-DNS
 //! key each (`com.example.tool`), holding an object.
@@ -8,7 +8,7 @@
 //! Reading never validates: a well-known key holding something other than text is kept as it
 //! is and reads as absent, so a file another tool wrote always opens. Writing through
 //! [`Metadata::set`] (the `document.metadata.set` command) checks the key, the value's kind and
-//! its size, so nothing SolidCraft writes is malformed.
+//! its size, so nothing Polykrom writes is malformed.
 //!
 //! The map is stored as is: typed fields would refuse a design another tool had written
 //! `"author": 42` into. Everything under `metadata` is informational, never geometry, so keeping
@@ -27,8 +27,8 @@ pub const ORGANIZATION: &str = "organization";
 pub const DESCRIPTION: &str = "description";
 pub const LICENSE: &str = "license";
 
-/// SolidCraft's own keys, in the order the Design Properties dialog shows them. Every other
-/// unprefixed key is reserved for SolidCraft too.
+/// Polykrom's own keys, in the order the Design Properties dialog shows them. Every other
+/// unprefixed key is reserved for Polykrom too.
 pub const WELL_KNOWN: [&str; 7] = [PROJECT, PART_NUMBER, REVISION, AUTHOR, ORGANIZATION, DESCRIPTION, LICENSE];
 
 /// Longest key, in bytes.
@@ -48,7 +48,7 @@ pub const MAX_TOTAL_BYTES: usize = 256 * 1024;
 #[serde(transparent)]
 pub struct Metadata(pub Map<String, Value>);
 
-/// A key SolidCraft reads as a design property.
+/// A key Polykrom reads as a design property.
 pub fn is_well_known(key: &str) -> bool {
     WELL_KNOWN.contains(&key)
 }
@@ -123,7 +123,7 @@ impl Metadata {
         self.text(LICENSE)
     }
 
-    /// The keys SolidCraft doesn't read (other tools' data, or keys a newer SolidCraft added),
+    /// The keys Polykrom doesn't read (other tools' data, or keys a newer Polykrom added),
     /// kept as they are.
     pub fn others(&self) -> impl Iterator<Item = (&String, &Value)> {
         self.0.iter().filter(|(k, _)| !is_well_known(k))
@@ -193,7 +193,7 @@ fn check(key: &str, value: Value) -> Result<Option<Value>> {
     }
     let shown: String = key.chars().take(64).collect();
     Err(invalid(format!(
-        "`{shown}` is not a design property: SolidCraft's are {}; another tool's data goes under a reverse-DNS key such as `com.example.tool`",
+        "`{shown}` is not a design property: Polykrom's are {}; another tool's data goes under a reverse-DNS key such as `com.example.tool`",
         WELL_KNOWN.join(", ")
     )))
 }

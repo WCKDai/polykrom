@@ -1,4 +1,4 @@
-//! The command registry. Ids are SolidCraft's own dotted ids (`solid.extrude`,
+//! The command registry. Ids are Polykrom's own dotted ids (`solid.extrude`,
 //! `sketch.rectangle.two_point`); the toolbar placement (`tab`, `panel`) follows the familiar
 //! Design workspace layout.
 
@@ -45,7 +45,8 @@ pub use view_dxf::sketch::exportable as view_dxf_exportable;
 mod component_link;
 mod config;
 mod file;
-mod inspect;
+mod frame;
+pub(crate) mod inspect;
 mod interference;
 pub(crate) mod joints;
 mod libraries;
@@ -59,6 +60,7 @@ pub(crate) mod motion;
 mod parts;
 mod script;
 mod section;
+mod tri_tree;
 pub(crate) use measure_sel::measure_items;
 #[cfg(test)]
 mod kernel_heal_tests;
@@ -278,6 +280,7 @@ pub fn command_specs() -> Vec<&'static CommandSpec> {
     v.extend(construct::COMMANDS.iter());
     v.extend(sheet::COMMANDS.iter());
     v.extend(plastic::COMMANDS.iter());
+    v.extend(frame::COMMANDS.iter());
     v.extend(component::COMMANDS.iter());
     v.extend(component_link::COMMANDS.iter());
     v.extend(joints::COMMANDS.iter());

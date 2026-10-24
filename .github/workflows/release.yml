@@ -81,7 +81,7 @@ jobs:
           fi
           case "$VERSION" in *-*) pre=true ;; *) pre=false ;; esac
           { echo "version=$VERSION"; echo "date=$(date -u +%Y-%m-%d)"; echo "prerelease=$pre"; } >>"$GITHUB_OUTPUT"
-          echo "### SolidCraft v$VERSION (\`${GITHUB_SHA::9}\`)" >>"$GITHUB_STEP_SUMMARY"
+          echo "### Polykrom v$VERSION (\`${GITHUB_SHA::9}\`)" >>"$GITHUB_STEP_SUMMARY"
 
   # The app icon in every size, drawn by solidcraft-cli (no image files are committed), for the
   # Windows jobs: the ARM64 build is cross-compiled and can't run there to draw its own.
@@ -203,7 +203,7 @@ jobs:
     name: Snap ${{ matrix.arch }}
     needs: [version, linux]
     if: needs.version.outputs.build == 'true'
-    # The Snap Store hasn't accepted SolidCraft yet, so a snap failure never holds up a release.
+    # The Snap Store hasn't accepted Polykrom yet, so a snap failure never holds up a release.
     continue-on-error: true
     # Repackages the Linux job's tarball, like the Flatpak. On 24.04 because the core24 base is
     # Ubuntu 24.04, which lets snapcraft build on the runner itself (--destructive-mode).
@@ -452,7 +452,7 @@ jobs:
           umask 077
           printf '%s\n' "$UPDATE_SIGNING_KEY" >"$RUNNER_TEMP/update.key"
           minisign -S -s "$RUNNER_TEMP/update.key" -m artifacts/SHA256SUMS.txt \
-            -x artifacts/SHA256SUMS.txt.minisig -t "SolidCraft v$VERSION" </dev/null
+            -x artifacts/SHA256SUMS.txt.minisig -t "Polykrom v$VERSION" </dev/null
           rm -f "$RUNNER_TEMP/update.key"
           if [ -n "$public_key" ]; then
             minisign -V -P "$public_key" -m artifacts/SHA256SUMS.txt -x artifacts/SHA256SUMS.txt.minisig
@@ -465,7 +465,7 @@ jobs:
           sha256sum --check SHA256SUMS.txt
           # Stage all packages before publishing. Published tags are never replaced.
           gh release create "$tag" --draft --prerelease --latest=false \
-            --title "SolidCraft v$VERSION (nightly)" --target "$GITHUB_SHA" \
+            --title "Polykrom v$VERSION (nightly)" --target "$GITHUB_SHA" \
             --notes-file ../notes.md --generate-notes -- *
           gh release edit "$tag" --draft=false --prerelease --latest=false
           echo "### Published nightly: $tag (\`${GITHUB_SHA::9}\`)" >>"$GITHUB_STEP_SUMMARY"
@@ -494,15 +494,15 @@ jobs:
             while IFS= read -r asset; do
               if [ -n "$asset" ]; then gh release delete-asset "$tag" "$asset" --yes; fi
             done <<<"$assets"
-            gh release edit "$tag" --draft --title "SolidCraft v$VERSION" \
+            gh release edit "$tag" --draft --title "Polykrom v$VERSION" \
               --target "$GITHUB_SHA" --prerelease="$PRERELEASE"
             gh release upload "$tag" --clobber -- *
           else
-            gh release create "$tag" --draft --title "SolidCraft v$VERSION" \
+            gh release create "$tag" --draft --title "Polykrom v$VERSION" \
               --target "$GITHUB_SHA" --notes-file ../notes.md --generate-notes "${pre[@]}" -- *
           fi
           {
-            echo "Draft **SolidCraft v$VERSION** at \`${GITHUB_SHA::9}\`:"
+            echo "Draft **Polykrom v$VERSION** at \`${GITHUB_SHA::9}\`:"
             echo
             sed 's/^/    /' SHA256SUMS.txt
           } >>"$GITHUB_STEP_SUMMARY"

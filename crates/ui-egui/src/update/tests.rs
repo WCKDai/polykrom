@@ -98,7 +98,7 @@ fn portable_windows_layout_is_recognised() {
     );
 }
 
-/// #1870: the installer's wizard can put SolidCraft anywhere, and it puts solidcraft-cli.exe
+/// #1870: the installer's wizard can put Polykrom anywhere, and it puts solidcraft-cli.exe
 /// beside it as the portable zip does. The folder it recorded is what tells its copy apart.
 #[test]
 fn an_msi_install_outside_program_files_is_recognised() {
@@ -148,11 +148,11 @@ fn release() -> Release {
     ];
     let assets: Vec<Value> = names
         .iter()
-        .map(|n| json!({"name": n, "size": 10, "browser_download_url": format!("https://github.com/bherbruck/solidcraft/releases/download/v0.10.0/{n}")}))
+        .map(|n| json!({"name": n, "size": 10, "browser_download_url": format!("https://github.com/wckdboy/polykrom/releases/download/v0.10.0/{n}")}))
         .collect();
     let body = json!({
-        "tag_name": "v0.10.0", "name": "SolidCraft v0.10.0", "body": "**What's new**\n\n- Surface tools.",
-        "html_url": "https://github.com/bherbruck/solidcraft/releases/tag/v0.10.0", "draft": false, "prerelease": false, "assets": assets,
+        "tag_name": "v0.10.0", "name": "Polykrom v0.10.0", "body": "**What's new**\n\n- Surface tools.",
+        "html_url": "https://github.com/wckdboy/polykrom/releases/tag/v0.10.0", "draft": false, "prerelease": false, "assets": assets,
     });
     Release::parse(body.to_string().as_bytes()).unwrap()
 }
@@ -178,14 +178,14 @@ fn each_installation_gets_its_own_file() {
     // Download: the file, or the page when there is none or a package manager updates it.
     assert_eq!(
         r.download_url(&InstallKind::WindowsMsi, "x86_64"),
-        "https://github.com/bherbruck/solidcraft/releases/download/v0.10.0/solidcraft-windows-x64.msi"
+        "https://github.com/wckdboy/polykrom/releases/download/v0.10.0/solidcraft-windows-x64.msi"
     );
-    assert_eq!(r.download_url(&InstallKind::Other, "x86_64"), "https://github.com/bherbruck/solidcraft/releases/tag/v0.10.0");
+    assert_eq!(r.download_url(&InstallKind::Other, "x86_64"), "https://github.com/wckdboy/polykrom/releases/tag/v0.10.0");
     assert_eq!(r.download_url(&InstallKind::Flatpak(APP_ID.into()), "x86_64"), r.page);
     assert_eq!(r.download_url(&InstallKind::Snap { store: true }, "x86_64"), r.page);
     assert_eq!(
         r.download_url(&InstallKind::Snap { store: false }, "x86_64"),
-        "https://github.com/bherbruck/solidcraft/releases/download/v0.10.0/solidcraft-linux-x86_64.snap"
+        "https://github.com/wckdboy/polykrom/releases/download/v0.10.0/solidcraft-linux-x86_64.snap"
     );
     assert_eq!(
         InstallKind::Snap { store: false }.update_command(Some("solidcraft-linux-x86_64.snap")).as_deref(),
@@ -212,7 +212,7 @@ fn release_answers_are_checked() {
     let r = Release::parse(
         json!({"tag_name": "v1.0.0", "html_url": "https://evil.example/x", "assets": [
             {"name": "solidcraft-windows-x64.msi", "browser_download_url": "https://evil.example/a.msi"},
-            {"name": "solidcraft-windows-x86.msi", "browser_download_url": "https://github.com/bherbruck/solidcraft/releases/download/v1.0.0/solidcraft-windows-x86.msi"},
+            {"name": "solidcraft-windows-x86.msi", "browser_download_url": "https://github.com/wckdboy/polykrom/releases/download/v1.0.0/solidcraft-windows-x86.msi"},
         ]})
         .to_string()
         .as_bytes(),
@@ -220,7 +220,7 @@ fn release_answers_are_checked() {
     .unwrap();
     assert_eq!(r.page, RELEASES_PAGE);
     assert_eq!(r.assets.len(), 1);
-    assert_eq!(r.name, "SolidCraft v1.0.0");
+    assert_eq!(r.name, "Polykrom v1.0.0");
     // Huge notes are cut (on a character boundary).
     let r = Release::parse(json!({"tag_name": "v1.0.0", "body": "é".repeat(MAX_NOTES)}).to_string().as_bytes()).unwrap();
     assert!(r.notes.len() <= MAX_NOTES + 8 && r.notes.ends_with('…'));
@@ -305,9 +305,9 @@ fn next_release_feed(dir: &Path) -> (PathBuf, String) {
     let path = dir.join("latest.json");
     let body = json!({
         "tag_name": format!("v{v}"),
-        "name": format!("SolidCraft {v}"),
+        "name": format!("Polykrom {v}"),
         "body": "## What's new\n\n- Faster rebuilds.",
-        "html_url": format!("https://github.com/bherbruck/solidcraft/releases/tag/v{v}"),
+        "html_url": format!("https://github.com/wckdboy/polykrom/releases/tag/v{v}"),
         "assets": []
     });
     std::fs::write(&path, body.to_string()).unwrap();
@@ -442,7 +442,7 @@ fn the_memo_survives_with_the_preferences() {
 
 #[test]
 fn release_notes_read_as_markdown() {
-    let md = "## What's new\n\n**Why 0.10:** a minor\nbump.\n\n- **Surface tools.** Revolve and `solidcraft-cli mcp`\n  continued ([#925](https://x/925)).\n  - nested\n* Fix by @a in https://github.com/bherbruck/solidcraft/pull/1064\n\nSee https://example.com/x.";
+    let md = "## What's new\n\n**Why 0.10:** a minor\nbump.\n\n- **Surface tools.** Revolve and `solidcraft-cli mcp`\n  continued ([#925](https://x/925)).\n  - nested\n* Fix by @a in https://github.com/wckdboy/polykrom/pull/1064\n\nSee https://example.com/x.";
     let b = parse_markdown(md);
     assert_eq!(b.first(), Some(&Block::Heading(vec![Span::Text("What's new".into())])));
     assert_eq!(b.get(1), Some(&Block::Paragraph(vec![Span::Strong("Why 0.10:".into()), Span::Text(" a minor bump.".into())])));
@@ -467,7 +467,7 @@ fn release_notes_read_as_markdown() {
             0,
             vec![
                 Span::Text("Fix by @a in ".into()),
-                Span::Link { text: "#1064".into(), url: Some("https://github.com/bherbruck/solidcraft/pull/1064".into()) }
+                Span::Link { text: "#1064".into(), url: Some("https://github.com/wckdboy/polykrom/pull/1064".into()) }
             ]
         ))
     );
@@ -490,7 +490,7 @@ fn release_note_links_keep_their_web_targets() {
 }
 
 #[test]
-fn releases_under_either_owner_are_accepted() {
+fn only_polykrom_releases_are_accepted() {
     let parse = |owner: &str| {
         let base = format!("https://github.com/{owner}/releases");
         Release::parse(
@@ -502,13 +502,14 @@ fn releases_under_either_owner_are_accepted() {
         )
         .unwrap()
     };
-    for owner in ["bherbruck/solidcraft", "tangency-labs/solidcraft"] {
-        let r = parse(owner);
-        assert_eq!(r.page, format!("https://github.com/{owner}/releases/tag/v1.0.0"));
-        assert_eq!(r.assets.len(), 1, "{owner}");
-    }
-    // Any other owner, repository, host or scheme is dropped.
-    for owner in ["evil/solidcraft", "tangency-labs/solidcraft-evil", "tangency-labs.evil/solidcraft", "bherbruck/other"] {
+    let r = parse("wckdboy/polykrom");
+    assert_eq!(r.page, "https://github.com/wckdboy/polykrom/releases/tag/v1.0.0");
+    assert_eq!(r.assets.len(), 1);
+    // Any other owner, repository, host or scheme is dropped, SolidCraft's own releases included:
+    // they are another program's.
+    for owner in
+        ["bherbruck/solidcraft", "tangency-labs/solidcraft", "evil/polykrom", "wckdboy/polykrom-evil", "wckdboy.evil/polykrom", "wckdboy/other"]
+    {
         let r = parse(owner);
         assert_eq!(r.page, RELEASES_PAGE, "{owner}");
         assert!(r.assets.is_empty(), "{owner}");

@@ -1,8 +1,12 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <title>Move</title>
-  <path d="M32 14L32 50M14 32L50 32" fill="none" stroke="#236ead" stroke-width="4.25" stroke-linejoin="round" stroke-linecap="round"/>
-  <path d="M32 5L38 15L26 15Z" fill="#236ead"/>
-  <path d="M32 59L26 49L38 49Z" fill="#236ead"/>
-  <path d="M5 32L15 26L15 38Z" fill="#236ead"/>
-  <path d="M59 32L49 38L49 26Z" fill="#236ead"/>
+  <title>Move / Copy</title>
+  <path d="M22 28.84L36.88 36.28L36.88 43.72L22 51.16L7.12 43.72L7.12 36.28Z" fill="none" stroke="#6f879c" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="3 3.2"/>
+  <path d="M42 12.84L56.88 20.28L42 27.72L27.12 20.28Z" fill="#328bd3"/>
+  <path d="M42 12.84L56.88 20.28L56.88 27.72L42 35.16L27.12 27.72L27.12 20.28Z" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M27.12 20.28L42 27.72L56.88 20.28" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M42 27.72L42 35.16" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M22 40L35.97 29.69" fill="none" stroke="#ffffff" stroke-width="6.8" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M42 25.24L37.94 34.05L32.38 26.53Z" fill="#ffffff" stroke="#ffffff" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M22 40L35.97 29.69" fill="none" stroke="#236ead" stroke-width="4.4" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M42 25.24L37.94 34.05L32.38 26.53Z" fill="#236ead"/>
 </svg>

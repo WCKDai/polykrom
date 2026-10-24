@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Repackage a SolidCraft Linux tarball as a snap:
+# Repackage a Polykrom Linux tarball as a snap:
 #
 #   $DIST/solidcraft-<version>-linux-<arch>.snap
 #
@@ -45,7 +45,7 @@ if ! printf '%s' "$VERSION" | grep -Eq '^[A-Za-z0-9][A-Za-z0-9.+~-]{0,31}$'; the
   exit 1
 fi
 
-echo "==> SolidCraft $VERSION snap for $SNAP_ARCH from $(basename "$TARBALL")"
+echo "==> Polykrom $VERSION snap for $SNAP_ARCH from $(basename "$TARBALL")"
 
 WORK="$CARGO_TARGET_DIR/snap-pack"
 rm -rf "$WORK"

@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
   <title>Warning</title>
-  <path d="M32 8L57 53L7 53Z" fill="#b9ddf8"/>
-  <path d="M32 8L57 53L7 53Z" fill="none" stroke="#236ead" stroke-width="4.25" stroke-linejoin="round" stroke-linecap="round"/>
-  <path d="M32 24L32 37" fill="none" stroke="#236ead" stroke-width="4.25" stroke-linejoin="round" stroke-linecap="round"/>
-  <circle cx="32" cy="45" r="3" fill="#236ead"/>
+  <path d="M32 8L58 54L6 54Z" fill="#328bd3"/>
+  <path d="M32 8L58 54L6 54Z" fill="none" stroke="#328bd3" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M32 24L32 38" fill="none" stroke="#ffffff" stroke-width="5" stroke-linejoin="round" stroke-linecap="round"/>
+  <circle cx="32" cy="46" r="3.2" fill="#ffffff"/>
 </svg>

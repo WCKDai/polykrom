@@ -1,7 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
   <title>Compute</title>
-  <path d="M14.78 23.97A19 19 0 0 1 49.22 23.97" fill="none" stroke="#236ead" stroke-width="4.25" stroke-linejoin="round" stroke-linecap="round"/>
-  <path d="M51.5 28.86L43.17 22.82L52.23 18.59Z" fill="#236ead"/>
-  <path d="M49.22 40.03A19 19 0 0 1 14.78 40.03" fill="none" stroke="#236ead" stroke-width="4.25" stroke-linejoin="round" stroke-linecap="round"/>
-  <path d="M12.5 35.14L20.83 41.18L11.77 45.41Z" fill="#236ead"/>
+  <path d="M17 12L47 12A5 5 0 0 1 52 17L52 47A5 5 0 0 1 47 52L17 52A5 5 0 0 1 12 47L12 17A5 5 0 0 1 17 12Z" fill="none" stroke="currentColor" stroke-width="4.4" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M24 21L40 21A3 3 0 0 1 43 24L43 40A3 3 0 0 1 40 43L24 43A3 3 0 0 1 21 40L21 24A3 3 0 0 1 24 21Z" fill="#328bd3"/>
+  <path d="M22 6L22 12M32 6L32 12M42 6L42 12M22 52L22 58M32 52L32 58M42 52L42 58M6 22L12 22M6 32L12 32M6 42L12 42M52 22L58 22M52 32L58 32M52 42L58 42" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linejoin="round" stroke-linecap="round"/>
 </svg>

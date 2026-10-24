@@ -1,7 +1,7 @@
 # UI icons and review tool
 
 **Authors start with [AGENTS.md](AGENTS.md) and [STYLE_GUIDE.md](STYLE_GUIDE.md).**
-No chat history is required. The palette, canonical bases and named finished
+No chat history is required. The palette, Facet bases and named finished
 references define the style. The SVGs are the application's editable masters.
 
 ## Review all existing and new icons
@@ -83,7 +83,8 @@ Palette changes preserve accepted artwork and never update review hashes.
 | `design/review.json` | Owner acceptance hashes and current notes |
 | `design/references.toml` | Curated style references; does not control discovery |
 | `design/requested_icons.txt` | Sorted runtime requests and placeholder flags, checked by the Harness audit |
-| `design/tools/author/{lib,bases}.py` | Reusable geometry and canonical cube/slab/arrow bases |
+| `design/tools/author/{lib,facet,bases}.py` | Facet geometry: dimetric projection, parts, cues and the standard part/plate |
+| `design/tools/author/facet_icons.py` | The source of every master: one function per icon id |
 | `design/tools/author/new_icon.py` | Safe new-master scaffold, never overwrites an id |
 | `design/tools/icon_status.py`, `review_state.py` | Discovery, review backend and state |
 | `design/tools/review/` | Included HTML/CSS/JavaScript interface and reference page |

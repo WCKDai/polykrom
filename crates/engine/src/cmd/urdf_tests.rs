@@ -76,7 +76,7 @@ fn close(a: &Mat, b: &Mat) -> bool {
     a.iter().flatten().zip(b.iter().flatten()).all(|(x, y)| (x - y).abs() < 1e-9)
 }
 
-/// Every placement's link, composed at the design's current joint values, sits where SolidCraft
+/// Every placement's link, composed at the design's current joint values, sits where Polykrom
 /// places it.
 fn assert_fk(m: &UrdfModel, s: &Session, what: &str) {
     let vals = joints::joint_values(&s.doc.assembly);
@@ -89,7 +89,7 @@ fn assert_fk(m: &UrdfModel, s: &Session, what: &str) {
         }
         let Some((_, _, want)) = placements.iter().find(|p| p.1 == l.path) else { panic!("{what}: {} has no placement", l.name) };
         let got = mat_mul(f, &l.mesh_origin);
-        assert!(close(&got, want), "{what}: {} at {got:?}, SolidCraft has {want:?}", l.name);
+        assert!(close(&got, want), "{what}: {} at {got:?}, Polykrom has {want:?}", l.name);
         seen += 1;
     }
     assert_eq!(seen, placements.len() - 1, "{what}: a link per placement");
@@ -182,7 +182,7 @@ fn urdf_forward_kinematics_match_the_assembly() {
             let p = package(&s);
             let what = format!("{kind} (B grounded: {b_grounded})");
             assert_fk(&p.model, &s, &what);
-            // The same URDF follows SolidCraft to other values.
+            // The same URDF follows Polykrom to other values.
             run(&mut s, "joint.drive", json!({"joint": "J", "values": second}));
             assert_fk(&p.model, &s, &what);
             let moving = p.model.joints.iter().filter(|j| j.step != Step::Fixed).count();
@@ -383,7 +383,7 @@ fn urdf_names_are_unique_across_links_joints_and_files() {
     let mut s = Session::default();
     for name in ["Arm", "base", "Arm_link1"] {
         run(&mut s, "component.activate", json!({"component": "root"}));
-        run(&mut s, "component.create", json!({"name": name}));
+        run(&mut s, "component.create", json!({"name": name, "grounded": false}));
         run(&mut s, "solid.box", json!({"length": 10, "width": 10, "height": 10, "corner": [0, 0, 0]}));
     }
     run(&mut s, "solid.box", json!({"length": 5, "width": 5, "height": 5, "corner": [50, 50, 0]}));
@@ -649,4 +649,48 @@ fn urdf_files_stay_inside_allow_paths() {
     assert!(ok.is_ok(), "{ok:?}");
     let _ = std::fs::remove_dir_all(&inside);
     let _ = std::fs::remove_dir_all(&outside);
+}
+
+/// Gears and racks reach a simulator: the driven joint carries `<mimic>` with the ratio in URDF
+/// units (radians and metres), so a pinion turning drives the wheel and the rack there too.
+#[test]
+fn urdf_writes_motion_links_as_mimic() {
+    let mut s = Session::default();
+    for (name, body) in [
+        ("Frame", json!({"length": 120, "width": 40, "height": 5, "corner": [-20, -20, -5]})),
+        ("Rack", json!({"length": 80, "width": 6, "height": 6, "corner": [-40, 11, 0]})),
+    ] {
+        run(&mut s, "component.activate", json!({"component": "root"}));
+        run(&mut s, "component.create", json!({"name": name}));
+        run(&mut s, "solid.box", body);
+    }
+    for (name, x, r) in [("Pinion", 0, 10), ("Wheel", 50, 40)] {
+        run(&mut s, "component.activate", json!({"component": "root"}));
+        run(&mut s, "component.create", json!({"name": name}));
+        run(&mut s, "solid.cylinder", json!({"base": [x, 0, 0], "axis": [0, 0, 1], "radius": r, "height": 5}));
+    }
+    run(&mut s, "component.activate", json!({"component": "root"}));
+    ground(&mut s, "Frame", true);
+    for (name, x) in [("Pinion", 0), ("Wheel", 50)] {
+        run(
+            &mut s,
+            "joint.create",
+            json!({"type": "revolute", "name": name, "a": {"occurrence": "Frame", "point": [x, 0, 0]}, "b": {"occurrence": name, "point": [x, 0, 0]}, "flip": true}),
+        );
+    }
+    run(
+        &mut s,
+        "joint.create",
+        json!({"type": "slider", "name": "Rack Slide", "a": {"occurrence": "Frame", "point": [0, 14, 0], "z": [1, 0, 0]}, "b": {"occurrence": "Rack", "point": [0, 14, 0], "z": [1, 0, 0]}, "flip": true, "limits": [[-30, 30]]}),
+    );
+    run(&mut s, "joint.gear", json!({"a": "Pinion", "b": "Wheel", "ra": 10, "rb": 40}));
+    run(&mut s, "joint.rack_pinion", json!({"a": "Pinion", "b": "Rack Slide", "radius": 10}));
+    let p = package(&s);
+    let joint_xml = |name: &str| {
+        let at = p.xml.find(&format!("<joint name=\"{name}\"")).unwrap_or_else(|| panic!("no joint {name} in\n{}", p.xml));
+        p.xml[at..].split("</joint>").next().unwrap_or("").to_string()
+    };
+    assert!(joint_xml("Wheel").contains("<mimic joint=\"Pinion\" multiplier=\"-0.25\" offset=\"0\"/>"), "{}", joint_xml("Wheel"));
+    assert!(joint_xml("Rack_Slide").contains("<mimic joint=\"Pinion\" multiplier=\"0.01\" offset=\"0\"/>"), "{}", joint_xml("Rack_Slide"));
+    assert!(!joint_xml("Pinion").contains("<mimic"), "the driver is free");
 }

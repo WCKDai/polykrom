@@ -1,4 +1,4 @@
-# Self-host SolidCraft in the browser (see "Self-hosting with Docker" in the book's Getting started).
+# Self-host Polykrom in the browser (see "Self-hosting with Docker" in the book's Getting started).
 # From this folder, or from anywhere with -f packaging/docker/compose.yaml:
 #
 #   docker compose up -d             the published image from GitHub's container registry

@@ -24,7 +24,9 @@ pub static COMMANDS: &[CommandSpec] = &[
     ),
     CommandSpec::new("joint.create", "Joint", joint).at("SOLID", "ASSEMBLE").icon("joint").key("J").params(
         "type: rigid|revolute|slider|cylindrical|pin_slot|planar|ball, or a relation: parallel|perpendicular|angle|point_on_plane|point_on_line|line_on_plane \
-         (ties only some directions or points, made where the parts are; several between two parts add up); a, b: joint origins ({occurrence, face|circle|edge|point: [x,y,z] in world, or face|circle: \"<face name>\"; z? for a point, end?, x? as joint.origin} | origin name); \
+         (ties only some directions or points, made where the parts are; several between two parts add up). A joint moves in its origin's frame: \
+         revolute turns about z, slider slides along z (give the origin `z` along the travel), cylindrical turns about and slides along z, \
+         pin_slot turns about z and slides along x, planar slides in x and y and turns about z, ball turns about the point; a, b: joint origins ({occurrence, face|circle|edge|point: [x,y,z] in world, or face|circle: \"<face name>\"; z? for a point, end?, x? as joint.origin} | origin name); \
          values?: [angles in deg or expressions, distances]; limits?: [[min, max] | null…]; flip?: bool (default false: the origins are mated, \
          b's z against a's as two faces meet; true: b's z along a's, so two origins given at one point with the same z stay as they are); \
          offset?: mm or an expression; angle?: deg or an expression (an angle relation's tilt from mated; for other joints the default \
@@ -94,7 +96,7 @@ pub static COMMANDS: &[CommandSpec] = &[
     ),
     CommandSpec::new("joint.solve", "Solve Joints", solve_cmd).icon("compute").params("re-place the occurrences from the joints → conflicts, errors, dof"),
     CommandSpec::new("inspect.interference", "Interference", super::interference::interference).at("SOLID", "INSPECT").icon("interference").noundo().params(
-        "bodies?: [names] (default: all, in world placement); budget_s?: seconds (default 240, at most 86400: pairs not finished by then are listed in unchecked as \"not checked: the time budget … ran out\" and the call returns) → interferences: pairs that overlap with the overlap volume, area, bounding box and centre (a pin a hair off the axis of a hole of its size also has near_coaxial: {offset_mm, length_mm}, its volume the crescent the walls share); unchecked: [{a, b, reason}], the pairs that could not be checked, with the reason, and each mesh body (STL, 3MF or OBJ import: not intersected) as {a: name, b: null, reason: \"mesh body: not checked\"}, so count: 0 is not read as no overlap (checked counts the solid bodies). Bodies are pruned by bounding box first, then by their display meshes (pairs whose meshes stay apart by more than their chord tolerances, neither inside the other, are clear without a boolean), so any number of bodies is fine; the pairs left are intersected exactly, in parallel on desktop, the slowest first; at most 20000 pairs whose boxes overlap are intersected per call (truncated: true and skipped_pairs: n say when more were left out). Also: pairs_candidate (boxes overlap), pairs_cleared (by the meshes), pairs_intersected, pairs_not_checked, budget_exceeded, threads (worker threads; 0: on the calling thread), boolean_ms and tessellate_ms (kernel time summed over the pairs), slowest: [{a, b, ms, boolean_ms, tessellate_ms}] and ms",
+        "bodies?: [names] (default: all, in world placement); budget_s?: seconds (default 240, at most 86400: pairs not finished by then are listed in unchecked as \"not checked: the time budget … ran out\" and the call returns); method?: exact (default: overlaps intersected exactly, with their volume) | mesh (seconds on hundreds of parts: which pairs pass into each other and depth_mm, within the meshes' chord tolerance, no volume) → interferences: pairs that overlap with the overlap volume, area, bounding box and centre (a pin a hair off the axis of a hole of its size also has near_coaxial: {offset_mm, length_mm}, its volume the crescent the walls share); threaded: [{a, b, thread, engaged_mm, volume_mm3}] (an overlap that is a cosmetic thread's engagement, a shank at the major diameter in a hole tapped at the drill size, as inspect.clearance lists it; not in interferences or count; with method mesh a hit no deeper than a thread of either body has thread and a note instead); unchecked: [{a, b, reason}], the pairs that could not be checked, with the reason, and each mesh body (STL, 3MF or OBJ import: not intersected) as {a: name, b: null, reason: \"mesh body: not checked\"}, so count: 0 is not read as no overlap (checked counts the solid bodies). Bodies are pruned by bounding box first, then by their display meshes (pairs whose meshes stay apart by more than their chord tolerances, neither inside the other, are clear without a boolean), so any number of bodies is fine; the pairs left are intersected exactly, in parallel on desktop, the slowest first; at most 20000 pairs whose boxes overlap are intersected per call (truncated: true and skipped_pairs: n say when more were left out). Also: pairs_candidate (boxes overlap), pairs_cleared (by the meshes), pairs_intersected, pairs_not_checked, budget_exceeded, threads (worker threads; 0: on the calling thread), boolean_ms and tessellate_ms (kernel time summed over the pairs), slowest: [{a, b, ms, boolean_ms, tessellate_ms}] and ms",
     ),
 ];
 
@@ -104,6 +106,14 @@ pub fn resolve(s: &mut Session) -> joints::Solution {
     reexpress(s);
     recouple(s);
     resolve_holding(s, &BTreeMap::new())
+}
+
+/// Update placements after an edit without computing a DOF report that the caller discards.
+/// Expressions and geometry-dependent couplings are refreshed just as in [`resolve`].
+pub fn place(s: &mut Session) -> joints::Solution {
+    reexpress(s);
+    recouple(s);
+    place_holding(s, &BTreeMap::new())
 }
 
 /// Work out the offsets, angles and values joints were given as expressions again (a parameter
@@ -165,8 +175,22 @@ fn recouple(s: &mut Session) {
 /// Re-solve the joints, keeping the `held` values (the ones being driven, mapped to the values
 /// they move from) where loops are closed.
 pub fn resolve_holding(s: &mut Session, held: &joints::Held) -> joints::Solution {
-    let st = s.model.state();
-    let sol = joints::solve_holding(&s.doc, &st, held);
+    resolve_with_analysis(s, held, joints::Analysis::DegreesOfFreedom)
+}
+
+/// Contact and loop-search trials need placements and conflicts, not a DOF report.
+pub(super) fn place_holding(s: &mut Session, held: &joints::Held) -> joints::Solution {
+    resolve_with_analysis(s, held, joints::Analysis::Placement)
+}
+
+fn solution(s: &Session, held: &joints::Held, analysis: joints::Analysis) -> joints::Solution {
+    #[cfg(test)]
+    solve_counts::record(analysis);
+    joints::solve_holding_with_analysis(&s.doc, &s.model.state(), held, analysis)
+}
+
+fn resolve_with_analysis(s: &mut Session, held: &joints::Held, analysis: joints::Analysis) -> joints::Solution {
+    let sol = solution(s, held, analysis);
     if !sol.world.is_empty() {
         let mut next = (*s.doc).clone();
         if next.apply_joint_solution(&sol) {
@@ -175,6 +199,11 @@ pub fn resolve_holding(s: &mut Session, held: &joints::Held) -> joints::Solution
         }
     }
     sol
+}
+
+/// A quiet drive/reach does not publish DOF, so it needs only placement and constraint checks.
+fn response_analysis(p: &Value) -> joints::Analysis {
+    if bool_(p, "quiet").unwrap_or(false) { joints::Analysis::Placement } else { joints::Analysis::DegreesOfFreedom }
 }
 
 /// A solve's answer; `quiet: true` in the command's params leaves out the per-occurrence lists.
@@ -313,7 +342,7 @@ pub(crate) fn occurrence_at(s: &Session, p: Vec3) -> Option<u64> {
 }
 
 /// A joint origin from parameters: a named origin, or a snap given in world coordinates.
-fn origin_param(s: &Session, v: Option<&Value>, cmd: &str) -> Result<JointOrigin> {
+pub(crate) fn origin_param(s: &Session, v: Option<&Value>, cmd: &str) -> Result<JointOrigin> {
     let v = v.ok_or_else(|| bad(cmd, "joint origins `a` and `b` are required"))?;
     if let Value::String(name) = v {
         return s
@@ -407,7 +436,13 @@ fn origin_by_name(s: &Session, v: &Value, what: &str, name: &str, cmd: &str) -> 
         return Err(bad(cmd, "a face name is 1…512 characters"));
     }
     let st = s.model.state();
-    let (component, pick) = joints::named_face_spot(&s.doc, &st, str_(v, "body"), name).map_err(|why| bad(cmd, why))?;
+    let (component, pick) = joints::named_face_spot(&s.doc, &st, str_(v, "body"), name).map_err(|why| {
+        if s.doc.assembly.origins.iter().any(|o| o.name == name) {
+            bad(cmd, format!("`{name}` is a joint origin: pass it as the whole origin, not as a `{what}` name"))
+        } else {
+            bad(cmd, why)
+        }
+    })?;
     let occurrence = match v.get("occurrence") {
         Some(o) => occurrence_id(s, Some(o), cmd)?,
         None if component == 0 => 0,
@@ -787,7 +822,7 @@ fn drive(s: &mut Session, p: &Value) -> Result<Value> {
     }
     let before = super::motion::positions(s);
     let r = super::motion::drive_joint(s, id, q, given)?;
-    let sol = joints::solve(&s.doc, &s.model.state());
+    let sol = solution(s, &BTreeMap::new(), response_analysis(p));
     let mut out = sol_json(&sol, p);
     out["joint"] = json!(id);
     out["values"] = json!(effective_values(s, id));
@@ -852,7 +887,7 @@ fn reach(s: &mut Session, p: &Value) -> Result<Value> {
         Err(_) => joints::Reached::default(),
     };
     // Loops closed again from there, and where it ended up.
-    let sol = resolve(s);
+    let sol = if response_analysis(p) == joints::Analysis::Placement { place(s) } else { resolve(s) };
     let t = joints::occurrence_world(&s.doc, occ);
     let got = solidcraft_doc::apply_point(&t, at);
     let mut out = sol_json(&sol, p);
@@ -1439,3 +1474,25 @@ mod tests;
 #[cfg(test)]
 #[path = "joints_turn_tests.rs"]
 mod turn_tests;
+
+/// Per-thread work counts for ordinary engine regression tests; no production instrumentation.
+#[cfg(test)]
+pub(super) mod solve_counts {
+    use solidcraft_doc::joints::Analysis;
+    use std::cell::Cell;
+
+    thread_local! {
+        static COUNTS: Cell<(usize, usize)> = const { Cell::new((0, 0)) };
+    }
+
+    pub fn record(analysis: Analysis) {
+        COUNTS.with(|c| {
+            let (all, full) = c.get();
+            c.set((all + 1, full + usize::from(analysis == Analysis::DegreesOfFreedom)));
+        });
+    }
+
+    pub fn take() -> (usize, usize) {
+        COUNTS.with(|c| c.replace((0, 0)))
+    }
+}

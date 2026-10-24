@@ -109,7 +109,7 @@ fn insert(s: &mut Session, p: &Value, cmd: &str, svg: bool) -> Result<Value> {
     let text = source_text(p, cmd)?;
     let geom = if svg { solidcraft_io::read_svg(&text) } else { solidcraft_io::read_dxf(&text) }.map_err(|e| bad(cmd, e.to_string()))?;
     if geom.is_empty() {
-        return Err(bad(cmd, "the drawing has no geometry SolidCraft reads"));
+        return Err(bad(cmd, "the drawing has no geometry Polykrom reads"));
     }
     let k = num(p, "scale").filter(|k| *k > 1e-9 && *k < 1e6).unwrap_or(1.0);
     let off = p.get("at").and_then(vec2).unwrap_or(Vec2::ZERO);
@@ -236,6 +236,20 @@ mod tests {
             let r = s.execute("sketch.insert_dxf", &json!({"text": gappy, "tolerance": tol})).unwrap();
             let ss = s.model.state().sketch(r["sketch"].as_u64().unwrap()).unwrap().clone();
             assert_eq!(ss.profiles.len(), n, "tolerance {tol}");
+            s.execute("sketch.finish", &json!({})).unwrap();
+        }
+    }
+
+    /// A degree-9 SPLINE (solidcraft#5269) with fewer control points than its degree needs still
+    /// comes in as one spline over all its points, which the sketch draws at the degree they allow.
+    #[test]
+    fn a_degree_nine_spline_with_few_control_points_comes_in_whole() {
+        let mut s = Session::default();
+        for n in 2..=10 {
+            let points: String = (0..n).map(|i| format!("10\n{i}\n20\n{}\n", i % 2)).collect();
+            let dxf = format!("0\nSECTION\n2\nENTITIES\n0\nSPLINE\n71\n9\n{points}0\nENDSEC\n0\nEOF\n");
+            let r = s.execute("sketch.insert_dxf", &json!({"text": dxf})).unwrap();
+            assert_eq!(r["curves"], 1, "{n} points: {r}");
             s.execute("sketch.finish", &json!({})).unwrap();
         }
     }

@@ -1,5 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
   <title>Tangent</title>
-  <path d="M17.6 32A14.4 14.4 0 1 0 46.4 32A14.4 14.4 0 1 0 17.6 32Z" fill="none" stroke="currentColor" stroke-width="4.25" stroke-linejoin="round" stroke-linecap="round"/>
-  <path d="M10.4 17.6L53.6 17.6" fill="none" stroke="#236ead" stroke-width="4.25" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M14 36A16 16 0 1 0 46 36A16 16 0 1 0 14 36Z" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M6 20L58 20" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linejoin="round" stroke-linecap="round"/>
+  <circle cx="30" cy="20" r="5.5" fill="#236ead"/>
+  <circle cx="30" cy="20" r="2.48" fill="#ffffff"/>
 </svg>

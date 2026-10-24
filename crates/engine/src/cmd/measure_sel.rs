@@ -410,6 +410,39 @@ fn closest(a: &Geo, b: &Geo) -> Option<(Vec3, Vec3)> {
     }
 }
 
+/// A face or edge picked by its `point` alone gets the `index` a selection carries: the face
+/// nearest the point (an edge's index is resolved from the point anyway, by `edge_index`).
+fn with_index(st: &solidcraft_doc::ModelState, value: &Value) -> Value {
+    let mut v = value.clone();
+    let kind = v.get("type").and_then(Value::as_str).map(str::to_string);
+    if v.get("index").is_some() || !matches!(kind.as_deref(), Some("face" | "edge")) {
+        return v;
+    }
+    let (Some(body), Some(point)) = (v.get("body").and_then(Value::as_str), v.get("point").and_then(crate::params::vec3)) else { return v };
+    let index = match kind.as_deref() {
+        Some("face") => st.body(body).and_then(|b| solidcraft_doc::appearance::nearest_face(b, point)).map(|(_, f)| f),
+        _ => Some(0),
+    };
+    if let Some(i) = index {
+        v["index"] = json!(i);
+    }
+    v
+}
+
+/// Two straight edges sharing exactly one end define rays away from that corner. Their
+/// stored directions are arbitrary, so use the rays to preserve obtuse (and straight) angles.
+/// Separate edges and coincident copies have no unique corner and keep the undirected angle.
+fn corner_cos(a: Shape, b: Shape) -> Option<f64> {
+    let (Shape::Line { a, b }, Shape::Line { a: c, b: d }) = (a, b) else { return None };
+    let tol = a.dist(b).min(c.dist(d)).max(1.0) * 1e-6;
+    let mut corners = [(a, b, c, d), (a, b, d, c), (b, a, c, d), (b, a, d, c)].into_iter().filter(|(p, _, q, _)| p.dist(*q) <= tol);
+    let (p, end_a, q, end_b) = corners.next()?;
+    if corners.next().is_some() {
+        return None;
+    }
+    Some((end_a - p).normalized()?.dot((end_b - q).normalized()?))
+}
+
 /// `inspect.measure` with `items` (one or two selections).
 pub(crate) fn measure_items(s: &Session, items: &Value) -> Result<Value> {
     let cmd = "inspect.measure";
@@ -420,7 +453,7 @@ pub(crate) fn measure_items(s: &Session, items: &Value) -> Result<Value> {
     let st = s.world_state();
     let mut sels = Vec::new();
     for value in list {
-        let mut sel = serde_json::from_value::<Sel>(value.clone()).map_err(|e| bad(cmd, e.to_string()))?;
+        let mut sel = serde_json::from_value::<Sel>(with_index(&st, value)).map_err(|e| bad(cmd, e.to_string()))?;
         // Two kernel halves of one visible item are one measurement target.
         match &mut sel {
             Sel::Edge { body, index, point } => {
@@ -509,9 +542,8 @@ pub(crate) fn measure_items(s: &Session, items: &Value) -> Result<Value> {
         out["measure"] = json!(if c.is_some() { "center" } else { "min" });
         if let (Some(da), Some(db)) = (a.dir, b.dir) {
             let both_faces = matches!(sels.as_slice(), [Sel::Face { .. }, Sel::Face { .. }]);
-            let cos = da.dot(db).clamp(-1.0, 1.0);
-            let cos = if both_faces { cos } else { cos.abs() };
-            out["angle_deg"] = json!(cos.acos().to_degrees());
+            let cos = if both_faces { da.dot(db) } else { corner_cos(a.shape, b.shape).unwrap_or_else(|| da.dot(db).abs()) };
+            out["angle_deg"] = json!(cos.clamp(-1.0, 1.0).acos().to_degrees());
         }
     }
     Ok(out)

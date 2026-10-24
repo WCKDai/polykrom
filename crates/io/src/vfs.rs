@@ -357,7 +357,7 @@ fn short_name(name: &str) -> bool {
     name.as_bytes().windows(2).any(|w| w[0] == b'~' && w[1].is_ascii_digit())
 }
 
-/// `path` spelled with long names, for the folders SolidCraft derives from the environment
+/// `path` spelled with long names, for the folders Polykrom derives from the environment
 /// itself (the temporary folder, the recovery folder). On Windows those may hold a short (8.3)
 /// name: the temporary folder is often `…\NAME~1.XYZ\AppData\Local\Temp`, with the user folder's
 /// short name, when that folder's name is long, and [`windows_refusal`] refuses short names in
@@ -385,7 +385,7 @@ pub fn long_names(path: &std::path::Path) -> std::path::PathBuf {
     }
 }
 
-/// The temporary folder spelled with long names ([`long_names`]), for the folders SolidCraft
+/// The temporary folder spelled with long names ([`long_names`]), for the folders Polykrom
 /// makes in it.
 pub fn temp_dir() -> std::path::PathBuf {
     long_names(&std::env::temp_dir())
@@ -663,7 +663,7 @@ mod tests {
         Some(String::from_utf8_lossy(&out.stdout).trim().to_string()).filter(|s| s.split('\\').any(super::short_name)).map(Into::into)
     }
 
-    /// The folders SolidCraft derives from the environment are spelled with long names: on Windows
+    /// The folders Polykrom derives from the environment are spelled with long names: on Windows
     /// the temporary folder's path often has a short (8.3) name (the user folder's `NAME~1.XYZ`
     /// when its name is long), and the server's own folders in it were refused like an agent's
     /// short names. An agent's own short spelling of a folder it may use stays refused.

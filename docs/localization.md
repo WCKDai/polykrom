@@ -1,6 +1,6 @@
 # UI localization
 
-SolidCraft embeds its translations and works offline. English, Czech, Danish, German, English (UK), Spanish, French, Galician, Italian,
+Polykrom embeds its translations and works offline. English, Czech, Danish, German, English (UK), Spanish, French, Galician, Italian,
 Japanese, Korean, Malay, Polish, Brazilian Portuguese, Russian, Turkish, Ukrainian and Chinese are currently registered in `crates/ui-egui/src/i18n.rs`. Adding a language requires an
 embedded catalog and one registration there; the preferences selector and validation use the same
 registry.
@@ -72,7 +72,7 @@ claim it, or the English-text lookup would silently pick one.
 
 ## Rendering and coverage
 
-The Italian catalog uses original translations of SolidCraft's English messages, not text
+The Italian catalog uses original translations of Polykrom's English messages, not text
 extracted from commercial CAD software. Its core terminology is Schizzo (Sketch),
 Estrusione (Extrude), Raccordo (Fillet), Smusso (Chamfer), Corpo (Body), Componente
 (Component) and Vincolo (Constraint). Draft geometry is Sformo, while a report draft
@@ -85,8 +85,9 @@ use a render scope that restores the previous locale when it exits, including ne
 Standalone translated panels enter the same scope. Measure rendered text to size custom
 widgets; UTF-8 byte lengths do not describe their displayed width.
 
-The desktop host tries system CJK fonts across Windows, macOS and Linux, as well as an optional
-`CRAFT_FONTS_DIR` font pack, and skips files that cannot be parsed. Chinese uses its own fallback
+The desktop host tries system CJK fonts across Windows, macOS and Linux, the Flatpak host font
+folders (`/run/host/fonts`, `/run/host/user-fonts`), the folders listed in `SOLIDCRAFT_FONT_DIRS`
+and an optional `CRAFT_FONTS_DIR` font pack, and skips files that cannot be parsed. Chinese uses its own fallback
 chain after the general CJK font: many Japanese CJK fonts (Hiragino Gothic, Meiryo, Yu Gothic)
 match the CJK font search but lack simplified characters, so a second fallback found by the
 Chinese font-name list (`PingFang`, `Microsoft YaHei`, `Noto Sans CJK SC`, …) covers them per

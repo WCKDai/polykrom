@@ -1,7 +1,10 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <title>Replace face</title>
-  <path d="M9.43 18.55L31.08 31.05L31.08 56.05L9.43 43.55Z" fill="#b8c3cf" stroke="#34465b" stroke-width="2.55" stroke-linejoin="round" stroke-linecap="round"/>
-  <path d="M31.08 6.05L52.73 18.55Q34.69 20.63 31.08 31.05L9.43 18.55Z" fill="#e2e8ef" stroke="#34465b" stroke-width="2.55" stroke-linejoin="round" stroke-linecap="round"/>
-  <path d="M54.57 17.53Q33.93 19.36 30.76 31.28L30.76 57.95Q33.93 46.03 54.57 44.2Z" fill="#b9ddf8" stroke="#236ead" stroke-width="2.55" stroke-linejoin="round" stroke-linecap="round"/>
-  <path d="M54.57 30.86Q33.93 32.7 30.76 44.61" fill="none" stroke="#236ead" stroke-width="2.55" stroke-linejoin="round" stroke-linecap="round"/>
+  <title>Replace Face</title>
+  <path d="M32 21.85L54.8 33.25L54.8 42.75L32 54.15L9.2 42.75L9.2 33.25Z" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M9.2 33.25L32 44.65L54.8 33.25" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M32 44.65L32 54.15" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M10 18C22 8 42 8 54 18L54 22C42 12 22 12 10 22Z" fill="#328bd3"/>
+  <path d="M10 20C22 10 42 10 54 20" fill="none" stroke="#236ead" stroke-width="4.4" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M32 32.77L32 21" fill="none" stroke="#236ead" stroke-width="3.4" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M32 16L35.3 22L28.7 22Z" fill="#236ead"/>
 </svg>

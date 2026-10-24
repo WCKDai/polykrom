@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
 
-/// An agent SolidCraft knows how to start in ACP mode.
+/// An agent Polykrom knows how to start in ACP mode.
 pub struct Known {
     pub id: &'static str,
     pub name: &'static str,
@@ -489,11 +489,12 @@ mod tests {
         if let Some(root) = std::env::var_os(CHILD) {
             let root = PathBuf::from(root);
             let agent = find_in("solidcraft-test-agent", &search_dirs()).unwrap();
-            assert_eq!(version(&agent, Duration::from_secs(3)).as_deref(), Some("1.2.3"));
+            // Generous: the scripts start slowly on a machine busy with the rest of the suite.
+            assert_eq!(version(&agent, Duration::from_secs(60)).as_deref(), Some("1.2.3"));
             let mut p = AgentProcess::spawn(&[agent.to_string_lossy().into_owned()], &root, &[], || {}).unwrap();
             let message = serde_json::json!({"id": 1, "method": "initialize"});
             p.send(&message);
-            let reply = p.from_agent.recv_timeout(Duration::from_secs(5)).unwrap();
+            let reply = p.from_agent.recv_timeout(Duration::from_secs(60)).unwrap();
             p.shutdown(true);
             match reply {
                 FromAgent::Line(line) => assert_eq!(serde_json::from_str::<serde_json::Value>(&line).unwrap(), message),

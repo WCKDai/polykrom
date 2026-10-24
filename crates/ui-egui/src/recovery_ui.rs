@@ -133,7 +133,7 @@ pub fn show(app: &mut SolveApp, ctx: &egui::Context) {
         .show(ctx, true, |ui| {
             ui_kit::text(
                 ui,
-                crate::i18n::tr_label("SolidCraft closed before these designs were saved. Their last autosave can be opened."),
+                crate::i18n::tr_label("Polykrom closed before these designs were saved. Their last autosave can be opened."),
                 ui_kit::Text::Report("intro", false),
             );
             for (index, e) in app.recoverable.iter().take(20).enumerate() {
@@ -402,7 +402,7 @@ mod tests {
         edit(&mut app);
         tick_and_wait(&mut app);
         let id = entries(&dir)[0].id.clone();
-        let blocked = dir.join(format!("{id}.solidcraft"));
+        let blocked = dir.join(format!("{id}.{}", solidcraft_engine::io::DESIGN_EXT));
         fs::remove_file(&blocked).unwrap();
         fs::create_dir(&blocked).unwrap();
         edit(&mut app);

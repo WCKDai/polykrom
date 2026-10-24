@@ -126,6 +126,11 @@ fn middle_double_click_preference_fit_or_off() {
     // Fit frames everything shown, not the selection.
     let body = h.app.session.world_state().bodies[0].name.clone();
     h.app.run("select.set", json!({"items": [{"type": "body", "name": body}]})).unwrap();
+    // A selected body opens the inspector, and Fit keeps clear of it like the other cards:
+    // the camera to expect is a fit of everything with the inspector shown.
+    h.frames(2);
+    h.app.fit_view();
+    h.settle();
     let fitted = h.app.cam;
     h.app.cam.pan(60.0, 0.0, 500.0);
     // Well after the last pair (a third click soon after a double-click is a triple-click).

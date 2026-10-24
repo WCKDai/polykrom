@@ -1,6 +1,6 @@
 # Design file corpus
 
-Designs saved by older SolidCraft builds. `tests/design_corpus.rs` opens each one with the
+Designs saved by older Polykrom builds. `tests/design_corpus.rs` opens each one with the
 current build and checks that it evaluates as it did when saved (the `.expected.json` next to
 it is `solidcraft-cli eval` of that file by the build that saved it: bodies, volumes, areas,
 world bounding boxes), that it is upgraded to the current file format, and that damaged and

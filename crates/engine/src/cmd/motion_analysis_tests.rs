@@ -167,6 +167,98 @@ fn interference_names_the_step_two_parts_start_to_collide() {
     assert!(r["clear"] == true && r["collisions"] == json!([]), "{r}");
 }
 
+/// A part fixed overlapping A (a pin pressed into it, a thread in its tapped hole) overlaps it
+/// at every step, and no motion of the study changes that: it is listed under static_overlaps,
+/// tested once, and is not a collision of the motion. B's pass through A still is.
+#[test]
+fn a_fixed_overlap_is_static_not_a_collision_of_the_motion() {
+    let mut s = rail();
+    run(&mut s, "component.create", json!({"name": "P"}));
+    run(&mut s, "solid.box", json!({"length": 4, "width": 4, "height": 4, "corner": [-3, 3, 3]}));
+    run(&mut s, "component.activate", json!({"component": "root"}));
+    let p = occ(&s, "P");
+    run(&mut s, "occurrence.ground", json!({"occurrence": p, "grounded": true}));
+    run(&mut s, "motion.study", json!({"name": "Push", "steps": 15, "keys": [{"joint": "Rail", "points": [[0, 10], [15, -5]]}]}));
+    let r = run(&mut s, "motion.interference", json!({"study": "Push"}));
+    let names = |v: &Value| {
+        v.as_array().into_iter().flatten().map(|c| format!("{}-{}", c["a"].as_str().unwrap_or(""), c["b"].as_str().unwrap_or(""))).collect::<Vec<_>>()
+    };
+    assert_eq!(names(&r["collisions"]), ["A:1-B:1"], "{r}");
+    assert_eq!(names(&r["static_overlaps"]), ["A:1-P:1"], "{r}");
+    assert!((r["static_overlaps"][0]["depth_mm"].as_f64().unwrap_or(0.0) - 1.0).abs() < 0.05, "{r}");
+    assert!(r["clear"] == false && r["pairs_moving_together"] == 1 && r["pairs"] == 3, "{r}");
+    // Pushed only to touching, the motion is clear; the fixed overlap is still listed.
+    run(&mut s, "motion.study", json!({"study": "Push", "keys": [{"joint": "Rail", "points": [[0, 10], [15, 0]]}]}));
+    let r = run(&mut s, "motion.interference", json!({"study": "Push"}));
+    assert!(r["clear"] == true && names(&r["static_overlaps"]) == ["A:1-P:1"], "{r}");
+}
+
+/// A 200 mm link's Ø10.2 bore is meshed up to 0.2 mm inside its surface (the contact meshes'
+/// chord is a thousandth of the body), so a Ø10 pin turning in it at 0.1 mm clearance pokes
+/// through the mesh: the exact check finds nothing shared, so the pair is a mesh contact, not a
+/// collision. A Ø10.6 pin in the same bore still collides.
+#[test]
+fn a_pin_turning_in_its_bore_at_a_clearance_is_not_a_collision() {
+    for (radius, collides) in [(5.0, false), (5.3, true)] {
+        let mut s = Session::default();
+        run(&mut s, "component.create", json!({"name": "Link"}));
+        run(&mut s, "solid.box", json!({"length": 200, "width": 20, "height": 10, "corner": [-10, -10, 0]}));
+        run(&mut s, "solid.cylinder", json!({"radius": 5.1, "height": 12, "base": [0, 0, -1], "operation": "cut"}));
+        run(&mut s, "component.activate", json!({"component": "root"}));
+        run(&mut s, "component.create", json!({"name": "Pin"}));
+        run(&mut s, "solid.cylinder", json!({"radius": radius, "height": 20, "base": [0, 0, -5], "operation": "new"}));
+        run(&mut s, "component.activate", json!({"component": "root"}));
+        let link = occ(&s, "Link");
+        run(&mut s, "occurrence.ground", json!({"occurrence": link, "grounded": true}));
+        pin(&mut s, "revolute", "Turn", "Link", "Pin", Vec3::ZERO, Vec3::Z);
+        run(&mut s, "motion.study", json!({"name": "Spin", "steps": 36, "keys": [{"joint": "Turn", "points": [[0, 0], [36, 360]]}]}));
+        let r = run(&mut s, "motion.interference", json!({"study": "Spin"}));
+        let pair = |v: &Value| v.as_array().into_iter().flatten().any(|c| c["a"] == "Link:1" && c["b"] == "Pin:1");
+        if collides {
+            assert!(
+                r["clear"] == false && pair(&r["collisions"]) && r["collisions"][0]["volume_mm3"].as_f64().unwrap_or(0.0) > 1.0,
+                "Ø{}: {r}",
+                2.0 * radius
+            );
+        } else {
+            assert!(r["clear"] == true && pair(&r["mesh_contacts"]), "Ø{}: {r}", 2.0 * radius);
+            assert!(r["mesh_contacts"][0]["depth_mm"].as_f64().unwrap_or(1.0) <= 0.2, "{r}");
+        }
+    }
+}
+
+/// A ring seated line to line in a 200 mm link's Ø22 bore (both grounded) and a pin turning in
+/// the ring's Ø8 bore touch but share nothing: the meshes, a fifth of a millimetre off on the
+/// link, make them look 0.1 mm into each other. The exact check makes them mesh contacts, not a
+/// static overlap or a collision.
+#[test]
+fn parts_seated_line_to_line_are_mesh_contacts_not_static_overlaps() {
+    let mut s = Session::default();
+    run(&mut s, "component.create", json!({"name": "Link"}));
+    run(&mut s, "solid.box", json!({"length": 200, "width": 30, "height": 7, "corner": [-15, -15, 0]}));
+    run(&mut s, "solid.cylinder", json!({"radius": 11, "height": 9, "base": [0, 0, -1], "operation": "cut"}));
+    run(&mut s, "component.activate", json!({"component": "root"}));
+    run(&mut s, "component.create", json!({"name": "Ring"}));
+    run(&mut s, "solid.cylinder", json!({"radius": 11, "height": 7, "base": [0, 0, 0], "operation": "new"}));
+    run(&mut s, "solid.cylinder", json!({"radius": 4, "height": 9, "base": [0, 0, -1], "operation": "cut"}));
+    run(&mut s, "component.activate", json!({"component": "root"}));
+    run(&mut s, "component.create", json!({"name": "Pin"}));
+    run(&mut s, "solid.cylinder", json!({"radius": 4, "height": 20, "base": [0, 0, -5], "operation": "new"}));
+    run(&mut s, "component.activate", json!({"component": "root"}));
+    for name in ["Link", "Ring"] {
+        let o = occ(&s, name);
+        run(&mut s, "occurrence.ground", json!({"occurrence": o, "grounded": true}));
+    }
+    pin(&mut s, "revolute", "Turn", "Ring", "Pin", Vec3::ZERO, Vec3::Z);
+    run(&mut s, "motion.study", json!({"name": "Spin", "steps": 36, "keys": [{"joint": "Turn", "points": [[0, 0], [36, 360]]}]}));
+    let r = run(&mut s, "motion.interference", json!({"study": "Spin"}));
+    let pairs = |v: &Value| {
+        v.as_array().into_iter().flatten().map(|c| format!("{}-{}", c["a"].as_str().unwrap_or(""), c["b"].as_str().unwrap_or(""))).collect::<Vec<_>>()
+    };
+    assert!(r["clear"] == true && r["static_overlaps"] == json!([]), "{r}");
+    assert!(pairs(&r["mesh_contacts"]).contains(&"Link:1-Ring:1".to_string()), "{r}");
+}
+
 /// A number names a study by its id first, text by its name first: a study may be named like
 /// another's id.
 #[test]

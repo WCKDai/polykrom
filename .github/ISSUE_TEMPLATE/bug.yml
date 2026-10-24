@@ -1,5 +1,5 @@
 name: Bug report
-description: Something in SolidCraft does the wrong thing
+description: Something in Polykrom does the wrong thing
 labels: [bug]
 body:
   - type: markdown
@@ -28,7 +28,7 @@ body:
   - type: input
     id: version
     attributes:
-      label: SolidCraft version and OS
+      label: Polykrom version and OS
       description: Help → About shows the version.
       placeholder: 0.15.0, Windows 11
     validations:

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build and package SolidCraft for macOS:
+# Build and package Polykrom for macOS:
 #
 #   $DIST/solidcraft-<version>-macos-<arch>.dmg        SolidCraft.app (with solidcraft-cli inside) on a
 #                                                      drag-to-Applications DMG
@@ -41,7 +41,7 @@ APP="$WORK/SolidCraft.app"
 DMG="$DIST/solidcraft-$VERSION-macos-$ARCH.dmg"
 CLI_ZIP="$DIST/solidcraft-cli-$VERSION-macos-$ARCH.zip"
 
-echo "==> SolidCraft $VERSION for macOS ($ARCH)"
+echo "==> Polykrom $VERSION for macOS ($ARCH)"
 if [ "$SKIP_BUILD" = 0 ]; then
   args=()
   for t in "${TARGETS[@]}"; do args+=(--target "$t"); done
@@ -60,14 +60,14 @@ done
 # ---- SolidCraft.app ----------------------------------------------------------------------------
 echo "==> assembling $APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
-cp "$WORK/bin/solidcraft" "$APP/Contents/MacOS/SolidCraft"
+cp "$WORK/bin/solidcraft" "$APP/Contents/MacOS/Polykrom"
 # solidcraft-cli next to the app, as every other package has it: the agent chat starts it as the
 # agent's MCP server (`solidcraft-cli mcp --connect`) and looks for it beside the running program.
 cp "$WORK/bin/solidcraft-cli" "$APP/Contents/MacOS/solidcraft-cli"
 # Apple-compiled layered icon and older-macOS fallback (regeneration: assets/README.md).
 # Keep compiled resources so packaging also works on runners with older Xcode versions.
 cp "$ROOT/assets/icons/app/macos/exports/Assets.car" "$APP/Contents/Resources/Assets.car"
-cp "$ROOT/assets/icons/app/macos/exports/icon.icns" "$APP/Contents/Resources/SolidCraft.icns"
+cp "$ROOT/assets/icons/app/macos/exports/icon.icns" "$APP/Contents/Resources/Polykrom.icns"
 mkdir -p "$APP/Contents/Resources/Licenses"
 copy_docs "$APP/Contents/Resources/Licenses"
 sed -e "s/@VERSION@/$VERSION/g" -e "s/@SHORT_VERSION@/$SHORT_VERSION/g" "$ROOT/assets/platforms/macos/Info.plist.in" >"$APP/Contents/Info.plist"
@@ -90,7 +90,7 @@ cp "$ROOT/assets/platforms/macos/README.txt" "$STAGE/README.txt"
 rm -f "$DMG" "$WORK/raw.dmg"
 # makehybrid + convert builds the image without attaching a device, unlike `create -srcfolder`,
 # which is flaky on CI runners ("Resource busy").
-hdiutil makehybrid -hfs -hfs-volume-name "SolidCraft" -hfs-openfolder "$STAGE" -o "$WORK/raw.dmg" "$STAGE"
+hdiutil makehybrid -hfs -hfs-volume-name "Polykrom" -hfs-openfolder "$STAGE" -o "$WORK/raw.dmg" "$STAGE"
 hdiutil convert "$WORK/raw.dmg" -format UDZO -imagekey zlib-level=9 -o "$DMG"
 rm -f "$WORK/raw.dmg"
 
@@ -102,21 +102,21 @@ test -L "$MNT/Applications" && test "$(readlink "$MNT/Applications")" = /Applica
 plutil -lint "$MNT/SolidCraft.app/Contents/Info.plist"
 # Check the names Finder/LaunchServices actually use, and the bundle identity.
 for key in CFBundleName CFBundleDisplayName CFBundleExecutable CFBundleIconFile CFBundleIconName; do
-  test "$(/usr/libexec/PlistBuddy -c "Print :$key" "$MNT/SolidCraft.app/Contents/Info.plist")" = SolidCraft
+  test "$(/usr/libexec/PlistBuddy -c "Print :$key" "$MNT/SolidCraft.app/Contents/Info.plist")" = Polykrom
 done
 test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$MNT/SolidCraft.app/Contents/Info.plist")" = "$MACOS_BUNDLE_ID"
-test -s "$MNT/SolidCraft.app/Contents/Resources/SolidCraft.icns"
-cmp "$ROOT/assets/icons/app/macos/exports/icon.icns" "$MNT/SolidCraft.app/Contents/Resources/SolidCraft.icns"
+test -s "$MNT/SolidCraft.app/Contents/Resources/Polykrom.icns"
+cmp "$ROOT/assets/icons/app/macos/exports/icon.icns" "$MNT/SolidCraft.app/Contents/Resources/Polykrom.icns"
 cmp "$ROOT/assets/icons/app/macos/exports/Assets.car" "$MNT/SolidCraft.app/Contents/Resources/Assets.car"
 cmp "$ROOT/assets/platforms/macos/README.txt" "$MNT/README.txt"
 case "$ARCH" in universal) WANT=(arm64 x86_64) ;; aarch64) WANT=(arm64) ;; *) WANT=(x86_64) ;; esac
 for arch in "${WANT[@]}"; do
-  lipo "$MNT/SolidCraft.app/Contents/MacOS/SolidCraft" -verify_arch "$arch"
+  lipo "$MNT/SolidCraft.app/Contents/MacOS/Polykrom" -verify_arch "$arch"
 done
 test -s "$MNT/SolidCraft.app/Contents/Resources/Licenses/THIRD-PARTY-LICENSES.txt"
 # Not --strict: the mounted HFS volume adds Finder info, which strict verification rejects.
 codesign --verify --deep --verbose=2 "$MNT/SolidCraft.app"
-"$MNT/SolidCraft.app/Contents/MacOS/SolidCraft" --version
+"$MNT/SolidCraft.app/Contents/MacOS/Polykrom" --version
 hdiutil detach "$MNT"
 
 # ---- CLI ---------------------------------------------------------------------------------------

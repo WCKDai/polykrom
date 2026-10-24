@@ -1,10 +1,11 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
   <title>Conic</title>
-  <path d="M8.82 29.6A24 17 0 0 1 55.18 29.6" fill="none" stroke="#236ead" stroke-width="4.25" stroke-linejoin="round" stroke-linecap="round"/>
-  <circle cx="8.82" cy="29.6" r="5.8" fill="#ffffff"/>
-  <circle cx="8.82" cy="29.6" r="3.4" fill="#236ead"/>
-  <circle cx="32" cy="17" r="5.8" fill="#ffffff"/>
-  <circle cx="32" cy="17" r="3.4" fill="#236ead"/>
-  <circle cx="55.18" cy="29.6" r="5.8" fill="#ffffff"/>
-  <circle cx="55.18" cy="29.6" r="3.4" fill="#236ead"/>
+  <path d="M10 50L32 14L54 50" fill="none" stroke="#6f879c" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="3 3.2"/>
+  <path d="M10 50Q32 14 54 50" fill="none" stroke="#236ead" stroke-width="4.4" stroke-linejoin="round" stroke-linecap="round"/>
+  <circle cx="10" cy="50" r="4.4" fill="#236ead"/>
+  <circle cx="10" cy="50" r="1.98" fill="#ffffff"/>
+  <circle cx="54" cy="50" r="4.4" fill="#236ead"/>
+  <circle cx="54" cy="50" r="1.98" fill="#ffffff"/>
+  <circle cx="32" cy="32" r="4.4" fill="#236ead"/>
+  <circle cx="32" cy="32" r="1.98" fill="#ffffff"/>
 </svg>

@@ -1,3 +1,23 @@
+# Compatibility with earlier names
+
+## Polykrom and the SolidCraft name
+
+Polykrom is a fork of SolidCraft. The first rename stage changed what a person sees: the window
+and menu names, messages, docs, MCP descriptions, the logo and app icons, the macOS bundle name
+and executable, release URLs (github.com/wckdboy/polykrom) and the STEP writer name. These still
+carry SolidCraft's name until the second stage, which will migrate them with shims like the ones
+below:
+
+| Kept | Why |
+| --- | --- |
+| Crates `solidcraft-*`, binaries `solidcraft` and `solidcraft-cli` | Renaming them breaks every script and MCP registration; `polykrom` and `polykrom-cli` are aliases that run the same program |
+| The `solidcraft/N` format tag inside designs | Polykrom saves `.polykrom` files, but their contents are SolidCraft's container, so a renamed file still opens in SolidCraft. `.solidcraft` (and the older `.solvecraft`) open in Polykrom and save as `.polykrom` |
+| Settings, preferences, autosave, recovery and thumbnail folders | Moving them needs a one-time migration, like section 4 |
+| Bundle and package IDs (`ai.storyteller.solidcraft`), the MSI UpgradeCode, `SolidCraft.app`, installer folders and registry keys, the agent-chat keychain service | Changing them makes a second, separate install or loses saved keys; until then a Polykrom install replaces a SolidCraft one |
+| `SOLIDCRAFT_*` environment variables | Those read through `solidcraft_geom::env` accept `POLYKROM_*` first; the others keep the old name |
+| STEP files written by SolidCraft | Recognised as this program's own, like Polykrom's |
+| The updater's release key | Polykrom needs its own key before it can publish updates |
+
 # Compatibility with the SolveCraft name
 
 SolidCraft was first called SolveCraft, and builds up to 0.4 kept that name in their

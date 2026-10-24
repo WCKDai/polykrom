@@ -281,6 +281,6 @@ mod tests {
     fn the_tool_colour_is_a_hex_colour_the_command_takes() {
         assert_eq!(parse_body(&format!("Tool:color={TOOL_COLOR}")).unwrap().color, Some(TOOL_COLOR.to_owned()));
         assert!((0.0..1.0).contains(&TARGET_OPACITY), "a target must be see-through: {TARGET_OPACITY}");
-        assert_eq!(default_body_hex(), "#b0bac6");
+        assert_eq!(default_body_hex(), "#b8b8be");
     }
 }

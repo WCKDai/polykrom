@@ -1,8 +1,10 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
   <title>Intersect</title>
-  <path d="M4 32A19 19 0 1 0 42 32A19 19 0 1 0 4 32Z" fill="#e2e8ef"/>
-  <path d="M22 32A19 19 0 1 0 60 32A19 19 0 1 0 22 32Z" fill="#e2e8ef"/>
-  <path d="M32 15.27A19 19 0 0 1 32 48.73A19 19 0 0 1 32 15.27Z" fill="#328bd3"/>
-  <path d="M4 32A19 19 0 1 0 42 32A19 19 0 1 0 4 32Z" fill="none" stroke="#34465b" stroke-width="2.55" stroke-linejoin="round" stroke-linecap="round"/>
-  <path d="M22 32A19 19 0 1 0 60 32A19 19 0 1 0 22 32Z" fill="none" stroke="#34465b" stroke-width="2.55" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M10 32A15 15 0 1 0 40 32A15 15 0 1 0 10 32Z" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M24 32A15 15 0 1 0 54 32A15 15 0 1 0 24 32Z" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linejoin="round" stroke-linecap="round"/>
+  <defs><clipPath id="isect"><path d="M10 32A15 15 0 1 0 40 32A15 15 0 1 0 10 32Z" fill="none"/></clipPath></defs>
+  <g clip-path="url(#isect)">
+  <path d="M24 32A15 15 0 1 0 54 32A15 15 0 1 0 24 32Z" fill="#328bd3"/>
+  </g>
+  <path d="M32 18.6A15 15 0 0 1 32 45.4A15 15 0 0 1 32 18.6Z" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linejoin="round" stroke-linecap="round"/>
 </svg>

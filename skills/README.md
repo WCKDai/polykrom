@@ -1,8 +1,11 @@
 # Agent skills
 
-Skills for AI agents that model in SolidCraft through its [MCP server](../docs/mcp.md). Each folder is
+Skills for AI agents that model in Polykrom through its [MCP server](../docs/mcp.md). Each folder is
 one skill in the [Agent Skills](https://agentskills.io) format: a `SKILL.md` with a name and a
 description that tell the agent when to load it, and an optional supporting reference file.
+
+The same documents are built into SolidCraft: its MCP server's `skill_reference` tool returns them, so an
+agent without file access (such as the one in SolidCraft's own chat) can still read a skill's reference.
 
 | Skill | Loads when the agent |
 |---|---|
@@ -19,7 +22,7 @@ They teach the agent to:
 
 They also list the traps that otherwise cost failed calls. Examples are the sketch axes of the XZ plane, edge picks that snap to the nearest edge, and cuts that miss but still report success.
 
-They are written for SolidCraft 0.8 and later; `solidcraft-mechanisms` for `main` after 0.11.1 (the next release), which counts the degrees of freedom of closed loops.
+They are written for Polykrom 0.8 and later; `solidcraft-mechanisms` for `main` after 0.11.1 (the next release), which counts the degrees of freedom of closed loops.
 
 ## Install
 
@@ -39,7 +42,7 @@ Copy-Item -Recurse solidcraft\skills\solidcraft-* $HOME\.claude\skills\
 
 - **One project only:** copy the folders into that project's `.claude/skills/` instead.
 - **Other agents:** for agents that read the Agent Skills format, copy the folders into the skills directory their documentation names.
-- **Updating:** copy the folders again after you update SolidCraft.
+- **Updating:** copy the folders again after you update Polykrom.
 
 ## Maintaining
 

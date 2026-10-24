@@ -156,3 +156,58 @@ fn mesh_bodies_are_listed_as_unchecked_not_dropped() {
     assert_eq!(i["checked"], 1, "{i}");
     assert_eq!(i["unchecked"][0]["a"].as_str(), Some(meshes[0].as_str()), "{i}");
 }
+
+/// Copies of one part repeat its inner pairs: the pair is intersected once and the copy takes its
+/// answer, at the copy's place (six servos' cases and gears cost one boolean, not six).
+#[test]
+fn placements_of_one_part_reuse_its_inner_pairs() {
+    let mut s = Session::default();
+    let c = s.execute("component.create", &json!({"name": "Servo"})).unwrap();
+    s.execute("solid.box", &json!({"length": 20, "width": 10, "height": 10, "corner": [0, 0, 0], "body_name": "Case"})).unwrap();
+    s.execute("solid.box", &json!({"length": 10, "width": 10, "height": 10, "corner": [15, 0, 0], "operation": "new", "body_name": "Gear"})).unwrap();
+    s.execute("component.activate", &json!({"component": "root"})).unwrap();
+    s.execute("occurrence.copy", &json!({"component": c["component"], "translate": [0, 50, 0]})).unwrap();
+    let r = s.execute("inspect.interference", &json!({})).unwrap();
+    assert_eq!(r["count"], 2, "{r}");
+    assert_eq!(r["pairs_reused"], 1, "{r}");
+    let mut centres: Vec<f64> = r["interferences"].as_array().unwrap().iter().map(|h| h["center"][1].as_f64().unwrap()).collect();
+    centres.sort_by(f64::total_cmp);
+    assert!((centres[0] - 5.0).abs() < 1e-6 && (centres[1] - 55.0).abs() < 1e-6, "the copy's overlap is at its own place: {centres:?}");
+    for h in r["interferences"].as_array().unwrap() {
+        assert!((h["volume_mm3"].as_f64().unwrap() - 500.0).abs() < 1e-6, "{h}");
+    }
+}
+
+/// `method: mesh` answers from the meshes: the overlapping pair and how deep, no boolean, no
+/// volume; an unknown method is refused.
+#[test]
+fn the_mesh_method_finds_overlaps_without_a_boolean() {
+    let mut s = Session::default();
+    run(&mut s, "solid.box", json!({"length": 20, "width": 10, "height": 10, "corner": [0, 0, 0], "body_name": "A"}));
+    run(&mut s, "solid.box", json!({"length": 10, "width": 10, "height": 10, "corner": [17, 0, 0], "operation": "new", "body_name": "B"}));
+    run(&mut s, "solid.box", json!({"length": 10, "width": 10, "height": 10, "corner": [60, 0, 0], "operation": "new", "body_name": "Far"}));
+    let r = run(&mut s, "inspect.interference", json!({"method": "mesh"}));
+    assert_eq!(r["method"], "mesh");
+    assert_eq!(r["count"], 1, "{r}");
+    let hit = &r["interferences"][0];
+    assert!((f(&hit["depth_mm"]) - 3.0).abs() < 1e-6, "A reaches 3 mm into B: {hit}");
+    assert!(hit.get("volume_mm3").is_none());
+    assert!(s.execute("inspect.interference", &json!({"method": "fast"})).is_err());
+}
+
+/// A threaded M6 shank in a plate tapped at 5 mm is the thread's engagement, not an interference;
+/// the mesh method, which has no volume to tell by, marks it as likely that (the radial depth is 0.5).
+#[test]
+fn a_threaded_shank_in_its_tapped_hole_is_listed_as_engagement() {
+    let mut s = Session::default();
+    run(&mut s, "solid.box", json!({"length": 20, "width": 20, "height": 10, "corner": [-10, -10, 0], "operation": "new", "body_name": "Plate"}));
+    run(&mut s, "solid.cylinder", json!({"radius": 2.5, "height": 12, "base": [0, 0, -1], "operation": "cut", "targets": ["Plate"]}));
+    run(&mut s, "solid.cylinder", json!({"radius": 3, "height": 16, "base": [0, 0, -2], "operation": "new", "body_name": "Screw"}));
+    run(&mut s, "solid.thread", json!({"face": [3, 0, 5], "designation": "M6"}));
+    let r = run(&mut s, "inspect.interference", json!({}));
+    assert_eq!((r["count"].as_u64(), r["threaded"][0]["thread"].as_str()), (Some(0), Some("M6")), "{r}");
+    assert!((f(&r["threaded"][0]["engaged_mm"]) - 10.0).abs() < 1e-3, "{r}");
+    let m = run(&mut s, "inspect.interference", json!({"method": "mesh"}));
+    let hit = &m["interferences"][0];
+    assert!((hit["thread"].as_str(), (f(&hit["depth_mm"]) - 0.5).abs() < 0.05) == (Some("M6"), true), "{m}");
+}

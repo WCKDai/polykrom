@@ -21,7 +21,10 @@ pub fn extract(s: &Session) -> Result<ProductScene> {
         let mesh = body.mesh();
         scene.bounds = scene.bounds.union(&mesh.bounds());
         let to8 = |v: f32| (v.clamp(0.0, 1.0) * 255.0).round() as u8;
-        let color = s.doc.body_color(body).map(|c| c.map(to8)).unwrap_or([176, 186, 198]);
+        let color = s.doc.body_color(body).map(|c| c.map(to8)).unwrap_or({
+            let b = crate::view::colors::BODY;
+            [b.0, b.1, b.2]
+        });
         let faces = s
             .doc
             .face_colors(body)
@@ -60,7 +63,7 @@ mod tests {
     #[test]
     fn product_scene_keeps_placed_appearances_and_meshes_without_design_overlays() {
         let mut s = Session::default();
-        let component = s.execute("component.create", &json!({"name":"Part"})).unwrap();
+        let component = s.execute("component.create", &json!({"name":"Part","grounded":false})).unwrap();
         s.execute("solid.box", &json!({"length":10,"width":10,"height":10,"body_name":"Block"})).unwrap();
         s.execute("appearance.assign", &json!({"bodies":["Block"],"color":"#20a080","opacity":0.4})).unwrap();
         s.execute("appearance.assign", &json!({"faces":[[5,5,10]],"color":"#ff0000","opacity":0.7})).unwrap();

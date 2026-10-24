@@ -1,9 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
   <title>Decal</title>
-  <path d="M30.74 15.26L61 32.73L33.26 48.74L3 31.27Z" fill="#e2e8ef"/>
-  <path d="M30.74 15.26L61 32.73L33.26 48.74L3 31.27Z" fill="none" stroke="#34465b" stroke-width="2.55" stroke-linejoin="round" stroke-linecap="round"/>
-  <path d="M30.74 21.08L50.91 32.73L33.26 42.92L13.09 31.27Z" fill="#b9ddf8"/>
-  <path d="M30.74 21.08L50.91 32.73L33.26 42.92L13.09 31.27Z" fill="none" stroke="#34465b" stroke-width="2.55" stroke-linejoin="round" stroke-linecap="round"/>
-  <path d="M13.09 31.27L28.22 29.09L27.59 35.28L33.26 35.64L33.26 42.92Z" fill="#328bd3"/>
-  <path d="M30.74 21.08L50.91 32.73L33.26 42.92L13.09 31.27Z" fill="none" stroke="#34465b" stroke-width="2.55" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M12 8L52 8A4 4 0 0 1 56 12L56 52A4 4 0 0 1 52 56L12 56A4 4 0 0 1 8 52L8 12A4 4 0 0 1 12 8Z" fill="none" stroke="currentColor" stroke-width="4.4" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M16 46L28 30L36 40L42 34L50 46Z" fill="#328bd3"/>
+  <circle cx="42" cy="20" r="4" fill="#236ead"/>
 </svg>

@@ -663,7 +663,7 @@ fn navigation(app: &SolveApp, ui: &mut egui::Ui, action: &mut Option<FileAction>
         ("home:settings", app.tr("home.settings"), format!("{primary},"), None, true, FileAction::Settings),
         ("home:shortcuts", app.tr("home.shortcuts"), String::new(), None, true, FileAction::Shortcuts),
         ("home:crashes", app.tr("home.crashes"), String::new(), None, true, FileAction::Crashes),
-        ("home:about", app.tr_label("About SolidCraft"), String::new(), None, true, FileAction::About),
+        ("home:about", app.tr_label("About Polykrom"), String::new(), None, true, FileAction::About),
     ];
     for (index, (id, label, key, section, enabled, picked)) in nav.into_iter().enumerate() {
         if index == 4 || index == 8 {
@@ -794,7 +794,6 @@ fn start_content(app: &mut SolveApp, ui: &mut egui::Ui, action: &mut Option<File
                         },
                     );
                     publish(&format!("home:recent:{index}"), &response);
-                    response.clone().on_hover_text(path);
                     ui_kit::Menu::context(&response, |ui| {
                         if crate::context_menu::button(ui, app.tr_label("Remove from list"), "delete").clicked() {
                             app.home.recent.retain(|x| x != path);
@@ -1464,7 +1463,7 @@ mod tests {
         h.frames(3);
         h.settle();
         assert!(!h.app.home.open);
-        assert_eq!(h.app.session.path.as_deref(), h.dir.join("Copy.solidcraft").to_str());
+        assert_eq!(h.app.session.path.as_deref(), h.dir.join("Copy.polykrom").to_str());
         assert_eq!(std::fs::read(source).unwrap(), bytes);
     }
 

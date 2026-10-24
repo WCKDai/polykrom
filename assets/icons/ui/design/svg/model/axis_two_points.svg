@@ -1,7 +1,11 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <title>Axis through two points</title>
-  <path d="M9 55L55 9" fill="none" stroke="#ffffff" stroke-width="6.45" stroke-linejoin="round" stroke-linecap="round"/>
-  <path d="M9 55L55 9" fill="none" stroke="#236ead" stroke-width="4.25" stroke-linejoin="round" stroke-linecap="round"/>
-  <circle cx="19" cy="45" r="3.8" fill="#e2e8ef" stroke="#34465b" stroke-width="2.55" stroke-linejoin="round" stroke-linecap="round"/>
-  <circle cx="45" cy="19" r="3.8" fill="#e2e8ef" stroke="#34465b" stroke-width="2.55" stroke-linejoin="round" stroke-linecap="round"/>
+  <title>Axis Through Two Points</title>
+  <path d="M10 54L54 10" fill="none" stroke="#236ead" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/>
+  <circle cx="10" cy="54" r="2.6" fill="#236ead"/>
+  <circle cx="54" cy="10" r="2.6" fill="#236ead"/>
+  <path d="M10 54L54 10" fill="none" stroke="#236ead" stroke-width="4.4" stroke-linejoin="round" stroke-linecap="round"/>
+  <circle cx="21" cy="43" r="5.4" fill="#236ead"/>
+  <circle cx="21" cy="43" r="2.43" fill="#ffffff"/>
+  <circle cx="43" cy="21" r="5.4" fill="#236ead"/>
+  <circle cx="43" cy="21" r="2.43" fill="#ffffff"/>
 </svg>

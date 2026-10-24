@@ -20,10 +20,12 @@ use crate::{Result, Session};
 
 pub static COMMANDS: &[CommandSpec] = &[CommandSpec::new("inspect.clearance", "Clearance", clearance).icon("interference").noundo().params(
     "bodies?: [names] (default: every solid body, in world placement, but those in `against`; mesh bodies are not measured); against?: [names] (only pairs with one body in `bodies` and the other here); \
-     min_volume?: mm³ (default 0.01: smaller overlaps count as contact); clearance?: mm (default 0: report pairs closer than this); \
+     min_volume?: mm³ (default 0.01: smaller overlaps count as contact); budget_s?: seconds (default 240, at most 86400: pairs not started by then are listed in unchecked as \"not checked: the time budget … ran out\"); clearance?: mm (default 0: report pairs closer than this); \
      nearest?: n (each body of `bodies` gets its n nearest others); skip_within?: \"occurrence\" (pairs of bodies of one occurrence) | \
      \"component\" (pairs of bodies inside one placed component, its subcomponents included) | null; tolerance?: mm (default 1e-6: a gap \
-     below it is contact, 0) → overlaps: [{a, b, volume_mm3, area_mm2, bbox, center}]; near: [{a, b, distance_mm, from, to, overlap_mm3?: \
+     below it is contact, 0) → overlaps: [{a, b, volume_mm3, area_mm2, bbox, center}]; threaded: [{a, b, thread, engaged_mm, volume_mm3}] \
+     (an overlap that is a cosmetic thread's engagement, a shank at the major diameter in a hole tapped at the drill size: centred on the \
+     thread's axis, within its length and no more than its thread ring; not listed in overlaps); near: [{a, b, distance_mm, from, to, overlap_mm3?: \
      a contact's shared volume below min_volume, exact?: false when measured on the meshes}], nearest by body (the same for pairs that overlap: 0); \
      nearest: {body: [{body, distance_mm}]}; unchecked: [{a, b, reason}] (pairs whose overlap could not be worked out; each mesh body, STL/3MF/OBJ import, is not measured and is listed as {a: name, b: null, reason: \"mesh body: not checked\"}, also when named in `bodies` or `against`; the result's `bodies` counts the solid bodies only); pairs_checked; \
      pairs_reused (of those, measured by an earlier call: neither body changed or moved since); pairs_pruned (ruled out by their boxes); ms. Distances are measured on the exact faces and edges, the meshes only rule pairs out",
@@ -47,6 +49,10 @@ enum SkipWithin {
 
 /// Most pairs [`PairCache`] keeps; it starts over when full.
 const MAX_CACHED: usize = 2 * MAX_PAIRS;
+/// Seconds a call may take by default, and at most (`budget_s`).
+const DEFAULT_BUDGET_S: f64 = 240.0;
+const MAX_BUDGET_S: f64 = 86_400.0;
+
 /// The kernel's tries at intersecting a pin with its hole on one cylinder (each about a second
 /// on real parts; a plain pin on its axis needs one or two).
 const PIN_ATTEMPTS: usize = 4;
@@ -66,6 +72,32 @@ struct PairResult {
     unchecked: Option<String>,
 }
 
+impl PairResult {
+    /// This result for another placement of the same two parts: its points moved by `m`.
+    fn moved(&self, m: &solidcraft_doc::Mat) -> PairResult {
+        let at = |v: solidcraft_geom::Vec3| solidcraft_doc::apply_point(m, v);
+        let boxed = |b: &Aabb3| {
+            let mut out = Aabb3::EMPTY;
+            for k in 0..8 {
+                let x = if k & 1 == 0 { b.min.x } else { b.max.x };
+                let y = if k & 2 == 0 { b.min.y } else { b.max.y };
+                let z = if k & 4 == 0 { b.min.z } else { b.max.z };
+                out.add(at(solidcraft_geom::Vec3::new(x, y, z)));
+            }
+            out
+        };
+        PairResult {
+            overlap: self.overlap.map(|(v, a, b, c)| (v, a, if b.is_empty() { b } else { boxed(&b) }, at(c))),
+            distance: self.distance.map(|mut d| {
+                d.from = at(d.from);
+                d.to = at(d.to);
+                d
+            }),
+            unchecked: self.unchecked.clone(),
+        }
+    }
+}
+
 fn clearance(s: &mut Session, p: &Value) -> Result<Value> {
     let cmd = "inspect.clearance";
     let started = web_time::Instant::now();
@@ -82,6 +114,14 @@ fn clearance(s: &mut Session, p: &Value) -> Result<Value> {
     let gap = param("clearance", 0.0, MAX_CLEARANCE)?;
     let tolerance = param("tolerance", 1e-6, 1.0)?;
     let nearest = param("nearest", 0.0, MAX_NEAREST as f64)?.floor() as usize;
+    let budget = match p.get("budget_s") {
+        None | Some(Value::Null) => DEFAULT_BUDGET_S,
+        Some(_) => match num(p, "budget_s") {
+            Some(v) if v > 0.0 && v <= MAX_BUDGET_S => v,
+            _ => return Err(bad(cmd, format!("`budget_s` must be a number of seconds above 0, at most {MAX_BUDGET_S}"))),
+        },
+    };
+    let deadline = std::time::Duration::from_secs_f64(budget);
     let skip = match p.get("skip_within") {
         None | Some(Value::Null) => SkipWithin::Nothing,
         Some(_) => match str_(p, "skip_within") {
@@ -223,12 +263,58 @@ fn clearance(s: &mut Session, p: &Value) -> Result<Value> {
         close.iter().map(|&(i, j)| cache.as_ref().and_then(|c| c.0.get(&cache_key(i, j)?)).cloned().map(Ok)).collect()
     };
     let todo: Vec<usize> = (0..close.len()).filter(|&k| results.get(k).is_some_and(Option::is_none)).collect();
-    let reused = close.len() - todo.len();
+    let mut reused = close.len() - todo.len();
+    // Placements of one part (six copies of a servo) repeat its inner pairs: a pair of the same two
+    // definitions placed the same way relative to each other comes to the same, so one is measured
+    // and the others take its result, moved to where they are.
+    let mut first: HashMap<(u64, u64, Vec<i64>), usize> = HashMap::new();
+    let mut copies: Vec<(usize, usize, solidcraft_doc::Mat)> = Vec::new();
+    let todo: Vec<usize> = todo
+        .into_iter()
+        .filter(|&k| {
+            let Some(&(i, j)) = close.get(k) else { return true };
+            let (Some(a), Some(b)) = (solid.get(i), solid.get(j)) else { return true };
+            let (Some(ka), Some(kb), Some(inv_a)) = (a.definition_key(), b.definition_key(), solidcraft_doc::mat_inverse(&a.source_transform)) else {
+                return true;
+            };
+            let relative = solidcraft_doc::mat_mul(&inv_a, &b.source_transform);
+            let key = (ka, kb, relative.iter().flatten().map(|v| (v * 1e6).round() as i64).collect::<Vec<_>>());
+            match first.get(&key).copied() {
+                Some(rep) => {
+                    let moved = close
+                        .get(rep)
+                        .and_then(|&(ri, _)| solid.get(ri))
+                        .and_then(|r| solidcraft_doc::mat_inverse(&r.source_transform))
+                        .map(|inv| solidcraft_doc::mat_mul(&a.source_transform, &inv));
+                    match moved {
+                        Some(m) => {
+                            copies.push((k, rep, m));
+                            false
+                        }
+                        None => true,
+                    }
+                }
+                None => {
+                    first.insert(key, k);
+                    true
+                }
+            }
+        })
+        .collect();
+    reused += copies.len();
     // A body in many pairs is cut down to each pair's region from the same mesh of it.
     let kept: Vec<std::sync::OnceLock<Option<solidcraft_kernel::Body>>> = (0..n).map(|_| std::sync::OnceLock::new()).collect();
     let kept_body = |i: usize| kept.get(i)?.get_or_init(|| solid.get(i).map(|b| b.body.keeping_meshes())).as_ref();
     let measured = solidcraft_kernel::map_with_local_pools(&todo, usize::MAX, |&k| {
         let Some(&(i, j)) = close.get(k) else { return Ok(PairResult::default()) };
+        // A pair not started by the time the budget is spent is listed, not measured (one under
+        // way finishes: a kernel boolean can't be stopped part way).
+        if started.elapsed() > deadline {
+            return Ok(PairResult {
+                unchecked: Some(format!("not checked: the time budget of {budget} s ran out (budget_s)")),
+                ..PairResult::default()
+            });
+        }
         let (Some(a), Some(b)) = (shape(i), shape(j)) else { return Ok(PairResult::default()) };
         let (Some(ba), Some(bb)) = (solid.get(i), solid.get(j)) else { return Ok(PairResult::default()) };
         let (Some(ka), Some(kb)) = (kept_body(i), kept_body(j)) else { return Ok(PairResult::default()) };
@@ -253,10 +339,21 @@ fn clearance(s: &mut Session, p: &Value) -> Result<Value> {
             *slot = Some(r);
         }
     }
+    for (k, rep, m) in copies {
+        // A copy of a pair that could not be worked out is listed as unchecked too, not passed as clear.
+        let moved = match results.get(rep).and_then(|r| r.as_ref()) {
+            Some(Ok(r)) => Some(r.moved(&m)),
+            Some(Err(e)) => Some(PairResult { unchecked: Some(e.to_string()), ..PairResult::default() }),
+            None => None,
+        };
+        if let (Some(slot), Some(r)) = (results.get_mut(k), moved) {
+            *slot = Some(Ok(r));
+        }
+    }
     let results = results.into_iter().map(|r| r.unwrap_or_else(|| Ok(PairResult::default())));
 
     let mut known: HashMap<(usize, usize), f64> = HashMap::new();
-    let (mut overlaps, mut near) = (Vec::new(), Vec::new());
+    let (mut overlaps, mut near, mut threaded) = (Vec::new(), Vec::new(), Vec::new());
     // The mesh bodies the call was about (every one without `bodies`, else those named in
     // `bodies` or `against`) come first, so "nothing found" is not read as "no overlap".
     let asked: Vec<String> = ["bodies", "against"].iter().flat_map(|k| string_list(p, k)).collect();
@@ -281,6 +378,11 @@ fn clearance(s: &mut Session, p: &Value) -> Result<Value> {
         if let Some((volume, area, bbox, center)) = r.overlap
             && volume >= min_volume
         {
+            if let Some((t, engaged)) = solid.get(i).zip(solid.get(j)).and_then(|(a, b)| engagement(&st.threads, a, b, volume, &bbox, center)) {
+                threaded.push(json!({"a": name(i), "b": name(j), "thread": t.designation, "engaged_mm": engaged, "volume_mm3": volume}));
+                known.insert((i, j), 0.0);
+                continue;
+            }
             overlaps.push(json!({"a": name(i), "b": name(j), "volume_mm3": volume, "area_mm2": area,
                 "bbox": {"min": bbox.min, "max": bbox.max}, "center": center}));
             known.insert((i, j), 0.0);
@@ -317,6 +419,7 @@ fn clearance(s: &mut Session, p: &Value) -> Result<Value> {
 
     Ok(json!({
         "overlaps": overlaps,
+        "threaded": threaded,
         "near": near,
         "nearest": nearest_out,
         "unchecked": unchecked,
@@ -327,6 +430,68 @@ fn clearance(s: &mut Session, p: &Value) -> Result<Value> {
         "truncated": truncated > 0,
         "ms": started.elapsed().as_secs_f64() * 1000.0,
     }))
+}
+
+/// The cosmetic thread of `a` or `b` an overlap is the engagement of, and the engaged length: the
+/// overlap is centred on the thread's axis and lies within its threaded length; the holed body (the
+/// other one for a thread on a shank, the threaded one for a tapped hole) has a hole wall on that
+/// axis along the whole overlap, between the thread's major diameter and a little under its minor
+/// one; and the overlap is no bigger than the ring between that wall and the major diameter (a shank
+/// at the major diameter in a hole tapped at the drill size shares just that ring with the part
+/// around it, where a rod down the axis shares its core).
+pub(super) fn engagement<'t>(
+    threads: &'t [solidcraft_doc::ThreadInfo],
+    a: &solidcraft_doc::ModelBody,
+    b: &solidcraft_doc::ModelBody,
+    volume: f64,
+    bbox: &Aabb3,
+    center: solidcraft_geom::Vec3,
+) -> Option<(&'t solidcraft_doc::ThreadInfo, f64)> {
+    let owns = |m: &solidcraft_doc::ModelBody, t: &solidcraft_doc::ThreadInfo| m.name == t.body || m.definition_name() == t.body;
+    threads.iter().filter(|t| owns(a, t) || owns(b, t)).find_map(|t| {
+        let u = *t.axis;
+        let (outer, inner) = (t.major_diameter / 2.0, (t.major_diameter - 1.25 * t.pitch) / 2.0);
+        let slack = 0.02 * t.major_diameter;
+        let off = center - t.axis_point;
+        if (off - u * off.dot(u)).len() > slack {
+            return None;
+        }
+        // The box's reach along the axis, less what a ring round an oblique axis adds to it.
+        let span = |lo: f64, hi: f64, u: f64| ((lo * u).min(hi * u), (lo * u).max(hi * u));
+        let [x, y, z] = [span(bbox.min.x, bbox.max.x, u.x), span(bbox.min.y, bbox.max.y, u.y), span(bbox.min.z, bbox.max.z, u.z)];
+        let base = t.axis_point.dot(u);
+        let pad = outer * [u.x, u.y, u.z].iter().map(|c| c.abs() * (1.0 - c * c).max(0.0).sqrt()).sum::<f64>();
+        let (lo, hi) = (x.0 + y.0 + z.0 - base + pad, x.1 + y.1 + z.1 - base - pad);
+        let (start, end) = (t.start.min(t.end), t.start.max(t.end));
+        if lo < start - slack || hi > end + slack || hi <= lo {
+            return None;
+        }
+        let holed = if t.internal == owns(a, t) { a } else { b };
+        let wall = hole_wall(&holed.body, t, (lo, hi), (inner - slack, outer), slack)?;
+        let ring = std::f64::consts::PI * (outer * outer - wall * wall) * (hi - lo);
+        (volume <= ring * 1.02).then_some((t, hi - lo))
+    })
+}
+
+/// The radius of a hole wall of `body` on the thread's axis, with a radius in `radii`, running
+/// along the axis over `lo..hi` (measured from the thread's axis point).
+fn hole_wall(body: &solidcraft_kernel::Body, t: &solidcraft_doc::ThreadInfo, (lo, hi): (f64, f64), radii: (f64, f64), slack: f64) -> Option<f64> {
+    let u = *t.axis;
+    let across = |p: solidcraft_geom::Vec3| {
+        let off = p - t.axis_point;
+        (off - u * off.dot(u)).len()
+    };
+    (0..body.face_count()).find_map(|i| {
+        let solidcraft_kernel::FaceSurface::Cylinder { origin, axis, radius } = solidcraft_kernel::face_surface(body, i)? else { return None };
+        if axis.dot(u).abs() < 1.0 - 1e-6 || across(origin) > slack || radius < radii.0 || radius > radii.1 {
+            return None;
+        }
+        // The face itself, found from a point on it halfway along: a hole, over the whole overlap.
+        let c = solidcraft_kernel::cylinder_face_at(body, t.axis_point + u * ((lo + hi) / 2.0) + u.any_perp() * radius)?;
+        let (base, sign) = ((c.axis_point - t.axis_point).dot(u), c.axis.dot(u).signum());
+        let (s0, s1) = (base + sign * c.start, base + sign * c.end);
+        (c.internal && (c.radius - radius).abs() < slack && s0.min(s1) <= lo + slack && s0.max(s1) >= hi - slack).then_some(radius)
+    })
 }
 
 /// One pair: its overlap when the meshes meet or one holds the other, otherwise its distance

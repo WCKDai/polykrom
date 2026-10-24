@@ -1,6 +1,7 @@
 accessibility	false
 activate	false
 align	false
+analysis_stress	false
 appearance	false
 arc3	false
 arc_center	false
@@ -104,6 +105,7 @@ flange	false
 flat	false
 fold	false
 folder	false
+frame_member	false
 gear	false
 graph	false
 ground	false
@@ -211,6 +213,7 @@ shield	false
 silhouette	false
 sketch	false
 sketch_break	false
+sketch_cancel	false
 sketch_chamfer	false
 sketch_chamfer_angle	false
 sketch_chamfer_equal	false

@@ -1,4 +1,4 @@
-# SolidCraft 英語・日本語 ローカライズ対照リスト (全 847 件)
+# Polykrom 英語・日本語 ローカライズ対照リスト (全 847 件)
 
 | 英語 (English) | 日本語 (Japanese) | キー名 (Key) |
 | :--- | :--- | :--- |
@@ -25,8 +25,8 @@
 | 3D Sketch | 3D スケッチ | `ui.3d_sketch` |
 | 3D Spline | 3D スプライン | `cmd.sketch_spline3d` |
 | A new configuration, a copy of the active one | アクティブな構成をコピーして新しい構成を作成 | `A new configuration, a copy of the active one` |
-| About | SolidCraft について | `ui.about` |
-| About SolidCraft | SolidCraft について | `About SolidCraft` |
+| About | Polykrom について | `ui.about` |
+| About Polykrom | Polykrom について | `About Polykrom` |
 | Accessibility Analysis | アクセシビリティ解析 | `cmd.inspect_accessibility` |
 | Activate | アクティブ化 | `ui.activate` |
 | Activate Component | コンポーネントをアクティブ化 | `cmd.component_activate` |
@@ -60,7 +60,7 @@
 | Animation | アニメーション | `ui.animation` |
 | Animation speed | アニメーション速度 | `ui.animation_speed` |
 | Anti-aliasing | アンチエイリアス | `ui.anti_aliasing` |
-| Anti-aliasing applies the next time SolidCraft starts | アンチエイリアスは次回 SolidCraft を起動したときに適用されます | `settings.msaa_applies_on_restart` |
+| Anti-aliasing applies the next time Polykrom starts | アンチエイリアスは次回 Polykrom を起動したときに適用されます | `settings.msaa_applies_on_restart` |
 | Appearance | 外観 | `cmd.appearance_assign` |
 | Appearance Library | 外観ライブラリ | `cmd.appearance_library` |
 | Appearance name | 外観名 | `Appearance name` |
@@ -333,7 +333,7 @@
 | Feature Options | フィーチャーオプション | `ui.feature_options` |
 | Features | フィーチャー | `ui.features` |
 | File | ファイル | `ui.file` |
-| Files from many CAD programs have Y up, so they open lying on their back here (Z up). | 多くのCADではY軸を上向きとしているため、Z軸を上向きとするSolidCraftでは、読み込んだモデルが横倒しの向きで表示されることがあります。 | `Files from many CAD programs have Y up, so they open lying on their back here (Z up).` |
+| Files from many CAD programs have Y up, so they open lying on their back here (Z up). | 多くのCADではY軸を上向きとしているため、Z軸を上向きとするPolykromでは、読み込んだモデルが横倒しの向きで表示されることがあります。 | `Files from many CAD programs have Y up, so they open lying on their back here (Z up).` |
 | Fillet | フィレット | `ui.fillet` |
 | FILLET | フィレット | `ui.heading_fillet` |
 | Filter | フィルター | `Filter` |
@@ -474,7 +474,7 @@
 | Move | 移動 | `ui.move` |
 | MOVE | 移動 | `ui.heading_move` |
 | Move 3D Point | 3D 点を移動 | `cmd.sketch_move3d` |
-| Move and rotate the view together; sketches use pan and zoom only. | 視点の移動と回転を同時に行います（スケッチ中はパンとズームのみ） | `ui.space_mouse_hint` |
+| Move and rotate the view together; sketches use pan and zoom only. | 視点の移動と回転を同時に行います（スケッチ中はパンとズームのみ） | `ui.3d_mouse_hint` |
 | Move Bodies to Component | ボディをコンポーネントに移動 | `cmd.component_move_bodies` |
 | Move Browser Items | ブラウザ項目を移動 | `cmd.browser_move` |
 | Move Dimension Text | 寸法テキストを移動 | `cmd.sketch_dimension_text` |
@@ -490,7 +490,7 @@
 | Name | 名前 | `Name` |
 | Named Views | 名前付きビュー | `ui.named_views` |
 | Navigate View | ビューナビゲーション | `cmd.view_navigate` |
-| Navigate with SpaceNavigator / SpaceMouse | SpaceNavigator / SpaceMouseで視点を操作 | `ui.space_mouse_navigate` |
+| Navigate with the 3D mouse | 3Dマウスで視点を操作 | `ui.3d_mouse_navigate` |
 | Navigation | ナビゲーション | `ui.navigation` |
 | needs two joints | 2つのジョイントが必要 | `needs two joints` |
 | New Body | 新規ボディ | `ui.new_body` |
@@ -743,7 +743,7 @@
 | Snap Fit | スナップ フィット | `cmd.plastic_snap_fit` |
 | Snap Inference | スナップ推論 | `cmd.sketch_snap` |
 | SOLID | ソリッド | `ui.heading_solid` |
-| SolidCraft closed before these designs were saved. Their last autosave can be opened. | これらのデザインが保存される前にSolidCraftが終了しました。最後の自動保存ファイルを開くことができます。 | `SolidCraft closed before these designs were saved. Their last autosave can be opened.` |
+| Polykrom closed before these designs were saved. Their last autosave can be opened. | これらのデザインが保存される前にPolykromが終了しました。最後の自動保存ファイルを開くことができます。 | `Polykrom closed before these designs were saved. Their last autosave can be opened.` |
 | Solve Joints | ジョイントを解決 | `cmd.joint_solve` |
 | Solve Sketch | スケッチを解決 | `cmd.sketch_solve` |
 | Speed | 速度 | `Speed` |
@@ -787,7 +787,7 @@
 | Then | 次を実行 (Then) | `Then` |
 | These features will be deleted: | 以下のフィーチャーが削除されます: | `These features will be deleted:` |
 | These features will fail: | 以下のフィーチャーでエラーが発生します: | `These features will fail:` |
-| These settings don't work on this computer and would keep SolidCraft from starting, so they were changed: | 次の設定はこのコンピューターでは使用できず、SolidCraft が起動できなくなるため変更されました: | `settings.reset_intro` |
+| These settings don't work on this computer and would keep Polykrom from starting, so they were changed: | 次の設定はこのコンピューターでは使用できず、Polykrom が起動できなくなるため変更されました: | `settings.reset_intro` |
 | Thicken | 厚み付け | `cmd.surface_thicken` |
 | Thickness | 厚さ | `ui.thickness` |
 | This child is shared. Deleting it removes it from every copy of its parent. | この子要素は共有されています。削除すると親のすべてのコピーから削除されます。 | `This child is shared. Deleting it removes it from every copy of its parent.` |

@@ -1,7 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <title>Perpendicular plane</title>
-  <path d="M28.71 27.48L56.68 43.63L35.29 55.98L7.32 39.84Z" fill="#b8c3cf" stroke="#34465b" stroke-width="2.55" stroke-linejoin="round" stroke-linecap="round"/>
-  <path d="M18.01 33.66L45.99 49.81L45.99 24.16L18.01 8.01Z" fill="#b9ddf8" stroke="#236ead" stroke-width="2.55" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="0.1 5"/>
-  <path d="M25.42 45.53L25.42 37.94L32 34.13" fill="none" stroke="#ffffff" stroke-width="4.05" stroke-linejoin="round" stroke-linecap="round"/>
-  <path d="M25.42 45.53L25.42 37.94L32 34.13" fill="none" stroke="currentColor" stroke-width="2.55" stroke-linejoin="round" stroke-linecap="round"/>
+  <title>Perpendicular Plane</title>
+  <path d="M8 46C20 46 30 40 38 26C46 12 50 10 58 10" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M24 22L42 16L42 44L24 50Z" fill="#b9ddf8"/>
+  <path d="M24 22L42 16L42 44L24 50Z" fill="none" stroke="#236ead" stroke-width="3.4" stroke-linejoin="round" stroke-linecap="round"/>
+  <circle cx="33" cy="33" r="4.4" fill="#236ead"/>
+  <circle cx="33" cy="33" r="1.98" fill="#ffffff"/>
 </svg>

@@ -31,7 +31,7 @@ pub(crate) const SHELL_GAP: f32 = 7.0;
 /// The viewport's top corners are rounded concentrically with the cards: the card margin plus the
 /// card radius.
 pub(crate) fn corner_radius() -> f32 {
-    SHELL_GAP + f32::from(Tokens::get().radius_lg)
+    Tokens::outset_radius(f32::from(Tokens::get().radius_lg), SHELL_GAP)
 }
 
 /// Fill the two concave corners where the application bar flows into the viewport's top edge, so
@@ -120,6 +120,7 @@ pub(crate) fn covered_rects(app: &SolveApp) -> Vec<Rect> {
         rects.extend(app.shell.history.map(|card| crate::ui_kit::HistorySeam::new(card).pill));
     }
     rects.extend(app.shell.browser.filter(|_| app.ui.show_browser));
+    rects.extend(app.inspector.rect);
     rects.extend(app.viewport.palette_rect.filter(|_| app.session.active_sketch.is_some()));
     rects.extend(app.viewport.dialog_rect.filter(|_| app.dialog.is_some() || app.tree.redefine.is_some()));
     rects.retain(|r| r.is_finite() && r.is_positive());

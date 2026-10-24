@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <title>Static Stress</title>
+  <path d="M21.9 19.65L32.9 25.15L21.9 30.65L10.9 25.15Z" fill="#236ead"/>
+  <path d="M32.9 25.15L45 31.2L34 36.7L21.9 30.65Z" fill="#328bd3"/>
+  <path d="M45 31.2L57.1 37.25L46.1 42.75L34 36.7Z" fill="#b9ddf8"/>
+  <path d="M21.9 19.65L57.1 37.25L57.1 46.05L46.1 51.55L10.9 33.95L10.9 25.15Z" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M10.9 25.15L46.1 42.75L57.1 37.25" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M46.1 42.75L46.1 51.55" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M24.65 29.82L4.85 39.73L4.85 19.93L24.65 10.02Z" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M48.3 20.75L48.3 31.25" fill="none" stroke="#236ead" stroke-width="4.4" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M48.3 37.25L44.45 30.25L52.15 30.25Z" fill="#236ead"/>
+</svg>

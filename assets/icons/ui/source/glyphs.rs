@@ -99,59 +99,55 @@ pub(crate) fn breadcrumb(p: &egui::Painter, c: egui::Pos2, col: Color32) {
 }
 
 pub(crate) fn brand_mark(p: &egui::Painter, c: Pos2) {
-    brand_mark_styled(p, c, 20.0, crate::theme::Tokens::get().logo, true);
+    let t = crate::theme::Tokens::get();
+    brand_mark_styled(p, c, 20.0, t.logo[0], t.logo_facets, true);
 }
 
 /// The same original mark as a single quiet silhouette, without face seams or outlines.
 pub(crate) fn brand_mark_silhouette(p: &egui::Painter, c: Pos2, height: f32, ink: Color32) {
-    brand_mark_styled(p, c, height, [ink; 4], false);
+    brand_mark_styled(p, c, height, ink, [ink; 9], false);
 }
 
-fn brand_mark_styled(p: &egui::Painter, c: Pos2, height: f32, colours: [Color32; 4], edges: bool) {
-    let s = height / 412.217;
-    let m = |pts: &[(f32, f32)]| -> Vec<egui::Pos2> { pts.iter().map(|&(x, y)| pos2(c.x + (x - 178.5) * s, c.y + (y - 206.1) * s)).collect() };
-    // egui only fills convex shapes, so each face is a few overlapping convex pieces.
-    let face = |col: Color32, pts: &[(f32, f32)]| {
-        p.add(egui::Shape::convex_polygon(m(pts), col, Stroke::NONE));
+/// Polykrom's mark: a faceted gem, a regular hexagon (pointy top) tiled like a polyhedron seen
+/// down its axis. A light centre triangle, three mid facets on its sides reaching the alternate
+/// corners, and six corner facets, each in its own colour of the brand's cyan-to-violet range
+/// (`facets`: the mids, then the corners clockwise from the top). `height` is corner to corner.
+fn brand_mark_styled(p: &egui::Painter, c: Pos2, height: f32, centre: Color32, facets: [Color32; 9], edges: bool) {
+    let r = height / 2.0;
+    // Hexagon corners from the top, clockwise; the centre triangle points up at half the radius.
+    let corner = |k: f32| {
+        let a = std::f32::consts::FRAC_PI_2 - k * std::f32::consts::FRAC_PI_3;
+        pos2(c.x + r * a.cos(), c.y - r * a.sin())
     };
-    // The faces are separated by gaps that show the application bar, not by white lines.
-    let [light, mid, dark, _] = colours;
-    let edge_col = crate::theme::Tokens::get().app_bar;
-    face(light, &[(3.5, 105.9), (177.0, 5.8), (263.4, 55.6), (263.8, 156.0), (177.0, 406.4)]);
-    face(light, &[(177.0, 206.1), (263.8, 156.0), (350.5, 206.2), (350.5, 306.3), (177.0, 406.4)]);
-    face(mid, &[(3.5, 105.9), (177.0, 206.1), (177.0, 406.4)]);
-    face(mid, &[(3.5, 105.9), (3.5, 205.7), (90.3, 256.2), (177.0, 206.1)]);
-    face(mid, &[(177.0, 206.1), (90.3, 256.2), (90.0, 356.2), (177.0, 406.4)]);
-    face(dark, &[(264.1, 155.8), (177.0, 206.1), (177.0, 406.4), (263.8, 256.2)]);
-    face(dark, &[(263.8, 256.2), (350.5, 206.2), (350.5, 306.3), (177.0, 406.4)]);
-    face(dark, &[(177.0, 206.1), (177.0, 406.4), (350.5, 306.3)]);
-    face(dark, &[(263.8, 55.9), (263.8, 156.0), (177.1, 105.9)]);
+    let inner = |k: f32| {
+        let a = std::f32::consts::FRAC_PI_2 - k * 2.0 * std::f32::consts::FRAC_PI_3;
+        pos2(c.x + 0.5 * r * a.cos(), c.y - 0.5 * r * a.sin())
+    };
+    let h: [Pos2; 6] = [corner(0.0), corner(1.0), corner(2.0), corner(3.0), corner(4.0), corner(5.0)];
+    let t: [Pos2; 3] = [inner(0.0), inner(1.0), inner(2.0)];
+    let tri = |col: Color32, a: Pos2, b: Pos2, d: Pos2| {
+        p.add(egui::Shape::convex_polygon(vec![a, b, d], col, Stroke::NONE));
+    };
+    // Six corner facets: each hexagon side with the nearest centre-triangle corner.
+    for (k, near) in [(0, 0), (1, 1), (2, 1), (3, 2), (4, 2), (5, 0)] {
+        tri(facets[3 + k], h[k], h[(k + 1) % 6], t[near]);
+    }
+    // Three mid facets: each side of the centre triangle with the corner across from it.
+    tri(facets[0], t[0], t[1], h[1]);
+    tri(facets[1], t[1], t[2], h[3]);
+    tri(facets[2], t[2], t[0], h[5]);
+    tri(centre, t[0], t[1], t[2]);
     if !edges {
         return;
     }
-    // White edge lines.
-    let edge = Stroke::new(10.0 * s, edge_col);
-    let line = |pts: &[(f32, f32)]| {
-        p.add(egui::Shape::line(m(pts), edge));
-    };
-    line(&[(263.8, 55.9), (177.1, 105.9), (263.8, 156.0), (263.8, 256.2), (350.6, 206.1)]);
-    line(&[(5.0, 105.9), (178.5, 206.1), (178.5, 406.4)]);
-    line(&[(177.0, 206.1), (263.8, 156.0)]);
-    p.add(egui::Shape::closed_line(
-        m(&[
-            (178.5, 5.8),
-            (5.0, 105.9),
-            (5.0, 206.1),
-            (91.7, 256.2),
-            (91.7, 356.4),
-            (178.5, 406.4),
-            (352.0, 306.3),
-            (352.0, 206.1),
-            (265.2, 156.0),
-            (265.2, 55.9),
-        ]),
-        edge,
-    ));
+    // Seams in the bar's colour, so the facets read as separate planes.
+    let seam = Stroke::new((height / 40.0).max(0.6), crate::theme::Tokens::get().app_bar);
+    for (a, b) in [(t[0], t[1]), (t[1], t[2]), (t[2], t[0])] {
+        p.line_segment([a, b], seam);
+    }
+    for (k, near) in [(1, 0), (1, 1), (3, 1), (3, 2), (5, 2), (5, 0), (0, 0), (2, 1), (4, 2)] {
+        p.line_segment([h[k], t[near]], seam);
+    }
 }
 
 pub(crate) fn cross(p: &egui::Painter, r: Rect, s: Stroke) {

@@ -1,6 +1,6 @@
 [package]
 name = "solidcraft-derive"
-description = "SolidCraft derive macros: the walk over a feature's geometry, from role attributes on its fields"
+description = "Polykrom derive macros: the walk over a feature's geometry, from role attributes on its fields"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

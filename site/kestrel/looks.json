@@ -1,0 +1,107 @@
+{
+ "Base": {
+  "color": "#c3ccd4",
+  "metalness": 0.55,
+  "roughness": 0.38
+ },
+ "Yaw_Motor": {
+  "color": "#7c858f",
+  "metalness": 0.7,
+  "roughness": 0.32
+ },
+ "Pinion": {
+  "color": "#7c858f",
+  "metalness": 0.7,
+  "roughness": 0.32
+ },
+ "Turntable": {
+  "color": "#c3ccd4",
+  "metalness": 0.55,
+  "roughness": 0.38
+ },
+ "Shoulder_Yoke": {
+  "color": "#c3ccd4",
+  "metalness": 0.55,
+  "roughness": 0.38
+ },
+ "Upper_Arm": {
+  "color": "#c3ccd4",
+  "metalness": 0.55,
+  "roughness": 0.38
+ },
+ "Forearm": {
+  "color": "#c3ccd4",
+  "metalness": 0.55,
+  "roughness": 0.38
+ },
+ "Shoulder_Pin": {
+  "color": "#7c858f",
+  "metalness": 0.7,
+  "roughness": 0.32
+ },
+ "Elbow_Pin": {
+  "color": "#7c858f",
+  "metalness": 0.7,
+  "roughness": 0.32
+ },
+ "Wrist": {
+  "color": "#22b8c4",
+  "metalness": 0.0,
+  "roughness": 0.55
+ },
+ "Jaw_L": {
+  "color": "#ece8de",
+  "metalness": 0.0,
+  "roughness": 0.7
+ },
+ "Jaw_R": {
+  "color": "#ece8de",
+  "metalness": 0.0,
+  "roughness": 0.7
+ },
+ "Bearing_608": {
+  "color": "#7c858f",
+  "metalness": 0.7,
+  "roughness": 0.32
+ },
+ "Washer_M4_1": {
+  "color": "#7c858f",
+  "metalness": 0.7,
+  "roughness": 0.32
+ },
+ "SHCS_M4x12_1": {
+  "color": "#7c858f",
+  "metalness": 0.7,
+  "roughness": 0.32
+ },
+ "Washer_M4_2": {
+  "color": "#7c858f",
+  "metalness": 0.7,
+  "roughness": 0.32
+ },
+ "Washer_M4_3": {
+  "color": "#7c858f",
+  "metalness": 0.7,
+  "roughness": 0.32
+ },
+ "Washer_M4_4": {
+  "color": "#7c858f",
+  "metalness": 0.7,
+  "roughness": 0.32
+ },
+ "SHCS_M4x12_2": {
+  "color": "#7c858f",
+  "metalness": 0.7,
+  "roughness": 0.32
+ },
+ "SHCS_M4x12_3": {
+  "color": "#7c858f",
+  "metalness": 0.7,
+  "roughness": 0.32
+ },
+ "SHCS_M4x12_4": {
+  "color": "#7c858f",
+  "metalness": 0.7,
+  "roughness": 0.32
+ }
+}

@@ -1,6 +1,6 @@
-//! SolidCraft desktop app.
+//! Polykrom desktop app.
 //!
-//! Usage: `solidcraft [--control <port>] [--sample] [--crash-log] [--safe-mode] [design.solidcraft | part.step]`
+//! Usage: `solidcraft [--control <port>] [--sample] [--crash-log] [--safe-mode] [design.polykrom | part.step]`
 //!
 //! `--safe-mode` (or `SOLIDCRAFT_SAFE_MODE=1`) starts with default settings, no recovery offer and
 //! the software renderer; see `startup` and docs/book/src/guide/troubleshooting.md.
@@ -10,6 +10,7 @@
 //!
 //! `--control <port>` (or `SOLIDCRAFT_CONTROL_PORT`) starts a localhost JSON-lines control
 //! server: `{"id":1,"method":"engine.execute","params":{"command":"solid.box","params":{…}}}`.
+//! Without them the channel still opens, on the default port, unless Preferences turns it off.
 //! See `solidcraft_ui_egui::control` and docs/control-protocol.md.
 #![cfg_attr(all(target_os = "windows", not(debug_assertions)), windows_subsystem = "windows")]
 #![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::unimplemented, clippy::todo, clippy::unreachable)]
@@ -24,6 +25,8 @@ mod device_lost;
 mod native_crash;
 #[cfg(target_os = "windows")]
 mod native_frame;
+#[cfg(target_os = "macos")]
+mod native_menu;
 #[cfg(target_os = "macos")]
 mod open_documents;
 #[cfg(any(target_os = "windows", target_os = "linux", target_os = "macos"))]
@@ -81,6 +84,8 @@ struct App {
     gpu: Option<LostWatch>,
     #[cfg(any(target_os = "windows", target_os = "linux", target_os = "macos"))]
     space_mouse: space_mouse::SpaceMouse,
+    #[cfg(target_os = "macos")]
+    native_menu: Option<native_menu::NativeMenu>,
 }
 
 impl eframe::App for App {
@@ -123,6 +128,10 @@ impl eframe::App for App {
         for f in if self.solve.file_picker_busy() { Vec::new() } else { open_documents::take() } {
             self.solve.open_path_async(&f);
         }
+        #[cfg(target_os = "macos")]
+        if let Some(menu) = &mut self.native_menu {
+            menu.tick(&mut self.solve, ctx);
+        }
         self.solve.logic(ctx);
         #[cfg(any(target_os = "windows", target_os = "linux", target_os = "macos"))]
         if !self.solve.file_picker_busy() {
@@ -132,10 +141,17 @@ impl eframe::App for App {
             ctx.send_viewport_cmd(egui::ViewportCommand::Close);
         }
     }
-    fn raw_input_hook(&mut self, _ctx: &egui::Context, raw: &mut egui::RawInput) {
+    fn raw_input_hook(&mut self, ctx: &egui::Context, raw: &mut egui::RawInput) {
+        #[cfg(target_os = "macos")]
+        if let Some(menu) = &mut self.native_menu {
+            menu.raw_input_hook(&mut self.solve, ctx, raw);
+        }
         // Before the app's own hook, which adds the control channel's events.
         #[cfg(any(target_os = "windows", target_os = "linux", target_os = "macos"))]
         self.space_mouse.raw_input_hook(self.solve.preferences.space_mouse_enabled, raw);
+        // The 3D mouse's buttons, before the app reads the frame: Esc and held modifiers join its input.
+        #[cfg(any(target_os = "windows", target_os = "linux", target_os = "macos"))]
+        solidcraft_ui_egui::space_mouse::buttons_hook(&mut self.solve, ctx, self.space_mouse.buttons(), raw);
         self.solve.raw_input_hook(raw);
     }
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
@@ -190,11 +206,29 @@ impl App {
         let Some(gpu) = self.gpu.as_mut().filter(|g| g.lost_at.is_none() && g.lost.is_lost()) else { return };
         let reason = gpu.lost.reason().unwrap_or_default();
         log::error!("graphics: the device was lost ({reason}); closing to start again");
-        eprintln!("SolidCraft graphics: the device was lost ({reason}); starting again");
+        eprintln!("Polykrom graphics: the device was lost ({reason}); starting again");
         solidcraft_engine::crash::phase(&format!("graphics device lost: {reason}"));
         gpu.lost_at = Some(device_lost::now_secs());
         self.solve.quit_requested = true;
     }
+}
+
+/// Linux file dialogs match patterns by case, so each extension goes in as lower and upper
+/// case, plus FreeCAD's own mixed casing.
+fn case_variants(exts: &[&str]) -> Vec<String> {
+    let mut all: Vec<String> = Vec::new();
+    for e in exts {
+        let mut forms = vec![e.to_ascii_lowercase(), e.to_ascii_uppercase()];
+        if e.eq_ignore_ascii_case("fcstd") {
+            forms.push("FCStd".into());
+        }
+        for v in forms {
+            if !all.contains(&v) {
+                all.push(v);
+            }
+        }
+    }
+    all
 }
 
 fn services(cc: &eframe::CreationContext<'_>) -> Services {
@@ -208,48 +242,14 @@ fn services(cc: &eframe::CreationContext<'_>) -> Services {
             let mut dialog = open_parent.clone();
             if !first.is_empty() {
                 let label = first.iter().map(|e| e.to_uppercase()).collect::<Vec<_>>().join(", ");
-                let both: Vec<String> = first.iter().flat_map(|e| [e.to_lowercase(), e.to_uppercase()]).collect();
-                dialog = dialog.add_filter(label, &both);
+                dialog = dialog.add_filter(label, &case_variants(first));
             }
-            let future = dialog
-                .add_filter(
-                    "Designs, CAD files and meshes",
-                    &[
-                        io::DESIGN_EXT,
-                        io::LEGACY_DESIGN_EXT,
-                        "json",
-                        "step",
-                        "stp",
-                        "STEP",
-                        "STP",
-                        "igs",
-                        "iges",
-                        "IGS",
-                        "IGES",
-                        "FCStd",
-                        "fcstd",
-                        "3dm",
-                        "3DM",
-                        "3mf",
-                        "3MF",
-                        "stl",
-                        "STL",
-                        "obj",
-                        "OBJ",
-                        "glb",
-                        "GLB",
-                        "gltf",
-                        "GLTF",
-                    ],
-                )
-                .add_filter("SolidCraft design (container or JSON)", &[io::DESIGN_EXT, io::LEGACY_DESIGN_EXT, "json"])
-                .add_filter("STEP", &["step", "stp", "STEP", "STP"])
-                .add_filter("IGES", &["igs", "iges", "IGS", "IGES"])
-                .add_filter("FreeCAD and Rhino", &["FCStd", "fcstd", "3dm", "3DM"])
-                .add_filter("Mesh (3MF, STL, OBJ, glTF)", &["3mf", "3MF", "stl", "STL", "obj", "OBJ", "glb", "GLB", "gltf", "GLTF"])
-                .add_filter("Sketch drawings (DXF, SVG)", &["dxf", "DXF", "svg", "SVG"])
-                .add_filter("All files", &["*"])
-                .pick_file();
+            // The groups come from the format registry, so a new format joins this dialog by itself.
+            dialog = dialog.add_filter("Designs, CAD files and meshes", &case_variants(&io::formats::open_extensions(true)));
+            for (label, exts) in io::formats::import_filters(true) {
+                dialog = dialog.add_filter(label, &case_variants(&exts));
+            }
+            let future = dialog.add_filter("All files", &["*"]).pick_file();
             Box::pin(async move { future.await.map(|p| p.path().to_string_lossy().into_owned()) })
         })),
         // One kind of file (the agent chat's attachments): only the types it names, as given and in
@@ -278,9 +278,9 @@ fn services(cc: &eframe::CreationContext<'_>) -> Services {
             let dialog = parent.clone().set_file_name(name);
             let dialog = if exts == [io::DESIGN_EXT, "json"] {
                 if name.ends_with(".json") {
-                    dialog.add_filter("Plain JSON design", &["json"]).add_filter("SolidCraft container", &[io::DESIGN_EXT])
+                    dialog.add_filter("Plain JSON design", &["json"]).add_filter("Polykrom container", &[io::DESIGN_EXT])
                 } else {
-                    dialog.add_filter("SolidCraft container", &[io::DESIGN_EXT]).add_filter("Plain JSON design", &["json"])
+                    dialog.add_filter("Polykrom container", &[io::DESIGN_EXT]).add_filter("Plain JSON design", &["json"])
                 }
             } else {
                 dialog.add_filter("File", exts)
@@ -289,6 +289,7 @@ fn services(cc: &eframe::CreationContext<'_>) -> Services {
             Box::pin(async move { future.await.map(|p| p.path().to_string_lossy().into_owned()) })
         })),
         graphics_path: graphics_path().map(|p| p.to_string_lossy().to_string()),
+        window_system: window_system_now(),
         http_get: Some(std::sync::Arc::new(http_get)),
         http_download: Some(std::sync::Arc::new(http_download)),
         // Already an installed app: only the browser build offers to install.
@@ -369,7 +370,7 @@ fn agent_http(r: &solidcraft_ui_egui::agent_chat::backend::HttpRequest) -> Resul
         .http_status_as_error(false)
         .timeout_global(Some(Duration::from_secs(r.timeout_s.clamp(1, 900))))
         .timeout_connect(Some(Duration::from_secs(10)))
-        .user_agent("SolidCraft")
+        .user_agent("Polykrom")
         .max_redirects(0)
         .build()
         .into();
@@ -392,7 +393,7 @@ fn agent_http(r: &solidcraft_ui_egui::agent_chat::backend::HttpRequest) -> Resul
     Ok((status, body))
 }
 
-/// API keys in the system keychain (service "SolidCraft agent chat", one entry per agent).
+/// API keys in the system keychain (service "SolidCraft agent chat", one entry per agent; the name stays until the settings migration).
 struct Keychain;
 
 impl Keychain {
@@ -434,7 +435,7 @@ fn http_call(url: &str, timeout: std::time::Duration) -> Result<ureq::http::Resp
         .http_status_as_error(false)
         .timeout_global(Some(timeout))
         .timeout_connect(Some(Duration::from_secs(5)))
-        .user_agent("SolidCraft-update-check")
+        .user_agent("Polykrom-update-check")
         .max_redirects(3)
         .build()
         .into();
@@ -514,6 +515,18 @@ fn backend_preference() -> Option<String> {
     graphics().and_then(|v| v.get("backend").and_then(serde_json::Value::as_str).map(str::to_string))
 }
 
+/// The viewport scene's sample count: the app's anti-aliasing (the window's pass is 1x), clamped
+/// by the backend's policy (OpenGL renders 1x, see `effective_msaa_samples`). A count the device
+/// cannot render with falls back to the supported default.
+fn scene_samples(backend: eframe::wgpu::Backend, samples: u32, supported: &[u32]) -> u32 {
+    let requested = eframe::egui_wgpu::effective_msaa_samples(backend, samples.max(1));
+    if requested <= 1 || supported.is_empty() || supported.contains(&requested) {
+        requested
+    } else {
+        supported.iter().copied().filter(|&n| n <= solidcraft_ui_egui::prefs::Prefs::default().msaa).max().unwrap_or(1)
+    }
+}
+
 /// Anti-aliasing samples from Preferences (4 when unset).
 fn msaa() -> u16 {
     graphics()
@@ -544,7 +557,7 @@ fn app_viewport() -> Result<egui::ViewportBuilder, eframe::Error> {
     let icon =
         egui::IconData { rgba: app_icon::rgba(64).map_err(|e| eframe::Error::AppCreation(std::io::Error::other(e).into()))?, width: 64, height: 64 };
     Ok(egui::ViewportBuilder::default()
-        .with_title("SolidCraft")
+        .with_title("Polykrom")
         .with_icon(icon)
         .with_inner_size([1600.0, 1000.0])
         .with_min_inner_size([960.0, 600.0])
@@ -560,6 +573,8 @@ fn app_viewport() -> Result<egui::ViewportBuilder, eframe::Error> {
 const APP_ID: &str = solidcraft_engine::io::APP_ID;
 
 fn main() -> eframe::Result {
+    #[cfg(target_os = "macos")]
+    objc2_foundation::NSProcessInfo::processInfo().setProcessName(objc2_foundation::ns_string!("SolidCraft"));
     mark("main");
     adopt_legacy_settings();
     let mut safe_mode = startup::env_on(std::env::var(startup::SAFE_MODE_ENV).ok().as_deref());
@@ -640,9 +655,11 @@ fn main() -> eframe::Result {
     solidcraft_engine::crash::phase("window");
     let options = eframe::NativeOptions {
         viewport: app_viewport()?,
-        depth_buffer: depth_bits,
-        stencil_buffer: STENCIL_BITS,
-        multisampling: samples,
+        // The window's pass (egui's) has no depth and one sample: the viewport draws its scene
+        // offscreen with its own depth and MSAA, then blits it, so the UI pass pays for neither.
+        depth_buffer: 0,
+        stencil_buffer: 0,
+        multisampling: 1,
         // Kept with the other settings, not in a folder named after the app id. Safe mode reads
         // and writes a scratch copy, leaving the user's settings as they were.
         persistence_path: if safe_mode {
@@ -659,12 +676,24 @@ fn main() -> eframe::Result {
     #[cfg(all(unix, not(target_os = "macos")))]
     let mut options = options;
     #[cfg(all(unix, not(target_os = "macos")))]
-    if prefer_x11(
-        std::env::var_os("DISPLAY").is_some(),
-        std::env::var_os("WAYLAND_DISPLAY").is_some(),
-        std::env::var("XDG_CURRENT_DESKTOP").ok().as_deref(),
-        solidcraft_engine::geom::env::var("WAYLAND").as_deref(),
-    ) {
+    let x11 = {
+        // SOLIDCRAFT_WAYLAND wins over Preferences › Graphics › Window system (#3083).
+        let environment = solidcraft_engine::geom::env::var("WAYLAND");
+        let preference = window_system_preference();
+        let wayland_override = environment.as_deref().or(window_system_override(preference.as_deref()));
+        let wayland_display = std::env::var_os("WAYLAND_DISPLAY").is_some();
+        let x11 = prefer_x11(
+            std::env::var_os("DISPLAY").is_some(),
+            wayland_display,
+            std::env::var("XDG_CURRENT_DESKTOP").ok().as_deref(),
+            wayland_override,
+        );
+        // Without a Wayland socket winit opens on X11 anyway.
+        let _ = WINDOW_SYSTEM.set(if x11 || !wayland_display { "x11" } else { "wayland" });
+        x11
+    };
+    #[cfg(all(unix, not(target_os = "macos")))]
+    if x11 {
         options.event_loop_builder = Some(Box::new(|b| {
             use winit::platform::x11::EventLoopBuilderExtX11;
             b.with_x11();
@@ -678,6 +707,7 @@ fn main() -> eframe::Result {
     let starting = settings.clone();
     mark("run_native");
     let result = eframe::run_native(
+        // The settings folder keeps the SolidCraft name until it moves with a migration.
         "SolidCraft",
         options,
         Box::new(move |cc| {
@@ -696,7 +726,7 @@ fn main() -> eframe::Result {
             {
                 app.native_resize_border = CUSTOM_TITLEBAR && native_frame::install(cc);
                 if CUSTOM_TITLEBAR && !app.native_resize_border {
-                    eprintln!("SolidCraft window: no native resize border; egui edge zones instead");
+                    eprintln!("Polykrom window: no native resize border; egui edge zones instead");
                 }
             }
             app.integrated_titlebar = cfg!(target_os = "macos");
@@ -711,9 +741,10 @@ fn main() -> eframe::Result {
                 lost_at: None,
             });
             if let Some(rs) = &cc.wgpu_render_state {
-                eprintln!("SolidCraft graphics: {:?}, MSAA {}x (requested {}x)", rs.adapter.get_info().backend, rs.msaa_samples, samples);
+                let scene_samples = scene_samples(rs.adapter.get_info().backend, u32::from(samples), &rs.msaa_supported);
+                eprintln!("Polykrom graphics: {:?}, MSAA {scene_samples}x (requested {}x)", rs.adapter.get_info().backend, samples);
                 solidcraft_engine::crash::phase("viewport pipelines (shader compile)");
-                app.set_wgpu(rs, depth_bits, STENCIL_BITS, rs.msaa_samples);
+                app.set_wgpu_split(rs, depth_bits, STENCIL_BITS, scene_samples);
                 solidcraft_ui_egui::gpu::install_picture_renderer(rs);
                 // The graphics driver is loaded now; it may have put its own exception filter
                 // in front of ours.
@@ -723,13 +754,15 @@ fn main() -> eframe::Result {
                 solidcraft_ui_egui::prefs::check_msaa(&mut app, u32::from(samples));
                 let info = rs.adapter.get_info();
                 solidcraft_engine::crash::set_environment(&format!(
-                    "Renderer: {:?} {} ({}), MSAA {}x",
-                    info.backend, info.name, info.driver, rs.msaa_samples
+                    "Renderer: {:?} {} ({}), MSAA {scene_samples}x",
+                    info.backend, info.name, info.driver
                 ));
             }
             mark("viewport pipelines");
-            if let Some(port) = control_port {
-                let rx = control_server::start(port, cc.egui_ctx.clone());
+            // `--control`/the environment name a port; otherwise the preference (on by default)
+            // opens the default one (docs/control-protocol.md).
+            if let Some(listen_on) = solidcraft_engine::control_auth::plan(control_port, app.preferences.agent_control) {
+                let rx = control_server::start(listen_on, cc.egui_ctx.clone());
                 app = app.with_control(rx);
             }
             // The agent chat's MCP bridge reaches the app through an endpoint of its own, started
@@ -780,6 +813,18 @@ fn main() -> eframe::Result {
             }
             #[cfg(any(target_os = "windows", target_os = "linux", target_os = "macos"))]
             let space_mouse = space_mouse::SpaceMouse::start(&cc.egui_ctx);
+            #[cfg(target_os = "macos")]
+            let native_menu = match native_menu::NativeMenu::new(&app, &cc.egui_ctx) {
+                Ok(menu) => Some(menu),
+                Err(error) => {
+                    app.set_status(format!("System menu: {error}"), true);
+                    None
+                }
+            };
+            #[cfg(target_os = "macos")]
+            {
+                app.native_file_menu = native_menu.is_some();
+            }
             mark("app created");
             solidcraft_engine::crash::phase("first frame");
             Ok(Box::new(App {
@@ -790,6 +835,8 @@ fn main() -> eframe::Result {
                 gpu,
                 #[cfg(any(target_os = "windows", target_os = "linux", target_os = "macos"))]
                 space_mouse,
+                #[cfg(target_os = "macos")]
+                native_menu,
             }))
         }),
     );
@@ -817,7 +864,7 @@ fn wgpu_options(cpu: bool, preference: Option<&str>) -> eframe::egui_wgpu::WgpuC
     if let eframe::egui_wgpu::WgpuSetup::CreateNew(setup) = &mut options.wgpu_setup {
         let env_set = std::env::var(startup::WGPU_BACKEND_ENV).is_ok_and(|v| !v.trim().is_empty());
         if let Some(backends) = startup::choose_backends(cfg!(target_os = "windows"), env_set, cpu, preference, startup::has_hardware_adapter) {
-            eprintln!("SolidCraft graphics: starting {backends:?}");
+            eprintln!("Polykrom graphics: starting {backends:?}");
             setup.instance_descriptor.backends = backends;
         }
         if cpu {
@@ -838,9 +885,9 @@ fn wgpu_options(cpu: bool, preference: Option<&str>) -> eframe::egui_wgpu::WgpuC
 /// the software renderer, else a message box saying what failed instead of a silent exit.
 fn no_window(error: eframe::Error, tried_cpu: bool, settings: Option<&std::path::Path>) -> eframe::Result {
     log::error!("the window could not open: {error}");
-    eprintln!("SolidCraft: the window could not open: {error}");
+    eprintln!("Polykrom: the window could not open: {error}");
     if !tried_cpu && let Ok(exe) = std::env::current_exe() {
-        eprintln!("SolidCraft: trying again with the software renderer ({}=cpu)", startup::RENDERER_ENV);
+        eprintln!("Polykrom: trying again with the software renderer ({}=cpu)", startup::RENDERER_ENV);
         match std::process::Command::new(exe).args(std::env::args_os().skip(1)).env(startup::RENDERER_ENV, "cpu").status() {
             Ok(status) if status.success() => return Ok(()),
             // The second try showed its own message.
@@ -850,11 +897,41 @@ fn no_window(error: eframe::Error, tried_cpu: bool, settings: Option<&std::path:
     }
     let _ = rfd::MessageDialog::new()
         .set_level(rfd::MessageLevel::Error)
-        .set_title("SolidCraft could not start")
+        .set_title("Polykrom could not start")
         .set_description(startup::no_window_message(&error.to_string(), settings))
         .set_buttons(rfd::MessageButtons::Ok)
         .show();
     Err(error)
+}
+
+/// Linux: the window system this run opened with (`wayland` or `x11`), for Preferences (#3083).
+#[cfg(all(unix, not(target_os = "macos")))]
+static WINDOW_SYSTEM: std::sync::OnceLock<&'static str> = std::sync::OnceLock::new();
+
+/// The window system this run uses, where there is a choice (Linux).
+fn window_system_now() -> Option<&'static str> {
+    #[cfg(all(unix, not(target_os = "macos")))]
+    return WINDOW_SYSTEM.get().copied();
+    #[cfg(not(all(unix, not(target_os = "macos"))))]
+    None
+}
+
+/// Preferences › Graphics › Window system (`graphics.json`'s `window_system`), read before the
+/// window opens.
+#[cfg(all(unix, not(target_os = "macos")))]
+fn window_system_preference() -> Option<String> {
+    graphics().and_then(|v| v.get("window_system").and_then(serde_json::Value::as_str).map(str::to_string))
+}
+
+/// The window system preference as the `SOLIDCRAFT_WAYLAND` value it stands for: `wayland` is
+/// `1`, `x11` is `0`, and `auto` (or anything else) leaves the choice to [`prefer_x11`].
+#[cfg(all(unix, not(target_os = "macos")))]
+fn window_system_override(preference: Option<&str>) -> Option<&'static str> {
+    match preference.map(str::trim) {
+        Some("wayland") => Some("1"),
+        Some("x11") => Some("0"),
+        _ => None,
+    }
 }
 
 /// Whether to run through XWayland rather than native Wayland. winit has no file drag-and-drop
@@ -893,6 +970,19 @@ mod backend_tests {
         assert!(!prefer_x11(true, true, Some("GNOME"), Some("")));
         assert!(prefer_x11(true, true, Some("niri"), Some("0")));
         assert!(!prefer_x11(false, true, Some("niri"), Some("0")));
+    }
+
+    /// Preferences › Graphics › Window system stands for the same values (#3083).
+    #[test]
+    fn the_window_system_preference_maps_to_the_override() {
+        use super::window_system_override as over;
+        assert_eq!(
+            (over(Some("wayland")), over(Some("x11")), over(Some("auto")), over(None), over(Some("junk"))),
+            (Some("1"), Some("0"), None, None, None)
+        );
+        // Wayland chosen on GNOME keeps native Wayland; X11 chosen on niri goes through XWayland.
+        assert!(!prefer_x11(true, true, Some("GNOME"), over(Some("wayland"))));
+        assert!(prefer_x11(true, true, Some("niri"), over(Some("x11"))));
     }
 }
 
@@ -950,5 +1040,14 @@ mod msaa_tests {
                 assert_eq!(eframe::egui_wgpu::effective_msaa_samples(backend, requested), requested);
             }
         }
+    }
+
+    #[test]
+    fn the_scene_follows_the_backend_policy_too() {
+        use eframe::wgpu::Backend;
+        assert_eq!(super::scene_samples(Backend::Gl, 4, &[1, 4]), 1);
+        assert_eq!(super::scene_samples(Backend::Gl, 4, &[]), 1);
+        assert_eq!(super::scene_samples(Backend::Vulkan, 4, &[1, 4]), 4);
+        assert_eq!(super::scene_samples(Backend::Dx12, 8, &[1, 2, 4]), 4);
     }
 }

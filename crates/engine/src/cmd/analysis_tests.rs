@@ -1,4 +1,4 @@
-//! Static stress through Nightfall's study runner. With `SOLIDCRAFT_NIGHTFALL` naming `nf` the
+//! Static stress through Nightfall's study runner. With `POLYKROM_NIGHTFALL` naming `nf` the
 //! cantilever is checked against beam theory; without it, only the refusals that need no solver.
 
 use serde_json::{Value, json};
@@ -6,7 +6,7 @@ use serde_json::{Value, json};
 use crate::Session;
 
 fn nightfall() -> bool {
-    std::env::var_os(super::NF).is_some_and(|v| !v.is_empty())
+    crate::geom::env::var_os(super::NF).is_some_and(|v| !v.is_empty())
 }
 
 /// An aluminium cantilever 200 mm long, 10 x 10 mm, along X from the origin.
@@ -24,7 +24,7 @@ fn tip_load() -> Value {
 #[test]
 fn a_cantilever_bends_as_beam_theory_says() {
     if !nightfall() {
-        eprintln!("SOLIDCRAFT_NIGHTFALL is not set: skipping");
+        eprintln!("POLYKROM_NIGHTFALL is not set: skipping");
         return;
     }
     let mut s = cantilever();
@@ -71,7 +71,7 @@ fn refusals_need_no_solver() {
     ];
     if !nightfall() {
         // Without the solver every call says how to get it.
-        cases = vec![(tip_load(), "SOLIDCRAFT_NIGHTFALL")];
+        cases = vec![(tip_load(), "POLYKROM_NIGHTFALL")];
     }
     for (p, words) in cases {
         let e = s.execute("analysis.static_stress", &p).unwrap_err().to_string();

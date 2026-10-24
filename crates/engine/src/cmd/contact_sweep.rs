@@ -13,9 +13,9 @@ use crate::{Result, Session};
 
 const MAX_SAMPLES: usize = 4096;
 const MAX_PLACEMENTS: usize = 4096;
-const MAX_BODIES: usize = 256;
+const MAX_BODIES: usize = 1024;
 const MAX_TRIANGLES: usize = 50_000;
-const MAX_WORK: usize = 50_000_000;
+const MAX_WORK: usize = 200_000_000;
 
 fn limit(message: &str) -> crate::EngineError {
     bad("contact.sweep", message)
@@ -26,10 +26,14 @@ struct CachedBody {
     path: Vec<u64>,
     offset: Mat,
     mesh: Arc<Mesh>,
+    /// Its triangles' tree, in the body's own frame (built once per body geometry).
+    tree: Arc<super::TriTree>,
     size: f64,
     /// How far its mesh may stray from its faces: 0 when every face is flat (the mesh is the
     /// shape), else the chord tolerance it was tessellated to.
     chord: f64,
+    /// Its thinnest width (a quarter of it is the sampling step a motion needs for it).
+    thickness: f64,
 }
 
 /// Bodies [`ContactMeshes`] keeps; it starts over when full.
@@ -39,6 +43,7 @@ const MAX_CACHED_MESHES: usize = 4 * MAX_BODIES;
 #[derive(Clone)]
 pub(crate) struct ContactMesh {
     mesh: Arc<Mesh>,
+    tree: Arc<super::TriTree>,
     chord: f64,
     /// Its thinnest width across its facet directions (the sweep's step is a quarter of it).
     thickness: f64,
@@ -48,6 +53,15 @@ pub(crate) struct ContactMesh {
 /// by a session and its scratch copies: driving a joint again meshes no body that did not change.
 #[derive(Default)]
 pub(crate) struct ContactMeshes(HashMap<u64, ContactMesh>);
+
+/// Whether bodies `a` and `b` have the same placement relative to each other in `now` as in `base`.
+fn same_relative(base: &[Mat], now: &[Mat], a: usize, b: usize) -> bool {
+    let relative = |f: &[Mat]| -> Option<Mat> { Some(mat_mul(&solidcraft_doc::mat_inverse(f.get(a)?)?, f.get(b)?)) };
+    match (relative(base), relative(now)) {
+        (Some(x), Some(y)) => x.iter().flatten().zip(y.iter().flatten()).all(|(p, q)| (p - q).abs() <= 1e-9 * (1.0 + p.abs())),
+        _ => false,
+    }
+}
 
 /// Tessellate `body` for contact checks and measure how thin it is.
 fn contact_mesh(body: &solidcraft_doc::ModelBody) -> Result<ContactMesh> {
@@ -88,7 +102,8 @@ fn contact_mesh(body: &solidcraft_doc::ModelBody) -> Result<ContactMesh> {
     let faces = body.body.face_count();
     let flat = faces <= 1024 && (0..faces).all(|i| body.body.face_plane(i).is_some());
     let chord = if flat { 0.0 } else { tolerance };
-    Ok(ContactMesh { mesh: Arc::new(mesh), chord, thickness })
+    let tree = Arc::new(super::tree_of(&mesh));
+    Ok(ContactMesh { mesh: Arc::new(mesh), tree, chord, thickness })
 }
 
 /// A member of a contact set: (occurrence id, name).
@@ -120,7 +135,7 @@ impl ContactGeometry {
             return Ok(out);
         }
         let state = s.model.state();
-        let mut meshes: HashMap<String, (Arc<Mesh>, f64)> = HashMap::new();
+        let mut meshes: HashMap<String, (Arc<Mesh>, f64, Arc<super::TriTree>, f64)> = HashMap::new();
         let mut stack = vec![(0, Vec::<u64>::new())];
         let mut count = 0;
         while let Some((component, path)) = stack.pop() {
@@ -146,7 +161,7 @@ impl ContactGeometry {
                 if out.bodies.len() >= MAX_BODIES {
                     return Err(limit("too many bodies for a contact sweep"));
                 }
-                let (mesh, chord) = if let Some(cached) = meshes.get(&body.name) {
+                let (mesh, chord, tree, thickness) = if let Some(cached) = meshes.get(&body.name) {
                     cached.clone()
                 } else {
                     let key = body.geometry_key();
@@ -165,15 +180,17 @@ impl ContactGeometry {
                         }
                     };
                     out.step = out.step.min(made.thickness * 0.25);
-                    meshes.insert(body.name.clone(), (made.mesh.clone(), made.chord));
-                    (made.mesh, made.chord)
+                    meshes.insert(body.name.clone(), (made.mesh.clone(), made.chord, made.tree.clone(), made.thickness));
+                    (made.mesh, made.chord, made.tree, made.thickness)
                 };
                 out.bodies.push(CachedBody {
                     path: path.clone(),
                     offset: s.doc.model_body_offset(body).copied().unwrap_or(IDENTITY),
                     mesh,
+                    tree,
                     size: body.body.size(),
                     chord,
+                    thickness,
                 });
             }
         }
@@ -217,8 +234,50 @@ impl ContactGeometry {
     }
 
     /// How many pairs of set members are checked against each other.
+    /// Set aside the pairs whose two bodies keep the same placement relative to each other in
+    /// every one of `poses` (and `start`): they move as one through the motion, so they cannot
+    /// meet in it. The sampling step then follows only the bodies still paired, so a thin washer
+    /// riding on a bracket no longer makes a long sweep take thousands of samples. Returns how
+    /// many pairs were set aside.
+    pub(super) fn drop_rigid_pairs(&mut self, start: &Session, poses: &[Session]) -> Result<usize> {
+        let base = self.frames(start)?;
+        let after: Vec<Vec<Mat>> = poses.iter().map(|s| self.frames(s)).collect::<Result<_>>()?;
+        let before = self.pairs.len();
+        self.pairs.retain(|(a, b, _, _)| after.iter().any(|f| !same_relative(&base, f, *a, *b)));
+        let used: BTreeSet<usize> = self.pairs.iter().flat_map(|(a, b, _, _)| [*a, *b]).collect();
+        let thinnest = used.iter().filter_map(|i| self.bodies.get(*i)).map(|b| b.thickness).fold(f64::INFINITY, f64::min);
+        if thinnest.is_finite() {
+            self.step = thinnest * 0.25;
+        }
+        Ok(before - self.pairs.len())
+    }
+
+    /// Each body's frame in `s`.
+    pub(super) fn frames(&self, s: &Session) -> Result<Vec<Mat>> {
+        self.bodies.iter().map(|b| Self::frame(b, s)).collect()
+    }
+
+    /// The member pairs (lower id first) whose bodies all have, in `now`, the placements relative
+    /// to each other they have in `base`: whatever they met in `base` they meet the same way now.
+    pub(super) fn unmoved(&self, base: &[Mat], now: &[Mat]) -> BTreeSet<(u64, u64)> {
+        let (mut all, mut moved) = (BTreeSet::new(), BTreeSet::new());
+        for (a, b, oa, ob) in &self.pairs {
+            let key = (oa.0.min(ob.0), oa.0.max(ob.0));
+            all.insert(key);
+            if !same_relative(base, now, *a, *b) {
+                moved.insert(key);
+            }
+        }
+        all.difference(&moved).copied().collect()
+    }
+
     pub(super) fn pair_count(&self) -> usize {
-        self.pairs.iter().map(|(_, _, a, b)| (a.0.min(b.0), a.0.max(b.0))).collect::<BTreeSet<_>>().len()
+        self.member_pairs().len()
+    }
+
+    /// The member pairs checked (lower id first).
+    pub(super) fn member_pairs(&self) -> BTreeSet<(u64, u64)> {
+        self.pairs.iter().map(|(_, _, a, b)| (a.0.min(b.0), a.0.max(b.0))).collect()
     }
 
     fn frame(body: &CachedBody, s: &Session) -> Result<Mat> {
@@ -309,18 +368,47 @@ impl ContactGeometry {
     /// first two bodies found go (every pair, or the first found when `all` is false). `work`
     /// adds up the cost, refused past `budget`.
     pub(super) fn hits(&self, s: &Session, work: &mut usize, budget: usize, all: bool) -> Result<Vec<(Member, Member, f64)>> {
+        self.hits_except(s, work, budget, all, &BTreeSet::new())
+    }
+
+    /// [`ContactGeometry::hits`], but the member pairs in `skip` (lower id first) are not tested.
+    pub(super) fn hits_except(
+        &self,
+        s: &Session,
+        work: &mut usize,
+        budget: usize,
+        all: bool,
+        skip: &BTreeSet<(u64, u64)>,
+    ) -> Result<Vec<(Member, Member, f64)>> {
         let mut out: Vec<(Member, Member, f64)> = Vec::new();
         // The member pairs found so far (lower id first).
         let mut found: BTreeSet<(u64, u64)> = BTreeSet::new();
-        let meshes = self.placed(s)?;
-        // Each mesh's box once, not once per pair it is in.
-        let boxes: Vec<Aabb3> = meshes.iter().map(Mesh::bounds).collect();
+        // Each body's frame and world box once, not once per pair it is in: its local box's
+        // corners moved (a box around the box, enough to rule pairs out).
+        let frames: Vec<Mat> = self.bodies.iter().map(|b| Self::frame(b, s)).collect::<Result<_>>()?;
+        let boxes: Vec<Aabb3> = self
+            .bodies
+            .iter()
+            .zip(&frames)
+            .map(|(b, f)| {
+                let l = b.tree.bounds();
+                let mut w = Aabb3::EMPTY;
+                for k in 0..8 {
+                    let x = if k & 1 == 0 { l.min.x } else { l.max.x };
+                    let y = if k & 2 == 0 { l.min.y } else { l.max.y };
+                    let z = if k & 4 == 0 { l.min.z } else { l.max.z };
+                    w.add(apply_point(f, Vec3::new(x, y, z)));
+                }
+                w
+            })
+            .collect();
         for (a, b, oa, ob) in &self.pairs {
             // Members already found colliding need no more of their bodies tested.
-            if found.contains(&(oa.0.min(ob.0), oa.0.max(ob.0))) {
+            let key = (oa.0.min(ob.0), oa.0.max(ob.0));
+            if found.contains(&key) || skip.contains(&key) {
                 continue;
             }
-            let (Some(ma), Some(mb), Some(ba), Some(bb)) = (meshes.get(*a), meshes.get(*b), self.bodies.get(*a), self.bodies.get(*b)) else {
+            let (Some(fa), Some(fb), Some(ba), Some(bb)) = (frames.get(*a), frames.get(*b), self.bodies.get(*a), self.bodies.get(*b)) else {
                 return Err(limit("invalid contact geometry pair"));
             };
             let (Some(aabb), Some(bbb)) = (boxes.get(*a), boxes.get(*b)) else {
@@ -335,18 +423,14 @@ impl ContactGeometry {
             {
                 continue;
             }
-            let cost = ma
-                .positions
-                .len()
-                // 4 sample points and 3 edges to probe per triangle of `a` against each triangle of `b` (#3323), and the other way round.
-                .saturating_add(ma.triangles.len().saturating_mul(7))
-                .saturating_mul(mb.triangles.len())
-                .saturating_add(mb.positions.len().saturating_add(mb.triangles.len().saturating_mul(7)).saturating_mul(ma.triangles.len()));
-            *work = work.saturating_add(cost);
+            // The triangles the check actually tests (its tree skips what boxes rule out), counted
+            // against the budget: a pin turning in its bore costs what is near it, not every
+            // triangle against every other (#25).
+            let depth = super::overlap_framed((&ba.mesh, &ba.tree, fa), (&bb.mesh, &bb.tree, fb), 1e-4 * ba.size.max(bb.size).max(1.0), work);
             if *work > budget {
                 return Err(limit("motion exceeds contact sweep collision budget; simplify the contact set or use smaller increments"));
             }
-            if let Some(depth) = super::mesh_overlap(ma, mb, 1e-4 * ba.size.max(bb.size).max(1.0)) {
+            if let Some(depth) = depth {
                 found.insert((oa.0.min(ob.0), oa.0.max(ob.0)));
                 out.push((oa.clone(), ob.clone(), depth));
                 if !all {

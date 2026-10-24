@@ -1,4 +1,4 @@
-//! Original SolidCraft mark, shared by desktop, packaging and CLI.
+//! Original Polykrom mark, shared by desktop, packaging and CLI.
 /// This block is the icon image data
 pub fn rgba(size: usize) -> Result<Vec<u8>, String> {
     if !(1..=2048).contains(&size) {
@@ -9,11 +9,20 @@ pub fn rgba(size: usize) -> Result<Vec<u8>, String> {
     let ss = if size > 512 { 2 } else { 4 };
     let n = size * ss;
     let mut buf = vec![[0u8; 4]; n * n];
-    let s = n as f32 / 412.217; // SVG units -> samples: the logo fills the height
-    let ox = (n as f32 - 357.0 * s) / 2.0; // and is centred sideways
-    // Fill a convex polygon given in SVG units.
-    let mut fill = |pts: &[P], col: [u8; 3]| {
-        let v: Vec<P> = pts.iter().map(|p| (ox + p.0 * s, p.1 * s)).collect();
+    // The gem: a pointy-top hexagon, corner to corner across the whole height, centred.
+    let (cx, cy, r) = (n as f32 / 2.0, n as f32 / 2.0, n as f32 / 2.0);
+    let corner = |k: usize| {
+        let a = std::f32::consts::FRAC_PI_2 - k as f32 * std::f32::consts::FRAC_PI_3;
+        (cx + r * a.cos(), cy - r * a.sin())
+    };
+    let inner = |k: usize| {
+        let a = std::f32::consts::FRAC_PI_2 - k as f32 * 2.0 * std::f32::consts::FRAC_PI_3;
+        (cx + 0.5 * r * a.cos(), cy - 0.5 * r * a.sin())
+    };
+    let h: [P; 6] = [corner(0), corner(1), corner(2), corner(3), corner(4), corner(5)];
+    let t: [P; 3] = [inner(0), inner(1), inner(2)];
+    // Fill a convex polygon given in samples.
+    let mut fill = |v: &[P], col: [u8; 3]| {
         let (top, bottom) = v.iter().fold((f32::MAX, f32::MIN), |(a, b), p| (a.min(p.1), b.max(p.1)));
         for y in ((top - 0.5).ceil() as i32).max(0)..=((bottom - 0.5).floor() as i32).min(n as i32 - 1) {
             let cy = y as f32 + 0.5;
@@ -34,55 +43,40 @@ pub fn rgba(size: usize) -> Result<Vec<u8>, String> {
             }
         }
     };
-    // Faces: each is a few overlapping convex pieces (the filler only does convex shapes).
-    let (light, mid, dark) = ([96, 158, 236], [58, 136, 238], [55, 108, 197]);
-    fill(&[(3.5, 105.9), (177.0, 5.8), (263.4, 55.6), (263.8, 156.0), (177.0, 406.4)], light);
-    fill(&[(177.0, 206.1), (263.8, 156.0), (350.5, 206.2), (350.5, 306.3), (177.0, 406.4)], light);
-    fill(&[(3.5, 105.9), (177.0, 206.1), (177.0, 406.4)], mid);
-    fill(&[(3.5, 105.9), (3.5, 205.7), (90.3, 256.2), (177.0, 206.1)], mid);
-    fill(&[(177.0, 206.1), (90.3, 256.2), (90.0, 356.2), (177.0, 406.4)], mid);
-    fill(&[(264.1, 155.8), (177.0, 206.1), (177.0, 406.4), (263.8, 256.2)], dark);
-    fill(&[(263.8, 256.2), (350.5, 206.2), (350.5, 306.3), (177.0, 406.4)], dark);
-    fill(&[(177.0, 206.1), (177.0, 406.4), (350.5, 306.3)], dark);
-    fill(&[(263.8, 55.9), (263.8, 156.0), (177.1, 105.9)], dark);
-    // White edge lines, 10 units wide: a rectangle per segment and a disc at each inner corner.
+    // Facets, the same as the toolbar mark: six corners and three mids, each its own colour of
+    // the brand range (theme `logo_facets`), around a pale centre.
+    let corners: [[u8; 3]; 6] = [[65, 70, 194], [26, 143, 171], [19, 116, 140], [94, 54, 168], [116, 66, 196], [53, 58, 166]];
+    let mids: [[u8; 3]; 3] = [[46, 196, 214], [90, 110, 232], [139, 98, 234]];
+    for (k, near) in [(0, 0), (1, 1), (2, 1), (3, 2), (4, 2), (5, 0)] {
+        fill(&[h[k], h[(k + 1) % 6], t[near]], corners[k]);
+    }
+    fill(&[t[0], t[1], h[1]], mids[0]);
+    fill(&[t[1], t[2], h[3]], mids[1]);
+    fill(&[t[2], t[0], h[5]], mids[2]);
+    fill(&[t[0], t[1], t[2]], [201, 246, 250]);
+    // White seams, a fortieth of the height wide: a rectangle per segment, a disc at each end.
+    let w = n as f32 / 80.0;
     let white = [255, 255, 255];
-    let mut stroke = |pts: &[P], closed: bool| {
-        let m = pts.len();
-        for i in 0..(if closed { m } else { m - 1 }) {
-            let (a, b) = (pts[i], pts[(i + 1) % m]);
-            let l = ((b.0 - a.0).powi(2) + (b.1 - a.1).powi(2)).sqrt();
-            let (nx, ny) = (-(b.1 - a.1) / l * 5.0, (b.0 - a.0) / l * 5.0);
-            fill(&[(a.0 + nx, a.1 + ny), (b.0 + nx, b.1 + ny), (b.0 - nx, b.1 - ny), (a.0 - nx, a.1 - ny)], white);
-        }
-        for c in &pts[if closed { 0 } else { 1 }..if closed { m } else { m - 1 }] {
+    let mut seam = |a: P, b: P| {
+        let l = ((b.0 - a.0).powi(2) + (b.1 - a.1).powi(2)).sqrt();
+        let (nx, ny) = (-(b.1 - a.1) / l * w, (b.0 - a.0) / l * w);
+        fill(&[(a.0 + nx, a.1 + ny), (b.0 + nx, b.1 + ny), (b.0 - nx, b.1 - ny), (a.0 - nx, a.1 - ny)], white);
+        for c in [a, b] {
             let disc: Vec<P> = (0..16)
                 .map(|k| {
-                    let t = k as f32 * std::f32::consts::TAU / 16.0;
-                    (c.0 + 5.0 * t.cos(), c.1 + 5.0 * t.sin())
+                    let u = k as f32 * std::f32::consts::TAU / 16.0;
+                    (c.0 + w * u.cos(), c.1 + w * u.sin())
                 })
                 .collect();
             fill(&disc, white);
         }
     };
-    stroke(&[(263.8, 55.9), (177.1, 105.9), (263.8, 156.0), (263.8, 256.2), (350.6, 206.1)], false);
-    stroke(&[(5.0, 105.9), (178.5, 206.1), (178.5, 406.4)], false);
-    stroke(&[(177.0, 206.1), (263.8, 156.0)], false);
-    stroke(
-        &[
-            (178.5, 5.8),
-            (5.0, 105.9),
-            (5.0, 206.1),
-            (91.7, 256.2),
-            (91.7, 356.4),
-            (178.5, 406.4),
-            (352.0, 306.3),
-            (352.0, 206.1),
-            (265.2, 156.0),
-            (265.2, 55.9),
-        ],
-        true,
-    );
+    for (a, b) in [(0, 1), (1, 2), (2, 0)] {
+        seam(t[a], t[b]);
+    }
+    for (k, near) in [(1, 0), (1, 1), (3, 1), (3, 2), (5, 2), (5, 0), (0, 0), (2, 1), (4, 2)] {
+        seam(h[k], t[near]);
+    }
     // Average each ss x ss block down to one pixel (straight alpha = covered share).
     let mut rgba = Vec::with_capacity(size * size * 4);
     for y in 0..size {

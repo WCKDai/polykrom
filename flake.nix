@@ -1,5 +1,5 @@
 {
-  description = "SolidCraft — native app development shell and package for Linux and macOS";
+  description = "Polykrom — native app development shell and package for Linux and macOS";
 
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
 
@@ -60,7 +60,7 @@
       shellHook = pkgs: ''
         ${pkgs.lib.optionalString pkgs.stdenv.isLinux ''
           if [ ! -d ${driverLibDir pkgs} ]; then
-            echo "SolidCraft: ${driverLibDir pkgs} is missing — on NixOS enable hardware.graphics; on other distributions use a matching nixGL driver wrapper." >&2
+            echo "Polykrom: ${driverLibDir pkgs} is missing — on NixOS enable hardware.graphics; on other distributions use a matching nixGL driver wrapper." >&2
           fi
         ''}
         command -v cc >/dev/null || echo "solidcraft: no C linker on PATH, cargo cannot link — use nix develop .#rust" >&2
@@ -106,7 +106,7 @@
         default = solidcraft;
         solidcraft = assert pkgs.lib.assertMsg
           (pkgs.lib.versionAtLeast pkgs.rustc.version (pkgs.lib.importTOML ./Cargo.toml).workspace.package.rust-version)
-          "SolidCraft requires the Rust version advertised in Cargo.toml; update the pinned nixpkgs input.";
+          "Polykrom requires the Rust version advertised in Cargo.toml; update the pinned nixpkgs input.";
           pkgs.rustPlatform.buildRustPackage {
           pname = "solidcraft";
           version = (pkgs.lib.importTOML ./Cargo.toml).workspace.package.version;

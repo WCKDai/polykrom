@@ -1,13 +1,15 @@
-//! Bundled IBM Plex interface faces, user overrides, and language-specific system fallbacks.
+//! Bundled Atkinson Hyperlegible interface faces, user overrides, and language-specific system fallbacks.
 //! The same definitions are used on desktop and web; the web shell adds Japanese on demand.
 
 use std::sync::Arc;
 
 use egui::{FontDefinitions, FontFamily, FontId, RichText};
 
-const PLEX_SANS: &[u8] = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/../../assets/fonts/ibm-plex-sans/IBMPlexSans-Variable.ttf"));
-const PLEX_MONO: &[u8] = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/../../assets/fonts/ibm-plex-mono/IBMPlexMono-Regular.ttf"));
-const WEIGHTS: [(&str, f32); 4] = [("plex-sans", 400.0), ("ui-medium", 500.0), ("ui-semibold", 600.0), ("ui-bold", 700.0)];
+const UI_SANS: &[u8] =
+    include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/../../assets/fonts/atkinson-hyperlegible-next/AtkinsonHyperlegibleNext-Variable.ttf"));
+const UI_MONO: &[u8] =
+    include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/../../assets/fonts/atkinson-hyperlegible-mono/AtkinsonHyperlegibleMono-Regular.ttf"));
+const WEIGHTS: [(&str, f32); 4] = [("ui-sans", 400.0), ("ui-medium", 500.0), ("ui-semibold", 600.0), ("ui-bold", 700.0)];
 
 fn sans_families() -> [FontFamily; 4] {
     [FontFamily::Proportional, medium_family(), semibold_family(), bold_family()]
@@ -17,19 +19,19 @@ fn all_families() -> impl Iterator<Item = FontFamily> {
     sans_families().into_iter().chain([FontFamily::Monospace])
 }
 
-/// IBM Plex Sans at 400/500/600/700 and Plex Mono Regular, followed by egui's symbol/emoji
+/// Atkinson Hyperlegible Next at 400/500/600/700 and Atkinson Hyperlegible Mono Regular, followed by egui's symbol/emoji
 /// fallbacks. Each variable instance shares the embedded bytes and selects a real weight.
 pub fn base_font_definitions() -> FontDefinitions {
     let mut fonts = FontDefinitions::default();
     let fallbacks = fonts.families.get(&FontFamily::Proportional).cloned().unwrap_or_default();
     for ((name, weight), family) in WEIGHTS.into_iter().zip(sans_families()) {
-        let mut data = egui::FontData::from_static(PLEX_SANS);
+        let mut data = egui::FontData::from_static(UI_SANS);
         data.tweak.coords = egui::epaint::text::VariationCoords::new([(b"wght", weight)]);
         fonts.font_data.insert(name.to_owned(), Arc::new(data));
         fonts.families.insert(family, std::iter::once(name.to_owned()).chain(fallbacks.iter().cloned()).collect());
     }
-    fonts.font_data.insert("plex-mono".to_owned(), Arc::new(egui::FontData::from_static(PLEX_MONO)));
-    fonts.families.entry(FontFamily::Monospace).or_default().insert(0, "plex-mono".to_owned());
+    fonts.font_data.insert("ui-mono".to_owned(), Arc::new(egui::FontData::from_static(UI_MONO)));
+    fonts.families.entry(FontFamily::Monospace).or_default().insert(0, "ui-mono".to_owned());
     with_symbol_fallback(fonts)
 }
 
@@ -127,7 +129,7 @@ pub fn ui_font(name: &str) -> Option<egui::FontData> {
     Some(font)
 }
 
-/// Put a chosen interface face first in every sans family; keep Plex and language fallbacks.
+/// Put a chosen interface face first in every sans family; keep the bundled face and language fallbacks.
 /// A user-selected static face keeps its own weight (we never synthesize a bold face).
 pub fn with_ui_font(mut fonts: FontDefinitions, font: egui::FontData) -> FontDefinitions {
     fonts.font_data.insert(UI_FONT.to_owned(), Arc::new(font));
@@ -223,7 +225,7 @@ fn with_fallback(mut fonts: egui::FontDefinitions, name: &str, bytes: Vec<u8>) -
 }
 
 /// Use one primary CJK face for mixed-script labels in every sans weight family.
-/// An explicit interface font stays first; Plex and the other fallbacks remain available.
+/// An explicit interface font stays first; the bundled face and the other fallbacks remain available.
 fn promote_font_to_front(fonts: &mut FontDefinitions, name: &str) {
     for family in sans_families() {
         if let Some(list) = fonts.families.get_mut(&family)
@@ -555,12 +557,22 @@ fn scan_dir_for_font_where(dir: &std::path::Path, depth_remaining: usize, matche
     None
 }
 
-/// Find a CJK fallback font on the local system or in CRAFT_FONTS_DIR.
+/// The font folders named by `SOLIDCRAFT_FONT_DIRS` (a path list), or else by the single folder
+/// in `CRAFT_FONTS_DIR` (the craft-fonts pack).
+#[cfg(not(target_arch = "wasm32"))]
+fn font_override_dirs(dirs: Option<std::ffi::OsString>, pack: Option<std::ffi::OsString>) -> Vec<std::path::PathBuf> {
+    match (dirs, pack) {
+        (Some(dirs), _) => std::env::split_paths(&dirs).collect(),
+        (None, Some(pack)) => vec![std::path::PathBuf::from(pack)],
+        (None, None) => Vec::new(),
+    }
+}
+
+/// Find a CJK fallback font on the local system or in SOLIDCRAFT_FONT_DIRS / CRAFT_FONTS_DIR.
 #[cfg(not(target_arch = "wasm32"))]
 fn find_system_cjk_font() -> Option<Vec<u8>> {
-    // 1. Check optional craft-fonts pack directory if specified.
-    if let Ok(craft_dir) = std::env::var("CRAFT_FONTS_DIR") {
-        let dir = std::path::Path::new(&craft_dir);
+    // 1. Check the font folders the user named.
+    for dir in font_override_dirs(std::env::var_os("SOLIDCRAFT_FONT_DIRS"), std::env::var_os("CRAFT_FONTS_DIR")) {
         let names = ["BIZUDPGothic-Regular.ttf", "BIZ-UDGothicR.ttc", "NotoSansCJK-Regular.ttc", "NotoSansJP-Regular.ttf"];
         for name in names {
             if let Some(bytes) = try_read_font(&dir.join(name)) {
@@ -615,7 +627,12 @@ fn find_system_cjk_font() -> Option<Vec<u8>> {
 
     #[cfg(target_os = "linux")]
     {
-        let search_dirs = [std::path::PathBuf::from("/usr/share/fonts"), std::path::PathBuf::from("/usr/local/share/fonts")];
+        let search_dirs = [
+            std::path::PathBuf::from("/usr/share/fonts"),
+            std::path::PathBuf::from("/usr/local/share/fonts"),
+            std::path::PathBuf::from("/run/host/fonts"),
+            std::path::PathBuf::from("/run/host/user-fonts"),
+        ];
         for dir in &search_dirs {
             if let Some(bytes) = scan_dir_for_font(dir, 3, is_cjk_font_name) {
                 return Some(bytes);
@@ -809,6 +826,8 @@ fn chinese_font_dirs() -> Vec<std::path::PathBuf> {
     {
         dirs.push(std::path::PathBuf::from("/usr/share/fonts"));
         dirs.push(std::path::PathBuf::from("/usr/local/share/fonts"));
+        dirs.push(std::path::PathBuf::from("/run/host/fonts"));
+        dirs.push(std::path::PathBuf::from("/run/host/user-fonts"));
         if let Ok(home) = std::env::var("HOME") {
             dirs.push(std::path::PathBuf::from(&home).join(".local/share/fonts"));
             dirs.push(std::path::PathBuf::from(home).join(".fonts"));
@@ -883,6 +902,22 @@ pub(crate) fn test_context() -> egui::Context {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// `SOLIDCRAFT_FONT_DIRS` wins and may list several folders; `CRAFT_FONTS_DIR` is the fallback.
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn cjk_font_folders_from_the_environment() -> Result<(), std::env::JoinPathsError> {
+        use std::path::PathBuf;
+        let list = std::env::join_paths(["/a", "/b"])?;
+        assert_eq!(font_override_dirs(Some(list), Some("/pack".into())), vec![PathBuf::from("/a"), PathBuf::from("/b")]);
+        assert_eq!(font_override_dirs(None, Some("/pack".into())), vec![PathBuf::from("/pack")]);
+        assert!(font_override_dirs(None, None).is_empty());
+        #[cfg(target_os = "linux")]
+        for dir in ["/run/host/fonts", "/run/host/user-fonts"] {
+            assert!(chinese_font_dirs().contains(&PathBuf::from(dir)), "missing {dir}");
+        }
+        Ok(())
+    }
 
     /// The system faces are searched for on a thread; installing fonts before they are found does
     /// not wait for the search and still gives the bundled faces.
@@ -963,14 +998,14 @@ mod tests {
             assert_eq!(list[0], name);
             assert_eq!(&list[1..], defaults.families[&FontFamily::Proportional]);
             let data = &fonts.font_data[name];
-            assert_eq!(data.font.as_ref(), PLEX_SANS);
+            assert_eq!(data.font.as_ref(), UI_SANS);
             assert_eq!(data.tweak.coords.as_ref()[0].1, weight);
             assert!(data.variation_axes().iter().any(|a| a.tag == *b"wght"));
         }
         let mono = &fonts.families[&FontFamily::Monospace];
-        assert_eq!(mono[0], "plex-mono");
+        assert_eq!(mono[0], "ui-mono");
         assert_eq!(&mono[1..], defaults.families[&FontFamily::Monospace]);
-        assert_eq!(fonts.font_data["plex-mono"].font.as_ref(), PLEX_MONO);
+        assert_eq!(fonts.font_data["ui-mono"].font.as_ref(), UI_MONO);
     }
 
     #[test]
@@ -998,7 +1033,7 @@ mod tests {
     }
 
     #[test]
-    fn web_download_and_preference_changes_compose_without_losing_plex_or_japanese() {
+    fn web_download_and_preference_changes_compose_without_losing_the_ui_face_or_japanese() {
         let ctx = test_context();
         let chosen = solidcraft_engine::sketch::DEFAULT_FONT_FAMILY;
         install(&ctx, web_font_definitions(chosen, None));
@@ -1133,8 +1168,8 @@ mod tests {
             assert_eq!(list.first().map(String::as_str), Some(CJK_FALLBACK));
             assert!(list.contains(&defaults.families[&family][0]), "the bundled weight remains available");
         }
-        assert_eq!(fonts.families[&FontFamily::Monospace][0], "plex-mono");
-        let chosen = egui::FontData::from_static(PLEX_SANS);
+        assert_eq!(fonts.families[&FontFamily::Monospace][0], "ui-mono");
+        let chosen = egui::FontData::from_static(UI_SANS);
         let mut fonts = with_ui_font(fonts, chosen);
         promote_font_to_front(&mut fonts, CJK_FALLBACK);
         for family in sans_families() {

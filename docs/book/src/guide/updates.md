@@ -1,6 +1,6 @@
 # Updates and privacy
 
-SolidCraft tells you when a newer release is out. It never updates itself without asking, and
+Polykrom tells you when a newer release is out. It never updates itself without asking, and
 the check sends nothing about you or your designs.
 
 ## What you see
@@ -16,7 +16,7 @@ room, then to its icon alone.
 - **Skip this version** hides the pill until an even newer release comes out.
 - **Remind me later** hides it for three days.
 
-SolidCraft checks every time it starts, so a release that came out since you last opened it shows
+Polykrom checks every time it starts, so a release that came out since you last opened it shows
 up straight away, and again once a day while it stays open.
 
 **Preferences ▸ General ▸ Updates** has **Check for updates automatically** (on by default) and
@@ -24,22 +24,22 @@ up straight away, and again once a day while it stays open.
 
 ## Updating in one click
 
-Where SolidCraft can replace itself safely, the window also has **Update now**:
+Where Polykrom can replace itself safely, the window also has **Update now**:
 
 | Installed as | Update now does |
 |---|---|
 | AppImage | Downloads the new AppImage next to the old one, verifies it, renames it over the old file and offers **Restart now** |
-| Windows installer (`.msi`) | **Install (closes SolidCraft)**: downloads and verifies the `.msi`, closes SolidCraft (asking about unsaved designs first) and starts the installer |
+| Windows installer (`.msi`) | **Install (closes Polykrom)**: downloads and verifies the `.msi`, closes Polykrom (asking about unsaved designs first) and starts the installer |
 | Windows portable `.zip` or `.exe` | Downloads and verifies the package, swaps in the new `solidcraft.exe` (and `solidcraft-cli.exe`) and offers **Restart now**; the old file is removed at the next start |
-| macOS | **Download and open**: downloads and verifies the `.dmg` and opens it; drag SolidCraft to Applications to replace the old copy |
+| macOS | **Download and open**: downloads and verifies the `.dmg` and opens it; drag Polykrom to Applications to replace the old copy |
 | Flatpak, Snap, `.deb`, `.rpm`, `.tar.gz` | Nothing: your package manager updates these (the window shows the command), or you unpack the new archive |
 
 Every download is verified before anything changes: its SHA-256 must match the release's
 `SHA256SUMS.txt`, fetched over HTTPS from the same release, and, once the project signs its
-releases, that list must carry a valid signature by SolidCraft's release key that names the
-release (see [releasing](https://github.com/bherbruck/solidcraft/blob/main/docs/releasing.md#update-signing)).
+releases, that list must carry a valid signature by Polykrom's release key that names the
+release (see [releasing](https://github.com/wckdboy/polykrom/blob/main/docs/releasing.md#update-signing)).
 A download that doesn't verify is deleted and the installed copy is left as it was; **Download**
-still gets the package for a manual install. On macOS SolidCraft opens the disk image rather than
+still gets the package for a manual install. On macOS Polykrom opens the disk image rather than
 replacing the app itself, because the app is ad-hoc signed and not notarized: replacing it in the
 background would install code macOS can't vouch for without you seeing it.
 
@@ -48,39 +48,39 @@ fails with a message, and **Download** is the way to update it.
 
 ## Updating from 0.11 to 0.14
 
-SolidCraft 0.11.0 to 0.14.0 only accept packages from the project's old GitHub address. Since
+Polykrom 0.11.0 to 0.14.0 only accept packages from the project's old GitHub address. Since
 the repository moved to `github.com/tangency-labs/solidcraft`, every release names the new address,
 so these versions see that a newer release is out but find no package in it: **Update now** can't
 install it, and **Download** opens the release page.
 
 Download 0.15.0 or later once yourself, from the release page or the
 [download links](https://github.com/tangency-labs/solidcraft#download), and install it over the old
-version as you first installed it. From 0.15.0 on, SolidCraft accepts either address, and
+version as you first installed it. From 0.15.0 on, Polykrom accepts either address, and
 **Update now** works again. Package managers (Flatpak, Snap, WinGet, `.deb`, `.rpm`) aren't
 affected.
 
 ## What is sent
 
-One HTTPS request each time SolidCraft starts, and once a day while it stays open:
+One HTTPS request each time Polykrom starts, and once a day while it stays open:
 
 ```text
-GET https://api.github.com/repos/bherbruck/solidcraft/releases/latest
-User-Agent: SolidCraft-update-check
+GET https://api.github.com/repos/wckdboy/polykrom/releases/latest
+User-Agent: Polykrom-update-check
 Accept: application/vnd.github+json
 X-GitHub-Api-Version: 2022-11-28
 ```
 
 **Update now** then downloads `SHA256SUMS.txt` (and its signature) and the one package from the
-release's own `github.com/bherbruck/solidcraft/releases/download/…` links, with the same
+release's own `github.com/wckdboy/polykrom/releases/download/…` links, with the same
 User-Agent. That's all: no version number, no machine or user identifier, no usage data, no cookies. GitHub
 sees the request like any other visit to the API (your IP address, the time); see
 [GitHub's privacy statement](https://docs.github.com/site-policy/privacy-policies/github-general-privacy-statement).
-SolidCraft compares the answer with its own version on your computer.
+Polykrom compares the answer with its own version on your computer.
 
 - Offline, or GitHub doesn't answer within 15 seconds: nothing is shown, and the check is tried
   again an hour later (or at the next start, whichever comes first).
 - GitHub's rate limit for anonymous requests (60 an hour per address) is respected: when GitHub
-  says to wait, SolidCraft waits that long, Check now and the check at start included.
+  says to wait, Polykrom waits that long, Check now and the check at start included.
 - Turning off **Check for updates automatically** stops the checks; only **Check now** asks.
 - Setting the environment variable `SOLIDCRAFT_UPDATE_CHECK=0` turns all checks off, for
   example on managed machines.
@@ -89,8 +89,8 @@ Builds you compile yourself, the Flatpak and the browser app (which updates itse
 
 ## Which file Download gets
 
-Releases attach the main packages under fixed names (see [releasing](https://github.com/bherbruck/solidcraft/blob/main/docs/releasing.md)),
-and SolidCraft picks the one matching how it was installed:
+Releases attach the main packages under fixed names (see [releasing](https://github.com/wckdboy/polykrom/blob/main/docs/releasing.md)),
+and Polykrom picks the one matching how it was installed:
 
 | Installed as | Detected by | Download | How to update |
 |---|---|---|---|

@@ -1,6 +1,6 @@
 [Desktop Entry]
 Type=Application
-Name=SolidCraft
+Name=Polykrom
 GenericName=3D CAD
 Comment=Parametric 3D CAD: sketch, constrain, extrude, and change a parameter to rebuild
 Exec=solidcraft %f
@@ -11,6 +11,6 @@ StartupNotify=true
 StartupWMClass=ai.storyteller.solidcraft
 Categories=Graphics;3DGraphics;Engineering;
 Keywords=cad;3d;parametric;sketch;step;stl;modelling;modeling;
-MimeType=application/x-solidcraft;model/step;model/iges;model/stl;model/3mf;
+MimeType=application/x-polykrom;application/x-solidcraft;model/step;model/iges;model/stl;model/3mf;
 # Releases before 0.8 used this desktop id; launchers keep pinned entries across the rename.
 X-Flatpak-RenamedFrom=ai.storyteller.solvecraft.desktop;

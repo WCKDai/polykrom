@@ -64,7 +64,7 @@ this way (anything else meshes itself), and anything that changes what a body sh
 lines; any operation, which makes a new body) drops the link. Measurements, booleans and export
 read the instance's own geometry as before, so `solidcraft-cli eval` of an assembly is unchanged.
 
-Two generated assemblies (SolidCraft designs with placed copies of components, exported as STEP
+Two generated assemblies (Polykrom designs with placed copies of components, exported as STEP
 AP214 assemblies), `solidcraft-cli bench-open`, release build, shared 16-core Linux box:
 
 | file | bodies | mesh phase before | after | CPU before | after | peak RSS before | after |
@@ -397,7 +397,7 @@ forward/reverse order. Memory is each process's peak working set from Windows
 processes; it excludes a desktop window/GPU.
 
 The original STEP fixture is a 32 by 16 array of 10 mm cubes, 12 mm apart, exported
-by SolidCraft: 512 bodies and 6,144 final triangles. Its JSON embeds about 2 MB of
+by Polykrom: 512 bodies and 6,144 final triangles. Its JSON embeds about 2 MB of
 STEP. Every encoding reopens without feature errors and with those same counts.
 
 | STEP encoding | Bytes | Atomic save, ms |
@@ -826,7 +826,7 @@ browser downloads default to `cache: false`, so they incur none of the thumbnail
 work or added bytes measured below.
 
 Measured 2026-10-13 on the same Windows machine and `ci` profile as above, but
-with **SolidCraft 0.7.0** on both sides: `d3d215b` before the thumbnail change and
+with **Polykrom 0.7.0** on both sides: `d3d215b` before the thumbnail change and
 thumbnail revision `e180cdc` after it. These measurements precede the integration
 of upstream `9f88537`; later geometry changes are not included in these timings.
 A preserved executable of the baseline
@@ -859,7 +859,7 @@ its existing thumbnail-generation fallback for this case. A small triangle count
 alone does not guarantee eligibility, because large overlapping faces cost more.
 
 Actual desktop check: copy the STEP container to a new public temporary path,
-start SolidCraft 0.7.0 with that path in Recent and an empty local thumbnail cache,
+start Polykrom 0.7.0 with that path in Recent and an empty local thumbnail cache,
 and show Home without opening the design. The portable picture was ready in one
 observed 47.6 ms check; no local PNG was created and the active document remained
 empty. The screenshot shows the transferred file's picture while built-in sample

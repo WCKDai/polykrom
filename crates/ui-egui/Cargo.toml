@@ -1,6 +1,6 @@
 [package]
 name = "solidcraft-ui-egui"
-description = "SolidCraft user interface (egui + wgpu): the swappable front end"
+description = "Polykrom user interface (egui + wgpu): the swappable front end"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -30,6 +30,10 @@ minisign-verify = "0.3"
 zip = { workspace = true }
 # Rasterises the icon SVGs (assets/icons/ui/design/svg) at the size they are drawn.
 tiny-skia = { workspace = true }
+
+[target.'cfg(unix)'.dependencies]
+# Ends an agent's process group with the system call (MIT; already in the tree through zip).
+nix = { workspace = true }
 
 [target.'cfg(windows)'.dependencies]
 # Updates: the folder the Windows installer recorded, so an install outside Program Files is still

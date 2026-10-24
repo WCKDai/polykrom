@@ -1,6 +1,6 @@
 [package]
 name = "solidcraft-cli"
-description = "SolidCraft headless CLI: run command scripts, measure, export, render snapshots, replay oracle recipes"
+description = "Polykrom headless CLI: run command scripts, measure, export, render snapshots, replay oracle recipes"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -12,6 +12,12 @@ workspace = true
 [[bin]]
 name = "solidcraft-cli"
 path = "src/main.rs"
+
+# Polykrom's name for the CLI: runs solidcraft-cli, the program itself until packaging moves to
+# the new name (docs/compatibility.md).
+[[bin]]
+name = "polykrom-cli"
+path = "src/polykrom.rs"
 
 # Compatibility alias for the CLI's former name: forwards to solidcraft-cli with a deprecation
 # note on stderr. Shipped in every package for at least one release.

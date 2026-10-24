@@ -1,4 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <title>Graphics display</title>
-  <path d="M13 10L51 10A5 5 0 0 1 56 15L56 37A5 5 0 0 1 51 42L13 42A5 5 0 0 1 8 37L8 15A5 5 0 0 1 13 10ZM32 42L32 54M24 54L40 54" fill="none" stroke="currentColor" stroke-width="5.6" stroke-linejoin="round" stroke-linecap="round"/>
+  <title>Display</title>
+  <path d="M10 10L54 10A4 4 0 0 1 58 14L58 40A4 4 0 0 1 54 44L10 44A4 4 0 0 1 6 40L6 14A4 4 0 0 1 10 10Z" fill="none" stroke="currentColor" stroke-width="4.4" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M26 54L38 54M32 44L32 54" fill="none" stroke="currentColor" stroke-width="4.4" stroke-linejoin="round" stroke-linecap="round"/>
 </svg>

@@ -1,8 +1,12 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <title>Params</title>
-  <path d="M5.23 55.4C10.18 60.35 16.13 58.37 17.61 49.45L23.06 13.77C24.55 4.86 30.5 3.86 34.96 8.82" fill="none" stroke="currentColor" stroke-width="4.2" stroke-linejoin="round" stroke-linecap="round"/>
-  <path d="M13.15 23.68L27.03 23.68" fill="none" stroke="currentColor" stroke-width="4.2" stroke-linejoin="round" stroke-linecap="round"/>
-  <path d="M35.95 25.67C29.01 28.64 25.05 35.58 25.05 41.52C25.05 49.45 30 55.4 35.95 57.38" fill="none" stroke="currentColor" stroke-width="4.2" stroke-linejoin="round" stroke-linecap="round"/>
-  <path d="M47.84 25.67C54.78 28.64 58.74 35.58 58.74 41.52C58.74 49.45 53.79 55.4 47.84 57.38" fill="none" stroke="currentColor" stroke-width="4.2" stroke-linejoin="round" stroke-linecap="round"/>
-  <path d="M35.95 37.56L46.85 48.46M46.85 37.56L35.95 48.46" fill="none" stroke="#236ead" stroke-width="4.2" stroke-linejoin="round" stroke-linecap="round"/>
+  <title>Parameters</title>
+  <path d="M10 18L54 18" fill="none" stroke="currentColor" stroke-width="4.4" stroke-linejoin="round" stroke-linecap="round"/>
+  <circle cx="40" cy="18" r="6.2" fill="#ffffff"/>
+  <circle cx="40" cy="18" r="5.2" fill="currentColor"/>
+  <path d="M10 32L54 32" fill="none" stroke="currentColor" stroke-width="4.4" stroke-linejoin="round" stroke-linecap="round"/>
+  <circle cx="22" cy="32" r="6.2" fill="#ffffff"/>
+  <circle cx="22" cy="32" r="5.2" fill="#328bd3"/>
+  <path d="M10 46L54 46" fill="none" stroke="currentColor" stroke-width="4.4" stroke-linejoin="round" stroke-linecap="round"/>
+  <circle cx="34" cy="46" r="6.2" fill="#ffffff"/>
+  <circle cx="34" cy="46" r="5.2" fill="currentColor"/>
 </svg>

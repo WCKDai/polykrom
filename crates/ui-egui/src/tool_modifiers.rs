@@ -330,7 +330,7 @@ const SELECTION_BINDINGS: &[Binding] = &[
 const SKETCH_SNAP_BINDINGS: &[Binding] = &[
     Binding {
         action: ModAction::SuppressSnap,
-        // Classic SolidCraft: Ctrl/Cmd or Alt/Option each suppress snap.
+        // Classic Polykrom: Ctrl/Cmd or Alt/Option each suppress snap.
         defaults: &[ModifierCombo::CTRL, ModifierCombo::ALT],
         matching: Match::AtLeast,
         trigger: Trigger::Live,

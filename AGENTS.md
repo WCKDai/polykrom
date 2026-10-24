@@ -1,18 +1,21 @@
-# SolidCraft — instructions for agents
+# Polykrom — instructions for agents
 
-SolidCraft is a clean-room, open-source, pure-Rust parametric 3D CAD application:
+Polykrom is a clean-room, open-source, pure-Rust parametric 3D CAD application:
 sketches with a constraint solver, a parametric timeline of features, a B-rep
 kernel, and a desktop UI that agents can drive. Projects published by
 [storytold](https://github.com/storytold) can serve as references for implementation conventions.
 Any code adapted from other projects (MIT OR Apache-2.0) is noted in ATTRIBUTION.md.
 
 ## Product name
-SolidCraft everywhere: crates `solidcraft-*`, binaries `solidcraft` and `solidcraft-cli`,
-`.solidcraft` designs, the `solidcraft/N` format tag, `SOLIDCRAFT_*` environment variables,
-settings and recovery folders, the MCP server name, docs, CI and packaging. The old name
-survives only in the explicit compatibility shims listed in `docs/compatibility.md`; don't add
-new uses of it anywhere else. Public docs/web/Flatpak deployments use project Pages
-`/solidcraft/`; do not add permanent old-name Pages aliases.
+Polykrom is a fork of SolidCraft (github.com/tangency-labs/solidcraft). Say Polykrom in
+everything a person reads: the UI, messages, docs, MCP descriptions, packaging names. Until the
+second rename stage, the internals keep SolidCraft's names: crates `solidcraft-*`, binaries
+`solidcraft` and `solidcraft-cli` (with `polykrom` and `polykrom-cli` aliases), the
+`solidcraft/N` format tag inside designs, settings and recovery folders and the bundle IDs.
+Variables read through `solidcraft_geom::env` are `POLYKROM_*`, with `SOLIDCRAFT_*` and
+`SOLVECRAFT_*` fallbacks; read new ones that way. Designs are saved as `.polykrom`
+(`solidcraft_io::DESIGN_EXT`); `.solidcraft` and `.solvecraft` still open (`DESIGN_EXTS`). The rest are still `SOLIDCRAFT_*`. Don't rename those internals piecemeal; `docs/compatibility.md` lists
+them. Credit SolidCraft wherever its work is described.
 
 ## Start every session here
 1. Read `plan/STATUS.md` (current milestone, next task), then the task in `plan/execution-plan.md`
@@ -25,7 +28,7 @@ new uses of it anywhere else. Public docs/web/Flatpak deployments use project Pa
 `plan/` is gitignored (local only).
 
 ## Never crash
-People trust SolidCraft with their designs; a crash loses their work. **This outranks feature work.**
+People trust Polykrom with their designs; a crash loses their work. **This outranks feature work.**
 - **No panics in non-test code:** no `unwrap()`, `expect()`, `panic!`, `unreachable!`, `todo!`,
   `unimplemented!`; no `unsafe` (`unsafe_code = "forbid"`). The exceptions, in the app crate and in
   `crates/threedx-client` (which deny it instead), have no safe API: the macOS-only
@@ -58,7 +61,7 @@ People trust SolidCraft with their designs; a crash loses their work. **This out
   `#![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::unimplemented, clippy::todo, clippy::unreachable)]`.
 
 ## Non-negotiables
-- **Independent.** SolidCraft is independent. Behaviour is designed from public documentation,
+- **Independent.** Polykrom is independent. Behaviour is designed from public documentation,
   general CAD conventions and user feedback. Reference tests use analytic values and open-source
   tools. Never copy another product's code, icons, artwork, help text, tooltips, templates or
   materials. File formats come from public specifications.
@@ -70,7 +73,7 @@ People trust SolidCraft with their designs; a crash loses their work. **This out
   runs FreeCAD as a separate program through its public scripting API to compute reference values;
   nothing from FreeCAD is linked, vendored or shipped.) The sketch solver and the blend
   operations are our own.
-- **Assets — absolutely essential.** SolidCraft contains **no iconography, images, fonts or
+- **Assets — absolutely essential.** Polykrom contains **no iconography, images, fonts or
   artwork from commercial CAD products — ever.** Command icons are the original SVG masters in
   `assets/icons/ui/design/svg/`, compiled through `crates/ui-egui/src/icon_svg.rs`.
   **Before any icon, icon assignment or media edit, read `assets/AGENTS.md`,
@@ -110,11 +113,10 @@ People trust SolidCraft with their designs; a crash loses their work. **This out
   Keep them minimal; `cargo xtask web-offline-test` covers the service worker.
 - **Quality gates** before every commit: `cargo xtask ci` (fmt, clippy -D warnings, tests,
   assets, layers). Commit after every feature arc that builds.
-- **Publishing**: the repository is github.com/tangency-labs/solidcraft. Changes land through
-  **pull requests** and the **merge queue**: push a branch and open a PR. The heavy CI jobs start
-  when a maintainer adds `approved-for-ci` after reviewing the code. Approved PRs go into the queue
-  with `gh pr merge N -R tangency-labs/solidcraft --squash --auto`; the queue runs the full suite
-  on each group before it lands on `main`. Keep each PR to one topic and one issue, and never
+- **Publishing**: the repository is github.com/wckdboy/polykrom. Changes land through
+  **pull requests**: push a branch and open a PR against `main`. A fix that also applies to
+  SolidCraft goes upstream first, as a PR to tangency-labs/solidcraft following that project's
+  rules, and comes to Polykrom with the next merge from upstream. Keep each PR to one topic and one issue, and never
   force-push `main`. Never commit `plan/`, build dirs (`target*/`) or generated reference data;
   check `git ls-files` before pushing.
 - **Never break wasm**: everything below the apps must build for `wasm32-unknown-unknown`
@@ -197,7 +199,7 @@ before the draft is verified.
   - `{"id":3,"method":"ui.screenshot","params":{"path":"/tmp/shot.png"}}` then read the PNG.
 - **For UI work, look at the result** (screenshot, read the PNG). Without a window use
   `ui.render` or `solidcraft-cli snapshot`.
-- Headless: `solidcraft-cli run script.json --out part.step`, `solidcraft-cli eval design.solidcraft`,
+- Headless: `solidcraft-cli run script.json --out part.step`, `solidcraft-cli eval design.polykrom`,
   `solidcraft-cli snapshot script.json --out shot.png`, `solidcraft-cli commands`.
 - Reference tests: `cargo xtask oracle` replays `tests/oracle/*/recipe.json` and compares with
   each case's `expected.json` (analytic or FreeCAD values; writes `docs/oracle.md`). Expected
@@ -206,7 +208,7 @@ before the draft is verified.
 
 ## Roadmap
 `ROADMAP.md` (committed) tracks status, milestones and estimates. Update it whenever a
-milestone task lands. `docs/features.md` (SolidCraft's commands by area, from the registry) and
+milestone task lands. `docs/features.md` (Polykrom's commands by area, from the registry) and
 `THIRD-PARTY-LICENSES.txt` are regenerated on `main` after each merge by the Generated files
 workflow; never regenerate them in a PR.
 

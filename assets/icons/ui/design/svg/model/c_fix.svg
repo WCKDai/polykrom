@@ -1,6 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <title>Fixed</title>
-  <path d="M22.4 22.4A9.6 9.6 0 1 0 41.6 22.4A9.6 9.6 0 1 0 22.4 22.4Z" fill="none" stroke="#236ead" stroke-width="4.25" stroke-linejoin="round" stroke-linecap="round"/>
-  <path d="M32 32L32 51.2" fill="none" stroke="#236ead" stroke-width="4.25" stroke-linejoin="round" stroke-linecap="round"/>
-  <path d="M24.8 51.2L39.2 51.2" fill="none" stroke="currentColor" stroke-width="4.25" stroke-linejoin="round" stroke-linecap="round"/>
+  <title>Fix</title>
+  <path d="M10 40L54 16" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M25 30L39 30A3 3 0 0 1 42 33L42 45A3 3 0 0 1 39 48L25 48A3 3 0 0 1 22 45L22 33A3 3 0 0 1 25 30Z" fill="#236ead"/>
+  <path d="M26 30L26 25A6 6 0 0 1 38 25L38 30" fill="none" stroke="#236ead" stroke-width="4.4" stroke-linejoin="round" stroke-linecap="round"/>
+  <circle cx="32" cy="39" r="2.4" fill="#ffffff"/>
 </svg>

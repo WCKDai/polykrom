@@ -1,8 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
   <title>Line</title>
-  <path d="M15 49L49 15" fill="none" stroke="#236ead" stroke-width="4.25" stroke-linejoin="round" stroke-linecap="round"/>
-  <circle cx="15" cy="49" r="5.8" fill="#ffffff"/>
-  <circle cx="15" cy="49" r="3.4" fill="#236ead"/>
-  <circle cx="49" cy="15" r="5.8" fill="#ffffff"/>
-  <circle cx="49" cy="15" r="3.4" fill="#236ead"/>
+  <path d="M12 50L52 14" fill="none" stroke="#236ead" stroke-width="4.4" stroke-linejoin="round" stroke-linecap="round"/>
+  <circle cx="12" cy="50" r="4.4" fill="#236ead"/>
+  <circle cx="12" cy="50" r="1.98" fill="#ffffff"/>
+  <circle cx="52" cy="14" r="4.4" fill="#236ead"/>
+  <circle cx="52" cy="14" r="1.98" fill="#ffffff"/>
 </svg>

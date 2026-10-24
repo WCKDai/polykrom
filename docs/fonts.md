@@ -1,24 +1,27 @@
 # Interface fonts
 
-SolidCraft bundles IBM Plex Sans as its default interface font on desktop and web.
-The unmodified variable font provides regular (400), medium (500), semibold (600)
+Polykrom bundles Atkinson Hyperlegible Next as its default interface font on desktop and
+web. The Braille Institute designed it so that easily confused characters (1, l and I; 0 and
+O; rn and m) stay distinct, which matters for part names and dimensions. The unmodified
+variable font provides regular (400), medium (500), semibold (600)
 and bold (700) faces. Titles and selected labels use semibold; compass letters
 and the primary OK action use bold. Selection fields and status messages use
-medium. Numeric fields and sketch dimensions use IBM Plex Mono Regular.
+medium. Numeric fields and sketch dimensions use Atkinson Hyperlegible Mono Regular.
 
 Both fonts are licensed under the SIL Open Font License 1.1. Their licence texts
-are in `assets/fonts/ibm-plex-sans/OFL.txt` and
-`assets/fonts/ibm-plex-mono/OFL.txt`; provenance is recorded in
+are in `assets/fonts/atkinson-hyperlegible-next/OFL.txt` and
+`assets/fonts/atkinson-hyperlegible-mono/OFL.txt`; provenance is recorded in
 [ATTRIBUTION.md](../ATTRIBUTION.md).
 
 The `ui_font` preference puts the chosen font first in every sans family,
 including the three weighted families. A chosen static font retains its own
-weight; SolidCraft does not simulate bold by drawing text twice. Clearing the
-preference restores Plex. Monospace fields keep Plex Mono.
+weight; Polykrom does not simulate bold by drawing text twice. Clearing the
+preference restores Atkinson Hyperlegible Next. Monospace fields keep Atkinson Hyperlegible
+Mono.
 
 Egui's symbol and emoji fallbacks remain available. Desktop also appends the
 available Japanese/Chinese, Hangul and Thai system fonts to every family, ordered
-for the selected language. The web app installs Plex at startup and adds its
+for the selected language. The web app installs Atkinson Hyperlegible Next at startup and adds its
 bundled Japanese font asynchronously when needed, preserving the interface faces
 and any font preference.
 

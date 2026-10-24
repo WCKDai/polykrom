@@ -4,17 +4,17 @@
 deflection, the reactions at the supports, and the safety factor against the material's yield.
 It is linear elastic finite element analysis with second-order tetrahedra. Nightfall's study
 runner meshes the part with Netgen and solves with MFEM, in a separate program, the way the
-FreeCAD oracle runs FreeCAD: nothing of either is linked into SolidCraft.
+FreeCAD oracle runs FreeCAD: nothing of either is linked into Polykrom.
 
 ## Setting it up
 
-The analysis runs Nightfall's `nf`, built with its studies. Point SolidCraft at it:
+The analysis runs Nightfall's `nf`, built with its studies. Point Polykrom at it:
 
 ```sh
-export SOLIDCRAFT_NIGHTFALL=/path/to/nightfall/build/occt/tools/cli/nf
+export POLYKROM_NIGHTFALL=/path/to/nightfall/build/occt/tools/cli/nf
 ```
 
-Without it, the command says so and does nothing. The browser build has no analysis.
+Without it, the command says so and does nothing. `SOLIDCRAFT_NIGHTFALL` still works. The browser build has no analysis.
 
 ## Running it
 

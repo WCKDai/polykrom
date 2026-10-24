@@ -2,11 +2,11 @@
 
 | Format | Read | Write |
 |---|---|---|
-| `.solidcraft` (versioned container or JSON design) | yes | yes |
+| `.polykrom` (versioned container or JSON design; SolidCraft's `.solidcraft` opens too) | yes | yes |
 | `.json` (self-contained plain JSON design) | yes | yes |
 | STEP (AP203, AP214, AP242) | solids, assemblies, units, names, colours | AP242 with names, colours and the component tree |
 | IGES 5.3 | manifold solids, or trimmed surfaces sewn into solids | manifold solids with names and colours |
-| FreeCAD `.FCStd`, Rhino `.3dm` | solids, through cadmpeg (desktop app only) | |
+| FreeCAD `.FCStd`, Rhino `.3dm` | solids, through cadmpeg | |
 | 3MF, STL, OBJ | mesh bodies | yes |
 | glTF 2.0 (`.glb`, `.gltf` with its `.bin` files) | mesh bodies in the node tree's components, materials as appearances | |
 | 3MF with face tags | as 3MF | each triangle tagged with its B-rep face, exact coordinates |
@@ -36,13 +36,14 @@ message: save the file uncompressed first.
 
 A 3MF project saved by a slicer comes in too, also when it keeps its objects in model parts of
 their own inside the file (the 3MF Production extension): each object on the build plates becomes
-one mesh body, with all its volumes merged where the slicer placed them. Slicer-only data
-(modifier, negative and support volumes, painting, per-object settings, and names kept in the
-slicer's metadata) is not read: modifier and negative volumes come in as ordinary solid geometry,
-and objects without a name in the model itself are called Mesh1, Mesh2, …
+one mesh body, with all its volumes merged where the slicer placed them. Each body is named after
+its object: the name in the model, else the one the slicer keeps in its project settings (Bambu
+Studio's `Metadata/model_settings.config`), else Mesh1, Mesh2, … Other slicer-only data
+(modifier, negative and support volumes, painting, per-object settings) is not read: modifier and
+negative volumes come in as ordinary solid geometry.
 
-**File → Export STL…** and **File → Export 3MF…** (also on the Mesh tab under Modify as Save as
-mesh, and in the right-click menu of a body) open the same dialog with that format chosen; it saves
+**File → Export STL…** and **File → Export 3MF…** (also **Save As Mesh** on the Insert tab's Files
+panel, and in the right-click menu of a body) open the same dialog with that format chosen; it saves
 the selected bodies as STL, 3MF or 3MF with face tags (below), and you can change the format there. With **Send to slicer** ticked, it writes the file to
 a temporary folder and opens it in the chosen slicer instead of asking for a file name. The slicer
 list shows the slicers found on the computer with their icons; **Custom…** adds any other program
@@ -59,7 +60,7 @@ them. The format is specified in [`docs/formats/3mf-face-tags.md`](https://githu
 
 **File → Export URDF…** (`file.export` with a `.urdf` path) writes the assembly for robot
 simulators and ROS: a link per component placement with its mesh, mass and inertia, and the
-assembly's joints, so the parts move in the simulator as they do in SolidCraft. The meshes are
+assembly's joints, so the parts move in the simulator as they do in Polykrom. The meshes are
 written as STL files next to the `.urdf`. See [`docs/urdf.md`](https://github.com/bherbruck/solidcraft/blob/main/docs/urdf.md).
 
 Saves are atomic: a crash at any moment leaves either the old file or the new one, and the
@@ -75,7 +76,7 @@ from a newer version are refused with a message.
 desktop; **Save As JSON** is also available in the File menu on desktop and web. Choose
 the `.json` extension for plain JSON. **Export Design as JSON** writes an independent,
 self-contained copy without changing the current file. Scripts can explicitly pass
-`"format": "json"` to `file.save` or `file.save_as` even with a `.solidcraft` name.
+`"format": "json"` to `file.save` or `file.save_as` even with a `.polykrom` name.
 Opening detects the format from the contents, so existing JSON designs keep working.
 Containers favor fast reading and saving by default. Scripts can request
 `"compression": "compact"` when file size matters more than CPU time.
@@ -95,7 +96,7 @@ is available. Missing or incompatible pictures use the usual thumbnail generatio
 The default `cache: false` omits the portable thumbnail too.
 The repository's `docs/design-container.md` describes limits and encoding details.
 
-Designs are saved in the newest format this version of SolidCraft knows (`"format": "solidcraft/N"`
+Designs are saved in the newest format this version of Polykrom knows (`"format": "solidcraft/N"`
 in the file). It opens designs of every older format and upgrades them as they open; a design
 from a newer version asks you to update instead of being guessed at. Development (nightly) builds
 save a format number no release reads yet.
@@ -149,12 +150,12 @@ none, and is saved exactly as before:
 }
 ```
 
-- **SolidCraft's keys are unprefixed** and hold text. Every other unprefixed key is reserved for
-  later SolidCraft versions.
+- **Polykrom's keys are unprefixed** and hold text. Every other unprefixed key is reserved for
+  later Polykrom versions.
 - **Other tools keep their data under one reverse-DNS key** of their own (`com.example.tool`:
   two or more dot-separated labels of letters, digits, `-` and `_`), holding an object. A tool
   writes only under its own key and leaves the others alone.
-- **SolidCraft keeps every key as it is** through open, edit and save, in both the container
+- **Polykrom keeps every key as it is** through open, edit and save, in both the container
   and plain JSON, and never checks what another tool wrote: a well-known key holding something
   other than text (`"author": 42`) is kept, reads as absent, and never stops the design from
   opening. Typing over it in Design Properties replaces it.
@@ -170,7 +171,7 @@ copy its properties; Save As keeps them. A command script of the design
 ## Saving in the web app
 
 In Chrome, Edge and Opera, **Save As** opens your browser's save dialog and writes the
-`.solidcraft` file to the folder you choose, and **Open** opens the browser's open dialog.
+`.polykrom` file to the folder you choose, and **Open** opens the browser's open dialog.
 **Save** then writes back to that same file. The browser remembers the file, so after you
 reload the page the first **Save** asks once for permission to write to it, and carries on.
 A design you open from your computer saves back to the file you opened.

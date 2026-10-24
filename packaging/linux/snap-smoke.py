@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Start the installed SolidCraft snap on headless X11 and Wayland and model a box in it.
+"""Start the installed Polykrom snap on headless X11 and Wayland and model a box in it.
 
 Runs the confined app (`snap install --dangerous` first) with its normal plugs, drives it over
 the control channel from the host (snaps share the host's network namespace), checks a
@@ -96,7 +96,7 @@ def run_backend(backend, out):
                 time.sleep(.1)
         with socket.socket() as probe:
             if probe.connect_ex(("127.0.0.1", PORTS[backend])) == 0:
-                raise RuntimeError(f"port {PORTS[backend]} is already in use (another SolidCraft?)")
+                raise RuntimeError(f"port {PORTS[backend]} is already in use (another Polykrom?)")
         # Its own process group, so stopping it also stops the app under xvfb-run.
         app = subprocess.Popen(prefix + ["/snap/bin/solidcraft", "--control", str(PORTS[backend])],
                                env=env, stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
