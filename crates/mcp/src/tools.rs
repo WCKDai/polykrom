@@ -98,7 +98,7 @@ pub fn tool_definitions() -> Vec<Value> {
                     "command": string("Command id (see list_commands)"),
                     "params": {"type": "object", "description": "The command's parameters"},
                     "verbose": {"type": "boolean", "description": "false: omit the full feature body list and sketch ids repeated outside `created`; keep created_bodies, changed_bodies and removed_bodies (default true)"},
-                    "select": {"type": "array", "items": {"type": "string"}, "description": "Only these parts of the result: dotted paths, * for every item of a list (e.g. [\"total.mass_g\", \"bodies.*.name\", \"bodies.*.mass_g\"]). Paths that match nothing are listed in missing_paths. Keeps replies on large designs small"},
+                    "select": {"type": "array", "items": {"type": "string"}, "description": "Only these parts of the result: dotted paths, * for every item of a list or value of an object, a name at a list asked of each item (e.g. [\"total.mass_g\", \"bodies.*.name\", \"bodies.*.mass_g\"]). Paths that match nothing are listed in missing_paths. Keeps replies on large designs small"},
                 }),
                 &["command"],
             ),
@@ -545,14 +545,15 @@ impl Undo {
     }
 }
 
-/// `batch`: run steps in order, stop at the first failure and (by default) go back to the
-/// design as it was before the batch.
-/// A result cut down to the dotted `select` paths (`*` for every item of a list), merged into one
-/// value shaped like the result; paths that match nothing are listed in `missing_paths`. No
-/// `select` (or one that is not a list of strings) leaves the result whole.
+/// A result cut down to the dotted `select` paths (`*` for every item of a list or every value of
+/// an object), merged into one value shaped like the result; paths that match nothing are listed in
+/// `missing_paths`. No `select` (or one that is not a list of strings) leaves the result whole.
 fn selected(v: Value, select: Option<&Value>) -> Value {
     let Some(paths) = select.and_then(Value::as_array).filter(|p| !p.is_empty()) else { return v };
     let paths: Vec<&str> = paths.iter().filter_map(Value::as_str).collect();
+    if paths.is_empty() {
+        return v;
+    }
     let mut out = Value::Null;
     let mut missing = Vec::new();
     for path in paths {
@@ -581,7 +582,13 @@ fn take(v: &Value, segs: &[&str]) -> Option<Value> {
             let parts: Vec<Value> = items.iter().map(|x| take(x, rest).unwrap_or(Value::Null)).collect();
             parts.iter().any(|p| !p.is_null()).then_some(Value::Array(parts))
         }
+        (&"*", Value::Object(o)) => {
+            let parts: Map<String, Value> = o.iter().filter_map(|(k, x)| take(x, rest).map(|x| (k.clone(), x))).collect();
+            (!parts.is_empty()).then_some(Value::Object(parts))
+        }
         (key, Value::Object(o)) => o.get(*key).and_then(|x| take(x, rest)).map(|x| json!({ *key: x })),
+        // A name met at a list is asked of each of its items (`bodies.name` is `bodies.*.name`).
+        (key, Value::Array(_)) if key.parse::<usize>().is_err() => take(v, &[&["*"], segs].concat()),
         (index, Value::Array(items)) => index.parse::<usize>().ok().and_then(|i| items.get(i)).and_then(|x| take(x, rest)).map(|x| {
             // An index keeps its place: the items before it are null.
             let i = index.parse::<usize>().unwrap_or(0);
@@ -617,6 +624,8 @@ fn merge(into: &mut Value, add: Value) {
     }
 }
 
+/// `batch`: run steps in order, stop at the first failure and (by default) go back to the
+/// design as it was before the batch.
 fn batch(b: &mut dyn Backend, a: &Map<String, Value>) -> Value {
     let Some(steps) = a.get("commands").and_then(Value::as_array) else {
         return text_result(&json!("`commands` must be an array of {command, params}"), true);

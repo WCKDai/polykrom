@@ -1687,4 +1687,13 @@ fn select_keeps_only_the_paths_asked_for() {
     );
     assert_eq!(b["results"][0], json!({"bodies": [null, {"volume_mm3": 1000.0}]}), "{b}");
     assert_eq!(b["results"][1]["body_count"], 1, "a step without select is whole: {b}");
+    // `*` also takes every value of an object, and a name met at a list is asked of each item.
+    let names = json!([{"name": "A"}, {"name": "B"}]);
+    let m = tool(&mut s, "execute", json!({"command": "inspect.measure", "params": {}, "select": ["bodies.name"]}));
+    assert_eq!(m, json!({"bodies": names}), "{m}");
+    let m = tool(&mut s, "execute", json!({"command": "inspect.measure", "params": {}, "select": ["*.name"]}));
+    assert_eq!(m, json!({"bodies": names}), "{m}");
+    // A select with no paths in it leaves the result whole.
+    let m = tool(&mut s, "execute", json!({"command": "inspect.measure", "params": {}, "select": [1]}));
+    assert_eq!(m["body_count"], 2, "{m}");
 }
