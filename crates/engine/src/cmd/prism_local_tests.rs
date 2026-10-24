@@ -84,11 +84,16 @@ fn a_ring_cut_round_a_counterbored_hole_in_a_chamfered_disc() {
         run(&mut s, "sketch.circle.center", json!({"center":[20,0],"radius":6}));
         run(&mut s, "sketch.finish", json!({}));
         // The ring between the counterbore's rim (projected from the face) and the 6 mm circle.
-        cut(&mut s, json!({"direction":"negative","distance":3,"operation":"cut","profiles":[{"point":[25.25,0]}]}))
+        let body = volume(&mut s);
+        (cut(&mut s, json!({"direction":"negative","distance":3,"operation":"cut","profiles":[{"point":[25.25,0]}]})), body)
     };
     let want = PI * (36.0 - 20.25) * 3.0;
     for chamfer in [false, true] {
-        let taken = ring(chamfer);
-        assert!((taken - want).abs() < want * 1e-3, "chamfer {chamfer}: {taken} taken, want {want}");
+        // What the cut takes is the difference of two measures of the whole disc, each within
+        // about 1e-5 of it (they are taken on meshes: -0.57 and -0.41 of 49,800 mm³ on macOS),
+        // so the allowance has that on top. A cut that missed the counterbore's step would take
+        // 106 mm³ more.
+        let (taken, body) = ring(chamfer);
+        assert!((taken - want).abs() < want * 1e-3 + body * 2e-5, "chamfer {chamfer}: {taken} taken, want {want}");
     }
 }
