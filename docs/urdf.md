@@ -74,6 +74,10 @@ defaults are written and a warning says so. A value that is not a positive numbe
 - **Chains:** a joint with several values becomes one URDF joint per value. Between them sit
   links named `<joint>_link1`, `<joint>_link2`. The steps before the last are named
   `<joint>_dof1`, `<joint>_dof2`, and the last one keeps the joint's name.
+- **Motion links:** gears, rack and pinion, screws and plain motion links are written as
+  `<mimic joint="driver" multiplier="…" offset="…"/>` on the joint they drive, in URDF units
+  (radians and metres), so simulators that read `<mimic>` keep the parts turning together. A cam
+  is not linear, so it is left free with a warning. A joint driven by two links keeps the first.
 - **Values:** each URDF joint value equals the Polykrom value it comes from: the same angle
   (in radians) or distance (in metres). This holds whichever side of the joint is nearer the
   base. When the tree reaches a joint from its B side, the chain runs backwards with its axes
