@@ -147,7 +147,9 @@ fn long_names_stay_inside_the_popup_and_remain_available_on_hover() {
     h.step(&json!({"hold": {"world": [5, 5, 10]}})).unwrap();
     let label = format!("Body · {name}");
     let row = labels(&h).iter().position(|r| r == &label).unwrap();
-    let mut output = h.ctx.run_ui(egui::RawInput { screen_rect: Some(h.ctx.content_rect()), focused: true, ..Default::default() }, |ui| {
+    // A frame after the harness's last: without a time egui guesses one, a hair before it at times.
+    let time = Some(h.ctx.input(|i| i.time) + 1.0 / 60.0);
+    let mut output = h.ctx.run_ui(egui::RawInput { screen_rect: Some(h.ctx.content_rect()), focused: true, time, ..Default::default() }, |ui| {
         h.app.logic(ui.ctx());
         h.app.ui(ui);
     });

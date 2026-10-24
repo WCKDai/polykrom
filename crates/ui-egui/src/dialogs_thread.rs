@@ -418,11 +418,13 @@ mod contribution_tests {
             let mut designation = original.to_string();
             let mut custom = None;
             let doc = Document::default();
-            let _ = ctx.run_ui(Default::default(), |ui| {
+            ctx.run_ui(Default::default(), |ui| {
                 egui::Grid::new("hole_catalogue").show(ui, |ui| {
                     hole_rows(ui, &doc, &mut designation, &mut custom);
                 });
-            });
+            })
+            .textures_delta
+            .clear();
             assert_eq!(designation, original);
         }
     }
@@ -570,14 +572,16 @@ mod contribution_tests {
             let mut full = true;
             let mut custom = None;
             let doc = Document::default();
-            let _ = context.run_ui(Default::default(), |ui| {
-                egui::Grid::new("authored_hole").show(ui, |ui| {
-                    hole_rows(ui, &doc, &mut hole, &mut custom);
-                });
-                egui::Grid::new("authored_thread").show(ui, |ui| {
+            // The thread rows hold a collapsible section: the dialog lays them out in a column, not a grid.
+            context
+                .run_ui(Default::default(), |ui| {
+                    egui::Grid::new("authored_hole").show(ui, |ui| {
+                        hole_rows(ui, &doc, &mut hole, &mut custom);
+                    });
                     rows(ui, &mut thread, &mut suggested, &mut modeled, &mut full);
-                });
-            });
+                })
+                .textures_delta
+                .clear();
             assert_eq!(hole, original);
             assert_eq!(thread, original);
         }
