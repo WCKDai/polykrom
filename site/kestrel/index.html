@@ -269,7 +269,7 @@ footer.band { padding-block: 40px 56px; border-top: 1px solid var(--rule); color
 </div></footer>
 
 <script type="module">
-import { mount } from "./viewer.js";
+import { mount } from "../shared/viewer.js";
 const $ = (id) => document.getElementById(id);
 const motion = await (await fetch("motion.json")).json();
 const track = (n) => (motion.joints.find((j) => j.name === n) || { value: [0] }).value;
