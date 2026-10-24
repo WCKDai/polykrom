@@ -86,7 +86,7 @@ impl PairResult {
         };
         PairResult {
             overlap: self.overlap.map(|(v, a, b, c)| (v, a, if b.is_empty() { b } else { boxed(&b) }, at(c))),
-            distance: self.distance.clone().map(|mut d| {
+            distance: self.distance.map(|mut d| {
                 d.from = at(d.from);
                 d.to = at(d.to);
                 d
