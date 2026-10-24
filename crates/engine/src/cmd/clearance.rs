@@ -338,7 +338,12 @@ fn clearance(s: &mut Session, p: &Value) -> Result<Value> {
         }
     }
     for (k, rep, m) in copies {
-        let moved = results.get(rep).and_then(|r| r.as_ref()).and_then(|r| r.as_ref().ok()).map(|r| r.moved(&m));
+        // A copy of a pair that could not be worked out is listed as unchecked too, not passed as clear.
+        let moved = match results.get(rep).and_then(|r| r.as_ref()) {
+            Some(Ok(r)) => Some(r.moved(&m)),
+            Some(Err(e)) => Some(PairResult { unchecked: Some(e.to_string()), ..PairResult::default() }),
+            None => None,
+        };
         if let (Some(slot), Some(r)) = (results.get_mut(k), moved) {
             *slot = Some(Ok(r));
         }
