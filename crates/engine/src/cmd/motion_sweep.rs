@@ -27,7 +27,7 @@ pub const SWEEP_DOC: &str = "joint: id|name; from, to: its value the sweep runs 
      stopped_by: {a, b, at: [x,y,z] (where they touch, world)} | \"loop\" | \"limit\" | null, samples: [{value, min_gap_mm?, \
      pair?}], min_gap? (report_gaps: {part: {mm, at_value, to}}, the nearest each part came to another), unit, gap_method \
      (\"mesh\": distances between the tessellations), gap_tolerance_mm (how far those can be off: 0 when every face is flat), \
-     pairs (checked), touching_at_start: [[a, b]] (pairs already touching at `from`, such as parts joined face to face or a door \
+     pairs (checked), pairs_moving_together (set aside: their two parts keep their placement relative to each other all through the sweep, so they cannot meet), touching_at_start: [[a, b]] (pairs already touching at `from`, such as parts joined face to face or a door \
      on its frame: these stop it only once they pass into each other deeper than they start), applied. The parts are tested at the samples and through the bisection; the motion is on a copy (closed loops \
      follow, contact sets do not stop it)";
 
@@ -110,6 +110,19 @@ pub(super) fn sweep(s: &mut Session, p: &Value) -> Result<Value> {
     }
     if (reached(&t) - from).abs() > 1e-9 {
         return Err(bad(cmd, "`from` is outside the joint's limits"));
+    }
+    // Parts that move as one through this sweep (a washer and its bracket, two parts of one link)
+    // cannot meet in it: set them aside before anything is measured. Probed at irregular points
+    // so a geared part turning whole turns between probes still shows it moves.
+    let mut poses = Vec::new();
+    for k in [0.137, 0.381, 0.619, 0.853, 1.0] {
+        let mut probe = t.scratch();
+        drive_to(&mut probe, from + (to - from) * k)?;
+        poses.push(probe);
+    }
+    let rigid = geometry.drop_rigid_pairs(&t, &poses)?;
+    if !geometry.has_pairs() {
+        return Err(bad(cmd, "nothing moves relative to anything else in this sweep: every checked pair moves as one"));
     }
     let scale = geometry.scale();
     // Nearer than this is touching (well below any `refine`).
@@ -250,6 +263,7 @@ pub(super) fn sweep(s: &mut Session, p: &Value) -> Result<Value> {
         "refine_mm": refine,
         "gap_method": "mesh", "gap_tolerance_mm": geometry.chord(),
         "pairs": geometry.pair_count() + resting.pair_count(),
+        "pairs_moving_together": rigid,
         "touching_at_start": touching_names,
         "applied": applied,
     });
