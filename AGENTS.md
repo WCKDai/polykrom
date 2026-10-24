@@ -10,10 +10,11 @@ Any code adapted from other projects (MIT OR Apache-2.0) is noted in ATTRIBUTION
 Polykrom is a fork of SolidCraft (github.com/tangency-labs/solidcraft). Say Polykrom in
 everything a person reads: the UI, messages, docs, MCP descriptions, packaging names. Until the
 second rename stage, the internals keep SolidCraft's names: crates `solidcraft-*`, binaries
-`solidcraft` and `solidcraft-cli` (with `polykrom` and `polykrom-cli` aliases), `.solidcraft`
-designs, the `solidcraft/N` format tag, settings and recovery folders and the bundle IDs.
+`solidcraft` and `solidcraft-cli` (with `polykrom` and `polykrom-cli` aliases), the
+`solidcraft/N` format tag inside designs, settings and recovery folders and the bundle IDs.
 Variables read through `solidcraft_geom::env` are `POLYKROM_*`, with `SOLIDCRAFT_*` and
-`SOLVECRAFT_*` fallbacks; read new ones that way. The rest are still `SOLIDCRAFT_*`. Don't rename those internals piecemeal; `docs/compatibility.md` lists
+`SOLVECRAFT_*` fallbacks; read new ones that way. Designs are saved as `.polykrom`
+(`solidcraft_io::DESIGN_EXT`); `.solidcraft` and `.solvecraft` still open (`DESIGN_EXTS`). The rest are still `SOLIDCRAFT_*`. Don't rename those internals piecemeal; `docs/compatibility.md` lists
 them. Credit SolidCraft wherever its work is described.
 
 ## Start every session here
@@ -198,7 +199,7 @@ before the draft is verified.
   - `{"id":3,"method":"ui.screenshot","params":{"path":"/tmp/shot.png"}}` then read the PNG.
 - **For UI work, look at the result** (screenshot, read the PNG). Without a window use
   `ui.render` or `solidcraft-cli snapshot`.
-- Headless: `solidcraft-cli run script.json --out part.step`, `solidcraft-cli eval design.solidcraft`,
+- Headless: `solidcraft-cli run script.json --out part.step`, `solidcraft-cli eval design.polykrom`,
   `solidcraft-cli snapshot script.json --out shot.png`, `solidcraft-cli commands`.
 - Reference tests: `cargo xtask oracle` replays `tests/oracle/*/recipe.json` and compares with
   each case's `expected.json` (analytic or FreeCAD values; writes `docs/oracle.md`). Expected

@@ -1,7 +1,8 @@
 # Getting started
 
-The desktop executable is `solidcraft`, the CLI is `solidcraft-cli`, and designs are saved as
-`.solidcraft`. Designs, settings and setups from builds released under the previous product name keep
+The desktop executable is `solidcraft` (also `polykrom`), the CLI is `solidcraft-cli` (also
+`polykrom-cli`), and designs are saved as `.polykrom`. SolidCraft's `.solidcraft` designs open too,
+and save as `.polykrom`. Designs, settings and setups from builds released under the previous product name keep
 working (see the [compatibility notes](https://github.com/wckdboy/polykrom/blob/main/docs/compatibility.md)).
 
 ## Desktop
@@ -17,7 +18,7 @@ cargo run --release -p solidcraft -- --sample   # opens with a sample part
 ```
 
 `solidcraft part.step` opens a STEP, IGES, 3MF, STL or OBJ file as a new design, and
-`solidcraft design.solidcraft` opens a saved design. Windows builds cross-compile from Linux with
+`solidcraft design.polykrom` opens a saved design. Windows builds cross-compile from Linux with
 `cargo xwin build --release --target x86_64-pc-windows-msvc -p solidcraft`.
 
 ### macOS
@@ -50,7 +51,7 @@ flatpak install --user solidcraft ai.storyteller.solidcraft
 flatpak run ai.storyteller.solidcraft
 ```
 
-A Polykrom remote added before the project moved to `docs.solidcraft.io` (from
+A Polykrom remote added before the project moved to `docs.polykrom.io` (from
 `bherbruck.github.io`) no longer finds updates. Point it at the new address, then update:
 `flatpak remote-modify --user --url=https://docs.solidcraft.io/flatpak/repo/ solidcraft` and
 `flatpak update --user`.
@@ -202,7 +203,7 @@ cargo run --release -p solidcraft-cli -- run examples/bracket.json --out bracket
 cargo run --release -p solidcraft-cli -- eval examples/bracket.json     # volume, area, faces…
 cargo run --release -p solidcraft-cli -- snapshot examples/bracket.json --out bracket.png
 cargo run --release -p solidcraft-cli -- exec solid.box '{"length": 20, "width": 10, "height": 5}'
-cargo run --release -p solidcraft-cli -- run mechanism.json --in arm.solidcraft  # with a motion.export_animation step: a GIF
+cargo run --release -p solidcraft-cli -- run mechanism.json --in arm.polykrom  # with a motion.export_animation step: a GIF
 ```
 
 A script is a list of commands:
@@ -222,8 +223,8 @@ A script is a list of commands:
 `snapshot` looks at the model from the iso view. `--view NAME` takes another standard view (`front`, `back`, `top`, `bottom`, `left`, `right`) or the name of a view saved in the design with `view.save`. `--camera JSON` takes any camera, as the MCP `screenshot` tool does (its conventions are in [the MCP page](mcp.md#camera-and-close-up-recipe)). A script that applies a view itself with `view.apply` sets the camera too. The ground grid lies on Z 0, so it cuts through a part that straddles it: `--no-grid` leaves it out of the picture, and `--no-axes` the origin's axes. The picture is drawn on the GPU with the viewport's own pipelines, so it shows what the window would (a surface analysis such as `inspect.zebra` included); a machine without a GPU uses a software one (Mesa's lavapipe on Linux, WARP on Windows), and with neither (a Mac without usable Metal, a Linux box without Mesa's Vulkan) the CPU rasterizer draws it, without surface analysis colours, and the reply's `renderer` says `cpu` with a warning. `SOLIDCRAFT_GPU=auto|hardware|software|cpu` chooses (`hardware` and `software` fail rather than fall to the CPU), and `solidcraft-cli gpu` lists the adapters and the tier a snapshot would use.
 
 ```sh
-solidcraft-cli snapshot part.solidcraft --out photo.png --view Photo
-solidcraft-cli snapshot part.solidcraft --out close-up.png --no-grid --no-axes --camera '{"target": [30, -20, 0], "yaw": 0.6, "pitch": 0.25, "distance": 60}'
+solidcraft-cli snapshot part.polykrom --out photo.png --view Photo
+solidcraft-cli snapshot part.polykrom --out close-up.png --no-grid --no-axes --camera '{"target": [30, -20, 0], "yaw": 0.6, "pitch": 0.25, "distance": 60}'
 ```
 
 ### Seeing what a cut or a join is about to do
@@ -244,9 +245,9 @@ the other side, `XY`, `XZ` or `YZ` for a plane through the origin, or the comman
 
 ```sh
 # The pin the cut would remove, inside the plate it stops 6 mm short of.
-solidcraft-cli snapshot plate.solidcraft --out preview.png --tool Pin
-solidcraft-cli snapshot plate.solidcraft --out cut.png --tool Pin --section z=12
-solidcraft-cli snapshot plate.solidcraft --out glass.png --body "Plate:opacity=0.25" --body "Pin:color=#1a7f4b"
+solidcraft-cli snapshot plate.polykrom --out preview.png --tool Pin
+solidcraft-cli snapshot plate.polykrom --out cut.png --tool Pin --section z=12
+solidcraft-cli snapshot plate.polykrom --out glass.png --body "Plate:opacity=0.25" --body "Pin:color=#1a7f4b"
 ```
 
 A body drawn see-through is drawn see-through everywhere a picture is drawn, not only here:
@@ -288,7 +289,7 @@ A design's history turns into a script that rebuilds it, which makes a bug that 
 on one design a one-file reproduction:
 
 ```sh
-cargo run --release -p solidcraft-cli -- script part.solidcraft --out repro.json
+cargo run --release -p solidcraft-cli -- script part.polykrom --out repro.json
 cargo run --release -p solidcraft-cli -- eval repro.json               # the same part
 ```
 

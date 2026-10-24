@@ -22,7 +22,7 @@ document remains the reference implementation today.
 solidcraft-cli mcp
 
 # Headless, starting from a design file or a command script.
-solidcraft-cli mcp --in part.solidcraft
+solidcraft-cli mcp --in part.polykrom
 
 # Bridged to the running app, so you can watch the agent model:
 solidcraft --control 7878 &
@@ -166,7 +166,7 @@ They cover the workflow, the command shapes, how to verify with `measure`, and t
 | `crash_reports` | `id?`, `limit?` | The crash reports on this computer, newest first; with `id`, the whole report (backtrace, command, recent commands, `design_path`/`replay_path`). See [crash-reports.md](crash-reports.md). |
 | `running` | - | What the app is running or has queued, for every client (`control.running`, see [control-protocol.md](control-protocol.md#limits)): each request's connection and id, method, command id or a batch's step count, `running_s` and `queued`, never its parameters. Answers at once while the app is busy: ask it when a call timed out before sending a change again. Headless: always `{"running": []}`. |
 | `new_design` | `name?` | Start an empty design. |
-| `open` | `path` | Open a `.solidcraft` design, a STEP file (`.step`/`.stp`) as a new design holding its bodies (an Import base feature), or a 3MF/STL file as mesh bodies. |
+| `open` | `path` | Open a `.polykrom` design, a STEP file (`.step`/`.stp`) as a new design holding its bodies (an Import base feature), or a 3MF/STL file as mesh bodies. |
 | `save` | `path?` | Save the design (to its current file without `path`). |
 
 `measure` with `items` reports each item under `items` (`length_mm`, `area_mm2` or `position`).

@@ -2,7 +2,7 @@
 
 | Format | Read | Write |
 |---|---|---|
-| `.solidcraft` (versioned container or JSON design) | yes | yes |
+| `.polykrom` (versioned container or JSON design; SolidCraft's `.solidcraft` opens too) | yes | yes |
 | `.json` (self-contained plain JSON design) | yes | yes |
 | STEP (AP203, AP214, AP242) | solids, assemblies, units, names, colours | AP242 with names, colours and the component tree |
 | IGES 5.3 | manifold solids, or trimmed surfaces sewn into solids | manifold solids with names and colours |
@@ -75,7 +75,7 @@ from a newer version are refused with a message.
 desktop; **Save As JSON** is also available in the File menu on desktop and web. Choose
 the `.json` extension for plain JSON. **Export Design as JSON** writes an independent,
 self-contained copy without changing the current file. Scripts can explicitly pass
-`"format": "json"` to `file.save` or `file.save_as` even with a `.solidcraft` name.
+`"format": "json"` to `file.save` or `file.save_as` even with a `.polykrom` name.
 Opening detects the format from the contents, so existing JSON designs keep working.
 Containers favor fast reading and saving by default. Scripts can request
 `"compression": "compact"` when file size matters more than CPU time.
@@ -170,7 +170,7 @@ copy its properties; Save As keeps them. A command script of the design
 ## Saving in the web app
 
 In Chrome, Edge and Opera, **Save As** opens your browser's save dialog and writes the
-`.solidcraft` file to the folder you choose, and **Open** opens the browser's open dialog.
+`.polykrom` file to the folder you choose, and **Open** opens the browser's open dialog.
 **Save** then writes back to that same file. The browser remembers the file, so after you
 reload the page the first **Save** asks once for permission to write to it, and carries on.
 A design you open from your computer saves back to the file you opened.

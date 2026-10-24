@@ -85,15 +85,17 @@
               Icon="SolidcraftIcon.exe" IconIndex="0" />
         </File>
 
-        <!-- .solidcraft: Polykrom's own format; Polykrom is its default app. -->
+        <!-- .polykrom: Polykrom's own format; Polykrom is its default app. -->
         <ProgId Id="Solidcraft.Design" Description="Polykrom Design" Icon="SolidcraftExe" IconIndex="0">
-          <Extension Id="solidcraft" ContentType="application/x-solidcraft">
+          <Extension Id="polykrom" ContentType="application/x-polykrom">
             <Verb Id="open" Command="Open" TargetFile="SolidcraftExe" Argument="&quot;%1&quot;" />
           </Extension>
         </ProgId>
-        <!-- Compatibility shim (docs/compatibility.md): designs saved before the rename open as
+        <!-- SolidCraft's .solidcraft and the pre-rename .solvecraft (docs/compatibility.md) open as
              the same ProgId. Registered by hand: a second Extension under one ProgId would write
              its open verb twice (WIX0091). -->
+        <RegistryValue Root="HKLM" Key="Software\Classes\.solidcraft" Value="Solidcraft.Design" Type="string" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\.solidcraft" Name="Content Type" Value="application/x-solidcraft" Type="string" />
         <RegistryValue Root="HKLM" Key="Software\Classes\.solvecraft" Value="Solidcraft.Design" Type="string" />
         <RegistryValue Root="HKLM" Key="Software\Classes\.solvecraft" Name="Content Type" Value="application/x-solvecraft" Type="string" />
         <!-- STEP, IGES and meshes: offered under "Open with", never forced as the default. -->
@@ -109,6 +111,7 @@
         <!-- "Open with" app list and the Run dialog (Win+R "solidcraft"). -->
         <RegistryValue Root="HKLM" Key="Software\Classes\Applications\solidcraft.exe" Name="FriendlyAppName" Value="Polykrom" Type="string" />
         <RegistryValue Root="HKLM" Key="Software\Classes\Applications\solidcraft.exe\shell\open\command" Value="&quot;[#SolidcraftExe]&quot; &quot;%1&quot;" Type="string" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\Applications\solidcraft.exe\SupportedTypes" Name=".polykrom" Value="" Type="string" />
         <RegistryValue Root="HKLM" Key="Software\Classes\Applications\solidcraft.exe\SupportedTypes" Name=".solidcraft" Value="" Type="string" />
         <RegistryValue Root="HKLM" Key="Software\Classes\Applications\solidcraft.exe\SupportedTypes" Name=".solvecraft" Value="" Type="string" />
         <RegistryValue Root="HKLM" Key="Software\Classes\Applications\solidcraft.exe\SupportedTypes" Name=".step" Value="" Type="string" />

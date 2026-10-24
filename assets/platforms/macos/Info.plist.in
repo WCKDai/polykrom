@@ -45,8 +45,9 @@
       <key>CFBundleTypeName</key>
       <string>Polykrom design</string>
       <key>CFBundleTypeExtensions</key>
-      <!-- solvecraft: designs saved before the rename (compatibility shim, docs/compatibility.md). -->
-      <array><string>solidcraft</string><string>solvecraft</string></array>
+      <!-- polykrom: Polykrom's own; solidcraft: SolidCraft's, the same container; solvecraft:
+           designs saved before SolidCraft's rename (docs/compatibility.md). -->
+      <array><string>polykrom</string><string>solidcraft</string><string>solvecraft</string></array>
       <key>CFBundleTypeRole</key>
       <string>Editor</string>
       <key>LSHandlerRank</key>

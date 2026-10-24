@@ -1905,5 +1905,5 @@ mod test_support;
 /// mesh file.
 fn is_design_path(path: &str) -> bool {
     let ext = std::path::Path::new(path).extension().and_then(|e| e.to_str()).unwrap_or("").to_ascii_lowercase();
-    matches!(ext.as_str(), "solidcraft" | "solvecraft" | "json")
+    matches!(ext.as_str(), "polykrom" | "solidcraft" | "solvecraft" | "json")
 }

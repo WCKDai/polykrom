@@ -41,7 +41,7 @@ folder. Releases before the rename used `SolveCraft` folders next to these; Poly
 reads them, so you can leave them alone.
 
 - The **`recovery`** folder holds autosaves of designs that were never saved. Rename the data
-  folder rather than deleting it, so you can still open those autosaves (`.solidcraft` files)
+  folder rather than deleting it, so you can still open those autosaves (`.polykrom` files)
   with File > Open.
 - The **`crashes`** folder holds crash reports. Please attach the newest one to a bug report.
 

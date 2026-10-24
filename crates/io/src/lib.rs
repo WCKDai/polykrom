@@ -44,15 +44,18 @@ pub use urdf::{UrdfOptions, UrdfPackage, urdf};
 use solidcraft_doc::{Document, Metadata, ModelState};
 use solidcraft_geom::{Mesh, Vec3};
 
-/// Design file extension.
-pub const DESIGN_EXT: &str = "solidcraft";
-/// The design extension of earlier releases. Compatibility shim (docs/compatibility.md): such
-/// files still open everywhere a design opens; new designs are saved as [`DESIGN_EXT`].
+/// Design file extension: Polykrom saves `.polykrom`.
+pub const DESIGN_EXT: &str = "polykrom";
+/// The extension SolidCraft, which Polykrom is forked from, saves. Its designs are the same
+/// container and open everywhere a design opens (docs/compatibility.md).
+pub const SOLIDCRAFT_DESIGN_EXT: &str = "solidcraft";
+/// The design extension of SolidCraft's earliest releases (SolveCraft). Compatibility shim
+/// (docs/compatibility.md): such files still open everywhere a design opens.
 pub const LEGACY_DESIGN_EXT: &str = "solvecraft";
 /// Every extension a design file may have, current first.
-pub const DESIGN_EXTS: [&str; 2] = [DESIGN_EXT, LEGACY_DESIGN_EXT];
+pub const DESIGN_EXTS: [&str; 3] = [DESIGN_EXT, SOLIDCRAFT_DESIGN_EXT, LEGACY_DESIGN_EXT];
 
-/// Is this a design file name (`.solidcraft`, or the legacy extension), any case?
+/// Is this a design file name (`.polykrom`, `.solidcraft` or the legacy extension), any case?
 pub fn is_design_path(path: &str) -> bool {
     std::path::Path::new(path)
         .extension()
@@ -64,7 +67,7 @@ pub const MAX_DESIGN_BYTES: usize = 256 << 20;
 
 #[derive(Debug, thiserror::Error)]
 pub enum IoError {
-    #[error("unsupported format `{0}` (use stl, obj, step, 3mf, urdf or solidcraft)")]
+    #[error("unsupported format `{0}` (use stl, obj, step, 3mf, urdf or polykrom)")]
     Format(String),
     #[error("nothing to export: the design has no bodies")]
     Empty,
@@ -344,7 +347,7 @@ impl Format {
             "3mf" => Format::ThreeMf,
             "3mf-tagged" => Format::ThreeMfTagged,
             "urdf" => Format::Urdf,
-            "solidcraft" | "solvecraft" | "json" => Format::Design,
+            "polykrom" | "solidcraft" | "solvecraft" | "json" => Format::Design,
             _ => return Err(IoError::Format(ext)),
         })
     }

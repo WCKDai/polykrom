@@ -1,6 +1,6 @@
 ---
 name: solidcraft-editing
-description: Use when changing, fixing or extending an existing Polykrom design through its MCP server - a .solidcraft file or the design open in the app. Typical requests: resize it, move a cut, change a hole or standoff, add a fillet or chamfer, make a fixed value parametric, or a feature shows an error after a change or after the app crashed.
+description: Use when changing, fixing or extending an existing Polykrom design through its MCP server - a .polykrom (or SolidCraft .solidcraft) file or the design open in the app. Typical requests: resize it, move a cut, change a hole or standoff, add a fillet or chamfer, make a fixed value parametric, or a feature shows an error after a change or after the app crashed.
 ---
 
 # Polykrom editing
@@ -59,7 +59,7 @@ Inspect one feature of each kind, not every copy.
   - Never retry the crashing command unchanged.
 
 ## Save
-`save {"path":"...-v2.solidcraft"}` writes a copy. `save {}` overwrites the opened file; do that only when the user asked for it.
+`save {"path":"...-v2.polykrom"}` writes a copy. `save {}` overwrites the opened file; do that only when the user asked for it.
 
 ## Red flags
 

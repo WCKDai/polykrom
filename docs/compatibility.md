@@ -11,7 +11,7 @@ below:
 | Kept | Why |
 | --- | --- |
 | Crates `solidcraft-*`, binaries `solidcraft` and `solidcraft-cli` | Renaming them breaks every script and MCP registration; `polykrom` and `polykrom-cli` are aliases that run the same program |
-| `.solidcraft` designs and the `solidcraft/N` format tag | Designs must open in both apps until a converter exists |
+| The `solidcraft/N` format tag inside designs | Polykrom saves `.polykrom` files, but their contents are SolidCraft's container, so a renamed file still opens in SolidCraft. `.solidcraft` (and the older `.solvecraft`) open in Polykrom and save as `.polykrom` |
 | Settings, preferences, autosave, recovery and thumbnail folders | Moving them needs a one-time migration, like section 4 |
 | Bundle and package IDs (`ai.storyteller.solidcraft`), the MSI UpgradeCode, `SolidCraft.app`, installer folders and registry keys, the agent-chat keychain service | Changing them makes a second, separate install or loses saved keys; until then a Polykrom install replaces a SolidCraft one |
 | `SOLIDCRAFT_*` environment variables | Those read through `solidcraft_geom::env` accept `POLYKROM_*` first; the others keep the old name |

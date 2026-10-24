@@ -1,6 +1,6 @@
 //! Polykrom desktop app.
 //!
-//! Usage: `solidcraft [--control <port>] [--sample] [--crash-log] [--safe-mode] [design.solidcraft | part.step]`
+//! Usage: `solidcraft [--control <port>] [--sample] [--crash-log] [--safe-mode] [design.polykrom | part.step]`
 //!
 //! `--safe-mode` (or `SOLIDCRAFT_SAFE_MODE=1`) starts with default settings, no recovery offer and
 //! the software renderer; see `startup` and docs/book/src/guide/troubleshooting.md.
@@ -216,6 +216,7 @@ fn services(cc: &eframe::CreationContext<'_>) -> Services {
                     "Designs, CAD files and meshes",
                     &[
                         io::DESIGN_EXT,
+                        io::SOLIDCRAFT_DESIGN_EXT,
                         io::LEGACY_DESIGN_EXT,
                         "json",
                         "step",
@@ -242,7 +243,7 @@ fn services(cc: &eframe::CreationContext<'_>) -> Services {
                         "GLTF",
                     ],
                 )
-                .add_filter("Polykrom design (container or JSON)", &[io::DESIGN_EXT, io::LEGACY_DESIGN_EXT, "json"])
+                .add_filter("Polykrom design (container or JSON)", &[io::DESIGN_EXT, io::SOLIDCRAFT_DESIGN_EXT, io::LEGACY_DESIGN_EXT, "json"])
                 .add_filter("STEP", &["step", "stp", "STEP", "STP"])
                 .add_filter("IGES", &["igs", "iges", "IGS", "IGES"])
                 .add_filter("FreeCAD and Rhino", &["FCStd", "fcstd", "3dm", "3DM"])
