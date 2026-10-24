@@ -56,6 +56,15 @@ const MAX_BUDGET_S: f64 = 86_400.0;
 /// The kernel's tries at intersecting a pin with its hole on one cylinder (each about a second
 /// on real parts; a plain pin on its axis needs one or two).
 const PIN_ATTEMPTS: usize = 4;
+/// The kernel's own intersections one pair may use, across all its booleans. A pair the boolean
+/// answers takes a few, or at most about a hundred (screws in printed parts on the SO-101, #88);
+/// one it can't answer ran the whole ladder of retries, 300 and more at seconds each, before
+/// failing anyway. A count, not a time, so a pair answers the same on every machine.
+const PAIR_ATTEMPTS: usize = 128;
+/// The tries every pair gets first (most answered pairs need no more); only the pairs that use
+/// them up get [`PAIR_ATTEMPTS`], after all the others, so that a few hard pairs can't hold up
+/// the many quick ones until the budget is spent.
+const FIRST_ATTEMPTS: usize = 8;
 
 /// Pairs measured before, by the two bodies' geometry where they stood
 /// ([`solidcraft_doc::ModelBody::geometry_key`]) and the settings that shape the result
@@ -305,24 +314,44 @@ fn clearance(s: &mut Session, p: &Value) -> Result<Value> {
     // A body in many pairs is cut down to each pair's region from the same mesh of it.
     let kept: Vec<std::sync::OnceLock<Option<solidcraft_kernel::Body>>> = (0..n).map(|_| std::sync::OnceLock::new()).collect();
     let kept_body = |i: usize| kept.get(i)?.get_or_init(|| solid.get(i).map(|b| b.body.keeping_meshes())).as_ref();
-    let measured = solidcraft_kernel::map_with_local_pools(&todo, usize::MAX, |&k| {
-        let Some(&(i, j)) = close.get(k) else { return Ok(PairResult::default()) };
-        // A pair not finished by the time the budget is spent is listed, not measured. One under
-        // way stops retrying its booleans then (a try under way can't be stopped part way, #86).
-        let out_of_time =
-            || Ok(PairResult { unchecked: Some(format!("not checked: the time budget of {budget} s ran out (budget_s)")), ..PairResult::default() });
-        if started.elapsed() > deadline {
-            return out_of_time();
+    // (the result, whether the pair used up its tries)
+    let pass = |todo: &[usize], tries: usize| {
+        solidcraft_kernel::map_with_local_pools(todo, usize::MAX, |&k| {
+            let Some(&(i, j)) = close.get(k) else { return Ok((PairResult::default(), false)) };
+            // A pair not finished by the time the budget is spent is listed, not measured. One under
+            // way stops retrying its booleans then (a try under way can't be stopped part way, #86).
+            let out_of_time = || {
+                let why = format!("not checked: the time budget of {budget} s ran out (budget_s)");
+                Ok((PairResult { unchecked: Some(why), ..PairResult::default() }, false))
+            };
+            if started.elapsed() > deadline {
+                return out_of_time();
+            }
+            let (Some(a), Some(b)) = (shape(i), shape(j)) else { return Ok((PairResult::default(), false)) };
+            let (Some(ba), Some(bb)) = (solid.get(i), solid.get(j)) else { return Ok((PairResult::default(), false)) };
+            let (Some(ka), Some(kb)) = (kept_body(i), kept_body(j)) else { return Ok((PairResult::default(), false)) };
+            let measure = || {
+                let r = measure_pair((ba, ka), a, (bb, kb), b, gap, min_volume, tolerance);
+                let spent = solidcraft_kernel::attempts_left() == Some(0);
+                (r, spent)
+            };
+            let (r, spent) = solidcraft_kernel::with_deadline(started + deadline, || solidcraft_kernel::with_attempt_budget(tries, measure));
+            if r.unchecked.is_some() && started.elapsed() > deadline {
+                return out_of_time();
+            }
+            let retry = spent && r.unchecked.is_some();
+            Ok((r, retry))
+        })
+    };
+    let first = pass(&todo, FIRST_ATTEMPTS);
+    let again: Vec<usize> = first.iter().enumerate().filter(|(_, r)| matches!(r, Ok((_, true)))).map(|(n, _)| n).collect();
+    let retried = pass(&again.iter().filter_map(|&n| todo.get(n).copied()).collect::<Vec<_>>(), PAIR_ATTEMPTS);
+    let mut measured: Vec<_> = first.into_iter().map(|r| r.map(|(p, _)| p)).collect();
+    for (n, r) in again.into_iter().zip(retried) {
+        if let Some(slot) = measured.get_mut(n) {
+            *slot = r.map(|(p, _)| p);
         }
-        let (Some(a), Some(b)) = (shape(i), shape(j)) else { return Ok(PairResult::default()) };
-        let (Some(ba), Some(bb)) = (solid.get(i), solid.get(j)) else { return Ok(PairResult::default()) };
-        let (Some(ka), Some(kb)) = (kept_body(i), kept_body(j)) else { return Ok(PairResult::default()) };
-        let r = solidcraft_kernel::with_deadline(started + deadline, || measure_pair((ba, ka), a, (bb, kb), b, gap, min_volume, tolerance));
-        if r.unchecked.is_some() && started.elapsed() > deadline {
-            return out_of_time();
-        }
-        Ok(r)
-    });
+    }
     if let Ok(mut cache) = s.clearance_cache.lock() {
         for (&k, r) in todo.iter().zip(&measured) {
             // A pair that could not be worked out is tried again next time.
