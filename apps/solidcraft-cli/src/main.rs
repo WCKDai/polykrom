@@ -1,10 +1,10 @@
 //! Polykrom headless command line.
 //!
 //! ```text
-//! solidcraft-cli run <script.json|design.solidcraft|part.step|mesh.3mf> [--in design|part.step|mesh.3mf] [--out FILE]... [--save FILE] [--quiet] [--results] [--timings] [--profile] [--json-out FILE] [--allow-errors]
-//! solidcraft-cli eval <script.json|design.solidcraft|part.step> [--json-out FILE] (alias: inspect) measurements as JSON
-//! solidcraft-cli script <design.solidcraft> [--out script.json]     the design's history as a command script
-//! solidcraft-cli bench-open <design.solidcraft | part.step> [--parse-only] [--save OUT.solidcraft] [--display LEVEL [--edit NAME EXPR]] [--ops script.json] loading timings as JSON lines
+//! solidcraft-cli run <script.json|design.polykrom|part.step|mesh.3mf> [--in design|part.step|mesh.3mf] [--out FILE]... [--save FILE] [--quiet] [--results] [--timings] [--profile] [--json-out FILE] [--allow-errors]
+//! solidcraft-cli eval <script.json|design.polykrom|part.step> [--json-out FILE] (alias: inspect) measurements as JSON
+//! solidcraft-cli script <design.polykrom> [--out script.json]     the design's history as a command script
+//! solidcraft-cli bench-open <design.polykrom | part.step> [--parse-only] [--save OUT.polykrom] [--display LEVEL [--edit NAME EXPR]] [--ops script.json] loading timings as JSON lines
 //! solidcraft-cli bench-agent [--scale F] [--save F] [--script-out F] a ~1,300-body design built command by command, timed
 //! solidcraft-cli snapshot <script|design> [--in design|part.step] --out shot.png [--width W] [--height H] [--view iso|front|top|…|NAME | --camera JSON] [--no-grid] [--no-axes]
 //!                                                             [--body NAME:opacity=0.3,color=#rrggbb]... [--tool NAME]... [--section z=27]
@@ -43,23 +43,23 @@ use solidcraft_engine::Session;
 use solidcraft_engine::view::Guides;
 
 const USAGE: &str = "usage:
-  solidcraft-cli run <script.json|design.solidcraft|part.step> [--in design.solidcraft|part.step] [--out FILE]... [--save FILE] [--quiet] [--results] [--timings] [--profile] [--json-out FILE] [--allow-errors]
-  solidcraft-cli run --in <design.solidcraft|part.step> [--out FILE]...
+  solidcraft-cli run <script.json|design.polykrom|part.step> [--in design.polykrom|part.step] [--out FILE]... [--save FILE] [--quiet] [--results] [--timings] [--profile] [--json-out FILE] [--allow-errors]
+  solidcraft-cli run --in <design.polykrom|part.step> [--out FILE]...
       (a timeline feature that fails fails the run and nothing is written; --allow-errors writes anyway)
       (--timings prints {timings: [{index, command, ms}], total_ms} for a script, with --results its results too;
        --profile adds each command's profile: {boolean_ms, tessellate_ms, other_ms}, the kernel's share)
-  solidcraft-cli eval <script.json|design.solidcraft|part.step> [--json-out FILE]     (alias: inspect; or --in FILE)
+  solidcraft-cli eval <script.json|design.polykrom|part.step> [--json-out FILE]     (alias: inspect; or --in FILE)
       (--json-out FILE writes the JSON that run (with --results, else the measurement) and eval print to FILE instead of stdout,
        as plain UTF-8: a shell's > can re-encode it, e.g. Windows PowerShell adds a byte-order mark)
-  solidcraft-cli script <design.solidcraft|script.json> [--out script.json]
+  solidcraft-cli script <design.polykrom|script.json> [--out script.json]
       (the design's history as a command script that eval and run replay)
-  solidcraft-cli bench-open <design.solidcraft | part.step> [--parse-only] [--save OUT.solidcraft] [--display LEVEL [--edit NAME EXPR]] [--ops script.json]
+  solidcraft-cli bench-open <design.polykrom | part.step> [--parse-only] [--save OUT.polykrom] [--display LEVEL [--edit NAME EXPR]] [--ops script.json]
       (--ops: after opening, run each command of the script and undo it, timing the command, the
        evaluations it caused and the view it leaves: placing and meshing what changed)
-  solidcraft-cli bench-agent [--scale F] [--save design.solidcraft] [--script-out script.json]
-  solidcraft-cli snapshot <script|design> [--in design.solidcraft|part.step] --out shot.png [--width W] [--height H] [--view NAME | --camera JSON] [--no-grid] [--no-axes]
+  solidcraft-cli bench-agent [--scale F] [--save design.polykrom] [--script-out script.json]
+  solidcraft-cli snapshot <script|design> [--in design.polykrom|part.step] --out shot.png [--width W] [--height H] [--view NAME | --camera JSON] [--no-grid] [--no-axes]
       [--body NAME:opacity=0.3,color=#rrggbb]... [--tool NAME]... [--section z=27]
-  solidcraft-cli snapshot --in <design.solidcraft|part.step> --out shot.png ...
+  solidcraft-cli snapshot --in <design.polykrom|part.step> --out shot.png ...
       (as with run, --in starts from a design and the script runs on top of it; an option snapshot doesn't take is an error;
        --view: iso, front, back, top, bottom, left, right, or the name of a view saved in the design with view.save;
        --camera: {target: [x,y,z], yaw, pitch, distance, fov?} in mm and radians, as the MCP screenshot takes it (docs/mcp.md);
@@ -76,7 +76,7 @@ const USAGE: &str = "usage:
   solidcraft-cli recipe <recipe.json>
   solidcraft-cli oracle <case-dir>... [--json]
   solidcraft-cli fuzz [--from N] [--count N] [--jobs J] [--timeout S] [--steps N] [--minimise] [--out DIR] [--report FILE]
-  solidcraft-cli mcp [--in design.solidcraft|script.json] [--connect 127.0.0.1:PORT [--token T]] [--allow-path DIR]... [--allow-any-path]
+  solidcraft-cli mcp [--in design.polykrom|script.json] [--connect 127.0.0.1:PORT [--token T]] [--allow-path DIR]... [--allow-any-path]
                      [--param-check off|warn|strict]
   solidcraft-cli crashes [list [--json] | show <id> | replay <id> | dir | clear [<id>]]
   solidcraft-cli licences
@@ -688,7 +688,7 @@ fn bench_ops(mut s: Session, script: &str) -> Result<Session, String> {
 
 /// Separate file reading, JSON decoding/repair, timeline evaluation and display meshing.
 pub(crate) fn cmd_bench_open(args: &[String]) -> Result<(), String> {
-    let path = args.first().ok_or("usage: solidcraft-cli bench-open <design.solidcraft | part.step> [--parse-only]")?;
+    let path = args.first().ok_or("usage: solidcraft-cli bench-open <design.polykrom | part.step> [--parse-only]")?;
     let t = std::time::Instant::now();
     let step = solidcraft_engine::io::is_step_path(path);
     let limit = if step { solidcraft_engine::io::MAX_STEP_BYTES } else { solidcraft_engine::io::MAX_DESIGN_BYTES };
