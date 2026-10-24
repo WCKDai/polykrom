@@ -29,6 +29,9 @@ pub const MAX_CUSTOM: usize = 64;
 // Older exports contain colours for retired window bands and procedural icons.
 // Discard them at import; they have no token, renderer, or exported setting now.
 const RETIRED_COLORS: &[&str] = &[
+    // The brand mark is not themable (Polykrom's p is the brand's lime, as in the WCKD family).
+    "logo",
+    "logo_facets",
     "icon_fill",
     "heading_bg",
     "subheading_bg",
@@ -275,9 +278,10 @@ macro_rules! theme_keys {
         #[allow(dead_code)]
         fn every_colour_has_a_key(t: &Tokens) {
             // Not colours: the hover lift is a grey step, the analysis colours belong to shaders.
+            // Not themable: the brand mark (`logo`), the WCKD family's lime.
             let Tokens {
                 $($one: _,)* $($many: _,)*
-                hover_face_lift: _, analysis: _, icons: _, borders: _, icon_palette: _,
+                hover_face_lift: _, analysis: _, icons: _, borders: _, icon_palette: _, logo: _,
                 file_action_height: _, file_back_height: _, file_recovery_icon: _, file_grid_gap: _,
                 file_nav_width: _, file_nav_height: _, file_tile_height: _, file_tile_icon: _, file_recent_height: _,
                 file_sample_image_height: _, file_content_inset_x: _, file_content_inset_y: _, file_section_gap: _, font_start_title: _,
@@ -315,7 +319,7 @@ theme_keys! {
         app_bar_hover_button, app_bar_hover_strong, app_bar_tab_active,
         form_ink, form_dim, form_primary, form_error, form_error_fill, form_success, form_success_fill, dialog_body, dialog_footer, dialog_rule, control_fill, control_border, dialog_label, selected_ink, selected_bg,
     ],
-    many: [triad, gizmo, continuity, logo, logo_facets],
+    many: [triad, gizmo, continuity],
     icons: [highlight, agent, marker_halo],
 }
 
@@ -344,28 +348,6 @@ fn colors_of(v: &Value, len: usize) -> Result<Vec<Color32>, String> {
         _ => return Err(format!("must be a list of {len} colours")),
     };
     list.into_iter().map(|c| c.as_str().and_then(parse_color).ok_or_else(|| format!("`{c}` is not a colour such as \"#282828\""))).collect()
-}
-
-// The application mark now has three faces and no outline. Older theme exports and
-// saved preferences carry a fourth, retired outline colour; keep their face colours.
-fn colors_for_key(key: &str, value: &Value, len: usize) -> Result<Vec<Color32>, String> {
-    if key == "logo"
-        && len == 3
-        && let Value::Array(colors) = value
-        && colors.len() == 4
-    {
-        return colors_of(&Value::Array(colors.iter().take(len).cloned().collect()), len);
-    }
-    // Polykrom's mark adds a fourth tone, its seams. A three-face logo (SolidCraft's themes and
-    // exports) sets the faces; the seams keep the base theme's.
-    if key == "logo"
-        && len == 4
-        && let Value::Array(colors) = value
-        && colors.len() == 3
-    {
-        return colors_of(value, 3);
-    }
-    colors_of(value, len)
 }
 
 /// A theme file's text, checked: the format tag, a name, a base and only known keys with valid
@@ -407,7 +389,7 @@ pub fn from_value(v: &Value) -> Result<ThemeFile, String> {
         match slot(&mut probe, k) {
             None => bad.push(format!("`{k}` is not a theme colour")),
             Some(s) => {
-                if let Err(e) = colors_for_key(k, c, s.len()) {
+                if let Err(e) = colors_of(c, s.len()) {
                     bad.push(format!("`{k}` {e}"));
                 }
             }
@@ -472,7 +454,7 @@ pub fn resolve(theme: &ThemeFile) -> Tokens {
     let mut t = if theme.base.is_dark() { Tokens::dark() } else { Tokens::light() };
     for (k, v) in &theme.colors {
         if let Some(s) = slot(&mut t, k)
-            && let Ok(c) = colors_for_key(k, v, s.len())
+            && let Ok(c) = colors_of(v, s.len())
             && let Some(head) = s.get_mut(..c.len())
         {
             head.copy_from_slice(&c);
@@ -760,17 +742,16 @@ mod tests {
         let mut file = export("Older theme", Base::Dark, &Tokens::dark());
         let colors = file.get_mut("colors").and_then(Value::as_object_mut).unwrap();
         colors.insert("panel".into(), json!("#102030"));
-        colors.insert("logo".into(), json!(["#102030", "#405060", "#708090", "#000000"]));
         for key in RETIRED_COLORS {
             colors.insert((*key).into(), json!("#abcdef"));
         }
+        // SolidCraft's themes recolour their mark; Polykrom's p keeps the brand's lime.
+        colors.insert("logo".into(), json!(["#102030", "#405060", "#708090"]));
         let imported = from_value(&file).unwrap();
         assert_eq!(resolve(&imported).panel, Color32::from_rgb(0x10, 0x20, 0x30));
         let resolved = resolve(&imported);
-        // Polykrom's mark has four tones (centre, mid, deep, seams).
-        let four = ["#102030", "#405060", "#708090", "#000000"].map(|c| parse_color(c).unwrap());
-        assert_eq!(resolved.logo, four);
-        assert_eq!(export("Current", Base::Dark, &resolved)["colors"]["logo"].as_array().unwrap().len(), 4);
+        assert_eq!(resolved.logo, Tokens::dark().logo);
+        assert!(export("Current", Base::Dark, &resolved)["colors"].get("logo").is_none());
         assert_eq!(imported.colors.len(), keys().len());
         assert!(RETIRED_COLORS.iter().all(|key| !imported.colors.contains_key(*key)));
     }

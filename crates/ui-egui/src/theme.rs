@@ -750,12 +750,10 @@ pub struct Tokens {
     pub icons: IconColors,
     /// Optional SVG display roles and semantic ramps from the active theme file.
     pub icon_palette: Option<crate::icon_svg::Palette>,
-    /// The Polykrom mark on the application bar: its light centre, a mid and a deep tone of the
-    /// brand ramp, and the seams between facets.
-    pub logo: [Color32; 4],
-    /// The mark's polychrome facets: the three mid facets (upper right, bottom, upper left), then
-    /// the six corner facets clockwise from the top.
-    pub logo_facets: [Color32; 9],
+    /// Polykrom's mark on the application bar: the p (`logo[0]`, the brand's lime) and the
+    /// ground under it (`logo[1]`, clear on the dark bar). Not themable: in the WCKD family a
+    /// brand's colour is never changed, so a theme file's `logo` is read and dropped.
+    pub logo: [Color32; 2],
 }
 
 impl Tokens {

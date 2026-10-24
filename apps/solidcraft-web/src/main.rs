@@ -46,8 +46,9 @@ mod web {
     const DEPTH_BITS: u8 = 32;
 
     /// The loading animation (assets/styles/web/loading-logo.svg) settles into the finished mark
-    /// about 3.2 s after the page starts; this adds a short hold. The app doesn't land before it.
-    const LOADING_MIN_MS: f64 = 3600.0;
+    /// and name about 1.5 s after the page starts; this adds a short hold. The app doesn't land
+    /// before it.
+    const LOADING_MIN_MS: f64 = 1800.0;
     /// The fade from the loading screen into the app.
     const LOADING_FADE_MS: i32 = 300;
 

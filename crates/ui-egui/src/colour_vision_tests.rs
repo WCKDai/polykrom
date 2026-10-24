@@ -341,7 +341,7 @@ fn groups(t: &Tokens) -> Vec<Group> {
         group("mesh tab", &[("mesh_accent", t.mesh_accent)], &[("toolbar", t.toolbar)]),
         group("form tab", &[("form_accent", t.form_accent)], &[("toolbar", t.toolbar)]),
         group("agent status", &[("agent_ok", t.agent_ok), ("agent_busy", t.agent_busy)], &[("app_bar", t.app_bar)]),
-        group("logo", &[("logo[0]", t.logo[0]), ("logo[1]", t.logo[1]), ("logo[2]", t.logo[2])], &[("app_bar", t.app_bar)]),
+        group("logo", &[("logo[0]", t.logo[0])], &[("app_bar", t.app_bar)]),
     ];
     // Tab fills and small-text inks have distinct jobs: compare each with its actual
     // grounds, rather than with the same-hue fill/ink. WCAG text ratios are also guarded
@@ -531,8 +531,7 @@ const NO_MEANING: &[(&str, &str)] = &[
     ("cube_hover", "hover highlight"),
     // Not a colour.
     ("analysis.hatch", "a flag: stripes on the failing faces"),
-    ("logo[3]", "the mark's white edge"),
-    ("logo_facets", "the mark's polychrome facets: brand colours, read as one shape"),
+    ("logo[1]", "the ground under the mark: clear on the dark application bar"),
     // Icon colours that are a shade of a measured one, or one mark alone.
     ("icons.highlight", "white ink on viewport markers and the agent pointer"),
     ("icons.agent", "the agent's pointer, alone"),

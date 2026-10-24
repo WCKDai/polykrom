@@ -5,8 +5,8 @@
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#e8ebf0",
-  "theme_color": "#343840",
+  "background_color": "#111111",
+  "theme_color": "#111111",
   "categories": ["productivity", "utilities"],
   "icons": [
     { "src": "icons/32x32/ai.storyteller.solidcraft.png", "sizes": "32x32", "type": "image/png" },
