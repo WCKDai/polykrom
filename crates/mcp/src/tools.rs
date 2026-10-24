@@ -458,7 +458,15 @@ fn command_error(command: &str, error: String) -> String {
         })
         .collect();
     closest.sort_unstable();
-    let hints: Vec<_> = closest.iter().take(3).map(|(_, _, _, id)| format!("`{id}`")).collect();
+    // What the guess most likely meant comes before what it is spelled like.
+    let specs: Vec<&'static str> = solidcraft_engine::command_specs().into_iter().map(|spec| spec.id).collect();
+    let mut ids: Vec<&str> = meant(id, &specs);
+    for (_, _, _, c) in &closest {
+        if !ids.contains(c) {
+            ids.push(c);
+        }
+    }
+    let hints: Vec<_> = ids.iter().take(3).map(|id| format!("`{id}`")).collect();
     let mut message = format!("unknown command `{command}`");
     if !hints.is_empty() {
         message.push_str(&format!("; closest: {}", hints.join(", ")));
@@ -467,6 +475,52 @@ fn command_error(command: &str, error: String) -> String {
         message.push_str("; command ids have no parameters; pass them in `params`");
     }
     message
+}
+
+/// The commands an unknown id most likely meant, of `specs`: the commands under it
+/// (`sketch.circle` → `sketch.circle.center`), its verb as commands name it (`joint.add` →
+/// `joint.create`), and the command that answers what it names (`inspect.mass_properties` →
+/// `inspect.measure`). Agents guess by meaning; spelling alone points them elsewhere.
+fn meant(id: &str, specs: &[&'static str]) -> Vec<&'static str> {
+    let id = id.to_ascii_lowercase();
+    let exists = |c: &str| specs.iter().copied().find(|s| *s == c);
+    let mut out: Vec<&'static str> = specs.iter().copied().filter(|s| s.starts_with(&format!("{id}."))).take(3).collect();
+    if let Some((group, verb)) = id.rsplit_once('.') {
+        let usual = match verb {
+            "add" | "new" | "make" | "build" | "insert" | "place" => "create",
+            "remove" | "del" | "destroy" => "delete",
+            "set" | "update" | "modify" | "change" => "edit",
+            _ => "",
+        };
+        if let Some(c) = (!usual.is_empty()).then(|| exists(&format!("{group}.{usual}"))).flatten() {
+            out.push(c);
+        }
+    }
+    let words: Vec<&str> = id.split(|c: char| !c.is_ascii_alphanumeric()).filter(|w| !w.is_empty()).collect();
+    let names = |list: &[&str]| words.iter().any(|w| list.contains(w));
+    for (topic, command) in [
+        (
+            &["mass", "weight", "volume", "area", "centroid", "inertia", "density", "properties", "dimensions", "bbox", "bounds"][..],
+            "inspect.measure",
+        ),
+        (&["interference", "collision", "collisions", "clash", "clashes", "overlap"][..], "inspect.interference"),
+        (&["clearance", "gap", "gaps", "distance"][..], "inspect.clearance"),
+        (&["bom", "bill"][..], "assembly.bom"),
+    ] {
+        if names(topic)
+            && let Some(c) = exists(command)
+        {
+            out.push(c);
+        }
+    }
+    let mut seen = Vec::new();
+    out.retain(|c| {
+        !seen.contains(c) && {
+            seen.push(*c);
+            true
+        }
+    });
+    out
 }
 
 fn command_distance(a: &str, b: &str) -> usize {
