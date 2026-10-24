@@ -1116,3 +1116,7 @@ pub fn world_point(s: &Session, occurrence: u64, p: Vec3) -> Vec3 {
 #[cfg(test)]
 #[path = "motion_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "systems_tests.rs"]
+mod systems_tests;
