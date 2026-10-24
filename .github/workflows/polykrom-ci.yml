@@ -1,0 +1,80 @@
+# Polykrom's checks on GitHub-hosted runners. The inherited ci.yml targets SolidCraft's Blacksmith
+# runners, which this repository does not have (its jobs never start here), so this workflow runs
+# the same gate as `cargo xtask ci` in three parallel test parts. It runs only in wckdboy/polykrom.
+name: Polykrom CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: polykrom-ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  checks:
+    name: Format, repository checks, Clippy, wasm
+    if: github.repository == 'wckdboy/polykrom'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          key: checks
+      - name: Format
+        run: cargo fmt --all --check
+      - name: Asset attribution
+        run: cargo xtask assets
+      - name: UI icon standards
+        run: cargo xtask icons
+      - name: Sorted lists
+        run: cargo xtask lists
+      - name: Dependency layers
+        run: cargo xtask layers
+      - name: Universal UI containers
+        run: cargo xtask ui-containers
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - name: WebAssembly check
+        run: cargo xtask wasm
+
+  tests:
+    name: Tests (${{ matrix.part }})
+    if: github.repository == 'wckdboy/polykrom'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 300
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - part: engine
+            args: -p solidcraft-engine --lib
+          - part: ui
+            args: -p solidcraft-ui-egui
+          - part: rest
+            args: --workspace --exclude solidcraft-engine --exclude solidcraft-ui-egui
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          key: tests-${{ matrix.part }}
+      - name: Software Vulkan for the GPU tests
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends mesa-vulkan-drivers libvulkan1
+      - name: Test
+        run: cargo test --locked ${{ matrix.args }}
