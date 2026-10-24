@@ -57,6 +57,7 @@ design.
 | 2026-10-24 | 5 | #61 | 2/4 | 223 s | $2.14 | 65 |
 | 2026-10-24 | 5 | #61–#67 | 4/4 | 203 s | $2.05 | 69 |
 | 2026-10-24 | 6 (systems) | #61–#67 | 2/2 | 109 s | $0.87 | 30 |
+| 2026-10-24 | 3 (a designed arm) | #71 | 1/1 | 268 s | $0.31 | 12 |
 
 **What moved the round 5 numbers:**
 
@@ -64,7 +65,7 @@ design.
 - **#62 and #63:** a screw in its tapped hole reads as thread engagement, not a clash.
 - **The clevis grader:** it now reads `nearest` as well as `near`.
 
-**Round 3:** the agent ran out of time designing an arm from a loose brief.
+**Round 3:** the agent ran out of time designing an arm from a loose brief on the first build. On #71's build it designed a 150 mm steel I-beam arm that meets both limits (safety factor 2.05 on the finest mesh, 0.125 mm deflection, 152 g) in 268 s.
 
 Four tasks are a small sample, so a single run's time and cost move by 20–40 % from noise alone
 (round 5 on one build: 203, 253 and 292 s). Compare runs of the same build before drawing a
