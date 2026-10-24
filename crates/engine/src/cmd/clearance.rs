@@ -20,7 +20,7 @@ use crate::{Result, Session};
 
 pub static COMMANDS: &[CommandSpec] = &[CommandSpec::new("inspect.clearance", "Clearance", clearance).icon("interference").noundo().params(
     "bodies?: [names] (default: every solid body, in world placement, but those in `against`; mesh bodies are not measured); against?: [names] (only pairs with one body in `bodies` and the other here); \
-     min_volume?: mm³ (default 0.01: smaller overlaps count as contact); budget_s?: seconds (default 240, at most 86400: pairs not started by then are listed in unchecked as \"not checked: the time budget … ran out\"); clearance?: mm (default 0: report pairs closer than this); \
+     min_volume?: mm³ (default 0.01: smaller overlaps count as contact); budget_s?: seconds (default 240, at most 86400: pairs not finished by then are listed in unchecked as \"not checked: the time budget … ran out\"); clearance?: mm (default 0: report pairs closer than this); \
      nearest?: n (each body of `bodies` gets its n nearest others); skip_within?: \"occurrence\" (pairs of bodies of one occurrence) | \
      \"component\" (pairs of bodies inside one placed component, its subcomponents included) | null; tolerance?: mm (default 1e-6: a gap \
      below it is contact, 0) → overlaps: [{a, b, volume_mm3, area_mm2, bbox, center}]; threaded: [{a, b, thread, engaged_mm, volume_mm3}] \
@@ -307,18 +307,21 @@ fn clearance(s: &mut Session, p: &Value) -> Result<Value> {
     let kept_body = |i: usize| kept.get(i)?.get_or_init(|| solid.get(i).map(|b| b.body.keeping_meshes())).as_ref();
     let measured = solidcraft_kernel::map_with_local_pools(&todo, usize::MAX, |&k| {
         let Some(&(i, j)) = close.get(k) else { return Ok(PairResult::default()) };
-        // A pair not started by the time the budget is spent is listed, not measured (one under
-        // way finishes: a kernel boolean can't be stopped part way).
+        // A pair not finished by the time the budget is spent is listed, not measured. One under
+        // way stops retrying its booleans then (a try under way can't be stopped part way, #86).
+        let out_of_time =
+            || Ok(PairResult { unchecked: Some(format!("not checked: the time budget of {budget} s ran out (budget_s)")), ..PairResult::default() });
         if started.elapsed() > deadline {
-            return Ok(PairResult {
-                unchecked: Some(format!("not checked: the time budget of {budget} s ran out (budget_s)")),
-                ..PairResult::default()
-            });
+            return out_of_time();
         }
         let (Some(a), Some(b)) = (shape(i), shape(j)) else { return Ok(PairResult::default()) };
         let (Some(ba), Some(bb)) = (solid.get(i), solid.get(j)) else { return Ok(PairResult::default()) };
         let (Some(ka), Some(kb)) = (kept_body(i), kept_body(j)) else { return Ok(PairResult::default()) };
-        Ok(measure_pair((ba, ka), a, (bb, kb), b, gap, min_volume, tolerance))
+        let r = solidcraft_kernel::with_deadline(started + deadline, || measure_pair((ba, ka), a, (bb, kb), b, gap, min_volume, tolerance));
+        if r.unchecked.is_some() && started.elapsed() > deadline {
+            return out_of_time();
+        }
+        Ok(r)
     });
     if let Ok(mut cache) = s.clearance_cache.lock() {
         for (&k, r) in todo.iter().zip(&measured) {
