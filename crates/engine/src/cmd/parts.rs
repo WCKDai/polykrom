@@ -399,17 +399,24 @@ fn insert(s: &mut Session, p: &Value) -> Result<Value> {
     let c = run(s, "component.create", json!({"name": name}))?;
     let (comp, occ) = (c["component"].as_u64().unwrap_or(0), c["occurrence"].as_u64().unwrap_or(0));
     build(s, &sh)?;
+    finish(s, comp, &name);
     s.doc_mut().parts.insert(comp, solidcraft_doc::StandardPart { family: family.clone(), size: size.clone(), length: shape_len(&sh) });
     set_identity(s, comp, identity(&family, &size, &sh), None);
     run(s, "component.activate", json!({"component": active}))?;
     let mut out = json!({"component": comp, "occurrence": occ, "name": name});
     if let (Some(a), Some(h)) = (at, host) {
         // Seat it: its axis on the hole's, its seating plane on the hole's face, the shank going
-        // into the hole (the joint mates the part's −z with the face's outward z).
+        // into the hole (the joint mates the part's −z with the face's outward z). A bearing is
+        // pressed into the bore instead: its top face lies on the picked rim and it fills the bore
+        // from there, whichever end of the bore was picked.
+        let seat = match sh {
+            Shape::Ring { h: w, .. } if family == "bearing" => w,
+            _ => 0.0,
+        };
         let j = run(
             s,
             "joint.create",
-            json!({"type": "rigid", "a": {"occurrence": h, "circle": a}, "b": {"occurrence": occ, "point": [0, 0, 0], "z": [0, 0, -1]}, "name": format!("{name} seat")}),
+            json!({"type": "rigid", "a": {"occurrence": h, "circle": a}, "b": {"occurrence": occ, "point": [0, 0, seat], "z": [0, 0, -1]}, "name": format!("{name} seat")}),
         )?;
         out["joint"] = j["joint"].clone();
     } else if let Some(pt) = p.get("point").and_then(vec3) {
@@ -428,6 +435,25 @@ fn insert(s: &mut Session, p: &Value) -> Result<Value> {
         }
     }
     Ok(out)
+}
+
+/// A library part's bodies as the part: named after it (`SHCS M4x12`, numbered when that name is
+/// taken) rather than `Body1`, and in Steel rather than the default material, so its mass and the
+/// bill of materials are right without a further step. The component is the active one.
+fn finish(s: &mut Session, comp: u64, name: &str) {
+    let made: Vec<String> = s.model.state().bodies.iter().filter(|b| s.doc.model_body_component(b) == comp).map(|b| b.name.clone()).collect();
+    let mut names = Vec::new();
+    for (i, old) in made.iter().enumerate() {
+        let base = if made.len() == 1 { name.to_string() } else { format!("{name} {}", i + 1) };
+        let free = (1..1000)
+            .map(|n| if n == 1 { base.clone() } else { format!("{base} ({n})") })
+            .find(|c| c == old || s.model.state().body(c).is_none())
+            .unwrap_or_else(|| old.clone());
+        names.push(if run(s, "body.rename", json!({"body": old, "name": free})).is_ok() { free } else { old.clone() });
+    }
+    if !names.is_empty() {
+        let _ = run(s, "material.assign", json!({"bodies": names, "material": "Steel"}));
+    }
 }
 
 /// A point on the cylindrical wall of the hole at `a`, a little in from the picked rim. `a` is in
@@ -509,6 +535,7 @@ fn resize(s: &mut Session, p: &Value) -> Result<Value> {
     run(s, "component.activate", json!({"component": comp}))?;
     build(s, &sh)?;
     let name = part_name(&part.family, &size, &sh);
+    finish(s, comp, &name);
     let was = shape(&part.family, &part.size, part.length).ok().map(|old| identity(&part.family, &part.size, &old));
     set_identity(s, comp, identity(&part.family, &size, &sh), was);
     s.doc_mut().parts.insert(comp, solidcraft_doc::StandardPart { family: part.family.clone(), size: size.clone(), length: shape_len(&sh) });
@@ -615,6 +642,30 @@ mod tests {
         let (lo, hi) = bbox(&s, "SHCS M6x16");
         assert!((hi.z - (10.0 + t + 6.0)).abs() < 1e-6 && (lo.z - (10.0 + t - 16.0)).abs() < 1e-6, "the head sits on the washer: {lo:?} {hi:?}");
         assert!(((lo.x + hi.x) / 2.0 - 20.0).abs() < 1e-6 && ((lo.y + hi.y) / 2.0 - 15.0).abs() < 1e-6, "on the hole's axis");
+    }
+
+    /// A bearing presses into the bore it is seated on, whichever rim is picked; library parts come
+    /// in Steel, their body named as the part (not Body1).
+    #[test]
+    fn a_bearing_fills_its_pocket_in_steel_named_for_the_part() {
+        // The pocket's top rim, then (in a second design) its floor rim.
+        for rim in [[11.0, 0.0, 20.0], [11.0, 0.0, 13.0]] {
+            let mut t = Session::default();
+            run(&mut t, "solid.box", json!({"length": 60, "width": 60, "height": 20, "corner": [-30, -30, 0], "body_name": "Housing"}));
+            run(&mut t, "solid.cylinder", json!({"base": [0, 0, 13], "axis": [0, 0, 1], "radius": 11, "height": 7, "operation": "cut"}));
+            run(&mut t, "parts.insert", json!({"family": "bearing", "size": "608", "at": rim}));
+            let (lo, hi) = bbox(&t, "Bearing 608");
+            assert!((lo.z - 13.0).abs() < 1e-6 && (hi.z - 20.0).abs() < 1e-6, "rim {rim:?}: the bearing fills the 7 mm pocket: {lo:?} {hi:?}");
+            let names: Vec<String> = t.world_state().bodies.iter().map(|b| b.name.clone()).collect();
+            assert!(names.iter().any(|n| n == "Bearing 608"), "{names:?}");
+            assert_eq!(t.doc.materials.get("Bearing 608").map(String::as_str), Some("Steel"));
+        }
+        // A second screw of the same size gets a name of its own.
+        let mut u = Session::default();
+        run(&mut u, "parts.insert", json!({"family": "socket_head_cap_screw", "size": "M4", "length": 12}));
+        run(&mut u, "parts.insert", json!({"family": "socket_head_cap_screw", "size": "M4", "length": 12}));
+        let names: Vec<String> = u.world_state().bodies.iter().map(|b| b.name.clone()).collect();
+        assert!(names.contains(&"SHCS M4x12".to_string()) && names.contains(&"SHCS M4x12 (2)".to_string()), "{names:?}");
     }
 
     #[test]
