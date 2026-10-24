@@ -94,6 +94,17 @@ pub struct UrdfJoint {
     pub limit: Option<(f64, f64)>,
     /// The Polykrom joint and the index of its value this step follows.
     pub source: Option<(u64, usize)>,
+    /// Another joint this one follows (a gear, rack, screw or plain motion link).
+    pub mimic: Option<Mimic>,
+}
+
+/// `<mimic>`: this joint's value is `multiplier` times `joint`'s plus `offset` (URDF units:
+/// radians and metres).
+#[derive(Clone, Debug, PartialEq)]
+pub struct Mimic {
+    pub joint: String,
+    pub multiplier: f64,
+    pub offset: f64,
 }
 
 impl UrdfModel {
@@ -334,7 +345,7 @@ impl<'a> Tree<'a> {
     fn fixed(&mut self, parent: usize, child: usize, origin: Mat) {
         let n = self.model.links.get(child).map(|l| format!("{}_fixed", l.name)).unwrap_or_default();
         let name = self.names.take(&n);
-        self.model.joints.push(UrdfJoint { name, parent, child, origin, step: Step::Fixed, axis: Vec3::Z, limit: None, source: None });
+        self.model.joints.push(UrdfJoint { name, parent, child, origin, step: Step::Fixed, axis: Vec3::Z, limit: None, source: None, mimic: None });
     }
 
     /// The link an occurrence fixed in place hangs on, and its frame: `base_link` for the top
@@ -423,6 +434,7 @@ impl<'a> Tree<'a> {
                 axis: Vec3::Z,
                 limit: None,
                 source: None,
+                mimic: None,
             });
             return Some(());
         }
@@ -464,6 +476,7 @@ impl<'a> Tree<'a> {
                 axis,
                 limit,
                 source: Some((j.id, dof)),
+                mimic: None,
             });
             from = to;
         }
@@ -602,6 +615,7 @@ pub fn urdf(doc: &Document, st: &ModelState, stem: &str, options: &UrdfOptions) 
         }
     }
     tree.copies(&jointed);
+    mimics(doc, &mut tree.model, &mut tree.warnings);
 
     let moving = tree.model.joints.iter().any(|j| j.step != Step::Fixed);
     if moving && (options.effort.is_none() || options.velocity.is_none()) {
@@ -613,6 +627,32 @@ pub fn urdf(doc: &Document, st: &ModelState, stem: &str, options: &UrdfOptions) 
     out.model = tree.model;
     out.warnings = tree.warnings;
     Ok(out)
+}
+
+/// Motion links as `<mimic>` on the joint they drive, so a simulator keeps gears, racks and screws
+/// turning together. Polykrom keeps a link's ratio in its own units (radians and millimetres);
+/// URDF's are radians and metres. A cam is not a ratio: it is warned about and left free.
+fn mimics(doc: &Document, model: &mut UrdfModel, warnings: &mut Vec<String>) {
+    let name = |id: u64| doc.assembly.joints.iter().find(|j| j.id == id).map_or_else(|| id.to_string(), |j| j.name.clone());
+    for l in &doc.assembly.links {
+        if matches!(l.coupling, Some(joints::Coupling::Cam(_))) {
+            warnings.push(format!("the cam driving `{}` has no URDF form (<mimic> is linear): it is left free", name(l.b)));
+            continue;
+        }
+        let find = |id: u64, dof: usize| model.joints.iter().position(|j| j.source == Some((id, dof)));
+        let (Some(a), Some(b)) = (find(l.a, l.ia), find(l.b, l.ib)) else {
+            warnings.push(format!("the motion link from `{}` to `{}` is left out: one of its joints is not in the URDF", name(l.a), name(l.b)));
+            continue;
+        };
+        let unit = |j: &UrdfJoint| if j.step == Step::Prismatic { 1e-3 } else { 1.0 };
+        let (ka, kb) = (unit(&model.joints[a]), unit(&model.joints[b]));
+        if model.joints[b].mimic.is_some() {
+            warnings.push(format!("`{}` already follows another joint: its second motion link is left out", model.joints[b].name));
+            continue;
+        }
+        let leader = model.joints[a].name.clone();
+        model.joints[b].mimic = Some(Mimic { joint: leader, multiplier: l.ratio * kb / ka, offset: l.offset * kb });
+    }
 }
 
 fn token() -> Inertial {
@@ -777,6 +817,9 @@ fn write_xml(model: &UrdfModel, name: &str, options: &UrdfOptions) -> String {
                 }
                 None => s += &format!("    <limit effort=\"{}\" velocity=\"{}\"/>\n", num(effort), num(velocity)),
             }
+            if let Some(m) = &j.mimic {
+                s += &format!("    <mimic joint=\"{}\" multiplier=\"{}\" offset=\"{}\"/>\n", attr(&m.joint), num(m.multiplier), num(m.offset));
+            }
         }
         s += "  </joint>\n";
     }
@@ -850,6 +893,7 @@ mod tests {
                 axis: -Vec3::Y,
                 limit: Some((-1.0, 2.0)),
                 source: None,
+                mimic: None,
             });
         }
         let xml = write_xml(&model, "r", &UrdfOptions::default());

@@ -650,3 +650,47 @@ fn urdf_files_stay_inside_allow_paths() {
     let _ = std::fs::remove_dir_all(&inside);
     let _ = std::fs::remove_dir_all(&outside);
 }
+
+/// Gears and racks reach a simulator: the driven joint carries `<mimic>` with the ratio in URDF
+/// units (radians and metres), so a pinion turning drives the wheel and the rack there too.
+#[test]
+fn urdf_writes_motion_links_as_mimic() {
+    let mut s = Session::default();
+    for (name, body) in [
+        ("Frame", json!({"length": 120, "width": 40, "height": 5, "corner": [-20, -20, -5]})),
+        ("Rack", json!({"length": 80, "width": 6, "height": 6, "corner": [-40, 11, 0]})),
+    ] {
+        run(&mut s, "component.activate", json!({"component": "root"}));
+        run(&mut s, "component.create", json!({"name": name}));
+        run(&mut s, "solid.box", body);
+    }
+    for (name, x, r) in [("Pinion", 0, 10), ("Wheel", 50, 40)] {
+        run(&mut s, "component.activate", json!({"component": "root"}));
+        run(&mut s, "component.create", json!({"name": name}));
+        run(&mut s, "solid.cylinder", json!({"base": [x, 0, 0], "axis": [0, 0, 1], "radius": r, "height": 5}));
+    }
+    run(&mut s, "component.activate", json!({"component": "root"}));
+    ground(&mut s, "Frame", true);
+    for (name, x) in [("Pinion", 0), ("Wheel", 50)] {
+        run(
+            &mut s,
+            "joint.create",
+            json!({"type": "revolute", "name": name, "a": {"occurrence": "Frame", "point": [x, 0, 0]}, "b": {"occurrence": name, "point": [x, 0, 0]}, "flip": true}),
+        );
+    }
+    run(
+        &mut s,
+        "joint.create",
+        json!({"type": "slider", "name": "Rack Slide", "a": {"occurrence": "Frame", "point": [0, 14, 0], "z": [1, 0, 0]}, "b": {"occurrence": "Rack", "point": [0, 14, 0], "z": [1, 0, 0]}, "flip": true, "limits": [[-30, 30]]}),
+    );
+    run(&mut s, "joint.gear", json!({"a": "Pinion", "b": "Wheel", "ra": 10, "rb": 40}));
+    run(&mut s, "joint.rack_pinion", json!({"a": "Pinion", "b": "Rack Slide", "radius": 10}));
+    let p = package(&s);
+    let joint_xml = |name: &str| {
+        let at = p.xml.find(&format!("<joint name=\"{name}\"")).unwrap_or_else(|| panic!("no joint {name} in\n{}", p.xml));
+        p.xml[at..].split("</joint>").next().unwrap_or("").to_string()
+    };
+    assert!(joint_xml("Wheel").contains("<mimic joint=\"Pinion\" multiplier=\"-0.25\" offset=\"0\"/>"), "{}", joint_xml("Wheel"));
+    assert!(joint_xml("Rack_Slide").contains("<mimic joint=\"Pinion\" multiplier=\"0.01\" offset=\"0\"/>"), "{}", joint_xml("Rack_Slide"));
+    assert!(!joint_xml("Pinion").contains("<mimic"), "the driver is free");
+}
