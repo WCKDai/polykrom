@@ -38,6 +38,12 @@ const ANTHROPIC_MAX_TOKENS: u64 = 8192;
 /// The API version sent to Anthropic-compatible endpoints. It is the version every such endpoint
 /// knows: DeepSeek ignores it, Qwen does not require it, and the Claude API still accepts it.
 const ANTHROPIC_VERSION: &str = "2023-06-01";
+/// The API version sent to the Claude API itself (api.anthropic.com): the current one. Compatible
+/// endpoints keep [`ANTHROPIC_VERSION`].
+const CLAUDE_API_VERSION: &str = "2026-10-21";
+/// `max_tokens` at the Claude API: current Claude models think before they answer (it is always on
+/// for Claude Opus 5.5), so a reply needs room for both.
+const CLAUDE_MAX_TOKENS: u64 = 16_000;
 /// The connection test's own timeout: it asks for a token or two, not a whole answer.
 const TEST_TIMEOUT_S: u64 = 60;
 
@@ -402,14 +408,21 @@ impl Worker {
                 body
             }
             Protocol::Anthropic => {
+                let claude = claude_api(&self.cfg.base_url);
                 let mut body = json!({
                     "model": self.cfg.model,
-                    "max_tokens": ANTHROPIC_MAX_TOKENS,
+                    "max_tokens": if claude { CLAUDE_MAX_TOKENS } else { ANTHROPIC_MAX_TOKENS },
                     "system": super::acp::SYSTEM_NOTE,
                     "messages": &self.history,
                 });
                 if !self.tools.is_empty() {
                     body["tools"] = Value::Array(self.tools.clone());
+                }
+                // A tool loop sends the same tools, system note and history again with each round:
+                // at the Claude API the prefix is cached (its breakpoint moves forward with the
+                // conversation). Compatible endpoints get the plain request.
+                if claude {
+                    body["cache_control"] = json!({"type": "ephemeral"});
                 }
                 body
             }
@@ -421,7 +434,7 @@ impl Worker {
         let url = match self.cfg.protocol {
             Protocol::OpenAi => format!("{}/chat/completions", self.cfg.base_url),
             Protocol::Anthropic => {
-                headers.push(("anthropic-version".to_string(), ANTHROPIC_VERSION.to_string()));
+                headers.push(("anthropic-version".to_string(), anthropic_version(&self.cfg.base_url).to_string()));
                 endpoint(&self.cfg.base_url, "messages")
             }
         };
@@ -685,6 +698,20 @@ fn tool_names(list: &Value) -> Vec<String> {
         .unwrap_or_default()
 }
 
+/// Whether `base_url` is the Claude API itself rather than another endpoint that speaks its
+/// protocol (DeepSeek, Qwen, a proxy): only there are its newer request fields sent.
+fn claude_api(base_url: &str) -> bool {
+    let rest = base_url.trim().split_once("://").map_or(base_url.trim(), |(_, r)| r);
+    let host = rest.split(['/', ':', '?', '#']).next().unwrap_or("");
+    host.eq_ignore_ascii_case("api.anthropic.com")
+}
+
+/// The `anthropic-version` for an endpoint: the current one at the Claude API, the one every
+/// compatible endpoint knows elsewhere.
+fn anthropic_version(base_url: &str) -> &'static str {
+    if claude_api(base_url) { CLAUDE_API_VERSION } else { ANTHROPIC_VERSION }
+}
+
 /// `{base}/v1/{path}`, whether the user's base URL ends in `/v1` or in the endpoint root the
 /// provider's documentation gives (Anthropic's `https://api.anthropic.com`, DeepSeek's
 /// `https://api.deepseek.com/anthropic`).
@@ -696,7 +723,7 @@ fn endpoint(base_url: &str, path: &str) -> String {
 /// Headers for an Anthropic-compatible request: the version, and the key when there is one (which
 /// only goes over HTTPS or to this computer).
 fn anthropic_headers(base_url: &str, key: Option<&str>) -> Result<Vec<(String, String)>, String> {
-    let mut headers = vec![("anthropic-version".to_string(), ANTHROPIC_VERSION.to_string())];
+    let mut headers = vec![("anthropic-version".to_string(), anthropic_version(base_url).to_string())];
     if let Some(k) = key {
         if !super::agents::key_safe_for(base_url) {
             return Err(crate::i18n::tr("ui.ai_key_needs_https").to_string());
@@ -1179,6 +1206,28 @@ mod tests {
         (w, seen)
     }
 
+    /// At the Claude API the request caches its prefix and leaves room for thinking, with the
+    /// current API version; an endpoint that only speaks the protocol gets the plain request.
+    #[test]
+    fn the_claude_api_gets_caching_and_room_to_think_compatible_endpoints_do_not() {
+        let (mut w, _) = scripted_worker(vec![]);
+        w.cfg.protocol = Protocol::Anthropic;
+        for (url, claude) in [
+            ("https://api.anthropic.com/v1", true),
+            ("https://API.anthropic.com", true),
+            ("https://api.deepseek.com/anthropic", false),
+            ("https://api.anthropic.com.example.net/v1", false),
+            ("http://localhost:8080/v1", false),
+        ] {
+            w.cfg.base_url = url.into();
+            let b = w.body();
+            assert_eq!(b.get("cache_control").is_some(), claude, "{url}: {b}");
+            assert_eq!(b["max_tokens"], if claude { CLAUDE_MAX_TOKENS } else { ANTHROPIC_MAX_TOKENS }, "{url}");
+            let version = anthropic_headers(url, None).unwrap()[0].1.clone();
+            assert_eq!(version, if claude { CLAUDE_API_VERSION } else { ANTHROPIC_VERSION }, "{url}");
+        }
+    }
+
     fn refusal() -> (u16, Value) {
         (400, json!({"error": {"message": "Function tools with reasoning_effort are not supported for gpt-6.1-sol in /v1/chat/completions."}}))
     }
@@ -1323,7 +1372,7 @@ mod tests {
         assert!(message.contains("claude-opus-5-5"), "{message}");
         let sent = seen.lock().unwrap();
         assert_eq!(sent[0].url, "https://api.anthropic.com/v1/messages");
-        assert!(sent[0].headers.iter().any(|(k, v)| k == "anthropic-version" && v == ANTHROPIC_VERSION));
+        assert!(sent[0].headers.iter().any(|(k, v)| k == "anthropic-version" && v == CLAUDE_API_VERSION));
         assert!(sent[0].headers.iter().any(|(k, v)| k == "x-api-key" && v == "sk-k"));
         let body: Value = serde_json::from_slice(sent[0].body.as_deref().unwrap()).unwrap();
         assert_eq!(body["max_tokens"], 16);

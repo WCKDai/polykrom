@@ -218,11 +218,22 @@ pub const OPENAI_PRESETS: &[ApiPreset] = &[
     ApiPreset { name: "Ollama", base_url: "http://localhost:11434/v1" },
     ApiPreset { name: "LM Studio", base_url: "http://localhost:1234/v1" },
     ApiPreset { name: "OpenAI", base_url: "https://api.openai.com/v1" },
+    // Hosted providers' own OpenAI-compatible endpoints, as their documentation gives them.
+    ApiPreset { name: "Google Gemini", base_url: "https://generativelanguage.googleapis.com/v1beta/openai" },
+    ApiPreset { name: "OpenRouter", base_url: "https://openrouter.ai/api/v1" },
+    ApiPreset { name: "Groq", base_url: "https://api.groq.com/openai/v1" },
+    ApiPreset { name: "Mistral", base_url: "https://api.mistral.ai/v1" },
+    ApiPreset { name: "DeepSeek", base_url: "https://api.deepseek.com/v1" },
+    ApiPreset { name: "xAI", base_url: "https://api.x.ai/v1" },
+    ApiPreset { name: "Together", base_url: "https://api.together.xyz/v1" },
 ];
 
 /// Anthropic-compatible endpoints people use. The base URL is the one their documentation calls
 /// `ANTHROPIC_BASE_URL`: the `/v1` is added where needed.
-pub const ANTHROPIC_PRESETS: &[ApiPreset] = &[ApiPreset { name: "Anthropic", base_url: "https://api.anthropic.com/v1" }];
+pub const ANTHROPIC_PRESETS: &[ApiPreset] = &[
+    ApiPreset { name: "Anthropic", base_url: "https://api.anthropic.com/v1" },
+    ApiPreset { name: "DeepSeek", base_url: "https://api.deepseek.com/anthropic" },
+];
 
 /// The presets offered for an endpoint protocol.
 pub fn presets(protocol: Protocol) -> &'static [ApiPreset] {
@@ -307,6 +318,10 @@ mod tests {
         assert_eq!(Kind::Api.id(), "api");
         assert_eq!(Kind::Anthropic.id(), "anthropic");
         assert!(presets(Protocol::OpenAi).iter().all(|p| !p.name.is_empty() && p.base_url.starts_with("http")));
+        // A key may go to every preset: each is HTTPS or this computer.
+        for p in presets(Protocol::OpenAi).iter().chain(presets(Protocol::Anthropic)) {
+            assert!(key_safe_for(p.base_url), "{}: {}", p.name, p.base_url);
+        }
         assert!(presets(Protocol::Anthropic).iter().any(|p| p.base_url == "https://api.anthropic.com/v1"));
     }
 }
