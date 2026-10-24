@@ -11,6 +11,7 @@ use solidcraft_kernel::Body;
 
 use super::CommandSpec;
 use super::joints::{cannot_move, effective_values, joint_id, occurrence_id, resolve_holding, value};
+use super::tri_tree::TriTree;
 use crate::params::{bad, bool_, str_, vec3};
 use crate::{EngineError, Result, Session};
 
@@ -181,6 +182,11 @@ fn overlap(a: &Body, b: &Body) -> Option<f64> {
 }
 
 fn mesh_overlap(ma: &solidcraft_geom::Mesh, mb: &solidcraft_geom::Mesh, tol: f64) -> Option<f64> {
+    mesh_overlap_counted(ma, mb, tol, &mut 0)
+}
+
+/// [`mesh_overlap`], adding the triangles it tests to `work` (what contact budgets limit).
+pub(super) fn mesh_overlap_counted(ma: &solidcraft_geom::Mesh, mb: &solidcraft_geom::Mesh, tol: f64, work: &mut usize) -> Option<f64> {
     let (ba, bb) = (ma.bounds(), mb.bounds());
     if ba.max.x < bb.min.x + tol
         || bb.max.x < ba.min.x + tol
@@ -191,7 +197,9 @@ fn mesh_overlap(ma: &solidcraft_geom::Mesh, mb: &solidcraft_geom::Mesh, tol: f64
     {
         return None;
     }
-    let depth = deepest(ma, mb, tol).max(deepest(mb, ma, tol));
+    let (ta, tb) = (TriTree::new(tris(ma)), TriTree::new(tris(mb)));
+    *work += ta.tris().len() + tb.tris().len();
+    let depth = deepest(ma, &tb, bb, tol, work).max(deepest(mb, &ta, ba, tol, work));
     (depth > tol).then_some(depth)
 }
 
@@ -199,10 +207,13 @@ fn tris(m: &solidcraft_geom::Mesh) -> Vec<[Vec3; 3]> {
     m.triangles.iter().filter_map(|t| m.tri(t)).collect()
 }
 
-/// The deepest any sample point of `a` lies inside `b` (0 if none).
-fn deepest(a: &solidcraft_geom::Mesh, b: &solidcraft_geom::Mesh, tol: f64) -> f64 {
-    let tb = tris(b);
-    let bx = b.bounds();
+/// How far `p` is from the surface `tb` (its nearest triangle).
+fn surface_distance(p: Vec3, tb: &TriTree, work: &mut usize) -> f64 {
+    tb.nearest(p, work, |[a, b, c]| closest(p, *a, *b, *c).dist(p))
+}
+
+/// The deepest any sample point of `a` lies inside `b` (0 if none); `bx` is b's box.
+fn deepest(a: &solidcraft_geom::Mesh, tb: &TriTree, bx: Aabb3, tol: f64, work: &mut usize) -> f64 {
     let mut pts: Vec<Vec3> = a.positions.clone();
     let mut edges: Vec<(Vec3, Vec3)> = Vec::new();
     for [p, q, r] in tris(a) {
@@ -220,13 +231,13 @@ fn deepest(a: &solidcraft_geom::Mesh, b: &solidcraft_geom::Mesh, tol: f64) -> f6
         {
             continue;
         }
-        let d = tb.iter().map(|[a, b, c]| closest(p, *a, *b, *c).dist(p)).fold(f64::MAX, f64::min);
-        if d > tol.max(best) && inside(p, &tb) {
+        let d = surface_distance(p, tb, work);
+        if d > tol.max(best) && inside_tree(p, tb, work) {
             best = d;
         }
     }
     for (p, q) in edges.into_iter().take(200_000) {
-        best = best.max(crossing(p, q, &tb, bx, tol));
+        best = best.max(crossing(p, q, tb, bx, tol, work));
     }
     best
 }
@@ -236,7 +247,7 @@ fn deepest(a: &solidcraft_geom::Mesh, b: &solidcraft_geom::Mesh, tol: f64) -> f6
 /// lie inside, deeper than `tol`, as elsewhere in the check). Two plates crossing each other's
 /// faces put no vertex, mid-edge or triangle centre of either inside the other — the chord an
 /// edge cuts is how that crossing is seen (#3323).
-fn crossing(p: Vec3, q: Vec3, tb: &[[Vec3; 3]], bx: Aabb3, tol: f64) -> f64 {
+fn crossing(p: Vec3, q: Vec3, tb: &TriTree, bx: Aabb3, tol: f64, work: &mut usize) -> f64 {
     if p.x.max(q.x) < bx.min.x - tol
         || p.x.min(q.x) > bx.max.x + tol
         || p.y.max(q.y) < bx.min.y - tol
@@ -254,7 +265,12 @@ fn crossing(p: Vec3, q: Vec3, tb: &[[Vec3; 3]], bx: Aabb3, tol: f64) -> f64 {
     // Where the edge crosses the surface, along the edge. A crossing at a vertex or along an
     // edge shared by two triangles is found twice (or more); merges of neighbours leave the
     // entry and exit of each chord as one pair each.
-    let mut hits: Vec<f64> = tb.iter().filter_map(|t| contact_sweep::segment_hits_triangle(p, q, t)).map(|h| (h - p).dot(d) / len2).collect();
+    let mut hits: Vec<f64> = Vec::new();
+    tb.along(p, q, false, PAD, work, |t| {
+        if let Some(h) = contact_sweep::segment_hits_triangle(p, q, t) {
+            hits.push((h - p).dot(d) / len2);
+        }
+    });
     if hits.len() < 2 {
         return 0.0;
     }
@@ -266,42 +282,54 @@ fn crossing(p: Vec3, q: Vec3, tb: &[[Vec3; 3]], bx: Aabb3, tol: f64) -> f64 {
             break;
         }
         let m = p + d * ((pair[0] + pair[1]) * 0.5);
-        let deep = tb.iter().map(|[a, b, c]| closest(m, *a, *b, *c).dist(m)).fold(f64::MAX, f64::min);
-        if deep > tol.max(best) && inside(m, tb) {
+        let deep = surface_distance(m, tb, work);
+        if deep > tol.max(best) && inside_tree(m, tb, work) {
             best = deep;
         }
     }
     best
 }
 
+/// How far past a box a segment or ray is still tested against what is in it (mm): the
+/// crossing and ray tests run on triangles, a box only rules them out.
+const PAD: f64 = 1e-6;
+
+/// The fixed skew direction of the parity ray (no axis-aligned edge hits).
+// Fixed ray coordinates, not an approximation used to compute Euler's constant.
+#[allow(clippy::approx_constant)]
+const RAY: Vec3 = Vec3::new(0.577_215_664_9, 0.327_118_441_9, 0.751_891_438_7);
+
+/// Whether the parity ray from `p` crosses triangle abc (ahead of `p`).
+fn ray_hit(p: Vec3, [a, b, c]: &[Vec3; 3]) -> bool {
+    let (e1, e2) = (*b - *a, *c - *a);
+    let h = RAY.cross(e2);
+    let det = e1.dot(h);
+    if det.abs() < 1e-14 {
+        return false;
+    }
+    let f = 1.0 / det;
+    let sv = p - *a;
+    let u = f * sv.dot(h);
+    if !(0.0..=1.0).contains(&u) {
+        return false;
+    }
+    let q = sv.cross(e1);
+    let v = f * RAY.dot(q);
+    if v < 0.0 || u + v > 1.0 {
+        return false;
+    }
+    f * e2.dot(q) > 0.0
+}
+
 /// Ray parity along a skew direction (no axis-aligned edge hits).
 fn inside(p: Vec3, tris: &[[Vec3; 3]]) -> bool {
-    // Fixed ray coordinates, not an approximation used to compute Euler's constant.
-    #[allow(clippy::approx_constant)]
-    let dir = Vec3::new(0.577_215_664_9, 0.327_118_441_9, 0.751_891_438_7);
-    let mut n = 0;
-    for [a, b, c] in tris {
-        let (e1, e2) = (*b - *a, *c - *a);
-        let h = dir.cross(e2);
-        let det = e1.dot(h);
-        if det.abs() < 1e-14 {
-            continue;
-        }
-        let f = 1.0 / det;
-        let sv = p - *a;
-        let u = f * sv.dot(h);
-        if !(0.0..=1.0).contains(&u) {
-            continue;
-        }
-        let q = sv.cross(e1);
-        let v = f * dir.dot(q);
-        if v < 0.0 || u + v > 1.0 {
-            continue;
-        }
-        if f * e2.dot(q) > 0.0 {
-            n += 1;
-        }
-    }
+    tris.iter().filter(|t| ray_hit(p, t)).count() % 2 == 1
+}
+
+/// [`inside`] through the tree: only the triangles whose box the ray passes are tested.
+fn inside_tree(p: Vec3, tb: &TriTree, work: &mut usize) -> bool {
+    let mut n = 0usize;
+    tb.along(p, p + RAY, true, PAD, work, |t| n += usize::from(ray_hit(p, t)));
     n % 2 == 1
 }
 

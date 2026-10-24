@@ -15,7 +15,7 @@ const MAX_SAMPLES: usize = 4096;
 const MAX_PLACEMENTS: usize = 4096;
 const MAX_BODIES: usize = 256;
 const MAX_TRIANGLES: usize = 50_000;
-const MAX_WORK: usize = 50_000_000;
+const MAX_WORK: usize = 200_000_000;
 
 fn limit(message: &str) -> crate::EngineError {
     bad("contact.sweep", message)
@@ -335,18 +335,14 @@ impl ContactGeometry {
             {
                 continue;
             }
-            let cost = ma
-                .positions
-                .len()
-                // 4 sample points and 3 edges to probe per triangle of `a` against each triangle of `b` (#3323), and the other way round.
-                .saturating_add(ma.triangles.len().saturating_mul(7))
-                .saturating_mul(mb.triangles.len())
-                .saturating_add(mb.positions.len().saturating_add(mb.triangles.len().saturating_mul(7)).saturating_mul(ma.triangles.len()));
-            *work = work.saturating_add(cost);
+            // The triangles the check actually tests (its tree skips what boxes rule out), counted
+            // against the budget: a pin turning in its bore costs what is near it, not every
+            // triangle against every other (#25).
+            let depth = super::mesh_overlap_counted(ma, mb, 1e-4 * ba.size.max(bb.size).max(1.0), work);
             if *work > budget {
                 return Err(limit("motion exceeds contact sweep collision budget; simplify the contact set or use smaller increments"));
             }
-            if let Some(depth) = super::mesh_overlap(ma, mb, 1e-4 * ba.size.max(bb.size).max(1.0)) {
+            if let Some(depth) = depth {
                 found.insert((oa.0.min(ob.0), oa.0.max(ob.0)));
                 out.push((oa.clone(), ob.clone(), depth));
                 if !all {
