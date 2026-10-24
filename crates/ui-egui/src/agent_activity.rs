@@ -214,7 +214,7 @@ pub fn paint(app: &SolveApp, ctx: &egui::Context) {
                             painter.circle_filled(end, 3.0, t.accent.gamma_multiply(fade));
                         }
                         let mid = pos2((p.x + q.x) / 2.0, (p.y + q.y) / 2.0 - 10.0);
-                        painter.text(mid, Align2::CENTER_BOTTOM, format!("{mm:.3} mm"), FontId::proportional(12.0), t.text.gamma_multiply(fade));
+                        painter.text(mid, Align2::CENTER_BOTTOM, format!("{mm:.3} mm"), FontId::proportional(t.font_small), t.text.gamma_multiply(fade));
                     }
                 }
             }
@@ -225,7 +225,7 @@ pub fn paint(app: &SolveApp, ctx: &egui::Context) {
     if k <= 0.0 {
         return;
     }
-    let font = FontId::proportional(12.5);
+    let font = FontId::proportional(t.font_label);
     let line = 18.0;
     let rows = feed.entries.len() as f32 + 1.0;
     // In the viewport's bottom-right corner: the browser floats over its top-left, the view cube
