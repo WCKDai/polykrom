@@ -64,6 +64,11 @@ impl TriTree {
         &self.tris
     }
 
+    /// The box around every triangle (empty for no triangles).
+    pub(super) fn bounds(&self) -> Aabb3 {
+        self.nodes.first().map_or(Aabb3::EMPTY, |n| n.bounds)
+    }
+
     /// Build the subtree over `tris[lo..hi]`: split at the median of the longest axis.
     fn build(&mut self, lo: usize, hi: usize) -> usize {
         let bounds = self.tris[lo..hi].iter().fold(Aabb3::EMPTY, |b, t| b.union(&tri_box(t)));
