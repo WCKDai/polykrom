@@ -367,7 +367,9 @@ fn a_pin_seated_line_to_line_in_its_bushing_is_measured() {
         }
         let started = std::time::Instant::now();
         let r = run(&mut s, "inspect.clearance", json!({"bodies": ["Pin"], "against": ["Bush"], "min_volume": 0.01, "clearance": 1e-6}));
-        assert!(started.elapsed().as_secs_f64() < 30.0, "sunk {sunk}: {:?}", started.elapsed());
+        // A guard against a hang (the boolean once took minutes here), not a timing: about 9 s
+        // alone, it ran past 30 s while the whole suite shares the cores.
+        assert!(started.elapsed().as_secs_f64() < 120.0, "sunk {sunk}: {:?}", started.elapsed());
         if fillet {
             assert!(r["unchecked"][0]["reason"].as_str().is_some_and(|w| w.contains("pin on one cylinder")), "{r}");
             continue;
