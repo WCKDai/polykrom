@@ -306,6 +306,14 @@ impl Autosaver {
         }
     }
 
+    /// Whether a crash now would leave `s` as it is to recover: no write running, and the last
+    /// autosave holds the design and what was hidden (or nothing is unsaved). Scenario tests wait
+    /// for it, frame by frame, before they crash an app.
+    pub fn caught_up(&self, s: &Session) -> bool {
+        self.writing.is_none()
+            && (!s.is_dirty() || self.last.as_ref().is_some_and(|(l, v)| (Arc::ptr_eq(l, &s.doc) || **l == *s.doc) && *v == s.visibility))
+    }
+
     /// What the next autosave writes: `None` when there is nothing to write (and, with nothing
     /// unsaved, the entry has been dropped).
     fn begin(&mut self, s: &Session) -> Option<Snapshot> {
