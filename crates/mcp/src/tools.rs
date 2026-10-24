@@ -987,14 +987,7 @@ fn with_timings(mut reply: Value, timed: bool, rows: Vec<Value>, total_ms: f64) 
 }
 
 /// The `batch` reply from the app's `engine.batch` answer, shaped as the per-step path shapes it.
-fn batch_reply(
-    r: &Value,
-    len: usize,
-    rollback: bool,
-    verbose: bool,
-    narrow: &dyn Fn(usize, Value) -> Value,
-    selects: &[Option<Value>],
-) -> Value {
+fn batch_reply(r: &Value, len: usize, rollback: bool, verbose: bool, narrow: &dyn Fn(usize, Value) -> Value, selects: &[Option<Value>]) -> Value {
     let results: Vec<Value> = r["results"]
         .as_array()
         .cloned()
