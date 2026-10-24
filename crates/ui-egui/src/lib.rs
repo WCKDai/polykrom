@@ -35,6 +35,7 @@ pub mod dialogs_appearance;
 pub mod dialogs_assembly;
 pub mod dialogs_coupling;
 pub mod dialogs_frame;
+mod dialogs_hole;
 pub mod dialogs_library;
 pub mod dialogs_motion;
 pub mod dialogs_move;
@@ -63,6 +64,9 @@ pub mod gpu;
 pub mod help;
 #[cfg(test)]
 mod hole_direction_ui_tests;
+pub(crate) mod hole_place;
+#[cfg(test)]
+mod hole_place_ui_tests;
 #[cfg(test)]
 mod hole_placement_ui_tests;
 pub mod home;

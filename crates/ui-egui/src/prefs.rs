@@ -581,6 +581,13 @@ preference_settings! {
     /// Extrude: with a profile picked, a face, vertex or parallel plane picked off its plane
     /// switches the extent to To Object (off: picks only add profiles, as before).
     extrude_auto_to_object: bool = false, PAGE_DESIGN => check("Extrude to a picked target", "In Extrude, with a profile picked, picking a face, vertex or parallel plane off its plane switches the extent to To Object");
+    /// Placing a Single hole snaps to the middle of the face and the centres of its round edges
+    /// (`hole_place`). Off by default: a hole goes where it is clicked.
+    hole_snaps: bool = false, PAGE_DESIGN => check("Snap to face and edge centres");
+    /// A placed Single hole has a handle that drags it, and a pick elsewhere on a face that has a
+    /// hole moves the hole there (`hole_place`). Off by default: a second pick on its face takes
+    /// the hole out, and a hole is moved by taking it out and picking again.
+    hole_moves: bool = false, PAGE_DESIGN => check("Move holes by clicking or dragging");
     /// What a middle-button double-click in the view does: `home`, `fit` or `off`.
     middle_double_click: String = "home".into(), PAGE_NAVIGATION;
     /// Colour vision mode (#778): `off`, `protan`, `deutan` or `tritan`.
