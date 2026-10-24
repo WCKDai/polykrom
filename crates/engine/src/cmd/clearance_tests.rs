@@ -574,3 +574,39 @@ fn a_pin_through_a_d_bore_of_its_size_overlaps_the_flat() {
     assert_eq!(overlaps.len(), 1, "{res}");
     assert!((f(&overlaps[0]["volume_mm3"]) - want).abs() < 0.05 * want, "{want} {res}");
 }
+
+/// Copies of one part repeat its inner pairs: each is measured once, and the copy takes the result
+/// at its own place (its overlap's centre, its nearest points).
+#[test]
+fn placements_of_one_part_reuse_their_inner_pairs() {
+    let mut s = Session::default();
+    let c = run(&mut s, "component.create", json!({"name": "Servo"}));
+    cube(&mut s, "Case", 10.0, [0.0, 0.0, 0.0]);
+    cube(&mut s, "Gear", 10.0, [8.0, 0.0, 0.0]);
+    cube(&mut s, "Board", 10.0, [0.0, 0.0, 11.0]);
+    run(&mut s, "component.activate", json!({"component": "root"}));
+    run(&mut s, "occurrence.copy", json!({"component": c["component"], "translate": [0, 50, 0]}));
+    let r = run(&mut s, "inspect.clearance", json!({"clearance": 2}));
+    assert!(f(&r["pairs_reused"]) >= 2.0, "{r}");
+    let mut centres: Vec<f64> = r["overlaps"].as_array().unwrap().iter().map(|o| f(&o["center"][1])).collect();
+    centres.sort_by(f64::total_cmp);
+    assert_eq!(centres.len(), 2, "{r}");
+    assert!((centres[0] - 5.0).abs() < 1e-6 && (centres[1] - 55.0).abs() < 1e-6, "{centres:?}");
+    let near: Vec<&Value> = r["near"].as_array().unwrap().iter().filter(|n| (f(&n["distance_mm"]) - 1.0).abs() < 1e-6).collect();
+    assert_eq!(near.len(), 4, "the case and the gear 1 mm under the board, in each placement: {r}");
+    let at_copy = near.iter().filter(|n| (f(&n["from"][1]) - 50.0).abs() < 1e-6 && (f(&n["to"][1]) - 50.0).abs() < 1e-6).count();
+    assert_eq!(at_copy, 2, "the copy's nearest points are at the copy: {r}");
+}
+
+/// A budget too small for the work lists the pairs it did not reach rather than running on.
+#[test]
+fn a_spent_budget_lists_pairs_as_unchecked() {
+    let mut s = Session::default();
+    for k in 0..6 {
+        cube(&mut s, &format!("C{k}"), 10.0, [k as f64 * 9.0, 0.0, 0.0]);
+    }
+    let r = run(&mut s, "inspect.clearance", json!({"budget_s": 1e-9}));
+    let unchecked = r["unchecked"].as_array().unwrap();
+    assert!(unchecked.iter().any(|u| u["reason"].as_str().unwrap_or("").contains("time budget")), "{r}");
+    assert!(s.execute("inspect.clearance", &json!({"budget_s": 0})).is_err());
+}
