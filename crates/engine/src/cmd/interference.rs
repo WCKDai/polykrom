@@ -10,10 +10,11 @@
 //! rather than holding the call. The shared part is measured as `solidcraft_kernel::measure`
 //! measures it (its mass properties alone).
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use serde_json::{Value, json};
+use solidcraft_doc::Mat;
 use solidcraft_geom::mesh_distance::TriangleSet;
 use solidcraft_geom::{Aabb3, Mesh, Vec3};
 use solidcraft_kernel::Body;
@@ -132,12 +133,37 @@ pub(super) fn interference(s: &mut Session, p: &Value) -> Result<Value> {
     });
     let mut jobs = Vec::new();
     let mut cleared = 0usize;
+    // Placements of one part (six copies of a servo) give their inner pairs again and again: a
+    // pair of the same two definitions placed the same way relative to each other has the same
+    // answer, so it is intersected once and the others take its answer, moved to where they are.
+    let mut first: HashMap<(u64, u64, Vec<i64>), (usize, usize)> = HashMap::new();
+    let mut reused: Vec<(usize, usize, Mat)> = Vec::new();
     for (k, (&(i, j), exact)) in pairs.iter().zip(need_exact).enumerate() {
         if !exact.unwrap_or(true) {
             cleared += 1;
             continue;
         }
         let (Some(a), Some(b)) = (bodies.get(i), bodies.get(j)) else { continue };
+        if let (Some(ka), Some(kb), Some(inv_a)) = (a.definition_key(), b.definition_key(), solidcraft_doc::mat_inverse(&a.source_transform)) {
+            let relative = solidcraft_doc::mat_mul(&inv_a, &b.source_transform);
+            let key = (ka, kb, relative.iter().flatten().map(|v| (v * 1e6).round() as i64).collect::<Vec<_>>());
+            match first.get(&key) {
+                Some(&(orig, orig_body)) => {
+                    // From where the first pair's a is to where this one's is.
+                    let moved = bodies
+                        .get(orig_body)
+                        .and_then(|o| solidcraft_doc::mat_inverse(&o.source_transform))
+                        .map(|inv| solidcraft_doc::mat_mul(&a.source_transform, &inv));
+                    if let Some(moved) = moved {
+                        reused.push((k, orig, moved));
+                        continue;
+                    }
+                }
+                None => {
+                    first.insert(key, (k, i));
+                }
+            }
+        }
         jobs.push(Job {
             pair: k,
             a: a.body.clone(),
@@ -147,11 +173,28 @@ pub(super) fn interference(s: &mut Session, p: &Value) -> Result<Value> {
         });
     }
     let intersected = jobs.len();
+    let names_of = |k: usize| pairs.get(k).and_then(|&(i, j)| Some((bodies.get(i)?.name.clone(), bodies.get(j)?.name.clone())));
     jobs.sort_by(|x, y| y.cost.cmp(&x.cost).then(x.pair.cmp(&y.pair)));
 
     let left = budget.saturating_sub(started.elapsed());
     let waited = web_time::Instant::now();
-    let (done, threads) = run_jobs(jobs, left);
+    let (mut done, threads) = run_jobs(jobs, left);
+    // The reused pairs take the answer of the pair they repeat, at their own place.
+    let answers: HashMap<(String, String), usize> = done.iter().enumerate().map(|(n, (names, _))| (names.clone(), n)).collect();
+    for (k, orig, moved) in &reused {
+        let (Some(names), Some(orig_names)) = (names_of(*k), names_of(*orig)) else { continue };
+        let copy = answers.get(&orig_names).and_then(|&n| done.get(n)).and_then(|(_, d)| d.as_ref()).map(|d| Done {
+            outcome: match &d.outcome {
+                Outcome::Hit(v) => Outcome::Hit(moved_hit(v, &names, moved)),
+                Outcome::Clear => Outcome::Clear,
+                Outcome::Unchecked(r) => Outcome::Unchecked(r.clone()),
+            },
+            note: d.note.clone(),
+            ms: 0.0,
+            kernel: KernelTimes::default(),
+        });
+        done.push((names, copy));
+    }
     let waited_ms = waited.elapsed().as_secs_f64() * 1000.0;
 
     // Mesh bodies are not intersected: say so, rather than let `count: 0` read as "no overlap".
@@ -192,11 +235,34 @@ pub(super) fn interference(s: &mut Session, p: &Value) -> Result<Value> {
     Ok(json!({
         "interferences": hits, "count": hits.len(), "checked": bodies.len(), "unchecked": unchecked,
         "truncated": skipped > 0, "skipped_pairs": skipped,
-        "pairs_candidate": pairs.len(), "pairs_cleared": cleared, "pairs_intersected": intersected,
+        "pairs_candidate": pairs.len(), "pairs_cleared": cleared, "pairs_intersected": intersected, "pairs_reused": reused.len(),
         "pairs_not_checked": not_checked, "budget_s": budget_s, "budget_exceeded": not_checked > 0,
         "threads": threads, "boolean_ms": round_ms(boolean_ms), "tessellate_ms": round_ms(tessellate_ms),
         "slowest": slowest, "ms": round_ms(started.elapsed().as_secs_f64() * 1000.0),
     }))
+}
+
+/// A hit found for one placement of a pair, for another placement: its names, and its centre
+/// and box moved by `m`.
+fn moved_hit(v: &Value, (a, b): &(String, String), m: &Mat) -> Value {
+    let mut out = v.clone();
+    out["a"] = json!(a);
+    out["b"] = json!(b);
+    let point = |p: &Value| -> Option<Vec3> { Some(Vec3::new(p.get(0)?.as_f64()?, p.get(1)?.as_f64()?, p.get(2)?.as_f64()?)) };
+    if let Some(c) = v.get("center").and_then(point) {
+        out["center"] = json!(solidcraft_doc::apply_point(m, c));
+    }
+    if let (Some(lo), Some(hi)) = (v.pointer("/bbox/min").and_then(point), v.pointer("/bbox/max").and_then(point)) {
+        let mut b = Aabb3::EMPTY;
+        for k in 0..8 {
+            let x = if k & 1 == 0 { lo.x } else { hi.x };
+            let y = if k & 2 == 0 { lo.y } else { hi.y };
+            let z = if k & 4 == 0 { lo.z } else { hi.z };
+            b.add(solidcraft_doc::apply_point(m, Vec3::new(x, y, z)));
+        }
+        out["bbox"] = json!({"min": b.min, "max": b.max});
+    }
+    out
 }
 
 fn round_ms(ms: f64) -> f64 {
