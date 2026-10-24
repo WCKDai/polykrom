@@ -2248,6 +2248,8 @@
   "ui.shortcut_capture_press": "Press modifiers and one key. Escape cancels.",
   "ui.shortcut_capture_release": "Release all keys to confirm. Escape cancels.",
   "ui.shortcut_capture_settling": "Confirming shortcut… Escape cancels.",
+  "ui.shortcut_cycles_modes": "Pressing a tool's shortcut again switches its mode",
+  "ui.shortcut_cycles_modes_tip": "Before the first point, pressing a sketch tool's shortcut again steps through its creation modes. Off: it starts the tool again.",
   "ui.shortcut_multiple_keys": "Use modifiers and only one other key. Click the binding to try again.",
   "ui.show": "Show",
   "ui.showAll": "Show All",
