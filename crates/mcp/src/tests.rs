@@ -2159,3 +2159,21 @@ fn execute_with_a_tool_name_points_at_the_tool() {
     let text = r["result"]["content"][0]["text"].as_str().unwrap_or_default();
     assert!(r["result"]["isError"] == true && text.contains("is a tool, not a command"), "{r}");
 }
+
+/// An unknown command is answered with what it most likely meant, before what it is spelled like.
+#[test]
+fn unknown_commands_suggest_what_they_meant() {
+    let mut s = server();
+    for (guess, want) in [
+        ("inspect.mass_properties", "inspect.measure"),
+        ("joint.add", "joint.create"),
+        ("sketch.circle", "sketch.circle.center"),
+        ("inspect.collisions", "inspect.interference"),
+        ("export.bom", "assembly.bom"),
+    ] {
+        let r = call(&mut s, 1, "tools/call", json!({"name": "execute", "arguments": {"command": guess}}));
+        let text = r["result"]["content"][0]["text"].as_str().unwrap_or_default().to_string();
+        let first = text.split("closest: ").nth(1).and_then(|h| h.split(", ").next()).unwrap_or_default();
+        assert_eq!(first, format!("`{want}`"), "{guess}: {text}");
+    }
+}
