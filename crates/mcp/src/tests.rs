@@ -1658,3 +1658,33 @@ fn describe_command_and_strict_parameter_checking() {
     let m = tool(&mut s, "measure", json!({}));
     assert_eq!(m["body_count"], json!(0), "{m}");
 }
+
+/// `select` cuts a reply down to the paths asked for (`*` for every item of a list), in execute
+/// and in each batch step, and names the paths that matched nothing.
+#[test]
+fn select_keeps_only_the_paths_asked_for() {
+    let mut s = server();
+    tool(
+        &mut s,
+        "batch",
+        json!({"commands": [
+            {"command": "solid.box", "params": {"length": 20, "width": 10, "height": 5, "body_name": "A"}},
+            {"command": "solid.box", "params": {"length": 10, "width": 10, "height": 10, "corner": [40, 0, 0], "operation": "new", "body_name": "B"}},
+        ]}),
+    );
+    let m = tool(&mut s, "execute", json!({"command": "inspect.measure", "params": {}, "select": ["total.volume_mm3", "bodies.*.name", "nope.x"]}));
+    assert_eq!(m["total"], json!({"volume_mm3": 2000.0}), "{m}");
+    assert_eq!(m["bodies"], json!([{"name": "A"}, {"name": "B"}]), "{m}");
+    assert_eq!(m["missing_paths"], json!(["nope.x"]), "{m}");
+    assert!(m.get("body_count").is_none(), "only what was asked for: {m}");
+    let b = tool(
+        &mut s,
+        "batch",
+        json!({"commands": [
+            {"command": "inspect.measure", "params": {}, "select": ["bodies.1.volume_mm3"]},
+            {"command": "inspect.measure", "params": {"bodies": ["A"]}},
+        ]}),
+    );
+    assert_eq!(b["results"][0], json!({"bodies": [null, {"volume_mm3": 1000.0}]}), "{b}");
+    assert_eq!(b["results"][1]["body_count"], 1, "a step without select is whole: {b}");
+}
