@@ -32,6 +32,8 @@ struct CachedBody {
     /// How far its mesh may stray from its faces: 0 when every face is flat (the mesh is the
     /// shape), else the chord tolerance it was tessellated to.
     chord: f64,
+    /// Its thinnest width (a quarter of it is the sampling step a motion needs for it).
+    thickness: f64,
 }
 
 /// Bodies [`ContactMeshes`] keeps; it starts over when full.
@@ -124,7 +126,7 @@ impl ContactGeometry {
             return Ok(out);
         }
         let state = s.model.state();
-        let mut meshes: HashMap<String, (Arc<Mesh>, f64, Arc<super::TriTree>)> = HashMap::new();
+        let mut meshes: HashMap<String, (Arc<Mesh>, f64, Arc<super::TriTree>, f64)> = HashMap::new();
         let mut stack = vec![(0, Vec::<u64>::new())];
         let mut count = 0;
         while let Some((component, path)) = stack.pop() {
@@ -150,7 +152,7 @@ impl ContactGeometry {
                 if out.bodies.len() >= MAX_BODIES {
                     return Err(limit("too many bodies for a contact sweep"));
                 }
-                let (mesh, chord, tree) = if let Some(cached) = meshes.get(&body.name) {
+                let (mesh, chord, tree, thickness) = if let Some(cached) = meshes.get(&body.name) {
                     cached.clone()
                 } else {
                     let key = body.geometry_key();
@@ -169,8 +171,8 @@ impl ContactGeometry {
                         }
                     };
                     out.step = out.step.min(made.thickness * 0.25);
-                    meshes.insert(body.name.clone(), (made.mesh.clone(), made.chord, made.tree.clone()));
-                    (made.mesh, made.chord, made.tree)
+                    meshes.insert(body.name.clone(), (made.mesh.clone(), made.chord, made.tree.clone(), made.thickness));
+                    (made.mesh, made.chord, made.tree, made.thickness)
                 };
                 out.bodies.push(CachedBody {
                     path: path.clone(),
@@ -179,6 +181,7 @@ impl ContactGeometry {
                     tree,
                     size: body.body.size(),
                     chord,
+                    thickness,
                 });
             }
         }
@@ -222,6 +225,30 @@ impl ContactGeometry {
     }
 
     /// How many pairs of set members are checked against each other.
+    /// Set aside the pairs whose two bodies keep the same placement relative to each other in
+    /// every one of `poses` (and `start`): they move as one through the motion, so they cannot
+    /// meet in it. The sampling step then follows only the bodies still paired, so a thin washer
+    /// riding on a bracket no longer makes a long sweep take thousands of samples. Returns how
+    /// many pairs were set aside.
+    pub(super) fn drop_rigid_pairs(&mut self, start: &Session, poses: &[Session]) -> Result<usize> {
+        let frames = |s: &Session| -> Result<Vec<Mat>> { self.bodies.iter().map(|b| Self::frame(b, s)).collect() };
+        let base = frames(start)?;
+        let after: Vec<Vec<Mat>> = poses.iter().map(frames).collect::<Result<_>>()?;
+        let relative = |f: &[Mat], a: usize, b: usize| -> Option<Mat> { Some(mat_mul(&solidcraft_doc::mat_inverse(f.get(a)?)?, f.get(b)?)) };
+        let same = |x: &Mat, y: &Mat| x.iter().flatten().zip(y.iter().flatten()).all(|(p, q)| (p - q).abs() <= 1e-9 * (1.0 + p.abs()));
+        let before = self.pairs.len();
+        self.pairs.retain(|(a, b, _, _)| {
+            let Some(r0) = relative(&base, *a, *b) else { return true };
+            after.iter().any(|f| relative(f, *a, *b).is_none_or(|r| !same(&r0, &r)))
+        });
+        let used: BTreeSet<usize> = self.pairs.iter().flat_map(|(a, b, _, _)| [*a, *b]).collect();
+        let thinnest = used.iter().filter_map(|i| self.bodies.get(*i)).map(|b| b.thickness).fold(f64::INFINITY, f64::min);
+        if thinnest.is_finite() {
+            self.step = thinnest * 0.25;
+        }
+        Ok(before - self.pairs.len())
+    }
+
     pub(super) fn pair_count(&self) -> usize {
         self.pairs.iter().map(|(_, _, a, b)| (a.0.min(b.0), a.0.max(b.0))).collect::<BTreeSet<_>>().len()
     }
