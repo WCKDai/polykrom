@@ -109,6 +109,12 @@ impl ModelBody {
         self.source_transform.iter().flatten().for_each(|v| v.to_bits().hash(&mut h));
         Some(h.finish())
     }
+    /// The key of the definition geometry this body is (or places), without where it is placed:
+    /// two placements of one part share it. `None` when the body has no key.
+    pub fn definition_key(&self) -> Option<u64> {
+        Some(if self.key != 0 { self.key } else { self.source_key }).filter(|k| *k != 0)
+    }
+
     pub fn definition_name(&self) -> &str {
         self.source_name.as_deref().unwrap_or(&self.name)
     }

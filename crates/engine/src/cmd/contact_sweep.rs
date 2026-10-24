@@ -13,7 +13,7 @@ use crate::{Result, Session};
 
 const MAX_SAMPLES: usize = 4096;
 const MAX_PLACEMENTS: usize = 4096;
-const MAX_BODIES: usize = 256;
+const MAX_BODIES: usize = 1024;
 const MAX_TRIANGLES: usize = 50_000;
 const MAX_WORK: usize = 200_000_000;
 
