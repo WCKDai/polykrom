@@ -193,6 +193,40 @@ fn a_fixed_overlap_is_static_not_a_collision_of_the_motion() {
     assert!(r["clear"] == true && names(&r["static_overlaps"]) == ["A:1-P:1"], "{r}");
 }
 
+/// A 200 mm link's Ø10.2 bore is meshed up to 0.2 mm inside its surface (the contact meshes'
+/// chord is a thousandth of the body), so a Ø10 pin turning in it at 0.1 mm clearance pokes
+/// through the mesh: the exact check finds nothing shared, so the pair is a mesh contact, not a
+/// collision. A Ø10.6 pin in the same bore still collides.
+#[test]
+fn a_pin_turning_in_its_bore_at_a_clearance_is_not_a_collision() {
+    for (radius, collides) in [(5.0, false), (5.3, true)] {
+        let mut s = Session::default();
+        run(&mut s, "component.create", json!({"name": "Link"}));
+        run(&mut s, "solid.box", json!({"length": 200, "width": 20, "height": 10, "corner": [-10, -10, 0]}));
+        run(&mut s, "solid.cylinder", json!({"radius": 5.1, "height": 12, "base": [0, 0, -1], "operation": "cut"}));
+        run(&mut s, "component.activate", json!({"component": "root"}));
+        run(&mut s, "component.create", json!({"name": "Pin"}));
+        run(&mut s, "solid.cylinder", json!({"radius": radius, "height": 20, "base": [0, 0, -5], "operation": "new"}));
+        run(&mut s, "component.activate", json!({"component": "root"}));
+        let link = occ(&s, "Link");
+        run(&mut s, "occurrence.ground", json!({"occurrence": link, "grounded": true}));
+        pin(&mut s, "revolute", "Turn", "Link", "Pin", Vec3::ZERO, Vec3::Z);
+        run(&mut s, "motion.study", json!({"name": "Spin", "steps": 36, "keys": [{"joint": "Turn", "points": [[0, 0], [36, 360]]}]}));
+        let r = run(&mut s, "motion.interference", json!({"study": "Spin"}));
+        let pair = |v: &Value| v.as_array().into_iter().flatten().any(|c| c["a"] == "Link:1" && c["b"] == "Pin:1");
+        if collides {
+            assert!(
+                r["clear"] == false && pair(&r["collisions"]) && r["collisions"][0]["volume_mm3"].as_f64().unwrap_or(0.0) > 1.0,
+                "Ø{}: {r}",
+                2.0 * radius
+            );
+        } else {
+            assert!(r["clear"] == true && pair(&r["mesh_contacts"]), "Ø{}: {r}", 2.0 * radius);
+            assert!(r["mesh_contacts"][0]["depth_mm"].as_f64().unwrap_or(1.0) <= 0.2, "{r}");
+        }
+    }
+}
+
 /// A number names a study by its id first, text by its name first: a study may be named like
 /// another's id.
 #[test]

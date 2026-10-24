@@ -38,7 +38,9 @@ pub const INTERFERENCE_DOC: &str = "study: id|name; occurrences?: [ids or names]
      to each other all through it, such as a pin pressed into its block or a thread in its tapped hole: no motion of the study \
      changes them, so they are not collisions and do not make it unclear; inspect.clearance measures them; only when every sample \
      was checked: a check that stopped early keeps them in collisions), pairs_moving_together \
-     (pairs that keep their placement to each other: each is tested once). The study plays as motion.play plays it but contact sets do not stop it, on a copy (the design is not \
+     (pairs that keep their placement to each other: each is tested once); mesh_contacts: [{a, b, depth_mm}] (pairs the meshes \
+     found no deeper into each other than their chord tolerance, such as a pin turning in its bore at a small clearance, and \
+     the exact check where they went deepest found sharing nothing: not collisions). The study plays as motion.play plays it but contact sets do not stop it, on a copy (the design is not \
      changed). Parts are tested at the samples only: one that passes wholly through another between two samples is missed";
 
 /// Most samples a plot or an interference check takes: each is a solve.
@@ -294,6 +296,12 @@ fn shared_volume(s: &Session, doc: &Document, a: u64, b: u64, booleans: &mut usi
             }
             *booleans = booleans.checked_sub(1)?;
             let (pa, pb) = (solidcraft_kernel::transform_matrix(&ba.body, *fa).ok()?, solidcraft_kernel::transform_matrix(&bb.body, *fb).ok()?);
+            // A pin a hair off the axis of its bore: the crescent the walls share, which the
+            // boolean can't intersect.
+            if let Some(o) = solidcraft_kernel::coaxial_overlap(&pa, &pb) {
+                total += o.volume;
+                continue;
+            }
             if let Some(shared) = solidcraft_kernel::boolean(&pa, &pb, solidcraft_kernel::BoolOp::Intersect).ok()? {
                 total += solidcraft_kernel::measure(&shared).ok()?.volume;
             }
@@ -430,14 +438,27 @@ pub(super) fn interference(s: &mut Session, p: &Value) -> Result<Value> {
     let fixed: Vec<(u64, u64)> = if whole { found.keys().filter(|k| !moved.contains(k)).copied().collect() } else { Vec::new() };
     let static_overlaps: Vec<Value> =
         fixed.iter().filter_map(|k| found.remove(k)).map(|c| json!({"a": c.names.0, "b": c.names.1, "depth_mm": c.depth})).collect();
+    // A hit no deeper than the meshes can be off (a pin turning in its bore at a small clearance,
+    // the bore meshed inside its surface) is checked exactly where it went deepest: with nothing
+    // shared there, it is a contact of the meshes, not a collision.
+    let mut booleans = MAX_BOOLEANS;
+    let (slack, nothing) = (2.0 * geometry.chord(), 1e-9 * geometry.scale().powi(3));
+    let volumes: BTreeMap<(u64, u64), Option<f64>> =
+        found.iter().filter(|(_, c)| c.depth <= slack).map(|(k, c)| (*k, shared_volume(s, &c.at_deepest, k.0, k.1, &mut booleans))).collect();
+    let mesh_only: Vec<(u64, u64)> = volumes.iter().filter(|(_, v)| v.is_some_and(|v| v <= nothing)).map(|(k, _)| *k).collect();
+    let mesh_contacts: Vec<Value> =
+        mesh_only.iter().filter_map(|k| found.remove(k)).map(|c| json!({"a": c.names.0, "b": c.names.1, "depth_mm": c.depth})).collect();
     let mut list: Vec<(&(u64, u64), &Collision)> = found.iter().collect();
     list.sort_by_key(|(_, c)| c.samples.first().copied().unwrap_or(usize::MAX));
-    let mut booleans = MAX_BOOLEANS;
     let collisions: Vec<Value> = list
         .iter()
         .enumerate()
         .map(|(i, ((a, b), c))| {
-            let volume = if i < MAX_VOLUMES { shared_volume(s, &c.at_deepest, *a, *b, &mut booleans) } else { None };
+            let volume = match volumes.get(&(*a, *b)) {
+                Some(v) => *v,
+                None if i < MAX_VOLUMES => shared_volume(s, &c.at_deepest, *a, *b, &mut booleans),
+                None => None,
+            };
             let first = c.samples.first().map(|k| step_of(&m, *k, n));
             let last = c.samples.last().map(|k| step_of(&m, *k, n));
             json!({"a": c.names.0, "b": c.names.1, "first_step": first, "last_step": last, "steps": ranges(&m, &c.samples, n),
@@ -445,7 +466,7 @@ pub(super) fn interference(s: &mut Session, p: &Value) -> Result<Value> {
         })
         .collect();
     let mut out = json!({"study": m.name, "steps": m.steps, "clear": collisions.is_empty(), "collisions": collisions,
-        "static_overlaps": static_overlaps, "pairs": geometry.pair_count(), "pairs_moving_together": together, "samples": checked,
+        "static_overlaps": static_overlaps, "mesh_contacts": mesh_contacts, "pairs": geometry.pair_count(), "pairs_moving_together": together, "samples": checked,
         "truncated": truncated});
     if truncated {
         out["checked_to"] = json!(checked.checked_sub(1).map(|k| step_of(&m, k, n)));
