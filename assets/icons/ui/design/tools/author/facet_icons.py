@@ -1881,12 +1881,13 @@ def component():
 @icon('model', 'Joint')
 def joint():
     ic = new('joint', 'Joint')
-    a = frame(0.62, dx=-11, dy=10, height=10)
-    b = frame(0.62, dx=11, dy=-6, height=10)
-    block(ic, a, -12, -12, 0, 12, 12, 10)
-    block(ic, b, -12, -12, 0, 12, 12, 10, facet='top')
-    ic.stroke(ell(32, 32, 7), A3, WA, fill=GAP)
-    ic.dot(32, 32, 2.6, A3)
+    d = frame(0.95, dy=4, height=12)
+    # A base and an arm on one pin; the arm is the facet, the pin the joint.
+    block(ic, d, -14, -7, 0, 4, 7, 6)
+    block(ic, d, -3, -4, 6, 17, 4, 10, facet='top')
+    cylinder(ic, d, 0, 0, 10, 13, 2.6, facet='top', colour=A3)
+    (cx, cy), rx, ry = d.ell(0, 0, 13, 7)
+    arc_arrow(ic, cx, cy, rx, ry, 150, 400, head=7, w=3.4)
     return ic
 
 
@@ -1906,23 +1907,25 @@ def joint_origin():
 @icon('model', 'As-Built Joint')
 def as_built():
     ic = new('as_built', 'As-Built Joint')
-    a = frame(0.62, dx=-9, dy=8, height=10)
-    b = frame(0.62, dx=9, dy=-4, height=10)
-    block(ic, a, -12, -12, 0, 12, 12, 10)
-    block(ic, b, -12, -12, 0, 12, 12, 10)
-    ic.stroke(ell(32, 32, 7), A3, WA, fill=GAP)
-    ic.stroke('M29 32L31.5 34.5L36 29.5', A3, 2.6)
+    d = frame(0.95, dy=4, height=12)
+    # A base and an arm on one pin; the arm is the facet, the pin the joint.
+    block(ic, d, -14, -7, 0, 4, 7, 6)
+    block(ic, d, -3, -4, 6, 17, 4, 10, facet='top')
+    cylinder(ic, d, 0, 0, 10, 13, 2.6, facet='top', colour=A3)
+    badge(ic, 50, 14, 'check')
     return ic
 
 
 @icon('model', 'Rigid Group')
 def rigid_group():
     ic = new('rigid_group', 'Rigid Group')
-    a = frame(0.6, dx=-10, dy=6, height=10)
-    b = frame(0.6, dx=10, dy=-2, height=10)
-    block(ic, a, -12, -12, 0, 12, 12, 10)
-    block(ic, b, -12, -12, 0, 12, 12, 10)
-    ic.stroke('M20 30H44M20 36H44', A3, WA)
+    d = frame(0.9, dy=4, height=10)
+    # Two parts held as one: a bar locks them together.
+    block(ic, d, -14, -6, 0, -2, 6, 10)
+    block(ic, d, 2, -6, 0, 14, 6, 10)
+    ic.stroke(poly([d.p(-8, 0, 10), d.p(8, 0, 10)], False), A3, WA + 1.5)
+    for x in (-8, 8):
+        ic.dot(*d.p(x, 0, 10), 3.4, A3)
     return ic
 
 
@@ -2236,47 +2239,76 @@ def sheet():
 @icon('model', 'Flange')
 def flange():
     ic = new('flange', 'Flange')
-    d = frame(1.0, dy=6, height=18)
-    block(ic, d, -14, -14, 0, 14, 10, 2.4)
-    block(ic, d, -14, 10, 0, 14, 12.4, 18, facet='left')
+    d = frame(1.0, dy=4, height=18)
+    # The wall bent up from the plate's far edge; its inner face is the facet.
+    block(ic, d, -12, -14, 0, 12, -11, 18, facet='left')
+    block(ic, d, -12, -11, 0, 12, 14, 3)
     return ic
 
 
 @icon('model', 'Hem')
 def hem():
     ic = new('hem', 'Hem')
-    ic.stroke('M6 42H44A6 6 0 0 0 44 30H24', LINE, WA)
-    ic.stroke('M44 42A6 6 0 0 0 44 30', A3, WA + 2)
+    # Side view of a sheet whose edge is folded back on itself; the fold is the facet.
+    ic.stroke('M6 44H40', LINE, 6.5)
+    ic.stroke('M40 44A8 8 0 0 0 40 28', A2, 6.5)
+    ic.stroke('M40 28H20', LINE, 6.5)
+    ic.stroke('M40 47.25A11.25 11.25 0 0 0 40 24.75M40 40.75A4.75 4.75 0 0 0 40 31.25', LINE, 1.6)
     return ic
 
 
 @icon('model', 'Fold')
 def fold():
     ic = new('fold', 'Fold')
-    ic.stroke('M6 46H30', LINE, WA)
-    ic.stroke('M30 46L48 20', A3, WA)
-    ic.stroke('M30 46H54', LINE, WG, dash=DASH)
-    arc_arrow(ic, 30, 46, 16, 16, -5, -50, head=6, w=3)
+    d = frame(1.0, dy=6, height=12)
+    # A plate hinged along the dashed bend line (along x): the front half lies flat, the back
+    # half is folded up.
+    ic.stroke(d.poly((-12, 0, 0), (12, 0, 0), (12, 14, 0), (-12, 14, 0)), LINE, W)
+    up = [d.p(-12, 0, 0), d.p(12, 0, 0), d.p(12, -7, 12.1), d.p(-12, -7, 12.1)]
+    out = [d.p(-12, 0, 0), d.p(12, 0, 0), d.p(12, -14, 0), d.p(-12, -14, 0)]
+    ic.fill(poly(up), A2)
+    ic.stroke(poly(up), LINE, W)
+    ic.stroke(poly(out), LINE, WG, dash=DASH)
+    ic.stroke(poly([d.p(-15, 0, 0), d.p(15, 0, 0)], False), A3, WG, dash=DASH)
+    h = d.p(12, 0, 0)
+    arc_arrow(ic, h[0], h[1], 13, 13, 60, -50, head=7, w=3.6)
     return ic
 
 
 @icon('model', 'Unfold')
 def unfold():
     ic = new('unfold', 'Unfold')
-    ic.stroke('M6 46H30', LINE, WA)
-    ic.stroke('M30 46L48 20', LINE, WG, dash=DASH)
-    ic.stroke('M30 46H56', A3, WA)
-    arc_arrow(ic, 30, 46, 18, 18, -52, -10, head=6, w=3)
+    d = frame(1.0, dy=6, height=12)
+    # A plate hinged along the dashed bend line (along x): the front half lies flat, the back
+    # half is folded up.
+    ic.stroke(d.poly((-12, 0, 0), (12, 0, 0), (12, 14, 0), (-12, 14, 0)), LINE, W)
+    up = [d.p(-12, 0, 0), d.p(12, 0, 0), d.p(12, -7, 12.1), d.p(-12, -7, 12.1)]
+    out = [d.p(-12, 0, 0), d.p(12, 0, 0), d.p(12, -14, 0), d.p(-12, -14, 0)]
+    ic.stroke(poly(up), LINE, WG, dash=DASH)
+    ic.fill(poly(out), A2)
+    ic.stroke(poly(out), LINE, W)
+    ic.stroke(poly([d.p(-15, 0, 0), d.p(15, 0, 0)], False), A3, WG, dash=DASH)
+    h = d.p(12, 0, 0)
+    arc_arrow(ic, h[0], h[1], 13, 13, -50, 60, head=7, w=3.6)
     return ic
 
 
 @icon('model', 'Refold')
 def refold():
     ic = new('refold', 'Refold')
-    ic.stroke('M6 46H30', LINE, WA)
-    ic.stroke('M30 46L48 20', A3, WA)
-    arc_arrow(ic, 30, 46, 18, 18, -10, -52, head=6, w=3)
-    arc_arrow(ic, 30, 46, 24, 24, -58, -14, head=6, w=3)
+    d = frame(1.0, dy=6, height=12)
+    # A plate hinged along the dashed bend line (along x): the front half lies flat, the back
+    # half is folded up.
+    ic.stroke(d.poly((-12, 0, 0), (12, 0, 0), (12, 14, 0), (-12, 14, 0)), LINE, W)
+    up = [d.p(-12, 0, 0), d.p(12, 0, 0), d.p(12, -7, 12.1), d.p(-12, -7, 12.1)]
+    out = [d.p(-12, 0, 0), d.p(12, 0, 0), d.p(12, -14, 0), d.p(-12, -14, 0)]
+    ic.fill(poly(up), A2)
+    ic.stroke(poly(up), LINE, W)
+    ic.stroke(poly(out), LINE, WG, dash=DASH)
+    ic.stroke(poly([d.p(-15, 0, 0), d.p(15, 0, 0)], False), A3, WG, dash=DASH)
+    h = d.p(12, 0, 0)
+    arc_arrow(ic, h[0], h[1], 11, 11, -45, 55, head=6, w=3.2)
+    arc_arrow(ic, h[0], h[1], 17, 17, 55, -45, head=6, w=3.2)
     return ic
 
 
@@ -2342,10 +2374,12 @@ def lip():
 @icon('model', 'Snap Fit')
 def snap_fit():
     ic = new('snap_fit', 'Snap Fit')
-    ic.stroke('M10 56V12', LINE, WA)
-    ic.stroke('M10 12H26V40L36 48H26V56', LINE, WA)
-    ic.fill('M26 40L36 48H26Z', A2)
-    ic.stroke('M44 30H56M44 30V56', LINE, W)
+    # Side view: a flexible arm rises beside the mating wall, and its hook (the facet) clips
+    # over the wall's top edge.
+    ic.stroke('M28 24H56V54H28Z', LINE, WA)
+    ic.stroke('M8 54H22V12', LINE, WA + 1)
+    ic.fill('M22 10L38 24H22Z', A2)
+    ic.stroke('M22 10L38 24H22', LINE, W)
     return ic
 
 

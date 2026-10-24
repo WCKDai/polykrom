@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
   <title>Snap Fit</title>
-  <path d="M10 56L10 12" fill="none" stroke="currentColor" stroke-width="4.4" stroke-linejoin="round" stroke-linecap="round"/>
-  <path d="M10 12L26 12L26 40L36 48L26 48L26 56" fill="none" stroke="currentColor" stroke-width="4.4" stroke-linejoin="round" stroke-linecap="round"/>
-  <path d="M26 40L36 48L26 48Z" fill="#328bd3"/>
-  <path d="M44 30L56 30M44 30L44 56" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M28 24L56 24L56 54L28 54Z" fill="none" stroke="currentColor" stroke-width="4.4" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M8 54L22 54L22 12" fill="none" stroke="currentColor" stroke-width="5.4" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M22 10L38 24L22 24Z" fill="#328bd3"/>
+  <path d="M22 10L38 24L22 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linejoin="round" stroke-linecap="round"/>
 </svg>

@@ -1,10 +1,10 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
   <title>Flange</title>
-  <path d="M32 30.6L60 44.6L60 47L36 59L8 45L8 42.6Z" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linejoin="round" stroke-linecap="round"/>
-  <path d="M8 42.6L36 56.6L60 44.6" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linejoin="round" stroke-linecap="round"/>
-  <path d="M36 56.6L36 59" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linejoin="round" stroke-linecap="round"/>
-  <path d="M5.6 28.2L33.6 42.2L33.6 60.2L5.6 46.2Z" fill="#328bd3"/>
-  <path d="M8 27L36 41L36 59L33.6 60.2L5.6 46.2L5.6 28.2Z" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linejoin="round" stroke-linecap="round"/>
-  <path d="M5.6 28.2L33.6 42.2L36 41" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linejoin="round" stroke-linecap="round"/>
-  <path d="M33.6 42.2L33.6 60.2" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M31 15.5L55 27.5L55 45.5L31 33.5Z" fill="#328bd3"/>
+  <path d="M34 14L58 26L58 44L55 45.5L31 33.5L31 15.5Z" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M31 15.5L55 27.5L58 26" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M55 27.5L55 45.5" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M31 30.5L55 42.5L55 45.5L30 58L6 46L6 43Z" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M6 43L30 55L55 42.5" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M30 55L30 58" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linejoin="round" stroke-linecap="round"/>
 </svg>

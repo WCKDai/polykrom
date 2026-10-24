@@ -1,8 +1,10 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
   <title>Unfold</title>
-  <path d="M6 46L30 46" fill="none" stroke="currentColor" stroke-width="4.4" stroke-linejoin="round" stroke-linecap="round"/>
-  <path d="M30 46L48 20" fill="none" stroke="#6f879c" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="3 3.2"/>
-  <path d="M30 46L56 46" fill="none" stroke="#236ead" stroke-width="4.4" stroke-linejoin="round" stroke-linecap="round"/>
-  <path d="M41.08 31.82A18 18 0 0 1 46.18 38.11" fill="none" stroke="#236ead" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>
-  <path d="M47.73 42.87L42.73 38.19L49.01 36.15Z" fill="#236ead"/>
+  <path d="M20 38L44 50L30 57L6 45Z" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M20 38L44 50L51 34.4L27 22.4Z" fill="none" stroke="#6f879c" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="3 3.2"/>
+  <path d="M20 38L44 50L58 43L34 31Z" fill="#328bd3"/>
+  <path d="M20 38L44 50L58 43L34 31Z" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M17 36.5L47 51.5" fill="none" stroke="#236ead" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="3 3.2"/>
+  <path d="M52.36 40.04A13 13 0 0 1 54.65 57.46" fill="none" stroke="#236ead" stroke-width="3.6" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M50.5 61.26L53.06 53.69L58.26 59.37Z" fill="#236ead"/>
 </svg>
