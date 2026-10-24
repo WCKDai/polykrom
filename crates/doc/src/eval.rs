@@ -716,9 +716,11 @@ pub struct ModelState {
     /// Shared between states: a feature that does not change a sketch keeps it as it was.
     pub sketches: Vec<Arc<SolvedSketch>>,
     pub body_counter: usize,
-    /// Body names the design used and must not use again (a name a `body.rename` freed, #4957).
-    /// The counter starts over at every evaluation, so without these a design that is evaluated
-    /// again after a rename hands the freed name to the next body.
+    /// Body names the design used and must not use again (a name a `body.rename` freed, #4957),
+    /// and the names stored on the suppressed features so far, so a body made while a feature is
+    /// suppressed keeps its name once it is back (#4302). The counter starts over at every
+    /// evaluation, so without these a design that is evaluated again hands such a name to the next
+    /// body.
     pub reserved_body_names: std::collections::BTreeSet<String>,
     /// Sheet metal bodies (by body name) and their flat patterns.
     pub sheets: Vec<crate::sheet::SheetBody>,
@@ -1778,6 +1780,8 @@ impl Model {
         let mut prev_fp = 0u64;
         // The names the design must not use again travel with the state (#4957).
         let mut state = std::sync::Arc::new(ModelState { reserved_body_names: doc.reserved_body_names.clone(), ..(*self.empty).clone() });
+        // Those and the names stored on the suppressed features so far (#4302).
+        let mut reserved = doc.reserved_body_names.clone();
         let mut out: Vec<FeatureResult> = Vec::with_capacity(doc.features.len());
         let mut reuse = !self.no_cache;
         let mut recomputed = 0;
@@ -1804,6 +1808,9 @@ impl Model {
             // A state the saved model did not keep is evaluated again from the one before it; the
             // results after it that the model did keep still stand (#3220).
             let unkept = reuse && self.results.get(i).filter(current).is_some_and(|old| old.unkept);
+            if f.suppressed && !rolled_back {
+                reserved.extend(f.body_names.iter().map(|n| n.trim()).filter(|n| !n.is_empty()).map(str::to_string));
+            }
             if reuse
                 && !unkept
                 && let Some(old) = self.results.get(i).filter(current)
@@ -1830,6 +1837,11 @@ impl Model {
                     state: state.clone(),
                 });
                 continue;
+            }
+            // Taken from the design each time: a state taken from an earlier evaluation may have
+            // been made before a rename freed a name or a feature was suppressed.
+            if state.reserved_body_names != reserved {
+                Arc::make_mut(&mut state).reserved_body_names.clone_from(&reserved);
             }
             // The same feature on the same inputs: its earlier result.
             let key = cache_key(f, fp, fingerprint(0, f, &vals, false, &self.step_digests) ^ placement_digest(doc, f, Some(&state)), ctx, &state);
@@ -1874,9 +1886,8 @@ impl Model {
             recomputed += 1;
             let t0 = now();
             let mut next = (*state).clone();
-            // The names the design must not use again travel with the state (#4957): a state
-            // taken from an earlier evaluation may have been made before a rename freed one.
-            next.reserved_body_names = doc.reserved_body_names.clone();
+            // The names the design must not use again travel with the state (#4957, #4302).
+            next.reserved_body_names.clone_from(&reserved);
             for b in &mut next.bodies {
                 b.made = crate::lineage::Made::Before;
             }
