@@ -1,7 +1,7 @@
 //! Following an agent (#78): what an agent does over the control channel or MCP, shown in the
 //! app, so a person can follow along as it builds and inspects the model. Each command the agent
 //! runs (`engine.execute`, and each step of `engine.batch`) is listed in words in the viewport's
-//! corner with its outcome, the newest last, and fades when the agent has been quiet a while. The
+//! bottom-right corner with its outcome, the newest last, and fades when the agent has been quiet a while. The
 //! result of an inspection it runs is drawn on the model until the next one, or for
 //! [`MARK_SECONDS`]: overlaps and collisions as their boxes, thread engagements as theirs in
 //! another colour, and pairs closer than the clearance as a line between their nearest points
@@ -86,7 +86,12 @@ pub fn record(app: &mut SolveApp, id: &str, result: &Result<Value, String>) {
 /// A command's outcome in words: what an inspection found, else "done".
 pub fn outcome(id: &str, v: &Value) -> String {
     let count = |key: &str| v.get(key).and_then(Value::as_array).map_or(0, Vec::len);
-    let n = |key: &str, n: usize| tr(key).replace("{count}", &n.to_string());
+    // One of a thing reads "1 overlap", more "2 overlaps" (`_one` keys).
+    let n = |key: &str, n: usize| {
+        let one = format!("{key}_one");
+        let text = if n == 1 && tr(&one) != one { tr(&one) } else { tr(key) };
+        text.replace("{count}", &n.to_string())
+    };
     let num = |key: &str| v.get(key).and_then(Value::as_f64);
     match id {
         "inspect.clearance" => {
@@ -177,7 +182,8 @@ pub fn paint(app: &SolveApp, ctx: &egui::Context) {
     let Some(rect) = app.viewport.rect else { return };
     let feed = &app.agent_feed;
     let t = Tokens::get();
-    let painter = ctx.layer_painter(egui::LayerId::new(egui::Order::Foreground, egui::Id::new("sc_agent_activity")));
+    // Over the model but under every window and dialog.
+    let painter = ctx.layer_painter(egui::LayerId::new(egui::Order::Background, egui::Id::new("sc_agent_activity"))).with_clip_rect(rect);
     if !feed.marks.is_empty() && app.now - feed.marks_at < MARK_SECONDS {
         let proj = crate::viewport::projection(app, rect);
         let fade = (1.0 - ((app.now - feed.marks_at) / MARK_SECONDS) as f32).clamp(0.2, 1.0);
@@ -222,9 +228,12 @@ pub fn paint(app: &SolveApp, ctx: &egui::Context) {
     let font = FontId::proportional(12.5);
     let line = 18.0;
     let rows = feed.entries.len() as f32 + 1.0;
-    let at = rect.left_top() + vec2(12.0, 12.0);
+    // In the viewport's bottom-right corner: the browser floats over its top-left, the view cube
+    // sits top-right and the navigation bar bottom-centre.
     let width = 320.0_f32.min(rect.width() - 24.0).max(120.0);
-    let frame = egui::Rect::from_min_size(at, vec2(width, rows * line + 12.0));
+    let size = vec2(width, rows * line + 12.0);
+    let at = rect.right_bottom() - size - vec2(12.0, 64.0);
+    let frame = egui::Rect::from_min_size(at, size);
     painter.rect_filled(frame, 6.0, t.panel.gamma_multiply(0.92 * k));
     painter.rect_stroke(frame, 6.0, Stroke::new(1.0, t.border.gamma_multiply(k)), egui::StrokeKind::Inside);
     let mut y = at.y + 6.0;
@@ -254,6 +263,8 @@ mod tests {
         let found = json!({"overlaps": [{}, {}], "threaded": [{}], "near": []});
         let said = outcome("inspect.clearance", &found);
         assert!(said.contains('2') && said.contains('1'), "{said}");
+        // One of a thing is singular.
+        assert_eq!(outcome("inspect.clearance", &json!({"overlaps": [{}]})), tr("ui.agent_outcome_overlaps_one").replace("{count}", "1"));
         assert_eq!(outcome("motion.interference", &json!({"clear": true})), tr("ui.agent_outcome_clear"));
         assert!(outcome("motion.interference", &json!({"clear": false, "collisions": [{}, {}, {}]})).contains('3'));
         assert!(outcome("joint.sweep", &json!({"stopped_at": 33.137})).contains("33.14"));

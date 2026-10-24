@@ -39,7 +39,7 @@ solidcraft-cli mcp --connect 127.0.0.1:7878
 Bridged, everything the agent does happens in the window you have open, so you can watch it work:
 
 - The model changes on screen as each command runs, and new bodies are framed by the view.
-- An **Agent** list in the viewport's top-left corner names each command the agent runs, with
+- An **Agent** list in the viewport's bottom-right corner names each command the agent runs, with
   its outcome:
   - "Extrude · done";
   - "Clearance · 2 overlaps, 1 closer than the clearance";
