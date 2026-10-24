@@ -717,9 +717,9 @@ fn component_of(doc: &Document, occ: u64) -> Result<u64> {
 
 /// A snap's pick point moved onto its named face (an error when the face is gone: a joint must
 /// not quietly attach elsewhere).
-fn named_pick(doc: &Document, st: &ModelState, pick: Vec3, face: Option<&str>) -> Result<Vec3> {
+fn named_pick(doc: &Document, st: &ModelState, component: u64, pick: Vec3, face: Option<&str>) -> Result<Vec3> {
     match face {
-        Some(n) => face::named_face(doc, st, pick, n).map(|f| f.point),
+        Some(n) => face::named_face_in(doc, st, Some(component), pick, n).map(|f| f.point),
         None => Ok(pick),
     }
 }
@@ -757,7 +757,7 @@ pub fn resolve_origin(doc: &Document, st: &ModelState, o: &JointOrigin) -> Resul
             // A named planar face gives its own centre and normal; another face (or none) the
             // planar face nearest the point.
             let named = match face.as_deref() {
-                Some(n) => Some(face::named_face(doc, st, *pick, n)?),
+                Some(n) => Some(face::named_face_in(doc, st, Some(component_of(doc, o.occurrence)?), *pick, n)?),
                 None => None,
             };
             let (c, n) = match named.as_ref().map(face::NamedFace::plane).transpose()?.flatten() {
@@ -779,13 +779,13 @@ pub fn resolve_origin(doc: &Document, st: &ModelState, o: &JointOrigin) -> Resul
 /// it, as older builds found them. Any other snap is refused.
 fn round_of(doc: &Document, st: &ModelState, o: &JointOrigin) -> Result<face::Round> {
     let Snap::CircleCenter { pick, face, end, .. } = &o.snap else { return Err(DocError::Invalid("pick a round face".into())) };
+    let comp = component_of(doc, o.occurrence)?;
     if let Some(n) = face.as_deref()
-        && let Some(r) = face::named_round(doc, st, *pick, n, end.as_deref())?
+        && let Some(r) = face::named_round(doc, st, comp, *pick, n, end.as_deref())?
     {
         return Ok(r);
     }
-    let pick = named_pick(doc, st, *pick, face.as_deref())?;
-    let comp = component_of(doc, o.occurrence)?;
+    let pick = named_pick(doc, st, comp, *pick, face.as_deref())?;
     // A body moved in from another component: looked at in its own coordinates, its cylinder
     // placed by its offset (as a named face is).
     let cyl = component_bodies(doc, st, comp)

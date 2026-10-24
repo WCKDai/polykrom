@@ -13,6 +13,20 @@ fn near(value: &Value, expected: f64) {
     assert!((value.as_f64().unwrap() - expected).abs() < 1e-6, "{value} != {expected}");
 }
 
+/// Agents name a component where its one placement is meant (`Fork` for `Fork:1`); with two
+/// placements the name is ambiguous and the error lists them.
+#[test]
+fn a_component_name_stands_for_its_only_occurrence() {
+    let mut s = Session::default();
+    let (component, first) = created(&mut s, "Fork");
+    run(&mut s, "component.activate", json!({"component": "root"}));
+    run(&mut s, "occurrence.ground", json!({"occurrence": "Fork", "grounded": true}));
+    assert!(s.doc.occurrences.iter().find(|o| o.id == first).unwrap().grounded);
+    run(&mut s, "occurrence.copy", json!({"component": component, "translate": [20,0,0]}));
+    let err = s.execute("occurrence.move", &json!({"occurrence": "Fork", "translate": [1,0,0]})).unwrap_err().to_string();
+    assert!(err.contains("placed 2 times") && err.contains("Fork:1") && err.contains("Fork:2"), "{err}");
+}
+
 #[test]
 fn instance_copy_uses_selected_source_transform() {
     let mut s = Session::default();

@@ -81,7 +81,9 @@ fn table(id: &str) -> &'static [(&'static str, K)] {
         "sketch.project_to_surface" | "sketch.isoparametric_curve" => &[("face", Here)],
         "sketch.intersection_curve" => &[("a", Here), ("b", Here)],
         "inspect.curvature_comb" | "inspect.minimum_radius" | "inspect.isocurve" => &[("edges", Picks), ("faces", Picks)],
-        "parts.insert" | "parts.fastener" => &[("at", Pick), ("point", Make), ("direction", Dir)],
+        // `at` stays in the world: the insert finds the hole wherever its part is placed and seats
+        // the part with a joint, whose origins are world points.
+        "parts.insert" | "parts.fastener" => &[("point", Make), ("direction", Dir)],
         "appearance.assign" => &[("faces", Picks), ("bodies", Body), ("body", Body)],
         "solid.move" => &[("bodies", Body), ("translate", Dir), ("axis", Dir), ("origin", Make)],
         "solid.combine" => &[("target", Body), ("tools", Body)],

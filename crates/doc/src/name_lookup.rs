@@ -274,6 +274,15 @@ pub fn locate_face(st: &ModelState, name: &str, p: Vec3) -> Option<FaceHit> {
     locate_in(st.bodies.iter().enumerate().filter(|(_, b)| !b.body.is_mesh()), name, p)
 }
 
+/// [`locate_face`] among the bodies `keep` accepts (a joint origin's component: two parts each
+/// modelled at their own origin can hold faces of one name near one point).
+pub(crate) fn locate_face_among(st: &ModelState, keep: impl Fn(&ModelBody) -> bool, name: &str, p: Vec3) -> Option<FaceHit> {
+    if crate::sheet::split_sheet_face_name(name).is_some() {
+        return None;
+    }
+    locate_in(st.bodies.iter().enumerate().filter(|(_, b)| !b.body.is_mesh() && keep(b)), name, p)
+}
+
 /// [`locate_face`] for a feature that works on the faces of the body called `body` (a shell, a
 /// draft…): the one face of that body with the very name, found without working out the names
 /// of every other body (a body named from geometry is meshed for it: seconds in a large model).
