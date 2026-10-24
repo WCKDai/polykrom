@@ -199,10 +199,15 @@ Grok Build also supports `XAI_API_KEY` for users who choose API authentication.
 - **Custom command:** any other program that speaks ACP on stdin and stdout, such as
   `my-agent --acp`. Polykrom starts it directly, not through a shell.
 - **OpenAI-compatible API:** a preset (Ollama `http://localhost:11434/v1`, LM Studio
-  `http://localhost:1234/v1`, OpenAI) or a custom URL, the model name, and an optional key.
-- **Anthropic-compatible API:** a preset (Anthropic) or a custom URL, for an endpoint that
-  speaks the Anthropic Messages API (`{base}/v1/messages`). This covers Anthropic itself and
-  providers that offer an Anthropic-compatible endpoint, such as DeepSeek and Qwen.
+  `http://localhost:1234/v1`, OpenAI, Google Gemini, OpenRouter, Groq, Mistral, DeepSeek, xAI,
+  Together: each provider's own OpenAI-compatible endpoint) or a custom URL, the model name, and
+  an optional key.
+- **Anthropic-compatible API:** a preset (Anthropic, DeepSeek) or a custom URL, for an endpoint
+  that speaks the Anthropic Messages API (`{base}/v1/messages`). This covers Anthropic itself and
+  providers that offer an Anthropic-compatible endpoint, such as DeepSeek and Qwen. At the Claude
+  API itself (`api.anthropic.com`) Polykrom also asks for prompt caching, so the tools and the
+  conversation so far are not paid for again with each round of a tool loop, and leaves room for
+  the model's thinking; other endpoints get the plain request.
 - The key goes into the system keychain (Keychain on macOS, Credential Manager on Windows, the
   Secret Service on Linux) and is only ever sent over HTTPS or to this computer. **Test** asks an
   OpenAI-compatible endpoint for its models; an Anthropic-compatible one gets a short message,
