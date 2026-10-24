@@ -194,3 +194,20 @@ fn the_mesh_method_finds_overlaps_without_a_boolean() {
     assert!(hit.get("volume_mm3").is_none());
     assert!(s.execute("inspect.interference", &json!({"method": "fast"})).is_err());
 }
+
+/// A threaded M6 shank in a plate tapped at 5 mm is the thread's engagement, not an interference;
+/// the mesh method, which has no volume to tell by, marks it as likely that (the radial depth is 0.5).
+#[test]
+fn a_threaded_shank_in_its_tapped_hole_is_listed_as_engagement() {
+    let mut s = Session::default();
+    run(&mut s, "solid.box", json!({"length": 20, "width": 20, "height": 10, "corner": [-10, -10, 0], "operation": "new", "body_name": "Plate"}));
+    run(&mut s, "solid.cylinder", json!({"radius": 2.5, "height": 12, "base": [0, 0, -1], "operation": "cut", "targets": ["Plate"]}));
+    run(&mut s, "solid.cylinder", json!({"radius": 3, "height": 16, "base": [0, 0, -2], "operation": "new", "body_name": "Screw"}));
+    run(&mut s, "solid.thread", json!({"face": [3, 0, 5], "designation": "M6"}));
+    let r = run(&mut s, "inspect.interference", json!({}));
+    assert_eq!((r["count"].as_u64(), r["threaded"][0]["thread"].as_str()), (Some(0), Some("M6")), "{r}");
+    assert!((f(&r["threaded"][0]["engaged_mm"]) - 10.0).abs() < 1e-3, "{r}");
+    let m = run(&mut s, "inspect.interference", json!({"method": "mesh"}));
+    let hit = &m["interferences"][0];
+    assert!((hit["thread"].as_str(), (f(&hit["depth_mm"]) - 0.5).abs() < 0.05) == (Some("M6"), true), "{m}");
+}
