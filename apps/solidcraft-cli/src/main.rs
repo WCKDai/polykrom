@@ -15,6 +15,7 @@
 //! polykrom-cli commands                                     the command registry as JSON
 //! polykrom-cli recipe <recipe.json>                         translate an oracle recipe to a script
 //! polykrom-cli oracle <case-dir>...                         replay recipes and compare with expected.json
+//! polykrom-cli kernel-cases <case-dir>... [--json]          the kernel regression rig (tests/kernel-cases)
 //! polykrom-cli mcp [--headless] [--in design|script] [--connect HOST:PORT [--token T]] [--allow-path DIR]... [--allow-any-path]
 //!                    [--param-check off|warn|strict]
 //!                                                             MCP server on stdio (docs/mcp.md)
@@ -30,6 +31,7 @@ mod bench_agent;
 mod bench_assistant;
 mod crashes;
 mod fuzz;
+mod kernel_cases;
 mod logger;
 mod oracle;
 mod preview;
@@ -78,6 +80,8 @@ const USAGE_COMMANDS: &str = "  polykrom-cli commands\n";
 const USAGE_RECIPE: &str = "  polykrom-cli recipe <recipe.json>\n";
 /// `oracle`'s lines in the usage.
 const USAGE_ORACLE: &str = "  polykrom-cli oracle <case-dir>... [--json]\n";
+/// `kernel-cases`'s lines in the usage.
+const USAGE_KERNEL_CASES: &str = "  polykrom-cli kernel-cases <case-dir>... [--json]\n      (the kernel regression rig, tests/kernel-cases: each case graded against its own answer)\n";
 /// `fuzz`'s lines in the usage.
 const USAGE_FUZZ: &str = "  polykrom-cli fuzz [--from N] [--count N] [--jobs J] [--timeout S] [--steps N] [--minimise] [--out DIR] [--report FILE]\n";
 /// `mcp`'s lines in the usage.
@@ -114,6 +118,7 @@ const COMMANDS: &[Command] = &[
     Command { name: "commands", usage: USAGE_COMMANDS, listed: true },
     Command { name: "recipe", usage: USAGE_RECIPE, listed: true },
     Command { name: "oracle", usage: USAGE_ORACLE, listed: true },
+    Command { name: "kernel-cases", usage: USAGE_KERNEL_CASES, listed: true },
     Command { name: "fuzz", usage: USAGE_FUZZ, listed: true },
     Command { name: "fuzz-one", usage: USAGE_FUZZ_ONE, listed: false },
     Command { name: "mcp", usage: USAGE_MCP, listed: true },
@@ -162,6 +167,7 @@ fn main() -> ExitCode {
             recipe::to_script(&v).map(|s| println!("{}", pretty(&s)))
         }),
         Some("oracle") => oracle::run(&args[1..]),
+        Some("kernel-cases") => kernel_cases::run(&args[1..]),
         Some("fuzz") => fuzz::run(&args[1..]),
         Some("fuzz-one") => fuzz::one(&args[1..]),
         Some("mcp") => cmd_mcp(&args[1..]),

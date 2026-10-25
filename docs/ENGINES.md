@@ -48,6 +48,8 @@ The open-source landscape: OCCT is the only open kernel with the whole set (LGPL
 | **K6 Advanced blends** | Variable radius, setbacks, n-sided vertex blends, cliff edges, rollover and overflow (Braid 1997) | Literature; a freedom-to-operate check on setback blends first | multi-year | Parity on blends |
 | **K7 Healing and import** | Sewing, small-feature removal, tolerant STEP import measured on ABC and NIST | Published methods | ongoing | Interoperability |
 
+**Measured so far (K0, first step, #123):** truck on main passes **288 of 372** regression cases ([kernel-cases.md](kernel-cases.md)) and **102 of 116** ladder cases ([kernel-ladder.md](kernel-ladder.md), timing golden recorded). By area: sheet metal 57/57, fillets 38/50 (9 unsupported), chamfers and primitives all, booleans 64/89, sweeps 62/83, threads 21/28, shell 9/18. Ten cases hang past 180 s. SMLib's last run on the same cases was 317/372. The weakest areas (shell, booleans with coincident or tangent faces, sweeps) are where K1–K2 start.
+
 Truck's NURBS evaluation, tessellation and STEP I/O stay behind traits while they pass K0; truck-shapeops (and probably truck-topology, which lacks local tolerances, history and p-curves) is replaced in K1–K2. A one-week profile of five failing parts opens K2, so it starts from measured hotspots. Honest scale: K2 and K4 can beat truck by a wide margin within a year; matching Parasolid on blends, offsets and freeform corner cases is a multi-year, corpus-driven effort.
 
 ## V · Verified simulation (with Nightfall)
