@@ -1466,14 +1466,15 @@ fn resize(s: &mut Session, p: &Value) -> Result<Value> {
     // The output axis's origins on the part follow the output's top.
     let old_z = shape(&part.family, &part.size, part.length).ok().and_then(|old| output_z(&old));
     if let (Some(old), Some(new)) = (old_z, output_z(&sh)) {
-        let occs: Vec<u64> = s.doc.occurrences.iter().filter(|o| o.component == comp).map(|o| o.id).collect();
+        // The case's occurrences and the output's (a joint built on `output` frames the output there).
+        let mut occs: Vec<u64> = s.doc.occurrences.iter().filter(|o| o.component == comp).map(|o| o.id).collect();
+        occs.extend(output_of(s, comp).map(|(_, o)| o));
         let asm = &mut s.doc_mut().assembly;
         let joint_ends = asm.joints.iter_mut().flat_map(|j| [&mut j.a, &mut j.b]);
         for o in asm.origins.iter_mut().map(|o| &mut o.origin).chain(joint_ends).filter(|o| occs.contains(&o.occurrence)) {
-            if let Snap::Point { point, .. } = &mut o.snap
-                && point.dist(Vec3::new(0.0, 0.0, old)) < 1e-9
-            {
-                point.z = new;
+            match &mut o.snap {
+                Snap::Point { point, .. } | Snap::Frame { origin: point, .. } if point.dist(Vec3::new(0.0, 0.0, old)) < 1e-9 => point.z = new,
+                _ => {}
             }
         }
     }
@@ -1834,7 +1835,14 @@ mod tests {
         // Resized, the horn is rebuilt for the new size and the output origin moves to its top.
         let mut s = Session::default();
         let r = run(&mut s, "parts.insert", json!({"family": "servo", "size": "STS3215"}));
+        // A joint built on `output` frames the horn there too: both ends follow the resize.
+        let j = run(&mut s, "joint.as_built", json!({"type": "revolute", "a": r["occurrence"], "b": r["output_part"], "at": r["output"]}));
         run(&mut s, "parts.resize", json!({"component": r["component"], "size": "XL430-W250-T"}));
+        let joint = s.doc.assembly.joints.iter().find(|x| Some(x.id) == j["joint"].as_u64()).cloned().unwrap_or_else(|| panic!("{j}"));
+        for end in [&joint.a, &joint.b] {
+            let at = solidcraft_doc::joints::resolve_origin(&s.doc, &s.model.state(), end).unwrap_or_else(|e| panic!("{e}"));
+            assert!((at[3][2] - 36.0).abs() < 1e-9, "{:?} at {at:?}", end.snap);
+        }
         let (lo, hi) = bbox(&s, "Servo XL430-W250-T horn");
         assert!((hi.z - 36.0).abs() < 1e-6 && (lo.z - 34.0).abs() < 1e-6 && (hi.x - 10.25).abs() < 0.03, "{lo:?} {hi:?}");
         assert_eq!(s.doc.occurrences.iter().filter(|o| o.parent == r["component"].as_u64().unwrap_or(0)).count(), 1, "one horn");
