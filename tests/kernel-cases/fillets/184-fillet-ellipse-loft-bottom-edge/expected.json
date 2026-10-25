@@ -1,0 +1,11 @@
+{
+ "sources": [
+  "wckdboy/polykrom#184",
+  "wckdboy/polykrom#126"
+ ],
+ "what": "an R4 round on the elliptic bottom edge of a loft from an ellipse (30 x 20, z 0) to a circle (r 10, z 40): a closed curved edge between the floor and a lofted face whose angle to the floor changes all round",
+ "source": "oracle occt 7.9.3",
+ "method": "two sections: the loft is ruled, (1-s) E(theta) + s C(theta), and its volume is 40 pi * integral of (30-20s)(20-10s) ds = 39793.5069. The round has no closed form: the same recipe built in OpenCASCADE 7.9.3, run out of process (Nightfall's kernel service, BRepFilletAPI), removes 1073.473 of OCCT's loft of 39792.815 (its ellipse is a fitted spline); this volume is the exact loft less that",
+ "body_count": 1,
+ "volume_mm3": 38720.034
+}
