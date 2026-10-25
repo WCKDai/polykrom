@@ -970,6 +970,20 @@ mod tests {
         }
     }
 
+    /// An error message (ui_kit's `Text::Error`) can be read on its own fill in both themes and
+    /// every colour-vision mode: in the dark theme it was 1.9:1 on the timeline's error red (#131).
+    #[test]
+    fn error_text_can_be_read_on_its_fill() {
+        use super::ColorVision::{Deutan, Off, Protan, Tritan};
+        for dark in [false, true] {
+            for mode in [Off, Protan, Deutan, Tritan] {
+                let t = super::Tokens::themed(dark, mode);
+                let ratio = super::contrast_ratio(t.form_error, t.form_error_fill);
+                assert!(ratio >= 4.5, "dark={dark} {mode:?}: {ratio:.2}:1");
+            }
+        }
+    }
+
     #[test]
     fn tab_accents_hold_wcag_small_text_contrast_in_both_themes() {
         for (dark, t) in [(false, super::Tokens::light()), (true, super::Tokens::dark())] {

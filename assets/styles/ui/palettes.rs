@@ -370,7 +370,8 @@ impl Tokens {
         t.form_dim = Color32::from_rgb(186, 186, 192);
         t.form_primary = t.accent;
         t.form_error = t.error;
-        t.form_error_fill = t.timeline_item_error;
+        // Its own fill: the timeline's error red is too close to the error text to read on (#131).
+        t.form_error_fill = Color32::from_rgb(58, 30, 30);
         t.form_success = Color32::from_rgb(143, 219, 154);
         t.form_success_fill = Color32::from_rgb(44, 74, 51);
         t
