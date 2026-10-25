@@ -426,7 +426,7 @@ fn clear_history(s: &mut Session, sc: &Scope) {
     let a = &mut d.assembly;
     a.joints.retain(|j| !inner.contains(&j.a.occurrence) && !inner.contains(&j.b.occurrence));
     let joints: BTreeSet<u64> = a.joints.iter().map(|j| j.id).collect();
-    a.links.retain(|l| joints.contains(&l.a) && joints.contains(&l.b));
+    a.links.retain(|l| joints.contains(&l.b) && l.sources().all(|(j, _, _)| joints.contains(&j)));
     a.studies.retain(|study| study.keys.iter().all(|k| joints.contains(&k.joint)));
     for set in &mut a.contact_sets {
         set.occurrences.retain(|o| !inner.contains(o));

@@ -38,7 +38,7 @@ fn joint_json(s: &Session, st: &ModelState, sol: &joints::Solution, j: &Joint, q
         .links
         .iter()
         .enumerate()
-        .filter(|(_, l)| l.a == j.id || l.b == j.id)
+        .filter(|(_, l)| l.uses(j.id))
         .map(|(i, l)| {
             let mut v = link_json(s, st, l);
             v["index"] = json!(i);

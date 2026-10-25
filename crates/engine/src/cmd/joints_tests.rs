@@ -2011,3 +2011,125 @@ fn joint_drive_and_refresh_do_not_repeat_dof_analysis() {
         assert_eq!(*s.doc, *before);
     }
 }
+
+/// A CoreXY stage (#107): two motors on a frame, a gantry sliding in y, a head sliding in x on
+/// the gantry. Each pulley moves its belt `MM_PER_DEG`, so x follows (A + B) and y (A − B).
+fn corexy() -> Session {
+    let mut s = Session::default();
+    let part = |s: &mut Session, name: &str, corner: [f64; 3], grounded: bool| {
+        run(s, "component.activate", json!({"component": "root"}));
+        run(s, "component.create", json!({"name": name, "grounded": grounded}));
+        run(s, "solid.box", json!({"length": 10, "width": 10, "height": 10, "corner": corner}));
+    };
+    part(&mut s, "Frame", [0.0, 0.0, 0.0], true);
+    part(&mut s, "MotorA", [0.0, 0.0, 20.0], false);
+    part(&mut s, "MotorB", [20.0, 0.0, 20.0], false);
+    part(&mut s, "Gantry", [40.0, 0.0, 0.0], false);
+    part(&mut s, "Head", [60.0, 0.0, 0.0], false);
+    let joint = |s: &mut Session, kind: &str, a: Value, b: Value, name: &str| {
+        run(s, "joint.create", json!({"type": kind, "a": a, "b": b, "name": name}));
+    };
+    joint(&mut s, "revolute", json!({"occurrence": "Frame", "point": [5, 5, 10]}), json!({"occurrence": "MotorA", "point": [5, 5, 20]}), "A");
+    joint(&mut s, "revolute", json!({"occurrence": "Frame", "point": [25, 5, 10]}), json!({"occurrence": "MotorB", "point": [25, 5, 20]}), "B");
+    joint(
+        &mut s,
+        "slider",
+        json!({"occurrence": "Frame", "point": [45, 5, 10], "z": [0, 1, 0]}),
+        json!({"occurrence": "Gantry", "point": [45, 5, 0], "z": [0, 1, 0]}),
+        "Y",
+    );
+    joint(
+        &mut s,
+        "slider",
+        json!({"occurrence": "Gantry", "point": [65, 5, 10], "z": [1, 0, 0]}),
+        json!({"occurrence": "Head", "point": [65, 5, 0], "z": [1, 0, 0]}),
+        "X",
+    );
+    s
+}
+
+const MM_PER_DEG: f64 = 20.0 / 360.0;
+
+fn value(s: &mut Session, joint: &str) -> f64 {
+    let l = run(s, "joint.list", json!({}));
+    let j = l["joints"].as_array().and_then(|js| js.iter().find(|j| j["name"] == joint).cloned()).unwrap_or(Value::Null);
+    j["values"][0]["value"].as_f64().unwrap_or_else(|| panic!("{joint}: {j}"))
+}
+
+fn corexy_links(s: &mut Session) {
+    let k = MM_PER_DEG;
+    run(s, "joint.motion_link", json!({"a": "A", "b": "X", "ratio": k, "also": [{"joint": "B", "ratio": k}]}));
+    run(s, "joint.motion_link", json!({"a": "A", "b": "Y", "ratio": k, "also": [{"joint": "B", "ratio": -k}]}));
+}
+
+#[test]
+fn a_corexy_head_follows_both_motors() {
+    let mut s = corexy();
+    corexy_links(&mut s);
+    let at = |s: &mut Session, a: f64, b: f64| {
+        run(s, "joint.drive", json!({"joint": "A", "value": a}));
+        run(s, "joint.drive", json!({"joint": "B", "value": b}));
+        (value(s, "X"), value(s, "Y"))
+    };
+    let close = |(x, y): (f64, f64), (ex, ey): (f64, f64)| (x - ex).abs() < 1e-9 && (y - ey).abs() < 1e-9;
+    // Both motors the same way: the head moves in x only; opposite ways: in y only; one motor:
+    // half of each, on the diagonal.
+    let k = MM_PER_DEG;
+    assert!(close(at(&mut s, 90.0, 90.0), (180.0 * k, 0.0)), "{:?}", at(&mut s, 90.0, 90.0));
+    assert!(close(at(&mut s, 90.0, -90.0), (0.0, 180.0 * k)), "{:?}", at(&mut s, 90.0, -90.0));
+    assert!(close(at(&mut s, 90.0, 0.0), (90.0 * k, 90.0 * k)), "{:?}", at(&mut s, 90.0, 0.0));
+    // The head itself is where x and y put it.
+    let head = place(&s, "Head", Vec3::new(65.0, 5.0, 0.0));
+    let start = {
+        let mut t = corexy();
+        corexy_links(&mut t);
+        place(&t, "Head", Vec3::new(65.0, 5.0, 0.0))
+    };
+    assert!(near(head - start, Vec3::new(90.0 * k, 90.0 * k, 0.0)), "{:?}", head - start);
+    // The listing shows the second motor, in the units it was given in.
+    let l = run(&mut s, "joint.list", json!({}));
+    let also = &l["links"][0]["also"][0];
+    assert!((also["ratio"].as_f64().unwrap_or(0.0) - k).abs() < 1e-12, "{l}");
+    // Saved and reopened, the head follows the same way.
+    let back = solidcraft_doc::Document::from_json(&s.doc.to_json()).unwrap();
+    assert_eq!(back.assembly, s.doc.assembly);
+    let mut t = Session::new(back);
+    assert!(close(at(&mut t, 45.0, -45.0), (0.0, 90.0 * k)));
+}
+
+#[test]
+fn a_corexy_axis_stops_at_its_limits() {
+    let mut s = corexy();
+    corexy_links(&mut s);
+    run(&mut s, "joint.limits", json!({"joint": "X", "min": 0, "max": 8}));
+    run(&mut s, "joint.drive", json!({"joint": "A", "value": 180}));
+    run(&mut s, "joint.drive", json!({"joint": "B", "value": 180}));
+    assert!((value(&mut s, "X") - 8.0).abs() < 1e-9);
+}
+
+#[test]
+fn a_multi_input_link_refuses_what_it_cannot_drive() {
+    let mut s = corexy();
+    let k = MM_PER_DEG;
+    let refuse = |s: &mut Session, p: Value, why: &str| {
+        let e = s.execute("joint.motion_link", &p).unwrap_err().to_string();
+        assert!(e.contains(why), "{p}: {e}");
+    };
+    refuse(&mut s, json!({"a": "A", "b": "X", "ratio": k, "also": [{"joint": "X", "ratio": k}]}), "itself");
+    refuse(&mut s, json!({"a": "A", "b": "X", "ratio": k, "also": [{"joint": "A", "ratio": k}]}), "once");
+    refuse(&mut s, json!({"a": "A", "b": "X", "ratio": k, "also": [{"joint": "B"}]}), "ratio");
+    // X already follows A: a second link may not set it too.
+    run(&mut s, "joint.motion_link", json!({"a": "A", "b": "X", "ratio": k}));
+    refuse(&mut s, json!({"a": "A", "b": "X", "ratio": k, "also": [{"joint": "B", "ratio": k}]}), "already follows");
+    // B follows Y: Y following B would go round in a circle.
+    run(&mut s, "joint.motion_link", json!({"a": "Y", "b": "B", "ratio": 1}));
+    refuse(&mut s, json!({"a": "A", "b": "Y", "ratio": k, "also": [{"joint": "B", "ratio": -k}]}), "already drives");
+}
+
+#[test]
+fn deleting_a_second_input_removes_its_link() {
+    let mut s = corexy();
+    corexy_links(&mut s);
+    run(&mut s, "joint.delete", json!({"joint": "B"}));
+    assert!(s.doc.assembly.links.is_empty(), "{:?}", s.doc.assembly.links);
+}

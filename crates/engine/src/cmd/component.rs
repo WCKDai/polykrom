@@ -296,7 +296,7 @@ fn unlock(s: &mut Session, p: &Value) -> Result<Value> {
     }
     let doc = s.doc_mut();
     doc.assembly.joints.retain(|j| !gone.contains(&j.id));
-    doc.assembly.links.retain(|l| !gone.contains(&l.a) && !gone.contains(&l.b));
+    doc.assembly.links.retain(|l| !gone.iter().any(|g| l.uses(*g)));
     s.visibility.hidden_joints.retain(|h| !gone.contains(h));
     Ok(json!({"component": id, "joints": gone}))
 }
