@@ -18,13 +18,16 @@ use crate::{Result, Session};
 
 pub const SWEEP_DOC: &str = "joint: id|name; from, to: its value the sweep runs between (degrees for angles, mm for distances, \
      or expressions); index? (which value, default 0); step? (between samples, in the joint's unit; default: fine enough that \
-     no part passes through another between two); refine?: mm (the first contact is bisected until no part moves more than \
+     no part passes through another between two, or, for a motion too long to sample that finely, the finest step the sweep's \
+     budget allows); refine?: mm (the first contact is bisected until no part moves more than \
      this between the last clear value and the touching one; default 0.01); occurrences?: [ids or names] (checked against \
      each other; default every occurrence), with against?: [ids or names] (the parts that stay: each of `occurrences` only \
      against these), or contact_sets?: true (the pairs of the design's contact sets); report_gaps?: bool (the nearest gap at \
      every sample, default false); apply?: bool (leave the design where the sweep stopped; default false: the design is not \
      changed) → stopped_at (the last value clear of contact, or where a loop or limit stopped it; null: it reached `to`), \
-     stopped_by: {a, b, at: [x,y,z] (where they touch, world)} | \"loop\" | \"limit\" | null, samples: [{value, min_gap_mm?, \
+     stopped_by: {a, b, at: [x,y,z] (where they touch, world)} | \"loop\" | \"limit\" | null, step (the step taken), \
+     step_limited (true: the budget made it coarser than fine enough, so a part thinner than one step's travel may pass \
+     through another between two samples unseen: give a smaller range or check fewer parts), samples: [{value, min_gap_mm?, \
      pair?}], min_gap? (report_gaps: {part: {mm, at_value, to}}, the nearest each part came to another), unit, gap_method \
      (\"mesh\": distances between the tessellations), gap_tolerance_mm (how far those can be off: 0 when every face is flat), \
      pairs (checked), pairs_moving_together (set aside: their two parts keep their placement relative to each other all through the sweep, so they cannot meet), touching_at_start: [[a, b]] (pairs already touching at `from`, such as parts joined face to face or a door \
@@ -171,23 +174,26 @@ pub(super) fn sweep(s: &mut Session, p: &Value) -> Result<Value> {
     // The samples run to where the joint gets: a limit or a loop can stop it short of `to`, and
     // the default count is for the motion up to there. One more drive toward `to` then finds
     // what stops it.
-    let (n, sample_to) = match step {
+    // Without a `step`, a motion too long for the budgets to sample that finely takes the most
+    // samples they allow: a coarser step, which the reply says (`step_limited`).
+    let (n, sample_to, limited) = match step {
         Some(h) => {
             let n = ((to - from).abs() / h).ceil();
             if !n.is_finite() || n > MAX_SAMPLES as f64 {
                 return Err(bad(cmd, format!("`step` makes more than {MAX_SAMPLES} samples: take a larger step")));
             }
-            (n as usize, to)
+            (n as usize, to, false)
         }
         None => {
             let mut end = t.scratch();
             drive_to(&mut end, to)?;
-            let n = geometry.samples(&t, &end).map_err(|e| match e {
-                crate::EngineError::BadParams { msg, .. } => bad(cmd, format!("{msg} (or give a `step`)")),
-                e => e,
-            })?;
+            let (need, most) = geometry.sample_need(&t, &end)?;
+            if most == 0 {
+                return Err(bad(cmd, "the parts are too finely meshed to sample even once: check fewer parts (occurrences, against)"));
+            }
+            let limited = need > most as f64;
             let got = reached(&end);
-            (n, if (got - to).abs() > 1e-9 && got.is_finite() { got } else { to })
+            (if limited { most } else { need as usize }, if (got - to).abs() > 1e-9 && got.is_finite() { got } else { to }, limited)
         }
     };
     let n = n.max(1);
@@ -285,6 +291,8 @@ pub(super) fn sweep(s: &mut Session, p: &Value) -> Result<Value> {
         "stopped_at": stop.as_ref().map(|(v, _)| shown(*v)),
         "stopped_by": stop.map(|(_, by)| by),
         "samples": samples,
+        "step": shown((sample_to - from).abs() / n as f64),
+        "step_limited": limited,
         "refine_mm": refine,
         "gap_method": "mesh", "gap_tolerance_mm": geometry.chord(),
         "pairs": geometry.pair_count() + resting.pair_count(),

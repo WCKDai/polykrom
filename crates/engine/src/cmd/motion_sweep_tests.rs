@@ -143,6 +143,33 @@ fn a_thin_part_just_inside_a_limit_is_met() {
     }
 }
 
+/// A 1 m door 0.1 mm thick: samples fine enough for it to pass through nothing would be about
+/// 63,000 over 90° (a quarter of its thickness at its tip each), past the sweep's 4096. Without a
+/// `step` the sweep takes the finest step its budget allows, says so, and still meets the block
+/// (as in `a_door_swings_until_it_meets_the_block`, with the door's face 0.1 mm off the hinge).
+#[test]
+fn a_motion_too_long_to_sample_finely_takes_the_finest_step_the_budget_allows() {
+    let mut s = Session::default();
+    block(&mut s, "Door", [0.0, 0.0, 0.0], [1000.0, 0.1, 50.0]);
+    block(&mut s, "Block", [500.0, 60.0, 0.0], [20.0, 20.0, 50.0]);
+    run(
+        &mut s,
+        "joint.create",
+        json!({"type": "revolute", "a": {"occurrence": 0, "point": [0, 0, 0]}, "b": {"occurrence": "Door", "point": [0, 0, 0]}, "flip": true, "name": "Hinge"}),
+    );
+    let corner = |x: f64, y: f64| y.atan2(x) - (0.1 / x.hypot(y)).asin();
+    let expected =
+        [(500.0, 60.0), (520.0, 60.0), (500.0, 80.0), (520.0, 80.0)].iter().map(|(x, y)| corner(*x, *y)).fold(f64::INFINITY, f64::min).to_degrees();
+    let r = run(&mut s, "joint.sweep", json!({"joint": "Hinge", "from": 0, "to": 90}));
+    assert_eq!(r["step_limited"], true, "{r}");
+    assert!((num(&r["step"]) - 90.0 / 4096.0).abs() < 1e-9, "{r}");
+    let at = num(&r["stopped_at"]);
+    assert!((at - expected).abs() < 0.01 && at <= expected + 1e-9, "stopped at {at}°, the block is met at {expected}°: {}", r["stopped_by"]);
+    // A short motion is sampled as finely as it needs.
+    let r = run(&mut s, "joint.sweep", json!({"joint": "Hinge", "from": 0, "to": -1}));
+    assert!(r["step_limited"] == false && num(&r["step"]) < 1.0 && r["stopped_by"].is_null(), "{r}");
+}
+
 #[test]
 fn a_sweep_refuses_what_it_cannot_do() {
     let mut s = door();
