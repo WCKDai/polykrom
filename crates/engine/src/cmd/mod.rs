@@ -22,7 +22,7 @@ macro_rules! planned {
 
 mod analysis;
 mod bom;
-mod browser;
+pub(crate) mod browser;
 pub(crate) mod clearance;
 mod clipboard;
 mod compare;

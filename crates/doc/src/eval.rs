@@ -2121,10 +2121,7 @@ impl Model {
             .skip(at)
             .all(|r| r.state.bodies.iter().all(|b| if b.name == old { b.feature == feature } else { !b.name.starts_with(&derived) }));
         let quoted = self.results.iter().skip(at).any(|r| [&r.error, &r.warning].into_iter().flatten().any(|m| m.contains(old)));
-        let named_elsewhere = self
-            .results
-            .iter()
-            .any(|r| r.state.body(new).is_some() || r.state.sheets.iter().any(|x| x.body == old) || r.state.threads.iter().any(|t| t.body == old));
+        let named_elsewhere = self.results.iter().any(|r| r.state.body(new).is_some() || r.state.sheets.iter().any(|x| x.body == old));
         let faces_named = doc.features.iter().skip(at + 1).any(|f| f.face_names.iter().any(|n| n.contains(old)));
         if !one_run || !same_body || quoted || named_elsewhere || faces_named {
             return false;
@@ -2139,6 +2136,10 @@ impl Model {
                     for b in st.bodies.iter_mut().filter(|b| b.name == old) {
                         b.name = new.to_string();
                         b.names = b.names.renamed();
+                    }
+                    // A thread names the body it is cut in (#169: tapped parts are renamed too).
+                    for t in st.threads.iter_mut().filter(|t| t.body == old) {
+                        t.body = new.to_string();
                     }
                     // The names the design must not use again travel with the state (#4957).
                     st.reserved_body_names = doc.reserved_body_names.clone();
