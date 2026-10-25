@@ -273,6 +273,21 @@ fn fillet_keeps_expression_corner_when_parameter_changes() {
     }
 }
 
+/// Corners picked where they are, as agents see them (`point: [x, y]`), round like corners named
+/// by their points; a point that is no corner says which corner is nearest (TinyRex, #184's run).
+#[test]
+fn fillet_corners_picked_by_coordinates() {
+    let mut s = new_sketch();
+    run(&mut s, "sketch.rectangle.two_point", json!({"p0": [-65, -46], "p1": [65, 46]}));
+    run(&mut s, "sketch.fillet", json!({"point": [65, 46], "radius": 28}));
+    run(&mut s, "sketch.fillet", json!({"points": [[-65, 46], [-65, -46], [65, -46]], "radius": 28}));
+    let want = 130.0 * 92.0 - 4.0 * (28.0 * 28.0 - std::f64::consts::PI * 28.0 * 28.0 / 4.0);
+    let a = profiles(&s);
+    assert!(close(a[0], want), "{a:?} vs {want}");
+    let e = s.execute("sketch.fillet", &json!({"point": [0, 46], "radius": 5})).unwrap_err().to_string();
+    assert!(e.contains("no corner at [0, 46]") && e.contains("nearest"), "{e}");
+}
+
 #[test]
 fn fillet_and_chamfers() {
     let mut s = new_sketch();

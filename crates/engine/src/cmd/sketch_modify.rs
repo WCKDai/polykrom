@@ -23,7 +23,7 @@ pub static COMMANDS: &[CommandSpec] = &[
         .at("SKETCH", "MODIFY")
         .icon("sketch_fillet")
         .enabled(in_sketch)
-        .params(concat!("point: corner shared by two curves (\"l1.end\") | points: [corners] (all rounded alike: one radius, the rest equal) | a, b: two lines or arcs meeting at a corner; radius: expr. A corner that dimensions or constraints measure to stays as a virtual sharp corner on both curves' extensions (`virtual_corners`; the moved ones in `moved_to_virtual_corner`)", created_doc!())),
+        .params(concat!("point: corner shared by two curves (\"l1.end\", or where it is: [x, y]) | points: [corners] (all rounded alike: one radius, the rest equal) | a, b: two lines or arcs meeting at a corner; radius: expr. A corner that dimensions or constraints measure to stays as a virtual sharp corner on both curves' extensions (`virtual_corners`; the moved ones in `moved_to_virtual_corner`)", created_doc!())),
     CommandSpec::new("sketch.chamfer.equal_distance", "Equal Distance Chamfer", chamfer_equal)
         .at("SKETCH", "MODIFY")
         .icon("sketch_chamfer")
@@ -968,7 +968,8 @@ fn fillet(s: &mut Session, p: &Value) -> Result<Value> {
         let pname = doc.new_model_param(&r_expr, "mm");
         let (mut arcs, mut cons, mut kept) = (Vec::new(), Vec::new(), Vec::new());
         for q in &corners {
-            let (arc, mut c, k) = fillet_corner(sk, q, r, cmd)?;
+            let q = corner_at(sk, q, cmd)?;
+            let (arc, mut c, k) = fillet_corner(sk, &q, r, cmd)?;
             kept.push(k);
             // One radius for them all: the first carries the dimension, the rest are equal to it.
             match arcs.first() {
@@ -982,6 +983,22 @@ fn fillet(s: &mut Session, p: &Value) -> Result<Value> {
     })?;
     let (vc, moved) = out.3;
     Ok(json!({"curves": out.0, "constraints": out.1, "param": out.2, "virtual_corners": vc, "moved_to_virtual_corner": moved, "sketch": info}))
+}
+
+/// How far from a corner a corner given by its coordinates may be picked.
+const CORNER_PICK_MM: f64 = 0.01;
+
+/// A corner given where it is (`point: [x, y]`, in the sketch's coordinates) as the point there
+/// that two or more curves end at, so a corner can be picked as it is seen; anything else as given.
+fn corner_at(sk: &Sketch, q: &Value, cmd: &str) -> Result<Value> {
+    let Some(at) = q.get("point").filter(|v| v.is_array()).and_then(vec2) else { return Ok(q.clone()) };
+    let ends = |i: usize| sk.curves.iter().filter(|c| c.kind.ends().is_some_and(|(a, b)| a == i || b == i)).count();
+    let nearest = sk.points.iter().enumerate().filter(|(i, _)| ends(*i) >= 2).min_by(|a, b| a.1.pos.dist(at).total_cmp(&b.1.pos.dist(at)));
+    match nearest {
+        Some((_, p)) if p.pos.dist(at) <= CORNER_PICK_MM => Ok(json!({ "point": p.id })),
+        Some((_, p)) => Err(bad(cmd, format!("no corner at [{}, {}]: the nearest is `{}` at [{}, {}]", at.x, at.y, p.id, p.pos.x, p.pos.y))),
+        None => Err(bad(cmd, "the sketch has no corners to round")),
+    }
 }
 
 /// The virtual corners kept and the constraints moved to them, for a response.
