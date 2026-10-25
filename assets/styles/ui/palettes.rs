@@ -71,8 +71,9 @@ impl Tokens {
             font_display: 26.0,
             control_height: 28.0,
             form_ink: Color32::from_rgb(35, 35, 39),
-            form_dim: Color32::from_rgb(68, 91, 94),
-            form_primary: Color32::from_rgb(11, 120, 130),
+            form_dim: Color32::from_rgb(78, 82, 72),
+            // Polykrom's accent (light): a primary button is the brand's, as in the dark theme.
+            form_primary: Color32::from_rgb(77, 124, 15),
             form_error: Color32::from_rgb(161, 52, 44),
             form_error_fill: Color32::from_rgb(252, 239, 237),
             form_success: Color32::from_rgb(39, 107, 44),
