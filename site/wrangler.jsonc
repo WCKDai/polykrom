@@ -1,4 +1,5 @@
-// cad.polykrom.app: the landing page, the browser app (/app/) and the book (/docs/).
+// polykrom.app (and cad.polykrom.app): the landing page, the showcases, the browser app (/app/) and
+// the book (/docs/).
 // Build with `python3 site/build.py` (after `trunk build --release` and `cargo xtask book`),
 // then deploy with `npx wrangler deploy --config site/wrangler.jsonc`.
 {
@@ -9,9 +10,12 @@
     "directory": "../dist/site",
     "binding": "ASSETS",
     "not_found_handling": "404-page",
-    "run_worker_first": ["/app/*.wasm", "/*/meshes.bin"]
+    // Every request, so www.polykrom.app can redirect to polykrom.app.
+    "run_worker_first": true
   },
   "routes": [
+    { "pattern": "polykrom.app", "custom_domain": true },
+    { "pattern": "www.polykrom.app", "custom_domain": true },
     { "pattern": "cad.polykrom.app", "custom_domain": true }
   ]
 }
