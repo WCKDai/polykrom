@@ -93,7 +93,7 @@ header.ink .stage3d { background: transparent; border: 0; height: min(62vh, 560p
 .stage3d.live .poster { opacity: 0 }
 .live-dot { position: absolute; left: 0; bottom: 0; font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 8px }
 .live-dot::before { content: ""; width: 7px; height: 7px; background: var(--lime); animation: blink 2.4s steps(1) infinite }
-.hud { position: absolute; left: 12px; right: 12px; bottom: 12px; display: flex; gap: 14px; align-items: center; flex-wrap: wrap;
+.hud { position: absolute; z-index: 1; left: 12px; right: 12px; bottom: 12px; display: flex; gap: 14px; align-items: center; flex-wrap: wrap;
   background: color-mix(in srgb, var(--page) 88%, transparent); backdrop-filter: blur(8px); border: 1px solid var(--rule); padding: 10px 12px }
 .hud button { font: 600 13px var(--mono); color: var(--page); background: var(--ink); border: 0; border-radius: 4px; padding: 7px 14px; cursor: pointer; min-width: 72px }
 .hud input[type=range] { flex: 1 1 200px; accent-color: var(--ink); min-width: 0 }
@@ -145,6 +145,46 @@ figure figcaption { font-size: 13px; color: var(--muted); margin-top: 10px }
 .gap p { margin: 0 } .gap p + p { color: var(--muted); font-size: 14px; margin-top: 6px }
 .tag { display: inline-block; font-size: 12px; padding: 0 8px; border: 1px solid var(--rule); color: var(--muted); margin-right: 6px; border-radius: 2px }
 .tag.v::before { content: "✓ "; color: var(--ash) } .tag.w::before { content: "! "; color: var(--warn) }
+/* a showcase's stage table, its briefs folded away, its checks, its bill of materials */
+.stagetable td:first-child { white-space: nowrap; font-weight: 600; padding-right: 18px }
+.stagetable td:nth-child(2) { color: var(--muted); min-width: 22em }
+.stagetable td.n, .corners td.n { white-space: nowrap; padding-left: 14px }
+tfoot td { border-bottom: 0; border-top: 2px solid var(--ink); font-weight: 700 }
+.briefs-h { margin: 40px 0 10px }
+.briefs { border-top: 1px solid var(--rule) }
+details { border-bottom: 1px solid var(--rule) }
+summary { cursor: pointer; list-style: none; display: flex; gap: 12px; align-items: baseline; padding: 11px 0; font-size: 14px }
+summary::-webkit-details-marker { display: none }
+summary::before { content: "+"; width: 1ch; color: var(--muted); flex: none }
+details[open] summary::before { content: "−" }
+summary b { text-transform: lowercase } summary span { color: var(--muted); font-size: 13px }
+summary:hover b { text-decoration: underline 2px var(--lime); text-underline-offset: 4px }
+.brief { color: var(--muted); font-size: 14px; border-left: 2px solid var(--ink); padding-left: 12px; margin: 2px 0 18px calc(1ch + 12px); max-width: 52em }
+.checks { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--rule) }
+.checks li { padding: 12px 0; border-bottom: 1px solid var(--rule) }
+.checks b { font-weight: 600 }
+.mk { display: inline-block; width: 8px; height: 8px; background: var(--lime); margin-right: 8px; vertical-align: .05em }
+.bom { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 40px; align-items: start }
+.bom h3 { margin-bottom: 8px } .bom td.n { white-space: nowrap; padding-left: 12px }
+.corners { max-width: 640px; margin-top: 24px }
+figure video { width: 100%; max-width: 900px; height: auto; border: 1px solid var(--rule); background: var(--wash) }
+.gap .aside { max-width: 420px; margin-top: 14px }
+/* on a phone the stage table stacks: the stage, its numbers on one line, then what it did */
+@media (max-width: 640px) {
+  .stagetable thead { display: none } .stagetable, .stagetable tbody, .stagetable tfoot { display: block }
+  .stagetable tr { display: flex; flex-wrap: wrap; gap: 2px 14px; padding: 12px 0; border-bottom: 1px solid var(--rule) }
+  .stagetable td, .stagetable tfoot td { border: 0; padding: 0; min-width: 0 } .stagetable td.n { padding-left: 0 }
+  .stagetable td:first-child { flex-basis: 100% } .stagetable td:nth-child(2) { order: 1; min-width: 0; flex-basis: 100% }
+  .stagetable td:nth-child(2):empty { display: none } .stagetable tfoot tr { border-top: 2px solid var(--ink); border-bottom: 0 }
+  .stagetable td:nth-child(5)::after { content: " calls" } .stagetable td:nth-child(6)::after { content: " errors" }
+}
+.stats.of3 { grid-template-columns: repeat(3, minmax(0, 1fr)) }
+.stats.of3 .stat:nth-child(3n+1) { padding-left: 0; border-left: 0 } .stats.of3 .stat:nth-child(n+4) { border-top: 1px solid var(--rule) }
+@media (max-width: 960px) { .stats.of3 { grid-template-columns: repeat(2, minmax(0, 1fr)) }
+  .stats.of3 .stat { padding-left: 16px; border-left: 1px solid var(--rule); border-top: 1px solid var(--rule) }
+  .stats.of3 .stat:nth-child(odd) { padding-left: 0; border-left: 0 } .stats.of3 .stat:nth-child(-n+2) { border-top: 0 } }
+@media (max-width: 560px) { .stats.of3 { grid-template-columns: 1fr } .stats.of3 .stat { padding-left: 0; border-left: 0 }
+  .stats.of3 .stat:nth-child(n+2) { border-top: 1px solid var(--rule) } }
 
 /* the ladder of demonstrations */
 .ladder { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); border-top: 2px solid var(--ink); counter-reset: rung }
@@ -233,7 +273,7 @@ footer .family a { padding: 0 12px; border-left: 1px solid var(--rule); text-dec
   .rung:nth-child(even) { padding-left: 12px; border-left: 1px solid var(--rule) }
   .three, .grid2, .grid3 { grid-template-columns: 1fr } .card, .card + .card, .grid2 .card:nth-child(odd) { padding: 20px 0; border-left: 0; border-top: 1px solid var(--rule) }
   .facts { grid-template-columns: repeat(2, minmax(0, 1fr)) } .facts div:nth-child(3) { padding-left: 0; border-left: 0 }
-  .st, .gap { grid-template-columns: 1fr } .stagelist div { grid-template-columns: 100px minmax(0, 1fr) }
+  .st, .gap, .bom { grid-template-columns: 1fr } .stagelist div { grid-template-columns: 100px minmax(0, 1fr) }
   .stagelist em { grid-column: 2 }
   nav .links a { padding: 0 9px }
 }

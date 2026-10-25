@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>3D printer · Polykrom</title>
+<meta name="description" content="A CoreXY 3D printer designed, verified and run through a test print by an AI agent in Polykrom: 287 parts, a 252 × 272 × 284 mm build volume, its kinematics checked by driving the motors.">
+<meta property="og:title" content="A 3D printer, designed and verified by an AI agent in Polykrom">
+<meta property="og:description" content="Six briefs, 1 h 48 min, $27.85: a Voron-style CoreXY printer of 287 parts with a 252 × 272 × 284 mm build volume, exact CoreXY kinematics and a three-layer test print.">
+<meta property="og:image" content="https://polykrom.app/media/printer/printer-iso.jpg">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#111111" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="../mark.svg" type="image/svg+xml">
+<script type="importmap">
+{"imports": {"three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}
+</script>
+<link rel="preload" href="../fonts/jetbrains-mono-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="../shared/kit.css">
+</head>
+<body>
+{{NAV:printer}}
+
+<header class="band"><div class="in">
+  <p class="kicker">Showcase · D2 · 3D printer</p>
+  <h1>A 3D printer, designed, verified and <em>run</em> by an AI agent in Polykrom.</h1>
+  <p class="lede">The second rung of the ladder: a CoreXY printer in the style of a Voron Trident, from an empty design to a machine that draws a test square layer by layer. An AI agent was given six plain-language briefs and nothing but Polykrom's tools. It built the frame, the belt-driven XY motion and a three-screw Z axis from library parts and 27 printed parts, found how far each axis can travel, redesigned three printed parts to reach the build volume it was asked for, and ran a print study keyed only on the motors.</p>
+</div></header>
+
+<div class="viewer band"><div class="in">
+  <div class="stage3d" id="stage" aria-label="The printer in 3D, playing its print study: the nozzle draws a 100 mm square three times">
+    <img class="poster" src="../media/printer/printer-iso.jpg" width="1200" height="630" alt="The printer in Polykrom's colours: a black 2020 frame, lime printed brackets and mounts, the bed partway down">
+    <div class="loading" id="loading">Loading the printer (3 MB of meshes)…</div>
+    <div class="hud">
+      <button id="play" type="button">Pause</button>
+      <input id="scrub" type="range" min="0" max="240" step="0.1" value="0" aria-label="Print study step">
+      <div class="read"><span>step <b id="r-step">0</b></span><span>A <b id="r-A">0°</b></span><span>B <b id="r-B">0°</b></span><span>X <b id="r-X">0</b></span><span>Y <b id="r-Y">0</b></span><span>tip <b id="r-gap">0</b> above the bed</span></div>
+    </div>
+  </div>
+  <p class="caption">Live: the URDF Polykrom exported from the agent's design, driven by its print study's recorded joint values. Motors A and B turn, the gantry and toolhead follow through the CoreXY links, and the bed drops 0.2 mm after each layer. The belts are hidden because they don't move with the machine (below). Drag to orbit, scroll to zoom.</p>
+  <div class="stats of3">
+    <div class="stat"><div class="n">252 × 272 × 284</div><div class="t">mm build volume, against 250³</div></div>
+    <div class="stat"><div class="n">40.000 mm</div><div class="t">along X only for A = B = 360°</div></div>
+    <div class="stat"><div class="n">8.000 mm</div><div class="t">of bed travel per Z motor turn</div></div>
+    <div class="stat"><div class="n">0.2 · 0.4 · 0.6</div><div class="t">mm test layers, 100.000 mm sides</div></div>
+    <div class="stat"><div class="n">287</div><div class="t">parts, 9.48 kg</div></div>
+    <div class="stat"><div class="n">1 h 48 min</div><div class="t">agent time, $27.85</div></div>
+  </div>
+</div></div>
+
+<section class="band"><div class="in">
+  <h2>How it was built</h2>
+  <p class="sub">Each stage was one request to Claude Code running headless, with Polykrom's MCP server (<code>polykrom-cli mcp --headless</code>) as its only tool, starting from the design the stage before had saved. Times, costs and tool calls are from the agent's run records.</p>
+  <div class="scroll"><table class="stagetable">
+    <thead><tr><th>Stage</th><th>What the agent did</th><th style="text-align:right">Time</th><th style="text-align:right">Cost</th><th style="text-align:right">Calls</th><th style="text-align:right">Errors</th></tr></thead>
+    <tbody>
+      <tr><td>1. Frame and bed</td><td>A 400 × 400 × 450 mm frame of 2020 extrusion, eight printed corner brackets, four feet and the pixel-p badge, held by 36 M5 screws, most of them in T-nuts it modelled itself (the library has none); a 300 × 300 × 8 mm aluminium bed with a black print surface.</td><td class="n">11.7 min</td><td class="n">$4.09</td><td class="n">77</td><td class="n">2</td></tr>
+      <tr><td>2. XY motion</td><td>MGN12 rails and carriages, the gantry and toolhead, two NEMA17 motors on printed mounts, idlers on stacked 625 bearings and two GT2 belts. CoreXY links X = (A + B) / 2 and Y = (A − B) / 2, checked by driving the motors.</td><td class="n">22.2 min</td><td class="n">$8.48</td><td class="n">116</td><td class="n">2</td></tr>
+      <tr><td>3. Z axis</td><td>Three NEMA17 motors on printed mounts, couplers, T8 lead screws and nuts, printed bed brackets. The bed rides joint Z, driven by Zmotor through the 8 mm lead; the other two screws follow it 1 : 1.</td><td class="n">15.1 min</td><td class="n">$4.12</td><td class="n">63</td><td class="n">6</td></tr>
+      <tr><td>4. Verify</td><td>Swept each axis to its first contact and set the limits. X reached only 225 mm, so it reworked the gantry joiners and the carriage plate to reach 252; a Corners study to the build volume's eight corners then found the shroud hitting two corner brackets, so it reworked those too. BOM and mass.</td><td class="n">18.9 min</td><td class="n">$4.63</td><td class="n">89</td><td class="n">3</td></tr>
+      <tr><td>5. Print</td><td>A 240-step Print study keyed only on A, B and Zmotor, with the motor angles worked out from the CoreXY relations: a 100 mm square, three layers, 0.2 mm apart. Traced the tip, checked for collisions, exported the GIF.</td><td class="n">12.4 min</td><td class="n">$2.36</td><td class="n">48</td><td class="n">3</td></tr>
+      <tr><td>6. Showcase</td><td>Posed the machine, rendered it, exported the BOM, and checked that all 293 bodies still had their colours.</td><td class="n">27.6 min</td><td class="n">$4.17</td><td class="n">92</td><td class="n">6</td></tr>
+    </tbody>
+    <tfoot><tr><td>Total</td><td></td><td class="n">1 h 48 min</td><td class="n">$27.85</td><td class="n">485</td><td class="n">22</td></tr></tfoot>
+  </table></div>
+  <p class="caption">Errors are tool calls that came back with an error; the agent recovered from each one and reported what it worked around.</p>
+  <h3 class="briefs-h">The briefs, word for word</h3>
+  <div class="briefs">
+    <details><summary><b>1. Frame and bed</b><span>the brief</span></summary><p class="brief">Start a new design: the frame and bed of a CoreXY 3D printer in the style of a Voron Trident (the XY gantry fixed at the top, the bed moving down on three lead screws). Frame: 2020 extrusions from the library (parts.insert family extrusion, size 2020): four vertical posts 450 mm long at the corners of a 400 x 400 mm footprint (outer faces flush with it), and eight horizontal members between the posts at the bottom and at the top (360 mm). Hold the corners together with 3D-printed corner brackets: at each of the eight corners a printed bracket that wraps the joint, each with M5 socket head cap screws (library) through it into the extrusions' slots or core. Four printed feet under the posts. Give the front a logo: Polykrom's pixel p, a printed badge made of 5 mm square cells, 6 cells tall, rows from the top '#####.', '##..##', '##..##', '#####.', '##....', '##....' (# is a cell), standing out 3 mm, mounted on the front of the top front extrusion, centred. Ground the frame (a grounded component named Frame holding its extrusions, brackets, feet, screws and the badge, or grounded subcomponents rigidly joined). Bed: an aluminium plate 300 x 300 x 8 in a component named Bed, centred, its top 380 mm above the frame's bottom, with a 1 mm black print surface on top. Report the frame's outer dimensions, its mass, a cut list, and how many brackets and screws you used.</p></details>
+    <details><summary><b>2. XY motion</b><span>the brief</span></summary><p class="brief">Open s1_frame.polykrom (a CoreXY printer frame with its bed). Add the XY motion, every part held: Y: an MGN12 rail 400 long on top of each of the two top extrusions that run along Y (left and right; extend them to the frame's outer edge if needed), fastened with M3 screws through its holes, each with an MGN12H carriage. Gantry: a 2020 extrusion along X joined to the two Y carriages by printed gantry joiners (one on each carriage, screwed to the carriage's M3 holes and to the extrusion), in a component named Gantry with those carriages and joiners; a slider joint named Y between the Frame and the Gantry, axis +Y. X: an MGN12 rail 350 long screwed to the gantry's front face, an MGN12H carriage on it, and a printed X-carriage plate on that carrying the toolhead: a printed shroud about 55 x 45 x 60, an aluminium heater block and a brass nozzle (a cone about 10 mm ending in a point), all in a component named Toolhead; a slider joint named X between the Gantry and the Toolhead, axis +X. Motors: two NEMA17-48 steppers at the two rear top corners on printed motor mounts (each mount screwed to the frame, the motor screwed to the mount with four M3 screws into its tapped holes), shafts vertical, a GT2 20T-5 pulley on each shaft; revolute joints named A (rear left) and B (rear right) about their shafts. Belts and idlers: idlers of stacked 625 bearings (library) on M5 screws in printed idler mounts at the two front top corners and at both ends of the gantry, and the two GT2 belts as thin solids (6 mm wide, 1.4 mm thick) along the CoreXY path at two heights, from each motor's pulley round the idlers to the X carriage: the belts are part of the picture, not of the kinematics. CoreXY: motion links that follow two joints (joint.motion_link with `also`): X follows (A + B) / 2 and Y follows (A - B) / 2, in mm of belt per degree (parts.library gt2_pulley: belt_mm_per_deg). Verify by driving: A = B = 360 deg moves the toolhead along X only, A = -B = 360 deg along Y only. Report what you measured, then put the joints back to 0, and check that nothing overlaps (inspect.interference) except fasteners in their holes.</p></details>
+    <details><summary><b>3. Z axis</b><span>the brief</span></summary><p class="brief">Open s2_xy.polykrom (a CoreXY printer with its XY motion). Add the Z axis, every part held: three NEMA17-40 steppers under the bed at its front left, front right and rear centre, each on a printed Z motor mount screwed to a bottom extrusion, shaft up; a shaft coupler (an aluminium cylinder 20 mm across, 25 long) joining each motor shaft to a T8 lead screw 400 long; a T8 lead nut on each screw, screwed into a printed bed bracket that carries the bed (the brackets fastened to the bed). The bed moves on a slider joint named Z between the Frame and the Bed (axis +Z), driven by a revolute joint named Zmotor (the front left motor) through joint.screw with the T8's lead (8 mm per turn); the other two motors and their screws turn with it (motion links). Verify: one turn of Zmotor moves the bed 8 mm and turns all three screws. Check that nothing overlaps except fasteners in their holes, and report the masses of the printed parts together.</p></details>
+    <details><summary><b>4. Verify it as a machine</b><span>the brief</span></summary><p class="brief">Open s3_z.polykrom (a complete CoreXY printer: gantry on joint Y, toolhead on joint X, motors A and B driving X and Y through CoreXY motion links, the bed on joint Z driven by Zmotor through lead screws). Verify it as a machine. 1. Travel: with joint sweeps (sweep a motor where a joint follows it), find how far X, Y and Z can go both ways before anything collides or a carriage would leave its rail, and set the joints' limits to that range. 2. Build volume: the box the nozzle tip can reach above the bed's print surface (X x Y x Z ranges); is it at least 250 x 250 x 250 mm? If not, change the design until it is, and say what you changed. 3. Collisions: a motion study named Corners keyed on A, B and Zmotor that takes the nozzle to the eight corners of the build volume; check it for interference and fix anything that collides. 4. The bill of materials (assembly.bom) by part and quantity, the total mass, the printed parts' mass, and the centre of mass.</p></details>
+    <details><summary><b>5. Make it print</b><span>the brief</span></summary><p class="brief">Open s4_verify.polykrom (a verified CoreXY 3D printer: A and B are the XY motors, Zmotor the bed's lead screws; X and Y follow A and B through CoreXY links). Make it print: a motion study named Print of 240 steps, keyed only on A, B and Zmotor (never on X or Y directly), in which the nozzle draws a 100 mm square centred on the bed three times, the first layer with the tip 0.2 mm above the print surface and each next layer 0.2 mm higher. Work out the motor angles for each corner from the CoreXY relations. Check it for interference. Trace the nozzle tip's path and report the square's side lengths and the corners' heights above the print surface. Export the animation as a GIF to corexy-print.gif (900 x 600), and give the motor angles you used for the first layer's corners.</p></details>
+    <details><summary><b>6. Showcase</b><span>the brief</span></summary><p class="brief">Open s5_print.polykrom (the finished CoreXY printer, in Polykrom's colours: black frame, lime printed parts, the pixel p badge on the front). Make its showcase pictures: put the joints at a pose that shows the machine well (the toolhead off centre, the bed partway down); render it in the render workspace (render.preflight, render.start, render.status until done, render.export) to printer-render.png at 1600 x 1000 from a three-quarter front view that shows the badge, and export the bill of materials as CSV to printer-bom.csv. Report the render's settings and the BOM's line count. Check before you finish that every part still has its colour.</p></details>
+    <details><summary><b>every brief</b><span>ended with</span></summary><p class="brief">Units are millimetres and degrees; Z is up. Work only through the Polykrom tools. Standard hardware comes from the parts library: parts.library lists the families (extrusion, stepper, gt2_pulley, linear_rail, linear_carriage, lead_screw, lead_nut, bearing, socket_head_cap_screw, hex_nut, washer...), with their dimensions. Everything has to make physical sense: every part is held by something (a bracket, a fastener, a joint), nothing floats and nothing overlaps another part except fasteners in their holes; parts that a real printer would 3D-print (brackets, mounts, joiners, the toolhead shroud) are modelled as their own components in PLA. Colours, Polykrom's: the aluminium frame anodised black (#111111), every printed part lime (#CCFF00), the bed's print surface black, metal hardware left as metal (appearance.assign). When the stage is done and you have verified it, save the design to &lt;the stage’s file&gt; and reply with a short report: what you did, the numbers you verified, and anything that did not work or that you had to work around.</p></details>
+  </div>
+</div></section>
+
+<section class="band"><div class="in">
+  <h2>Measured, not claimed</h2>
+  <p class="sub">Every number here was measured on the model by Polykrom's tools: by driving joints, sweeping them to contact, tracing the nozzle and checking for interference. We then re-measured the test print from the exported URDF with this page's own viewer code.</p>
+  <ul class="checks">
+    <li><span class="tag v">verified</span><b>Build volume 252 × 272 × 284 mm</b> (X × Y × Z) above the print surface, against a target of 250 mm on each axis. At first X reached only 225 mm: the 55 mm carriage plate hit the gantry joiners. The agent cut a 9.7 mm pocket into each joiner so the carriage can enter, narrowed the carriage plate's upper part to ±16 mm, and, when the Corners study showed the shroud hitting the top front corner brackets by 2.5 mm, shortened the brackets' gussets from 35 to 21 mm.</li>
+    <li><span class="tag v">verified</span><b>CoreXY:</b> A = B = 360° moves the nozzle along X only, by exactly 40.000 mm (Y 0.000); A = −B = 360° moves it along Y only, by 40.000 mm. That is 0.0555 mm per degree of motor, half of the 20-tooth pulley's 0.1111 mm of belt per degree.</li>
+    <li><span class="tag v">verified</span><b>Z:</b> one turn of Zmotor moves the bed 8.000 mm and a quarter turn 2.000 mm; the other two lead screws read the same angle, so all three turn together.</li>
+    <li><span class="tag v">verified</span><b>Travel:</b> X ±125.99 mm, Y −149.49 to +122.49 mm, Z −281.99 to +1.99 mm, each found by a joint sweep to the first contact and set as the joint's limits. Y is limited to what is clear at every X.</li>
+    <li><span class="tag v">verified</span><b>Corners:</b> a 160-step study takes the nozzle to the eight corners of the build volume; all 161 samples are clear of collisions, checked in three groups.</li>
+    <li><span class="tag v">verified</span><b>The test print:</b> each side of the square measures 100.000 mm (corners within 10⁻¹⁴ mm), and the tip is 0.200, 0.400 and 0.600 mm above the print surface at every corner of the three layers. Posing the exported URDF with the study's values, as the viewer above does, gives the same: (±50.000, ±50.000) mm and 0.200 / 0.400 / 0.600 mm.</li>
+    <li><span class="tag v">verified</span><b>Mass:</b> 9,477 g in all, of which the 27 printed PLA parts are 1,363 g; centre of mass at (0.14, 15.28, 324.60) mm.</li>
+    <li><span class="tag v">verified</span><b>Held:</b> every part is held by the grounded frame, a joint or a rigid group; the joint list shows nothing floating and no conflicts.</li>
+    <li><span class="tag w">noted</span><b>Tight spots:</b> at the X extremes the shroud clears the front lead screws by about 0.5 mm, and the redesigned joiner keeps only 0.8 mm of material between its new pocket and the idler bearings. The agent suggested printing a test joiner first.</li>
+    <li><span class="tag w">noted</span><b>Overlaps:</b> nothing overlaps except fasteners in their holes, but copied screws count as overlaps (below), so the agent had to show that each one was a thread, not a clash.</li>
+  </ul>
+</div></section>
+
+<section class="band"><div class="in">
+  <h2>The print</h2>
+  <p class="sub">The Print study as Polykrom's headless renderer exported it. The motors are keyed, never X or Y directly: for each corner the agent solved A = 9 (X + Y) and B = 9 (X − Y) in degrees, and Zmotor lowers the bed 0.2 mm between layers. 121 frames, every second step (the export stops at 124 frames at 900 × 600). The agent hid the belts while recording.</p>
+  <figure><video src="../media/printer/printer-print.mp4" poster="../media/printer/printer-print.jpg" width="900" height="600" autoplay muted loop playsinline preload="none" aria-label="The toolhead draws a 100 mm square three times while the bed steps down between layers"></video></figure>
+  <div class="scroll"><table class="corners">
+    <thead><tr><th>First layer corner (X, Y)</th><th style="text-align:right">A</th><th style="text-align:right">B</th><th style="text-align:right">Zmotor</th></tr></thead>
+    <tbody>
+      <tr><td>(−50, −50) start</td><td class="n">−900°</td><td class="n">0°</td><td class="n">81°</td></tr>
+      <tr><td>(+50, −50)</td><td class="n">0°</td><td class="n">+900°</td><td class="n">81°</td></tr>
+      <tr><td>(+50, +50)</td><td class="n">+900°</td><td class="n">0°</td><td class="n">81°</td></tr>
+      <tr><td>(−50, +50)</td><td class="n">0°</td><td class="n">−900°</td><td class="n">81°</td></tr>
+    </tbody>
+  </table></div>
+  <p class="caption">Zmotor 81° puts the tip 0.2 mm above the print surface; the second and third layers run at 72° and 63°.</p>
+</div></section>
+
+<section class="band"><div class="in">
+  <h2>Bill of materials</h2>
+  <p class="sub">287 parts on 47 lines, from <code>assembly.bom</code>. Standard parts come from Polykrom's library with their part numbers. The rest were modelled for this printer and have no part number yet; the <span class="mk"></span>printed ones are PLA.</p>
+  <div class="bom">
+    <div>
+      <h3>From the library</h3>
+      <table>
+        <thead><tr><th>Part</th><th style="text-align:right">Qty</th></tr></thead>
+        <tbody>
+          <tr><td>2020 extrusion, 450 mm (posts)</td><td class="n">4</td></tr>
+          <tr><td>2020 extrusion, 360 mm (top and bottom)</td><td class="n">8</td></tr>
+          <tr><td>2020 extrusion, 395 mm (gantry)</td><td class="n">1</td></tr>
+          <tr><td>MGN12 rail, 400 mm</td><td class="n">2</td></tr>
+          <tr><td>MGN12 rail, 350 mm</td><td class="n">1</td></tr>
+          <tr><td>MGN12H carriage</td><td class="n">3</td></tr>
+          <tr><td>NEMA17-48 stepper (A, B)</td><td class="n">2</td></tr>
+          <tr><td>NEMA17-40 stepper (Z)</td><td class="n">3</td></tr>
+          <tr><td>GT2 pulley 20T-5</td><td class="n">2</td></tr>
+          <tr><td>625 bearing (idlers)</td><td class="n">16</td></tr>
+          <tr><td>T8 lead screw, 400 mm</td><td class="n">3</td></tr>
+          <tr><td>T8 flanged nut</td><td class="n">3</td></tr>
+          <tr><td>ISO 4762 M3 × 8 · × 10 · × 16</td><td class="n">66 · 24 · 8</td></tr>
+          <tr><td>ISO 4762 M5 × 10 · × 16 · × 25 · × 35</td><td class="n">40 · 6 · 8 · 4</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div>
+      <h3>Made for this printer</h3>
+      <table>
+        <thead><tr><th>Part</th><th style="text-align:right">Qty</th></tr></thead>
+        <tbody>
+          <tr><td><span class="mk"></span>Corner bracket</td><td class="n">8</td></tr>
+          <tr><td><span class="mk"></span>Foot</td><td class="n">4</td></tr>
+          <tr><td><span class="mk"></span>Pixel-p badge</td><td class="n">1</td></tr>
+          <tr><td><span class="mk"></span>Gantry joiner, left and right</td><td class="n">2</td></tr>
+          <tr><td><span class="mk"></span>XY motor mount, A and B</td><td class="n">2</td></tr>
+          <tr><td><span class="mk"></span>Front idler mount, left and right</td><td class="n">2</td></tr>
+          <tr><td><span class="mk"></span>X carriage plate</td><td class="n">1</td></tr>
+          <tr><td><span class="mk"></span>Hotend shroud</td><td class="n">1</td></tr>
+          <tr><td><span class="mk"></span>Z motor mount</td><td class="n">3</td></tr>
+          <tr><td><span class="mk"></span>Bed bracket</td><td class="n">3</td></tr>
+          <tr><td>Bed: aluminium plate with print surface</td><td class="n">1</td></tr>
+          <tr><td>Shaft coupler, Ø20 × 25</td><td class="n">3</td></tr>
+          <tr><td>Heater block and nozzle</td><td class="n">1 + 1</td></tr>
+          <tr><td>GT2 belts (one body)</td><td class="n">1</td></tr>
+          <tr><td>M5 T-nut: slot · top</td><td class="n">38 · 8</td></tr>
+          <tr><td>M3 nut strip: X · Y</td><td class="n">1 · 2</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <p class="caption">27 printed parts of 17 designs, 1,363 g of PLA. Every left/right or per-motor variant is its own line in the CSV.</p>
+</div></section>
+
+<section class="band" id="short"><div class="in">
+  <h2>Where Polykrom fell short</h2>
+  <p class="sub">A whole machine finds what a robot arm didn't. The ticked item was fixed while the printer was being built; the others are open issues.</p>
+  <div class="short">
+    <div class="gap fixed"><div class="area">Fastener seating</div><div><p>Seating a screw in a hole picked the wrong part.</p><p>In the Z stage, five tries at seating M3 screws in a printed motor mount failed with "no cylindrical face there": the stepper's shaft reaches up past the mount, so the stepper's bounding box held the mount's holes and won. The agent placed the screws by position with hand-made rigid joints. Fixed: the host is now the part that has a hole at the pick, on its wall or centred on one of its ends. → <a href="https://github.com/wckdboy/polykrom/issues/134">#134</a>, fixed in <a href="https://github.com/wckdboy/polykrom/pull/137">#137</a></p></div></div>
+    <div class="gap"><div class="area">Belts</div><div><p>The belts don't follow the machine.</p><p>Each GT2 belt is a fixed solid drawn for one pose, so away from it every sweep and study shows the belts up to about 10 mm inside the joiners and carriage. The agent left them out of every motion check, hid them for the GIF and redrew them for the showcase pose; the saved belts fit only that pose, and the viewer above hides them. A belt routed over its pulleys, with its length measured, would move with the joints and check itself. → <a href="https://github.com/wckdboy/polykrom/issues/139">#139</a></p></div></div>
+    <div class="gap"><div class="area">Render limits</div><div><p>The renderer refused the whole printer.</p><p>Its preview mode stops at 262,144 triangles, and the printer has about 350,000, so the agent hid 113 parts the camera couldn't see. A 128-million pixel-work cap then made it pull the camera back to 1,950 mm, so the machine fills half the frame. The GIF export stops at 124 frames. <code>polykrom-cli snapshot</code> draws the whole machine; the picture behind the 3D view is one. → <a href="https://github.com/wckdboy/polykrom/issues/140">#140</a></p><figure class="aside"><img src="../media/printer/printer-render.jpg" width="1000" height="625" alt="The agent's render: the whole printer, small in the middle of a pale frame" loading="lazy"><figcaption>The agent's render, as it came out.</figcaption></figure></div></div>
+    <div class="gap"><div class="area">Interference budget</div><div><p>The whole-printer collision check over the print stopped early.</p><p>Checking every part over the 240-step print study ran out of its budget after 10 samples, and a larger time budget made no difference. The agent split the check by hand into three groups (toolhead against bed, the bed's side, gantry and toolhead against the frame) to get a verdict. → <a href="https://github.com/wckdboy/polykrom/issues/141">#141</a></p></div></div>
+    <div class="gap"><div class="area">Copied screws</div><div><p>Screws placed as copies aren't recognised as fasteners.</p><p>A copy of a library screw isn't recognised as a fastener, so its thread engagement counts as a clash: 53 overlaps at the showcase pose, 28 in the first stage. The agent showed the overlaps match a seated screw's (5.8298 mm³ for the rails' M3 × 8 screws, copy or not) and rebuilt the first stage's copies as separate parts. → <a href="https://github.com/wckdboy/polykrom/issues/142">#142</a></p></div></div>
+    <div class="gap"><div class="area">Joints after a redesign</div><div><p>Joints on a redesigned face were dropped silently.</p><p>When the agent shortened the corner brackets' gussets, eight M5 screws seated on a face that no longer existed lost their joints without a warning: they and their T-nuts floated until the next stage noticed and re-seated them by hand. → <a href="https://github.com/wckdboy/polykrom/issues/143">#143</a></p></div></div>
+    <div class="gap"><div class="area">Stepper masses</div><div><p>Library steppers weigh what aluminium blocks of their shape would.</p><p>A NEMA17-40 comes out at 191.8 g against about 280 g for a real one, so the printer's 9,477 g and its centre of mass are short of the five real motors' weight. Standard parts need their datasheet masses. → <a href="https://github.com/wckdboy/polykrom/issues/144">#144</a></p></div></div>
+  </div>
+</div></section>
+
+<section class="band"><div class="in">
+  <h2>Take it apart yourself</h2>
+  <p class="sub">The agent's design as it left it after the showcase stage (the belts fit that pose: toolhead at X 70, Y 40, bed 140 mm down), the bill of materials and the print study's joint values.</p>
+  <div class="dl">
+    <a class="btn go" href="../media/printer/printer.polykrom" download>printer.polykrom (3.9 MB)</a>
+    <a class="btn" href="printer-bom.csv" download>BOM (CSV)</a>
+    <a class="btn" href="motion.json" download>Print study (JSON)</a>
+    <a class="btn" href="../so101/">D1: the SO-101 arm →</a>
+  </div>
+</div></section>
+
+<footer class="band"><div class="in">
+  <div>Voron and the Trident are the Voron Design project's; this printer only follows the layout. Polykrom is not affiliated with Voron Design or with any parts maker named here.</div>
+  <div>Built 2026-10-25 with Polykrom and Claude, through Polykrom's MCP server. Polykrom is open source under MIT or Apache-2.0.</div>
+</div></footer>
+
+<script type="module">
+import { mount } from "../shared/viewer.js";
+const $ = (id) => document.getElementById(id);
+// The design's parts in its own colours: the frame anodised black, the printed parts lime. The rest
+// keep the URDF's colours (steel, aluminium, brass, the black print surface). The belts are hidden:
+// they are one solid drawn for one pose and would cut through the moving gantry (#139).
+const PRINTED = /^(Badge|BedBracket|CornerBracket|Foot|GantryJoiner|HotendShroud|IdlerMount|MotorMount|XCarriagePlate|ZMount)/;
+const looks = (link) => link === "Belts" ? { visible: false }
+  : /^(Post_|Rail_(Top|Bot)_|XBeam)/.test(link) ? { color: "#111111", metalness: 0.3, roughness: 0.5 }
+  : PRINTED.test(link) ? { color: "#CCFF00", metalness: 0.05, roughness: 0.55 }
+  : undefined;
+try {
+  const motion = await (await fetch("motion.json")).json();
+  const track = (n) => (motion.joints.find((j) => j.name === n) || { value: [0] }).value;
+  const T = { A: track("A"), B: track("B"), X: track("X"), Y: track("Y"), Z: track("Z") };
+  const at = (v, s) => { const i = Math.floor(s), f = s - i; const a = v[Math.min(i, v.length - 1)], b = v[Math.min(i + 1, v.length - 1)]; return a + (b - a) * f; };
+  let scrubbing = false;
+  const narrow = $("stage").clientWidth < 1.2 * $("stage").clientHeight;
+  const v = await mount($("stage"), {
+    urdf: "urdf/printer.urdf", motion, pack: { bin: "meshes.bin", json: "meshes.json" }, colors: looks,
+    // Further out when the view is narrow (a phone), so the whole frame fits across it.
+    camera: { position: [0.74, -1.05, 0.68].map((c, i) => c * (narrow ? 1.6 : 1) + (i === 2 ? 0.24 : 0)), target: [0, 0, 0.24] },
+    onStep(s) {
+      if (!scrubbing) $("scrub").value = s;
+      $("r-step").textContent = Math.round(s);
+      for (const k of ["A", "B"]) $("r-" + k).textContent = at(T[k], s).toFixed(0) + "°";
+      for (const k of ["X", "Y"]) $("r-" + k).textContent = at(T[k], s).toFixed(1);
+      // At Z = 0 the tip is 2.0 mm above the print surface; raising the bed (Z > 0) closes the gap.
+      $("r-gap").textContent = (2 - at(T.Z, s)).toFixed(2) + " mm";
+    },
+  });
+  $("loading").remove();
+  $("stage").classList.add("live");
+  $("scrub").max = v.steps;
+  const label = () => { $("play").textContent = v.playing ? "Pause" : "Play"; };
+  label();
+  $("play").onclick = () => { v.play(!v.playing); label(); };
+  $("scrub").oninput = (e) => { scrubbing = true; v.play(false); label(); v.seek(+e.target.value); scrubbing = false; };
+} catch (e) {
+  $("loading").textContent = "The 3D view needs WebGL. The video below shows the same print.";
+  console.error(e);
+}
+</script>
+<script type="module" src="../shared/motion.js"></script>
+</body>
+</html>

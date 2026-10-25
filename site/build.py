@@ -45,7 +45,7 @@ def p_mark(fill='currentColor', ground=None, animate=False):
 
 
 # The masthead of every page: the p and the name, then the links split by rules (the WCKD kit).
-PAGES = [('home', 'overview', ''), ('so101', 'so-101', 'so101/'), ('kestrel', 'kestrel', 'kestrel/'), (None, 'open the app', 'app/'),
+PAGES = [('home', 'overview', ''), ('so101', 'so-101', 'so101/'), ('printer', 'printer', 'printer/'), ('kestrel', 'kestrel', 'kestrel/'), (None, 'open the app', 'app/'),
          (None, 'docs', 'docs/'), (None, 'roadmap', 'https://github.com/wckdboy/polykrom/blob/main/docs/ROADMAP.md'),
          (None, 'source', 'https://github.com/wckdboy/polykrom')]
 
@@ -76,13 +76,19 @@ def loop_svg():
     return ''.join(out)
 
 
-# Pictures on the home page, from the media branch (screenshots aren't committed), pinned by hash.
-MEDIA_AT = 'https://raw.githubusercontent.com/wckdboy/polykrom/9242139a/'
+# Pictures on the home page and the printer showcase (with its design), from the media branch
+# (screenshots aren't committed), pinned by hash. A name with a folder keeps it under media/.
+MEDIA_AT = 'https://raw.githubusercontent.com/wckdboy/polykrom/0656c13e/'
 MEDIA = {
     'site-lime-workspace.jpg': 'ebaf83fb49e7092e19ab710a989da6914a518d77ae84b39ce6c43be7a0c8274a',
     'site-follow-along-agent.jpg': '9750599c533542fc5de52cd527e4accf17c1fe0392923ede2859350ae42b912f',
     'site-parts-extrusions-steppers.jpg': '1baa7c5b8297f706b026158c423a1515ebd9f7f50484f25b3209a99d14f52ec4',
     'site-parts-rails-pulleys-leadscrews.jpg': '89d99f268879ca8a9cc1b942a91d874d9dd40cf6565a304b64f0edbe95a5b9af',
+    'printer/printer.polykrom': '97379470f48fa9f8eb76584e6dac9d47aaff749982e07fafb8cb38aed160e9aa',
+    'printer/printer-iso.jpg': '1ca3aa4845d6e753b1ff418102fdf63ae5ff0bf73d7ed694ed9a0edf9ff0788d',
+    'printer/printer-print.mp4': '58a7f61bdde761f972325725416aec7cc369b97a576b3b2cb5acdad7de60363b',
+    'printer/printer-print.jpg': 'c5ac7e95f5013f327a095832ca7dc55931d3b4c1fb13f18ed021b7cd6425df36',
+    'printer/printer-render.jpg': 'fe79338fa677596852308252350e16183c008b051f7634c467333a7de6de0d52',
 }
 
 
@@ -92,12 +98,13 @@ def media():
     cache.mkdir(parents=True, exist_ok=True)
     (OUT / 'media').mkdir(parents=True, exist_ok=True)
     for name, sha in MEDIA.items():
-        local = cache / ('%s-%s' % (sha[:12], name))
+        local = cache / ('%s-%s' % (sha[:12], name.replace('/', '-')))
         if not local.exists():
             data = urllib.request.urlopen(MEDIA_AT + name, timeout=60).read()
             if hashlib.sha256(data).hexdigest() != sha:
                 sys.exit('%s from the media branch does not match its pinned hash' % name)
             local.write_bytes(data)
+        (OUT / 'media' / name).parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(local, OUT / 'media' / name)
 
 
@@ -142,6 +149,7 @@ def main():
     media()
     kestrel()
     so101()
+    printer()
     fill_navs()
 
 
@@ -200,6 +208,63 @@ def so101():
             for f in sorted(urdf.iterdir()):
                 z.write(f, 'so101/' + f.name)
     subprocess.run([str(cli), 'snapshot', '--in', str(design), '--out', str(out / 'so101-poster.png'), '--width', '1200', '--height', '630', '--view', 'iso', '--no-grid'], check=True)
+
+
+def printer():
+    """The 3D printer showcase (D2): its page in site/printer; from the agent's design (fetched with
+    the media) the URDF and a mesh pack for the viewer, the Print study's motion and the BOM, made by
+    the CLI, so they always match it."""
+    import gzip, json, os, subprocess, tempfile
+    out = OUT / 'printer'
+    shutil.copytree(ROOT / 'site' / 'printer', out)
+    cli = Path(os.environ.get('POLYKROM_CLI', ROOT / 'target' / 'release' / 'polykrom-cli'))
+    if not cli.exists():
+        print('note: %s is missing, so the printer showcase has no model in this build' % cli)
+        return
+    design = OUT / 'media' / 'printer' / 'printer.polykrom'
+    with tempfile.TemporaryDirectory() as tmp:
+        urdf = Path(tmp) / 'urdf'
+        urdf.mkdir()
+        script = {'commands': [
+            {'command': 'file.export', 'params': {'path': str(urdf / 'printer.urdf')}},
+            {'command': 'motion.plot', 'params': {'study': 'Print'}},
+            {'command': 'assembly.bom', 'params': {'path': str(out / 'printer-bom.csv')}},
+        ]}
+        sc, res = Path(tmp) / 'printer.json', Path(tmp) / 'printer.out.json'
+        sc.write_text(json.dumps(script))
+        subprocess.run([str(cli), 'run', str(sc), '--in', str(design), '--quiet', '--results', '--json-out', str(res)], check=True)
+        plot = json.loads(res.read_text())[1]
+        (out / 'motion.json').write_text(json.dumps({'steps': plot['steps'], 'joints': [
+            {'name': j['name'], 'unit': j['unit'], 'value': [round(v, 4) for v in j['value']]} for j in plot['joints']]}, separators=(',', ':')))
+        print_surface(urdf, 'printer-Bed.stl', '0.0667 0.0667 0.0667 1')
+        # The page only draws it: collisions and inertias halve the file, which is served uncompressed.
+        (out / 'urdf').mkdir()
+        (out / 'urdf' / 'printer.urdf').write_text(re.sub(r'\s*<(collision|inertial)>.*?</\1>', '', (urdf / 'printer.urdf').read_text(), flags=re.S))
+        sys.path.insert(0, str(ROOT / 'site'))
+        import meshpack
+        meshpack.pack(urdf, out / 'meshes.bin', out / 'meshes.json')
+        (out / 'meshes.bin.gz').write_bytes(gzip.compress((out / 'meshes.bin').read_bytes(), 9))
+        (out / 'meshes.bin').unlink()
+
+
+def print_surface(urdf, stl, rgba, thick=0.001):
+    """The bed's print surface is a body of its own in the design, black, on the aluminium plate. The
+    URDF writes a link's bodies as one mesh in one colour (the plate's), so the top `thick` metres of
+    the bed's mesh become a second mesh, and a second visual in that colour."""
+    import struct
+    path = urdf / stl
+    data = path.read_bytes()
+    tris = [data[84 + t * 50:134 + t * 50] for t in range(struct.unpack_from('<I', data, 80)[0])]
+    zs = [[struct.unpack_from('<f', t, 12 + 12 * v + 8)[0] for v in range(3)] for t in tris]
+    top = max(max(z) for z in zs) - thick - 1e-6
+    split = ([t for t, z in zip(tris, zs) if min(z) < top], [t for t, z in zip(tris, zs) if min(z) >= top])
+    for name, part in zip((stl, stl.replace('.stl', '-surface.stl')), split):
+        (urdf / name).write_bytes(bytes(80) + struct.pack('<I', len(part)) + b''.join(part))
+    xml = (urdf / 'printer.urdf').read_text()
+    visual = re.search(r'<visual>(?:(?!</visual>).)*?filename="%s".*?</visual>' % re.escape(stl), xml, re.S).group(0)
+    surface = visual.replace(stl, stl.replace('.stl', '-surface.stl'))
+    surface = re.sub(r'rgba="[^"]*"', 'rgba="%s"' % rgba, re.sub(r'<material name="([^"]*)"', r'<material name="\1_surface"', surface))
+    (urdf / 'printer.urdf').write_text(xml.replace(visual, visual + surface, 1))
 
 
 def kestrel():

@@ -119,6 +119,22 @@ export function packedGeometry(buffer, m) {
   return geo;
 }
 
+/** The meshes of a pack, each built once however many parts share it (a printer's 38 T-nuts are
+ * one mesh), with its bounds: the first frame then only uploads them, rather than measuring
+ * hundreds of copies in one long task. Returns (file, entry) => geometry. */
+export function packCache(buffer, angle = Math.PI / 6) {
+  const built = new Map();
+  return (file, m) => {
+    let g = built.get(file);
+    if (!g) {
+      g = creased(packedGeometry(buffer, m), angle);
+      g.computeBoundingSphere();
+      built.set(file, g);
+    }
+    return g;
+  };
+}
+
 /** Motion-study tracks (motion.plot's joints, degrees and millimetres) as URDF values per step. */
 export function tracks(motion) {
   const ts = (motion?.joints || []).map((t) => ({ name: safe(t.name), k: t.unit === "deg" ? Math.PI / 180 : 0.001, v: t.value }));
@@ -170,6 +186,7 @@ export async function mount(root, { urdf, motion, onStep, colors = {}, pack, cam
   const loads = [], jobs = [];
   // A pack (one file for every mesh) when the page gives one, else one STL per mesh.
   const packed = pack ? await Promise.all([fetch(pack.bin).then((r) => r.arrayBuffer()), fetch(pack.json).then((r) => r.json())]) : null;
+  const geometry = packed && packCache(packed[0]);
   const robot = buildRobot(xml, (link, v, f) => {
     const mesh = kid(kid(v, "geometry"), "mesh");
     // The part's material look when the page gives one (by link), else the URDF's colour.
@@ -188,7 +205,7 @@ export async function mount(root, { urdf, motion, onStep, colors = {}, pack, cam
       f.add(m);
     };
     // Packed meshes are built after the tree, a few at a time (below); STLs as they arrive.
-    if (entry) jobs.push(() => place(creased(packedGeometry(packed[0], entry), Math.PI / 6)));
+    if (entry) jobs.push(() => place(geometry(file, entry)));
     else loads.push(loader.loadAsync(url.href).then((g) => (g.computeVertexNormals(), place(g))));
   });
   for (const g of robot.roots) scene.add(g);
@@ -236,7 +253,8 @@ export async function mount(root, { urdf, motion, onStep, colors = {}, pack, cam
   renderer.setAnimationLoop((now) => {
     if (still && ++frames > 40) { renderer.setAnimationLoop(null); document.body.dataset.ready = "1"; return; }
     if (!still && (!visible || document.hidden)) { last = now; return; }
-    const dt = Math.min(0.1, (now - last) / 1000);
+    // A frame's time can be a little before the moment the view started: never step backwards.
+    const dt = Math.max(0, Math.min(0.1, (now - last) / 1000));
     last = now;
     if (playing && steps > 0) { t = (t + dt * 14) % steps; pose(t); }
     controls.update();
