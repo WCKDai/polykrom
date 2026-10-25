@@ -278,3 +278,31 @@ fn over_a_study_the_horizontal_arm_is_the_worst_step() {
     close(&shoulder(&run(&mut s, "inspect.statics", json!({})))["load_nm"], 0.0, 1e-9, "upright");
     assert!(s.execute("inspect.statics", &json!({"study": "Nope"})).is_err());
 }
+
+/// The natural robot leg: the shoulder joins the printed `Bracket` to the `Arm`, and an STS3215
+/// is bolted rigidly to the bracket (or to the arm) with its output on the shoulder's axis, so it
+/// is not an end of the joint. Its stall torque (19.5 kgf·cm) still rates the shoulder; 2 mm off
+/// the axis (beyond the 0.5 mm tolerance) it drives nothing there.
+#[test]
+fn a_servo_bolted_to_a_bracket_rates_the_joint_about_its_output() {
+    let stall = 19.5 * 0.098_066_5;
+    for (off, on, rated) in [(0.0, "Bracket", Some(stall)), (0.0, "Arm", Some(stall)), (2.0, "Bracket", None)] {
+        let mut s = Session::default();
+        part(&mut s, "Bracket", [20.0, 20.0, 100.0], [-20.0, -10.0, 0.0], "Aluminum");
+        let m = arm(&mut s, json!("Bracket"));
+        // Its output along +y: the part's z turned onto y, the horn's top 36.125 up it.
+        let r = run(&mut s, "parts.insert", json!({"family": "servo", "size": "STS3215", "point": [off, -60, 100], "direction": [0, 1, 0]}));
+        run(&mut s, "joint.as_built", json!({"type": "rigid", "a": on, "b": r["occurrence"]}));
+        let r = run(&mut s, "inspect.statics", json!({}));
+        let j = shoulder(&r);
+        match rated {
+            Some(t) => {
+                close(&j["rated_nm"], t, 1e-12, &format!("servo on {on}"));
+                if on == "Bracket" {
+                    close(&j["utilisation"], m * G * 0.1 / t, 1e-9, "utilisation");
+                }
+            }
+            None => assert!(j["rated_nm"].is_null() && j["utilisation"].is_null(), "{off} mm off the axis: {j}"),
+        }
+    }
+}

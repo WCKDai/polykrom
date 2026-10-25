@@ -115,10 +115,7 @@ pub const RATINGS_KEY: &str = "app.polykrom.part";
 /// (steppers), picked by the joint itself or holding the part the joint picks (a horn nested in
 /// a servo). The MJCF export limits the joint's actuator to it.
 pub fn rated_torques(doc: &solidcraft_doc::Document) -> std::collections::BTreeMap<u64, f64> {
-    let rated = |component: u64| {
-        let r = doc.components.iter().find(|c| c.id == component)?.metadata.get(RATINGS_KEY)?;
-        ["stall_torque_nm", "holding_torque_nm"].iter().find_map(|k| r.get(k)?.as_f64()).filter(|t| t.is_finite() && *t > 0.0)
-    };
+    let rated = |component: u64| rated_torque(ratings_of(doc, component)?);
     let at = |occ: u64| {
         let mut cur = doc.occurrences.iter().find(|o| o.id == occ);
         for _ in 0..solidcraft_doc::MAX_PLACEMENT_DEPTH {
@@ -131,6 +128,27 @@ pub fn rated_torques(doc: &solidcraft_doc::Document) -> std::collections::BTreeM
         None
     };
     doc.assembly.joints.iter().filter_map(|j| Some((j.id, at(j.a.occurrence).or_else(|| at(j.b.occurrence))?))).collect()
+}
+
+fn ratings_of(doc: &solidcraft_doc::Document, component: u64) -> Option<&Value> {
+    doc.components.iter().find(|c| c.id == component)?.metadata.get(RATINGS_KEY)
+}
+
+fn rated_torque(r: &Value) -> Option<f64> {
+    ["stall_torque_nm", "holding_torque_nm"].iter().find_map(|k| r.get(k)?.as_f64()).filter(|t| t.is_finite() && *t > 0.0)
+}
+
+/// A library actuator's rated torque (N m, as `rated_torques` reads it) and its output axis
+/// (point, unit direction) in its component's frame; `None` for a part without both.
+pub fn rated_output(doc: &solidcraft_doc::Document, component: u64) -> Option<(f64, Vec3, Vec3)> {
+    let r = ratings_of(doc, component)?;
+    let axis = r.get("output_axis")?;
+    let at = |k: &str| {
+        let v = axis.get(k)?;
+        let p = Vec3::new(v.get(0)?.as_f64()?, v.get(1)?.as_f64()?, v.get(2)?.as_f64()?);
+        p.is_finite().then_some(p)
+    };
+    Some((rated_torque(r)?, at("point")?, at("direction")?.normalized()?))
 }
 
 /// N·m per kgf·cm, for hobby and serial-bus servo datasheets.

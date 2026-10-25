@@ -29,11 +29,12 @@ pub static COMMANDS: &[CommandSpec] = &[CommandSpec::new("inspect.statics", "Sta
      nothing up: inside false, margin ≤ 0)}, joints: [{joint, name, kind, load_nm (revolute, cylindrical: the torque gravity puts \
      on the joint's b side about a's z, N·m, right-handed; the actuator holds the opposite) | load_n (slider, cylindrical: the force \
      along it, N), rated_nm (the stall or holding torque of the library actuator at an end of the joint, as the MJCF export finds \
-     it; null: none), utilisation (|load_nm| / rated_nm), over (above 1), above_margin, indeterminate? (load null: the joint closes a \
-     loop, or what holds the design is on both its sides)}] (worst first). A joint carries the occurrences on its far side from what \
-     holds the design; with support, each foot pushes up at the centre of its contact, the pushes balancing the weight about the \
-     centre of mass (the least-squares share with four feet or more), and a joint with feet on both sides carries its b side's \
-     weight less their push. With study (the design is not changed): steps, margin_mm: [per sample], min_margin_mm, \
+     it, else of one fixed to either end (by rigid joints or seats, or hanging on its parent's occurrence) with its output axis \
+     on the joint's, within 0.5 mm and 0.5°; null: none), utilisation (|load_nm| / rated_nm), over (above 1), above_margin, \
+     indeterminate? (load null: the joint closes a loop, or what holds the design is on both its sides)}] (worst first). A joint \
+     carries the occurrences on its far side from what holds the design; with support, each foot pushes up at the centre of its \
+     contact, the pushes balancing the weight about the centre of mass (the least-squares share with four feet or more), and a \
+     joint with feet on both sides carries its b side's weight less their push. With study (the design is not changed): steps, margin_mm: [per sample], min_margin_mm, \
      min_margin_step, com_mm there, each joint at its worst_step, stopped_at, stopped_by_loop, stopped_by_contact. Mesh bodies \
      weigh nothing",
 )];
@@ -43,6 +44,10 @@ pub static COMMANDS: &[CommandSpec] = &[CommandSpec::new("inspect.statics", "Sta
 const MAX_SUPPORT: usize = 1000;
 const MAX_VERTICES: usize = 2_000_000;
 const MAX_SIDE_WORK: usize = 50_000_000;
+/// How near an actuator's output axis must be to a joint's axis to drive it: within this
+/// distance (mm) of its line, and within this angle (0.5°, in radians) of parallel either way.
+const AXIS_TOL_MM: f64 = 0.5;
+const AXIS_TOL_RAD: f64 = 0.5 * std::f64::consts::PI / 180.0;
 
 /// A joint whose load is worked out.
 struct Load {
@@ -268,17 +273,29 @@ fn setup(s: &Session, support: Option<BTreeSet<u64>>, cmd: &str) -> Result<Setup
         }
     };
     let rated = super::parts::rated_torques(doc);
+    let rigid: BTreeSet<u64> = live.iter().filter(|j| j.kind == JointKind::Rigid).map(|j| j.id).collect();
     let mut work = MAX_SIDE_WORK;
     let mut loads = Vec::new();
     for j in live.iter().filter(|j| matches!(j.kind, JointKind::Revolute | JointKind::Slider | JointKind::Cylindrical)) {
         // A joint whose origin is lost is left out, as the solver leaves it out.
         let Ok(frame) = joints::resolve_origin(doc, &st, &j.a) else { continue };
         let too_big = || bad(cmd, "too many joints and occurrences to work out which side of each joint hangs on it");
-        let b_side = side(&graph, j.b.occurrence, j.id, &mut work).ok_or_else(too_big)?;
+        let b_side = side(&graph, j.b.occurrence, |e| e != Some(j.id), &mut work).ok_or_else(too_big)?;
+        // A slider's actuator would be rated in newtons, which no library part gives yet.
+        let rated = match rated.get(&j.id) {
+            _ if j.kind == JointKind::Slider => None,
+            Some(t) => Some(*t),
+            None => {
+                let fixed = |e: Option<u64>| e.is_none_or(|id| rigid.contains(&id));
+                let mut group = side(&graph, j.a.occurrence, fixed, &mut work).ok_or_else(too_big)?;
+                group.extend(side(&graph, j.b.occurrence, fixed, &mut work).ok_or_else(too_big)?);
+                driving(doc, &group, j.a.occurrence, &frame)
+            }
+        };
         let side = if b_side.contains(&j.a.occurrence) {
             None
         } else {
-            let a_side = side(&graph, j.a.occurrence, j.id, &mut work).ok_or_else(too_big)?;
+            let a_side = side(&graph, j.a.occurrence, |e| e != Some(j.id), &mut work).ok_or_else(too_big)?;
             match (!b_side.is_disjoint(&held), !a_side.is_disjoint(&held)) {
                 (false, true) => Some((b_side, 1.0)),
                 (true, false) => Some((a_side, -1.0)),
@@ -287,21 +304,40 @@ fn setup(s: &Session, support: Option<BTreeSet<u64>>, cmd: &str) -> Result<Setup
                 _ => None,
             }
         };
-        // A slider's actuator would be rated in newtons, which no library part gives yet.
-        let rated = rated.get(&j.id).copied().filter(|_| j.kind != JointKind::Slider);
         loads.push(Load { id: j.id, name: j.name.clone(), kind: j.kind, a: j.a.occurrence, frame, side, rated });
     }
     Ok(Setup { mass, verts, support, held, loads })
 }
 
-/// The occurrences reached from `from` without going through joint `cut` (None: out of `work`).
-fn side(graph: &BTreeMap<u64, Vec<(u64, Option<u64>)>>, from: u64, cut: u64, work: &mut usize) -> Option<BTreeSet<u64>> {
+/// The rated torque of the library actuator among `group` (the occurrences fixed to a joint's
+/// ends) whose output axis lies on the joint's axis, the z of `frame` on occurrence `a`: the
+/// nearest to it, within `AXIS_TOL_MM` and `AXIS_TOL_RAD`.
+fn driving(doc: &Document, group: &BTreeSet<u64>, a: u64, frame: &Mat) -> Option<f64> {
+    let world = mat_mul(&if a == 0 { IDENTITY } else { joints::occurrence_world(doc, a) }, frame);
+    let (at, axis) = (apply_point(&world, Vec3::ZERO), apply_vector(&world, Vec3::Z).normalized()?);
+    group
+        .iter()
+        .filter_map(|o| {
+            let occ = doc.occurrences.iter().find(|x| x.id == *o)?;
+            let (torque, point, direction) = super::parts::rated_output(doc, occ.component)?;
+            let place = joints::occurrence_world(doc, *o);
+            let (p, d) = (apply_point(&place, point) - at, apply_vector(&place, direction).normalized()?);
+            let off = (p - axis * p.dot(axis)).len();
+            (off <= AXIS_TOL_MM && d.cross(axis).len() <= AXIS_TOL_RAD.sin()).then_some((off, torque))
+        })
+        .min_by(|x, y| x.0.total_cmp(&y.0))
+        .map(|x| x.1)
+}
+
+/// The occurrences reached from `from` along the links `cross` lets through (a joint's id, None
+/// for an occurrence hanging on its parent's; None: out of `work`).
+fn side(graph: &BTreeMap<u64, Vec<(u64, Option<u64>)>>, from: u64, cross: impl Fn(Option<u64>) -> bool, work: &mut usize) -> Option<BTreeSet<u64>> {
     let mut seen = BTreeSet::from([from]);
     let mut queue = VecDeque::from([from]);
     while let Some(n) = queue.pop_front() {
         for (next, joint) in graph.get(&n).into_iter().flatten() {
             *work = work.checked_sub(1)?;
-            if *joint != Some(cut) && seen.insert(*next) {
+            if cross(*joint) && seen.insert(*next) {
                 queue.push_back(*next);
             }
         }
