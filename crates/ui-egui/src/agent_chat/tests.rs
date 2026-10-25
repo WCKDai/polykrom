@@ -1850,8 +1850,11 @@ fn the_set_up_button_starts_the_install_and_its_row_shows_how_it_went() {
     h.app.agent_chat.detection = Some(discover::detect_in(std::slice::from_ref(&d)));
     h.frames(3);
     assert!(h.app.agent_chat.setup.is_none(), "nothing is installed by itself");
-    let (row, switcher) = (rect_of("agent_chat:setup_row:claude").expect("the row"), rect_of("agent_chat:switcher").expect("the switcher"));
-    assert!((row.left() - switcher.left()).abs() <= 1.0, "the row {row:?} has the switcher's inset {switcher:?}");
+    let (row, panel) = (rect_of("agent_chat:setup_row:claude").expect("the row"), rect_of("agent_chat:panel").expect("the panel"));
+    let inset = crate::theme::Tokens::get().space_12;
+    for (side, gap) in [("left", row.left() - panel.left()), ("right", panel.right() - row.right())] {
+        assert!((inset..=inset + 2.0).contains(&gap), "the row's {side} inset is the conversation's: {gap}");
+    }
     let button = handle_at("agent_chat:setup:claude").expect("Set up is drawn");
     assert!(button.x > row.center().x, "Set up sits on the right of its row");
     h.call("ui.click", json!({"x": button.x, "y": button.y}));

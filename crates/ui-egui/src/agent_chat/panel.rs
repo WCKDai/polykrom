@@ -1151,7 +1151,7 @@ fn setup_row(app: &mut SolveApp, ui: &mut egui::Ui, s: &discover::Setup, npm: bo
                 ui_kit::text(ui, tr("ui.agent_chat_set_up_installing"), ui_kit::Text::Note("setup_running"));
             });
         }
-        Some(Progress::Failed(why)) => setup_failure(ui, s, &why),
+        Some(Progress::Failed(why)) => setup_failure(ui, s, &why, row.response.rect),
         // Installed, yet discovery (once it has looked again) still can't find the adapter.
         Some(Progress::Done) if app.agent_chat.detecting.is_none() => {
             ui_kit::text(ui, &trf("ui.agent_chat_set_up_not_found", &[("name", s.name)]), ui_kit::Text::Note("setup_not_found"));
@@ -1169,7 +1169,7 @@ fn setup_row(app: &mut SolveApp, ui: &mut egui::Ui, s: &discover::Setup, npm: bo
 /// A failed Set up in its row: what went wrong in plain words, in the error style, a hint, and
 /// the command with npm's last lines under a folded Details, in a box of bounded height.
 #[cfg(not(target_arch = "wasm32"))]
-fn setup_failure(ui: &mut egui::Ui, s: &discover::Setup, why: &str) {
+fn setup_failure(ui: &mut egui::Ui, s: &discover::Setup, why: &str, row: egui::Rect) {
     use super::bridge::Cause;
     let t = Tokens::get();
     let (what, hint) = match super::bridge::cause(why) {
@@ -1180,29 +1180,37 @@ fn setup_failure(ui: &mut egui::Ui, s: &discover::Setup, why: &str) {
     };
     ui_kit::text(ui, tr(what), ui_kit::Text::Error("setup_error"));
     ui_kit::text(ui, tr(hint), ui_kit::Text::Note("setup_hint"));
-    let id = ui.make_persistent_id(("sc_agent_setup_details", s.id));
-    let mut details = egui::collapsing_header::CollapsingState::load_with_default_open(ui.ctx(), id, false);
+    // Folded for each new launch of the app: the fold is kept for this session only.
+    let id = ui.id().with(("sc_agent_setup_details", s.id));
+    let mut open = ui.data(|d| d.get_temp::<bool>(id)).unwrap_or(false);
     let head = ui.allocate_ui_with_layout(vec2(ui.available_width(), t.control_height), Layout::left_to_right(Align::Center), |ui| {
         ui.spacing_mut().item_spacing.x = t.space_4;
         let (rect, _) = ui.allocate_exact_size(vec2(t.space_14, t.space_14), Sense::hover());
-        ui_kit::disclosure(ui.painter(), rect.center(), details.is_open(), t.form_dim);
+        ui_kit::disclosure(ui.painter(), rect.center(), open, t.form_dim);
         ui.label(RichText::new(tr("ui.agent_chat_set_up_details")).size(t.font_small).color(t.form_dim));
     });
     let click = ui.interact(head.response.rect, id.with("head"), Sense::click()).on_hover_cursor(egui::CursorIcon::PointingHand);
     crate::scenario::publish_handle("agent_chat:setup_details", head.response.rect.center());
     if click.clicked() {
-        details.toggle(ui);
+        open = !open;
+        ui.data_mut(|d| d.insert_temp(id, open));
     }
-    details.show_body_unindented(ui, |ui| {
-        let output = format!("$ {}\n{why}", s.install);
-        let box_ = ui_kit::assistant_tool_detail(ui, |ui| {
-            ui.set_width(ui.available_width());
-            egui::ScrollArea::vertical().id_salt(("sc_agent_setup_output", s.id)).max_height(t.control_height * 5.0).show(ui, |ui| {
-                ui.add(egui::Label::new(RichText::new(output).monospace().size(t.font_small).color(t.form_ink)).selectable(true).wrap());
-            });
+    if !open {
+        return;
+    }
+    let output = format!("$ {}\n{why}", s.install);
+    let box_ = ui_kit::assistant_tool_detail(ui, |ui| {
+        ui.set_width(ui.available_width());
+        egui::ScrollArea::vertical().id_salt(("sc_agent_setup_output", s.id)).max_height(t.control_height * 5.0).show(ui, |ui| {
+            ui.add(egui::Label::new(RichText::new(output).monospace().size(t.font_small).color(t.form_ink)).selectable(true).wrap());
         });
-        crate::scenario::publish_rect("agent_chat:setup_output", box_.response.rect);
     });
+    crate::scenario::publish_rect("agent_chat:setup_output", box_.response.rect);
+    // Unfolded, the picker scrolls to show it from the row's name down: the name stays in view and
+    // the box isn't cut at the picker's edge.
+    if click.clicked() {
+        ui.scroll_to_rect(row.union(box_.response.rect), Some(Align::Min));
+    }
 }
 
 #[cfg(not(target_arch = "wasm32"))]
