@@ -773,21 +773,23 @@ fn start_content(app: &mut SolveApp, ui: &mut egui::Ui, action: &mut Option<File
                     let name = std::path::Path::new(path).file_stem().map(|name| name.to_string_lossy()).unwrap_or_else(|| path.as_str().into());
                     let missing = !available(app, path);
                     let when = if app.session.path.as_ref() == Some(path) { app.tr("home.open_now").to_string() } else { recent_time(app, path) };
-                    let shown_path = if missing {
-                        format!("{} · {}", app.tr("home.missing"), friendly_path(path))
-                    } else if path.starts_with("/disk/") {
+                    let shown_path = if path.starts_with("/disk/") {
                         app.tr_label("On your computer").to_string()
                     } else if path.starts_with("/opfs/") {
                         app.tr("home.in_this_browser").to_string()
                     } else {
-                        friendly_path(path)
+                        shown_folder(path, home_dir().as_deref().map(std::path::Path::new))
                     };
+                    let shown_path = if missing { format!("{} · {}", app.tr("home.missing"), shown_path) } else { shown_path };
+                    let tooltip = friendly_path(path);
                     let response = FileView::recent_row(
                         ui,
                         &format!("home:recent:{index}"),
                         ui_kit::RecentRow {
                             title: &name,
                             path: &shown_path,
+                            tooltip: &tooltip,
+                            missing,
                             when: &when,
                             workspace: app.tr("home.design_workspace"),
                             thumbnail: texture(app.home.thumbs.get(path).and_then(Option::as_ref)),
@@ -843,9 +845,26 @@ fn texture(texture: Option<&egui::TextureHandle>) -> Option<(egui::TextureId, eg
 }
 
 /// Abbreviate only an actual home-directory ancestor; the source path is kept for actions.
+fn home_dir() -> Option<std::ffi::OsString> {
+    std::env::var_os("HOME").or_else(|| std::env::var_os("USERPROFILE"))
+}
+
 fn friendly_path(path: &str) -> String {
-    let home = std::env::var_os("HOME").or_else(|| std::env::var_os("USERPROFILE"));
-    abbreviated_path(path, home.as_deref().map(std::path::Path::new))
+    abbreviated_path(path, home_dir().as_deref().map(std::path::Path::new))
+}
+
+/// Where a recent design lives, as its row shows it: its folder (the row's title is the file's
+/// name), the home folder as `~`, a deep folder shortened to its last two names, which are what
+/// tell designs apart (the tooltip has the whole path).
+fn shown_folder(path: &str, home: Option<&std::path::Path>) -> String {
+    let folder = path.rfind(['/', '\\']).and_then(|i| path.get(..i)).unwrap_or_default();
+    let short = abbreviated_path(folder, home);
+    let sep = if short.contains('\\') && !short.contains('/') { "\\" } else { "/" };
+    let names: Vec<&str> = short.split(['/', '\\']).filter(|n| !n.is_empty()).collect();
+    match names.len() {
+        n if n > 3 => format!("…{sep}{}", names.get(n - 2..).map(|last| last.join(sep)).unwrap_or_default()),
+        _ => short,
+    }
 }
 
 fn abbreviated_path(path: &str, home: Option<&std::path::Path>) -> String {
@@ -1016,6 +1035,16 @@ mod tests {
         assert_eq!(abbreviated_path("/Users/sample", home), "~");
         assert_eq!(abbreviated_path("/Users/sample-other/plate.solidcraft", home), "/Users/sample-other/plate.solidcraft");
         assert_eq!(abbreviated_path("/disk/design.solidcraft", None), "/disk/design.solidcraft");
+    }
+
+    #[test]
+    fn recent_rows_show_the_folder_shortened_from_the_left() {
+        let home = Some(std::path::Path::new("/Users/sample"));
+        assert_eq!(shown_folder("/Users/sample/Documents/arm.polykrom", home), "~/Documents");
+        assert_eq!(shown_folder("/Users/sample/arm.polykrom", home), "~");
+        assert_eq!(shown_folder("/private/tmp/agent-501/session/scratchpad/printer/work/s3.polykrom", home), "…/printer/work");
+        assert_eq!(shown_folder("/Volumes/Work/arm.polykrom", home), "/Volumes/Work");
+        assert_eq!(shown_folder(r"C:\Users\other\Designs\Robots\Arms\arm.polykrom", None), r"…\Robots\Arms");
     }
 
     #[test]
