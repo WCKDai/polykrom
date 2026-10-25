@@ -3226,3 +3226,23 @@ fn boolean_broad_phase_gives_the_every_pair_result() {
         }
     }
 }
+
+/// A mesh made of a body is reused for every body of the same solid at the same settings (#190),
+/// and only for those: the bodies made one after another here are dropped as soon as they are
+/// meshed, so a new solid can take the address an old one had, and each must still be meshed as
+/// itself (its own length, the same mesh as one made without reuse).
+#[test]
+fn recent_meshes_answer_only_for_their_own_solid() {
+    let same = |m: &solidcraft_geom::Mesh, n: &solidcraft_geom::Mesh| m.positions == n.positions && m.triangles == n.triangles;
+    let tol = 0.05;
+    for k in 0..40 {
+        let len = 10.0 + k as f64;
+        let body = extrude(&Plane::XY, &[rect(len, 5.0)], 0.0, 3.0).unwrap().pop().unwrap();
+        let first = body.tessellate_with(tol, true).unwrap();
+        let x = first.bounds().max.x - first.bounds().min.x;
+        assert!((x - len).abs() < 1e-9, "body {k}: meshed {x} long, want {len}");
+        // A clone shares the solid, and its mesh; a body that keeps its own meshes makes it anew.
+        assert!(same(&body.clone().tessellate_with(tol, true).unwrap(), &first), "body {k}");
+        assert!(same(&body.keeping_meshes().tessellate_with(tol, true).unwrap(), &first), "body {k}");
+    }
+}
