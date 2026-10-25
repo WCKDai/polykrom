@@ -97,3 +97,122 @@ fn filament_is_the_walls_and_the_infill() {
     assert!(s.execute("inspect.printability", &json!({"infill": 2})).is_err());
     assert!(s.execute("inspect.printability", &json!({"direction": [0, 0, 0]})).is_err());
 }
+
+// inspect.polish (#193): the finish report and its fixes.
+
+fn polish_body<'a>(r: &'a Value, name: &str) -> &'a Value {
+    r["bodies"].as_array().and_then(|b| b.iter().find(|b| b["body"] == name)).unwrap_or_else(|| panic!("no {name} in {r}"))
+}
+
+#[test]
+fn a_raw_box_has_twelve_sharp_edges_and_a_fillet_fix() {
+    let mut s = Session::default();
+    run(&mut s, "solid.box", json!({"length": 40, "width": 20, "height": 10, "body_name": "Block"}));
+    let r = run(&mut s, "inspect.polish", json!({}));
+    let b = polish_body(&r, "Block");
+    assert_eq!(b["sharp_edges"], 12, "{b}");
+    close(&b["sharp_edge_mm"], 280.0, 1e-6, "sharp length");
+    close(&b["boxiness"], 1.0, 1e-9, "boxiness");
+    assert!(b["score"].as_f64().unwrap() < 40.0, "{b}");
+    close(&b["scores"]["look"], 15.0, 1e-9, "look: 100 − 60 (all sharp) − 25 (all boxy)");
+    assert!(r["score"].as_f64().unwrap() < 40.0, "{r}");
+    let fix = &r["fixes"][0];
+    assert_eq!(fix["command"], "solid.fillet", "{r}");
+    assert_eq!(fix["category"], "look");
+    assert_eq!(fix["safe"], true);
+    let edges: usize = r["fixes"].as_array().unwrap().iter().map(|f| f["params"]["edges"].as_array().unwrap().len()).sum();
+    assert_eq!(edges, 12, "every sharp edge has a fix: {r}");
+    // 0.15 × the narrowest face's width (the 20 x 10 end: 2·200/60), rounded down to the family.
+    close(&b["edges"][0]["radius"], 1.0, 1e-9, "suggested radius");
+}
+
+#[test]
+fn a_filleted_box_scores_high_with_no_sharp_edges() {
+    let mut s = Session::default();
+    run(&mut s, "solid.box", json!({"length": 40, "width": 20, "height": 10, "body_name": "Block"}));
+    let all = run(&mut s, "inspect.polish", json!({}))["fixes"][0]["params"]["edges"].clone();
+    let mut edges = all.as_array().unwrap().clone();
+    for f in run(&mut s, "inspect.polish", json!({}))["fixes"].as_array().unwrap().iter().skip(1) {
+        edges.extend(f["params"]["edges"].as_array().unwrap().iter().cloned());
+    }
+    run(&mut s, "solid.fillet", json!({"edges": edges, "radius": 2}));
+    let r = run(&mut s, "inspect.polish", json!({}));
+    let b = polish_body(&r, "Block");
+    assert_eq!(b["sharp_edges"], 0, "{b}");
+    assert_eq!(r["fixes"].as_array().map(Vec::len), Some(0), "{r}");
+    assert_eq!(b["radii"][0]["radius"], 2.0, "the fillets are one family: {b}");
+    close(&b["boxiness"], 0.0, 1e-9, "boxiness");
+    assert!(b["score"].as_f64().unwrap() > 90.0, "{b}");
+}
+
+#[test]
+fn a_box_seated_on_another_leaves_out_its_seat_edges() {
+    let mut s = Session::default();
+    run(&mut s, "solid.box", json!({"length": 40, "width": 40, "height": 10, "body_name": "Base"}));
+    run(&mut s, "solid.box", json!({"length": 10, "width": 10, "height": 10, "corner": [15, 15, 10], "operation": "new_body", "body_name": "Cap"}));
+    let r = run(&mut s, "inspect.polish", json!({}));
+    assert_eq!(polish_body(&r, "Cap")["sharp_edges"], 8, "the four edges on the base are a seat: {r}");
+    assert_eq!(polish_body(&r, "Base")["sharp_edges"], 12, "{r}");
+    for f in r["fixes"].as_array().unwrap() {
+        for p in f["params"]["edges"].as_array().unwrap() {
+            assert!(!(f["body"] == "Cap" && p[2].as_f64() == Some(10.0)), "no fix on the seat: {f}");
+        }
+    }
+}
+
+#[test]
+fn running_the_polish_fix_raises_the_score() {
+    let mut s = Session::default();
+    run(&mut s, "solid.box", json!({"length": 40, "width": 20, "height": 10, "body_name": "Block"}));
+    let before = run(&mut s, "inspect.polish", json!({}));
+    let fix = &before["fixes"][0];
+    run(&mut s, fix["command"].as_str().unwrap(), fix["params"].clone());
+    let after = run(&mut s, "inspect.polish", json!({}));
+    assert!(after["score"].as_f64().unwrap() > before["score"].as_f64().unwrap() + 5.0, "{before}\n{after}");
+    assert!(polish_body(&after, "Block")["sharp_edges"].as_u64().unwrap() < 12);
+}
+
+#[test]
+fn a_part_placed_twice_is_fixed_once_where_it_is_shown() {
+    let mut s = Session::default();
+    run(&mut s, "component.create", json!({"name": "Leg"}));
+    run(&mut s, "solid.box", json!({"length": 10, "width": 10, "height": 30, "corner": [0, 0, 0]}));
+    run(&mut s, "component.activate", json!({"component": "root"}));
+    run(&mut s, "occurrence.copy", json!({"component": "Leg", "translate": [50, 0, 0]}));
+    let r = run(&mut s, "inspect.polish", json!({}));
+    assert_eq!(r["bodies"].as_array().map(Vec::len), Some(2), "{r}");
+    let edges: usize = r["fixes"].as_array().unwrap().iter().map(|f| f["params"]["edges"].as_array().unwrap().len()).sum();
+    assert_eq!(edges, 12, "one part's edges, not both placements': {r}");
+    for f in r["fixes"].as_array().unwrap().clone() {
+        run(&mut s, f["command"].as_str().unwrap(), f["params"].clone());
+    }
+    let after = run(&mut s, "inspect.polish", json!({}));
+    for b in after["bodies"].as_array().unwrap() {
+        assert_eq!(b["sharp_edges"], 0, "{after}");
+    }
+}
+
+#[test]
+fn a_printed_box_gets_a_bed_chamfer_and_print_scores() {
+    let mut s = Session::default();
+    run(&mut s, "solid.box", json!({"length": 40, "width": 20, "height": 10, "body_name": "Block"}));
+    run(&mut s, "material.assign", json!({"bodies": ["Block"], "material": "PLA"}));
+    let r = run(&mut s, "inspect.polish", json!({}));
+    let b = polish_body(&r, "Block");
+    assert_eq!(b["printed"], true);
+    assert_eq!(b["print"]["first_layer_edges"], 4, "{b}");
+    assert_eq!(b["sharp_edges"], 8, "the bed's edges are chamfered, not rounded: {b}");
+    close(&b["print"]["overhang_mm2"], 0.0, 1e-9, "overhang");
+    assert!(r["fixes"].as_array().unwrap().iter().any(|f| f["command"] == "solid.chamfer" && f["category"] == "print"), "{r}");
+    for k in ["look", "print", "strength", "mass", "tidy"] {
+        assert!(b["scores"][k].is_number(), "{k}: {b}");
+    }
+    // A 3 mm hole is tight for an M3 screw; a 3.4 mm one isn't.
+    run(&mut s, "solid.cylinder", json!({"diameter": 3, "height": 12, "base": [10, 10, -1], "operation": "cut", "targets": ["Block"]}));
+    run(&mut s, "solid.cylinder", json!({"diameter": 3.4, "height": 12, "base": [30, 10, -1], "operation": "cut", "targets": ["Block"]}));
+    let r = run(&mut s, "inspect.polish", json!({}));
+    let holes = &polish_body(&r, "Block")["print"]["tight_holes"];
+    assert_eq!(holes, &json!([{"diameter": 3.0, "screw": 3.0, "holes": 1}]), "{r}");
+    assert!(s.execute("inspect.polish", &json!({"bodies": ["Nope"]})).is_err());
+    assert!(s.execute("inspect.polish", &json!({"max_fixes": 0})).is_err());
+}

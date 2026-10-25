@@ -36,6 +36,7 @@ mod edit;
 mod face;
 mod features;
 mod features_more;
+mod polish;
 mod printability;
 mod statics;
 pub(crate) use face::{FaceRefForm, face_ref_form};
@@ -289,6 +290,7 @@ pub fn command_specs() -> Vec<&'static CommandSpec> {
     v.extend(joints::COMMANDS.iter());
     v.extend(clearance::COMMANDS.iter());
     v.extend(printability::COMMANDS.iter());
+    v.extend(polish::COMMANDS.iter());
     v.extend(statics::COMMANDS.iter());
     v.extend(motion::COMMANDS.iter());
     v.extend(config::COMMANDS.iter());

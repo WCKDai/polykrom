@@ -545,6 +545,7 @@
   "cmd.inspect_interference": "干涉",
   "cmd.inspect_isocurve": "等參線分析",
   "cmd.inspect_minimum_radius": "最小半徑分析",
+  "cmd.inspect_polish": "精修",
   "cmd.inspect_printability": "可列印性",
   "cmd.inspect_silhouette": "輪廓",
   "cmd.inspect_statics": "靜力學",
