@@ -240,6 +240,17 @@ fn mujoco_job_of_a_study() {
 
     // Without a study it holds the design's pose.
     let (stand, _) = crate::cmd::sim::job(&s, &json!({"hold_s": 3, "fall_height_mm": 40}), "arm.xml", None).unwrap();
+    // A second key on the same joint value merges into its actuator's one track, in step order.
+    let mut twice = Session::new((*s.doc).clone());
+    if let Some(study) = twice.doc_mut().assembly.studies.iter_mut().find(|st| st.name == "Swing") {
+        let mut extra = study.keys[0].clone();
+        extra.points = vec![(15.0, 40f64.to_radians())];
+        study.keys.push(extra);
+    }
+    let (merged, _) = crate::cmd::sim::job(&twice, &p, "arm.xml", Some(&model)).unwrap();
+    assert_eq!(merged["tracks"].as_array().map(Vec::len), Some(1), "{merged}");
+    let steps: Vec<f64> = merged["tracks"][0]["points"].as_array().unwrap().iter().map(|q| q[0].as_f64().unwrap()).collect();
+    assert_eq!(steps, [0.0, 10.0, 15.0, 20.0]);
     assert_eq!(stand, json!({"mjcf": "arm.xml", "mode": "stand", "settle_s": 0.5, "fall_tilt_deg": 45.0, "fall_height_mm": 40.0, "hold_s": 3.0}));
     for bad in [
         json!({"mode": "walk"}),

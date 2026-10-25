@@ -88,7 +88,8 @@ pub(super) fn job(s: &Session, p: &Value, mjcf: &str, model: Option<&UrdfModel>)
     }
     let study = study.ok_or_else(|| bad(CMD, "mode study needs `study` (motion.list names them)"))?;
     let model = model.ok_or_else(|| bad(CMD, "a study needs the design's model"))?;
-    let mut tracks = Vec::new();
+    // One track per actuator: keys of the same joint value (two keys, or a key and a copy) merge.
+    let mut tracks: Vec<(String, Vec<[f64; 2]>)> = Vec::new();
     let mut warnings = Vec::new();
     for k in &study.keys {
         let driven = model.joints.iter().find(|j| j.source == Some((k.joint, k.index)) && j.step != Step::Fixed && j.mimic.is_none());
@@ -98,12 +99,28 @@ pub(super) fn job(s: &Session, p: &Value, mjcf: &str, model: Option<&UrdfModel>)
             continue;
         };
         let scale = if j.step == Step::Prismatic { 1e-3 } else { 1.0 };
-        let mut points: Vec<[f64; 2]> = k.points.iter().filter(|(t, v)| t.is_finite() && v.is_finite()).map(|(t, v)| [*t, v * scale]).collect();
-        points.sort_by(|a, b| a[0].total_cmp(&b[0]));
-        if !points.is_empty() {
-            tracks.push(json!({"actuator": j.name, "points": points}));
+        let points = k.points.iter().filter(|(t, v)| t.is_finite() && v.is_finite()).map(|(t, v)| [*t, v * scale]);
+        match tracks.iter_mut().find(|(name, _)| *name == j.name) {
+            Some((_, have)) => have.extend(points),
+            None => tracks.push((j.name.clone(), points.collect())),
         }
     }
+    // In step order, a later key at the same step replacing an earlier one.
+    let tracks: Vec<Value> = tracks
+        .into_iter()
+        .filter(|(_, points)| !points.is_empty())
+        .map(|(name, mut points)| {
+            points.sort_by(|a, b| a[0].total_cmp(&b[0]));
+            let mut kept: Vec<[f64; 2]> = Vec::with_capacity(points.len());
+            for q in points {
+                match kept.last_mut() {
+                    Some(last) if last[0] == q[0] => *last = q,
+                    _ => kept.push(q),
+                }
+            }
+            json!({"actuator": name, "points": kept})
+        })
+        .collect();
     job["steps"] = json!(study.steps.max(1));
     job["step_s"] = json!(within(p, "step_s", 0.05, 1e-4, 60.0)?);
     job["cycles"] = json!(within(p, "cycles", 1.0, 1.0, 1000.0)?.round());
@@ -130,16 +147,33 @@ mod native {
 
     pub(super) fn run(s: &mut Session, p: &Value) -> Result<Value> {
         let checked = |path: &str| solidcraft_io::vfs::check(path).map_err(|e| EngineError::Other(e.to_string()));
-        if let Some(v) = str_(p, "video") {
-            checked(v)?;
-        }
-        let given = str_(p, "mjcf").filter(|m| !m.trim().is_empty() && m.len() < 4096);
-        if let Some(m) = given {
-            checked(m)?;
-            if !Path::new(m).is_file() {
-                return Err(bad(CMD, format!("no MJCF model at {m}")));
+        // The video written where it was asked for, not in the runner's folder.
+        let mut p = p.clone();
+        if let Some(v) = str_(&p, "video").map(str::to_string) {
+            checked(&v)?;
+            if Path::new(&v).is_relative() {
+                let here = std::env::current_dir().map_err(|e| bad(CMD, format!("video: {e}")))?;
+                p["video"] = json!(here.join(&v).to_string_lossy());
             }
-        } else if s.doc.assembly.joints.is_empty() {
+        }
+        let p = &p;
+        // The model given, checked against the agent's folders and then used by that same resolved
+        // path (the runner starts in its own folder, so a relative path would point elsewhere).
+        let given = match str_(p, "mjcf").filter(|m| !m.trim().is_empty() && m.len() < 4096) {
+            Some(m) => {
+                checked(m)?;
+                let full = std::fs::canonicalize(m).map_err(|_| bad(CMD, format!("no MJCF model at {m}")))?;
+                if !full.is_file() {
+                    return Err(bad(CMD, format!("no MJCF model at {m}")));
+                }
+                let full = full.to_string_lossy().into_owned();
+                checked(&full)?;
+                Some(full)
+            }
+            None => None,
+        };
+        let given = given.as_deref();
+        if given.is_none() && s.doc.assembly.joints.is_empty() {
             return Err(bad(CMD, "the design has no joints: make the robot components joined with joint.create (or give `mjcf`)"));
         }
         let budget = Duration::from_secs_f64(within(p, "budget_s", 300.0, 1.0, 86_400.0)?);
