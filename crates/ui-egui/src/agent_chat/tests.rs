@@ -1721,3 +1721,138 @@ fn add_agent_opens_its_dialog_from_home() {
     assert!(h.app.agent_chat.settings.add.is_some(), "Add agent opened its dialog");
     assert!(handle_at("ai_add:add").is_some(), "the dialog is drawn over Home");
 }
+
+// ---- Set up of an agent's ACP adapter (#95) ----
+
+/// A folder of stand-in programs (shell scripts), for discovery to look in instead of the usual
+/// folders: nothing real is found, started or installed.
+#[cfg(unix)]
+fn stand_ins(tag: &str, programs: &[(&str, &str)]) -> std::path::PathBuf {
+    use std::os::unix::fs::PermissionsExt;
+    let d = std::env::temp_dir().join(format!("solidcraft-chat-setup-{tag}-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&d);
+    std::fs::create_dir_all(&d).unwrap();
+    for (name, body) in programs {
+        let path = d.join(name);
+        std::fs::write(&path, format!("#!/bin/sh\n{body}\n")).unwrap();
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755)).unwrap();
+    }
+    d
+}
+
+/// An app whose discovery looks only in `dir`, after its first look there.
+#[cfg(unix)]
+fn app_looking_in(dir: &std::path::Path) -> (SolveApp, egui::Context) {
+    let mut app = SolveApp::new(solidcraft_engine::Session::default(), crate::Services::default());
+    let ctx = crate::fonts::test_context();
+    app.agent_chat.search_in = Some(vec![dir.to_path_buf()]);
+    refresh(&mut app, &ctx);
+    settle_setup(&mut app, &ctx);
+    (app, ctx)
+}
+
+/// Poll as the window does until a Set up and the search after it have ended.
+#[cfg(unix)]
+fn settle_setup(app: &mut SolveApp, ctx: &egui::Context) {
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(30);
+    while (bridge::running(app) || app.agent_chat.detecting.is_some()) && std::time::Instant::now() < deadline {
+        poll(app, ctx);
+        std::thread::sleep(std::time::Duration::from_millis(20));
+    }
+}
+
+/// Claude Code is here without its adapter: Set up runs npm in the background (the call returns
+/// at once, running), then looks for agents again and Claude Code can be used.
+#[test]
+#[cfg(unix)]
+fn set_up_installs_the_adapter_in_the_background_then_finds_the_agent() {
+    // As `npm install -g` would, it puts the adapter where discovery looks.
+    let npm = r#"[ "$*" = "install -g @agentclientprotocol/claude-agent-acp" ] || exit 9
+dir=$(dirname "$0")
+printf '#!/bin/sh\necho 0.5.0\n' > "$dir/claude-agent-acp"
+chmod +x "$dir/claude-agent-acp""#;
+    let d = stand_ins("ok", &[("claude", "echo 2.1.0"), ("npm", npm)]);
+    let (mut app, ctx) = app_looking_in(&d);
+    let st = control(&mut app, &ctx, &json!({})).unwrap();
+    assert_eq!(st["detection"]["setup"][0]["id"], "claude", "{st}");
+    assert!(st["detection"]["npm"].is_string(), "{st}");
+    assert!(!agents::entries(&app).iter().any(|e| e.id == "claude"), "not usable before Set up");
+
+    let st = control(&mut app, &ctx, &json!({"setup": "claude"})).unwrap();
+    assert_eq!(st["setup"], json!({"id": "claude", "state": "running", "error": null}));
+    assert!(control(&mut app, &ctx, &json!({"setup": "claude"})).is_err(), "one Set up at a time");
+    settle_setup(&mut app, &ctx);
+
+    let st = status(&app);
+    assert_eq!(st["setup"]["state"], "done", "{st}");
+    assert_eq!(st["detection"]["found"][0]["id"], "claude", "looked again and found it: {st}");
+    assert_eq!(st["detection"]["setup"], json!([]));
+    assert_eq!(agents::current(&app).map(|e| e.id).as_deref(), Some("claude"), "picked for the next chat");
+    let _ = std::fs::remove_dir_all(d);
+}
+
+/// A failed install keeps the end of npm's errors as its outcome and still looks for agents
+/// again; nothing changes the chosen agent.
+#[test]
+#[cfg(unix)]
+fn a_failed_set_up_keeps_the_end_of_npms_errors_and_looks_again() {
+    let npm = r#"i=1; while [ $i -le 20 ]; do echo "npm error line $i" >&2; i=$((i+1)); done; exit 1"#;
+    let d = stand_ins("fail", &[("claude", "echo 2.1.0"), ("npm", npm)]);
+    let (mut app, ctx) = app_looking_in(&d);
+    assert!(control(&mut app, &ctx, &json!({"setup": "codex"})).is_err(), "Codex isn't here");
+    // Codex's command line arrives during the install: only a new search lists it.
+    control(&mut app, &ctx, &json!({"setup": "claude"})).unwrap();
+    std::fs::copy(d.join("claude"), d.join("codex")).unwrap();
+    settle_setup(&mut app, &ctx);
+
+    let st = status(&app);
+    assert_eq!(st["setup"]["state"], "failed", "{st}");
+    let error = st["setup"]["error"].as_str().unwrap_or_default();
+    assert!(error.ends_with("npm error line 20") && !error.contains("line 12\n"), "{error}");
+    let setup: Vec<&str> = st["detection"]["setup"].as_array().unwrap().iter().filter_map(|s| s["id"].as_str()).collect();
+    assert_eq!(setup, ["claude", "codex"], "discovery looked again");
+    assert_eq!(app.agent_chat.agent_id, None);
+    let _ = std::fs::remove_dir_all(d);
+}
+
+/// Without npm, Set up can't run: the control channel says so, and the list shows the command to
+/// run instead of the button.
+#[test]
+#[cfg(unix)]
+fn without_npm_set_up_says_npm_is_needed_and_shows_the_command() {
+    use crate::scenario::handle_at;
+    let d = stand_ins("no-npm", &[("claude", "echo 2.1.0")]);
+    let (mut app, ctx) = app_looking_in(&d);
+    let why = control(&mut app, &ctx, &json!({"setup": "claude"})).unwrap_err();
+    assert!(why.contains("npm") && why.contains("npm install -g @agentclientprotocol/claude-agent-acp"), "{why}");
+    assert_eq!(status(&app)["setup"]["state"], "failed");
+
+    let mut h = narrow_chat();
+    h.app.agent_chat.detection = app.agent_chat.detection.take();
+    h.frames(3);
+    assert!(handle_at("agent_chat:setup:claude").is_some(), "the row offers Copy");
+    assert!(handle_at("dialog:report:Claude Code").is_some(), "and the install command");
+    let _ = std::fs::remove_dir_all(d);
+}
+
+/// The Set up button in the agent list starts the install; nothing runs before the click.
+#[test]
+#[cfg(unix)]
+fn the_set_up_button_starts_the_install() {
+    use crate::scenario::handle_at;
+    let d = stand_ins("button", &[("claude", "echo 2.1.0"), ("npm", "exit 1")]);
+    let mut h = narrow_chat();
+    h.app.agent_chat.search_in = Some(vec![d.clone()]);
+    h.app.agent_chat.detection = Some(discover::detect_in(std::slice::from_ref(&d)));
+    h.frames(3);
+    assert!(h.app.agent_chat.setup.is_none(), "nothing is installed by itself");
+    let button = handle_at("agent_chat:setup:claude").expect("Set up is drawn");
+    h.call("ui.click", json!({"x": button.x, "y": button.y}));
+    h.frames(2);
+    assert_eq!(h.app.agent_chat.setup.as_ref().map(|j| j.id), Some("claude"), "the click started it");
+    let ctx = crate::fonts::test_context();
+    settle_setup(&mut h.app, &ctx);
+    h.frames(2);
+    assert!(handle_at("dialog:report:setup_failed").is_some(), "the outcome shows in the row");
+    let _ = std::fs::remove_dir_all(d);
+}

@@ -153,7 +153,16 @@ the keychain, so Polykrom doesn't guess there.
 | GitHub Copilot CLI, Qwen Code, goose | listed with their install command when missing |
 
 The panel lists agents that aren't installed with their install command and a **Copy** button.
-**Refresh** looks again after you install one. **Test** starts an agent briefly, asks it for a
+**Refresh** looks again after you install one.
+
+Claude Code and Codex speak ACP through a separate adapter. When their own command (`claude`,
+`codex`) is installed but the adapter isn't, the panel lists them under **Ready to set up** with a
+**Set up** button. It runs the adapter's `npm install -g` command shown above, in the background,
+only when you press it; npm is found in the same folders as the agents. The row shows that it is
+running and, if it fails, the last lines of npm's error output. When it ends Polykrom looks for
+agents again, so the agent can be used at once. Without npm the row shows the command to run in a
+terminal instead. On the control channel, `ui.agent_chat {"setup": "claude"}` does the same, and
+the state's `setup` reports `running`, `done` or `failed` with the error. **Test** starts an agent briefly, asks it for a
 session and ends it again.
 
 ### Flatpak

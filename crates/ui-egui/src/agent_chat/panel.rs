@@ -1062,15 +1062,31 @@ fn picker(app: &mut SolveApp, ui: &mut egui::Ui) {
             app.agent_chat.agent_id = Some(e.id.clone());
         }
     }
+    // A Set up that worked: the agent is now in the list above.
+    if let Some(j) = &app.agent_chat.setup
+        && j.progress == super::bridge::Progress::Done
+        && all.iter().any(|e| e.found && e.id == j.id)
+    {
+        ui_kit::text(ui, &trf("ui.agent_chat_set_up_done", &[("name", j.name)]), ui_kit::Text::Note("setup_done"));
+    }
     // In the Flatpak the hint already says nothing was found, so the install list below is
     // headed "Not installed" instead of repeating it.
     let flatpak_hint = all.is_empty() && app.agent_chat.detecting.is_none() && std::env::var_os("FLATPAK_ID").is_some();
     if flatpak_hint {
         no_agents(ui);
     }
+    let (setup, npm) = app.agent_chat.detection.as_ref().map(|d| (d.setup.clone(), d.npm.is_some())).unwrap_or_default();
+    if !setup.is_empty() {
+        ui_kit::section(ui, "sc_agent_setup", tr("ui.agent_chat_ready_to_set_up"), true, |ui| {
+            for s in &setup {
+                setup_row(app, ui, s, npm);
+            }
+        });
+    }
     let missing: Vec<discover::Missing> = app.agent_chat.detection.as_ref().map(|d| d.missing.clone()).unwrap_or_default();
     if !missing.is_empty() {
-        let heading = if all.is_empty() && !flatpak_hint { tr("ui.agent_chat_none_found") } else { tr("ui.agent_chat_not_installed") };
+        let none = all.is_empty() && setup.is_empty() && !flatpak_hint;
+        let heading = if none { tr("ui.agent_chat_none_found") } else { tr("ui.agent_chat_not_installed") };
         ui_kit::section(ui, "sc_agent_missing", heading, all.is_empty(), |ui| {
             for m in missing {
                 ui.horizontal(|ui| {
@@ -1082,6 +1098,54 @@ fn picker(app: &mut SolveApp, ui: &mut egui::Ui) {
                 ui_kit::text(ui, m.install, ui_kit::Text::Report(m.name, false));
             }
         });
+    }
+}
+
+/// An agent whose own command line is here without its ACP adapter: Set up installs the adapter
+/// with npm, and the row says how that is going. Without npm it shows the command to run instead.
+#[cfg(not(target_arch = "wasm32"))]
+fn setup_row(app: &mut SolveApp, ui: &mut egui::Ui, s: &discover::Setup, npm: bool) {
+    use super::bridge::{self, Progress};
+    let busy = bridge::running(app);
+    let progress = app.agent_chat.setup.as_ref().filter(|j| j.id == s.id).map(|j| j.progress.clone());
+    ui.horizontal(|ui| {
+        ui_kit::text(ui, s.name, ui_kit::Text::Inline);
+        let button = if npm {
+            ui_kit::button(ui, tr("ui.agent_chat_set_up"), ui_kit::Button::Enabled(!busy))
+        } else {
+            ui_kit::button(ui, tr("ui.agent_chat_copy"), ui_kit::Button::Small)
+        };
+        let button = button.on_hover_text(s.install);
+        crate::scenario::publish_handle(&format!("agent_chat:setup:{}", s.id), button.rect.center());
+        if button.clicked() {
+            if npm {
+                // A failure to start is kept as the row's outcome, shown below.
+                let _ = bridge::start(app, ui.ctx(), s.id);
+            } else {
+                ui.ctx().copy_text(s.install.to_string());
+            }
+        }
+    });
+    let name = [("name", s.name)];
+    match progress {
+        Some(Progress::Running) => {
+            ui_kit::text(ui, &trf("ui.agent_chat_set_up_running", &name), ui_kit::Text::Note("setup_running"));
+        }
+        Some(Progress::Failed(why)) => {
+            ui_kit::text(ui, &trf("ui.agent_chat_set_up_failed", &name), ui_kit::Text::Report("setup_failed", true));
+            ui_kit::text(ui, &why, ui_kit::Text::MonoNote("setup_error"));
+        }
+        // Installed, yet discovery (once it has looked again) still can't find the adapter.
+        Some(Progress::Done) if app.agent_chat.detecting.is_none() => {
+            ui_kit::text(ui, &trf("ui.agent_chat_set_up_not_found", &name), ui_kit::Text::Note("setup_not_found"));
+        }
+        _ if npm => {
+            ui_kit::text(ui, &trf("ui.agent_chat_set_up_note", &name), ui_kit::Text::Note(s.id));
+        }
+        _ => {
+            ui_kit::text(ui, tr("ui.agent_chat_set_up_needs_npm"), ui_kit::Text::Note(s.id));
+            ui_kit::text(ui, s.install, ui_kit::Text::Report(s.name, false));
+        }
     }
 }
 

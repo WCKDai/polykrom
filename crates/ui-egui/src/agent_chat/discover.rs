@@ -2,6 +2,10 @@
 //! shell's PATH, so the usual install folders are searched too. Detection never starts a login
 //! or a session: each agent found is asked for `--version` (with a time limit), and whether it
 //! looks logged in comes only from whether its own credentials file exists.
+//!
+//! Claude Code and Codex speak ACP through a separate adapter. When the agent's own command line
+//! is here but its adapter isn't, the agent is listed as ready to set up: one `npm install`, run
+//! only when the user presses Set up ([`install_bridge`]).
 
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
@@ -29,6 +33,17 @@ pub struct Known {
     /// Whether `--version` prints its version. Antigravity's server prints its build date and takes
     /// seconds to start, so it is not asked.
     pub reports_version: bool,
+    /// An agent whose ACP mode is a separate adapter: its own command line, and the adapter's npm
+    /// package. `None`: the program above is the agent itself.
+    pub bridge: Option<Bridge>,
+}
+
+/// The ACP adapter of an agent that is a separate npm package.
+pub struct Bridge {
+    /// The agent's own command line (`claude`, `codex`): when it is here, only the adapter is missing.
+    pub cli: &'static str,
+    /// What `npm install -g` installs.
+    pub package: &'static str,
 }
 
 /// The agents shown in the picker. The first one found is the default.
@@ -44,6 +59,7 @@ pub const KNOWN: &[Known] = &[
         key_vars: &["ANTHROPIC_API_KEY"],
         retired: false,
         reports_version: true,
+        bridge: Some(Bridge { cli: "claude", package: "@agentclientprotocol/claude-agent-acp" }),
     },
     Known {
         id: "codex",
@@ -56,6 +72,7 @@ pub const KNOWN: &[Known] = &[
         key_vars: &["OPENAI_API_KEY", "CODEX_API_KEY"],
         retired: false,
         reports_version: true,
+        bridge: Some(Bridge { cli: "codex", package: "@agentclientprotocol/codex-acp" }),
     },
     // Google's `agy` command line has no ACP mode; its ACP server is a separate download that the
     // ACP registry lists (`agy_acp_server.par`, `agy_acp_server.exe` on Windows).
@@ -70,6 +87,7 @@ pub const KNOWN: &[Known] = &[
         key_vars: &["GEMINI_API_KEY"],
         retired: false,
         reports_version: false,
+        bridge: None,
     },
     // Google retired it on 18 June 2026 in favour of Antigravity (#1790). Enterprise licences may
     // still work, so an installed one is found, but nobody is sent to install it.
@@ -84,6 +102,7 @@ pub const KNOWN: &[Known] = &[
         key_vars: &["GEMINI_API_KEY", "GOOGLE_API_KEY"],
         retired: true,
         reports_version: true,
+        bridge: None,
     },
     Known {
         id: "opencode",
@@ -96,6 +115,7 @@ pub const KNOWN: &[Known] = &[
         key_vars: &[],
         retired: false,
         reports_version: true,
+        bridge: None,
     },
     Known {
         id: "grok",
@@ -108,6 +128,7 @@ pub const KNOWN: &[Known] = &[
         key_vars: &["XAI_API_KEY"],
         retired: false,
         reports_version: true,
+        bridge: None,
     },
     Known {
         id: "copilot",
@@ -120,6 +141,7 @@ pub const KNOWN: &[Known] = &[
         key_vars: &["GH_TOKEN", "GITHUB_TOKEN"],
         retired: false,
         reports_version: true,
+        bridge: None,
     },
     Known {
         id: "qwen",
@@ -132,6 +154,7 @@ pub const KNOWN: &[Known] = &[
         key_vars: &["DASHSCOPE_API_KEY"],
         retired: false,
         reports_version: true,
+        bridge: None,
     },
     Known {
         id: "goose",
@@ -144,6 +167,7 @@ pub const KNOWN: &[Known] = &[
         key_vars: &[],
         retired: false,
         reports_version: true,
+        bridge: None,
     },
 ];
 
@@ -178,6 +202,18 @@ pub struct Missing {
     pub install: &'static str,
 }
 
+/// A known agent whose own command line is here but whose ACP adapter isn't: Set up installs it.
+#[derive(Clone, Debug)]
+pub struct Setup {
+    pub id: &'static str,
+    pub name: &'static str,
+    /// The agent's own command line, as found.
+    pub cli: PathBuf,
+    /// The adapter's npm package, and the install command shown when npm isn't found.
+    pub package: &'static str,
+    pub install: &'static str,
+}
+
 #[derive(Clone, Debug)]
 pub struct Found {
     pub id: &'static str,
@@ -193,6 +229,10 @@ pub struct Detection {
     pub found: Vec<Found>,
     /// Known agents not found.
     pub missing: Vec<Missing>,
+    /// Agents whose own command line was found without its ACP adapter.
+    pub setup: Vec<Setup>,
+    /// npm, which Set up runs; `None`: the install commands can only be shown.
+    pub npm: Option<PathBuf>,
     pub took_ms: u64,
 }
 
@@ -327,17 +367,22 @@ fn login_of(k: &Known, home: Option<&Path>) -> Login {
     }
 }
 
-/// Look for every known agent. Blocking (each probe has a time limit): run it off the UI thread.
-pub fn detect() -> Detection {
-    detect_in(&search_dirs(), home().as_deref())
+/// Look for every known agent in `dirs` (the folders [`search_dirs`] gives, or a test's own).
+/// Blocking (each probe has a time limit): run it off the UI thread.
+pub fn detect_in(dirs: &[PathBuf]) -> Detection {
+    detect_with_home(dirs, home().as_deref())
 }
 
-fn detect_in(dirs: &[PathBuf], home: Option<&Path>) -> Detection {
+fn detect_with_home(dirs: &[PathBuf], home: Option<&Path>) -> Detection {
     let t0 = Instant::now();
-    let mut d = Detection::default();
+    let mut d = Detection { npm: find_in("npm", dirs), ..Detection::default() };
     for k in KNOWN {
         let Some(path) = k.programs.iter().find_map(|p| find_in(p, dirs)) else {
-            if !k.retired {
+            if let Some(b) = &k.bridge
+                && let Some(cli) = find_in(b.cli, dirs)
+            {
+                d.setup.push(Setup { id: k.id, name: k.name, cli, package: b.package, install: k.install });
+            } else if !k.retired {
                 d.missing.push(Missing { id: k.id, name: k.name, install: k.install });
             }
             continue;
@@ -350,6 +395,64 @@ fn detect_in(dirs: &[PathBuf], home: Option<&Path>) -> Detection {
     }
     d.took_ms = u64::try_from(t0.elapsed().as_millis()).unwrap_or(u64::MAX);
     d
+}
+
+/// The most lines of a failed install's output kept to show.
+const INSTALL_TAIL_LINES: usize = 8;
+
+/// `npm install -g <package>` with `npm`, stopped after `limit`. Blocking: run it off the UI
+/// thread. Its error output's last lines when it fails, so the user sees npm's own reason
+/// (no network, no permission for the global folder, …).
+pub fn install_bridge(npm: &Path, package: &str, limit: Duration) -> Result<(), String> {
+    let mut cmd = command_for(npm);
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(0x0800_0000);
+    }
+    let mut child = cmd
+        .args(["install", "-g", package])
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|e| format!("{}: {e}", npm.display()))?;
+    // Read the error output as it comes: a full pipe would stall npm before it exits.
+    let stderr = child.stderr.take();
+    let reader = std::thread::spawn(move || {
+        let mut out = String::new();
+        if let Some(mut s) = stderr {
+            let _ = std::io::Read::read_to_string(&mut s, &mut out);
+        }
+        out
+    });
+    let start = Instant::now();
+    let status = loop {
+        match child.try_wait() {
+            Ok(Some(status)) => break Some(status),
+            Ok(None) if start.elapsed() < limit => std::thread::sleep(Duration::from_millis(50)),
+            _ => {
+                let _ = child.kill();
+                let _ = child.wait();
+                break None;
+            }
+        }
+    };
+    // A stopped npm's own children may still hold its error output open: don't wait for them.
+    let Some(status) = status else { return Err(format!("stopped after {} s", limit.as_secs())) };
+    if status.success() {
+        return Ok(());
+    }
+    let out = reader.join().unwrap_or_default();
+    Err(tail(&out, INSTALL_TAIL_LINES).unwrap_or_else(|| status.to_string()))
+}
+
+/// The last `n` non-empty lines of `text`, or `None` when it has none.
+fn tail(text: &str, n: usize) -> Option<String> {
+    let lines: Vec<&str> = text.lines().map(str::trim_end).filter(|l| !l.trim().is_empty()).collect();
+    let from = lines.len().saturating_sub(n);
+    let kept = lines.get(from..).unwrap_or_default();
+    (!kept.is_empty()).then(|| kept.join("\n"))
 }
 
 #[cfg(test)]
@@ -448,7 +551,7 @@ mod tests {
         };
         let ids = |d: &Detection| (d.found.iter().map(|f| f.id).collect::<Vec<_>>(), d.missing.iter().map(|m| m.id).collect::<Vec<_>>());
 
-        let none = detect_in(std::slice::from_ref(&root), None);
+        let none = detect_with_home(std::slice::from_ref(&root), None);
         let (found, missing) = ids(&none);
         assert!(found.is_empty());
         assert!(missing.contains(&"antigravity") && !missing.contains(&"gemini"), "{missing:?}");
@@ -458,7 +561,7 @@ mod tests {
         run("gemini", "echo gemini 0.64.0");
         // A server that would take seconds to answer `--version`, which Antigravity is never asked.
         run("agy_acp_server.par", "sleep 30");
-        let both = detect_in(std::slice::from_ref(&root), None);
+        let both = detect_with_home(std::slice::from_ref(&root), None);
         let (found, missing) = ids(&both);
         assert_eq!(found, ["antigravity", "gemini"]);
         assert!(!missing.contains(&"antigravity") && !missing.contains(&"gemini"), "{missing:?}");
@@ -469,11 +572,103 @@ mod tests {
         let _ = std::fs::remove_dir_all(root);
     }
 
+    /// Claude Code's and Codex's own command lines without their ACP adapters (#95) are ready to
+    /// set up, not "not installed"; with the adapter the agent is installed; with neither, missing.
+    #[test]
+    #[cfg(unix)]
+    fn an_agent_whose_cli_is_here_without_its_adapter_is_ready_to_set_up() {
+        use std::os::unix::fs::PermissionsExt;
+        let root = std::env::temp_dir().join(format!("sc-agent-setup-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        let run = |name: &str, body: &str| {
+            let path = root.join(name);
+            std::fs::write(&path, format!("#!/bin/sh\n{body}\n")).unwrap();
+            std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755)).unwrap();
+        };
+        let ids = |d: &Detection| {
+            (
+                d.found.iter().map(|f| f.id).collect::<Vec<_>>(),
+                d.setup.iter().map(|s| s.id).collect::<Vec<_>>(),
+                d.missing.iter().map(|m| m.id).collect::<Vec<_>>(),
+            )
+        };
+
+        let neither = detect_with_home(std::slice::from_ref(&root), None);
+        let (found, setup, missing) = ids(&neither);
+        assert!(found.is_empty() && setup.is_empty(), "{found:?} {setup:?}");
+        assert!(missing.contains(&"claude") && missing.contains(&"codex"), "{missing:?}");
+        assert_eq!(neither.npm, None);
+
+        run("claude", "echo '2.1.0 (Claude Code)'");
+        run("codex", "echo codex-cli 0.162.1");
+        run("npm", "exit 0");
+        let cli = detect_with_home(std::slice::from_ref(&root), None);
+        let (found, setup, missing) = ids(&cli);
+        assert!(found.is_empty(), "the command lines alone don't speak ACP: {found:?}");
+        assert_eq!(setup, ["claude", "codex"]);
+        assert!(!missing.contains(&"claude") && !missing.contains(&"codex"), "{missing:?}");
+        assert_eq!(cli.npm, Some(root.join("npm")));
+        let claude = cli.setup.first().unwrap();
+        assert_eq!((claude.cli.clone(), claude.package), (root.join("claude"), "@agentclientprotocol/claude-agent-acp"));
+
+        run("claude-agent-acp", "echo '@agentclientprotocol/claude-agent-acp 0.5.0'");
+        let both = detect_with_home(std::slice::from_ref(&root), None);
+        let (found, setup, missing) = ids(&both);
+        assert_eq!(found, ["claude"]);
+        assert_eq!(setup, ["codex"]);
+        assert!(!missing.contains(&"claude"), "{missing:?}");
+        assert_eq!(both.found.first().and_then(|f| f.version.clone()).as_deref(), Some("0.5.0"));
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    /// Set up runs `npm install -g <package>`; a failure keeps only the end of npm's errors, and an
+    /// install that hangs is stopped.
+    #[test]
+    #[cfg(unix)]
+    fn install_bridge_runs_npm_and_reports_the_end_of_its_errors() {
+        use std::os::unix::fs::PermissionsExt;
+        let root = std::env::temp_dir().join(format!("sc-agent-install-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        let npm = |name: &str, body: &str| {
+            let path = root.join(name);
+            std::fs::write(&path, format!("#!/bin/sh\n{body}\n")).unwrap();
+            std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755)).unwrap();
+            path
+        };
+        let args = root.join("args");
+        let ok = npm("npm-ok", &format!("echo \"$@\" > '{}'; echo added 1 package", args.display()));
+        assert_eq!(install_bridge(&ok, "@agentclientprotocol/codex-acp", Duration::from_secs(30)), Ok(()));
+        assert_eq!(std::fs::read_to_string(&args).unwrap().trim(), "install -g @agentclientprotocol/codex-acp");
+
+        let failing = npm("npm-fail", "i=1; while [ $i -le 20 ]; do echo \"npm error line $i\" >&2; i=$((i+1)); done; exit 1");
+        let why = install_bridge(&failing, "x", Duration::from_secs(30)).unwrap_err();
+        let lines: Vec<&str> = why.lines().collect();
+        assert_eq!(lines.len(), INSTALL_TAIL_LINES, "{why}");
+        assert_eq!((lines.first().copied(), lines.last().copied()), (Some("npm error line 13"), Some("npm error line 20")));
+
+        let silent = npm("npm-silent", "exit 3");
+        assert!(install_bridge(&silent, "x", Duration::from_secs(30)).unwrap_err().contains('3'), "the exit status, when npm says nothing");
+
+        let hangs = npm("npm-hangs", "sleep 30");
+        let t0 = Instant::now();
+        assert!(install_bridge(&hangs, "x", Duration::from_millis(300)).unwrap_err().contains("stopped"));
+        assert!(t0.elapsed() < Duration::from_secs(10), "the stuck install was stopped");
+        assert!(install_bridge(&root.join("no-npm"), "x", Duration::from_secs(1)).is_err());
+        let _ = std::fs::remove_dir_all(root);
+    }
+
     #[test]
     fn every_known_agent_has_a_program_and_an_install_hint() {
         for k in KNOWN {
             assert!(!k.programs.is_empty() && !k.install.is_empty(), "{}", k.id);
+            // Set up runs the same command the hint shows.
+            if let Some(b) = &k.bridge {
+                assert_eq!(k.install, format!("npm install -g {}", b.package), "{}", k.id);
+            }
         }
+        assert_eq!(KNOWN.iter().filter(|k| k.bridge.is_some()).map(|k| k.id).collect::<Vec<_>>(), ["claude", "codex"]);
         assert_eq!(KNOWN.first().map(|k| k.id), Some("claude"), "the Claude Code adapter is the default");
     }
 
