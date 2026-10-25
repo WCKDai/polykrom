@@ -14,7 +14,7 @@ pip install mujoco numpy imageio-ffmpeg
 
 ## The runner
 
-`python3 runner.py job.json` (or the job on stdin) runs one job and prints one line of JSON.
+`python3 tools/mujoco/runner.py job.json` (or the job on stdin) runs one job and prints one line of JSON.
 A study's keys go in as the actuators' tracks in the model's units, radians and metres; each
 actuator is named after its joint.
 

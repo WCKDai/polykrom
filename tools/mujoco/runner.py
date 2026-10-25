@@ -1,6 +1,6 @@
 """Polykrom's MuJoCo runner (docs/mujoco.md): runs one job on an exported MJCF model and prints
 its result as one line of JSON. Polykrom starts it as a separate program; by hand it is
-`python3 runner.py job.json` (or the job on stdin).
+`python3 tools/mujoco/runner.py job.json` (or the job on stdin).
 
 MuJoCo (Apache-2.0) is not part of Polykrom: `pip install mujoco numpy`, and `imageio-ffmpeg`
 for videos.
@@ -14,6 +14,7 @@ import sys
 
 OUT = sys.stdout
 sys.stdout = sys.stderr  # stdout carries the result only
+MAX_SIM_S = 14400.0  # the most simulated time one job may ask for (4 h)
 
 
 def fail(kind, message, code=2):
@@ -25,6 +26,20 @@ def main():
     job = json.load(open(sys.argv[1]) if len(sys.argv) > 1 else sys.stdin)
     if job.get("mode") not in ("stand", "study"):
         fail("job", "`mode` must be stand or study")
+    if not isinstance(job.get("mjcf"), str):
+        fail("job", "`mjcf` must be the path of an exported model")
+
+    def number(key, default, low, high):
+        v = job.get(key, default)
+        if not isinstance(v, (int, float)) or isinstance(v, bool) or not math.isfinite(v) or not low <= v <= high:
+            fail("job", f"`{key}` must be a number from {low} to {high}")
+        return float(v)
+
+    settle_s, hold_s = number("settle_s", 0.5, 0.0, MAX_SIM_S), number("hold_s", 2.0, 0.0, MAX_SIM_S)
+    steps_n, cycles_n = int(number("steps", 1, 1, 1e6)), int(number("cycles", 1, 1, 1e4))
+    step_s = number("step_s", 0.05, 1e-4, 60.0) if job["mode"] == "study" else 0.0
+    if settle_s + hold_s + steps_n * cycles_n * step_s > MAX_SIM_S:
+        fail("job", f"the job asks for more than {MAX_SIM_S:.0f} s of simulated time")
     try:
         import mujoco
         import numpy as np
@@ -58,7 +73,7 @@ def main():
             fail("track", f"the model has no actuator `{t['actuator']}`: export it again from this design")
         pts = np.array(sorted(t["points"]), dtype=float).reshape(-1, 2)
         tracks.append((idx[t["actuator"]], pts[:, 0], pts[:, 1]))
-    steps = max(1, int(job.get("steps", 1)))
+    steps = steps_n
 
     def targets(k):
         c = hold.copy()
@@ -77,9 +92,12 @@ def main():
         writer.send(None)
         cam = mujoco.MjvCamera()
         cam.distance, cam.azimuth, cam.elevation = 1.7 * m.stat.extent, -55, -16
-    stats = {"tilt": 0.0, "com_min": math.inf, "peak": np.zeros(m.nu), "err": np.zeros(m.nu), "frame": 0.0, "at_limit": np.zeros(m.nu)}
+    stats = {"tilt": 0.0, "com_min": float(d.subtree_com[root][2]), "peak": np.zeros(m.nu), "err": np.zeros(m.nu), "frame": 0.0, "at_limit": np.zeros(m.nu)}
     limits = np.where(m.actuator_forcelimited, m.actuator_forcerange[:, 1], np.inf)
-    resets0 = int(d.warning[mujoco.mjtWarning.mjWARN_BADQACC].number)
+    # MuJoCo resets a diverging simulation on a bad position, velocity or acceleration (and warns).
+    bad = (mujoco.mjtWarning.mjWARN_BADQPOS, mujoco.mjtWarning.mjWARN_BADQVEL, mujoco.mjtWarning.mjWARN_BADQACC)
+    warned = lambda: sum(int(d.warning[w].number) for w in bad)
+    resets0 = warned()
 
     def tilt():
         up = d.xmat[root].reshape(3, 3)[:, 2]
@@ -103,8 +121,9 @@ def main():
     dt = m.opt.timestep
     mm = lambda x: round(float(x) * 1000, 1)
     com0 = float(d.subtree_com[root][2])
-    for _ in range(int(round(float(job.get("settle_s", 0.5)) / dt))):
+    for _ in range(int(round(settle_s / dt))):
         step(targets(0) if job["mode"] == "study" else hold, False)
+    mujoco.mj_forward(m, d)  # positions after the last step, not before it
     settled = float(d.subtree_com[root][2])
     pos0 = d.xpos[root].copy()
     fwd = np.array([fwd0[0], fwd0[1], 0.0])
@@ -112,25 +131,27 @@ def main():
     left = np.array([-fwd[1], fwd[0], 0.0])
     out = {"mode": job["mode"], "mujoco": mujoco.__version__, "timestep_s": dt, "free_base": free is not None}
     if job["mode"] == "study":
-        cycles, sub = max(1, int(job.get("cycles", 1))), max(1, int(round(float(job["step_s"]) / dt)))
+        cycles, sub = cycles_n, max(1, int(round(step_s / dt)))
         per_cycle, last = [], pos0.copy()
         for k in range(steps * cycles):
             for i in range(sub):
                 step(targets(k + i / sub), True)
             if (k + 1) % steps == 0:
+                mujoco.mj_forward(m, d)
                 per_cycle.append(mm((d.xpos[root] - last) @ fwd))
                 last = d.xpos[root].copy()
         moved = d.xpos[root] - pos0
         out.update({"cycles": cycles, "advance_mm": mm(moved @ fwd), "drift_mm": mm(moved @ left), "per_cycle_mm": per_cycle,
                     "advance_x_mm": mm(moved[0]), "advance_y_mm": mm(moved[1])})
     else:
-        for _ in range(int(round(float(job.get("hold_s", 2.0)) / dt))):
+        for _ in range(int(round(hold_s / dt))):
             step(hold, True)
+        mujoco.mj_forward(m, d)
         out["base_drop_mm"] = mm(com0 - d.subtree_com[root][2])
     if writer is not None:
         writer.close()
         out["video"] = job["video"]
-    resets = int(d.warning[mujoco.mjtWarning.mjWARN_BADQACC].number) - resets0
+    resets = warned() - resets0
     finite = bool(np.all(np.isfinite(d.qpos)))
     fall_z = job.get("fall_height_mm")
     fall_z = fall_z / 1000 if fall_z is not None else settled / 2
