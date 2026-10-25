@@ -32,6 +32,32 @@ impl Progress {
     }
 }
 
+/// What a failed install's output says went wrong, for a line in plain words.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Cause {
+    /// npm can't write to its global folder (a system-owned prefix such as /usr/local).
+    Permission,
+    /// The package registry can't be reached.
+    Network,
+    /// The install ran past [`LIMIT`] and was stopped.
+    TimedOut,
+    Other,
+}
+
+/// The cause of a failure, from npm's error codes in its output.
+pub fn cause(why: &str) -> Cause {
+    let has = |codes: &[&str]| codes.iter().any(|c| why.contains(c));
+    if why.starts_with(discover::STOPPED) {
+        Cause::TimedOut
+    } else if has(&["EACCES", "EPERM"]) {
+        Cause::Permission
+    } else if has(&["ENOTFOUND", "EAI_AGAIN", "ETIMEDOUT", "ECONNREFUSED", "ECONNRESET", "ENETUNREACH"]) {
+        Cause::Network
+    } else {
+        Cause::Other
+    }
+}
+
 /// The last Set up: which agent, and how it went.
 pub struct Job {
     pub id: &'static str,

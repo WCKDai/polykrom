@@ -1835,24 +1835,58 @@ fn without_npm_set_up_says_npm_is_needed_and_shows_the_command() {
     let _ = std::fs::remove_dir_all(d);
 }
 
-/// The Set up button in the agent list starts the install; nothing runs before the click.
+/// The Set up button in the agent list starts the install; nothing runs before the click. The row
+/// lines up with the switcher above; while npm runs it shows that it is installing, and a failure
+/// stays in the row: the name and Retry in view, the reason in the error frame, npm's own lines
+/// folded under Details in a box of bounded height.
 #[test]
 #[cfg(unix)]
-fn the_set_up_button_starts_the_install() {
-    use crate::scenario::handle_at;
-    let d = stand_ins("button", &[("claude", "echo 2.1.0"), ("npm", "exit 1")]);
+fn the_set_up_button_starts_the_install_and_its_row_shows_how_it_went() {
+    use crate::scenario::{handle_at, rect_of};
+    let npm = "sleep 1; echo 'npm error code EACCES' >&2; echo 'npm error syscall mkdir' >&2; exit 243";
+    let d = stand_ins("button", &[("claude", "echo 2.1.0"), ("npm", npm)]);
     let mut h = narrow_chat();
     h.app.agent_chat.search_in = Some(vec![d.clone()]);
     h.app.agent_chat.detection = Some(discover::detect_in(std::slice::from_ref(&d)));
     h.frames(3);
     assert!(h.app.agent_chat.setup.is_none(), "nothing is installed by itself");
+    let (row, switcher) = (rect_of("agent_chat:setup_row:claude").expect("the row"), rect_of("agent_chat:switcher").expect("the switcher"));
+    assert!((row.left() - switcher.left()).abs() <= 1.0, "the row {row:?} has the switcher's inset {switcher:?}");
     let button = handle_at("agent_chat:setup:claude").expect("Set up is drawn");
+    assert!(button.x > row.center().x, "Set up sits on the right of its row");
     h.call("ui.click", json!({"x": button.x, "y": button.y}));
     h.frames(2);
     assert_eq!(h.app.agent_chat.setup.as_ref().map(|j| j.id), Some("claude"), "the click started it");
+    assert!(rect_of("dialog:note:setup_running").is_some(), "the row says it is installing");
+
     let ctx = crate::fonts::test_context();
     settle_setup(&mut h.app, &ctx);
-    h.frames(2);
-    assert!(handle_at("dialog:report:setup_failed").is_some(), "the outcome shows in the row");
+    h.frames(3);
+    let panel = rect_of("agent_chat:panel").expect("the panel");
+    let row = rect_of("agent_chat:setup_row:claude").expect("the name stays in view");
+    assert!(panel.contains_rect(row), "{row:?} in {panel:?}");
+    let error = rect_of("dialog:report:setup_error").expect("the reason, in the error frame");
+    assert!(error.top() >= row.bottom() && error.left() >= row.left() - 1.0, "under the name, inside the inset: {error:?}");
+    assert_eq!(bridge::cause("npm error code EACCES"), bridge::Cause::Permission);
+    assert!(handle_at("agent_chat:setup:claude").is_some(), "Retry");
+    assert!(rect_of("agent_chat:setup_output").is_none(), "npm's lines are folded away");
+    let details = handle_at("agent_chat:setup_details").expect("Details");
+    h.call("ui.click", json!({"x": details.x, "y": details.y}));
+    h.frames(3);
+    let output = rect_of("agent_chat:setup_output").expect("Details unfolds npm's lines");
+    let t = crate::theme::Tokens::get();
+    assert!(output.height() <= t.control_height * 5.0 + t.space_24, "a bounded box: {output:?}");
     let _ = std::fs::remove_dir_all(d);
+}
+
+/// npm's error codes give the plain-language reason; a stopped install says it took too long.
+#[test]
+fn a_failed_installs_cause_comes_from_npms_error_codes() {
+    use bridge::Cause;
+    assert_eq!(bridge::cause("npm error code EACCES\nnpm error syscall mkdir"), Cause::Permission);
+    assert_eq!(bridge::cause("npm error code EPERM"), Cause::Permission);
+    assert_eq!(bridge::cause("npm error code ENOTFOUND\nnpm error network request failed"), Cause::Network);
+    assert_eq!(bridge::cause("npm error code ETIMEDOUT"), Cause::Network);
+    assert_eq!(bridge::cause(&format!("{} 600 s", discover::STOPPED)), Cause::TimedOut);
+    assert_eq!(bridge::cause("npm error code E404"), Cause::Other);
 }

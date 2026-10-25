@@ -397,6 +397,9 @@ fn detect_with_home(dirs: &[PathBuf], home: Option<&Path>) -> Detection {
     d
 }
 
+/// How a stopped install's error begins.
+pub const STOPPED: &str = "stopped after";
+
 /// The most lines of a failed install's output kept to show.
 const INSTALL_TAIL_LINES: usize = 8;
 
@@ -439,7 +442,7 @@ pub fn install_bridge(npm: &Path, package: &str, limit: Duration) -> Result<(), 
         }
     };
     // A stopped npm's own children may still hold its error output open: don't wait for them.
-    let Some(status) = status else { return Err(format!("stopped after {} s", limit.as_secs())) };
+    let Some(status) = status else { return Err(format!("{STOPPED} {} s", limit.as_secs())) };
     if status.success() {
         return Ok(());
     }
