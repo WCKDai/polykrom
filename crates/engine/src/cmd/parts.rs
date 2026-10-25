@@ -750,7 +750,9 @@ fn insert(s: &mut Session, p: &Value) -> Result<Value> {
     let at = p.get("at").and_then(vec3).map(|a| hole_wall(s, a).unwrap_or(a));
     // The occurrence the hole belongs to, found before the part exists.
     let host = match at {
-        Some(a) => Some(super::joints::occurrence_at(s, a).ok_or_else(|| bad(cmd, "no body at `at` (pick a hole's rim or wall)"))?),
+        Some(a) => Some(
+            hole_host(s, a).or_else(|| super::joints::occurrence_at(s, a)).ok_or_else(|| bad(cmd, "no body at `at` (pick a hole's rim or wall)"))?,
+        ),
         None => None,
     };
     let name = str_(p, "name").map(str::to_string).unwrap_or_else(|| part_name(&family, &size, &sh));
@@ -853,6 +855,43 @@ fn hole_wall(s: &Session, a: Vec3) -> Option<Vec3> {
         }
     }
     None
+}
+
+/// The occurrence whose part has a hole at `a`, on its wall or centred on one of its ends: the
+/// part a fastener seats in. It is not always the nearest bounding box: a stepper's shaft reaches
+/// past the mount it hangs from, so its box holds the mount's holes (#134). A hole (material
+/// outside the cylinder) wins over a boss or a shaft at the same point.
+fn hole_host(s: &Session, a: Vec3) -> Option<u64> {
+    let st = s.model.state();
+    let mut best: Option<((bool, f64), u64)> = None;
+    for b in &st.bodies {
+        let comp = s.doc.model_body_component(b);
+        let occs: Vec<u64> = if comp == 0 { vec![0] } else { s.doc.occurrences.iter().filter(|o| o.component == comp).map(|o| o.id).collect() };
+        for occ in occs {
+            let t = if occ == 0 { solidcraft_doc::IDENTITY } else { solidcraft_doc::joints::occurrence_world(&s.doc, occ) };
+            let Some(inv) = solidcraft_doc::mat_inverse(&t) else { continue };
+            let q = solidcraft_doc::apply_point(&inv, a);
+            let bb = b.mesh().bounds();
+            let outside = (q.x - q.x.clamp(bb.min.x, bb.max.x)).abs()
+                + (q.y - q.y.clamp(bb.min.y, bb.max.y)).abs()
+                + (q.z - q.z.clamp(bb.min.z, bb.max.z)).abs();
+            if outside > 1e-3 {
+                continue;
+            }
+            let wall = solidcraft_doc::kernel::cylinder_face_at(&b.body, q).map(|c| (c.internal, c.off(q))).filter(|(_, off)| *off < 1e-3);
+            let end = solidcraft_doc::kernel::cylinder_end_at(&b.body, q).map(|c| {
+                let v = q - c.axis_point;
+                (c.internal, (v - c.axis * v.dot(c.axis)).len())
+            });
+            for (internal, off) in wall.into_iter().chain(end) {
+                let key = (!internal, off);
+                if best.is_none_or(|(k, _)| key < k) {
+                    best = Some((key, occ));
+                }
+            }
+        }
+    }
+    best.map(|(_, occ)| occ)
 }
 
 fn shape_len(sh: &Shape) -> Option<f64> {
@@ -1143,6 +1182,41 @@ mod tests {
         let (lo, hi) = bbox(&s, "SHCS M8x25");
         assert!((hi.z - 18.0).abs() < 1e-6 && (lo.z + 15.0).abs() < 1e-6, "{lo:?} {hi:?}");
         assert!(s.model.state().threads.iter().any(|t| t.designation == "M8" && (t.pitch - 1.25).abs() < 1e-9));
+    }
+
+    /// A hole picked at its centre (where no face is) seats like a rim pick (#134).
+    #[test]
+    fn a_screw_seats_on_a_hole_picked_at_its_centre() {
+        let mut s = Session::default();
+        run(&mut s, "solid.box", json!({"length": 40, "width": 30, "height": 10, "body_name": "Plate"}));
+        run(&mut s, "solid.hole", json!({"position": [20, 15, 10], "diameter": 6.4}));
+        let r = run(&mut s, "parts.insert", json!({"family": "socket_head_cap_screw", "size": "M6", "length": 20, "at": [20, 15, 10]}));
+        assert!(r["joint"].is_number(), "{r}");
+        let (lo, hi) = bbox(&s, "SHCS M6x20");
+        assert!((hi.z - 16.0).abs() < 1e-6 && (lo.z + 10.0).abs() < 1e-6, "{lo:?} {hi:?}");
+        assert!(((lo.x + hi.x) / 2.0 - 20.0).abs() < 1e-6 && ((lo.y + hi.y) / 2.0 - 15.0).abs() < 1e-6);
+    }
+
+    /// The part a screw seats in is the one with the hole, not the first whose bounding box holds
+    /// the pick: here a stepper's box (its shaft reaches down past the plate) holds the plate's
+    /// hole, and the stepper comes first (#134, the D2 printer's Z motor mounts).
+    #[test]
+    fn a_screw_seats_in_the_part_with_the_hole_not_a_bigger_neighbour() {
+        let mut s = Session::default();
+        run(&mut s, "parts.insert", json!({"family": "stepper", "size": "NEMA17-40"}));
+        run(&mut s, "solid.box", json!({"corner": [0, 0, -5], "length": 30, "width": 30, "height": 5, "operation": "new", "body_name": "Mount"}));
+        run(&mut s, "solid.hole", json!({"position": [10, 10, 0], "diameter": 3.4}));
+        for at in [json!([10, 10, 0]), json!([11.7, 10, 0])] {
+            let r = run(
+                &mut s,
+                "parts.insert",
+                json!({"family": "socket_head_cap_screw", "size": "M3", "length": 10, "at": at, "name": format!("S{at}")}),
+            );
+            assert!(r["joint"].is_number(), "{at}: {r}");
+            let (lo, hi) = bbox(&s, &format!("S{at}"));
+            assert!((hi.z - 3.0).abs() < 1e-6 && (lo.z + 10.0).abs() < 1e-6, "{at}: {lo:?} {hi:?}");
+            assert!(((lo.x + hi.x) / 2.0 - 10.0).abs() < 1e-6 && ((lo.y + hi.y) / 2.0 - 10.0).abs() < 1e-6, "{at}: {lo:?} {hi:?}");
+        }
     }
 
     /// A screw seats on a washer that is itself seated in the hole: the pick is in world
