@@ -1192,7 +1192,7 @@ fn output_part(s: &mut Session, comp: u64, name: &str, sh: &Shape) -> Result<Opt
         }
     };
     build_output(s, sh)?;
-    finish(s, c, &part);
+    finish(s, c, &part, &[]);
     Ok(Some(occ))
 }
 
@@ -1513,7 +1513,15 @@ fn resize(s: &mut Session, p: &Value) -> Result<Value> {
         let (seat, now) = (format!("{was_name} seat"), format!("{name} seat"));
         // Not a name another joint has (two screws resized to one size): `… seat (2)`.
         let taken = |s: &Session, n: &str| s.doc.assembly.joints.iter().any(|j| j.name == n);
-        let ours: Vec<u64> = s.doc.assembly.joints.iter().filter(|j| j.name == seat && occs.contains(&j.b.occurrence)).map(|j| j.id).collect();
+        // The seat as made, or numbered apart from another (`… seat (2)`).
+        let made_seat = |n: &str| {
+            n == seat
+                || n.strip_prefix(&seat)
+                    .and_then(|r| r.strip_prefix(" ("))
+                    .and_then(|r| r.strip_suffix(')'))
+                    .is_some_and(|k| k.parse::<u32>().is_ok())
+        };
+        let ours: Vec<u64> = s.doc.assembly.joints.iter().filter(|j| made_seat(&j.name) && occs.contains(&j.b.occurrence)).map(|j| j.id).collect();
         for id in ours {
             let free =
                 std::iter::once(now.clone()).chain((2..).map(|k| format!("{now} ({k})"))).find(|n| !taken(s, n)).unwrap_or_else(|| now.clone());
@@ -2124,6 +2132,11 @@ mod tests {
         let mut names: Vec<String> = s.doc.assembly.joints.iter().map(|j| j.name.clone()).collect();
         names.sort();
         assert_eq!(names, ["SHCS M8x25 seat", "SHCS M8x25 seat (2)"]);
+        // Resized again, the numbered seat follows the new size.
+        run(&mut s, "parts.resize", json!({"component": small, "size": "M8", "length": 30}));
+        let mut names: Vec<String> = s.doc.assembly.joints.iter().map(|j| j.name.clone()).collect();
+        names.sort();
+        assert_eq!(names, ["SHCS M8x25 seat", "SHCS M8x30 seat"]);
         run(&mut s, "component.rename", json!({"component": small, "name": "Bolt A"}));
         run(&mut s, "parts.resize", json!({"component": small, "size": "M8", "length": 30}));
         assert_eq!(super::component_bodies(&s, small), ["Bolt A"]);
