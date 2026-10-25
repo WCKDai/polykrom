@@ -558,6 +558,51 @@ pub(crate) fn counted(f: &solidcraft_doc::Feature, i: usize) -> bool {
     f.body_names.get(i).is_none_or(|n| n.trim().is_empty()) && (f.shell_piece_order || i < f.body_names.len() || !first)
 }
 
+/// Point every feature but `fid` (the one that made body `old`) at `name` where it names `old`,
+/// and the design's own keys (materials, appearances...): what renaming the body changes besides
+/// the features' stored body names. The rename fast path proves a change is only this (#169).
+pub(crate) fn rename_body_refs(d: &mut solidcraft_doc::Document, fid: u64, old: &str, name: &str) -> std::result::Result<(), String> {
+    let mut failed = None;
+    for f in d.features.iter_mut().filter(|f| f.id != fid) {
+        // The bodies a join/cut/intersect may change (a primitive's `targets`) are kept beside
+        // the feature's kind, not in it (#1108).
+        for b in f.participants.iter_mut().filter(|b| *b == old) {
+            *b = name.to_string();
+        }
+        for (b, _) in f.tool_frames.iter_mut().filter(|(b, _)| *b == old) {
+            *b = name.to_string();
+        }
+        if let FeatureKind::Sketch { plane, .. } = &mut f.kind {
+            solidcraft_doc::sheet::rename_plane_sheet_body(plane, old, name);
+        }
+        if let FeatureKind::Sketch { plane, sketch } = &mut f.kind
+            && let Some(anchor) = super::sketch::face::anchor_mut(plane)
+            && anchor.target.body == old
+        {
+            let ids = std::collections::BTreeMap::from([(anchor.target.origin_feature, anchor.target.origin_feature)]);
+            let bodies = std::collections::BTreeMap::from([(old.to_string(), name.to_string())]);
+            anchor.remap_target(&ids, &bodies).map_err(|e| e.to_string())?;
+            for link in &mut sketch.links {
+                if link.auto_face && matches!(&link.source,solidcraft_sketch::LinkSource::Face {body,..} if *body==old) {
+                    link.face_name = Some(anchor.target.name.clone());
+                }
+            }
+        }
+        let Ok(mut v) = serde_json::to_value(&f.kind) else { continue };
+        if replace_body_name(&mut v, old, name, false, 0) {
+            match serde_json::from_value(v) {
+                Ok(k) => f.kind = k,
+                Err(e) => failed = Some(e.to_string()),
+            }
+        }
+    }
+    if let Some(e) = failed {
+        return Err(e);
+    }
+    d.rename_body_keys(old, name);
+    Ok(())
+}
+
 fn rename_body(s: &mut Session, p: &Value) -> Result<Value> {
     let cmd = "body.rename";
     let old = str_(p, "body").ok_or_else(|| bad(cmd, "`body` must be a body name"))?.to_string();
@@ -639,45 +684,7 @@ fn rename_body(s: &mut Session, p: &Value) -> Result<Value> {
             *slot = name.to_string();
         }
     }
-    // Later features refer to bodies by name.
-    let mut failed = None;
-    for f in d.features.iter_mut().filter(|f| f.id != fid) {
-        // The bodies a join/cut/intersect may change (a primitive's `targets`) are kept beside
-        // the feature's kind, not in it (#1108).
-        for b in f.participants.iter_mut().filter(|b| **b == old) {
-            *b = name.to_string();
-        }
-        for (b, _) in f.tool_frames.iter_mut().filter(|(b, _)| *b == old) {
-            *b = name.to_string();
-        }
-        if let FeatureKind::Sketch { plane, .. } = &mut f.kind {
-            solidcraft_doc::sheet::rename_plane_sheet_body(plane, &old, name);
-        }
-        if let FeatureKind::Sketch { plane, sketch } = &mut f.kind
-            && let Some(anchor) = super::sketch::face::anchor_mut(plane)
-            && anchor.target.body == old
-        {
-            let ids = std::collections::BTreeMap::from([(anchor.target.origin_feature, anchor.target.origin_feature)]);
-            let bodies = std::collections::BTreeMap::from([(old.clone(), name.to_string())]);
-            anchor.remap_target(&ids, &bodies)?;
-            for link in &mut sketch.links {
-                if link.auto_face && matches!(&link.source,solidcraft_sketch::LinkSource::Face {body,..} if *body==old) {
-                    link.face_name = Some(anchor.target.name.clone());
-                }
-            }
-        }
-        let Ok(mut v) = serde_json::to_value(&f.kind) else { continue };
-        if replace_body_name(&mut v, &old, name, false, 0) {
-            match serde_json::from_value(v) {
-                Ok(k) => f.kind = k,
-                Err(e) => failed = Some(e.to_string()),
-            }
-        }
-    }
-    if let Some(e) = failed {
-        return Err(bad(cmd, e));
-    }
-    d.rename_body_keys(&old, name);
+    rename_body_refs(d, fid, &old, name).map_err(|e| bad(cmd, e))?;
     for b in s.visibility.hidden_bodies.iter_mut().filter(|b| **b == old) {
         *b = name.to_string();
     }
@@ -973,12 +980,16 @@ mod tests {
         assert_eq!(names(&s), vec!["Plate".to_string(), "B".to_string()]);
         assert_eq!(s.evaluations, 0, "undo and redo of a rename evaluate nothing");
         assert_eq!(meshes(&s), shown);
-        // A body a later feature uses is renamed in that feature too: that is evaluated.
+        // A body a later feature uses is renamed in that feature too, which builds nothing either
+        // (#169), and gives what evaluating the renamed design gives.
         run(&mut s, "solid.combine", json!({"target": "Plate", "tools": ["B"], "operation": "join", "keep_tools": true}));
         s.evaluations = 0;
         run(&mut s, "body.rename", json!({"body": "B", "name": "Tool"}));
-        assert!(s.evaluations > 0);
+        assert_eq!(s.evaluations, 0);
         assert!(names(&s).contains(&"Tool".to_string()));
+        let mut fresh = Session::new((*s.doc).clone());
+        fresh.refresh();
+        assert_eq!(names(&fresh), names(&s));
     }
 
     #[test]

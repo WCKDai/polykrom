@@ -4115,6 +4115,39 @@ fn renaming_a_body_later_features_change_evaluates_nothing() {
     assert_eq!(s.evaluations, 0, "nor do its undo and redo");
 }
 
+/// #169: renaming a body that a later cut from another component targets, and that carries a
+/// thread, evaluates nothing: the cut's target follows the name, as the thread does, and the
+/// result is what evaluating the renamed design gives. (Agents rename dozens of copied parts in
+/// one go; each used to evaluate the whole assembly.)
+#[test]
+fn renaming_a_targeted_threaded_body_evaluates_nothing() {
+    let mut s = Session::default();
+    run(&mut s, "component.create", json!({"name": "Arm", "grounded": false}));
+    run(&mut s, "solid.cylinder", json!({"radius": 4, "height": 20, "body_name": "Shaft"}));
+    run(&mut s, "solid.thread", json!({"face": [4, 0, 10], "length": 12}));
+    run(&mut s, "component.activate", json!({"component": "root"}));
+    run(&mut s, "solid.box", json!({"length": 4, "width": 20, "height": 4, "corner": [2, -10, 16], "operation": "cut", "targets": ["Shaft"]}));
+    let looks = |st: &solidcraft_doc::ModelState| {
+        let mut bodies: Vec<(String, u64)> =
+            st.bodies.iter().map(|b| (b.name.clone(), (solidcraft_kernel::measure(&b.body).unwrap().volume * 1e6).round() as u64)).collect();
+        bodies.sort();
+        (bodies, st.threads.iter().map(|t| t.body.clone()).collect::<Vec<_>>())
+    };
+    let before = looks(&s.model.state());
+    assert_eq!(before.1, ["Shaft"]);
+    s.evaluations = 0;
+    run(&mut s, "body.rename", json!({"body": "Shaft", "name": "Axle"}));
+    assert_eq!(s.evaluations, 0, "a rename evaluates nothing");
+    let after = looks(&s.model.state());
+    assert_eq!(after.1, ["Axle"]);
+    let mut fresh = Session::new((*s.doc).clone());
+    fresh.refresh();
+    assert_eq!(looks(&fresh.model.state()), after, "what evaluating the renamed design gives");
+    run(&mut s, "edit.undo", json!({}));
+    assert_eq!(looks(&s.model.state()), before);
+    assert_eq!(s.evaluations, 0, "nor does its undo");
+}
+
 /// A body whose name later bodies' names are worked out from (`X` patterned into `X (2)`) is still
 /// renamed by evaluating the design, so the copies follow it as they would on opening it.
 #[test]

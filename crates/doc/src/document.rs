@@ -2809,9 +2809,15 @@ impl Document {
 
     /// The single body rename (old name, new name) that turns `previous` into this design,
     /// when that is all that changed: the features' stored body names (`made` gives the names
-    /// each feature's bodies have now, by feature id) and what [`Document::rename_body_keys`]
-    /// renames. `None` for any other change.
-    pub fn body_rename_from(&self, previous: &Document, made: impl Fn(u64) -> Vec<String>) -> Option<(String, String)> {
+    /// each feature's bodies have now, by feature id) and what `refs` renames in a design (the
+    /// other features' references to the body and [`Document::rename_body_keys`]; it returns
+    /// `false` when it cannot). `None` for any other change.
+    pub fn body_rename_from(
+        &self,
+        previous: &Document,
+        made: impl Fn(u64) -> Vec<String>,
+        refs: impl Fn(&mut Document, &str, &str) -> bool,
+    ) -> Option<(String, String)> {
         if self.features.len() != previous.features.len() {
             return None;
         }
@@ -2842,8 +2848,7 @@ impl Document {
         for (f, g) in expected.features.iter_mut().zip(&self.features) {
             f.body_names.clone_from(&g.body_names);
         }
-        expected.rename_body_keys(&old, &new);
-        (expected == *self).then_some((old, new))
+        (refs(&mut expected, &old, &new) && expected == *self).then_some((old, new))
     }
 
     /// The feature whose name alone turns `previous` into this design, when that is all that
