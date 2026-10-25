@@ -620,6 +620,7 @@
   "cmd.plastic_rest": "墊塊",
   "cmd.plastic_rules": "列出塑膠規則",
   "cmd.plastic_snap_fit": "卡扣",
+  "cmd.polish_apply": "套用精修",
   "cmd.render_backends": "彩現後端",
   "cmd.render_cancel": "取消彩現",
   "cmd.render_export": "匯出 PNG",

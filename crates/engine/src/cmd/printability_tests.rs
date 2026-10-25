@@ -216,3 +216,56 @@ fn a_printed_box_gets_a_bed_chamfer_and_print_scores() {
     assert!(s.execute("inspect.polish", &json!({"bodies": ["Nope"]})).is_err());
     assert!(s.execute("inspect.polish", &json!({"max_fixes": 0})).is_err());
 }
+
+// polish.apply (#193): the safe fixes, each checked and rolled back when it makes things worse.
+
+#[test]
+fn polish_apply_rounds_a_raw_box_in_one_undo_step() {
+    let mut s = Session::default();
+    run(&mut s, "solid.box", json!({"length": 40, "width": 20, "height": 10, "body_name": "Block"}));
+    let features = s.doc.features.len();
+    let r = run(&mut s, "polish.apply", json!({}));
+    let (before, after) = (r["before"]["score"].as_f64().unwrap(), r["after"]["score"].as_f64().unwrap());
+    assert!(after > before + 20.0, "{r}");
+    assert!(!r["applied"].as_array().unwrap().is_empty(), "{r}");
+    let report = run(&mut s, "inspect.polish", json!({}));
+    assert_eq!(polish_body(&report, "Block")["sharp_edges"], 0, "{report}");
+    run(&mut s, "edit.undo", json!({}));
+    assert_eq!(s.doc.features.len(), features, "one undo takes every fix back");
+}
+
+#[test]
+fn polish_apply_rolls_back_a_fix_that_fails_its_checks() {
+    let mut s = Session::default();
+    run(&mut s, "solid.box", json!({"length": 40, "width": 20, "height": 10, "body_name": "Block"}));
+    let features = s.doc.features.len();
+    // No change of mass allowed: every fillet removes some, so each is rolled back.
+    let r = run(&mut s, "polish.apply", json!({"mass_tol": 0}));
+    assert_eq!(r["applied"].as_array().map(Vec::len), Some(0), "{r}");
+    let skipped = r["skipped"].as_array().unwrap();
+    assert!(!skipped.is_empty() && skipped.iter().all(|k| k["reason"].as_str().unwrap().contains("mass")), "{r}");
+    assert_eq!(s.doc.features.len(), features, "{r}");
+    assert_eq!(r["after"]["score"], r["before"]["score"]);
+    // Only the fixes asked for.
+    let r = run(&mut s, "polish.apply", json!({"fixes": ["F1"]}));
+    assert_eq!(r["applied"].as_array().map(Vec::len), Some(1), "{r}");
+    assert!(s.execute("polish.apply", &json!({"fixes": ["F99"]})).is_err());
+    assert!(s.execute("polish.apply", &json!({"mass_tol": 2})).is_err());
+}
+
+#[test]
+fn polish_apply_rounds_a_part_placed_twice_where_it_is_placed() {
+    let mut s = Session::default();
+    run(&mut s, "component.create", json!({"name": "Leg"}));
+    run(&mut s, "solid.box", json!({"length": 10, "width": 10, "height": 30, "corner": [0, 0, 0]}));
+    run(&mut s, "component.activate", json!({"component": "root"}));
+    run(&mut s, "occurrence.copy", json!({"component": "Leg", "translate": [50, 0, 0]}));
+    run(&mut s, "occurrence.copy", json!({"component": "Leg", "translate": [0, 40, 0]}));
+    let r = run(&mut s, "polish.apply", json!({}));
+    assert_eq!(r["skipped"], json!([]), "{r}");
+    let after = run(&mut s, "inspect.polish", json!({}));
+    assert_eq!(after["bodies"].as_array().map(Vec::len), Some(3), "{after}");
+    for b in after["bodies"].as_array().unwrap() {
+        assert_eq!(b["sharp_edges"], 0, "{after}");
+    }
+}
