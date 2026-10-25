@@ -4,8 +4,8 @@
 //! A face pair's intersection is found from its meshes' colliding triangles, and two triangles
 //! are tested only where their boxes overlap. A triangle's box lies inside its face mesh's box,
 //! so faces whose boxes miss each other have no colliding triangles and no intersection: leaving
-//! them out changes nothing. The boxes are grown by a margin all the same. A face with no mesh,
-//! an empty one or a coordinate that is not finite pairs with every face, as before.
+//! them out changes nothing. The boxes are grown by a margin all the same. Where a face has no
+//! mesh, an empty one or a coordinate that is not finite, every pair is intersected, as before.
 
 use super::integrate::MeshedShell;
 use truck_base::cgmath64::*;
@@ -51,18 +51,21 @@ pub(super) fn face_boxes(shell: &MeshedShell, margin: f64) -> Vec<Option<Aabb>> 
 }
 
 /// The pairs `(i, j)` of a face `i` of the first shell and a face `j` of the second whose boxes
-/// overlap (a face without a box pairs with every face), in the order the brute-force loop
-/// visits them: by `i`, then by `j`. Sort and sweep along x: the boxes are visited by their low
-/// x, and each pairs with the other shell's boxes that are still open there and meet it.
+/// overlap, in the order the brute-force loop visits them: by `i`, then by `j`. Sort and sweep
+/// along x: the boxes are visited by their low x, and each pairs with the other shell's boxes
+/// that are still open there and meet it. A face without a box would pair with every face of
+/// the other shell, so then every pair is taken, as truck did, without building and sorting a
+/// list of nearly all of them.
 pub(super) fn overlapping_pairs(boxes0: &[Option<Aabb>], boxes1: &[Option<Aabb>]) -> Vec<(usize, usize)> {
+    if boxes0.iter().chain(boxes1).any(Option::is_none) {
+        return every_pair(boxes0.len(), boxes1.len());
+    }
     let mut pairs = Vec::new();
     let mut events: Vec<(f64, usize, usize)> = Vec::with_capacity(boxes0.len() + boxes1.len());
     for (side, boxes) in [boxes0, boxes1].into_iter().enumerate() {
         for (i, b) in boxes.iter().enumerate() {
-            match b {
-                Some(b) => events.push((b.0[0][0], side, i)),
-                None if side == 0 => pairs.extend((0..boxes1.len()).map(|j| (i, j))),
-                None => pairs.extend((0..boxes0.len()).map(|i0| (i0, i))),
+            if let Some(b) = b {
+                events.push((b.0[0][0], side, i));
             }
         }
     }
@@ -80,8 +83,8 @@ pub(super) fn overlapping_pairs(boxes0: &[Option<Aabb>], boxes1: &[Option<Aabb>]
         }
         open[side].push((i, mine));
     }
+    // Each pair is found once, when the later of its two boxes opens.
     pairs.sort_unstable();
-    pairs.dedup();
     pairs
 }
 
