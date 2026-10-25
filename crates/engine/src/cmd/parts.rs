@@ -1051,9 +1051,25 @@ fn rated_material(s: &mut Session, comp: u64, size: &str, kg: f64, look: &str) -
     if !solidcraft_doc::valid_density(density) || s.doc.user_materials.len() >= 1000 {
         return None;
     }
-    let appearance = solidcraft_doc::appearance::material_look(look);
+    let appearance = solidcraft_doc::appearance::material_look(look).map(|mut l| {
+        if let Some(c) = case_color(size) {
+            l.color = c;
+        }
+        l
+    });
     s.doc_mut().user_materials.push(solidcraft_doc::UserMaterial { name: name.clone(), density, appearance });
     Some(name)
+}
+
+/// The case colour of an actuator whose maker sells it in one (most are black plastic or black
+/// anodised; the SG90 is translucent blue), so it reads as itself in a design and a render.
+fn case_color(size: &str) -> Option<[u8; 3]> {
+    match size {
+        "STS3215" | "XL430-W250-T" | "XM430-W350-T" | "MG996R" => Some([28, 28, 30]),
+        "SG90" => Some([38, 92, 196]),
+        s if s.starts_with("GB4106") || s.starts_with("AK80") => Some([36, 36, 38]),
+        _ => None,
+    }
 }
 
 fn label(family: &str) -> &'static str {
@@ -1684,6 +1700,17 @@ mod tests {
         let t = solidcraft_doc::joints::occurrence_world(&s.doc, r["occurrence"].as_u64().unwrap_or(0));
         let p = solidcraft_doc::apply_point(&t, solidcraft_geom::Vec3::new(42.5, 0.0, 0.0));
         assert!(p.dist(solidcraft_geom::Vec3::new(102.5, 60.0, 5.0)) < 1e-6, "{p:?}");
+    }
+
+    /// Actuators come in their makers' case colours: black servos and motors, the blue SG90.
+    #[test]
+    fn actuators_wear_their_case_colours() {
+        let mut s = Session::default();
+        for (family, size, rgb) in [("servo", "STS3215", [28, 28, 30]), ("servo", "SG90", [38, 92, 196]), ("bldc", "AK80-6", [36, 36, 38])] {
+            run(&mut s, "parts.insert", json!({"family": family, "size": size}));
+            let m = s.doc.user_materials.iter().find(|m| m.name.starts_with(size)).unwrap_or_else(|| panic!("{size}: {:?}", s.doc.user_materials));
+            assert_eq!(m.appearance.as_ref().map(|l| l.color), Some(rgb), "{size}");
+        }
     }
 
     fn ratings(s: &Session, comp: u64) -> Value {
