@@ -1,7 +1,8 @@
 //! Standard parts: ISO metric fasteners, dowel pins and ball bearings, generated in code from
 //! the dimensions in the public standards tables (no vendor geometry), and motion hardware
 //! (T-slot extrusions, NEMA stepper motors, GT2 pulleys, miniature linear rails, T8 lead
-//! screws) from the common dimensions their makers share (docs/parts-library-plan.md). Each part is inserted as
+//! screws) from the common dimensions their makers share (docs/parts-library-plan.md), and
+//! actuators (servos, brushless motors) as envelopes from their makers' datasheets. Each part is inserted as
 //! its own component, built by ordinary features (so it stays parametric and editable), with a
 //! cosmetic thread where it has one; at a hole it gets a rigid joint that puts its axis on the
 //! hole's and seats it on the face.
@@ -11,7 +12,18 @@
 //! stepper's pilot and shaft too, its body up +z; a lead screw nut's body too). An extrusion, a
 //! rail and a lead screw run up +z from z = 0; a rail's mounting face is y = 0, and its
 //! carriage, inserted at the same point and direction, sits on it at z = 0. A pulley's bore is
-//! along z, its hub from z = 0.
+//! along z, its hub from z = 0. An actuator's mounting face is z = 0 and its output turns about
+//! the z axis, its horn or flange on top (`Servo`, `Bldc`); its output is also a named joint
+//! origin, `<part> output`.
+//!
+//! Ratings (`RATINGS_KEY` in the part's component metadata), in SI units under the keys robot
+//! export (URDF/MJCF effort and velocity limits) reads: a stepper's `holding_torque_nm`; an
+//! actuator's `stall_torque_nm` (a brushless motor's is its `peak_torque_nm`, which it also
+//! gives), `rated_torque_nm`, `no_load_speed_rpm`, `voltage_v` (the voltage the torque and speed are rated
+//! at), `gear_ratio`, `kv_rpm_per_v` and `kt_nm_per_a`, `resolution_deg`, and its
+//! `output_axis` ({point, direction} in the part frame); every library part with a datasheet
+//! mass its `mass_kg`, which its body weighs (`rated_material`). A rating the maker does not
+//! publish is null.
 
 use serde_json::{Value, json};
 use solidcraft_geom::Vec3;
@@ -29,17 +41,18 @@ pub static COMMANDS: &[CommandSpec] = &[
     ),
     CommandSpec::new("parts.insert", "Insert Part", insert).icon("fastener").params(
         "family (socket_head_cap_screw | hex_bolt | hex_nut | washer | set_screw | dowel_pin | bearing | extrusion | stepper | gt2_pulley | \
-         linear_rail | linear_carriage | lead_screw | lead_nut); size (\"M6\", \"608\" for bearings, \"2020\" for extrusions, \"NEMA17-40\", \"20T-5\", \
-         \"MGN12\", \"MGN12H\", \"T8\": parts.library lists them); \
+         linear_rail | linear_carriage | lead_screw | lead_nut | servo | bldc); size (\"M6\", \"608\" for bearings, \"2020\" for extrusions, \"NEMA17-40\", \"20T-5\", \
+         \"MGN12\", \"MGN12H\", \"T8\", \"STS3215\", \"AK80-6\": parts.library lists them); \
          length? (mm; screws, bolts, set screws, pins, extrusions, rails, lead screws; default a standard length near 2.5 d, 200 for the others); \
-         at?: [x,y,z] on a hole's rim or wall (the part seats on the hole's face with a rigid joint) | point?: [x,y,z] with direction?: [x,y,z] (no joint); name?",
+         at?: [x,y,z] on a hole's rim or wall (the part seats on the hole's face with a rigid joint) | point?: [x,y,z] with direction?: [x,y,z] (no joint); name? \
+         → component, occurrence, name, joint?, output? (a servo's or motor's output axis: the joint origin `<name> output` to turn a revolute joint about)",
     ),
     CommandSpec::new("parts.resize", "Change Part Size", resize_atomic).icon("scale")
         .params("component: id|name of an inserted part; size?; length? — rebuilds it (joints keep it seated)"),
 ];
 
 /// A family: (id, name, standard).
-const FAMILIES: [(&str, &str, &str); 14] = [
+const FAMILIES: [(&str, &str, &str); 16] = [
     ("socket_head_cap_screw", "Socket head cap screw", "ISO 4762"),
     ("hex_bolt", "Hex head bolt / screw", "ISO 4014 / ISO 4017"),
     ("hex_nut", "Hex nut", "ISO 4032"),
@@ -54,6 +67,8 @@ const FAMILIES: [(&str, &str, &str); 14] = [
     ("linear_carriage", "Miniature linear guide carriage (standard, H)", "MGN series"),
     ("lead_screw", "Trapezoidal lead screw, 8 mm lead (4 starts)", "T8x8"),
     ("lead_nut", "Flanged lead screw nut", "T8x8"),
+    ("servo", "Servo, serial bus and hobby (case, mounting holes, horn)", "maker datasheets"),
+    ("bldc", "Brushless gimbal motor and geared actuator (body, mounting holes, output flange)", "maker datasheets"),
 ];
 
 /// GT2 pulleys: (size, teeth, bore). Pitch diameter = teeth · 2 mm / π; the outside diameter
@@ -118,8 +133,144 @@ pub fn rated_torques(doc: &solidcraft_doc::Document) -> std::collections::BTreeM
     doc.assembly.joints.iter().filter_map(|j| Some((j.id, at(j.a.occurrence).or_else(|| at(j.b.occurrence))?))).collect()
 }
 
+/// N·m per kgf·cm, for hobby and serial-bus servo datasheets.
+const KGF_CM: f64 = 0.098_066_5;
+
+/// A servo (#36), in its part frame: its mounting face at z = 0, its output on the z axis and its
+/// horn up +z. A bus servo's mounting face is its case's back, so its case runs up from z = 0; a
+/// hobby servo's is the underside of its ears, so its case reaches `below` down through its
+/// bracket.
+struct Servo {
+    size: &'static str,
+    /// The case across (x), along (y) and high (z); the output axis `axis_from_end` along y from
+    /// the case's near end.
+    case: [f64; 3],
+    axis_from_end: f64,
+    below: f64,
+    /// Ears (hobby servos), centred on the case: their length end to end along y and their
+    /// thickness, up from z = 0.
+    ears: Option<(f64, f64)>,
+    /// Holes in the mounting face: Ø, depth, spacing across (x) and along (y), the pattern's
+    /// centre on y.
+    holes: Option<(f64, f64, f64, f64, f64)>,
+    /// Holes in the case's far end (y = its far end): Ø, depth, spacing across (x) and up (z),
+    /// the pattern's centre on z.
+    end_holes: Option<(f64, f64, f64, f64, f64)>,
+    /// The horn (or a hobby servo's bare spline) on top of the case: Ø, height, bolt circle Ø,
+    /// number of holes, their Ø and depth.
+    horn: (f64, f64, f64, u32, f64, f64),
+    /// Ratings at `voltage_v`; `None` where the maker publishes none.
+    stall_torque_nm: f64,
+    rated_torque_nm: Option<f64>,
+    no_load_speed_rpm: f64,
+    voltage_v: f64,
+    gear_ratio: Option<f64>,
+    mass_kg: f64,
+    resolution_deg: Option<f64>,
+}
+
+/// A brushless motor or actuator (#36), in its part frame: its mounting face (the stator side) at
+/// z = 0, its body up +z, its output (the rotor, or the gearbox's flange) on top, about z.
+struct Bldc {
+    size: &'static str,
+    /// The body's Ø and length up from z = 0, and a through bore (0: none).
+    body: (f64, f64, f64),
+    /// A pilot (an actuator's driver cover) down from z = 0 into its bracket: Ø, length (0: none).
+    pilot: (f64, f64),
+    /// Steps up from the body's top, the last the output flange: (Ø, height), height 0 for none.
+    steps: [(f64, f64); 2],
+    /// Holes in the output's top: bolt circle Ø, number, Ø, depth.
+    output_holes: (f64, u32, f64, f64),
+    /// Holes in the mounting face: bolt circle Ø, number, Ø, depth.
+    mount_holes: (f64, u32, f64, f64),
+    peak_torque_nm: f64,
+    rated_torque_nm: Option<f64>,
+    no_load_speed_rpm: f64,
+    voltage_v: f64,
+    gear_ratio: f64,
+    kv_rpm_per_v: f64,
+    /// Torque per amp as the maker gives it (a geared actuator's: its motor's, before the gearbox).
+    kt_nm_per_a: Option<f64>,
+    mass_kg: f64,
+}
+
+/// Servos. Tapped holes are modelled at their tap drill (M2 Ø1.6, M2.5 Ø2.05, M3 Ø2.5).
+#[rustfmt::skip]
+const SERVOS: [Servo; 5] = [
+    // Feetech STS3215, 7.4 V, 1:345 (LeRobot SO-100/SO-101): Feetech datasheet A/0 (2020-04-10)
+    // pp. 3-7, feetechrc.com/Data/feetechrc/upload/file/20260622/6391772523943436695270694.pdf: case,
+    // ratings (19.5 kgf·cm stall, 5 rated, 0.192 s/60° at 7.4 V), 4096-count encoder, 55 g, metal
+    // horn Ø19.95 with 4 M3 on Ø14. Axis 10.11 from the end and the bottom's PA2.0 bosses (20.7
+    // along, 6.11 from the far end) from Waveshare's ST3215 drawing, files.waveshare.com/upload/0/08/ST3215-2D.zip;
+    // their 20.5 across is dimensioned on the horn face; the bosses' Ø and depth (Ø1.6, 4) and the
+    // horn's 1.125 above the case ((37.25 − 35) / 2 with both horns) are not published.
+    Servo { size: "STS3215", case: [24.7, 45.2, 35.0], axis_from_end: 10.11, below: 0.0, ears: None,
+        holes: Some((1.6, 4.0, 20.5, 20.7, 45.2 - 6.11 - 20.7 / 2.0 - 10.11)), end_holes: None,
+        horn: (19.95, 1.125, 14.0, 4, 2.5, 4.0),
+        stall_torque_nm: 19.5 * KGF_CM, rated_torque_nm: Some(5.0 * KGF_CM), no_load_speed_rpm: 60.0 / (6.0 * 0.192), voltage_v: 7.4,
+        gear_ratio: Some(345.0), mass_kg: 0.055, resolution_deg: Some(360.0 / 4096.0) },
+    // ROBOTIS DYNAMIXEL XL430-W250-T: emanual.robotis.com/docs/en/dxl/x/xl430-w250/ (57.2 g, 258.5:1,
+    // 1.4 N·m and 57 rpm at the recommended 11.1 V, 4096 pulses/rev); geometry from ROBOTIS's
+    // "XL-430" drawing (2018-03-24, emanual download no. 772): axis 11.25 from the top end, HN11 horn
+    // Ø20.5 with 8 holes on Ø16 (4 M2, 4 Ø1.7 for tapping screws: all Ø1.7 here) 3.5 deep, the
+    // bottom end's 4 Ø2.1 holes 4 deep on 16 x 12, 11 from the horn face (as the XM430's).
+    Servo { size: "XL430-W250-T", case: [28.5, 46.5, 34.0], axis_from_end: 11.25, below: 0.0, ears: None,
+        holes: None, end_holes: Some((2.1, 4.0, 16.0, 12.0, 34.0 - 11.0)), horn: (20.5, 2.0, 16.0, 8, 1.7, 3.5),
+        stall_torque_nm: 1.4, rated_torque_nm: None, no_load_speed_rpm: 57.0, voltage_v: 11.1,
+        gear_ratio: Some(258.5), mass_kg: 0.0572, resolution_deg: Some(360.0 / 4096.0) },
+    // ROBOTIS DYNAMIXEL XM430-W350-T: emanual.robotis.com/docs/en/dxl/x/xm430-w350/ (82 g, 353.5:1,
+    // 4.1 N·m and 46 rpm at the recommended 12 V); ROBOTIS "XM430/XH430" drawing (2019-03-19,
+    // download no. 157): axis 11.25 from the top end, HN12 horn Ø19.5 x 2 with 8 M2 2 deep on Ø16
+    // (its Ø8 hub left off), the bottom end's 4 M2.5 3 deep on 16 x 12, 11 from the horn face.
+    Servo { size: "XM430-W350-T", case: [28.5, 46.5, 34.0], axis_from_end: 11.25, below: 0.0, ears: None,
+        holes: None, end_holes: Some((2.05, 3.0, 16.0, 12.0, 34.0 - 11.0)), horn: (19.5, 2.0, 16.0, 8, 1.6, 2.0),
+        stall_torque_nm: 4.1, rated_torque_nm: None, no_load_speed_rpm: 46.0, voltage_v: 12.0,
+        gear_ratio: Some(353.5), mass_kg: 0.082, resolution_deg: Some(360.0 / 4096.0) },
+    // TowerPro MG996R: towerpro.com.tw/product/mg996r/ (A 42.7, B 40.9, C 37, D 20, E 54, F 26.8;
+    // 55 g; 11 kgf·cm and 0.15 s/60° at 6 V). Not published: the axis's place (10.4 from the end,
+    // scaled from the drawing in electronicoscaldas.com/datasheet/MG996R_Tower-Pro.pdf), the ears'
+    // thickness (2.5) and holes (open slots, left off); the spline Ø5.7 as Kitronik measured it.
+    Servo { size: "MG996R", case: [20.0, 40.9, 37.0], axis_from_end: 10.4, below: 26.8, ears: Some((54.0, 2.5)),
+        holes: None, end_holes: None, horn: (5.7, 42.7 - 37.0, 0.0, 0, 0.0, 0.0),
+        stall_torque_nm: 11.0 * KGF_CM, rated_torque_nm: None, no_load_speed_rpm: 60.0 / (6.0 * 0.15), voltage_v: 6.0,
+        gear_ratio: None, mass_kg: 0.055, resolution_deg: None },
+    // TowerPro SG90: towerpro.com.tw/product/sg90-analog/ (A 30.3, B 22.7, C 27, D 12.2, E 32.3, F 17;
+    // 9 g; 1.8 kgf·cm and 0.12 s/60° at 4.8 V). Not published: the axis's place (5.7 from the end,
+    // scaled from static.rapidonline.com/pdf/37-1330t.pdf), the ears (2.5 thick, holes left off) and
+    // the spline's Ø (4.8).
+    Servo { size: "SG90", case: [12.2, 22.7, 27.0], axis_from_end: 5.7, below: 17.0, ears: Some((32.3, 2.5)),
+        holes: None, end_holes: None, horn: (4.8, 30.3 - 27.0, 0.0, 0, 0.0, 0.0),
+        stall_torque_nm: 1.8 * KGF_CM, rated_torque_nm: None, no_load_speed_rpm: 60.0 / (6.0 * 0.12), voltage_v: 4.8,
+        gear_ratio: None, mass_kg: 0.009, resolution_deg: None },
+];
+
+/// Brushless motors and actuators.
+#[rustfmt::skip]
+const BLDCS: [Bldc; 2] = [
+    // T-Motor GB4106 gimbal motor (KV53): store.tmotor.com/product/gb4106-gimbal-type.html and its
+    // drawing store.tmotor.com/images/202408/271724739964255712.jpg: Ø47.75 x 20, bore Ø5.6, rotor
+    // 4 M2.5 on Ø15, base 4 M3 on Ø25, 0.2 N·m, 3-6S, 70 g with cable. Not published: the holes'
+    // depth (3), a rated torque, Kt; the speed is Kv × 22.2 V (6S). Chosen over the GM4108H-120T,
+    // whose hole patterns are not published.
+    Bldc { size: "GB4106", body: (47.75, 20.0, 5.6), pilot: (0.0, 0.0), steps: [(0.0, 0.0), (0.0, 0.0)],
+        output_holes: (15.0, 4, 2.05, 3.0), mount_holes: (25.0, 4, 2.5, 3.0),
+        peak_torque_nm: 0.2, rated_torque_nm: None, no_load_speed_rpm: 53.0 * 22.2, voltage_v: 22.2, gear_ratio: 1.0,
+        kv_rpm_per_v: 53.0, kt_nm_per_a: None, mass_kg: 0.070 },
+    // CubeMars AK80-6 KV100, 6:1 quasi-direct drive: cubemars.com/goods-981-AK80-6.html (48 V; 6 N·m
+    // rated, 12 peak; 800 rpm no load; Kv 100, Kt 0.105; 485 g) and its drawing
+    // cubemars.com/data/cms/202602/ak80-6-robotic-actuator-2d-drawing.pdf: Ø98 x 38.5 overall, the
+    // Ø71 driver cover 11 long behind, the Ø48 step and Ø37 output 3 proud of the front (the output
+    // 1.3), 6 M4 6 deep on Ø28 in the output, 8 M3 3 deep on Ø85 in the back.
+    Bldc { size: "AK80-6", body: (98.0, 38.5 - 11.0 - 3.0, 0.0), pilot: (71.0, 11.0), steps: [(48.0, 1.7), (37.0, 1.3)],
+        output_holes: (28.0, 6, 3.3, 6.0), mount_holes: (85.0, 8, 2.5, 3.0),
+        peak_torque_nm: 12.0, rated_torque_nm: Some(6.0), no_load_speed_rpm: 800.0, voltage_v: 48.0, gear_ratio: 6.0,
+        kv_rpm_per_v: 100.0, kt_nm_per_a: Some(0.105), mass_kg: 0.485 },
+];
+
 /// ISO metric coarse: (size, d, pitch).
-const METRIC: [(&str, f64, f64); 9] = [
+const METRIC: [(&str, f64, f64); 11] = [
+    ("M2", 2.0, 0.4),
+    ("M2.5", 2.5, 0.45),
     ("M3", 3.0, 0.5),
     ("M4", 4.0, 0.7),
     ("M5", 5.0, 0.8),
@@ -131,8 +282,11 @@ const METRIC: [(&str, f64, f64); 9] = [
     ("M20", 20.0, 2.5),
 ];
 
-/// ISO 4762: (size, head diameter dk, head height k, socket s, socket depth t).
-const SHCS: [(&str, f64, f64, f64, f64); 9] = [
+/// ISO 4762: (size, head diameter dk, head height k, socket s, socket depth t). M2 and M2.5 hold
+/// servo horns and cases.
+const SHCS: [(&str, f64, f64, f64, f64); 11] = [
+    ("M2", 3.8, 2.0, 1.5, 1.0),
+    ("M2.5", 4.5, 2.5, 2.0, 1.1),
     ("M3", 5.5, 3.0, 2.5, 1.3),
     ("M4", 7.0, 4.0, 3.0, 2.0),
     ("M5", 8.5, 5.0, 4.0, 2.5),
@@ -244,6 +398,10 @@ enum Shape {
     LeadScrew { len: f64 },
     /// A T8 flanged nut.
     LeadNut,
+    /// A servo, one row of `SERVOS`.
+    Servo { row: usize },
+    /// A brushless motor or actuator, one row of `BLDCS`.
+    Bldc { row: usize },
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -315,6 +473,8 @@ fn shape(family: &str, size: &str, length: Option<f64>) -> std::result::Result<S
         "lead_screw" if size.trim().eq_ignore_ascii_case("T8") => Shape::LeadScrew { len: length.unwrap_or(200.0) },
         "lead_nut" if size.trim().eq_ignore_ascii_case("T8") => Shape::LeadNut,
         "lead_screw" | "lead_nut" => return Err(need("lead screw")),
+        "servo" => Shape::Servo { row: SERVOS.iter().position(|r| r.size.eq_ignore_ascii_case(size.trim())).ok_or_else(|| need("servo"))? },
+        "bldc" => Shape::Bldc { row: BLDCS.iter().position(|r| r.size.eq_ignore_ascii_case(size.trim())).ok_or_else(|| need("BLDC"))? },
         o => return Err(format!("unknown part family `{o}` (parts.library lists them)")),
     })
 }
@@ -589,8 +749,94 @@ fn build(s: &mut Session, sh: &Shape) -> Result<()> {
             revolve(s, &[(4.0, -11.5), (5.1, -11.5), (5.1, 0.0), (11.0, 0.0), (11.0, 3.5), (4.0, 3.5)], "new")?;
             prism(s, &[], &[([8.0, 0.0], 1.75), ([0.0, 8.0], 1.75), ([-8.0, 0.0], 1.75), ([0.0, -8.0], 1.75)], -0.5, 4.5, "cut")?;
         }
+        Shape::Servo { row } => {
+            let Some(r) = SERVOS.get(row) else { return Err(bad("parts.insert", "no such servo")) };
+            let ([w, l, h], a) = (r.case, r.axis_from_end);
+            let rect = |y0: f64, y1: f64| vec![[-w / 2.0, y0], [w / 2.0, y0], [w / 2.0, y1], [-w / 2.0, y1]];
+            prism(s, &[rect(-a, l - a)], &[], -r.below, h, "new")?;
+            if let Some((span, t)) = r.ears {
+                let over = (span - l) / 2.0;
+                prism(s, &[rect(-a - over, -a), rect(l - a, l - a + over)], &[], 0.0, t, "join")?;
+            }
+            // A rectangle of holes (one column where `across` is 0), centred on `at` along y.
+            let grid = |across: f64, along: f64, at: f64| -> Vec<(f64, f64)> {
+                let xs: &[f64] = if across > 0.0 { &[-0.5, 0.5] } else { &[0.0] };
+                xs.iter().flat_map(|x| [-0.5, 0.5].map(|y| (x * across, at + y * along))).collect()
+            };
+            if let Some((d, depth, across, along, at)) = r.holes {
+                let holes: Vec<([f64; 2], f64)> = grid(across, along, at).iter().map(|(x, y)| ([*x, *y], d / 2.0)).collect();
+                prism(s, &[], &holes, -0.5, depth + 0.5, "cut")?;
+            }
+            if let Some((d, depth, across, up, at)) = r.end_holes {
+                holes_y(s, &grid(across, up, at), d, l - a - depth, depth + 0.5, "cut")?;
+            }
+            let (hd, hh, bc, n, bd, depth) = r.horn;
+            let top = h - r.below;
+            cyl(s, hd, top, top + hh, "join")?;
+            if n > 0 {
+                prism(s, &[], &circle_holes(bc, n, bd), top + hh - depth, depth + 0.5, "cut")?;
+            }
+        }
+        Shape::Bldc { row } => {
+            let Some(r) = BLDCS.get(row) else { return Err(bad("parts.insert", "no such motor")) };
+            let (d, len, bore) = r.body;
+            cyl(s, d, 0.0, len, "new")?;
+            if r.pilot.1 > 0.0 {
+                cyl(s, r.pilot.0, -r.pilot.1, 0.0, "join")?;
+            }
+            let mut top = len;
+            for (sd, sh) in r.steps.iter().filter(|st| st.1 > 0.0) {
+                cyl(s, *sd, top, top + sh, "join")?;
+                top += sh;
+            }
+            let ((bc, n, hd, depth), (mbc, mn, md, mdepth)) = (r.output_holes, r.mount_holes);
+            for (bc, n, d, z0, depth) in [(bc, n, hd, top - depth, depth), (mbc, mn, md, -0.5, mdepth)] {
+                if n > 0 {
+                    prism(s, &[], &circle_holes(bc, n, d), z0, depth + 0.5, "cut")?;
+                }
+            }
+            if bore > 0.0 {
+                cyl(s, bore, -r.pilot.1 - 1.0, top + 1.0, "cut")?;
+            }
+        }
     }
     Ok(())
+}
+
+/// `n` holes of Ø `d` evenly round a bolt circle of Ø `bc` about z, the first on +x.
+fn circle_holes(bc: f64, n: u32, d: f64) -> Vec<([f64; 2], f64)> {
+    let step = std::f64::consts::TAU / f64::from(n.max(1));
+    (0..n).map(|i| ([bc / 2.0 * (step * f64::from(i)).cos(), bc / 2.0 * (step * f64::from(i)).sin()], d / 2.0)).collect()
+}
+
+/// An actuator's output: the height of its horn's or flange's top face on the z axis, the face a
+/// link is screwed to.
+fn output_z(sh: &Shape) -> Option<f64> {
+    match *sh {
+        Shape::Servo { row } => SERVOS.get(row).map(|r| r.case[2] - r.below + r.horn.1),
+        Shape::Bldc { row } => BLDCS.get(row).map(|r| r.body.1 + r.steps.iter().map(|st| st.1).sum::<f64>()),
+        _ => None,
+    }
+}
+
+/// An actuator's ratings, under the keys robot export reads (MJCF's actuator force and velocity
+/// limits): `stall_torque_nm` (a BLDC's is its `peak_torque_nm`), `rated_torque_nm`,
+/// `no_load_speed_rpm`, `voltage_v`, `gear_ratio`, `mass_kg`, and the output axis in the part frame.
+fn actuator_ratings(sh: &Shape) -> Option<Value> {
+    let axis = |z: f64| json!({"point": [0.0, 0.0, z], "direction": [0.0, 0.0, 1.0]});
+    let z = output_z(sh)?;
+    match *sh {
+        Shape::Servo { row } => SERVOS.get(row).map(|r| {
+            json!({"kind": "servo", "stall_torque_nm": r.stall_torque_nm, "rated_torque_nm": r.rated_torque_nm, "no_load_speed_rpm": r.no_load_speed_rpm,
+                   "voltage_v": r.voltage_v, "gear_ratio": r.gear_ratio, "mass_kg": r.mass_kg, "resolution_deg": r.resolution_deg, "output_axis": axis(z)})
+        }),
+        Shape::Bldc { row } => BLDCS.get(row).map(|r| {
+            json!({"kind": "bldc", "peak_torque_nm": r.peak_torque_nm, "stall_torque_nm": r.peak_torque_nm, "rated_torque_nm": r.rated_torque_nm, "no_load_speed_rpm": r.no_load_speed_rpm,
+                   "voltage_v": r.voltage_v, "gear_ratio": r.gear_ratio, "kv_rpm_per_v": r.kv_rpm_per_v, "kt_nm_per_a": r.kt_nm_per_a,
+                   "mass_kg": r.mass_kg, "output_axis": axis(z)})
+        }),
+        _ => None,
+    }
 }
 
 fn library(_s: &mut Session, p: &Value) -> Result<Value> {
@@ -632,6 +878,30 @@ fn library(_s: &mut Session, p: &Value) -> Result<Value> {
                 .collect(),
             "lead_screw" => vec![json!({"size": "T8", "d": 8.0, "lead": 8.0, "pitch": 2.0, "starts": 4})],
             "lead_nut" => vec![json!({"size": "T8", "flange": 22.0, "flange_thickness": 3.5, "body": 10.2, "length": 15.0, "holes": 3.5, "hole_circle": 16.0})],
+            "servo" => (0..SERVOS.len())
+                .filter_map(|row| {
+                    let (r, mut v) = (SERVOS.get(row)?, actuator_ratings(&Shape::Servo { row })?);
+                    let holes = |h: Option<(f64, f64, f64, f64, f64)>, along: &str| {
+                        h.map(|h| json!({"d": h.0, "depth": h.1, "across": h.2, along: h.3, "at": h.4}))
+                    };
+                    let dims = json!({"size": r.size, "case": r.case, "axis_from_end": r.axis_from_end, "below_mount": r.below, "ears": r.ears.map(|e| e.0),
+                        "mount_holes": holes(r.holes, "along"), "end_holes": holes(r.end_holes, "up"),
+                        "horn": r.horn.0, "horn_height": r.horn.1, "horn_bolt_circle": r.horn.2, "horn_holes": r.horn.3});
+                    merge(&mut v, dims);
+                    Some(v)
+                })
+                .collect(),
+            "bldc" => (0..BLDCS.len())
+                .filter_map(|row| {
+                    let (r, mut v) = (BLDCS.get(row)?, actuator_ratings(&Shape::Bldc { row })?);
+                    let output = r.steps.iter().rev().find(|st| st.1 > 0.0).map_or(r.body.0, |st| st.0);
+                    let dims = json!({"size": r.size, "diameter": r.body.0, "length": r.body.1, "bore": r.body.2, "pilot": r.pilot.0, "pilot_length": r.pilot.1,
+                        "output": output, "output_bolt_circle": r.output_holes.0, "output_holes": r.output_holes.1,
+                        "mount_bolt_circle": r.mount_holes.0, "mount_holes": r.mount_holes.1});
+                    merge(&mut v, dims);
+                    Some(v)
+                })
+                .collect(),
             _ => Vec::new(),
         };
         let (_, name, standard) = FAMILIES.iter().find(|f| f.0 == id).copied().unwrap_or(("", "", ""));
@@ -648,6 +918,13 @@ fn library(_s: &mut Session, p: &Value) -> Result<Value> {
         Some(f) if FAMILIES.iter().any(|x| x.0 == f) => Ok(fam(f)),
         Some(f) => Err(bad("parts.library", format!("unknown part family `{f}`"))),
         None => Ok(json!({"families": FAMILIES.iter().map(|f| fam(f.0)).collect::<Vec<_>>()})),
+    }
+}
+
+/// `extra`'s fields added to the object `v`.
+fn merge(v: &mut Value, extra: Value) {
+    if let (Some(o), Value::Object(e)) = (v.as_object_mut(), extra) {
+        o.extend(e);
     }
 }
 
@@ -702,12 +979,14 @@ fn set_identity(s: &mut Session, comp: u64, now: (String, String), was: Option<(
 }
 
 /// What motion hardware is made of, and its ratings in its metadata (`RATINGS_KEY`): a stepper's
-/// torque and mass (its body is a solid block, so its mass comes from the datasheet's
-/// `mass_kg`, not the material), a pulley's belt travel per degree, a lead screw's lead.
-/// Extrusions, steppers and pulleys are aluminium, a lead screw nut brass, the rest steel.
+/// or an actuator's torque, speed and mass (its body is a solid envelope, so its mass comes from
+/// the datasheet's `mass_kg`, not the material), a pulley's belt travel per degree, a lead
+/// screw's lead. Extrusions, steppers, brushless motors and pulleys are aluminium, servos ABS, a
+/// lead screw nut brass, the rest steel.
 fn fit_out(s: &mut Session, comp: u64, sh: &Shape) {
     let material = match sh {
-        Shape::Extrusion { .. } | Shape::Stepper { .. } | Shape::Pulley { .. } => "Aluminum",
+        Shape::Extrusion { .. } | Shape::Stepper { .. } | Shape::Pulley { .. } | Shape::Bldc { .. } => "Aluminum",
+        Shape::Servo { .. } => "ABS Plastic",
         Shape::LeadNut => "Brass",
         Shape::LeadScrew { .. } => "Steel",
         _ => return,
@@ -716,6 +995,12 @@ fn fit_out(s: &mut Session, comp: u64, sh: &Shape) {
     let material = match *sh {
         Shape::Stepper { row } => {
             STEPPERS.get(row).and_then(|r| rated_material(s, comp, r.0, r.13, material)).unwrap_or_else(|| material.to_string())
+        }
+        Shape::Servo { row } => {
+            SERVOS.get(row).and_then(|r| rated_material(s, comp, r.size, r.mass_kg, material)).unwrap_or_else(|| material.to_string())
+        }
+        Shape::Bldc { row } => {
+            BLDCS.get(row).and_then(|r| rated_material(s, comp, r.size, r.mass_kg, material)).unwrap_or_else(|| material.to_string())
         }
         _ => material.to_string(),
     };
@@ -728,6 +1013,7 @@ fn fit_out(s: &mut Session, comp: u64, sh: &Shape) {
             json!({"kind": "gt2_pulley", "teeth": r.1, "pitch_diameter_mm": pulley_dims(r.1).0, "belt_mm_per_deg": f64::from(r.1) * 2.0 / 360.0})
         }),
         Shape::LeadScrew { .. } | Shape::LeadNut => Some(json!({"kind": "lead_screw", "lead_mm": 8.0, "pitch_mm": 2.0, "starts": 4})),
+        Shape::Servo { .. } | Shape::Bldc { .. } => actuator_ratings(sh),
         _ => None,
     };
     let Some(ratings) = ratings else { return };
@@ -785,6 +1071,8 @@ fn label(family: &str) -> &'static str {
         "linear_carriage" => "Carriage",
         "lead_screw" => "Lead Screw",
         "lead_nut" => "Lead Nut",
+        "servo" => "Servo",
+        "bldc" => "BLDC",
         _ => "Bearing",
     }
 }
@@ -853,6 +1141,18 @@ fn insert(s: &mut Session, p: &Value) -> Result<Value> {
         m[3] = [pt.x, pt.y, pt.z, 1.0];
         if let Some(o) = s.doc_mut().occurrences.iter_mut().find(|o| o.id == occ) {
             o.transform = m;
+        }
+    }
+    // An actuator's output axis as a named joint origin (`<name> output`) on its horn's or
+    // flange's round top end, for a revolute joint about it.
+    if let Some(z) = output_z(&sh) {
+        let world = solidcraft_doc::apply_point(&solidcraft_doc::joints::occurrence_world(&s.doc, occ), Vec3::new(0.0, 0.0, z));
+        let taken = |n: &str| s.doc.assembly.origins.iter().any(|o| o.name == n);
+        let origin = (1..1000).map(|k| if k == 1 { format!("{name} output") } else { format!("{name} output ({k})") }).find(|n| !taken(n));
+        if let Some(o) = origin
+            && run(s, "joint.origin", json!({"occurrence": occ, "circle": [world.x, world.y, world.z], "name": o})).is_ok()
+        {
+            out["output"] = json!(o);
         }
     }
     Ok(out)
@@ -1172,6 +1472,218 @@ mod tests {
         }
         // One material per size, reused by the second NEMA17-48.
         assert_eq!(s.doc.user_materials.len(), 2, "{:?}", s.doc.user_materials);
+    }
+
+    /// A library family's size, as `parts.library` lists it.
+    fn library_size(family: &str, size: &str) -> Value {
+        let lib = run(&mut Session::default(), "parts.library", json!({"family": family}));
+        lib["sizes"].as_array().and_then(|a| a.iter().find(|x| x["size"] == size)).cloned().unwrap_or_default()
+    }
+
+    /// Every servo and brushless motor in the library: its envelope from its table row (case,
+    /// ears, horn or flange, pilot), the datasheet mass by `inspect.measure`, its ratings in its
+    /// metadata under the keys robot export reads, and its output axis as a named joint origin (#36).
+    #[test]
+    fn actuators_have_their_envelopes_ratings_and_rated_mass() {
+        let lib = run(&mut Session::default(), "parts.library", json!({}));
+        let family = |f: &str| lib["families"].as_array().and_then(|a| a.iter().find(|x| x["family"] == f)).cloned().unwrap_or_default();
+        let f = |v: &Value| v.as_f64().unwrap_or(f64::NAN);
+        for (fam, count) in [("servo", 5), ("bldc", 2)] {
+            let sizes = family(fam)["sizes"].as_array().cloned().unwrap_or_default();
+            assert_eq!(sizes.len(), count, "{fam}: {sizes:?}");
+            for row in sizes {
+                let size = row["size"].as_str().unwrap_or_default();
+                let mut s = Session::default();
+                let r = run(&mut s, "parts.insert", json!({"family": fam, "size": size}));
+                let name = r["name"].as_str().unwrap_or_default().to_string();
+                let (lo, hi) = bbox(&s, &name);
+                let top = f(&row["output_axis"]["point"][2]);
+                // A servo's planar faces are exact; a motor's round body is meshed to the kernel's
+                // chord tolerance, 1e-3 of its diameter at most.
+                let (want_lo, want_hi, tol) = if fam == "servo" {
+                    let (w, l, a) = (f(&row["case"][0]), f(&row["case"][1]), f(&row["axis_from_end"]));
+                    let over = row["ears"].as_f64().map_or(0.0, |e| (e - l) / 2.0);
+                    ([-w / 2.0, -a - over, -f(&row["below_mount"])], [w / 2.0, l - a + over, top], 1e-6)
+                } else {
+                    let d = f(&row["diameter"]);
+                    ([-d / 2.0, -d / 2.0, -f(&row["pilot_length"])], [d / 2.0, d / 2.0, top], 1e-3 * d)
+                };
+                for (got, want) in
+                    [(lo.x, want_lo[0]), (lo.y, want_lo[1]), (lo.z, want_lo[2]), (hi.x, want_hi[0]), (hi.y, want_hi[1]), (hi.z, want_hi[2])]
+                {
+                    assert!((got - want).abs() < tol, "{size}: {lo:?} {hi:?}, want {want_lo:?} {want_hi:?}");
+                }
+                assert!((lo.z - want_lo[2]).abs() < 1e-6 && (hi.z - top).abs() < 1e-6, "{size}: {lo:?} {hi:?}");
+                let g = run(&mut s, "inspect.measure", json!({}))["total"]["mass_g"].as_f64().unwrap_or(0.0);
+                let kg = f(&row["mass_kg"]);
+                assert!((g - kg * 1000.0).abs() < 1e-6 * kg * 1000.0, "{size}: {g} g, want {kg} kg");
+                let rt = ratings(&s, r["component"].as_u64().unwrap_or(0));
+                // Robot export (MJCF force range) reads `stall_torque_nm` from every actuator.
+                assert!(f(&rt["stall_torque_nm"]) > 0.0 && f(&rt["no_load_speed_rpm"]) > 0.0 && f(&rt["voltage_v"]) > 0.0, "{size}: {rt}");
+                let torque = if fam == "servo" { "stall_torque_nm" } else { "peak_torque_nm" };
+                for k in [torque, "stall_torque_nm", "rated_torque_nm", "no_load_speed_rpm", "voltage_v", "gear_ratio", "mass_kg"] {
+                    assert!(rt.get(k).is_some() && rt[k] == row[k], "{size}: {k}: {rt}");
+                }
+                assert_eq!(rt["output_axis"]["direction"], json!([0.0, 0.0, 1.0]), "{size}");
+                // The output origin: on the z axis at the horn's or flange's top, z out of it.
+                assert_eq!(r["output"], format!("{name} output"), "{r}");
+                let o = s.doc.assembly.origins.iter().find(|o| o.name == format!("{name} output")).map(|o| o.origin.clone());
+                let m = o.and_then(|o| solidcraft_doc::joints::resolve_origin(&s.doc, &s.model.state(), &o).ok());
+                let m = m.unwrap_or_else(|| panic!("{size}: the output origin does not resolve"));
+                assert!(
+                    solidcraft_geom::Vec3::new(m[3][0], m[3][1], m[3][2]).dist(solidcraft_geom::Vec3::new(0.0, 0.0, top)) < 1e-6,
+                    "{size}: {m:?}"
+                );
+                assert!((m[2][2] - 1.0).abs() < 1e-9, "{size}: {m:?}");
+            }
+        }
+        assert!(Session::default().execute("parts.insert", &json!({"family": "servo", "size": "MG995"})).is_err());
+        assert!(Session::default().execute("parts.insert", &json!({"family": "bldc", "size": "AK10-9"})).is_err());
+    }
+
+    /// The datasheet numbers, spelled out: an STS3215 (the SO-101's servo, 7.4 V) and an AK80-6.
+    #[test]
+    fn actuator_tables_hold_the_datasheet_numbers() {
+        let near = |v: &Value, want: f64| (v.as_f64().unwrap_or(f64::NAN) - want).abs() < 1e-9;
+        let sts = library_size("servo", "STS3215");
+        for (k, want) in [
+            ("stall_torque_nm", 19.5 * 0.098_066_5),
+            ("rated_torque_nm", 5.0 * 0.098_066_5),
+            ("no_load_speed_rpm", 60.0 / (6.0 * 0.192)),
+            ("voltage_v", 7.4),
+            ("gear_ratio", 345.0),
+            ("mass_kg", 0.055),
+            ("resolution_deg", 360.0 / 4096.0),
+            ("horn", 19.95),
+            ("horn_bolt_circle", 14.0),
+        ] {
+            assert!(near(&sts[k], want), "STS3215 {k}: {sts}");
+        }
+        assert_eq!(sts["case"], json!([24.7, 45.2, 35.0]));
+        let ak = library_size("bldc", "AK80-6");
+        for (k, want) in [
+            ("peak_torque_nm", 12.0),
+            ("stall_torque_nm", 12.0),
+            ("rated_torque_nm", 6.0),
+            ("no_load_speed_rpm", 800.0),
+            ("voltage_v", 48.0),
+            ("gear_ratio", 6.0),
+            ("kv_rpm_per_v", 100.0),
+            ("kt_nm_per_a", 0.105),
+            ("mass_kg", 0.485),
+            ("diameter", 98.0),
+            ("pilot", 71.0),
+            ("output", 37.0),
+            ("output_bolt_circle", 28.0),
+            ("mount_bolt_circle", 85.0),
+        ] {
+            assert!(near(&ak[k], want), "AK80-6 {k}: {ak}");
+        }
+        // 38.5 overall: the driver cover, the body and the output's 3 mm.
+        assert!(near(&ak["output_axis"]["point"][2], 38.5 - 11.0), "{ak}");
+    }
+
+    /// A servo seated on a bracket's hole on its output axis sits square on the bracket with its
+    /// mounting holes over the bracket's, drilled from the library's pattern; screws put in from
+    /// under the bracket run up into them (#36).
+    #[test]
+    fn a_servo_seats_on_a_bracket_over_its_hole_pattern() {
+        let mut s = Session::default();
+        let h = library_size("servo", "STS3215")["mount_holes"].clone();
+        let g = |k: &str| h[k].as_f64().unwrap_or(f64::NAN);
+        let (across, along, at, depth) = (g("across"), g("along"), g("at"), g("depth"));
+        let holes: Vec<(f64, f64)> = [(-0.5, -0.5), (-0.5, 0.5), (0.5, -0.5), (0.5, 0.5)].iter().map(|(x, y)| (x * across, at + y * along)).collect();
+        // A 4 mm bracket, its top at z = 4, the output axis over (40, 40).
+        run(&mut s, "solid.box", json!({"length": 80, "width": 100, "height": 4, "body_name": "Bracket"}));
+        run(&mut s, "solid.hole", json!({"position": [40, 40, 4], "diameter": 8}));
+        for (x, y) in &holes {
+            run(&mut s, "solid.hole", json!({"position": [40.0 + x, 40.0 + y, 4], "diameter": 2.4}));
+        }
+        let r = run(&mut s, "parts.insert", json!({"family": "servo", "size": "STS3215", "at": [44, 40, 4]}));
+        assert!(r["joint"].is_number(), "{r}");
+        let t = solidcraft_doc::joints::occurrence_world(&s.doc, r["occurrence"].as_u64().unwrap_or(0));
+        let (lo, _) = bbox(&s, "Servo STS3215");
+        assert!((lo.z - 4.0).abs() < 1e-6, "the case's back on the bracket: {lo:?}");
+        for (i, (x, y)) in holes.iter().enumerate() {
+            let p = solidcraft_doc::apply_point(&t, solidcraft_geom::Vec3::new(*x, *y, 0.0));
+            assert!(p.dist(solidcraft_geom::Vec3::new(40.0 + x, 40.0 + y, 4.0)) < 1e-6, "hole {i}: {p:?}");
+            // An M2 x 8 from under the bracket, its head on the bottom face: 4 mm into the servo.
+            let at = json!([40.0 + x + 1.2, 40.0 + y, 0]);
+            let sc =
+                run(&mut s, "parts.insert", json!({"family": "socket_head_cap_screw", "size": "M2", "length": 8, "at": at, "name": format!("S{i}")}));
+            assert!(sc["joint"].is_number(), "{sc}");
+            let (slo, shi) = bbox(&s, &format!("S{i}"));
+            assert!(((slo.x + shi.x) / 2.0 - 40.0 - x).abs() < 1e-6 && ((slo.y + shi.y) / 2.0 - 40.0 - y).abs() < 1e-6, "{slo:?} {shi:?}");
+            assert!((shi.z - (4.0 + depth)).abs() < 1e-6 && (slo.z + 2.0).abs() < 1e-6, "{slo:?} {shi:?}");
+        }
+    }
+
+    /// A link screwed to a servo's horn turns about the servo's output: a revolute joint between
+    /// the grounded servo's `output` origin and the link's hole, driven to 90° (#36).
+    #[test]
+    fn a_link_on_a_servo_horn_turns_about_its_output() {
+        let mut s = Session::default();
+        let r = run(&mut s, "parts.insert", json!({"family": "servo", "size": "STS3215", "point": [0, 0, 0]}));
+        run(&mut s, "occurrence.ground", json!({"occurrence": r["occurrence"], "grounded": true}));
+        let top = ratings(&s, r["component"].as_u64().unwrap_or(0))["output_axis"]["point"][2].as_f64().unwrap_or(f64::NAN);
+        let bc = library_size("servo", "STS3215")["horn_bolt_circle"].as_f64().unwrap_or(f64::NAN);
+        // A 60 x 12 x 3 link on the horn: a Ø5 hole on the output axis, a Ø3.4 one on the bolt circle.
+        run(&mut s, "component.activate", json!({"component": "root"}));
+        run(&mut s, "component.create", json!({"name": "Link", "grounded": false}));
+        run(&mut s, "solid.box", json!({"length": 60, "width": 12, "height": 3, "corner": [-6, -6, top]}));
+        run(&mut s, "solid.hole", json!({"position": [0, 0, top + 3.0], "diameter": 5}));
+        run(&mut s, "solid.hole", json!({"position": [bc / 2.0, 0, top + 3.0], "diameter": 3.4}));
+        run(&mut s, "component.activate", json!({"component": "root"}));
+        let j = run(
+            &mut s,
+            "joint.create",
+            json!({"type": "revolute", "a": r["output"], "b": {"occurrence": "Link", "circle": [2.5, 0, top]}, "name": "Shoulder"}),
+        );
+        assert_eq!(j["conflicts"].as_array().map(Vec::len), Some(0), "{j}");
+        // MJCF export limits the joint's actuator to the servo's stall torque.
+        let torque = super::rated_torques(&s.doc).get(&j["joint"].as_u64().unwrap_or(0)).copied();
+        assert!(torque.is_some_and(|t| (t - 19.5 * 0.098_066_5).abs() < 1e-12), "{torque:?}");
+        let link = |s: &Session, p: solidcraft_geom::Vec3| {
+            let o = s.doc.find_component("Link").and_then(|c| s.doc.occurrence_of(c)).map(|o| o.id).unwrap_or(0);
+            solidcraft_doc::apply_point(&solidcraft_doc::joints::occurrence_world(&s.doc, o), p)
+        };
+        // The link has not moved: its hole's bottom end already sits on the horn's top.
+        let tip = solidcraft_geom::Vec3::new(54.0, 0.0, top);
+        assert!(link(&s, tip).dist(tip) < 1e-6, "{:?}", link(&s, tip));
+        // Screwed to the horn: an M3 x 6 through the link, 3 mm into a horn hole.
+        let at = json!([bc / 2.0 + 1.7, 0, top + 3.0]);
+        let sc = run(&mut s, "parts.insert", json!({"family": "socket_head_cap_screw", "size": "M3", "length": 6, "at": at, "name": "Horn screw"}));
+        assert!(sc["joint"].is_number(), "{sc}");
+        let l = run(&mut s, "joint.list", json!({}));
+        let link_occ = s.doc.find_component("Link").and_then(|c| s.doc.occurrence_of(c)).map(|o| o.id).unwrap_or(0);
+        let dof = l["dof"].as_array().and_then(|a| a.iter().find(|d| d["occurrence"] == link_occ)).map(|d| d["dof"].clone());
+        assert_eq!(dof, Some(json!(1)), "{l}");
+        run(&mut s, "joint.drive", json!({"joint": "Shoulder", "value": 90}));
+        // A quarter turn about the output axis (the sense is the joint's).
+        let p = link(&s, tip);
+        assert!(p.x.abs() < 1e-6 && (p.y.abs() - 54.0).abs() < 1e-6 && (p.z - top).abs() < 1e-6, "{p:?}");
+        let (lo, hi) = bbox(&s, "Horn screw");
+        let c = ((lo.x + hi.x) / 2.0, (lo.y + hi.y) / 2.0);
+        assert!(c.0.abs() < 1e-6 && (c.1.abs() - bc / 2.0).abs() < 1e-6 && c.1.signum() == p.y.signum(), "the screw went round with the link: {c:?}");
+        let (lo, hi) = bbox(&s, "Servo STS3215");
+        assert!(lo.z.abs() < 1e-6 && (hi.z - top).abs() < 1e-6, "the servo stays: {lo:?} {hi:?}");
+    }
+
+    /// An AK80-6 seats like a stepper: its driver cover through a bracket's Ø72 hole, its back on
+    /// the bracket, its eight M3 holes on the Ø85 circle over the bracket's (#36).
+    #[test]
+    fn an_actuator_seats_its_pilot_in_a_bracket() {
+        let mut s = Session::default();
+        run(&mut s, "solid.box", json!({"length": 120, "width": 120, "height": 5, "body_name": "Bracket"}));
+        run(&mut s, "solid.hole", json!({"position": [60, 60, 5], "diameter": 72}));
+        let r = run(&mut s, "parts.insert", json!({"family": "bldc", "size": "AK80-6", "at": [96, 60, 5]}));
+        assert!(r["joint"].is_number(), "{r}");
+        let (lo, hi) = bbox(&s, "BLDC AK80-6");
+        assert!((lo.z - (5.0 - 11.0)).abs() < 1e-6 && (hi.z - (5.0 + 27.5)).abs() < 1e-6, "{lo:?} {hi:?}");
+        assert!(((lo.x + hi.x) / 2.0 - 60.0).abs() < 0.1 && ((lo.y + hi.y) / 2.0 - 60.0).abs() < 0.1, "{lo:?} {hi:?}");
+        let t = solidcraft_doc::joints::occurrence_world(&s.doc, r["occurrence"].as_u64().unwrap_or(0));
+        let p = solidcraft_doc::apply_point(&t, solidcraft_geom::Vec3::new(42.5, 0.0, 0.0));
+        assert!(p.dist(solidcraft_geom::Vec3::new(102.5, 60.0, 5.0)) < 1e-6, "{p:?}");
     }
 
     fn ratings(s: &Session, comp: u64) -> Value {
