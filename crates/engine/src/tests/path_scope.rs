@@ -23,12 +23,16 @@ fn file_commands_stay_inside_the_agents_folders() {
         // Inside: the usual workflow.
         s.execute("file.save_as", &json!({"path": at(&root, "part.solidcraft")})).unwrap();
         s.execute("file.export", &json!({"path": at(&root, "part.step")})).unwrap();
+        // A missing folder is made, inside the agent's folders only (#171).
+        s.execute("file.export", &json!({"path": at(&root, "new/deeper/part.stl")})).unwrap();
+        assert!(root.join("new/deeper/part.stl").is_file());
         s.execute("doc.open", &json!({"path": at(&root, "part.solidcraft")})).unwrap();
         // Outside, directly or through `..`: refused, with the reason.
         for (cmd, p) in [
             ("file.save_as", json!({"path": at(&out, "x.solidcraft")})),
             ("file.save", json!({"path": at(&root, "../out/x.solidcraft")})),
             ("file.export", json!({"path": at(&out, "x.stl")})),
+            ("file.export", json!({"path": at(&out, "new/x.stl")})),
             ("file.export_view_dxf", json!({"path": at(&out, "x.dxf"),"camera":render::Camera::default()})),
             ("file.export", json!({"path": at(&out, "x.json"), "format": "json"})),
             ("file.save_as", json!({"path": at(&out, "x.json"), "format": "json", "preview": true})),

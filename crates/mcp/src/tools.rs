@@ -233,10 +233,11 @@ pub fn tool_definitions() -> Vec<Value> {
              comes from the extension unless given. URDF (.urdf) exports the whole assembly for robot simulators: a link per \
              component placement with mass and inertia, joints from the assembly's joints, and STL meshes in metres written \
              next to it (docs/urdf.md); RViz needs mesh_prefix such as package://robot/meshes/. MJCF (format mjcf, .xml) \
-             writes the same robot for MuJoCo with position actuators and a floor (docs/mjcf.md).",
+             writes the same robot for MuJoCo with position actuators and a floor (docs/mjcf.md); its reply counts \
+             bodies, joints, actuators and meshes and gives the mass, free root, keyframe and each actuator's ranges.",
             obj(
                 json!({
-                    "path": string("Output file"),
+                    "path": string("Output file; missing folders are made"),
                     "format": {"type": "string", "enum": ["step", "3mf", "3mf-tagged", "stl", "stla", "obj", "urdf", "mjcf"]},
                     "bodies": {"type": "array", "items": {"type": "string"}, "description": "Body names (default: all; not with urdf)"},
                     "mesh_prefix": string("urdf: put before each mesh file name (default: none, so relative to the .urdf)"),
