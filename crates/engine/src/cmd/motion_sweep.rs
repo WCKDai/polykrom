@@ -38,6 +38,23 @@ const MAX_BISECTIONS: usize = 64;
 /// Most gap work over a whole sweep (see `ContactGeometry::gaps`).
 const MAX_WORK: usize = 500_000_000;
 
+/// The joints a motion link makes value `index` of joint `id` follow, by name ("`A` or `B`"), or
+/// `None` when no link sets it.
+fn drivers_of(s: &Session, id: u64, index: usize) -> Option<String> {
+    let mut names: Vec<String> = Vec::new();
+    for link in s.doc.assembly.links.iter().filter(|l| l.b == id && l.ib == index) {
+        for (j, _, _) in link.sources() {
+            if let Some(joint) = s.doc.assembly.joints.iter().find(|x| x.id == j) {
+                let n = format!("`{}`", joint.name);
+                if !names.contains(&n) {
+                    names.push(n);
+                }
+            }
+        }
+    }
+    (!names.is_empty()).then(|| names.join(" or "))
+}
+
 /// The nearest a part came to another along the sweep.
 struct Nearest {
     mm: f64,
@@ -63,6 +80,14 @@ pub(super) fn sweep(s: &mut Session, p: &Value) -> Result<Value> {
             .ok_or_else(|| bad(cmd, format!("`index` must be below {dofs}, the joint's value count")))?,
     };
     let angle = kind.is_angle(index);
+    if let Some(drivers) = drivers_of(s, id, index) {
+        return Err(bad(
+            cmd,
+            format!(
+                "`{name}` follows {drivers} through motion links, so it does not move on its own: sweep {drivers} instead (each moves `{name}` with it)"
+            ),
+        ));
+    }
     // Shown in degrees for angles, mm for distances.
     let shown = |v: f64| if angle { v.to_degrees() } else { v };
     let end = |key: &str| match p.get(key) {
