@@ -36,6 +36,7 @@ mod edit;
 mod face;
 mod features;
 mod features_more;
+mod printability;
 pub(crate) use face::{FaceRefForm, face_ref_form};
 pub(crate) use features::profiles as feature_profiles;
 pub(crate) use features::{EdgeRefForm, edge_ref_form, sketch_key};
@@ -285,6 +286,7 @@ pub fn command_specs() -> Vec<&'static CommandSpec> {
     v.extend(component_link::COMMANDS.iter());
     v.extend(joints::COMMANDS.iter());
     v.extend(clearance::COMMANDS.iter());
+    v.extend(printability::COMMANDS.iter());
     v.extend(motion::COMMANDS.iter());
     v.extend(config::COMMANDS.iter());
     v.extend(parts::COMMANDS.iter());

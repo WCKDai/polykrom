@@ -1958,5 +1958,6 @@
   "update.up_to_date": "Polykrom 已是最新版本。",
   "update.update_now": "立即更新",
   "update.you_have": "目前版本為 {version}。",
-  "↑ ↓ choose · Enter / Tab complete · Esc dismiss": "↑ ↓ 選擇 · Enter / Tab 自動完成 · Esc 關閉"
+  "↑ ↓ choose · Enter / Tab complete · Esc dismiss": "↑ ↓ 選擇 · Enter / Tab 自動完成 · Esc 關閉",
+  "cmd.inspect_printability": "可列印性"
 }
