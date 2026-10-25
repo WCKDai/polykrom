@@ -273,6 +273,23 @@ fn fillet_keeps_expression_corner_when_parameter_changes() {
     }
 }
 
+/// Corners picked where they are, as agents see them (`point: [x, y]`), round like corners named
+/// by their points; a point that is no corner says which corner is nearest (TinyRex, #184's run).
+#[test]
+fn fillet_corners_picked_by_coordinates() {
+    let mut s = new_sketch();
+    run(&mut s, "sketch.rectangle.two_point", json!({"p0": [-65, -46], "p1": [65, 46]}));
+    run(&mut s, "sketch.fillet", json!({"point": [65, 46], "radius": 28}));
+    run(&mut s, "sketch.fillet", json!({"points": [[-65, 46], [-65, -46], [65, -46]], "radius": 28}));
+    let want = 130.0 * 92.0 - 4.0 * (28.0 * 28.0 - std::f64::consts::PI * 28.0 * 28.0 / 4.0);
+    let a = profiles(&s);
+    assert!(close(a[0], want), "{a:?} vs {want}");
+    let e = s.execute("sketch.fillet", &json!({"point": [0, 46], "radius": 5})).unwrap_err().to_string();
+    assert!(e.contains("no corner at [0, 46]") && e.contains("nearest"), "{e}");
+    let e = s.execute("sketch.fillet", &json!({"point": [65], "radius": 5})).unwrap_err().to_string();
+    assert!(e.contains("`point` must be"), "{e}");
+}
+
 #[test]
 fn fillet_and_chamfers() {
     let mut s = new_sketch();
@@ -914,8 +931,8 @@ fn fillet_a_line_and_an_arc() {
 #[test]
 fn fillet_a_line_and_an_arc_drawn_to_meet_at_a_point() {
     // #1208: the arc starts at the line's end by coordinates, so the corner is two points held
-    // together by a Coincident constraint. By point and by naming the two curves.
-    for how in [json!({"point": "l1.end"}), json!({"a": "l1", "b": "a1"})] {
+    // together by a Coincident constraint. By point, by where it is, and by naming the two curves.
+    for how in [json!({"point": "l1.end"}), json!({"point": [40, 0]}), json!({"a": "l1", "b": "a1"})] {
         let mut s = new_sketch();
         run(&mut s, "sketch.line", json!({"points": [[0, 0], [40, 0]], "ids": ["l1"]}));
         run(&mut s, "sketch.arc.center_point", json!({"center": [50, 0], "start": [60, 0], "end": [40, 0], "id": "a1"}));
