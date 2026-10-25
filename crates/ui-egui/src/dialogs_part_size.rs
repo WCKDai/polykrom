@@ -360,7 +360,12 @@ mod tests {
         menu(&mut app, Target::Component { id });
         change(&mut app, "M8", Some(25.0));
         apply(&mut app);
-        assert_eq!(app.session.doc.assembly.joints, joints);
+        // The same joint, its made name following the new size (#171).
+        let mut renamed = joints.clone();
+        for j in renamed.iter_mut().filter(|j| j.name == "SHCS M6x20 seat") {
+            j.name = "SHCS M8x25 seat".into();
+        }
+        assert_eq!(app.session.doc.assembly.joints, renamed);
         assert_eq!(app.session.doc.occurrences, occurrences);
         let state = app.session.world_state();
         let body = state.bodies.iter().find(|b| app.session.doc.model_body_component(b) == id).unwrap();

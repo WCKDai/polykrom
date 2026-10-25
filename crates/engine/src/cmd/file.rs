@@ -626,7 +626,14 @@ fn export_mjcf(s: &Session, path: &str, p: &Value) -> Result<Value> {
     let written = write_package(path, &pkg.meshes, &pkg.xml)?;
     // What the model holds, so an agent that can't read the file can check it (#171).
     let m = &pkg.summary;
-    let r = |x: f64| (x * 1e6).round() / 1e6;
+    // To nine significant digits, so a small force or mass is not rounded away.
+    let r = |x: f64| {
+        if x == 0.0 || !x.is_finite() {
+            return x;
+        }
+        let k = 10f64.powi(8 - x.abs().log10().floor() as i32);
+        (x * k).round() / k
+    };
     let actuators: Vec<Value> = m
         .actuators
         .iter()
