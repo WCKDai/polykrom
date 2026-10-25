@@ -1,11 +1,14 @@
 //! Standard parts: ISO metric fasteners, dowel pins and ball bearings, generated in code from
-//! the dimensions in the public standards tables (no vendor geometry). Each part is inserted as
+//! the dimensions in the public standards tables (no vendor geometry), and motion hardware
+//! (T-slot extrusions, NEMA stepper motors) from the common dimensions their makers share
+//! (docs/parts-library-plan.md). Each part is inserted as
 //! its own component, built by ordinary features (so it stays parametric and editable), with a
 //! cosmetic thread where it has one; at a hole it gets a rigid joint that puts its axis on the
 //! hole's and seats it on the face.
 //!
 //! Part frame: the seating plane is z = 0 (the underside of a head, the bottom of a nut or
-//! washer, the top of a set screw or pin); the shank runs down −z.
+//! washer, the top of a set screw or pin, a stepper's mounting face); the shank runs down −z (a
+//! stepper's pilot and shaft too, its body up +z). An extrusion runs up +z from z = 0.
 
 use serde_json::{Value, json};
 use solidcraft_geom::Vec3;
@@ -22,8 +25,9 @@ pub static COMMANDS: &[CommandSpec] = &[
         "the Insert Part dialog's command (same as parts.insert): family, size, length?, at?|point?+direction?, name?",
     ),
     CommandSpec::new("parts.insert", "Insert Part", insert).icon("fastener").params(
-        "family (socket_head_cap_screw | hex_bolt | hex_nut | washer | set_screw | dowel_pin | bearing); size (\"M6\", or \"608\" for bearings); \
-         length? (mm; screws, bolts, set screws, pins; default a standard length near 2.5 d); \
+        "family (socket_head_cap_screw | hex_bolt | hex_nut | washer | set_screw | dowel_pin | bearing | extrusion | stepper); size (\"M6\", \"608\" for \
+         bearings, \"2020\" or \"2040\" for extrusions, \"NEMA17-40\" for steppers: parts.library lists them); \
+         length? (mm; screws, bolts, set screws, pins, extrusions; default a standard length near 2.5 d, 200 for an extrusion); \
          at?: [x,y,z] on a hole's rim or wall (the part seats on the hole's face with a rigid joint) | point?: [x,y,z] with direction?: [x,y,z] (no joint); name?",
     ),
     CommandSpec::new("parts.resize", "Change Part Size", resize_atomic).icon("scale")
@@ -31,7 +35,7 @@ pub static COMMANDS: &[CommandSpec] = &[
 ];
 
 /// A family: (id, name, standard).
-const FAMILIES: [(&str, &str, &str); 7] = [
+const FAMILIES: [(&str, &str, &str); 9] = [
     ("socket_head_cap_screw", "Socket head cap screw", "ISO 4762"),
     ("hex_bolt", "Hex head bolt / screw", "ISO 4014 / ISO 4017"),
     ("hex_nut", "Hex nut", "ISO 4032"),
@@ -39,7 +43,35 @@ const FAMILIES: [(&str, &str, &str); 7] = [
     ("set_screw", "Hex socket set screw, flat point", "ISO 4026"),
     ("dowel_pin", "Parallel pin (dowel)", "ISO 8734"),
     ("bearing", "Deep groove ball bearing (envelope)", "ISO 15 (6000/6200/600 series)"),
+    ("extrusion", "Aluminium T-slot extrusion, 20 mm series (slot 6)", "series 5 / B-type"),
+    ("stepper", "Hybrid stepper motor (body, pilot, D-shaft)", "NEMA ICS 16"),
 ];
+
+/// A 20 mm T-slot extrusion module (series 5, slot 6): slot opening, lip, chamber width under
+/// the lip, depth where the chamber starts to narrow, slot depth from the face, core bore. The
+/// opening, lip, depth and bore are the makers' common 2020 dimensions (Misumi HFS5, Bosch,
+/// Item); the chamber narrows at 45° below the lip, as theirs do, which also keeps the four
+/// slots apart. Their hollow core is left solid: 1.9 cm² here against about 1.6.
+const SLOT: (f64, f64, f64, f64, f64, f64) = (6.2, 1.8, 11.0, 3.0, 6.1, 4.2);
+/// Extrusion sizes: (size, modules side by side along y).
+const EXTRUSIONS: [(&str, u8); 2] = [("2020", 1), ("2040", 2)];
+
+/// A stepper: (size, body square, body length, chamfer leg, hole pitch, hole Ø, hole depth,
+/// pilot Ø, pilot height, shaft Ø, shaft length from the face, holding torque N·m, rated current
+/// A, mass kg). Body, pilot, holes and shaft from NEMA ICS 16; torque, current and mass from
+/// common 1.8° datasheets of that body length.
+#[allow(clippy::type_complexity)]
+const STEPPERS: [(&str, f64, f64, f64, f64, f64, f64, f64, f64, f64, f64, f64, f64, f64); 7] = [
+    ("NEMA14-28", 35.2, 28.0, 3.5, 26.0, 2.5, 3.5, 22.0, 2.0, 5.0, 20.0, 0.13, 0.4, 0.14),
+    ("NEMA14-34", 35.2, 34.0, 3.5, 26.0, 2.5, 3.5, 22.0, 2.0, 5.0, 20.0, 0.18, 0.8, 0.18),
+    ("NEMA17-34", 42.3, 34.0, 4.5, 31.0, 2.5, 4.5, 22.0, 2.0, 5.0, 24.0, 0.28, 1.3, 0.23),
+    ("NEMA17-40", 42.3, 40.0, 4.5, 31.0, 2.5, 4.5, 22.0, 2.0, 5.0, 24.0, 0.42, 1.5, 0.28),
+    ("NEMA17-48", 42.3, 48.0, 4.5, 31.0, 2.5, 4.5, 22.0, 2.0, 5.0, 24.0, 0.55, 2.0, 0.36),
+    ("NEMA23-56", 56.4, 56.0, 5.0, 47.14, 5.1, 5.0, 38.1, 1.6, 6.35, 21.0, 1.26, 2.8, 0.70),
+    ("NEMA23-76", 56.4, 76.0, 5.0, 47.14, 5.1, 5.0, 38.1, 1.6, 6.35, 21.0, 1.89, 3.0, 1.0),
+];
+/// The key a library part keeps its ratings under, in its component's metadata.
+pub const RATINGS_KEY: &str = "app.polykrom.part";
 
 /// ISO metric coarse: (size, d, pitch).
 const METRIC: [(&str, f64, f64); 9] = [
@@ -153,6 +185,10 @@ enum Shape {
     Ring { d_in: f64, d_out: f64, h: f64 },
     /// A cylinder down −z with a socket in its top (set screw), or plain (pin).
     Rod { d: f64, pitch: Option<f64>, len: f64, socket: Option<(f64, f64)> },
+    /// A T-slot extrusion `modules` × 20 mm along y, 20 mm along x, z 0…len.
+    Extrusion { modules: u8, len: f64 },
+    /// A stepper motor, one row of `STEPPERS`.
+    Stepper { row: usize },
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -205,6 +241,14 @@ fn shape(family: &str, size: &str, length: Option<f64>) -> std::result::Result<S
             let (_, bore, od, w) = BEARINGS.iter().find(|r| r.0 == size.trim()).copied().ok_or_else(|| need("bearing"))?;
             Shape::Ring { d_in: bore, d_out: od, h: w }
         }
+        "extrusion" => {
+            let (_, modules) = EXTRUSIONS.iter().find(|r| r.0 == size.trim()).copied().ok_or_else(|| need("extrusion"))?;
+            Shape::Extrusion { modules, len: length.unwrap_or(200.0) }
+        }
+        "stepper" => {
+            let row = STEPPERS.iter().position(|r| r.0.eq_ignore_ascii_case(size.trim())).ok_or_else(|| need("stepper"))?;
+            Shape::Stepper { row }
+        }
         o => return Err(format!("unknown part family `{o}` (parts.library lists them)")),
     })
 }
@@ -240,6 +284,43 @@ fn revolve(s: &mut Session, pts: &[(f64, f64)], op: &str) -> Result<()> {
     run(s, "sketch.finish", json!({}))?;
     run(s, "solid.revolve", json!({"axis": "y", "operation": op}))?;
     Ok(())
+}
+
+/// A closed outline in the XY plane at height z0, extruded `dist` up, joined or cut (or as a new
+/// body).
+fn prism(s: &mut Session, outlines: &[Vec<[f64; 2]>], circles: &[([f64; 2], f64)], z0: f64, dist: f64, op: &str) -> Result<()> {
+    run(s, "sketch.create", json!({"plane": "XY", "offset": format!("{z0} mm")}))?;
+    for o in outlines {
+        run(s, "sketch.line", json!({"points": o, "closed": true}))?;
+    }
+    for (c, r) in circles {
+        run(s, "sketch.circle.center", json!({"center": c, "radius": r}))?;
+    }
+    run(s, "sketch.finish", json!({}))?;
+    run(s, "solid.extrude", json!({"distance": format!("{dist} mm"), "direction": "positive", "operation": op}))?;
+    Ok(())
+}
+
+/// The T-slot of a module centred at (cx, cy), in the face whose outward normal is (nx, ny):
+/// the opening through the lip, then the wider chamber behind it. It starts a little outside the
+/// face so the cut opens it cleanly.
+fn slot(cx: f64, cy: f64, nx: f64, ny: f64) -> Vec<[f64; 2]> {
+    let (open, lip, chamber, straight, depth, _) = SLOT;
+    let floor = chamber / 2.0 - (depth - straight);
+    // (along the normal from the module's centre, across it)
+    let local = [
+        (10.5, -open / 2.0),
+        (10.0 - lip, -open / 2.0),
+        (10.0 - lip, -chamber / 2.0),
+        (10.0 - straight, -chamber / 2.0),
+        (10.0 - depth, -floor),
+        (10.0 - depth, floor),
+        (10.0 - straight, chamber / 2.0),
+        (10.0 - lip, chamber / 2.0),
+        (10.0 - lip, open / 2.0),
+        (10.5, open / 2.0),
+    ];
+    local.iter().map(|(n, t)| [cx + n * nx - t * ny, cy + n * ny + t * nx]).collect()
 }
 
 fn thread(s: &mut Session, d: f64, pitch: f64, at: Vec3) {
@@ -287,6 +368,53 @@ fn build(s: &mut Session, sh: &Shape) -> Result<()> {
                 thread(s, d, p, Vec3::new(d / 2.0, 0.0, -len / 2.0));
             }
         }
+        Shape::Extrusion { modules, len } => {
+            let n = f64::from(modules);
+            let half_y = 10.0 * n;
+            run(
+                s,
+                "solid.box",
+                json!({"length": "20 mm", "width": format!("{} mm", 20.0 * n), "height": format!("{len} mm"), "corner": [-10, -half_y, 0]}),
+            )?;
+            // Module centres along y; every outer face of a module has a slot, the faces between
+            // modules none.
+            let centres: Vec<f64> = (0..modules).map(|i| -half_y + 10.0 + 20.0 * f64::from(i)).collect();
+            let mut slots = Vec::new();
+            for (i, cy) in centres.iter().enumerate() {
+                slots.push(slot(0.0, *cy, 1.0, 0.0));
+                slots.push(slot(0.0, *cy, -1.0, 0.0));
+                if i == 0 {
+                    slots.push(slot(0.0, *cy, 0.0, -1.0));
+                }
+                if i + 1 == centres.len() {
+                    slots.push(slot(0.0, *cy, 0.0, 1.0));
+                }
+            }
+            let bores: Vec<([f64; 2], f64)> = centres.iter().map(|cy| ([0.0, *cy], SLOT.5 / 2.0)).collect();
+            prism(s, &slots, &bores, -1.0, len + 2.0, "cut")?;
+        }
+        Shape::Stepper { row } => {
+            let Some(&(_, sq, len, c, pitch, hole, depth, pilot, pilot_h, shaft, shaft_len, ..)) = STEPPERS.get(row) else {
+                return Err(bad("parts.insert", "no such stepper"));
+            };
+            let h = sq / 2.0;
+            let body = vec![[h - c, -h], [h, -h + c], [h, h - c], [h - c, h], [-h + c, h], [-h, h - c], [-h, -h + c], [-h + c, -h]];
+            prism(s, &[body], &[], 0.0, len, "new")?;
+            cyl(s, pilot, -pilot_h, 0.0, "join")?;
+            cyl(s, shaft, -shaft_len, 0.0, "join")?;
+            // The shaft's flat: 0.5 mm deep over the 15 mm nearest its end.
+            let f = shaft / 2.0 - 0.5;
+            prism(s, &[vec![[f, -shaft], [shaft, -shaft], [shaft, shaft], [f, shaft]]], &[], -shaft_len - 1.0, 16.0, "cut")?;
+            let holes: Vec<([f64; 2], f64)> =
+                [(1.0, 1.0), (-1.0, 1.0), (-1.0, -1.0), (1.0, -1.0)].iter().map(|(x, y)| ([x * pitch / 2.0, y * pitch / 2.0], hole / 2.0)).collect();
+            prism(s, &[], &holes, -0.5, depth + 0.5, "cut")?;
+            // The NEMA 14 and 17 holes are tapped M3.
+            if hole < 3.0 {
+                for ([x, y], r) in &holes {
+                    thread(s, 3.0, 0.5, Vec3::new(x + r, *y, depth / 2.0));
+                }
+            }
+        }
     }
     Ok(())
 }
@@ -301,10 +429,23 @@ fn library(_s: &mut Session, p: &Value) -> Result<Value> {
             "set_screw" => SET_SCREW.iter().map(|r| json!({"size": r.0, "d": metric(r.0).map(|m| m.0), "pitch": metric(r.0).map(|m| m.1), "socket": r.1, "socket_depth": r.2})).collect(),
             "dowel_pin" => DOWEL.iter().map(|d| json!({"size": format!("{d}"), "d": d})).collect(),
             "bearing" => BEARINGS.iter().map(|r| json!({"size": r.0, "bore": r.1, "outer": r.2, "width": r.3})).collect(),
+            "extrusion" => EXTRUSIONS
+                .iter()
+                .map(|r| json!({"size": r.0, "width": 20.0, "height": 20.0 * f64::from(r.1), "slot": SLOT.0, "slot_depth": SLOT.4, "core_bore": SLOT.5}))
+                .collect(),
+            "stepper" => STEPPERS
+                .iter()
+                .map(|r| {
+                    json!({"size": r.0, "body": r.1, "length": r.2, "hole_pitch": r.4, "hole": r.5, "pilot": r.7, "shaft": r.9, "shaft_length": r.10,
+                           "holding_torque_nm": r.11, "rated_current_a": r.12, "mass_kg": r.13, "step_angle_deg": 1.8})
+                })
+                .collect(),
             _ => Vec::new(),
         };
         let (_, name, standard) = FAMILIES.iter().find(|f| f.0 == id).copied().unwrap_or(("", "", ""));
         let lengths = matches!(id, "socket_head_cap_screw" | "hex_bolt" | "set_screw" | "dowel_pin").then_some(LENGTHS.to_vec());
+        // Any length (mm) for an extrusion.
+        let lengths = if id == "extrusion" { Some(vec![100.0, 200.0, 250.0, 300.0, 350.0, 400.0, 500.0, 1000.0]) } else { lengths };
         json!({"family": id, "name": name, "standard": standard, "sizes": sizes, "lengths": lengths})
     };
     match str_(p, "family") {
@@ -316,7 +457,7 @@ fn library(_s: &mut Session, p: &Value) -> Result<Value> {
 
 fn part_name(family: &str, size: &str, sh: &Shape) -> String {
     match sh {
-        Shape::Screw { len, .. } | Shape::Rod { len, .. } => format!("{} {size}x{len}", label(family)),
+        Shape::Screw { len, .. } | Shape::Rod { len, .. } | Shape::Extrusion { len, .. } => format!("{} {size}x{len}", label(family)),
         _ => format!("{} {size}", label(family)),
     }
 }
@@ -325,7 +466,7 @@ fn part_name(family: &str, size: &str, sh: &Shape) -> String {
 /// a bearing's designation, and the family's name with the size.
 fn identity(family: &str, size: &str, sh: &Shape) -> (String, String) {
     let size = match sh {
-        Shape::Screw { len, .. } | Shape::Rod { len, .. } => format!("{size}x{len}"),
+        Shape::Screw { len, .. } | Shape::Rod { len, .. } | Shape::Extrusion { len, .. } => format!("{size}x{len}"),
         _ => size.to_string(),
     };
     let standard = match family {
@@ -360,6 +501,32 @@ fn set_identity(s: &mut Session, comp: u64, now: (String, String), was: Option<(
     }
 }
 
+/// What motion hardware is made of, and a stepper's ratings in its metadata (`RATINGS_KEY`): an
+/// extrusion is aluminium; a stepper's body is too (its geometry is a solid block, so its mass
+/// comes from the datasheet's `mass_kg`, not the material).
+fn fit_out(s: &mut Session, comp: u64, sh: &Shape) {
+    if !matches!(sh, Shape::Extrusion { .. } | Shape::Stepper { .. }) {
+        return;
+    }
+    let bodies: Vec<String> = s.model.state().bodies.iter().filter(|b| s.doc.model_body_component(b) == comp).map(|b| b.name.clone()).collect();
+    let _ = run(s, "material.assign", json!({"bodies": bodies, "material": "Aluminum"}));
+    let ratings = match *sh {
+        Shape::Stepper { row } => STEPPERS.get(row).map(|r| {
+            json!({"kind": "stepper", "holding_torque_nm": r.11, "rated_current_a": r.12, "mass_kg": r.13, "step_angle_deg": 1.8, "shaft_mm": r.9})
+        }),
+        _ => None,
+    };
+    let Some(ratings) = ratings else { return };
+    let Some(c) = s.doc.components.iter().find(|c| c.id == comp) else { return };
+    let mut m = c.metadata.clone();
+    if m.set(RATINGS_KEY, ratings).is_ok()
+        && m != c.metadata
+        && let Some(c) = s.doc_mut().components.iter_mut().find(|c| c.id == comp)
+    {
+        c.metadata = m;
+    }
+}
+
 fn label(family: &str) -> &'static str {
     match family {
         "socket_head_cap_screw" => "SHCS",
@@ -368,6 +535,8 @@ fn label(family: &str) -> &'static str {
         "washer" => "Washer",
         "set_screw" => "Set Screw",
         "dowel_pin" => "Dowel Pin",
+        "extrusion" => "Extrusion",
+        "stepper" => "Stepper",
         _ => "Bearing",
     }
 }
@@ -403,6 +572,7 @@ fn insert(s: &mut Session, p: &Value) -> Result<Value> {
     finish(s, comp, &name);
     s.doc_mut().parts.insert(comp, solidcraft_doc::StandardPart { family: family.clone(), size: size.clone(), length: shape_len(&sh) });
     set_identity(s, comp, identity(&family, &size, &sh), None);
+    fit_out(s, comp, &sh);
     run(s, "component.activate", json!({"component": active}))?;
     let mut out = json!({"component": comp, "occurrence": occ, "name": name});
     if let (Some(a), Some(h)) = (at, host) {
@@ -497,7 +667,7 @@ fn hole_wall(s: &Session, a: Vec3) -> Option<Vec3> {
 
 fn shape_len(sh: &Shape) -> Option<f64> {
     match sh {
-        Shape::Screw { len, .. } | Shape::Rod { len, .. } => Some(*len),
+        Shape::Screw { len, .. } | Shape::Rod { len, .. } | Shape::Extrusion { len, .. } => Some(*len),
         _ => None,
     }
 }
@@ -539,6 +709,7 @@ fn resize(s: &mut Session, p: &Value) -> Result<Value> {
     finish(s, comp, &name);
     let was = shape(&part.family, &part.size, part.length).ok().map(|old| identity(&part.family, &part.size, &old));
     set_identity(s, comp, identity(&part.family, &size, &sh), was);
+    fit_out(s, comp, &sh);
     s.doc_mut().parts.insert(comp, solidcraft_doc::StandardPart { family: part.family.clone(), size: size.clone(), length: shape_len(&sh) });
     if let Some(c) = s.doc_mut().components.iter_mut().find(|c| c.id == comp) {
         c.name = name.clone();
@@ -612,6 +783,79 @@ mod tests {
         let (lo, hi) = bbox(&b, "Bearing 608");
         assert!((hi.x - lo.x - 22.0).abs() < 1e-6 && (hi.z - lo.z - 7.0).abs() < 1e-6);
         assert!(b.execute("parts.insert", &json!({"family": "hex_nut", "size": "M7"})).is_err());
+    }
+
+    /// The volume of a part's bodies (the part's component, by its name).
+    fn volume(s: &mut Session, part: &str) -> f64 {
+        let comp = s.doc.components.iter().find(|c| c.name == part).map(|c| c.id).unwrap_or(0);
+        let bodies: Vec<String> = s.model.state().bodies.iter().filter(|b| s.doc.model_body_component(b) == comp).map(|b| b.name.clone()).collect();
+        let m = run(s, "inspect.measure", json!({"bodies": bodies}));
+        m["total"]["volume_mm3"].as_f64().unwrap_or_else(|| panic!("{m}"))
+    }
+
+    /// A series-5 2020 extrusion: 20 x 20 with a T-slot in each face and the core bore, any
+    /// length; its cross-section is the square less four slots and the bore (#106).
+    #[test]
+    fn extrusions_have_the_t_slot_profile() {
+        let (open, lip, chamber, straight, depth, bore) = (6.2, 1.8, 11.0, 3.0, 6.1, 4.2);
+        // The opening, the straight part of the chamber, then its 45° narrowing.
+        let floor = chamber - 2.0 * (depth - straight);
+        let slot = open * lip + chamber * (straight - lip) + (chamber + floor) / 2.0 * (depth - straight);
+        let core = std::f64::consts::PI * (bore / 2.0) * (bore / 2.0);
+        for (size, len, area) in [("2020", 100.0, 400.0 - 4.0 * slot - core), ("2040", 250.0, 800.0 - 6.0 * slot - 2.0 * core)] {
+            let mut s = Session::default();
+            let r = run(&mut s, "parts.insert", json!({"family": "extrusion", "size": size, "length": len}));
+            let name = r["name"].as_str().unwrap_or_default().to_string();
+            assert_eq!(name, format!("Extrusion {size}x{len}"));
+            let (lo, hi) = bbox(&s, &name);
+            let w = if size == "2020" { 20.0 } else { 40.0 };
+            assert!(
+                (hi.x - lo.x - 20.0).abs() < 1e-6 && (hi.y - lo.y - w).abs() < 1e-6 && (lo.z).abs() < 1e-6 && (hi.z - len).abs() < 1e-6,
+                "{lo:?} {hi:?}"
+            );
+            let v = volume(&mut s, &name);
+            // Within 1e-4 of the part: the round bore measures a little under π r² (2e-4 of it).
+            assert!((v - area * len).abs() < 1e-4 * area * len, "{size}: {v} mm³, expected {}", area * len);
+        }
+        // 1.9 cm² for a 2020 (the makers' hollow core is left solid).
+        assert!((400.0 - 4.0 * slot - core - 190.75).abs() < 0.01, "{}", 400.0 - 4.0 * slot - core);
+    }
+
+    /// A NEMA 17 x 40: the 42.3 square body up from its mounting face, the Ø22 pilot and Ø5 shaft
+    /// down, four M3 holes on the 31 mm square, and the datasheet's ratings on the part (#106).
+    #[test]
+    fn a_stepper_has_the_nema_envelope_and_its_ratings() {
+        let mut s = Session::default();
+        let r = run(&mut s, "parts.insert", json!({"family": "stepper", "size": "NEMA17-40"}));
+        let comp = r["component"].as_u64().unwrap_or(0);
+        let (lo, hi) = bbox(&s, "Stepper NEMA17-40");
+        assert!((hi.x - lo.x - 42.3).abs() < 1e-6 && (hi.y - lo.y - 42.3).abs() < 1e-6, "{lo:?} {hi:?}");
+        assert!((hi.z - 40.0).abs() < 1e-6 && (lo.z + 24.0).abs() < 1e-6, "body up 40, shaft down 24: {lo:?} {hi:?}");
+        let threads: Vec<_> = s.model.state().threads.iter().filter(|t| t.designation.starts_with("M3")).cloned().collect();
+        assert_eq!(threads.len(), 4, "{threads:?}");
+        let m = run(&mut s, "component.metadata", json!({"component": comp}));
+        let ratings = &s.doc.components.iter().find(|c| c.id == comp).map(|c| c.metadata.0.get(super::RATINGS_KEY).cloned()).unwrap_or_default();
+        assert_eq!(ratings.as_ref().and_then(|r| r["holding_torque_nm"].as_f64()), Some(0.42), "{m}");
+        let lib = run(&mut s, "parts.library", json!({"family": "stepper"}));
+        let n17 = lib["sizes"].as_array().and_then(|a| a.iter().find(|x| x["size"] == "NEMA17-40")).cloned().unwrap_or_default();
+        assert_eq!((n17["hole_pitch"].as_f64(), n17["pilot"].as_f64(), n17["shaft"].as_f64()), (Some(31.0), Some(22.0), Some(5.0)));
+        assert!(s.execute("parts.insert", &json!({"family": "stepper", "size": "NEMA42"})).is_err());
+        assert!(s.execute("parts.insert", &json!({"family": "extrusion", "size": "2525"})).is_err());
+    }
+
+    /// Picked on the rim of its Ø22 pilot hole, a stepper sits on the plate with its pilot and
+    /// shaft through the hole.
+    #[test]
+    fn a_stepper_seats_in_its_pilot_hole() {
+        let mut s = Session::default();
+        run(&mut s, "solid.box", json!({"length": 60, "width": 60, "height": 5, "body_name": "Plate"}));
+        run(&mut s, "solid.hole", json!({"position": [30, 30, 5], "diameter": 22.2}));
+        let r = run(&mut s, "parts.insert", json!({"family": "stepper", "size": "NEMA17-40", "at": [41.1, 30, 5]}));
+        assert!(r["joint"].is_number(), "{r}");
+        let (lo, hi) = bbox(&s, "Stepper NEMA17-40");
+        // The body on the top face, the shaft through the hole below: the part's −z goes in.
+        assert!((hi.z - (5.0 + 40.0)).abs() < 1e-6 && (lo.z - (5.0 - 24.0)).abs() < 1e-6, "{lo:?} {hi:?}");
+        assert!(((lo.x + hi.x) / 2.0 - 30.0).abs() < 1e-6 && ((lo.y + hi.y) / 2.0 - 30.0).abs() < 1e-6);
     }
 
     #[test]
