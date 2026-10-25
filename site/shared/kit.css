@@ -168,6 +168,8 @@ summary:hover b { text-decoration: underline 2px var(--lime); text-underline-off
 .bom h3 { margin-bottom: 8px } .bom td.n { white-space: nowrap; padding-left: 12px }
 .corners { max-width: 640px; margin-top: 24px }
 figure video { width: 100%; max-width: 900px; height: auto; border: 1px solid var(--rule); background: var(--wash) }
+/* a showcase's hero video runs the page's full width; a video under a 3D view keeps its distance */
+figure.wide video { max-width: none; max-height: min(70vh, 640px); object-fit: cover; object-position: 50% 70% } .stage3d + .caption + figure { margin-top: 32px }
 .gap .aside { max-width: 420px; margin-top: 14px }
 /* on a phone the stage table stacks: the stage, its numbers on one line, then what it did */
 @media (max-width: 640px) {

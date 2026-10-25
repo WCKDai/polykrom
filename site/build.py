@@ -45,7 +45,7 @@ def p_mark(fill='currentColor', ground=None, animate=False):
 
 
 # The masthead of every page: the p and the name, then the links split by rules (the WCKD kit).
-PAGES = [('home', 'overview', ''), ('so101', 'so-101', 'so101/'), ('printer', 'printer', 'printer/'), ('kestrel', 'kestrel', 'kestrel/'), (None, 'open the app', 'app/'),
+PAGES = [('home', 'overview', ''), ('so101', 'so-101', 'so101/'), ('printer', 'printer', 'printer/'), ('dog', 'dog', 'dog/'), ('kestrel', 'kestrel', 'kestrel/'), (None, 'open the app', 'app/'),
          (None, 'docs', 'docs/'), (None, 'roadmap', 'https://github.com/wckdboy/polykrom/blob/main/docs/ROADMAP.md'),
          (None, 'source', 'https://github.com/wckdboy/polykrom')]
 
@@ -76,9 +76,9 @@ def loop_svg():
     return ''.join(out)
 
 
-# Pictures on the home page and the printer showcase (with its design), from the media branch
-# (screenshots aren't committed), pinned by hash. A name with a folder keeps it under media/.
-MEDIA_AT = 'https://raw.githubusercontent.com/wckdboy/polykrom/0656c13e/'
+# Pictures on the home page and the printer and dog showcases (with their designs), from the media
+# branch (screenshots aren't committed), pinned by hash. A name with a folder keeps it under media/.
+MEDIA_AT = 'https://raw.githubusercontent.com/wckdboy/polykrom/39697f84/'
 MEDIA = {
     'site-lime-workspace.jpg': 'ebaf83fb49e7092e19ab710a989da6914a518d77ae84b39ce6c43be7a0c8274a',
     'site-follow-along-agent.jpg': '9750599c533542fc5de52cd527e4accf17c1fe0392923ede2859350ae42b912f',
@@ -89,6 +89,12 @@ MEDIA = {
     'printer/printer-print.mp4': '58a7f61bdde761f972325725416aec7cc369b97a576b3b2cb5acdad7de60363b',
     'printer/printer-print.jpg': 'c5ac7e95f5013f327a095832ca7dc55931d3b4c1fb13f18ed021b7cd6425df36',
     'printer/printer-render.jpg': 'fe79338fa677596852308252350e16183c008b051f7634c467333a7de6de0d52',
+    'dog/dog.polykrom': '192a92185caeec1c76cfdd4c68a0e3405abaa41e7f7b53744ab02c2cf3c29c06',
+    'dog/dog-walk.mp4': '43da397f3b248222df1acf1e3cf78dc7ad0650b9988d39784cce3a437ff2bdd4',
+    'dog/dog-walk.jpg': 'acebd2aaf31b3d3ea8ce7c09c1c470da996bd4c7dbc6d36764ad0157877a5234',
+    'dog/dog-gait.mp4': '668aa7a527cf668cb0f9cd00376edb1b0f9ab7eab6688298c8febd35448a874d',
+    'dog/dog-gait.jpg': '8f7642aad5c8df570da81ba582e42d8212ed52b47fa5dea754493200dd376cf9',
+    'dog/dog-render.jpg': '5cbe5e793af13535d0a145e57afb0c4e0712f49e9a61e563e2e6637306cf13fb',
 }
 
 
@@ -150,6 +156,7 @@ def main():
     kestrel()
     so101()
     printer()
+    dog()
     fill_navs()
 
 
@@ -245,6 +252,49 @@ def printer():
         meshpack.pack(urdf, out / 'meshes.bin', out / 'meshes.json')
         (out / 'meshes.bin.gz').write_bytes(gzip.compress((out / 'meshes.bin').read_bytes(), 9))
         (out / 'meshes.bin').unlink()
+
+
+def dog():
+    """The robot dog showcase (D3): its page in site/dog, with the MuJoCo replay script; from the
+    agent's design (fetched with the media) the URDF and a mesh pack for the viewer, the Crawl
+    study's motion, the BOM and the MJCF the walk was replayed on, made by the CLI, so they always
+    match it."""
+    import gzip, json, os, subprocess, tempfile, zipfile
+    out = OUT / 'dog'
+    shutil.copytree(ROOT / 'site' / 'dog', out)
+    cli = Path(os.environ.get('POLYKROM_CLI', ROOT / 'target' / 'release' / 'polykrom-cli'))
+    if not cli.exists():
+        print('note: %s is missing, so the dog showcase has no model in this build' % cli)
+        return
+    design = OUT / 'media' / 'dog' / 'dog.polykrom'
+    with tempfile.TemporaryDirectory() as tmp:
+        urdf, mjcf = Path(tmp) / 'urdf', Path(tmp) / 'mjcf'
+        urdf.mkdir()
+        mjcf.mkdir()
+        script = {'commands': [
+            {'command': 'file.export', 'params': {'path': str(urdf / 'dog.urdf')}},
+            {'command': 'motion.plot', 'params': {'study': 'Crawl'}},
+            {'command': 'assembly.bom', 'params': {'path': str(out / 'dog-bom.csv')}},
+            {'command': 'file.export', 'params': {'path': str(mjcf / 'dog.xml'), 'format': 'mjcf', 'floating': True}},
+        ]}
+        sc, res = Path(tmp) / 'dog.json', Path(tmp) / 'dog.out.json'
+        sc.write_text(json.dumps(script))
+        subprocess.run([str(cli), 'run', str(sc), '--in', str(design), '--quiet', '--results', '--json-out', str(res)], check=True)
+        plot = json.loads(res.read_text())[1]
+        (out / 'motion.json').write_text(json.dumps({'steps': plot['steps'], 'joints': [
+            {'name': j['name'], 'unit': j['unit'], 'value': [round(v, 4) for v in j['value']]} for j in plot['joints']]}, separators=(',', ':')))
+        # The page only draws it: collisions and inertias halve the file, which is served uncompressed.
+        (out / 'urdf').mkdir()
+        (out / 'urdf' / 'dog.urdf').write_text(re.sub(r'\s*<(collision|inertial)>.*?</\1>', '', (urdf / 'dog.urdf').read_text(), flags=re.S))
+        sys.path.insert(0, str(ROOT / 'site'))
+        import meshpack
+        meshpack.pack(urdf, out / 'meshes.bin', out / 'meshes.json')
+        (out / 'meshes.bin.gz').write_bytes(gzip.compress((out / 'meshes.bin').read_bytes(), 9))
+        (out / 'meshes.bin').unlink()
+        # The model MuJoCo walked, for mujoco-replay.py.
+        with zipfile.ZipFile(out / 'dog-mjcf.zip', 'w', zipfile.ZIP_DEFLATED) as z:
+            for f in sorted(mjcf.iterdir()):
+                z.write(f, 'dog/' + f.name)
 
 
 def print_surface(urdf, stl, rgba, thick=0.001):

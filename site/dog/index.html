@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Robot dog · Polykrom</title>
+<meta name="description" content="A 12-joint robot dog designed from an empty file by an AI agent in Polykrom, checked to stand and keep its balance through a crawl gait, and replayed in MuJoCo, where it walks.">
+<meta property="og:title" content="A robot dog, designed by an AI agent in Polykrom, that walks">
+<meta property="og:description" content="Six stages, 2 h 4 min, $18.91: a 12-joint quadruped of 154 parts, its balance and servo loads checked through a crawl gait, and 128.5 mm walked in MuJoCo with the body free.">
+<meta property="og:image" content="https://polykrom.app/media/dog/dog-walk.jpg">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#111111" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="../mark.svg" type="image/svg+xml">
+<script type="importmap">
+{"imports": {"three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}
+</script>
+<link rel="preload" href="../fonts/jetbrains-mono-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="../shared/kit.css">
+</head>
+<body>
+{{NAV:dog}}
+
+<header class="band"><div class="in">
+  <p class="kicker">Showcase · D3 · robot dog</p>
+  <h1>A robot dog, designed by an AI agent in Polykrom, that <em>walks</em>.</h1>
+  <p class="lede">The third rung of the ladder: a quadruped with twelve servo joints, from an empty design. An AI agent (Claude Opus 5.5) built it in six stages with nothing but Polykrom's tools: the body, one leg, then four, a standing pose found by inverse kinematics and a crawl gait keyed on the twelve servos. It checked in Polykrom that the dog stands and keeps its balance through every step of the gait. Then the design went to MuJoCo, an independent physics engine, with nothing holding the body up. It stands, and it walks.</p>
+</div></header>
+
+<div class="viewer band"><div class="in">
+  <figure class="wide"><video src="../media/dog/dog-walk.mp4" poster="../media/dog/dog-walk.jpg" width="960" height="608" autoplay muted loop playsinline preload="auto" aria-label="The lime and black robot dog walks forward on a grid in MuJoCo, lifting one foot at a time"></video></figure>
+  <p class="caption">MuJoCo 3, running the MJCF Polykrom exported, with the base free. Polykrom's Crawl study is replayed as the twelve servos' targets, 0.05 s per step, three cycles. Nothing holds the body up: physics decides whether it walks.</p>
+  <div class="stats of3">
+    <div class="stat"><div class="n">128.5 mm</div><div class="t">walked forward in MuJoCo in three cycles, 0.1 mm sideways</div></div>
+    <div class="stat"><div class="n">42.8 mm</div><div class="t">per cycle, against the 40 mm stride designed</div></div>
+    <div class="stat"><div class="n">0.11°</div><div class="t">the most the body tilted while it walked</div></div>
+    <div class="stat"><div class="n">20.77 mm</div><div class="t">smallest stability margin through the gait, against 10 required</div></div>
+    <div class="stat"><div class="n">31 %</div><div class="t">of stall torque, the hardest-working servo in the gait</div></div>
+    <div class="stat"><div class="n">2 h 4 min</div><div class="t">agent time, $18.91, 154 parts</div></div>
+  </div>
+</div></div>
+
+<section class="band"><div class="in">
+  <h2>How it was built</h2>
+  <p class="sub">An AI agent (Claude Opus 5.5) running headless, with Polykrom's MCP tools as its only tools, built the dog in six stages, each picking up the design the stage before had saved. Times, costs and tool calls are from the agent's run records.</p>
+  <div class="scroll"><table class="stagetable">
+    <thead><tr><th>Stage</th><th>What the agent did</th><th style="text-align:right">Time</th><th style="text-align:right">Cost</th><th style="text-align:right">Calls</th></tr></thead>
+    <tbody>
+      <tr><td>1. Body</td><td>A 230 × 110 × 55 mm chassis in printed PLA under a black 2 mm cover held by 6 M3 screws; a Raspberry Pi 4 on four M2.5 standoffs, a 2S LiPo under a printed strap, the four hip-abduction STS3215 servos on printed bulkheads (16 M2 screws), and the pixel-p badge.</td><td class="n">7.9 min</td><td class="n">$2.39</td><td class="n">43</td></tr>
+      <tr><td>2. One leg</td><td>The front-left leg: a hip bracket, hip-flex and knee STS3215 servos, a 100 mm upper and a 110 mm lower leg, a 20 mm TPU foot. Joints FL_abd ±30°, FL_hip ±90°, FL_knee −150° to 0°. It swept every joint and fixed the collision it found: a screw head hit the chassis at hip +90° with abduction past 24.3°.</td><td class="n">17.6 min</td><td class="n">$3.44</td><td class="n">57</td></tr>
+      <tr><td>3. Four legs</td><td>The three other legs, by mirroring: twelve independent joints, 142 bodies, no interferences.</td><td class="n">31.2 min</td><td class="n">$4.55</td><td class="n">74</td></tr>
+      <tr><td>4. Stand</td><td>The standing pose by inverse kinematics, hip 57.61° and knee −107.72°, with the body's underside 120 mm up. It split each servo horn into a part of its own, so the horn turns with its joint.</td><td class="n">47.3 min</td><td class="n">$3.74</td><td class="n">57</td></tr>
+      <tr><td>5. Gait</td><td>A Crawl study of 160 steps, keyed on the twelve joints only, with the inverse kinematics stored as design parameters.</td><td class="n">17.3 min</td><td class="n">$3.11</td><td class="n">41</td></tr>
+      <tr><td>6. Export</td><td>The MJCF for MuJoCo (a free base, twelve position actuators), the render and the bill of materials.</td><td class="n">2.6 min</td><td class="n">$1.68</td><td class="n">43</td></tr>
+    </tbody>
+    <tfoot><tr><td>Total</td><td></td><td class="n">2 h 4 min</td><td class="n">$18.91</td><td class="n">315</td></tr></tfoot>
+  </table></div>
+</div></section>
+
+<section class="band"><div class="in">
+  <h2>Measured, not claimed</h2>
+  <p class="sub">The agent checked the dog with Polykrom's statics: the four feet as the support, the ground at z = 0, the servos' rated stall torque of 1.912 N·m. Then MuJoCo, a physics engine that knows nothing of Polykrom, ran the MJCF the agent exported.</p>
+  <h3 class="briefs-h">In Polykrom</h3>
+  <ul class="checks">
+    <li><span class="tag v">verified</span><b>It stands:</b> the centre of mass is at (0.01, 0.00, 123.5) mm, over the polygon of the four feet, 114.7 mm inside its nearest edge.</li>
+    <li><span class="tag v">verified</span><b>Servo loads standing:</b> gravity puts 0.288 N·m on the knees (15.1 % of stall), 0.202 N·m on the abduction joints (10.6 %) and 0.058 N·m on the hips (3.0 %).</li>
+    <li><span class="tag v">verified</span><b>Balance through the crawl:</b> one foot at a time (rear left, front left, rear right, front right), each lifted 30 mm and moved 40 mm, the body shifted over the other three feet before each lift. The smallest stability margin over the whole gait is 20.77 mm, against the 10 mm required.</li>
+    <li><span class="tag v">verified</span><b>Servo loads walking:</b> the hardest-working joint is the rear right knee at 0.596 N·m, 31 % of stall.</li>
+    <li><span class="tag v">verified</span><b>No collisions:</b> no interference in any of the gait's 161 samples.</li>
+    <li><span class="tag v">verified</span><b>Planted feet stay put:</b> the feet on the ground follow their paths within 0.04 mm.</li>
+  </ul>
+  <h3 class="briefs-h">In MuJoCo 3</h3>
+  <ul class="checks">
+    <li><span class="tag v">verified</span><b>It stands:</b> 2 s simulated with the base free; all twelve servos hold within 0.02° of their targets at their rated force limit (±1.912 N·m). No NaN, no warnings.</li>
+    <li><span class="tag v">verified</span><b>It walks:</b> the Crawl study replayed as servo targets, 0.05 s per step, three cycles, 24.5 s simulated. The dog walks 128.5 mm forward, 42.8 mm per cycle against the 40 mm designed, drifts 0.1 mm sideways, and its body never tilts more than 0.11°.</li>
+  </ul>
+</div></section>
+
+<section class="band"><div class="in">
+  <h2>The crawl, in Polykrom</h2>
+  <p class="sub">The agent's Crawl study, keyed only on the twelve joints. Polykrom's motion studies can't yet move a free-floating base, so here the body stays still and only the feet move. The walk at the top of the page is MuJoCo's.</p>
+  <div class="stage3d" id="stage" aria-label="The robot dog in 3D, playing its Crawl study: one foot lifts at a time while the body stays still">
+    <img class="poster" src="../media/dog/dog-gait.jpg" width="900" height="600" alt="The dog in Polykrom's colours: a lime chassis under a black cover, lime legs, black servos and feet">
+    <div class="loading" id="loading">Loading the dog…</div>
+    <div class="hud">
+      <button id="play" type="button">Pause</button>
+      <input id="scrub" type="range" min="0" max="160" step="0.1" value="0" aria-label="Crawl study step">
+      <div class="read" id="read"><span>step <b id="r-step">0</b></span></div>
+    </div>
+  </div>
+  <p class="caption">Live: the URDF Polykrom exported from the agent's design, driven by the Crawl study's recorded joint values. Drag to orbit, scroll to zoom.</p>
+  <figure class="gait"><video src="../media/dog/dog-gait.mp4" poster="../media/dog/dog-gait.jpg" width="900" height="600" autoplay muted loop playsinline preload="none" aria-label="Polykrom's export of the Crawl study: the dog lifts and moves one foot at a time"></video><figcaption>The Crawl study as Polykrom's headless renderer exported it.</figcaption></figure>
+</div></section>
+
+<section class="band"><div class="in">
+  <h2>Bill of materials</h2>
+  <p class="sub">154 parts, 1.428 kg, from <code>assembly.bom</code>: twelve 55 g servos, a 46 g Raspberry Pi 4, a 120 g battery and a 274.4 g chassis. The servos and screws come from Polykrom's library with their part numbers. The rest were modelled for this dog and have no part number yet; the <span class="mk"></span>printed ones are PLA, the feet TPU. The Pi and the battery are envelopes with their masses.</p>
+  <div class="bom">
+    <div>
+      <h3>From the library</h3>
+      <table>
+        <thead><tr><th>Part</th><th style="text-align:right">Qty</th></tr></thead>
+        <tbody>
+          <tr><td>STS3215 servo, with its horn</td><td class="n">12</td></tr>
+          <tr><td>ISO 4762 M2 × 8</td><td class="n">48</td></tr>
+          <tr><td>ISO 4762 M3 × 6</td><td class="n">50</td></tr>
+          <tr><td>ISO 4762 M3 × 8</td><td class="n">6</td></tr>
+          <tr><td>ISO 4762 M2.5 × 6</td><td class="n">4</td></tr>
+        </tbody>
+      </table>
+      <h3 class="briefs-h">Made for this dog</h3>
+      <table>
+        <thead><tr><th>Part</th><th style="text-align:right">Qty</th></tr></thead>
+        <tbody>
+          <tr><td><span class="mk"></span>Body (chassis)</td><td class="n">1</td></tr>
+          <tr><td><span class="mk"></span>Cover</td><td class="n">1</td></tr>
+          <tr><td><span class="mk"></span>Pixel-p badge</td><td class="n">1</td></tr>
+          <tr><td><span class="mk"></span>Battery strap</td><td class="n">1</td></tr>
+          <tr><td><span class="mk"></span>Hip bracket</td><td class="n">4</td></tr>
+          <tr><td><span class="mk"></span>Upper leg</td><td class="n">4</td></tr>
+          <tr><td><span class="mk"></span>Lower leg</td><td class="n">4</td></tr>
+          <tr><td>Foot, TPU</td><td class="n">4</td></tr>
+          <tr><td>Servo horn, its own part</td><td class="n">12</td></tr>
+          <tr><td>Raspberry Pi 4</td><td class="n">1</td></tr>
+          <tr><td>2S LiPo battery</td><td class="n">1</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <figure><img class="scan" src="../media/dog/dog-render.jpg" width="1600" height="1000" alt="The agent's render of the dog: a lime chassis under a black cover with the pixel-p badge, four lime legs, black servos and feet" loading="lazy"><figcaption>The agent's render, as it came out. Every leg, bracket and foot is its own line in the CSV.</figcaption></figure>
+  </div>
+</div></section>
+
+<section class="band" id="short"><div class="in">
+  <h2>Where Polykrom fell short</h2>
+  <p class="sub">A walking machine finds what a printer didn't. These turned up during the run; the last three are open issues being fixed.</p>
+  <div class="short">
+    <div class="gap"><div class="area">Free-floating base</div><div><p>Polykrom's gait study can't move the body.</p><p>A motion study can't move a free-floating base, so in the Crawl study, its video and the 3D view above, the body stays still and the feet move. Polykrom's statics showed the dog keeps its balance at every step, but only MuJoCo, with the body free, shows that it really walks.</p></div></div>
+    <div class="gap"><div class="area">Render</div><div><p>The render is a preview.</p><p>The agent's render is preview quality: no shadows, a flat studio.</p></div></div>
+    <div class="gap"><div class="area">Driven joints</div><div><p>Driving a joint could reshape a part.</p><p>A part cut from another component could change shape when a joint moved. → <a href="https://github.com/wckdboy/polykrom/issues/168">#168</a>, being fixed in <a href="https://github.com/wckdboy/polykrom/pull/173">#173</a></p></div></div>
+    <div class="gap"><div class="area">Speed</div><div><p>Small edits re-evaluated the whole assembly.</p><p>Renames and resizes re-evaluated the whole assembly: 79 of the run's 124 minutes were spent inside Polykrom's tools. → <a href="https://github.com/wckdboy/polykrom/issues/169">#169</a></p></div></div>
+    <div class="gap"><div class="area">Servo horns</div><div><p>Servo horns were fused to the case.</p><p>A library servo's horn was part of its case, so it couldn't turn with its joint. In the stand stage the agent split each of the twelve horns into a part of its own. → <a href="https://github.com/wckdboy/polykrom/issues/170">#170</a></p></div></div>
+  </div>
+</div></section>
+
+<section class="band"><div class="in">
+  <h2>Take it apart yourself</h2>
+  <p class="sub">The agent's design as it left it, the bill of materials, the Crawl study's joint values, the MJCF it exported, and the script that replays the study on it in MuJoCo (with MuJoCo, NumPy and imageio installed: <code>python3 mujoco-replay.py dog.polykrom dog/dog.xml Crawl 3 0.05 walk.mp4</code>).</p>
+  <div class="dl">
+    <a class="btn go" href="../media/dog/dog.polykrom" download>dog.polykrom (3.5 MB)</a>
+    <a class="btn" href="dog-bom.csv" download>BOM (CSV)</a>
+    <a class="btn" href="motion.json" download>Crawl study (JSON)</a>
+    <a class="btn" href="dog-mjcf.zip" download>MJCF (zip)</a>
+    <a class="btn" href="mujoco-replay.py" download>mujoco-replay.py</a>
+    <a class="btn" href="../printer/">D2: the 3D printer →</a>
+  </div>
+</div></section>
+
+<footer class="band"><div class="in">
+  <div>MuJoCo is Google DeepMind's open-source physics engine. Polykrom is not affiliated with it, with Raspberry Pi or with any parts maker named here.</div>
+  <div>Built 2026-10-25 with Polykrom and Claude, through Polykrom's MCP server. Polykrom is open source under MIT or Apache-2.0.</div>
+</div></footer>
+
+<script type="module">
+import { mount } from "../shared/viewer.js";
+const $ = (id) => document.getElementById(id);
+const PRINTED = /^(Body|Badge|Battery_Strap|Hip_Bracket|Upper_Leg|Lower_Leg)/;
+const looks = (link) => /^(Cover|Foot)/.test(link) ? { color: "#111111", metalness: 0.05, roughness: 0.6 }
+  : PRINTED.test(link) ? { color: "#CCFF00", metalness: 0.05, roughness: 0.55 }
+  : undefined;
+try {
+  const motion = await (await fetch("motion.json")).json();
+  let scrubbing = false;
+  const narrow = $("stage").clientWidth < 1.2 * $("stage").clientHeight;
+  const v = await mount($("stage"), {
+    urdf: "urdf/dog.urdf", motion, pack: { bin: "meshes.bin", json: "meshes.json" }, colors: looks,
+    camera: { position: [0.42, -0.5, 0.32].map((c) => c * (narrow ? 1.5 : 1)), target: [0, 0, 0.07] },
+    onStep(s) {
+      if (!scrubbing) $("scrub").value = s;
+      $("r-step").textContent = Math.round(s);
+    },
+  });
+  $("loading").remove();
+  $("stage").classList.add("live");
+  $("scrub").max = v.steps;
+  const label = () => { $("play").textContent = v.playing ? "Pause" : "Play"; };
+  label();
+  $("play").onclick = () => { v.play(!v.playing); label(); };
+  $("scrub").oninput = (e) => { scrubbing = true; v.play(false); label(); v.seek(+e.target.value); scrubbing = false; };
+} catch (e) {
+  $("loading").textContent = "The 3D view needs WebGL. The video below shows the same study.";
+  console.error(e);
+}
+</script>
+<script type="module" src="../shared/motion.js"></script>
+</body>
+</html>
