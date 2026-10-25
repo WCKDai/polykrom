@@ -991,8 +991,20 @@ const CORNER_PICK_MM: f64 = 0.01;
 /// A corner given where it is (`point: [x, y]`, in the sketch's coordinates) as the point there
 /// that two or more curves end at, so a corner can be picked as it is seen; anything else as given.
 fn corner_at(sk: &Sketch, q: &Value, cmd: &str) -> Result<Value> {
-    let Some(at) = q.get("point").filter(|v| v.is_array()).and_then(vec2) else { return Ok(q.clone()) };
-    let ends = |i: usize| sk.curves.iter().filter(|c| c.kind.ends().is_some_and(|(a, b)| a == i || b == i)).count();
+    let Some(given) = q.get("point").filter(|v| v.is_array()) else { return Ok(q.clone()) };
+    let at = vec2(given).ok_or_else(|| bad(cmd, "`point` must be a corner (\"l1.end\") or where it is: [x, y]"))?;
+    // The curves ending at a point or at a point held coincident with it (curves drawn to meet).
+    let partners = |i: usize| {
+        sk.constraints.iter().filter_map(move |k| match k.kind {
+            ConstraintKind::Coincident { p, q } if p == i => Some(q),
+            ConstraintKind::Coincident { p, q } if q == i => Some(p),
+            _ => None,
+        })
+    };
+    let ends = |i: usize| {
+        let at_point = |j: usize| sk.curves.iter().filter(|c| c.kind.ends().is_some_and(|(a, b)| a == j || b == j)).count();
+        at_point(i) + partners(i).map(at_point).sum::<usize>()
+    };
     let nearest = sk.points.iter().enumerate().filter(|(i, _)| ends(*i) >= 2).min_by(|a, b| a.1.pos.dist(at).total_cmp(&b.1.pos.dist(at)));
     match nearest {
         Some((_, p)) if p.pos.dist(at) <= CORNER_PICK_MM => Ok(json!({ "point": p.id })),

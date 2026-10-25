@@ -286,6 +286,8 @@ fn fillet_corners_picked_by_coordinates() {
     assert!(close(a[0], want), "{a:?} vs {want}");
     let e = s.execute("sketch.fillet", &json!({"point": [0, 46], "radius": 5})).unwrap_err().to_string();
     assert!(e.contains("no corner at [0, 46]") && e.contains("nearest"), "{e}");
+    let e = s.execute("sketch.fillet", &json!({"point": [65], "radius": 5})).unwrap_err().to_string();
+    assert!(e.contains("`point` must be"), "{e}");
 }
 
 #[test]
@@ -929,8 +931,8 @@ fn fillet_a_line_and_an_arc() {
 #[test]
 fn fillet_a_line_and_an_arc_drawn_to_meet_at_a_point() {
     // #1208: the arc starts at the line's end by coordinates, so the corner is two points held
-    // together by a Coincident constraint. By point and by naming the two curves.
-    for how in [json!({"point": "l1.end"}), json!({"a": "l1", "b": "a1"})] {
+    // together by a Coincident constraint. By point, by where it is, and by naming the two curves.
+    for how in [json!({"point": "l1.end"}), json!({"point": [40, 0]}), json!({"a": "l1", "b": "a1"})] {
         let mut s = new_sketch();
         run(&mut s, "sketch.line", json!({"points": [[0, 0], [40, 0]], "ids": ["l1"]}));
         run(&mut s, "sketch.arc.center_point", json!({"center": [50, 0], "start": [60, 0], "end": [40, 0], "id": "a1"}));
