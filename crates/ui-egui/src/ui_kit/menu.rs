@@ -260,12 +260,8 @@ pub(crate) fn workspace_menu(ui: &mut egui::Ui, items: &[Item], key_row: Option<
                 };
                 let planned = tabs.is_none();
                 let current = item.shortcut == "current";
-                let (accent, soft) = if !planned && slug == "render" {
-                    (t.render_fill, t.render_soft)
-                } else {
-                    let accent = if planned { t.text_dim } else { t.accent };
-                    (accent, t.panel.lerp_to_gamma(accent, 0.10))
-                };
+                let accent = if planned { t.text_dim } else { t.accent };
+                let soft = t.panel.lerp_to_gamma(accent, 0.10);
                 let (r, resp) = ui.allocate_exact_size(
                     vec2(width, if planned { t.space_24 * 2.0 + t.space_12 } else { t.space_24 * 3.0 }),
                     if item.enabled { Sense::click() } else { Sense::hover() },

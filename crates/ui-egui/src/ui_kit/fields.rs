@@ -353,16 +353,32 @@ pub fn cell_editor(ui: &mut Ui, id: egui::Id, value: &mut String, hint: &str, in
 
 /// Stable-ID cell/name editor with a caller-supplied character cap. Tokens: cell_editor tokens.
 pub(crate) fn bounded_cell_editor(ui: &mut Ui, id: egui::Id, value: &mut String, hint: &str, invalid: bool, limit: usize) -> Response {
-    cell_editor_frame(ui, id, value, hint, invalid, limit, true)
+    cell_editor_frame(ui, id, value, hint, invalid, limit, CellLook::Code)
 }
 
-fn cell_editor_frame(ui: &mut Ui, id: egui::Id, value: &mut String, hint: &str, invalid: bool, limit: usize, frame: bool) -> Response {
+/// Framed, bounded name field in the proportional label font: a name, not an expression.
+/// Tokens: cell_editor tokens.
+pub(crate) fn bounded_name_field(ui: &mut Ui, id: egui::Id, value: &mut String, hint: &str, limit: usize) -> Response {
+    cell_editor_frame(ui, id, value, hint, false, limit, CellLook::Name)
+}
+
+/// A cell editor's look: unframed in a table cell, or framed in monospace (a value) or the label
+/// font (a name).
+#[derive(Clone, Copy, PartialEq)]
+enum CellLook {
+    Bare,
+    Code,
+    Name,
+}
+
+fn cell_editor_frame(ui: &mut Ui, id: egui::Id, value: &mut String, hint: &str, invalid: bool, limit: usize, look: CellLook) -> Response {
     let t = Tokens::get();
+    let frame = look != CellLook::Bare;
     let editor = text_input(egui::TextEdit::singleline(value))
         .char_limit(limit)
         .id(id)
         .hint_text(crate::i18n::tr_label(hint))
-        .font(if frame { egui::FontId::monospace(t.font_label) } else { egui::FontId::proportional(t.font_label) })
+        .font(if look == CellLook::Code { egui::FontId::monospace(t.font_label) } else { egui::FontId::proportional(t.font_label) })
         .background_color(if invalid { t.form_error_fill } else { t.input_fill() })
         .text_color(if invalid { t.form_error } else { t.form_ink })
         .clip_text(true);
@@ -644,7 +660,7 @@ pub(crate) fn library_cell(ui: &mut Ui, id: egui::Id, value: &mut String, hint: 
     let response = ui
         .scope_builder(egui::UiBuilder::new().max_rect(field).layout(egui::Layout::left_to_right(egui::Align::Center)), |ui| {
             ui.set_clip_rect(ui.clip_rect().intersect(field));
-            cell_editor_frame(ui, id, value, hint, false, usize::MAX, false)
+            cell_editor_frame(ui, id, value, hint, false, usize::MAX, CellLook::Bare)
         })
         .inner;
     let button = egui::Rect::from_min_max(egui::pos2(split, rect.top()), rect.max);
