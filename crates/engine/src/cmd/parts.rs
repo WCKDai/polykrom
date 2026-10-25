@@ -14,7 +14,9 @@
 //! carriage, inserted at the same point and direction, sits on it at z = 0. A pulley's bore is
 //! along z, its hub from z = 0. An actuator's mounting face is z = 0 and its output turns about
 //! the z axis, its horn or flange on top (`Servo`, `Bldc`); its output is also a named joint
-//! origin, `<part> output`.
+//! origin, `<part> output`. The horn (a motor's rotor bell or output flange) is a part of its own,
+//! `<part> horn` (`<part> rotor`), placed in the actuator's component: it hangs on the case until a
+//! joint turns it, and the two weigh the rated mass together.
 //!
 //! Ratings (`RATINGS_KEY` in the part's component metadata), in SI units under the keys robot
 //! export (URDF/MJCF effort and velocity limits) reads: a stepper's `holding_torque_nm`; an
@@ -27,6 +29,8 @@
 
 use serde_json::{Value, json};
 use solidcraft_geom::Vec3;
+
+use solidcraft_doc::joints::{JointOrigin, NamedOrigin, Snap};
 
 use super::CommandSpec;
 use crate::params::{bad, num, str_, vec3};
@@ -45,7 +49,10 @@ pub static COMMANDS: &[CommandSpec] = &[
          \"MGN12\", \"MGN12H\", \"T8\", \"STS3215\", \"AK80-6\": parts.library lists them); \
          length? (mm; screws, bolts, set screws, pins, extrusions, rails, lead screws; default a standard length near 2.5 d, 200 for the others); \
          at?: [x,y,z] on a hole's rim or wall (the part seats on the hole's face with a rigid joint) | point?: [x,y,z] with direction?: [x,y,z] (no joint); name? \
-         → component, occurrence, name, joint?, output? (a servo's or motor's output axis: the joint origin `<name> output` to turn a revolute joint about)",
+         → component, occurrence, name, joint?, output? (a servo's or motor's output axis: the joint origin `<name> output` on its case to turn a revolute joint about), \
+         output_part? (the occurrence of its horn or rotor, `<name> horn` | `<name> rotor`, a part of its own placed in the actuator: it stays on the case until a joint moves it; \
+         to turn it with the link the revolute about `output` turns, join it to the link: joint.as_built {type: rigid, a: link, b: output_part}; or turn it about `output` itself: \
+         joint.as_built {type: revolute, a: occurrence, b: output_part, at: output})",
     ),
     CommandSpec::new("parts.resize", "Change Part Size", resize_atomic).icon("scale")
         .params("component: id|name of an inserted part; size?; length? — rebuilds it (joints keep it seated)"),
@@ -199,6 +206,9 @@ struct Bldc {
     steps: [(f64, f64); 2],
     /// Holes in the output's top: bolt circle Ø, number, Ø, depth.
     output_holes: (f64, u32, f64, f64),
+    /// The height of the part that turns (the rotor's bell, or the output flange), down from the
+    /// top.
+    rotor: f64,
     /// Holes in the mounting face: bolt circle Ø, number, Ø, depth.
     mount_holes: (f64, u32, f64, f64),
     peak_torque_nm: f64,
@@ -268,10 +278,11 @@ const BLDCS: [Bldc; 2] = [
     // T-Motor GB4106 gimbal motor (KV53): store.tmotor.com/product/gb4106-gimbal-type.html and its
     // drawing store.tmotor.com/images/202408/271724739964255712.jpg: Ø47.75 x 20, bore Ø5.6, rotor
     // 4 M2.5 on Ø15, base 4 M3 on Ø25, 0.2 N·m, 3-6S, 70 g with cable. Not published: the holes'
-    // depth (3), a rated torque, Kt; the speed is Kv × 22.2 V (6S). Chosen over the GM4108H-120T,
-    // whose hole patterns are not published.
+    // depth (3), a rated torque, Kt, the split between the base and the turning bell (14 of the 20,
+    // scaled from the drawing's side view); the speed is Kv × 22.2 V (6S). Chosen over the
+    // GM4108H-120T, whose hole patterns are not published.
     Bldc { size: "GB4106", body: (47.75, 20.0, 5.6), pilot: (0.0, 0.0), steps: [(0.0, 0.0), (0.0, 0.0)],
-        output_holes: (15.0, 4, 2.05, 3.0), mount_holes: (25.0, 4, 2.5, 3.0),
+        output_holes: (15.0, 4, 2.05, 3.0), rotor: 14.0, mount_holes: (25.0, 4, 2.5, 3.0),
         peak_torque_nm: 0.2, rated_torque_nm: None, no_load_speed_rpm: 53.0 * 22.2, voltage_v: 22.2, gear_ratio: 1.0,
         kv_rpm_per_v: 53.0, kt_nm_per_a: None, mass_kg: 0.070 },
     // CubeMars AK80-6 KV100, 6:1 quasi-direct drive: cubemars.com/goods-981-AK80-6.html (48 V; 6 N·m
@@ -280,7 +291,7 @@ const BLDCS: [Bldc; 2] = [
     // Ø71 driver cover 11 long behind, the Ø48 step and Ø37 output 3 proud of the front (the output
     // 1.3), 6 M4 6 deep on Ø28 in the output, 8 M3 3 deep on Ø85 in the back.
     Bldc { size: "AK80-6", body: (98.0, 38.5 - 11.0 - 3.0, 0.0), pilot: (71.0, 11.0), steps: [(48.0, 1.7), (37.0, 1.3)],
-        output_holes: (28.0, 6, 3.3, 6.0), mount_holes: (85.0, 8, 2.5, 3.0),
+        output_holes: (28.0, 6, 3.3, 6.0), rotor: 1.3, mount_holes: (85.0, 8, 2.5, 3.0),
         peak_torque_nm: 12.0, rated_torque_nm: Some(6.0), no_load_speed_rpm: 800.0, voltage_v: 48.0, gear_ratio: 6.0,
         kv_rpm_per_v: 100.0, kt_nm_per_a: Some(0.105), mass_kg: 0.485 },
 ];
@@ -788,37 +799,91 @@ fn build(s: &mut Session, sh: &Shape) -> Result<()> {
             if let Some((d, depth, across, up, at)) = r.end_holes {
                 holes_y(s, &grid(across, up, at), d, l - a - depth, depth + 0.5, "cut")?;
             }
-            let (hd, hh, bc, n, bd, depth) = r.horn;
-            let top = h - r.below;
-            cyl(s, hd, top, top + hh, "join")?;
-            if n > 0 {
-                prism(s, &[], &circle_holes(bc, n, bd), top + hh - depth, depth + 0.5, "cut")?;
-            }
+            // The horn is its own part (`build_output`).
+            let (_, hh, bc, n, bd, depth) = r.horn;
+            groove(s, bc, n, bd, h - r.below, depth - hh)?;
         }
         Shape::Bldc { row } => {
             let Some(r) = BLDCS.get(row) else { return Err(bad("parts.insert", "no such motor")) };
-            let (d, len, bore) = r.body;
-            cyl(s, d, 0.0, len, "new")?;
+            let (split, top) = (bldc_top(r) - r.rotor, bldc_top(r));
+            // The base up to the rotor, which is its own part (`build_output`).
+            for (i, (d, z0, z1)) in bldc_stack(r).into_iter().filter(|c| split - c.1 > 1e-6).enumerate() {
+                cyl(s, d, z0, z1.min(split), if i == 0 { "new" } else { "join" })?;
+            }
             if r.pilot.1 > 0.0 {
                 cyl(s, r.pilot.0, -r.pilot.1, 0.0, "join")?;
             }
-            let mut top = len;
-            for (sd, sh) in r.steps.iter().filter(|st| st.1 > 0.0) {
-                cyl(s, *sd, top, top + sh, "join")?;
-                top += sh;
+            let (mbc, mn, md, mdepth) = r.mount_holes;
+            if mn > 0 {
+                prism(s, &[], &circle_holes(mbc, mn, md), -0.5, mdepth + 0.5, "cut")?;
             }
-            let ((bc, n, hd, depth), (mbc, mn, md, mdepth)) = (r.output_holes, r.mount_holes);
-            for (bc, n, d, z0, depth) in [(bc, n, hd, top - depth, depth), (mbc, mn, md, -0.5, mdepth)] {
-                if n > 0 {
-                    prism(s, &[], &circle_holes(bc, n, d), z0, depth + 0.5, "cut")?;
-                }
-            }
-            if bore > 0.0 {
-                cyl(s, bore, -r.pilot.1 - 1.0, top + 1.0, "cut")?;
+            let (bc, n, hd, depth) = r.output_holes;
+            groove(s, bc, n, hd, split, depth - (top - split))?;
+            if r.body.2 > 0.0 {
+                cyl(s, r.body.2, -r.pilot.1 - 1.0, top + 1.0, "cut")?;
             }
         }
     }
     Ok(())
+}
+
+/// An actuator's output, in the active component as a body of its own, the part a joint about
+/// the output axis turns: a servo's horn (or a hobby servo's bare spline), a motor's rotor bell
+/// or output flange, with the holes in its top.
+fn build_output(s: &mut Session, sh: &Shape) -> Result<()> {
+    let _frame = crate::frames::local_geometry();
+    let ((bc, n, d, depth), top) = match *sh {
+        Shape::Servo { row } => {
+            let Some(r) = SERVOS.get(row) else { return Err(bad("parts.insert", "no such servo")) };
+            let (hd, hh, bc, n, bd, depth) = r.horn;
+            let z = r.case[2] - r.below;
+            cyl(s, hd, z, z + hh, "new")?;
+            ((bc, n, bd, depth), z + hh)
+        }
+        Shape::Bldc { row } => {
+            let Some(r) = BLDCS.get(row) else { return Err(bad("parts.insert", "no such motor")) };
+            let (split, top) = (bldc_top(r) - r.rotor, bldc_top(r));
+            for (i, (d, z0, z1)) in bldc_stack(r).into_iter().filter(|c| c.2 - split > 1e-6).enumerate() {
+                cyl(s, d, z0.max(split), z1, if i == 0 { "new" } else { "join" })?;
+            }
+            if r.body.2 > 0.0 {
+                cyl(s, r.body.2, split - 1.0, top + 1.0, "cut")?;
+            }
+            (r.output_holes, top)
+        }
+        _ => return Ok(()),
+    };
+    if n > 0 {
+        prism(s, &[], &circle_holes(bc, n, d), top - depth, depth + 0.5, "cut")?;
+    }
+    Ok(())
+}
+
+/// Where an output's holes (`n` of Ø `d` on a bolt circle Ø `bc`) run on `depth` below its bottom
+/// at `z`: a groove round the bolt circle as wide as the holes, so a screw in them clears the case
+/// at any angle the output turns to.
+fn groove(s: &mut Session, bc: f64, n: u32, d: f64, z: f64, depth: f64) -> Result<()> {
+    if n == 0 || depth <= 0.0 {
+        return Ok(());
+    }
+    let (r0, r1) = ((bc - d) / 2.0, (bc + d) / 2.0);
+    revolve(s, &[(r0, z - depth), (r1, z - depth), (r1, z + 0.5), (r0, z + 0.5)], "cut")
+}
+
+/// A motor's round body and the steps on it, bottom up: (Ø, z from, z to).
+fn bldc_stack(r: &Bldc) -> Vec<(f64, f64, f64)> {
+    let mut z = r.body.1;
+    let mut out = vec![(r.body.0, 0.0, z)];
+    for (d, h) in r.steps.iter().filter(|st| st.1 > 0.0) {
+        out.push((*d, z, z + h));
+        z += h;
+    }
+    out
+}
+
+/// The height of a motor's top face, its output's.
+fn bldc_top(r: &Bldc) -> f64 {
+    r.body.1 + r.steps.iter().map(|st| st.1).sum::<f64>()
 }
 
 /// `n` holes of Ø `d` evenly round a bolt circle of Ø `bc` about z, the first on +x.
@@ -832,7 +897,7 @@ fn circle_holes(bc: f64, n: u32, d: f64) -> Vec<([f64; 2], f64)> {
 fn output_z(sh: &Shape) -> Option<f64> {
     match *sh {
         Shape::Servo { row } => SERVOS.get(row).map(|r| r.case[2] - r.below + r.horn.1),
-        Shape::Bldc { row } => BLDCS.get(row).map(|r| r.body.1 + r.steps.iter().map(|st| st.1).sum::<f64>()),
+        Shape::Bldc { row } => BLDCS.get(row).map(bldc_top),
         _ => None,
     }
 }
@@ -914,7 +979,7 @@ fn library(_s: &mut Session, p: &Value) -> Result<Value> {
                     let (r, mut v) = (BLDCS.get(row)?, actuator_ratings(&Shape::Bldc { row })?);
                     let output = r.steps.iter().rev().find(|st| st.1 > 0.0).map_or(r.body.0, |st| st.0);
                     let dims = json!({"size": r.size, "diameter": r.body.0, "length": r.body.1, "bore": r.body.2, "pilot": r.pilot.0, "pilot_length": r.pilot.1,
-                        "output": output, "output_bolt_circle": r.output_holes.0, "output_holes": r.output_holes.1,
+                        "output": output, "output_height": r.rotor, "output_bolt_circle": r.output_holes.0, "output_holes": r.output_holes.1,
                         "mount_bolt_circle": r.mount_holes.0, "mount_holes": r.mount_holes.1});
                     merge(&mut v, dims);
                     Some(v)
@@ -1000,7 +1065,8 @@ fn set_identity(s: &mut Session, comp: u64, now: (String, String), was: Option<(
 /// or an actuator's torque, speed and mass (its body is a solid envelope, so its mass comes from
 /// the datasheet's `mass_kg`, not the material), a pulley's belt travel per degree, a lead
 /// screw's lead. Extrusions, steppers, brushless motors and pulleys are aluminium, servos ABS, a
-/// lead screw nut brass, the rest steel.
+/// lead screw nut brass, the rest steel. An actuator's output part (`output_part`) is made of the
+/// same, so the case and the output together weigh the rated mass.
 fn fit_out(s: &mut Session, comp: u64, sh: &Shape) {
     let material = match sh {
         Shape::Extrusion { .. } | Shape::Stepper { .. } | Shape::Pulley { .. } | Shape::Bldc { .. } => "Aluminum",
@@ -1009,7 +1075,9 @@ fn fit_out(s: &mut Session, comp: u64, sh: &Shape) {
         Shape::LeadScrew { .. } => "Steel",
         _ => return,
     };
-    let bodies: Vec<String> = s.model.state().bodies.iter().filter(|b| s.doc.model_body_component(b) == comp).map(|b| b.name.clone()).collect();
+    let comps = [Some(comp), output_of(s, comp).map(|o| o.0)];
+    let bodies: Vec<String> =
+        s.model.state().bodies.iter().filter(|b| comps.contains(&Some(s.doc.model_body_component(b)))).map(|b| b.name.clone()).collect();
     let material = match *sh {
         Shape::Stepper { row } => {
             STEPPERS.get(row).and_then(|r| rated_material(s, comp, r.0, r.13, material)).unwrap_or_else(|| material.to_string())
@@ -1055,12 +1123,13 @@ fn rated_material(s: &mut Session, comp: u64, size: &str, kg: f64, look: &str) -
     if s.doc.user_materials.iter().any(|m| m.name == name) {
         return Some(name);
     }
+    let comps = [Some(comp), output_of(s, comp).map(|o| o.0)];
     let volume: f64 = s
         .model
         .state()
         .bodies
         .iter()
-        .filter(|b| s.doc.model_body_component(b) == comp)
+        .filter(|b| comps.contains(&Some(s.doc.model_body_component(b))))
         .filter_map(|b| solidcraft_doc::kernel::measure(&b.body).ok())
         .map(|m| m.volume)
         .sum();
@@ -1077,6 +1146,54 @@ fn rated_material(s: &mut Session, comp: u64, size: &str, kg: f64, look: &str) -
     });
     s.doc_mut().user_materials.push(solidcraft_doc::UserMaterial { name: name.clone(), density, appearance });
     Some(name)
+}
+
+/// The key in an actuator output part's metadata (`RATINGS_KEY`) that marks it.
+const OUTPUT_KIND: &str = "actuator_output";
+
+/// An actuator's output part (component, occurrence): the child of its component `comp` that
+/// `output_part` made.
+fn output_of(s: &Session, comp: u64) -> Option<(u64, u64)> {
+    let marked =
+        |c: u64| s.doc.components.iter().find(|x| x.id == c).and_then(|x| x.metadata.get(RATINGS_KEY)).is_some_and(|r| r["kind"] == OUTPUT_KIND);
+    s.doc.occurrences.iter().find(|o| o.parent == comp && marked(o.component)).map(|o| (o.component, o.id))
+}
+
+/// Build an actuator's horn or rotor (`build_output`) as its own part, `<name> horn` (`<name>
+/// rotor`), placed in the actuator's component `comp`, so a joint can turn it: made new, or
+/// rebuilt in the one `comp` has. It hangs on the case until a joint places it. `None` for other
+/// parts.
+fn output_part(s: &mut Session, comp: u64, name: &str, sh: &Shape) -> Result<Option<u64>> {
+    let kind = match sh {
+        Shape::Servo { .. } => "horn",
+        Shape::Bldc { .. } => "rotor",
+        _ => return Ok(None),
+    };
+    let part = format!("{name} {kind}");
+    let (c, occ) = match output_of(s, comp) {
+        Some((c, occ)) => {
+            let ids: Vec<u64> = s.doc.features.iter().filter(|f| f.component == c).map(|f| f.id).collect();
+            for id in ids.iter().rev() {
+                let _ = s.doc_mut().delete_feature(*id);
+            }
+            if let Some(x) = s.doc_mut().components.iter_mut().find(|x| x.id == c) {
+                x.name = part.clone();
+            }
+            run(s, "component.activate", json!({"component": c}))?;
+            (c, occ)
+        }
+        None => {
+            let r = run(s, "component.create", json!({"name": part, "parent": comp, "grounded": false}))?;
+            let (c, occ) = (r["component"].as_u64().unwrap_or(0), r["occurrence"].as_u64().unwrap_or(0));
+            if let Some(x) = s.doc_mut().components.iter_mut().find(|x| x.id == c) {
+                let _ = x.metadata.set(RATINGS_KEY, json!({"kind": OUTPUT_KIND}));
+            }
+            (c, occ)
+        }
+    };
+    build_output(s, sh)?;
+    finish(s, c, &part);
+    Ok(Some(occ))
 }
 
 /// The case colour of an actuator whose maker sells it in one (most are black plastic or black
@@ -1144,9 +1261,13 @@ fn insert(s: &mut Session, p: &Value) -> Result<Value> {
     finish(s, comp, &name);
     s.doc_mut().parts.insert(comp, solidcraft_doc::StandardPart { family: family.clone(), size: size.clone(), length: shape_len(&sh) });
     set_identity(s, comp, identity(&family, &size, &sh), None);
+    let output = output_part(s, comp, &name, &sh)?;
     fit_out(s, comp, &sh);
     run(s, "component.activate", json!({"component": active}))?;
     let mut out = json!({"component": comp, "occurrence": occ, "name": name});
+    if let Some(o) = output {
+        out["output_part"] = json!(o);
+    }
     if let (Some(a), Some(h)) = (at, host) {
         // Seat it: its axis on the hole's, its seating plane on the hole's face, the shank going
         // into the hole (the joint mates the part's −z with the face's outward z). A bearing is
@@ -1177,15 +1298,14 @@ fn insert(s: &mut Session, p: &Value) -> Result<Value> {
             o.transform = m;
         }
     }
-    // An actuator's output axis as a named joint origin (`<name> output`) on its horn's or
-    // flange's round top end, for a revolute joint about it.
+    // An actuator's output axis as a named joint origin (`<name> output`) on its case, at the
+    // centre of its horn's or rotor's top, for a revolute joint about it.
     if let Some(z) = output_z(&sh) {
-        let world = solidcraft_doc::apply_point(&solidcraft_doc::joints::occurrence_world(&s.doc, occ), Vec3::new(0.0, 0.0, z));
         let taken = |n: &str| s.doc.assembly.origins.iter().any(|o| o.name == n);
         let origin = (1..1000).map(|k| if k == 1 { format!("{name} output") } else { format!("{name} output ({k})") }).find(|n| !taken(n));
-        if let Some(o) = origin
-            && run(s, "joint.origin", json!({"occurrence": occ, "circle": [world.x, world.y, world.z], "name": o})).is_ok()
-        {
+        if let Some(o) = origin {
+            let snap = Snap::Point { point: Vec3::new(0.0, 0.0, z), z: Some(Vec3::Z), x: None };
+            s.doc_mut().assembly.origins.push(NamedOrigin { name: o.clone(), origin: JointOrigin { occurrence: occ, snap } });
             out["output"] = json!(o);
         }
     }
@@ -1341,7 +1461,22 @@ fn resize(s: &mut Session, p: &Value) -> Result<Value> {
     finish(s, comp, &name);
     let was = shape(&part.family, &part.size, part.length).ok().map(|old| identity(&part.family, &part.size, &old));
     set_identity(s, comp, identity(&part.family, &size, &sh), was);
+    output_part(s, comp, &name, &sh)?;
     fit_out(s, comp, &sh);
+    // The output axis's origins on the part follow the output's top.
+    let old_z = shape(&part.family, &part.size, part.length).ok().and_then(|old| output_z(&old));
+    if let (Some(old), Some(new)) = (old_z, output_z(&sh)) {
+        let occs: Vec<u64> = s.doc.occurrences.iter().filter(|o| o.component == comp).map(|o| o.id).collect();
+        let asm = &mut s.doc_mut().assembly;
+        let joint_ends = asm.joints.iter_mut().flat_map(|j| [&mut j.a, &mut j.b]);
+        for o in asm.origins.iter_mut().map(|o| &mut o.origin).chain(joint_ends).filter(|o| occs.contains(&o.occurrence)) {
+            if let Snap::Point { point, .. } = &mut o.snap
+                && point.dist(Vec3::new(0.0, 0.0, old)) < 1e-9
+            {
+                point.z = new;
+            }
+        }
+    }
     s.doc_mut().parts.insert(comp, solidcraft_doc::StandardPart { family: part.family.clone(), size: size.clone(), length: shape_len(&sh) });
     if let Some(c) = s.doc_mut().components.iter_mut().find(|c| c.id == comp) {
         c.name = name.clone();
@@ -1367,13 +1502,14 @@ mod tests {
         }
     }
 
+    /// The bounds of the parts named `prefix…` (an actuator with its horn or rotor).
     fn bbox(s: &Session, prefix: &str) -> (solidcraft_geom::Vec3, solidcraft_geom::Vec3) {
         let st = s.world_state();
-        let comp = s.doc.components.iter().find(|c| c.name.starts_with(prefix)).map(|c| c.id).unwrap_or(0);
+        let comps: Vec<u64> = s.doc.components.iter().filter(|c| c.name.starts_with(prefix)).map(|c| c.id).collect();
         let b = st
             .bodies
             .iter()
-            .filter(|b| s.doc.model_body_component(b) == comp)
+            .filter(|b| comps.contains(&s.doc.model_body_component(b)))
             .fold(solidcraft_geom::Aabb3::EMPTY, |a, b| a.union(&b.mesh().bounds()));
         (b.min, b.max)
     }
@@ -1652,6 +1788,61 @@ mod tests {
         }
     }
 
+    /// An actuator's horn or rotor is a part of its own in the actuator (#170): the top of its
+    /// envelope (the horn, the GB4106's bell above its 6 mm base, the AK80-6's Ø37 output), the
+    /// two parts' masses summing to the rated one. Joined to the case by a revolute joint about
+    /// `output`, it turns there and the case stays; resized, it is rebuilt and `output` follows it.
+    #[test]
+    fn an_actuators_horn_or_rotor_turns_about_its_output() {
+        let f = |v: &Value| v.as_f64().unwrap_or(f64::NAN);
+        for (fam, size, part, d, z0, z1) in [
+            ("servo", "STS3215", "horn", 19.95, 35.0, 36.125),
+            ("bldc", "GB4106", "rotor", 47.75, 6.0, 20.0),
+            ("bldc", "AK80-6", "rotor", 37.0, 26.2, 27.5),
+        ] {
+            let mut s = Session::default();
+            let r = run(&mut s, "parts.insert", json!({"family": fam, "size": size, "point": [0, 0, 0]}));
+            let name = r["name"].as_str().unwrap_or_default().to_string();
+            let out = r["output_part"].as_u64().unwrap_or_else(|| panic!("{size}: {r}"));
+            let o = s.doc.occurrences.iter().find(|o| o.id == out).cloned().unwrap_or_else(|| panic!("{size}: no {part}"));
+            assert_eq!(o.parent, r["component"].as_u64().unwrap_or(0), "{size}: the {part} is placed in the actuator");
+            let horn = format!("{name} {part}");
+            let (lo, hi) = bbox(&s, &horn);
+            // Round bodies are meshed to 1e-3 of their diameter at most.
+            for (got, want) in [(lo.x, -d / 2.0), (hi.x, d / 2.0), (lo.z, z0), (hi.z, z1)] {
+                assert!((got - want).abs() < 1e-3 * d, "{size} {part}: {lo:?} {hi:?}");
+            }
+            let mass = |s: &mut Session, comp: &str| {
+                let c = s.doc.components.iter().find(|c| c.name == comp).map(|c| c.id).unwrap_or(0);
+                let bodies: Vec<String> =
+                    s.model.state().bodies.iter().filter(|b| s.doc.model_body_component(b) == c).map(|b| b.name.clone()).collect();
+                f(&run(s, "inspect.measure", json!({"bodies": bodies}))["total"]["mass_g"])
+            };
+            let (case, output) = (mass(&mut s, &name), mass(&mut s, &horn));
+            let rated = f(&library_size(fam, size)["mass_kg"]) * 1000.0;
+            assert!(output > 0.0 && case > 0.0 && (case + output - rated).abs() < 1e-6 * rated, "{size}: {case} g + {output} g, rated {rated} g");
+            // Turned a quarter turn about the output, the horn's or rotor's +x edge goes round; the case stays.
+            run(&mut s, "occurrence.ground", json!({"occurrence": r["occurrence"], "grounded": true}));
+            let j = run(&mut s, "joint.as_built", json!({"type": "revolute", "a": r["occurrence"], "b": out, "at": r["output"]}));
+            run(&mut s, "joint.drive", json!({"joint": j["joint"], "value": 90}));
+            let edge =
+                solidcraft_doc::apply_point(&solidcraft_doc::joints::occurrence_world(&s.doc, out), solidcraft_geom::Vec3::new(d / 2.0, 0.0, z1));
+            assert!(edge.x.abs() < 1e-6 && (edge.y.abs() - d / 2.0).abs() < 1e-6 && (edge.z - z1).abs() < 1e-6, "{size}: {edge:?}");
+            let case_at = solidcraft_doc::joints::occurrence_world(&s.doc, r["occurrence"].as_u64().unwrap_or(0));
+            assert_eq!(case_at, solidcraft_doc::IDENTITY, "{size}: the case stays");
+        }
+        // Resized, the horn is rebuilt for the new size and the output origin moves to its top.
+        let mut s = Session::default();
+        let r = run(&mut s, "parts.insert", json!({"family": "servo", "size": "STS3215"}));
+        run(&mut s, "parts.resize", json!({"component": r["component"], "size": "XL430-W250-T"}));
+        let (lo, hi) = bbox(&s, "Servo XL430-W250-T horn");
+        assert!((hi.z - 36.0).abs() < 1e-6 && (lo.z - 34.0).abs() < 1e-6 && (hi.x - 10.25).abs() < 0.03, "{lo:?} {hi:?}");
+        assert_eq!(s.doc.occurrences.iter().filter(|o| o.parent == r["component"].as_u64().unwrap_or(0)).count(), 1, "one horn");
+        let o = s.doc.assembly.origins.iter().find(|o| Some(o.name.as_str()) == r["output"].as_str()).map(|o| o.origin.clone());
+        let m = o.and_then(|o| solidcraft_doc::joints::resolve_origin(&s.doc, &s.model.state(), &o).ok()).unwrap_or_else(|| panic!("output"));
+        assert!((m[3][2] - 36.0).abs() < 1e-9, "{m:?}");
+    }
+
     /// A link screwed to a servo's horn turns about the servo's output: a revolute joint between
     /// the grounded servo's `output` origin and the link's hole, driven to 90° (#36).
     #[test]
@@ -1688,6 +1879,8 @@ mod tests {
         let at = json!([bc / 2.0 + 1.7, 0, top + 3.0]);
         let sc = run(&mut s, "parts.insert", json!({"family": "socket_head_cap_screw", "size": "M3", "length": 6, "at": at, "name": "Horn screw"}));
         assert!(sc["joint"].is_number(), "{sc}");
+        // The horn is joined to the link, so it turns with it (#170).
+        run(&mut s, "joint.as_built", json!({"type": "rigid", "a": "Link", "b": r["output_part"]}));
         let l = run(&mut s, "joint.list", json!({}));
         let link_occ = s.doc.find_component("Link").and_then(|c| s.doc.occurrence_of(c)).map(|o| o.id).unwrap_or(0);
         let dof = l["dof"].as_array().and_then(|a| a.iter().find(|d| d["occurrence"] == link_occ)).map(|d| d["dof"].clone());
@@ -1699,6 +1892,9 @@ mod tests {
         let (lo, hi) = bbox(&s, "Horn screw");
         let c = ((lo.x + hi.x) / 2.0, (lo.y + hi.y) / 2.0);
         assert!(c.0.abs() < 1e-6 && (c.1.abs() - bc / 2.0).abs() < 1e-6 && c.1.signum() == p.y.signum(), "the screw went round with the link: {c:?}");
+        let horn = solidcraft_doc::joints::occurrence_world(&s.doc, r["output_part"].as_u64().unwrap_or(0));
+        let hole = solidcraft_doc::apply_point(&horn, solidcraft_geom::Vec3::new(bc / 2.0, 0.0, top));
+        assert!(hole.x.abs() < 1e-6 && (hole.y - c.1).abs() < 1e-6, "the horn went round with the link: {hole:?}");
         let (lo, hi) = bbox(&s, "Servo STS3215");
         assert!(lo.z.abs() < 1e-6 && (hi.z - top).abs() < 1e-6, "the servo stays: {lo:?} {hi:?}");
     }
