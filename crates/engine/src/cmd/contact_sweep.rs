@@ -305,6 +305,20 @@ impl ContactGeometry {
     }
 
     pub(super) fn samples(&self, start: &Session, end: &Session) -> Result<usize> {
+        let (required, most) = self.sample_need(start, end)?;
+        if !required.is_finite() || required > MAX_SAMPLES as f64 {
+            return Err(limit("motion exceeds contact sweep sampling budget; drive the joint in smaller increments"));
+        }
+        if required > most as f64 {
+            return Err(limit("motion exceeds contact sweep transform budget; simplify the contact set or use smaller increments"));
+        }
+        Ok(required as usize)
+    }
+
+    /// The samples from `start` to `end` fine enough that no part passes through another between
+    /// two (at least 1, possibly infinite), and the most samples the budgets allow (each sample
+    /// places every vertex: at most `MAX_SAMPLES`, and no more than `MAX_WORK` vertex placements).
+    pub(super) fn sample_need(&self, start: &Session, end: &Session) -> Result<(f64, usize)> {
         let a = joints::joint_values(&start.doc.assembly);
         let b = joints::joint_values(&end.doc.assembly);
         let bounds = self.bounds(start)?.union(&self.bounds(end)?);
@@ -338,14 +352,9 @@ impl ContactGeometry {
             }
         }
         let required = ((linear + angular * (radius + linear)) / self.step).max(angular / 1_f64.to_radians()).ceil().max(1.0);
-        if !required.is_finite() || required > MAX_SAMPLES as f64 {
-            return Err(limit("motion exceeds contact sweep sampling budget; drive the joint in smaller increments"));
-        }
         let vertices: usize = self.bodies.iter().map(|body| body.mesh.positions.len()).sum();
-        if (required as usize).saturating_mul(vertices.saturating_add(self.pairs.len())) > MAX_WORK {
-            return Err(limit("motion exceeds contact sweep transform budget; simplify the contact set or use smaller increments"));
-        }
-        Ok(required as usize)
+        let most = (MAX_WORK / vertices.saturating_add(self.pairs.len()).max(1)).min(MAX_SAMPLES);
+        Ok((required, most))
     }
 
     /// Each body's mesh placed where `s` has it.
