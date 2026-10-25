@@ -3,7 +3,7 @@
 // meshpack.py pack. Run: python3 site/tests/fixture.py DIR && python3 site/meshpack.py DIR DIR/pack.bin
 // DIR/pack.json && FIXTURE=DIR deno test -A --import-map=site/tests/import_map.json site/tests/viewer_test.ts
 import * as THREE from "three";
-import { buildRobot, creased, packedGeometry, tracks } from "../shared/viewer.js";
+import { buildRobot, creased, packCache, packedGeometry, tracks } from "../shared/viewer.js";
 
 const dir = Deno.env.get("FIXTURE") ?? "";
 
@@ -54,6 +54,17 @@ Deno.test("a pack decodes to its mesh within the quantisation step", async () =>
   geo.computeBoundingBox();
   const b = geo.boundingBox!;
   for (const k of ["x", "y", "z"] as const) { close(b.min[k], 0, 1e-9, "min " + k); close(b.max[k], 0.01, 0.01 / 65535, "max " + k); }
+});
+
+Deno.test("a pack's mesh is built once for every part that shares it, with its bounds", async () => {
+  const buf = (await Deno.readFile(dir + "/pack.bin")).buffer;
+  const m = JSON.parse(await Deno.readTextFile(dir + "/pack.json")).meshes["cube.stl"];
+  const geometry = packCache(buf);
+  const a = geometry("cube.stl", m), b = geometry("cube.stl", m);
+  if (a !== b) throw new Error("the second part rebuilt the mesh");
+  // Creased (unindexed: 36 corners) and bounded: a 10 mm cube's sphere is half its diagonal.
+  close(a.getAttribute("position").count, 36, 0, "corners");
+  close(a.boundingSphere!.radius, (Math.sqrt(3) * 0.01) / 2, 1e-6, "bounding radius");
 });
 
 /** An indexed mesh from flat position and index lists. */
