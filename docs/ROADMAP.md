@@ -90,8 +90,8 @@ Real parts to learn on, replicate or build with, every one with mates, mass, spe
 
 - **Parts library RFC: data model, sources, licences**: next · [#35](https://github.com/wckdboy/polykrom/issues/35) · parts  
   Part = parametric generator or pinned file (commit + checksum) + mates + mass/material + mechanical/electrical specs + datasheet link + licence/attribution carried into exports. Tiers: generated (licence-clean), open catalogs fetched on demand, bring-your-own vendor CAD.
-- **Actuators: hobby servos, Feetech STS3215, Dynamixel, NEMA steppers, BLDC and gimbal motors**: later · [#36](https://github.com/wckdboy/polykrom/issues/36) · parts  
-  Generated from datasheet dimensions: SG90, MG996R, STS3215, XL330/XL430/XM430, NEMA 8–23, outrunners 2204–5010, gimbal motors; horn/shaft mates, stall torque, Kv, mass.
+- **Actuators: hobby servos, Feetech STS3215, Dynamixel, NEMA steppers, BLDC and gimbal motors**: in review · [#36](https://github.com/wckdboy/polykrom/issues/36) · parts  
+  Generated from datasheet dimensions: SG90, MG996R, STS3215, XL430/XM430, NEMA 14–23, the GB4106 gimbal motor and the AK80-6 actuator, with their output axes as joint origins, ratings and rated masses; later XL330, NEMA 8, outrunners 2204–5010.
 - **Power: 18650/21700 cells, LiPo packs, holders, XT30/XT60**: later · [#37](https://github.com/wckdboy/polykrom/issues/37) · parts  
   Packs by S × capacity with Wh and mass; connector keep-outs.
 - **Motion hardware: extrusions, rails, bearings, belts, couplers**: later · [#38](https://github.com/wckdboy/polykrom/issues/38) · parts  
