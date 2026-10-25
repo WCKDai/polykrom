@@ -574,7 +574,7 @@ pub struct SheetPerforation {
     pub square: bool,
     /// The grid runs from the flat's right edge instead of its left: the field of a mirrored
     /// copy, whose holes are the mirror image of its source's.
-    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub from_right: bool,
 }
 
@@ -4686,6 +4686,16 @@ pub fn sheet_edge_names(st: &crate::ModelState, pts: &[Vec3]) -> Vec<String> {
 
 #[cfg(test)]
 mod tests {
+    /// A perforation field read back as it was written: `from_right` is left out when false, so
+    /// reading must default it (#157: a saved model holding one was refused).
+    #[test]
+    fn a_perforation_field_reads_back_without_from_right() {
+        let p = SheetPerforation { feature: 7, diameter: 3.0, pitch: 5.0, margin: 4.0, square: false, from_right: false };
+        let text = serde_json::to_string(&p).unwrap();
+        assert!(!text.contains("from_right"), "{text}");
+        assert_eq!(serde_json::from_str::<SheetPerforation>(&text).unwrap(), p);
+    }
+
     use super::*;
 
     fn steel() -> RuleValues {
