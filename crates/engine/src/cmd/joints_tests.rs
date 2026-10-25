@@ -2133,3 +2133,27 @@ fn deleting_a_second_input_removes_its_link() {
     run(&mut s, "joint.delete", json!({"joint": "B"}));
     assert!(s.doc.assembly.links.is_empty(), "{:?}", s.doc.assembly.links);
 }
+
+/// Two parts joined, neither grounded: the solve holds the first joint's A side where it is, and
+/// says so as its `reference`, not as `fixed` (an agent read "fixed" as grounded and went back to
+/// unground a part that never was).
+#[test]
+fn an_ungrounded_reference_is_not_reported_as_fixed() {
+    let mut s = Session::default();
+    let a = run(&mut s, "component.create", json!({"name": "Body", "grounded": false}));
+    run(&mut s, "solid.box", json!({"length": 10, "width": 10, "height": 10}));
+    run(&mut s, "component.activate", json!({"component": "root"}));
+    run(&mut s, "component.create", json!({"name": "Arm", "grounded": false}));
+    run(&mut s, "solid.box", json!({"length": 10, "width": 10, "height": 10, "corner": [20, 0, 0]}));
+    run(&mut s, "component.activate", json!({"component": "root"}));
+    run(&mut s, "joint.as_built", json!({"type": "revolute", "a": "Body", "b": "Arm", "at": {"occurrence": 0, "point": [15, 5, 5], "z": [0, 0, 1]}}));
+    let body = a["occurrence"].as_u64().unwrap();
+    let r = run(&mut s, "joint.list", json!({}));
+    assert!(r["fixed"].as_array().unwrap().iter().all(|o| o.as_u64() != Some(body)), "{r}");
+    assert_eq!(r["reference"]["occurrence"], body, "{r}");
+    // Grounded, it is fixed and no reference is needed.
+    run(&mut s, "occurrence.ground", json!({"occurrence": body, "grounded": true}));
+    let r = run(&mut s, "joint.list", json!({}));
+    assert!(r["fixed"].as_array().unwrap().iter().any(|o| o.as_u64() == Some(body)), "{r}");
+    assert!(r.get("reference").is_none(), "{r}");
+}

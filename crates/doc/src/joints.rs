@@ -907,8 +907,11 @@ pub struct Solution {
     /// motion link sets moving with the values its link chain starts from (a driven gear has its
     /// driving gear's one, a screw's travel its turn's). Empty for [`Analysis::Placement`].
     pub dof: BTreeMap<u64, usize>,
-    /// Occurrences fixed in place (grounded, or the root's).
+    /// Occurrences fixed in place (grounded, or the root's), and the reference below.
     pub fixed: Vec<u64>,
+    /// The occurrence held where it is for this solve because nothing joined to it is grounded
+    /// (the first joint's A side): a reference, not grounded, so the design can still move it.
+    pub reference: Option<u64>,
 }
 
 /// Joint values by joint id.
@@ -1943,6 +1946,7 @@ fn build<'a>(doc: &'a Document, st: &ModelState, vals: &Values, sol: &mut Soluti
     {
         placed.insert(j.a.occurrence, occurrence_world(doc, j.a.occurrence));
         dof.insert(j.a.occurrence, 0);
+        sol.reference = Some(j.a.occurrence);
     }
     sol.fixed = placed.keys().copied().collect();
     let mut tree =
