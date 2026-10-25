@@ -263,8 +263,11 @@ fn load_checked(path: &str, check: solidcraft_engine::schema::ParamCheck) -> Res
         s.execute("doc.open", &json!({"path": path})).map_err(|e| e.to_string())?;
         return Ok(s);
     }
-    let bytes = solidcraft_engine::io::vfs::read(path, solidcraft_engine::io::MAX_DESIGN_BYTES).map_err(|e| format!("{path}: {e}"))?;
-    if solidcraft_engine::io::is_design_container(&bytes) {
+    // A container is told by its first bytes; Open then reads it once (#174).
+    let mut head = [0u8; 4];
+    let container = std::fs::File::open(path).and_then(|mut f| std::io::Read::read_exact(&mut f, &mut head)).is_ok()
+        && solidcraft_engine::io::is_design_container(&head);
+    if container {
         // As Open reads it: with the model the file keeps, so a design is not evaluated again (#174).
         let (doc, saved) =
             solidcraft_engine::io::read_design_file(path, None::<fn(solidcraft_engine::io::DesignPreview)>).map_err(|e| format!("{path}: {e}"))?;
@@ -273,6 +276,7 @@ fn load_checked(path: &str, check: solidcraft_engine::schema::ParamCheck) -> Res
         session.param_check = check;
         return Ok(session);
     }
+    let bytes = solidcraft_engine::io::vfs::read(path, solidcraft_engine::io::MAX_DESIGN_BYTES).map_err(|e| format!("{path}: {e}"))?;
     let v: Value = serde_json::from_slice(&bytes).map_err(|e| format!("{path}: {e}"))?;
     if v.get("format").and_then(Value::as_str).is_some_and(|f| solidcraft_engine::doc::format::version_of(f).is_some()) {
         s.execute("doc.open", &json!({"path": path})).map_err(|e| e.to_string())?;
