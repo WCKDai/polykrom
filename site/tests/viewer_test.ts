@@ -3,7 +3,7 @@
 // meshpack.py pack. Run: python3 site/tests/fixture.py DIR && python3 site/meshpack.py DIR DIR/pack.bin
 // DIR/pack.json && FIXTURE=DIR deno test -A --import-map=site/tests/import_map.json site/tests/viewer_test.ts
 import * as THREE from "three";
-import { buildRobot, packedGeometry, tracks } from "../shared/viewer.js";
+import { buildRobot, creased, packedGeometry, tracks } from "../shared/viewer.js";
 
 const dir = Deno.env.get("FIXTURE") ?? "";
 
@@ -54,4 +54,47 @@ Deno.test("a pack decodes to its mesh within the quantisation step", async () =>
   geo.computeBoundingBox();
   const b = geo.boundingBox!;
   for (const k of ["x", "y", "z"] as const) { close(b.min[k], 0, 1e-9, "min " + k); close(b.max[k], 0.01, 0.01 / 65535, "max " + k); }
+});
+
+/** An indexed mesh from flat position and index lists. */
+function indexed(pos: number[], idx: number[]) {
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.BufferAttribute(new Float32Array(pos), 3));
+  g.setIndex(new THREE.BufferAttribute(new Uint32Array(idx), 1));
+  return g;
+}
+
+Deno.test("creased normals keep a cube's corners sharp and a cylinder's side smooth", () => {
+  // A unit cube sharing its eight corners: every corner of every face keeps that face's normal.
+  const p = [0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 0, 0, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1];
+  const f = [0, 2, 1, 0, 3, 2, 4, 5, 6, 4, 6, 7, 0, 1, 5, 0, 5, 4, 2, 3, 7, 2, 7, 6, 1, 2, 6, 1, 6, 5, 0, 4, 7, 0, 7, 3];
+  const cube = creased(indexed(p, f), Math.PI / 6);
+  const n = cube.getAttribute("normal").array, q = cube.getAttribute("position").array;
+  for (let c = 0; c < f.length; c += 3) {
+    const a = new THREE.Vector3(q[3 * c], q[3 * c + 1], q[3 * c + 2]);
+    const b = new THREE.Vector3(q[3 * c + 3], q[3 * c + 4], q[3 * c + 5]);
+    const d = new THREE.Vector3(q[3 * c + 6], q[3 * c + 7], q[3 * c + 8]);
+    const face = b.sub(a).cross(d.sub(a)).normalize();
+    for (let k = 0; k < 3; k++) {
+      close(n[3 * (c + k)] * face.x + n[3 * (c + k) + 1] * face.y + n[3 * (c + k) + 2] * face.z, 1, 1e-6, `cube corner ${c + k}`);
+    }
+  }
+  // A 64-sided cylinder's side: its facets meet at 5.6°, so each vertex's normal is the radial one.
+  const sides = 64, pos: number[] = [], idx: number[] = [];
+  for (let i = 0; i < sides; i++) {
+    const t = (2 * Math.PI * i) / sides;
+    pos.push(Math.cos(t), Math.sin(t), 0, Math.cos(t), Math.sin(t), 1);
+  }
+  for (let i = 0; i < sides; i++) {
+    const a = 2 * i, b = 2 * ((i + 1) % sides);
+    idx.push(a, b, b + 1, a, b + 1, a + 1);
+  }
+  const cyl = creased(indexed(pos, idx), Math.PI / 6);
+  const cn = cyl.getAttribute("normal").array, cp = cyl.getAttribute("position").array;
+  for (let c = 0; c < idx.length; c++) {
+    const r = Math.hypot(cp[3 * c], cp[3 * c + 1]);
+    // The radial direction, to the facets' own tilt at most (the average of two normals 5.6° apart).
+    close((cn[3 * c] * cp[3 * c] + cn[3 * c + 1] * cp[3 * c + 1]) / r, 1, 1e-3, `cylinder corner ${c}`);
+    close(cn[3 * c + 2], 0, 1e-6, `cylinder corner ${c} z`);
+  }
 });
