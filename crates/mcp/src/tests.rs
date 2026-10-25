@@ -141,6 +141,7 @@ fn handshake_and_tools_list() {
         "redo",
         "crash_reports",
         "skill_reference",
+        "polish",
         "running",
         "new_design",
         "open",
@@ -178,6 +179,7 @@ fn skill_reference_returns_bundled_text_without_backend_calls() {
         ("solidcraft-mechanisms", "SKILL.md", include_str!("../../../skills/solidcraft-mechanisms/SKILL.md")),
         ("solidcraft-checking", "SKILL.md", include_str!("../../../skills/solidcraft-checking/SKILL.md")),
         ("solidcraft-editing", "SKILL.md", include_str!("../../../skills/solidcraft-editing/SKILL.md")),
+        ("solidcraft-polish", "SKILL.md", include_str!("../../../skills/solidcraft-polish/SKILL.md")),
     ];
     for (skill, file, expected) in docs {
         let args = json!({"skill": skill, "file": file});
@@ -1405,6 +1407,7 @@ fn skills_name_only_real_tools_and_commands() {
         include_str!("../../../skills/solidcraft-checking/reference/porting.md"),
         include_str!("../../../skills/solidcraft-mechanisms/SKILL.md"),
         include_str!("../../../skills/solidcraft-mechanisms/reference.md"),
+        include_str!("../../../skills/solidcraft-polish/SKILL.md"),
     ];
     let mut s = server();
     let tools: Vec<String> = tool_definitions().iter().filter_map(|t| t["name"].as_str()).map(str::to_owned).collect();
@@ -1704,7 +1707,7 @@ fn tool_annotations_tell_the_whole_truth() {
         let a = &t["annotations"];
         (a["readOnlyHint"].as_bool().unwrap(), a["destructiveHint"].as_bool().unwrap(), a["openWorldHint"].as_bool().unwrap())
     };
-    for name in ["execute", "batch", "save", "export", "open", "screenshot"] {
+    for name in ["execute", "batch", "save", "export", "open", "screenshot", "polish"] {
         assert_eq!(hints(name), (false, true, true), "{name}");
     }
     for name in
@@ -2206,4 +2209,33 @@ fn agents_edit_a_past_sketch_rolled_to_it() {
     tool(&mut s, "execute", json!({"command": "sketch.finish"}));
     tool(&mut s, "execute", json!({"command": "sketch.edit", "params": {"sketch": "Base", "roll": false}}));
     assert_eq!(marker(&mut s), end);
+}
+
+/// `polish` measures the finish, applies the safe fixes when asked and renders four views (#193).
+#[test]
+fn polish_measures_applies_and_renders_four_views() {
+    let gpu = renders();
+    let mut s = server();
+    tool(&mut s, "execute", json!({"command": "solid.box", "params": {"length": 40, "width": 20, "height": 10, "body_name": "Block"}}));
+    let look = tool(&mut s, "polish", json!({}));
+    assert_eq!(look["before"], look["after"], "{look}");
+    assert!(look["fixes"].as_array().is_some_and(|f| !f.is_empty()), "{look}");
+    assert!(look["recommendations"].as_array().is_some_and(|f| f.iter().any(|r| r["kind"] == "boxy")), "{look}");
+    let only = tool(&mut s, "polish", json!({"categories": ["print"]}));
+    assert_eq!(only["fixes"], json!([]), "a box of the default material isn't printed: {only}");
+    let done = tool(&mut s, "polish", json!({"apply": "safe", "views": true}));
+    let (before, after) = (done["before"]["score"].as_f64().unwrap(), done["after"]["score"].as_f64().unwrap());
+    assert!(after > before, "{done}");
+    assert!(!done["applied"].as_array().unwrap().is_empty(), "{done}");
+    let views = done["views"].as_array().unwrap();
+    if gpu {
+        assert_eq!(views.len(), 4, "{done}");
+        for v in views {
+            assert!(std::path::Path::new(v["path"].as_str().unwrap()).is_file(), "{v}");
+        }
+    } else {
+        assert!(done["views_error"].is_string(), "{done}");
+    }
+    let r = raw_tool(&mut s, "polish", json!({"apply": "all"}));
+    assert_eq!(r["error"]["code"], -32602, "the schema refuses it: {r}");
 }
