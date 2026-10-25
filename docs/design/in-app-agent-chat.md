@@ -26,7 +26,7 @@ What the prototype uses:
 | Direction | Message | Use |
 |---|---|---|
 | → agent | `initialize {protocolVersion: 1, clientCapabilities, clientInfo}` | We declare no file system and no terminal (`fs.readTextFile/writeTextFile: false`, `terminal: false`), and terminal login (`auth.terminal: true`, plus the older `_meta["terminal-auth"]`). The reply carries `agentInfo` and `authMethods`. |
-| → agent | `session/new {cwd, mcpServers}` | `mcpServers` holds one stdio server: `solidcraft-cli mcp --connect 127.0.0.1:PORT`. `cwd` is the open design's folder (else Polykrom's own `agent` folder). |
+| → agent | `session/new {cwd, mcpServers}` | `mcpServers` holds one stdio server: `polykrom-cli mcp --connect 127.0.0.1:PORT`. `cwd` is the open design's folder (else Polykrom's own `agent` folder). |
 | → agent | `session/prompt {sessionId, prompt: [content]}` | One text block. The reply comes at the end of the turn with `stopReason` (`end_turn`, `cancelled`, `refusal`, …). |
 | → agent | `session/cancel {sessionId}` (notification) | Cancel button. Open permission prompts are answered `cancelled` first, as the spec asks. |
 | → agent | `authenticate {methodId}` | Only for an "agent" login method the user clicks (the agent then opens the browser itself). |
@@ -83,7 +83,7 @@ the picker instead of the hard-coded table.
 Polykrom window ──(child process, own process group, ACP over stdio)──> agent (claude-agent-acp, codex-acp, agy_acp_server, opencode acp, …)
       ▲                                                                     │ starts, per session/new
       │ the chat's own endpoint (loopback, fresh token, gate)               ▼
-      └──────────────────────────────────────────────────── solidcraft-cli mcp --connect 127.0.0.1:PORT
+      └──────────────────────────────────────────────────── polykrom-cli mcp --connect 127.0.0.1:PORT
 ```
 
 Code: `crates/ui-egui/src/agent_chat/`.
@@ -114,7 +114,7 @@ requests, for a backend that runs tools in process). Two backends exist:
 - `ApiBackend` talks to an OpenAI-compatible chat completions endpoint (Ollama, LM Studio,
   OpenAI, a custom URL) or an Anthropic-compatible Messages endpoint (Anthropic, or a provider
   that speaks the Messages API), and runs the tool loop itself: it starts the same
-  `solidcraft-cli mcp --connect` server an ACP agent would get and is its MCP client
+  `polykrom-cli mcp --connect` server an ACP agent would get and is its MCP client
   (`tools/list` becomes the endpoint's tools, `crash_reports` left out), so its calls pass the
   same gate, limits, questions and undo as an ACP agent's. At most 24 model requests per
   message. The HTTP request is the desktop host's (`Services::agent_http`, ureq with no
@@ -130,7 +130,7 @@ Another kind of backend slots in the same way without reshaping the panel.
 
 On the first Connect the app starts **an endpoint of the chat's own**
 (`control_server::listen_agent`): a free loopback port with a fresh random token, written to the
-per-user token file where `solidcraft-cli mcp --connect` finds it. The token never passes
+per-user token file where `polykrom-cli mcp --connect` finds it. The token never passes
 through the agent, `SOLIDCRAFT_CONTROL_TOKEN` is removed from the agent's environment, and
 `--allow-any-path` is never passed, so the MCP server keeps its #205 folder limits (a request
 that names no folders is confined to the chat's working folder).
@@ -218,6 +218,6 @@ returns the whole state, for tests and screenshots.
 | Session controls | Model and mode pickers from `configOptions` / `modes`, slash commands |
 | Auth | An embedded terminal or "open a terminal here" for terminal logins on each OS; logout |
 | Discovery | Read the ACP registry; keychain-aware login check on macOS |
-| Packaging | Make sure every desktop package ships `solidcraft-cli` next to `solidcraft` (Flatpak, AppImage, macOS bundle, Windows zip), or serve MCP from the app binary itself |
+| Packaging | Make sure every desktop package ships `polykrom-cli` next to `solidcraft` (Flatpak, AppImage, macOS bundle, Windows zip), or serve MCP from the app binary itself |
 | Windows | Job objects instead of `taskkill /T` once there's a safe API for them |
 | API backend | Streaming answers; images in tool results |

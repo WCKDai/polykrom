@@ -2,8 +2,8 @@
 """Polykrom agent evaluation: physical-world parts and systems built by an AI companion over MCP.
 
 Each task is a plain-language spec with an analytic answer. Claude Code runs headless with
-`solidcraft-cli mcp` as its only tool, saves a design, and the harness grades the saved design
-with `solidcraft-cli`: parts by body count, volume and bounding box; systems by replaying
+`polykrom-cli mcp` as its only tool, saves a design, and the harness grades the saved design
+with `polykrom-cli`: parts by body count, volume and bounding box; systems by replaying
 commands on the design (joints, motion studies, interference and clearance, URDF, BOM). The
 agent's own claims are never the verdict. See README.md.
 """

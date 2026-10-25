@@ -10,7 +10,7 @@ fn server() -> Server {
     Server::new(Box::new(Headless::default()))
 }
 
-/// Screenshots are drawn on the GPU by the renderer the host installs (`solidcraft-cli mcp`); the
+/// Screenshots are drawn on the GPU by the renderer the host installs (`polykrom-cli mcp`); the
 /// tests install the same one. `false`, with the reason printed, on a machine without a GPU
 /// adapter: the screenshots are then left out of the test.
 fn renders() -> bool {

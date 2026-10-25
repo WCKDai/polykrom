@@ -5,7 +5,7 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 publish = false
-default-run = "solidcraft"
+default-run = "polykrom"
 
 # The workspace lints, except unsafe_code: denied, not forbidden, so that src/open_documents.rs
 # (macOS file-open events), src/native_crash.rs (Windows exception filter) and src/native_frame.rs
@@ -20,15 +20,15 @@ too_many_arguments = "allow"
 type_complexity = "allow"
 neg_cmp_op_on_partial_ord = "allow"
 
-# Polykrom's name for the desktop app: runs `solidcraft`, the program itself until the app
-# bundles and installers move to the new name (docs/compatibility.md).
-[[bin]]
-name = "solidcraft"
-path = "src/main.rs"
-
 [[bin]]
 name = "polykrom"
-path = "src/polykrom.rs"
+path = "src/main.rs"
+
+# SolidCraft's name for the desktop app, kept so scripts and shortcuts that start it keep working:
+# it runs `polykrom` (docs/compatibility.md).
+[[bin]]
+name = "solidcraft"
+path = "src/solidcraft.rs"
 
 [dependencies]
 solidcraft-engine = { workspace = true }

@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # Build and package Polykrom for macOS:
 #
-#   $DIST/solidcraft-<version>-macos-<arch>.dmg        SolidCraft.app (with solidcraft-cli inside) on a
+#   $DIST/solidcraft-<version>-macos-<arch>.dmg        SolidCraft.app (with polykrom-cli inside) on a
 #                                                      drag-to-Applications DMG
-#   $DIST/solidcraft-cli-<version>-macos-<arch>.zip    the headless CLI (and its solvecraft-cli
-#                                                      compatibility alias) with the licence files
+#   $DIST/solidcraft-cli-<version>-macos-<arch>.zip    the headless CLI, polykrom-cli (and its
+#                                                      solidcraft-cli and solvecraft-cli aliases) with the licence files
 #
 # Usage: packaging/macos/package.sh [--arch universal|aarch64|x86_64] [--skip-build]
 #
@@ -50,7 +50,7 @@ fi
 
 rm -rf "$WORK"
 mkdir -p "$WORK/bin"
-for bin in solidcraft solidcraft-cli solvecraft-cli; do
+for bin in polykrom polykrom-cli solidcraft-cli solvecraft-cli; do
   inputs=()
   for t in "${TARGETS[@]}"; do inputs+=("$CARGO_TARGET_DIR/$t/release/$bin"); done
   lipo -create -output "$WORK/bin/$bin" "${inputs[@]}"
@@ -60,9 +60,12 @@ done
 # ---- SolidCraft.app ----------------------------------------------------------------------------
 echo "==> assembling $APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
-cp "$WORK/bin/solidcraft" "$APP/Contents/MacOS/Polykrom"
-# solidcraft-cli next to the app, as every other package has it: the agent chat starts it as the
-# agent's MCP server (`solidcraft-cli mcp --connect`) and looks for it beside the running program.
+cp "$WORK/bin/polykrom" "$APP/Contents/MacOS/Polykrom"
+# polykrom-cli next to the app, as every other package has it: the agent chat starts it as the
+# agent's MCP server (`polykrom-cli mcp --connect`) and looks for it beside the running program.
+# solidcraft-cli beside it keeps MCP registrations that name the old program working
+# (docs/compatibility.md).
+cp "$WORK/bin/polykrom-cli" "$APP/Contents/MacOS/polykrom-cli"
 cp "$WORK/bin/solidcraft-cli" "$APP/Contents/MacOS/solidcraft-cli"
 # Apple-compiled layered icon and older-macOS fallback (regeneration: assets/README.md).
 # Keep compiled resources so packaging also works on runners with older Xcode versions.
@@ -75,10 +78,13 @@ plutil -lint "$APP/Contents/Info.plist"
 printf 'APPL????' >"$APP/Contents/PkgInfo"
 # Ad-hoc signature over the whole bundle (Apple silicon refuses unsigned code). Nested code is
 # signed first: the bundle signature refuses an unsigned helper in Contents/MacOS.
-codesign --force --sign - --timestamp=none --identifier "$MACOS_BUNDLE_ID-cli" "$APP/Contents/MacOS/solidcraft-cli"
+codesign --force --sign - --timestamp=none --identifier "$MACOS_BUNDLE_ID-cli" "$APP/Contents/MacOS/polykrom-cli"
+codesign --force --sign - --timestamp=none --identifier "$MACOS_BUNDLE_ID-cli-alias" "$APP/Contents/MacOS/solidcraft-cli"
 codesign --force --sign - --timestamp=none "$APP"
 codesign --verify --strict --deep --verbose=2 "$APP"
-test -x "$APP/Contents/MacOS/solidcraft-cli" || { echo "solidcraft-cli is missing from $APP" >&2; exit 1; }
+for cli in polykrom-cli solidcraft-cli; do
+  test -x "$APP/Contents/MacOS/$cli" || { echo "$cli is missing from $APP" >&2; exit 1; }
+done
 
 # ---- DMG ---------------------------------------------------------------------------------------
 echo "==> building $DMG"
@@ -123,15 +129,18 @@ hdiutil detach "$MNT"
 echo "==> building $CLI_ZIP"
 CLI_DIR="$WORK/solidcraft-cli-$VERSION-macos-$ARCH"
 mkdir -p "$CLI_DIR"
-cp "$WORK/bin/solidcraft-cli" "$CLI_DIR/"
-codesign --force --sign - --timestamp=none --identifier "$MACOS_BUNDLE_ID-cli" "$CLI_DIR/solidcraft-cli"
-# Compatibility shim (docs/compatibility.md): the old CLI name forwards to solidcraft-cli.
-cp "$WORK/bin/solvecraft-cli" "$CLI_DIR/"
-codesign --force --sign - --timestamp=none --identifier "$MACOS_BUNDLE_ID-cli-alias" "$CLI_DIR/solvecraft-cli"
+cp "$WORK/bin/polykrom-cli" "$CLI_DIR/"
+codesign --force --sign - --timestamp=none --identifier "$MACOS_BUNDLE_ID-cli" "$CLI_DIR/polykrom-cli"
+# Compatibility shims (docs/compatibility.md): the earlier CLI names forward to polykrom-cli.
+for alias in solidcraft-cli solvecraft-cli; do
+  cp "$WORK/bin/$alias" "$CLI_DIR/"
+  codesign --force --sign - --timestamp=none --identifier "$MACOS_BUNDLE_ID-$alias-alias" "$CLI_DIR/$alias"
+done
 copy_docs "$CLI_DIR"
 rm -f "$CLI_ZIP"
 ditto -c -k --keepParent "$CLI_DIR" "$CLI_ZIP"
 
+"$WORK/bin/polykrom-cli" --version
 "$WORK/bin/solidcraft-cli" --version
 echo "==> done"
 ls -lh "$DMG" "$CLI_ZIP"

@@ -39,7 +39,7 @@ commands:
                   en.json under cmd.<command id> so only the translations are left to do
   oracle [--cli BIN]
                   replay the reference tests (tests/oracle/*/recipe.json), compare with each
-                  case's expected.json and write docs/oracle.md (--cli: a solidcraft-cli
+                  case's expected.json and write docs/oracle.md (--cli: a polykrom-cli
                   already built, instead of cargo run --release)
   action-matrix [--bless] [--results FILE] [--from DIR]
                   try every ordinary action on every face, edge, vertex and body of the design

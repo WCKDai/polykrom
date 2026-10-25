@@ -98,7 +98,7 @@ jobs:
       - run: cargo build --release --locked -p solidcraft-cli
       - run: |
           . packaging/env.sh
-          make_icons target/release/solidcraft-cli icons
+          make_icons target/release/polykrom-cli icons
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: icons
@@ -139,14 +139,18 @@ jobs:
       - name: Check the packages
         run: |
           dpkg-deb --info dist/release/*.deb
-          dpkg-deb --contents dist/release/*.deb | grep -E 'usr/bin/solidcraft$|usr/bin/solidcraft-cli$|metainfo|applications|THIRD-PARTY-LICENSES.txt'
-          # Compatibility shims (docs/compatibility.md): the old CLI name and the package rename.
-          dpkg-deb --contents dist/release/*.deb | grep -E 'usr/bin/solvecraft-cli$'
+          dpkg-deb --contents dist/release/*.deb | grep -E 'usr/bin/polykrom$|usr/bin/polykrom-cli$|metainfo|applications|THIRD-PARTY-LICENSES.txt'
+          dpkg-deb --contents dist/release/*.deb | grep -E 'usr/bin/polykrom$'
+          dpkg-deb --contents dist/release/*.deb | grep -E 'usr/bin/polykrom-cli$'
+          # Compatibility shims (docs/compatibility.md): the earlier names and the package rename.
+          for alias in solidcraft solidcraft-cli solvecraft-cli; do
+            dpkg-deb --contents dist/release/*.deb | grep -E "usr/bin/$alias\$"
+          done
           dpkg-deb --field dist/release/*.deb Replaces Conflicts Provides | grep -F solvecraft
           rpm -qip dist/release/*.rpm
-          rpm -qlp dist/release/*.rpm | grep -E '/usr/bin/solidcraft$|THIRD-PARTY-LICENSES.txt'
-          tar -tzf dist/release/*.tar.gz | grep -E '/bin/solidcraft$|THIRD-PARTY-LICENSES.txt'
-          ldd target/release/solidcraft
+          rpm -qlp dist/release/*.rpm | grep -E '/usr/bin/polykrom$'
+          tar -tzf dist/release/*.tar.gz | grep -E '/bin/polykrom$'
+          ldd target/release/polykrom
           for appimage in dist/release/*.AppImage; do
             chmod +x "$appimage"
             APPIMAGE_EXTRACT_AND_RUN=1 "$appimage" --version
@@ -288,7 +292,7 @@ jobs:
             export CARGO_TARGET_DIR=/var/tmp/solidcraft-target CARGO_BUILD_JOBS=4
             bash packaging/freebsd/package.sh
             tar -tzf dist/release/solidcraft-*-freebsd-x86_64.tar.gz \
-              | grep -E '/bin/solidcraft$|/bin/solidcraft-cli$|/share/applications/ai\.storyteller\.solvecraft\.desktop$|/share/doc/solidcraft/THIRD-PARTY-LICENSES\.txt$'
+              | grep -E '/bin/polykrom$|/bin/polykrom-cli$|/bin/solidcraft$|/bin/solidcraft-cli$|/share/applications/ai\.storyteller\.solvecraft\.desktop$|/share/doc/solidcraft/THIRD-PARTY-LICENSES\.txt$'
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: release-freebsd-x86_64

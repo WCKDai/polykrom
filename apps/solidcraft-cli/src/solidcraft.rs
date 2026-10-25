@@ -1,12 +1,13 @@
-//! `polykrom-cli`: Polykrom's name for the command-line tool. It runs `solidcraft-cli` (next to this executable, else on PATH)
-//! with the same arguments and standard streams and exits with its status, until the packages move
-//! to the new name (docs/compatibility.md).
+//! `solidcraft-cli`: SolidCraft's name for the command-line tool, kept so scripts and MCP
+//! registrations (`solidcraft-cli mcp`) keep working. It runs `polykrom-cli` (next to this
+//! executable, else on PATH) with the same arguments and standard streams and exits with its status
+//! (docs/compatibility.md). No note on stderr: MCP clients show it as an error.
 #![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::unimplemented, clippy::todo, clippy::unreachable)]
 #![forbid(unsafe_code)]
 
 use std::process::{Command, ExitCode};
 
-const TARGET: &str = "solidcraft-cli";
+const TARGET: &str = "polykrom-cli";
 
 fn main() -> ExitCode {
     let sibling = std::env::current_exe()
@@ -20,7 +21,7 @@ fn main() -> ExitCode {
             None => ExitCode::FAILURE,
         },
         Err(e) => {
-            eprintln!("polykrom-cli: could not run {}: {e}", program.to_string_lossy());
+            eprintln!("solidcraft-cli: could not run {}: {e}", program.to_string_lossy());
             ExitCode::FAILURE
         }
     }

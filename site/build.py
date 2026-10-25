@@ -87,7 +87,7 @@ def so101():
     import hashlib, json, os, subprocess, tempfile, urllib.request, zipfile
     out = OUT / 'so101'
     shutil.copytree(ROOT / 'site' / 'so101', out)
-    cli = Path(os.environ.get('POLYKROM_CLI', ROOT / 'target' / 'release' / 'solidcraft-cli'))
+    cli = Path(os.environ.get('POLYKROM_CLI', ROOT / 'target' / 'release' / 'polykrom-cli'))
     if not cli.exists():
         print('note: %s is missing, so the SO-101 showcase has no model in this build' % cli)
         return
@@ -133,11 +133,11 @@ def so101():
 def kestrel():
     """The Kestrel showcase. Its page and data are in site/kestrel. The files it shows (the URDF and
     its meshes, the GIF, the BOM and a poster) are made here from kestrel.polykrom by Polykrom's CLI,
-    so they always match the design (POLYKROM_CLI, else target/release/solidcraft-cli)."""
+    so they always match the design (POLYKROM_CLI, else target/release/polykrom-cli)."""
     import json, os, subprocess, tempfile
     src, out = ROOT / 'site' / 'kestrel', OUT / 'kestrel'
     shutil.copytree(src, out)
-    cli = Path(os.environ.get('POLYKROM_CLI', ROOT / 'target' / 'release' / 'solidcraft-cli'))
+    cli = Path(os.environ.get('POLYKROM_CLI', ROOT / 'target' / 'release' / 'polykrom-cli'))
     if not cli.exists():
         print('note: %s is missing, so the Kestrel downloads and animation are not in this build' % cli)
         return

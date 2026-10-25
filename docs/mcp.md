@@ -19,19 +19,19 @@ document remains the reference implementation today.
 
 ```sh
 # Headless: an in-process design session, no window (screenshots are drawn on the GPU).
-solidcraft-cli mcp
+polykrom-cli mcp
 
 # Headless, starting from a design file or a command script.
-solidcraft-cli mcp --in part.polykrom
+polykrom-cli mcp --in part.polykrom
 
 # Bridged to the running app, so you can watch the agent model. The app's control channel is
 # on by default (see below), so no flag is needed on either side:
 solidcraft &
-solidcraft-cli mcp          # finds the running app; headless when none runs (--headless forces that)
+polykrom-cli mcp          # finds the running app; headless when none runs (--headless forces that)
 
 # A fixed port, or a second app: name it.
 solidcraft --control 7878 &
-solidcraft-cli mcp --connect 127.0.0.1:7878
+polykrom-cli mcp --connect 127.0.0.1:7878
 ```
 
 ### Following along
@@ -60,7 +60,7 @@ Bridged, everything the agent does happens in the window you have open, so you c
 To work this way with Claude Code, start the app and add the server once:
 
 ```sh
-claude mcp add polykrom -- /path/to/solidcraft-cli mcp --allow-path ~/Polykrom-Agent
+claude mcp add polykrom -- /path/to/polykrom-cli mcp --allow-path ~/Polykrom-Agent
 ```
 
 With no `--connect`, the server finds the running app (and runs headless when none does).
@@ -72,7 +72,7 @@ when that one is taken), unless Preferences > Assistant > "Let AI agents connect
 channel / MCP)" is off; the setting takes effect at the next start. It is reachable from this
 computer only, and every connection must show the token made fresh for that launch, readable only
 by your user account ([control-protocol.md](control-protocol.md#token)). The app writes the port to
-`control/current.port` in the same folder as its token file; `solidcraft-cli mcp` with no
+`control/current.port` in the same folder as its token file; `polykrom-cli mcp` with no
 arguments reads it. `--control PORT` and `SOLIDCRAFT_CONTROL_PORT` still choose the port and apply
 even when the setting is off. With the setting off and no flag, the app listens on nothing.
 
@@ -143,8 +143,8 @@ A hard link inside an allowed folder can't be told apart from an ordinary file, 
 to a file elsewhere is reachable through it; don't keep such links in a folder you allow.
 
 ```sh
-solidcraft-cli mcp --allow-path ~/designs --allow-path ~/exports
-solidcraft-cli mcp --allow-any-path   # no limit (the behaviour before this option existed)
+polykrom-cli mcp --allow-path ~/designs --allow-path ~/exports
+polykrom-cli mcp --allow-any-path   # no limit (the behaviour before this option existed)
 ```
 
 Bridged, the server sends its folders with every request (`allow_paths`, see
@@ -164,13 +164,13 @@ not read-only, `destructiveHint` and `openWorldHint` are true.
 
 ### Client configuration
 
-Claude Code (project `.mcp.json`, or `claude mcp add solidcraft -- solidcraft-cli mcp`; a setup
+Claude Code (project `.mcp.json`, or `claude mcp add polykrom -- polykrom-cli mcp`; a setup
 added under the previous name keeps working, see the [compatibility notes](https://github.com/bherbruck/solidcraft/blob/main/docs/compatibility.md#mcp)):
 
 ```json
 {
   "mcpServers": {
-    "solidcraft": { "command": "solidcraft-cli", "args": ["mcp"] }
+    "solidcraft": { "command": "polykrom-cli", "args": ["mcp"] }
   }
 }
 ```
@@ -180,12 +180,12 @@ Claude Desktop (`claude_desktop_config.json`), bridged to a running app:
 ```json
 {
   "mcpServers": {
-    "solidcraft": { "command": "/path/to/solidcraft-cli", "args": ["mcp", "--connect", "127.0.0.1:7878"] }
+    "solidcraft": { "command": "/path/to/polykrom-cli", "args": ["mcp", "--connect", "127.0.0.1:7878"] }
   }
 }
 ```
 
-On Windows the installer puts `solidcraft-cli.exe` next to `solidcraft.exe` in
+On Windows the installer puts `polykrom-cli.exe` next to `solidcraft.exe` in
 `C:\Program Files\SolidCraft` (the portable zip has both too). Give the full path, with each
 backslash doubled in JSON. This configuration declares two servers: `solidcraft` models
 headless (no window; steadier for timings), `solidcraft-live` drives the app you have open, so
@@ -196,11 +196,11 @@ export; it must already exist.
 {
   "mcpServers": {
     "solidcraft": {
-      "command": "C:\\Program Files\\SolidCraft\\solidcraft-cli.exe",
+      "command": "C:\\Program Files\\SolidCraft\\polykrom-cli.exe",
       "args": ["mcp", "--allow-path", "C:\\Users\\NAME\\SolidCraft-Agent"]
     },
     "solidcraft-live": {
-      "command": "C:\\Program Files\\SolidCraft\\solidcraft-cli.exe",
+      "command": "C:\\Program Files\\SolidCraft\\polykrom-cli.exe",
       "args": ["mcp", "--connect", "127.0.0.1:7878", "--allow-path", "C:\\Users\\NAME\\SolidCraft-Agent"]
     }
   }
@@ -241,7 +241,7 @@ The `skill_reference` tool returns these documents from the copies built into So
 | `measure` | `body?` or `items?` | Volume (mm³), area (mm²), centre of mass, bbox and topology counts per body, with totals. With `items` (one or two selections as `execute` takes them: `face`, `edge`, `vertex`, `sketch_curve`, `profile`), the picked geometry instead: see below. |
 | `body_topology` | `body` | Edges (index, midpoint, length, ends) and faces (index, name, area, centroid, normal, `point`, and for a cylindrical face its `cylinder`: `origin`, `axis`, `radius`). An edge midpoint is the `[x,y,z]` that picks that edge for fillet and chamfer. A face's `point` lies on it and picks it (its centroid may not: that of a face with a hole is in the hole); a face's `name` picks it for the commands that take faces (`face.delete`, `solid.shell`, `solid.draft`, `solid.offset_face`, `solid.split_face`, `solid.replace_face`, and `face` of `sheet.convert`). |
 | `set_parameter` | `name`, `value` or `expression` (number or expression), `unit?`, `comment?` | Create or change a user parameter and recompute. `expression` is another name for `value` (the one `parameters.change` uses): give one of them, or both only when they agree; neither, or two that differ, is an error. Reports `recomputed` (features rebuilt), `restored` (features whose earlier result for the same inputs was reused, e.g. a value set back) and features that now fail. |
-| `screenshot` | `view?` (iso, top, front, back, bottom, left, right, home, fit, or a named view saved with `view.save`), `camera?` (`{target, yaw, pitch, distance, fov?}`, as `view.apply`), `path?`, `width?`, `height?`, `source?` (window, model), `grid?`, `axes?` | A PNG image content block. Headless: a render with the viewport's pipelines on a headless GPU device (see `solidcraft-cli gpu`; with no adapter, the CPU rasterizer, without analysis colours), fitted to the model, or from the named view or camera; the reply's `renderer` says which (`gpu`, `gpu-software`, `cpu`, with a `warning` for `cpu`). Bridged: the app window (default) or a model render with the app's camera; a named view or camera moves the app's viewport there first (`execute` `view.apply` does the same without a screenshot). `grid: false` and `axes: false` leave the ground grid (it lies on Z 0 and cuts through a part that straddles it) and the origin's axes out of a model render; axes hidden with `browser.visibility` stay out whatever `axes` says. Bridged, a screenshot that gives `grid` or `axes` is a model render, which follows the app's Grid and Origin switches for what it does not give; `source: "window"` with either is an error. A window that is minimised or on another macOS Space presents no frame: with no `source` the reply is a model render and says so (`fallback`); `source: "window"` is an error saying why, at once. Agents that don't need the app's chrome can ask for `source: "model"`. |
+| `screenshot` | `view?` (iso, top, front, back, bottom, left, right, home, fit, or a named view saved with `view.save`), `camera?` (`{target, yaw, pitch, distance, fov?}`, as `view.apply`), `path?`, `width?`, `height?`, `source?` (window, model), `grid?`, `axes?` | A PNG image content block. Headless: a render with the viewport's pipelines on a headless GPU device (see `polykrom-cli gpu`; with no adapter, the CPU rasterizer, without analysis colours), fitted to the model, or from the named view or camera; the reply's `renderer` says which (`gpu`, `gpu-software`, `cpu`, with a `warning` for `cpu`). Bridged: the app window (default) or a model render with the app's camera; a named view or camera moves the app's viewport there first (`execute` `view.apply` does the same without a screenshot). `grid: false` and `axes: false` leave the ground grid (it lies on Z 0 and cuts through a part that straddles it) and the origin's axes out of a model render; axes hidden with `browser.visibility` stay out whatever `axes` says. Bridged, a screenshot that gives `grid` or `axes` is a model render, which follows the app's Grid and Origin switches for what it does not give; `source: "window"` with either is an error. A window that is minimised or on another macOS Space presents no frame: with no `source` the reply is a model render and says so (`fallback`); `source: "window"` is an error saying why, at once. Agents that don't need the app's chrome can ask for `source: "model"`. |
 | `export` | `path`, `format?` (step, 3mf, 3mf-tagged, stl, stla, obj, urdf), `bodies?`, `mesh_prefix?`, `effort?`, `velocity?` | STEP, 3MF or mesh export; URDF writes the whole assembly with its meshes next to it (`docs/urdf.md`). |
 | `undo`, `redo` | — | Undo / redo one change. |
 | `pending` | — | Bridged: the result of a request that was still running when its call returned (an error starting `still running:`), waiting up to 60 s for it; `done: false` while it runs (call again), `pending: null` when nothing runs. See [Long-running requests](#long-running-requests). |
@@ -318,11 +318,11 @@ the batch added to the undo history.)
 
 ## Camera and close-up recipe
 
-The `camera` of `screenshot` (the object `view.apply`, `view.save` and `solidcraft-cli snapshot --camera` take too) is an orbit camera, `{target, yaw, pitch, distance, fov?}`, in millimetres and **radians**. Unlike the `angle` of `solid.move`, a bare number is not degrees here. The eye is at `target + distance * (-sin(yaw) * cos(pitch), -cos(yaw) * cos(pitch), sin(pitch))`, looking at `target` with Z up on the screen. So `yaw: 0, pitch: 0` is the front view: the eye at -Y, looking along +Y, with +X to the right. A yaw of π/2 looks from -X, π from +Y and -π/2 from +X. The pitch is the elevation angle up from the XY plane, and π/2 looks straight down with +X to the right and +Y up. `fov` is the vertical field of view in radians. `0`, or no `fov`, is an orthographic view whose visible half-height is 0.4 × `distance`; with a perspective `fov` the half-height at the target is `distance * tan(fov / 2)`. `inspect.section` removes what lies on the side its normal points to: it keeps the points `p` with `n · p < d`, where `d = n · origin` (`flip: true` keeps the other side). To look into the cut, put the eye on the removed side.
+The `camera` of `screenshot` (the object `view.apply`, `view.save` and `polykrom-cli snapshot --camera` take too) is an orbit camera, `{target, yaw, pitch, distance, fov?}`, in millimetres and **radians**. Unlike the `angle` of `solid.move`, a bare number is not degrees here. The eye is at `target + distance * (-sin(yaw) * cos(pitch), -cos(yaw) * cos(pitch), sin(pitch))`, looking at `target` with Z up on the screen. So `yaw: 0, pitch: 0` is the front view: the eye at -Y, looking along +Y, with +X to the right. A yaw of π/2 looks from -X, π from +Y and -π/2 from +X. The pitch is the elevation angle up from the XY plane, and π/2 looks straight down with +X to the right and +Y up. `fov` is the vertical field of view in radians. `0`, or no `fov`, is an orthographic view whose visible half-height is 0.4 × `distance`; with a perspective `fov` the half-height at the target is `distance * tan(fov / 2)`. `inspect.section` removes what lies on the side its normal points to: it keeps the points `p` with `n · p < d`, where `d = n · origin` (`flip: true` keeps the other side). To look into the cut, put the eye on the removed side.
 
 To look closely at one part of a large model, such as a STEP assembly, work in a headless session. These steps change only the open design in memory:
 
-1. Open the model with `solidcraft-cli mcp --in assembly.step` (or the `open` tool, which also takes `up` and `names`, see step 4 and [STEP import](step-import.md)). `inspect_design` lists the bodies with their names and bounding boxes.
+1. Open the model with `polykrom-cli mcp --in assembly.step` (or the `open` tool, which also takes `up` and `names`, see step 4 and [STEP import](step-import.md)). `inspect_design` lists the bodies with their names and bounding boxes.
 2. Remove what is in the way with `solid.remove`, e.g. `{"bodies": ["Cover"]}`.
 3. Cut the region out of the rest with `solid.box`, e.g. `{"corner": [40, 0, -45], "length": 20, "width": 50, "height": 45, "operation": "intersect", "targets": ["Housing", "Plate"]}`. Each listed body is trimmed to the box, and one that lies wholly outside the box is removed. The box itself is not kept.
 4. If the model lies on its back (many STEP files have +Y up), open it with `up: "y"` (the `open` tool, `doc.open`, `file.insert_step`), which turns the file's bodies a quarter turn about X (Y becomes Z). One already open is stood Z up with `solid.move`, listing every body you keep, e.g. `{"bodies": ["Housing", "Plate"], "axis": [1, 0, 0], "angle": 90}`. It turns the bodies about the world origin, and a bare angle is in degrees. A turn of +90° about X takes +Y to +Z.
@@ -350,7 +350,7 @@ engine's reply directly, without an additional design-inspection request.
 ## Demo: an enclosure built over MCP
 
 `examples/demo/enclosure_mcp.py` is a small MCP client. It drives a running app (`solidcraft
---control PORT`) through `solidcraft-cli mcp --connect` and builds an electronics enclosure one
+--control PORT`) through `polykrom-cli mcp --connect` and builds an electronics enclosure one
 `execute` call at a time (`enclosure_steps.json`): a rounded box, shelled open at the top, a
 USB port cut through a side wall, four screw bosses, and then a change of the `width`
 parameter that the timeline rebuilds. `examples/demo/record.sh` records the run with ffmpeg,

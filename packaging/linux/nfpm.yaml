@@ -25,7 +25,7 @@ license: MIT OR Apache-2.0
 description: |-
   Open-source, independent parametric 3D CAD
   Sketches with a constraint solver, a parametric feature timeline, components and
-  joints, sheet metal; STEP, IGES, 3MF, STL and OBJ. Includes solidcraft-cli, a
+  joints, sheet metal; STEP, IGES, 3MF, STL and OBJ. Includes polykrom-cli, a
   headless command runner and MCP server for AI agents.
 
 # The binaries link only glibc and libgcc_s directly. Windowing (X11/Wayland, xkbcommon) and the
@@ -70,13 +70,19 @@ overrides:
       - xdg-desktop-portal
 
 contents:
+  - src: ${STAGE}/usr/bin/polykrom
+    dst: /usr/bin/polykrom
+    file_info: { mode: 0755 }
+  - src: ${STAGE}/usr/bin/polykrom-cli
+    dst: /usr/bin/polykrom-cli
+    file_info: { mode: 0755 }
+  # Compatibility shims (docs/compatibility.md): the earlier names forward to polykrom and polykrom-cli.
   - src: ${STAGE}/usr/bin/solidcraft
     dst: /usr/bin/solidcraft
     file_info: { mode: 0755 }
   - src: ${STAGE}/usr/bin/solidcraft-cli
     dst: /usr/bin/solidcraft-cli
     file_info: { mode: 0755 }
-  # Compatibility shim (docs/compatibility.md): the old CLI name forwards to solidcraft-cli.
   - src: ${STAGE}/usr/bin/solvecraft-cli
     dst: /usr/bin/solvecraft-cli
     file_info: { mode: 0755 }

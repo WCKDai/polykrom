@@ -45,7 +45,7 @@ cargo xtask ci                                     # everything a PR must pass (
 Polykrom is the product, repository, Cargo package and executable name.
 Build the desktop app with `cargo build --release -p solidcraft`, or the CLI with
 `cargo build --release -p solidcraft-cli`. Run the CLI with
-`cargo run --release -p solidcraft-cli -- commands` (or `target/release/solidcraft-cli commands`
+`cargo run --release -p solidcraft-cli -- commands` (or `target/release/polykrom-cli commands`
 after building). The old name appears only in the compatibility shims listed in
 [docs/compatibility.md](docs/compatibility.md); don't add new uses of it.
 
@@ -79,7 +79,7 @@ The default development shell retains the Rust/C toolchain already on `PATH`;
 To launch, use `nix run .#solidcraft -- --sample`. To install the app's terminal
 commands, desktop entry and generated icons, use `nix profile install .#solidcraft`.
 `nix build` alone creates a build result; it does not install a launcher in your
-desktop menu. The installed `solidcraft` command runs the wrapped app; `solidcraft-cli` is included as
+desktop menu. The installed `solidcraft` command runs the wrapped app; `polykrom-cli` is included as
 well. See
 [Nix installation and troubleshooting](docs/nix.md) for remote-flake commands,
 desktop integration and how to distinguish an old executable on `PATH`.

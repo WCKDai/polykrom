@@ -327,15 +327,15 @@ or "ask" to see the agent ask its own permission.
 
 ## Benchmarking the Assistant
 
-`solidcraft-cli bench-assistant` runs the eleven tasks of the
+`polykrom-cli bench-assistant` runs the eleven tasks of the
 [standard model test (v1, #4851)](https://github.com/tangency-labs/solidcraft/issues/4851) against a
 desktop app that is already running with a control port, and checks each result on the design
 itself. Use it to see how well a local model drives SolidCraft before you post its results.
 
 ```sh
-solidcraft --control 9271
+polykrom --control 9271
 # In another terminal:
-solidcraft-cli bench-assistant --connect 127.0.0.1:9271 \
+polykrom-cli bench-assistant --connect 127.0.0.1:9271 \
   --base-url http://localhost:11434/v1 --model qwen2.5:7b \
   --json results.json --markdown results.md
 ```

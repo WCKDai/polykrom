@@ -40,7 +40,7 @@ platforms:
 
 apps:
   solidcraft:
-    command: usr/bin/solidcraft
+    command: usr/bin/polykrom
     desktop: usr/share/applications/ai.storyteller.solidcraft.desktop
     # Ties the snap to the AppStream id (ai.storyteller.solidcraft, the same in every package) so
     # software centres treat it as the same app.
@@ -61,7 +61,7 @@ apps:
       - network
       - network-bind
   cli:
-    command: usr/bin/solidcraft-cli
+    command: usr/bin/polykrom-cli
     plugs: [home, removable-media, network, network-bind]
 
 parts:

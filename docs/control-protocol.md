@@ -19,7 +19,7 @@ channel changes neither for a normal launch.
 
 Each app that opens its channel writes the port to a discovery file beside the token files,
 `control/current.port` (same folders and permissions as below), and removes it at exit if no later
-app has replaced it. It holds only the port, never the token. `solidcraft-cli mcp` with no
+app has replaced it. It holds only the port, never the token. `polykrom-cli mcp` with no
 arguments reads it, checks that something listens there and bridges to that app; with no app
 running, or with `--headless`, it runs a session of its own. `--connect HOST:PORT` and the
 other arguments still decide first. With several windows open, the most recently started one is
@@ -52,7 +52,7 @@ connection may leave it out. A first line without the right token is answered wi
 `{"ok": false, "error": "unauthorized: …"}` and the connection is closed, without running
 anything. Tokens are compared in constant time.
 
-`solidcraft-cli mcp --connect 127.0.0.1:PORT` reads the token file for that port by itself
+`polykrom-cli mcp --connect 127.0.0.1:PORT` reads the token file for that port by itself
 (`--token T` or `SOLIDCRAFT_CONTROL_TOKEN` give one explicitly). For a test harness, or a
 sandboxed package whose data folder the client can't see, start the app with
 `SOLIDCRAFT_CONTROL_TOKEN` set to at least 32 hex characters (for example
@@ -128,7 +128,7 @@ MCP server sends its folders this way on every request ([mcp.md](mcp.md)). Witho
 | `engine.commands` | — | every command: id, label, tab, panel, icon, shortcut, params doc, enabled |
 | `document.inspect` | `measure?`: bool | parameters, timeline (errors, timings), bodies, sketches, selection (assembly joints: `engine.execute` `joint.inspect {joint?}`, which reads only: each joint's two origins with the occurrence, the snap as saved, the feature, face, edge or sketch curve its names refer to, and whether it resolves or why not; kind, offset, angle, flip, values, limits, expressions and motion links) |
 
-Commands never open dialogs when run this way. `solidcraft-cli commands` prints the same registry.
+Commands never open dialogs when run this way. `polykrom-cli commands` prints the same registry.
 
 ### Slow commands and the window (#1989)
 
@@ -228,7 +228,7 @@ labels; `prefs:measure_axis_distances` identifies the checkbox.
 | `ui.key` | `key` (egui key name, `Enter`, `Escape`…), `cmd?`, `ctrl?`, `shift?`, `alt?`, `pressed?` | By default, press and release, then release modifiers. With `pressed: true` or `false`, send only that edge; modifiers remain as given. `cmd` retains the legacy primary-modifier alias unless `ctrl` is explicit: `cmd:true, ctrl:false` sends physical Command, and both true sends Control+Command. `ui.move` can change modifiers between edges. |
 | `ui.text` | `text` | typed text |
 | `ui.screenshot` | `path?` | PNG of the window (needs a presented frame: a minimised or fully covered window answers at once with `hidden: true` and an error; use `ui.render`) |
-| `ui.render` | `path`, `width?`, `height?`, `grid?`, `axes?` | Render of the model with the current camera (no window needed), drawn on the app's GPU device with the viewport's pipelines (the reply's `renderer`: `gpu`, or `gpu-software` on a software adapter), in the window's theme (light or dark; `solidcraft-cli snapshot` keeps the light colours); cut by the section the viewport shows (`inspect.section`, an open Section Analysis dialog's preview, a sketch's Slice), with the cut face capped. The ground grid and the origin's axes are drawn as the window shows them (`ui.set` `showGrid` and `showOrigin`, `hiddenOrigin`); `grid` and `axes` (booleans) say otherwise for this render |
+| `ui.render` | `path`, `width?`, `height?`, `grid?`, `axes?` | Render of the model with the current camera (no window needed), drawn on the app's GPU device with the viewport's pipelines (the reply's `renderer`: `gpu`, or `gpu-software` on a software adapter), in the window's theme (light or dark; `polykrom-cli snapshot` keeps the light colours); cut by the section the viewport shows (`inspect.section`, an open Section Analysis dialog's preview, a sketch's Slice), with the cut face capped. The ground grid and the origin's axes are drawn as the window shows them (`ui.set` `showGrid` and `showOrigin`, `hiddenOrigin`); `grid` and `axes` (booleans) say otherwise for this render |
 | `ui.confirm` | `accept?`: bool | answers the Delete confirmation (shown when a delete takes other features with it or makes some fail); without `accept`, what it lists |
 | `ui.messages` | `clear?`: `true` (empty the list), `open?`: bool (show or hide the Messages window) | every status message of this run, oldest first (the last 200; a message repeated in a row is one entry with a `count`): `messages` `[{text, error, at, count}]` (`at` in ms since the Unix epoch), and whether the window is `open` (#2763) |
 | `ui.documents` | `action?`: `new`, `switch`, `close`, `quit`; `index?`; `force?` (close without asking); `answer?`: `save`, `dont_save`, `cancel` (answers "save changes?") | the open designs (tabs): names, unsaved flags, the active one, a pending "save changes?" prompt, whether a quit is asking |
@@ -262,7 +262,7 @@ document edits, undo steps or a success-log entry per movement.
 
 ## MCP
 
-`solidcraft-cli mcp --connect 127.0.0.1:PORT` bridges an MCP client (an AI agent) to this
+`polykrom-cli mcp --connect 127.0.0.1:PORT` bridges an MCP client (an AI agent) to this
 channel; see [mcp.md](mcp.md).
 
 ## Example

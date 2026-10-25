@@ -12,7 +12,7 @@ Release titles, installer product names and everything a person reads use the Po
 Asset, binary and package file names keep SolidCraft's stable names until the second rename
 stage, because the updater picks assets by them
 (`solidcraft-<version>-linux-<arch>.AppImage`, `SolidCraft-<version>-windows-x64.exe`,
-`solidcraft-cli` archives, …). The old name survives only in the shims listed in
+`polykrom-cli` archives, …). The old name survives only in the shims listed in
 [compatibility.md](compatibility.md) (the end-of-life Flatpak refs of the old Linux app ID, the legacy `.zsync` and `.flatpakrepo`
 copies, the deprecated old-name CLI alias); keep them until that document says they can go. Do not
 rewrite published assets, checksums, tags or historical release notes of earlier versions.

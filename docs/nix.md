@@ -26,7 +26,7 @@ nix build github:bherbruck/solidcraft#solidcraft
 ./result/bin/solidcraft --sample
 ```
 
-The result contains `solidcraft`, `solidcraft-cli` and the deprecated old-name CLI alias
+The result contains `solidcraft`, `polykrom-cli` and the deprecated old-name CLI alias
 (see [compatibility.md](compatibility.md)). **Building does not install a desktop-menu entry.** For a user
 profile installation, run:
 
@@ -111,4 +111,4 @@ The environment overrides the preference: `SOLIDCRAFT_WAYLAND=1` (always native 
 `nix develop` supplies runtime libraries and uses the Rust/C toolchain already on
 your `PATH`. `nix develop .#rust` supplies the pinned toolchain, C linker and
 `target/nix` build directory. Both retain the GUI and CLI's existing Cargo package
-names (`solidcraft`, `solidcraft-cli`).
+names (`solidcraft`, `polykrom-cli`).

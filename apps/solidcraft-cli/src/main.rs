@@ -1,25 +1,25 @@
 //! Polykrom headless command line.
 //!
 //! ```text
-//! solidcraft-cli run <script.json|design.polykrom|part.step|mesh.3mf> [--in design|part.step|mesh.3mf] [--out FILE]... [--save FILE] [--quiet] [--results] [--timings] [--profile] [--json-out FILE] [--allow-errors]
-//! solidcraft-cli eval <script.json|design.polykrom|part.step> [--json-out FILE] (alias: inspect) measurements as JSON
-//! solidcraft-cli script <design.polykrom> [--out script.json]     the design's history as a command script
-//! solidcraft-cli bench-open <design.polykrom | part.step> [--parse-only] [--save OUT.polykrom] [--display LEVEL [--edit NAME EXPR]] [--ops script.json] loading timings as JSON lines
-//! solidcraft-cli bench-agent [--scale F] [--save F] [--script-out F] a ~1,300-body design built command by command, timed
-//! solidcraft-cli bench-assistant --connect 127.0.0.1:PORT [--token T] --base-url URL --model NAME [--tasks 1,2,5] [--repeat N]
+//! polykrom-cli run <script.json|design.polykrom|part.step|mesh.3mf> [--in design|part.step|mesh.3mf] [--out FILE]... [--save FILE] [--quiet] [--results] [--timings] [--profile] [--json-out FILE] [--allow-errors]
+//! polykrom-cli eval <script.json|design.polykrom|part.step> [--json-out FILE] (alias: inspect) measurements as JSON
+//! polykrom-cli script <design.polykrom> [--out script.json]     the design's history as a command script
+//! polykrom-cli bench-open <design.polykrom | part.step> [--parse-only] [--save OUT.polykrom] [--display LEVEL [--edit NAME EXPR]] [--ops script.json] loading timings as JSON lines
+//! polykrom-cli bench-agent [--scale F] [--save F] [--script-out F] a ~1,300-body design built command by command, timed
+//! polykrom-cli bench-assistant --connect 127.0.0.1:PORT [--token T] --base-url URL --model NAME [--tasks 1,2,5] [--repeat N]
 //!                                 [--timeout-s 300] [--json out.json] [--markdown out.md]
 //!                                                             the standard Assistant model test (#4851) on a running app
-//! solidcraft-cli snapshot <script|design> [--in design|part.step] --out shot.png [--width W] [--height H] [--view iso|front|top|…|NAME | --camera JSON] [--no-grid] [--no-axes]
+//! polykrom-cli snapshot <script|design> [--in design|part.step] --out shot.png [--width W] [--height H] [--view iso|front|top|…|NAME | --camera JSON] [--no-grid] [--no-axes]
 //!                                                             [--body NAME:opacity=0.3,color=#rrggbb]... [--tool NAME]... [--section z=27]
-//! solidcraft-cli exec <command> [json-params]                 run one command on an empty design
-//! solidcraft-cli commands                                     the command registry as JSON
-//! solidcraft-cli recipe <recipe.json>                         translate an oracle recipe to a script
-//! solidcraft-cli oracle <case-dir>...                         replay recipes and compare with expected.json
-//! solidcraft-cli mcp [--headless] [--in design|script] [--connect HOST:PORT [--token T]] [--allow-path DIR]... [--allow-any-path]
+//! polykrom-cli exec <command> [json-params]                 run one command on an empty design
+//! polykrom-cli commands                                     the command registry as JSON
+//! polykrom-cli recipe <recipe.json>                         translate an oracle recipe to a script
+//! polykrom-cli oracle <case-dir>...                         replay recipes and compare with expected.json
+//! polykrom-cli mcp [--headless] [--in design|script] [--connect HOST:PORT [--token T]] [--allow-path DIR]... [--allow-any-path]
 //!                    [--param-check off|warn|strict]
 //!                                                             MCP server on stdio (docs/mcp.md)
-//! solidcraft-cli licences                                     Polykrom's licence and the third-party licences
-//! solidcraft-cli icon --out F.png|F.ico [--size N]             the app icon (packaging; drawn, not a file)
+//! polykrom-cli licences                                     Polykrom's licence and the third-party licences
+//! polykrom-cli icon --out F.png|F.ico [--size N]             the app icon (packaging; drawn, not a file)
 //!
 //! --debug (with any command)                                  Polykrom's debug log on stderr (or RUST_LOG=LEVEL)
 //! ```
@@ -55,48 +55,47 @@ struct Command {
 }
 
 /// `run`'s lines in the usage.
-const USAGE_RUN: &str = "  solidcraft-cli run <script.json|design.polykrom|part.step> [--in design.polykrom|part.step] [--out FILE]... [--save FILE] [--quiet] [--results] [--timings] [--profile] [--json-out FILE] [--allow-errors]\n  solidcraft-cli run --in <design.polykrom|part.step> [--out FILE]...\n      (a timeline feature that fails fails the run and nothing is written; --allow-errors writes anyway)\n      (--timings prints {timings: [{index, command, ms}], total_ms} for a script, with --results its results too;\n       --profile adds each command's profile: {boolean_ms, tessellate_ms, other_ms}, the kernel's share)\n";
+const USAGE_RUN: &str = "  polykrom-cli run <script.json|design.polykrom|part.step> [--in design.polykrom|part.step] [--out FILE]... [--save FILE] [--quiet] [--results] [--timings] [--profile] [--json-out FILE] [--allow-errors]\n  polykrom-cli run --in <design.polykrom|part.step> [--out FILE]...\n      (a timeline feature that fails fails the run and nothing is written; --allow-errors writes anyway)\n      (--timings prints {timings: [{index, command, ms}], total_ms} for a script, with --results its results too;\n       --profile adds each command's profile: {boolean_ms, tessellate_ms, other_ms}, the kernel's share)\n";
 /// `eval`'s lines in the usage.
-const USAGE_EVAL: &str = "  solidcraft-cli eval <script.json|design.polykrom|part.step> [--json-out FILE]     (alias: inspect; or --in FILE)\n      (--json-out FILE writes the JSON that run (with --results, else the measurement) and eval print to FILE instead of stdout,\n       as plain UTF-8: a shell's > can re-encode it, e.g. Windows PowerShell adds a byte-order mark)\n";
+const USAGE_EVAL: &str = "  polykrom-cli eval <script.json|design.polykrom|part.step> [--json-out FILE]     (alias: inspect; or --in FILE)\n      (--json-out FILE writes the JSON that run (with --results, else the measurement) and eval print to FILE instead of stdout,\n       as plain UTF-8: a shell's > can re-encode it, e.g. Windows PowerShell adds a byte-order mark)\n";
 /// `script`'s lines in the usage.
-const USAGE_SCRIPT: &str = "  solidcraft-cli script <design.polykrom|script.json> [--out script.json]\n      (the design's history as a command script that eval and run replay)\n";
+const USAGE_SCRIPT: &str = "  polykrom-cli script <design.polykrom|script.json> [--out script.json]\n      (the design's history as a command script that eval and run replay)\n";
 /// `bench-open`'s lines in the usage.
-const USAGE_BENCH_OPEN: &str = "  solidcraft-cli bench-open <design.polykrom | part.step> [--parse-only] [--save OUT.polykrom] [--display LEVEL [--edit NAME EXPR]] [--ops script.json]\n      (--ops: after opening, run each command of the script and undo it, timing the command, the\n       evaluations it caused and the view it leaves: placing and meshing what changed)\n";
+const USAGE_BENCH_OPEN: &str = "  polykrom-cli bench-open <design.polykrom | part.step> [--parse-only] [--save OUT.polykrom] [--display LEVEL [--edit NAME EXPR]] [--ops script.json]\n      (--ops: after opening, run each command of the script and undo it, timing the command, the\n       evaluations it caused and the view it leaves: placing and meshing what changed)\n";
 /// `bench-agent`'s lines in the usage.
-const USAGE_BENCH_AGENT: &str = "  solidcraft-cli bench-agent [--scale F] [--save design.polykrom] [--script-out script.json]\n";
+const USAGE_BENCH_AGENT: &str = "  polykrom-cli bench-agent [--scale F] [--save design.polykrom] [--script-out script.json]\n";
 /// `bench-assistant`'s lines in the usage.
-const USAGE_BENCH_ASSISTANT: &str = "  solidcraft-cli bench-assistant --connect 127.0.0.1:PORT [--token T] --base-url URL --model NAME [--tasks 1,2,5] [--repeat N] [--timeout-s 300] [--json out.json] [--markdown out.md]\n";
+const USAGE_BENCH_ASSISTANT: &str = "  polykrom-cli bench-assistant --connect 127.0.0.1:PORT [--token T] --base-url URL --model NAME [--tasks 1,2,5] [--repeat N] [--timeout-s 300] [--json out.json] [--markdown out.md]\n";
 /// `snapshot`'s lines in the usage.
-const USAGE_SNAPSHOT: &str = "  solidcraft-cli snapshot <script|design> [--in design.polykrom|part.step] --out shot.png [--width W] [--height H] [--view NAME | --camera JSON] [--no-grid] [--no-axes]\n      [--body NAME:opacity=0.3,color=#rrggbb]... [--tool NAME]... [--section z=27]\n  solidcraft-cli snapshot --in <design.polykrom|part.step> --out shot.png ...\n      (as with run, --in starts from a design and the script runs on top of it; an option snapshot doesn't take is an error;\n       --view: iso, front, back, top, bottom, left, right, or the name of a view saved in the design with view.save;\n       --camera: {target: [x,y,z], yaw, pitch, distance, fov?} in mm and radians, as the MCP screenshot takes it (docs/mcp.md);\n       --no-grid and --no-axes leave the ground grid (on Z 0) and the origin's axes out of the picture;\n       --body: how one body is drawn, as appearance.assign takes it: opacity 0-1 (below 1 is see-through, so what is inside\n         it shows) and color #rrggbb, either or both, once per body;\n       --tool: draw this body solid in the tool colour and every other body see-through, so a cut's or a join's tool body\n         is visible inside the material it meets; a later --body overrides it;\n       --section: cut the model as inspect.section does, so the inside shows: z=27 (the plane through that world\n         coordinate, keeping the smaller side), add ,flip to keep the other side, or XY, XZ, YZ, or its own JSON)\n";
+const USAGE_SNAPSHOT: &str = "  polykrom-cli snapshot <script|design> [--in design.polykrom|part.step] --out shot.png [--width W] [--height H] [--view NAME | --camera JSON] [--no-grid] [--no-axes]\n      [--body NAME:opacity=0.3,color=#rrggbb]... [--tool NAME]... [--section z=27]\n  polykrom-cli snapshot --in <design.polykrom|part.step> --out shot.png ...\n      (as with run, --in starts from a design and the script runs on top of it; an option snapshot doesn't take is an error;\n       --view: iso, front, back, top, bottom, left, right, or the name of a view saved in the design with view.save;\n       --camera: {target: [x,y,z], yaw, pitch, distance, fov?} in mm and radians, as the MCP screenshot takes it (docs/mcp.md);\n       --no-grid and --no-axes leave the ground grid (on Z 0) and the origin's axes out of the picture;\n       --body: how one body is drawn, as appearance.assign takes it: opacity 0-1 (below 1 is see-through, so what is inside\n         it shows) and color #rrggbb, either or both, once per body;\n       --tool: draw this body solid in the tool colour and every other body see-through, so a cut's or a join's tool body\n         is visible inside the material it meets; a later --body overrides it;\n       --section: cut the model as inspect.section does, so the inside shows: z=27 (the plane through that world\n         coordinate, keeping the smaller side), add ,flip to keep the other side, or XY, XZ, YZ, or its own JSON)\n";
 /// `render`'s lines in the usage.
-const USAGE_RENDER: &str = "  solidcraft-cli render <script|design> --out image.png [--setup NAME] [--width W] [--height H] [--transparent] [--overwrite] [--timeout SECONDS]\n";
+const USAGE_RENDER: &str = "  polykrom-cli render <script|design> --out image.png [--setup NAME] [--width W] [--height H] [--transparent] [--overwrite] [--timeout SECONDS]\n";
 /// `exec`'s lines in the usage.
-const USAGE_EXEC: &str = "  solidcraft-cli exec <command> [json-params]\n";
+const USAGE_EXEC: &str = "  polykrom-cli exec <command> [json-params]\n";
 /// `commands`'s lines in the usage.
-const USAGE_COMMANDS: &str = "  solidcraft-cli commands\n";
+const USAGE_COMMANDS: &str = "  polykrom-cli commands\n";
 /// `recipe`'s lines in the usage.
-const USAGE_RECIPE: &str = "  solidcraft-cli recipe <recipe.json>\n";
+const USAGE_RECIPE: &str = "  polykrom-cli recipe <recipe.json>\n";
 /// `oracle`'s lines in the usage.
-const USAGE_ORACLE: &str = "  solidcraft-cli oracle <case-dir>... [--json]\n";
+const USAGE_ORACLE: &str = "  polykrom-cli oracle <case-dir>... [--json]\n";
 /// `fuzz`'s lines in the usage.
-const USAGE_FUZZ: &str =
-    "  solidcraft-cli fuzz [--from N] [--count N] [--jobs J] [--timeout S] [--steps N] [--minimise] [--out DIR] [--report FILE]\n";
+const USAGE_FUZZ: &str = "  polykrom-cli fuzz [--from N] [--count N] [--jobs J] [--timeout S] [--steps N] [--minimise] [--out DIR] [--report FILE]\n";
 /// `mcp`'s lines in the usage.
-const USAGE_MCP: &str = "  solidcraft-cli mcp [--headless] [--in design.polykrom|script.json] [--connect 127.0.0.1:PORT [--token T]] [--allow-path DIR]... [--allow-any-path]\n                     [--param-check off|warn|strict]\n";
+const USAGE_MCP: &str = "  polykrom-cli mcp [--headless] [--in design.polykrom|script.json] [--connect 127.0.0.1:PORT [--token T]] [--allow-path DIR]... [--allow-any-path]\n                     [--param-check off|warn|strict]\n";
 /// `crashes`'s lines in the usage.
-const USAGE_CRASHES: &str = "  solidcraft-cli crashes [list [--json] | show <id> | replay <id> | dir | clear [<id>]]\n";
+const USAGE_CRASHES: &str = "  polykrom-cli crashes [list [--json] | show <id> | replay <id> | dir | clear [<id>]]\n";
 /// `licences`'s lines in the usage.
-const USAGE_LICENCES: &str = "  solidcraft-cli licences\n";
+const USAGE_LICENCES: &str = "  polykrom-cli licences\n";
 /// `gpu`'s lines in the usage.
-const USAGE_GPU: &str = "  solidcraft-cli gpu [--policy auto|hardware|software|cpu]\n      (the GPU adapters a headless render can open, best first, the one the policy picks and the tier it\n       lands on: gpu, gpu-software, or the CPU rasterizer (auto with no adapter, or cpu); the policy defaults\n       to SOLIDCRAFT_GPU, else auto; exits with an error when hardware or software finds no such adapter)\n";
+const USAGE_GPU: &str = "  polykrom-cli gpu [--policy auto|hardware|software|cpu]\n      (the GPU adapters a headless render can open, best first, the one the policy picks and the tier it\n       lands on: gpu, gpu-software, or the CPU rasterizer (auto with no adapter, or cpu); the policy defaults\n       to SOLIDCRAFT_GPU, else auto; exits with an error when hardware or software finds no such adapter)\n";
 /// `icon`'s lines in the usage.
-const USAGE_ICON: &str = "  solidcraft-cli icon --out icon.png [--size 256] | --out icon.ico\n";
+const USAGE_ICON: &str = "  polykrom-cli icon --out icon.png [--size 256] | --out icon.ico\n";
 /// `fuzz-one`'s lines in the usage: a seed and the flags of one fuzz run.
-const USAGE_FUZZ_ONE: &str = "  solidcraft-cli fuzz-one <seed> [--steps N] [--minimise]\n";
+const USAGE_FUZZ_ONE: &str = "  polykrom-cli fuzz-one <seed> [--steps N] [--minimise]\n";
 /// `bench-edit`'s lines in the usage: the parameter a script changes.
-const USAGE_BENCH_EDIT: &str = "  solidcraft-cli bench-edit <script.json|recipe.json> <param> <expr>\n";
+const USAGE_BENCH_EDIT: &str = "  polykrom-cli bench-edit <script.json|recipe.json> <param> <expr>\n";
 /// `save-stress`'s lines in the usage: the file saved over and over.
-const USAGE_SAVE_STRESS: &str = "  solidcraft-cli save-stress <path> <rounds>\n";
+const USAGE_SAVE_STRESS: &str = "  polykrom-cli save-stress <path> <rounds>\n";
 /// The flags every command takes, at the end of the top-level usage.
 const USAGE_DEBUG: &str = "  --debug, with any command: what Polykrom logs (why a body has no display plan, why a save left its\n      model cache out), on stderr; RUST_LOG=error|warn|info|debug|trace sets one level for every crate\n";
 
@@ -184,7 +183,7 @@ fn main() -> ExitCode {
         // The standard Assistant model test (#4851), run against a desktop app over its control channel.
         Some("bench-assistant") => bench_assistant::run(&args[1..]),
         Some("--version" | "-V") => {
-            println!("solidcraft-cli {}", env!("CARGO_PKG_VERSION"));
+            println!("polykrom-cli {}", env!("CARGO_PKG_VERSION"));
             Ok(())
         }
         // Asked-for help is not an error: usage on stdout, exit 0.
@@ -481,7 +480,7 @@ fn cmd_gpu(args: &[String]) -> Result<(), String> {
     let policy = match args {
         [] => Policy::from_env()?,
         [flag, v] if flag == "--policy" => Policy::parse(v).ok_or_else(|| format!("--policy must be auto, hardware, software or cpu, not `{v}`"))?,
-        _ => return Err("usage: solidcraft-cli gpu [--policy auto|hardware|software|cpu]".into()),
+        _ => return Err("usage: polykrom-cli gpu [--policy auto|hardware|software|cpu]".into()),
     };
     let s = survey(policy);
     let chosen = s.chosen.and_then(|i| s.adapters.get(i)).cloned();
@@ -708,7 +707,7 @@ fn discover_app() -> Option<u16> {
 /// parameter `save_round` set to the round number each time.
 fn cmd_save_stress(args: &[String]) -> Result<(), String> {
     let (Some(path), Some(rounds)) = (args.first(), args.get(1).and_then(|n| n.parse::<u64>().ok())) else {
-        return Err("usage: solidcraft-cli save-stress <path> <rounds>".into());
+        return Err("usage: polykrom-cli save-stress <path> <rounds>".into());
     };
     let mut s = Session::default();
     let filler = (0..3000).map(|i| solidcraft_engine::doc::Param {
@@ -730,7 +729,7 @@ fn cmd_save_stress(args: &[String]) -> Result<(), String> {
 /// parameter edit, setting it back, undo and redo (ms and features recomputed each).
 fn cmd_bench_edit(args: &[String]) -> Result<(), String> {
     let (Some(path), Some(param), Some(expr)) = (args.first(), args.get(1), args.get(2)) else {
-        return Err("usage: solidcraft-cli bench-edit <script.json|recipe.json> <param> <expr>".into());
+        return Err("usage: polykrom-cli bench-edit <script.json|recipe.json> <param> <expr>".into());
     };
     let v = read_json(path)?;
     let script = if v.get("features").is_some() { recipe::to_script(&v)? } else { v };
@@ -788,7 +787,7 @@ fn bench_ops(mut s: Session, script: &str) -> Result<Session, String> {
 
 /// Separate file reading, JSON decoding/repair, timeline evaluation and display meshing.
 pub(crate) fn cmd_bench_open(args: &[String]) -> Result<(), String> {
-    let path = args.first().ok_or("usage: solidcraft-cli bench-open <design.polykrom | part.step> [--parse-only]")?;
+    let path = args.first().ok_or("usage: polykrom-cli bench-open <design.polykrom | part.step> [--parse-only]")?;
     let t = std::time::Instant::now();
     let step = solidcraft_engine::io::is_step_path(path);
     let limit = if step { solidcraft_engine::io::MAX_STEP_BYTES } else { solidcraft_engine::io::MAX_DESIGN_BYTES };

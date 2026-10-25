@@ -64,7 +64,7 @@ impl Server {
     pub fn new(backend: Box<dyn Backend>) -> Self {
         Self { backend, initialized: false, scope: None }
     }
-    /// Confine the files tool calls may reach to `scope` (`None`: anywhere). `solidcraft-cli mcp`
+    /// Confine the files tool calls may reach to `scope` (`None`: anywhere). `polykrom-cli mcp`
     /// always sets one unless started with `--allow-any-path` (docs/mcp.md).
     pub fn with_path_scope(mut self, scope: Option<PathScope>) -> Self {
         self.scope = scope;

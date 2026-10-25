@@ -708,18 +708,21 @@ fn solidcraft_tool(title: &str) -> bool {
     title.to_ascii_lowercase().contains("solidcraft")
 }
 
-/// `solidcraft-cli` next to this program, else on the search path.
+/// `polykrom-cli` next to this program, else on the search path; failing that, SolidCraft's
+/// name for it (an older install, or a PATH that only has that one).
 #[cfg(not(target_arch = "wasm32"))]
 fn find_cli() -> Option<std::path::PathBuf> {
-    let name = if cfg!(windows) { "solidcraft-cli.exe" } else { "solidcraft-cli" };
     if let Some(p) = solidcraft_engine::geom::env::var("CLI").map(std::path::PathBuf::from).filter(|p| p.is_file()) {
         return Some(p);
     }
-    std::env::current_exe()
-        .ok()
-        .and_then(|e| e.parent().map(|d| d.join(name)))
-        .filter(|p| p.is_file())
-        .or_else(|| discover::find_in("solidcraft-cli", &discover::search_dirs()))
+    let beside = std::env::current_exe().ok().and_then(|e| e.parent().map(std::path::Path::to_path_buf));
+    ["polykrom-cli", "solidcraft-cli"].into_iter().find_map(|name| {
+        beside
+            .as_ref()
+            .map(|d| d.join(format!("{name}{}", std::env::consts::EXE_SUFFIX)))
+            .filter(|p| p.is_file())
+            .or_else(|| discover::find_in(name, &discover::search_dirs()))
+    })
 }
 
 /// The agent's working folder: an empty folder of Polykrom's own, so an agent's own file tools

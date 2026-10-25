@@ -68,7 +68,7 @@ pub fn token_path(port: u16) -> Option<PathBuf> {
 }
 
 /// The discovery file: the port of the most recently started app, so a client with no port
-/// (`solidcraft-cli mcp`) finds it. It holds only the port; the token stays in its own file.
+/// (`polykrom-cli mcp`) finds it. It holds only the port; the token stays in its own file.
 pub fn current_port_path() -> Option<PathBuf> {
     Some(control_dir()?.join("current.port"))
 }

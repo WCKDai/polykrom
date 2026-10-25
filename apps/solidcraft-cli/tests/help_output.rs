@@ -51,9 +51,9 @@ const LISTED: &[&str] = &[
     "icon",
 ];
 
-/// The command names a text mentions after `solidcraft-cli `, each one only once.
+/// The command names a text mentions after `polykrom-cli `, each one only once.
 fn mentioned(text: &str) -> Vec<&str> {
-    let mut names: Vec<&str> = text.split("solidcraft-cli ").skip(1).filter_map(|rest| rest.split_whitespace().next()).collect();
+    let mut names: Vec<&str> = text.split("polykrom-cli ").skip(1).filter_map(|rest| rest.split_whitespace().next()).collect();
     names.sort_unstable();
     names.dedup();
     names
@@ -62,7 +62,7 @@ fn mentioned(text: &str) -> Vec<&str> {
 /// Runs the binary and waits at most `limit` for it to finish. `None` means it was still
 /// running and was killed: the fuzz run `fuzz --help` used to start goes on for minutes.
 fn run_within(limit: Duration, args: &[&str]) -> Option<(Option<i32>, String, String)> {
-    let mut child = Command::new(env!("CARGO_BIN_EXE_solidcraft-cli")).args(args).stdout(Stdio::piped()).stderr(Stdio::piped()).spawn().unwrap();
+    let mut child = Command::new(env!("CARGO_BIN_EXE_polykrom-cli")).args(args).stdout(Stdio::piped()).stderr(Stdio::piped()).spawn().unwrap();
     let started = Instant::now();
     loop {
         match child.try_wait().unwrap() {
@@ -83,18 +83,18 @@ fn run_within(limit: Duration, args: &[&str]) -> Option<(Option<i32>, String, St
 #[test]
 fn help_prints_usage_and_succeeds() {
     for arg in ["--help", "-h", "help"] {
-        let output = Command::new(env!("CARGO_BIN_EXE_solidcraft-cli")).arg(arg).output().unwrap();
+        let output = Command::new(env!("CARGO_BIN_EXE_polykrom-cli")).arg(arg).output().unwrap();
         assert!(output.status.success(), "{arg}: {}", String::from_utf8_lossy(&output.stderr));
         let stdout = String::from_utf8_lossy(&output.stdout);
         assert!(stdout.starts_with("usage:"), "{arg}: {stdout}");
-        assert!(stdout.contains("solidcraft-cli run"), "{arg}: {stdout}");
+        assert!(stdout.contains("polykrom-cli run"), "{arg}: {stdout}");
         assert!(output.stderr.is_empty(), "{arg}: {}", String::from_utf8_lossy(&output.stderr));
     }
 }
 
 #[test]
 fn unknown_command_still_fails_with_usage() {
-    let output = Command::new(env!("CARGO_BIN_EXE_solidcraft-cli")).arg("--not-a-command").output().unwrap();
+    let output = Command::new(env!("CARGO_BIN_EXE_polykrom-cli")).arg("--not-a-command").output().unwrap();
     assert!(!output.status.success());
     assert!(output.stdout.is_empty());
     assert!(String::from_utf8_lossy(&output.stderr).starts_with("error: usage:"));
@@ -104,7 +104,7 @@ fn unknown_command_still_fails_with_usage() {
 fn every_command_prints_its_own_usage() {
     for (cmd, named) in COMMANDS {
         for flag in ["--help", "-h"] {
-            let output = Command::new(env!("CARGO_BIN_EXE_solidcraft-cli")).args([*cmd, flag]).output().unwrap();
+            let output = Command::new(env!("CARGO_BIN_EXE_polykrom-cli")).args([*cmd, flag]).output().unwrap();
             assert!(output.status.success(), "{cmd} {flag}: {}", String::from_utf8_lossy(&output.stderr));
             let stdout = String::from_utf8_lossy(&output.stdout);
             assert!(stdout.starts_with("usage:"), "{cmd} {flag}: {stdout}");
@@ -116,10 +116,10 @@ fn every_command_prints_its_own_usage() {
 
 #[test]
 fn the_top_level_usage_still_lists_every_command() {
-    let output = Command::new(env!("CARGO_BIN_EXE_solidcraft-cli")).arg("--help").output().unwrap();
+    let output = Command::new(env!("CARGO_BIN_EXE_polykrom-cli")).arg("--help").output().unwrap();
     let stdout = String::from_utf8_lossy(&output.stdout);
     for cmd in LISTED {
-        assert!(stdout.contains(&format!("solidcraft-cli {cmd}")), "{cmd}: {stdout}");
+        assert!(stdout.contains(&format!("polykrom-cli {cmd}")), "{cmd}: {stdout}");
     }
 }
 

@@ -112,4 +112,4 @@ integrate() {
 }
 
 integrate
-exec "$APPDIR/usr/bin/solidcraft" "$@"
+exec "$APPDIR/usr/bin/polykrom" "$@"
