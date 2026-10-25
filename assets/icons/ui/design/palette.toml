@@ -9,44 +9,44 @@
 
 [roles.ink]        # outlines and details drawn over a face
 source = "#34465b"
-light = "#2a4b4e"
+light = "#2b2a28"
 dark  = "#202020"
 [roles.line]       # line art that sits directly on the UI background (SVG: currentColor)
 source = "#34465b"
-light = "#2a4b4e"
-dark  = "#d7e6e8"
+light = "#2b2a28"
+dark  = "#e6e3dd"
 [roles.passive-1]  # passive geometry, lightest face
 source = "#e2e8ef"
-light = "#e6e7ed"
-dark  = "#7eabb0"
+light = "#e8e6e1"
+dark  = "#a8a49d"
 [roles.passive-2]
 source = "#b8c3cf"
-light = "#c1c1c7"
-dark  = "#5b898f"
+light = "#c4c1bb"
+dark  = "#807c76"
 [roles.passive-3]  # darkest passive face
 source = "#8e9faf"
-light = "#89a2a5"
-dark  = "#466d72"
+light = "#94908a"
+dark  = "#605c57"
 [roles.gap]        # erases earlier artwork to transparency; light/dark retained for legacy schema only
 source = "#ffffff"
 light = "#ffffff"
 dark  = "#242428"
 [roles.guide]      # construction and guide dots
 source = "#6f879c"
-light = "#698b8f"
-dark  = "#7b9699"
+light = "#8a867f"
+dark  = "#8e8a84"
 [roles.active-1]   # changed or result geometry, palest face
 source = "#b9ddf8"
-light = "#b3e2e7"
-dark  = "#25acb9"
+light = "#e2f5a8"
+dark  = "#d6ff3d"
 [roles.active-2]
 source = "#328bd3"
-light = "#1297a3"
-dark  = "#0194a0"
+light = "#7fb51a"
+dark  = "#b4e000"
 [roles.active-3]   # strongest blue: strokes and accents
 source = "#236ead"
-light = "#0b7882"
-dark  = "#13818b"
+light = "#4d7c0f"
+dark  = "#94b800"
 
 [strokes]          # on the 64 grid
 geometry = 2.55

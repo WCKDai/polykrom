@@ -963,8 +963,8 @@ mod tests {
             let accent = super::TabAccent::for_tab(&super::Tokens::light(), tab);
             assert_eq!(accent.ink != accent.color, tab == "MESH", "only light Mesh separates ink from fill");
         }
-        // Polykrom's cyan Model accent.
-        for (t, values) in [(super::Tokens::light(), [0x048a95, 0x0b585f, 0xa9d9e3]), (super::Tokens::dark(), [0x139ba7, 0x88d1d9, 0x0e5870])] {
+        // Polykrom's lime Model accent (#91): a deep lime in the light theme, #CCFF00 in the dark.
+        for (t, values) in [(super::Tokens::light(), [0x4d7c0f, 0x365408, 0xa0ce2c]), (super::Tokens::dark(), [0xccff00, 0xebffb4, 0x647800])] {
             let [color, ink, soft] = values.map(rgb);
             assert_eq!(super::TabAccent::for_tab(&t, "MODEL"), super::TabAccent { color, ink, soft });
         }

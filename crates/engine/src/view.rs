@@ -14,7 +14,7 @@ use crate::{Sel, Session};
 pub mod colors {
     use solidcraft_render::Rgb;
     pub const BODY: Rgb = Rgb(184, 184, 190);
-    pub const BODY_SELECTED: Rgb = Rgb(20, 140, 165);
+    pub const BODY_SELECTED: Rgb = Rgb(110, 170, 0);
     pub const EDGE: Rgb = Rgb(43, 43, 48);
     pub const SKETCH: Rgb = Rgb(61, 79, 209);
     pub const SKETCH_DONE: Rgb = Rgb(20, 20, 20);
