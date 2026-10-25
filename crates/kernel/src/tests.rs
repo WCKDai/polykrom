@@ -3184,6 +3184,20 @@ fn transform_refuses_a_matrix_that_is_not_an_affine_placement() {
 /// The boolean's broad phase (#125) intersects only the face pairs whose mesh boxes overlap, and
 /// gives what intersecting every pair gives: two 32-sided prisms that overlap in a lens (most of
 /// their 34 x 34 face pairs are far apart), and the same prisms far apart (no pair is kept).
+/// A face without a mesh box (one that could not be meshed) pairs with every face across, and
+/// the faces with boxes are still pruned among themselves.
+#[test]
+fn an_unboxed_face_pairs_alone_and_the_rest_are_still_pruned() {
+    use truck_shapeops::broad_phase_test_hooks::pairs_of_boxes;
+    let bx = |x0: f64, x1: f64| Some([[x0, x1], [0.0, 1.0], [0.0, 1.0]]);
+    let boxes0 = [bx(0.0, 1.0), None, bx(10.0, 11.0)];
+    assert_eq!(pairs_of_boxes(&boxes0, &[bx(0.5, 1.5), bx(20.0, 21.0)]), [(0, 0), (1, 0), (1, 1)]);
+    // A pair whose faces both lack boxes is taken once.
+    assert_eq!(pairs_of_boxes(&boxes0, &[None, bx(10.5, 12.0)]), [(0, 0), (1, 0), (1, 1), (2, 0), (2, 1)]);
+    // No boxes on one side: every pair.
+    assert_eq!(pairs_of_boxes(&boxes0, &[None, None]), [(0, 0), (0, 1), (1, 0), (1, 1), (2, 0), (2, 1)]);
+}
+
 #[test]
 fn boolean_broad_phase_gives_the_every_pair_result() {
     use truck_shapeops::broad_phase_test_hooks::{every_pair, pairs_kept};
