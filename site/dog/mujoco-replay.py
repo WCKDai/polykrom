@@ -24,10 +24,16 @@ def targets(step):
 d.ctrl[:] = targets(0)
 for _ in range(int(0.5 / m.opt.timestep)):
     mujoco.mj_step(m, d)
-x0, z0 = d.qpos[0], d.qpos[2]
+x0, y0, z0 = d.qpos[0], d.qpos[1], d.qpos[2]
+resets0 = int(d.warning[mujoco.mjtWarning.mjWARN_BADQACC].number)
 m.vis.global_.offwidth, m.vis.global_.offheight = 1280, 800
 renderer = mujoco.Renderer(m, 600, 960) if out else None
-frames, worst_tilt, trail = [], 0.0, []
+# Frames go to the file as they are made, so a long replay needs no memory for them.
+writer = None
+if out:
+    import imageio
+    writer = imageio.get_writer(out, fps=25, macro_block_size=8)
+worst_tilt, trail = 0.0, []
 fps, sub = 25, max(1, int(round(step_s / m.opt.timestep)))
 t_walk, next_frame = d.time, d.time  # frames at 1/fps of simulated time, so the video plays in real time
 for k in range(steps * cycles):
@@ -37,16 +43,17 @@ for k in range(steps * cycles):
         if renderer and d.time >= next_frame:
             next_frame += 1 / fps
             cam = mujoco.MjvCamera(); cam.lookat[:] = [d.qpos[0], d.qpos[1], 0.08]; cam.distance = 0.62; cam.azimuth = -55; cam.elevation = -16
-            renderer.update_scene(d, cam); frames.append(renderer.render().copy())
+            renderer.update_scene(d, cam); writer.append_data(renderer.render())
     q = d.qpos[3:7]
     up = 1 - 2 * (q[1] ** 2 + q[2] ** 2)  # world z of the body's z axis
     worst_tilt = max(worst_tilt, math.degrees(math.acos(max(-1, min(1, up)))))
     trail.append((d.time, d.qpos[0] - x0, d.qpos[1], d.qpos[2]))
-ok = np.all(np.isfinite(d.qpos))
+# MuJoCo resets a diverging simulation (and warns): finite at the end is not enough.
+resets = int(d.warning[mujoco.mjtWarning.mjWARN_BADQACC].number) - resets0
+ok = bool(np.all(np.isfinite(d.qpos))) and resets == 0
 print(json.dumps({"study": study_name, "cycles": cycles, "seconds": round(d.time, 2), "advance_mm": round((d.qpos[0] - x0) * 1000, 1),
-    "per_cycle_mm": round((d.qpos[0] - x0) * 1000 / cycles, 1), "drift_y_mm": round((d.qpos[1]) * 1000, 1),
-    "base_z_mm": [round(z0 * 1000, 1), round(d.qpos[2] * 1000, 1)], "worst_tilt_deg": round(worst_tilt, 2), "finite": bool(ok)}))
-if out and frames:
-    import imageio.v3 as iio
-    iio.imwrite(out, np.stack(frames), fps=fps)
-    print("frames", len(frames), out)
+    "per_cycle_mm": round((d.qpos[0] - x0) * 1000 / cycles, 1), "drift_y_mm": round((d.qpos[1] - y0) * 1000, 1),
+    "base_z_mm": [round(z0 * 1000, 1), round(d.qpos[2] * 1000, 1)], "worst_tilt_deg": round(worst_tilt, 2), "finite": ok, "resets": resets}))
+if writer:
+    writer.close()
+    print("video", out)
