@@ -57,7 +57,7 @@ const CONTACT_MM3: f64 = 0.01;
 const MAX_BOOLEANS: usize = 64;
 
 /// How many samples `p` asks for (`min`…`MAX_SAMPLES`, default the study's steps + 1).
-fn samples(p: &Value, m: &MotionStudy, min: usize, cmd: &str) -> Result<usize> {
+pub(in crate::cmd) fn samples(p: &Value, m: &MotionStudy, min: usize, cmd: &str) -> Result<usize> {
     if m.steps == 0 {
         return Err(bad(cmd, "the study has no steps"));
     }
@@ -72,7 +72,7 @@ fn samples(p: &Value, m: &MotionStudy, min: usize, cmd: &str) -> Result<usize> {
 }
 
 /// The study step sample `k` of `n` is at.
-fn step_of(m: &MotionStudy, k: usize, n: usize) -> f64 {
+pub(in crate::cmd) fn step_of(m: &MotionStudy, k: usize, n: usize) -> f64 {
     f64::from(m.steps) * k as f64 / n.saturating_sub(1).max(1) as f64
 }
 
@@ -80,7 +80,13 @@ fn step_of(m: &MotionStudy, k: usize, n: usize) -> f64 {
 /// closed loops follow on their branch, as `motion.play` places them; contact sets stop it only
 /// when `contact`). `each` sees the copy at every sample and answers whether to go on. Returns
 /// where the motion stopped short (all null when it did not).
-fn play(s: &Session, m: &MotionStudy, n: usize, contact: bool, mut each: impl FnMut(&Session, usize) -> Result<bool>) -> Result<Value> {
+pub(in crate::cmd) fn play(
+    s: &Session,
+    m: &MotionStudy,
+    n: usize,
+    contact: bool,
+    mut each: impl FnMut(&Session, usize) -> Result<bool>,
+) -> Result<Value> {
     let mut t = s.scratch();
     // Played from where the parts are placed: moves only shown are not where joints are solved.
     t.pending_moves.clear();

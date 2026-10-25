@@ -547,6 +547,7 @@
   "cmd.inspect_minimum_radius": "最小半徑分析",
   "cmd.inspect_printability": "可列印性",
   "cmd.inspect_silhouette": "輪廓",
+  "cmd.inspect_statics": "靜力學",
   "cmd.inspect_zebra": "斑馬紋分析",
   "cmd.joint_as_built": "現狀接頭",
   "cmd.joint_cam": "凸輪",

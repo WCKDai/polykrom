@@ -17,6 +17,8 @@ use crate::{EngineError, Result, Session};
 
 #[path = "motion_analysis.rs"]
 mod analysis;
+// inspect.statics plays studies as motion.plot does.
+pub(super) use analysis::{play as play_study, samples as study_samples, step_of as study_step};
 #[path = "motion_animation.rs"]
 mod animation;
 #[path = "motion_trace.rs"]
@@ -602,7 +604,7 @@ fn check(s: &mut Session, _p: &Value) -> Result<Value> {
 
 // ---- Motion studies ----
 
-fn study_index(s: &Session, p: &Value, cmd: &str) -> Result<usize> {
+pub(super) fn study_index(s: &Session, p: &Value, cmd: &str) -> Result<usize> {
     // A number is an id first, text a name first: a study may be named like another's id.
     let (key, id_first) = match p.get("study") {
         Some(Value::Number(n)) => (n.to_string(), true),
