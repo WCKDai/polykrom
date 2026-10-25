@@ -95,6 +95,29 @@ const STEPPERS: [(&str, f64, f64, f64, f64, f64, f64, f64, f64, f64, f64, f64, f
 /// The key a library part keeps its ratings under, in its component's metadata.
 pub const RATINGS_KEY: &str = "app.polykrom.part";
 
+/// The rated torque (N m) of the library actuator at an end of each joint, by joint id: a part
+/// whose ratings give `stall_torque_nm` (servos, BLDC motors) or `holding_torque_nm`
+/// (steppers), picked by the joint itself or holding the part the joint picks (a horn nested in
+/// a servo). The MJCF export limits the joint's actuator to it.
+pub fn rated_torques(doc: &solidcraft_doc::Document) -> std::collections::BTreeMap<u64, f64> {
+    let rated = |component: u64| {
+        let r = doc.components.iter().find(|c| c.id == component)?.metadata.get(RATINGS_KEY)?;
+        ["stall_torque_nm", "holding_torque_nm"].iter().find_map(|k| r.get(k)?.as_f64()).filter(|t| t.is_finite() && *t > 0.0)
+    };
+    let at = |occ: u64| {
+        let mut cur = doc.occurrences.iter().find(|o| o.id == occ);
+        for _ in 0..solidcraft_doc::MAX_PLACEMENT_DEPTH {
+            let o = cur?;
+            if let Some(t) = rated(o.component) {
+                return Some(t);
+            }
+            cur = if o.parent == 0 { None } else { doc.occurrence_of(o.parent) };
+        }
+        None
+    };
+    doc.assembly.joints.iter().filter_map(|j| Some((j.id, at(j.a.occurrence).or_else(|| at(j.b.occurrence))?))).collect()
+}
+
 /// ISO metric coarse: (size, d, pitch).
 const METRIC: [(&str, f64, f64); 9] = [
     ("M3", 3.0, 0.5),

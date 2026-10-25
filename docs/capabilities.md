@@ -60,7 +60,8 @@ and help is welcome: see [CONTRIBUTING.md](../CONTRIBUTING.md).
   replace the parametric design. Export to STEP (AP242 with body names, colours and
   components as assemblies; revolved faces as native planes, cylinders, cones, spheres and tori),
   IGES 5.3 (manifold solid B-reps with names and colours), 3MF, STL (binary/ASCII) and OBJ, and
-  assemblies with joints as URDF for robot simulators (urdf.md);
+  assemblies with joints as URDF for robot simulators (urdf.md) and as MJCF for MuJoCo, with
+  position actuators and a floor (mjcf.md);
   3MF, STL, OBJ and glTF 2.0 (`.glb`/`.gltf`, its node tree as components and its materials as
   appearances) import as mesh bodies (they render, measure, move and export; solid features
   need B-rep bodies). The `mesh.convert` command reconstructs supported closed constant-section parts

@@ -11,6 +11,7 @@
 | glTF 2.0 (`.glb`, `.gltf` with its `.bin` files) | mesh bodies in the node tree's components, materials as appearances | |
 | 3MF with face tags | as 3MF | each triangle tagged with its B-rep face, exact coordinates |
 | URDF | | the assembly as a robot: links with meshes, mass and inertia, joints from the assembly's joints |
+| MJCF (MuJoCo) | | the same robot as MuJoCo bodies, with position actuators, a floor and a light |
 | DXF, SVG | into a sketch | sketches and flat patterns as DXF |
 | PNG, JPEG | canvases and decals | |
 
@@ -62,6 +63,12 @@ them. The format is specified in [`docs/formats/3mf-face-tags.md`](https://githu
 simulators and ROS: a link per component placement with its mesh, mass and inertia, and the
 assembly's joints, so the parts move in the simulator as they do in Polykrom. The meshes are
 written as STL files next to the `.urdf`. See [`docs/urdf.md`](https://github.com/bherbruck/solidcraft/blob/main/docs/urdf.md).
+
+`file.export` with `format: "mjcf"` (or a `.mjcf` path) writes the same robot for MuJoCo: nested
+bodies with mass and inertia, hinge and slide joints with their ranges, a position actuator per
+joint (its force limit from a library actuator's rated torque), and, unless `scene` is off, a
+floor and a light. A robot with nothing grounded gets a free base and falls onto the floor. See
+[`docs/mjcf.md`](https://github.com/bherbruck/solidcraft/blob/main/docs/mjcf.md).
 
 Saves are atomic: a crash at any moment leaves either the old file or the new one, and the
 replaced version is kept as `<file>.bak`. A save keeps the file's permissions, and a design

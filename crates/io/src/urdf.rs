@@ -22,8 +22,8 @@ const TOKEN_MASS: f64 = 1e-6;
 const TOKEN_INERTIA: f64 = 1e-12;
 /// Travel written for a prismatic step without a limit (mm): URDF requires one.
 const UNLIMITED_TRAVEL_MM: f64 = 1e6;
-const DEFAULT_EFFORT: f64 = 1000.0;
-const DEFAULT_VELOCITY: f64 = 10.0;
+pub(crate) const DEFAULT_EFFORT: f64 = 1000.0;
+pub(crate) const DEFAULT_VELOCITY: f64 = 10.0;
 
 /// Choices for [`urdf`] (`file.export` parameters).
 #[derive(Clone, Debug, Default)]
@@ -133,14 +133,14 @@ impl UrdfModel {
     }
 }
 
-fn translation(v: Vec3) -> Mat {
+pub(crate) fn translation(v: Vec3) -> Mat {
     let mut m = IDENTITY;
     m[3] = [v.x, v.y, v.z, 1.0];
     m
 }
 
 /// Rotation by `a` about the unit axis `u` (Rodrigues), column-major like `Mat`.
-fn rotation(u: Vec3, a: f64) -> Mat {
+pub(crate) fn rotation(u: Vec3, a: f64) -> Mat {
     let (s, c) = a.sin_cos();
     let t = 1.0 - c;
     let r = [
@@ -655,7 +655,7 @@ fn mimics(doc: &Document, model: &mut UrdfModel, warnings: &mut Vec<String>) {
     }
 }
 
-fn token() -> Inertial {
+pub(crate) fn token() -> Inertial {
     Inertial { mass: TOKEN_MASS, com: Vec3::ZERO, inertia: [[TOKEN_INERTIA, 0.0, 0.0], [0.0, TOKEN_INERTIA, 0.0], [0.0, 0.0, TOKEN_INERTIA]] }
 }
 
@@ -717,11 +717,11 @@ fn xyz_rpy(m: &Mat) -> (Vec3, Vec3) {
     (t, Vec3::new(roll, pitch, yaw))
 }
 
-fn attr(s: &str) -> String {
+pub(crate) fn attr(s: &str) -> String {
     quick_xml::escape::escape(s).into_owned()
 }
 
-fn num(x: f64) -> String {
+pub(crate) fn num(x: f64) -> String {
     // No "-0" and no non-finite values in the XML. Shortest round-trip digits either way; very
     // small or large values with an exponent rather than a run of zeros.
     if !x.is_finite() || x == 0.0 {
@@ -733,7 +733,7 @@ fn num(x: f64) -> String {
     }
 }
 
-fn triple(v: Vec3) -> String {
+pub(crate) fn triple(v: Vec3) -> String {
     format!("{} {} {}", num(v.x), num(v.y), num(v.z))
 }
 
