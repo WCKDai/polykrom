@@ -690,6 +690,12 @@ fn fit_out(s: &mut Session, comp: u64, sh: &Shape) {
         _ => return,
     };
     let bodies: Vec<String> = s.model.state().bodies.iter().filter(|b| s.doc.model_body_component(b) == comp).map(|b| b.name.clone()).collect();
+    let material = match *sh {
+        Shape::Stepper { row } => {
+            STEPPERS.get(row).and_then(|r| rated_material(s, comp, r.0, r.13, material)).unwrap_or_else(|| material.to_string())
+        }
+        _ => material.to_string(),
+    };
     let _ = run(s, "material.assign", json!({"bodies": bodies, "material": material}));
     let ratings = match *sh {
         Shape::Stepper { row } => STEPPERS.get(row).map(|r| {
@@ -710,6 +716,35 @@ fn fit_out(s: &mut Session, comp: u64, sh: &Shape) {
     {
         c.metadata = m;
     }
+}
+
+/// A material that makes a part whose model is a simplified envelope (a stepper: a solid block
+/// where the real one has windings, a rotor and air) weigh its datasheet mass: the rated mass
+/// spread evenly over the model's volume, with `look`'s appearance (#144). One per size, reused
+/// by later copies; `None` (keep `look` as the material) if the model has no volume or the
+/// design has no room for another material.
+fn rated_material(s: &mut Session, comp: u64, size: &str, kg: f64, look: &str) -> Option<String> {
+    let name = format!("{size} (rated {} g)", (kg * 1000.0).round());
+    if s.doc.user_materials.iter().any(|m| m.name == name) {
+        return Some(name);
+    }
+    let volume: f64 = s
+        .model
+        .state()
+        .bodies
+        .iter()
+        .filter(|b| s.doc.model_body_component(b) == comp)
+        .filter_map(|b| solidcraft_doc::kernel::measure(&b.body).ok())
+        .map(|m| m.volume)
+        .sum();
+    // g/cm³ from kg and mm³.
+    let density = kg * 1e6 / volume;
+    if !solidcraft_doc::valid_density(density) || s.doc.user_materials.len() >= 1000 {
+        return None;
+    }
+    let appearance = solidcraft_doc::appearance::material_look(look);
+    s.doc_mut().user_materials.push(solidcraft_doc::UserMaterial { name: name.clone(), density, appearance });
+    Some(name)
 }
 
 fn label(family: &str) -> &'static str {
@@ -1087,6 +1122,24 @@ mod tests {
         // The body on the top face, the shaft through the hole below: the part's −z goes in.
         assert!((hi.z - (5.0 + 40.0)).abs() < 1e-6 && (lo.z - (5.0 - 24.0)).abs() < 1e-6, "{lo:?} {hi:?}");
         assert!(((lo.x + hi.x) / 2.0 - 30.0).abs() < 1e-6 && ((lo.y + hi.y) / 2.0 - 30.0).abs() < 1e-6);
+    }
+
+    /// A library stepper weighs its datasheet mass, not its envelope's in aluminium (#144): every
+    /// mass readout (measure, component properties, the BOM) takes it from the body's material.
+    #[test]
+    fn a_stepper_weighs_its_rated_mass() {
+        let mut s = Session::default();
+        let mut total = 0.0;
+        for (size, kg) in [("NEMA17-48", 0.36), ("NEMA17-48", 0.36), ("NEMA23-56", 0.70)] {
+            let r = run(&mut s, "parts.insert", json!({"family": "stepper", "size": size}));
+            assert_eq!(ratings(&s, r["component"].as_u64().unwrap_or(0))["mass_kg"].as_f64(), Some(kg));
+            total += kg * 1000.0;
+            // Every body in the design: the steppers inserted so far.
+            let g = run(&mut s, "inspect.measure", json!({}))["total"]["mass_g"].as_f64().unwrap_or(0.0);
+            assert!((g - total).abs() < 1e-6 * total, "after {size}: {g} g, want {total} g");
+        }
+        // One material per size, reused by the second NEMA17-48.
+        assert_eq!(s.doc.user_materials.len(), 2, "{:?}", s.doc.user_materials);
     }
 
     fn ratings(s: &Session, comp: u64) -> Value {
