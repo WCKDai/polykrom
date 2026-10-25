@@ -39,7 +39,7 @@ pub use svg::read_svg;
 mod gltf_in;
 pub use gltf_in::{GltfImport, Loader, MAX_GLTF_BYTES, MeshPlan, PlanPlace, glb_container, is_gltf_path, read_gltf};
 mod obj;
-pub use mjcf::{MjcfOptions, MjcfPackage, mjcf};
+pub use mjcf::{MjcfActuator, MjcfOptions, MjcfPackage, MjcfSummary, mjcf};
 pub use obj::read_obj;
 pub use threemf::{MAX_3MF_BYTES, MeshObject, model_xml, model_xml_with, read_3mf, weld, write_3mf, write_3mf_with};
 pub use urdf::{UrdfOptions, UrdfPackage, urdf};

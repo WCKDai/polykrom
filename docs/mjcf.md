@@ -12,7 +12,13 @@ position actuator on every moving joint, a floor and a light.
 
 MJCF always exports the whole assembly, so `bodies` is refused. Next to the model the export
 writes one binary STL per component in metres, named as for URDF (`robot-<component>.stl`).
-Paths are checked and written as for URDF: meshes first, the model last.
+Paths are checked and written as for URDF: meshes first, the model last; a missing folder is made.
+
+The reply says what the model holds, so a caller that can't read the file can check it:
+`bodies`, `joints` (hinges and slides), `actuators` and `meshes` counts, `free_root`, `mass_kg`
+(every body's mass together), `keyframe` (the `design` key was written) and, per actuator,
+`actuator_ranges`: its `name`, `joint`, `force` range (N m or N) and `ctrl` range (rad or m;
+`null` when the joint has no limits).
 
 ## Loading it
 

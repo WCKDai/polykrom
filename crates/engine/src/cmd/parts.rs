@@ -1192,7 +1192,7 @@ fn output_part(s: &mut Session, comp: u64, name: &str, sh: &Shape) -> Result<Opt
         }
     };
     build_output(s, sh)?;
-    finish(s, c, &part);
+    finish(s, c, &part, &[]);
     Ok(Some(occ))
 }
 
@@ -1258,7 +1258,7 @@ fn insert(s: &mut Session, p: &Value) -> Result<Value> {
     let c = run(s, "component.create", json!({"name": name, "grounded": false}))?;
     let (comp, occ) = (c["component"].as_u64().unwrap_or(0), c["occurrence"].as_u64().unwrap_or(0));
     build(s, &sh)?;
-    finish(s, comp, &name);
+    finish(s, comp, &name, &[]);
     s.doc_mut().parts.insert(comp, solidcraft_doc::StandardPart { family: family.clone(), size: size.clone(), length: shape_len(&sh) });
     set_identity(s, comp, identity(&family, &size, &sh), None);
     let output = output_part(s, comp, &name, &sh)?;
@@ -1314,12 +1314,13 @@ fn insert(s: &mut Session, p: &Value) -> Result<Value> {
 
 /// A library part's bodies as the part: named after it (`SHCS M4x12`, numbered when that name is
 /// taken) rather than `Body1`, and in Steel rather than the default material, so its mass and the
-/// bill of materials are right without a further step. The component is the active one.
-fn finish(s: &mut Session, comp: u64, name: &str) {
-    let made: Vec<String> = s.model.state().bodies.iter().filter(|b| s.doc.model_body_component(b) == comp).map(|b| b.name.clone()).collect();
+/// bill of materials are right without a further step. The component is the active one. A body
+/// with a name in `kept` (by position) gets that name instead.
+fn finish(s: &mut Session, comp: u64, name: &str, kept: &[Option<String>]) {
+    let made = component_bodies(s, comp);
     let mut names = Vec::new();
     for (i, old) in made.iter().enumerate() {
-        let base = if made.len() == 1 { name.to_string() } else { format!("{name} {}", i + 1) };
+        let base = kept.get(i).cloned().flatten().unwrap_or_else(|| body_name(name, i, made.len()));
         let free = (1..1000)
             .map(|n| if n == 1 { base.clone() } else { format!("{base} ({n})") })
             .find(|c| c == old || s.model.state().body(c).is_none())
@@ -1329,6 +1330,21 @@ fn finish(s: &mut Session, comp: u64, name: &str) {
     if !names.is_empty() {
         let _ = run(s, "material.assign", json!({"bodies": names, "material": "Steel"}));
     }
+}
+
+/// The names of the bodies of component `comp`.
+fn component_bodies(s: &Session, comp: u64) -> Vec<String> {
+    s.model.state().bodies.iter().filter(|b| s.doc.model_body_component(b) == comp).map(|b| b.name.clone()).collect()
+}
+
+/// The name [`finish`] gives body `i` of `n` of a part called `name` (before any `(2)`).
+fn body_name(name: &str, i: usize, n: usize) -> String {
+    if n == 1 { name.to_string() } else { format!("{name} {}", i + 1) }
+}
+
+/// Whether `name` is `base` or `base` numbered as [`finish`] numbers a taken name (`base (2)`).
+fn named_after(name: &str, base: &str) -> bool {
+    name == base || name.strip_prefix(base).and_then(|r| r.strip_prefix(" (")?.strip_suffix(')')).is_some_and(|n| n.parse::<u32>().is_ok())
 }
 
 /// A point on the cylindrical wall of the hole at `a`, a little in from the picked rim. `a` is in
@@ -1449,6 +1465,17 @@ fn resize(s: &mut Session, p: &Value) -> Result<Value> {
     let size = str_(p, "size").map(str::to_string).unwrap_or(part.size.clone());
     let length = length_param(p, cmd)?.or(if size == part.size { part.length } else { None });
     let sh = shape(&part.family, &size, length).map_err(|e| bad(cmd, e))?;
+    // A name someone gave the part, its bodies or its seat stays; one made from the old size
+    // (`SHCS M3x6`, `SHCS M3x6 seat`) follows the new size (#171).
+    let was_name = s.doc.components.iter().find(|c| c.id == comp).map(|c| c.name.clone()).unwrap_or_default();
+    let old = shape(&part.family, &part.size, part.length).ok();
+    let made_name = old.as_ref().map(|old| part_name(&part.family, &part.size, old)).unwrap_or_default();
+    let was_auto = was_name == made_name;
+    let name = if was_auto { part_name(&part.family, &size, &sh) } else { was_name.clone() };
+    let old_bodies = component_bodies(s, comp);
+    // A body named after the part, as it is called now or as it was made (the part renamed alone).
+    let made = |b: &String, i: usize| [&was_name, &made_name].iter().any(|n| named_after(b, &body_name(n, i, old_bodies.len())));
+    let kept: Vec<Option<String>> = old_bodies.iter().enumerate().map(|(i, b)| (!made(b, i)).then(|| b.clone())).collect();
     // Rebuild: the component's features go, the new shape is built in their place.
     let ids: Vec<u64> = s.doc.features.iter().filter(|f| f.component == comp).map(|f| f.id).collect();
     for id in ids.iter().rev() {
@@ -1457,9 +1484,8 @@ fn resize(s: &mut Session, p: &Value) -> Result<Value> {
     let active = s.active_component;
     run(s, "component.activate", json!({"component": comp}))?;
     build(s, &sh)?;
-    let name = part_name(&part.family, &size, &sh);
-    finish(s, comp, &name);
-    let was = shape(&part.family, &part.size, part.length).ok().map(|old| identity(&part.family, &part.size, &old));
+    finish(s, comp, &name, &kept);
+    let was = old.map(|old| identity(&part.family, &part.size, &old));
     set_identity(s, comp, identity(&part.family, &size, &sh), was);
     output_part(s, comp, &name, &sh)?;
     fit_out(s, comp, &sh);
@@ -1481,6 +1507,28 @@ fn resize(s: &mut Session, p: &Value) -> Result<Value> {
     s.doc_mut().parts.insert(comp, solidcraft_doc::StandardPart { family: part.family.clone(), size: size.clone(), length: shape_len(&sh) });
     if let Some(c) = s.doc_mut().components.iter_mut().find(|c| c.id == comp) {
         c.name = name.clone();
+    }
+    if name != was_name {
+        let occs: Vec<u64> = s.doc.occurrences.iter().filter(|o| o.component == comp).map(|o| o.id).collect();
+        let (seat, now) = (format!("{was_name} seat"), format!("{name} seat"));
+        // Not a name another joint has (two screws resized to one size): `… seat (2)`.
+        let taken = |s: &Session, n: &str| s.doc.assembly.joints.iter().any(|j| j.name == n);
+        // The seat as made, or numbered apart from another (`… seat (2)`).
+        let made_seat = |n: &str| {
+            n == seat
+                || n.strip_prefix(&seat)
+                    .and_then(|r| r.strip_prefix(" ("))
+                    .and_then(|r| r.strip_suffix(')'))
+                    .is_some_and(|k| k.parse::<u32>().is_ok())
+        };
+        let ours: Vec<u64> = s.doc.assembly.joints.iter().filter(|j| made_seat(&j.name) && occs.contains(&j.b.occurrence)).map(|j| j.id).collect();
+        for id in ours {
+            let free =
+                std::iter::once(now.clone()).chain((2..).map(|k| format!("{now} ({k})"))).find(|n| !taken(s, n)).unwrap_or_else(|| now.clone());
+            if let Some(j) = s.doc_mut().assembly.joints.iter_mut().find(|j| j.id == id) {
+                j.name = free;
+            }
+        }
     }
     run(s, "component.activate", json!({"component": active}))?;
     s.refresh();
@@ -2028,6 +2076,70 @@ mod tests {
         let (lo, hi) = bbox(&s, "SHCS M8x25");
         assert!((hi.z - 18.0).abs() < 1e-6 && (lo.z + 15.0).abs() < 1e-6, "{lo:?} {hi:?}");
         assert!(s.model.state().threads.iter().any(|t| t.designation == "M8" && (t.pitch - 1.25).abs() < 1e-9));
+    }
+
+    /// A resize keeps the names someone gave (the part, its body, its seat); names made from the
+    /// old size follow the new one (#171).
+    #[test]
+    fn resizing_keeps_given_names_and_renames_made_ones() {
+        let mut s = Session::default();
+        run(&mut s, "solid.box", json!({"length": 60, "width": 30, "height": 10, "body_name": "Plate"}));
+        for x in [15, 45] {
+            run(&mut s, "solid.hole", json!({"position": [x, 15, 10], "diameter": 6.4}));
+        }
+        let made = run(&mut s, "parts.insert", json!({"family": "socket_head_cap_screw", "size": "M6", "length": 20, "at": [18.2, 15, 10]}));
+        let given = run(
+            &mut s,
+            "parts.insert",
+            json!({"family": "socket_head_cap_screw", "size": "M6", "length": 20, "at": [48.2, 15, 10], "name": "FL hip screw"}),
+        );
+        let (made, given) = (made["component"].as_u64().unwrap_or(0), given["component"].as_u64().unwrap_or(0));
+        let resize = |s: &mut Session, comp: u64| run(s, "parts.resize", json!({"component": comp, "size": "M8", "length": 25}));
+        let name = |s: &Session, comp: u64| s.doc.components.iter().find(|c| c.id == comp).map(|c| c.name.clone()).unwrap_or_default();
+        let joints = |s: &Session| {
+            let mut j: Vec<String> = s.doc.assembly.joints.iter().map(|j| j.name.clone()).collect();
+            j.sort();
+            j
+        };
+        assert_eq!(joints(&s), ["FL hip screw seat", "SHCS M6x20 seat"]);
+        assert_eq!(resize(&mut s, given)["name"], "FL hip screw");
+        assert_eq!((name(&s, given), super::component_bodies(&s, given)), ("FL hip screw".into(), vec!["FL hip screw".to_string()]));
+        assert_eq!(resize(&mut s, made)["name"], "SHCS M8x25");
+        assert_eq!((name(&s, made), super::component_bodies(&s, made)), ("SHCS M8x25".into(), vec!["SHCS M8x25".to_string()]));
+        assert_eq!(joints(&s), ["FL hip screw seat", "SHCS M8x25 seat"]);
+        // A body renamed on its own keeps its name while the part's made name follows the size.
+        run(&mut s, "body.rename", json!({"body": "SHCS M8x25", "name": "Left screw"}));
+        resize(&mut s, made);
+        assert_eq!(name(&s, made), "SHCS M8x25");
+        assert_eq!(super::component_bodies(&s, made), ["Left screw"]);
+        run(&mut s, "parts.resize", json!({"component": made, "size": "M5", "length": 12}));
+        assert_eq!((name(&s, made), super::component_bodies(&s, made)), ("SHCS M5x12".into(), vec!["Left screw".to_string()]));
+        assert_eq!(joints(&s), ["FL hip screw seat", "SHCS M5x12 seat"]);
+    }
+
+    /// A seated screw resized to the size of another seated screw takes a seat name of its own,
+    /// and a part renamed alone (its body still named as made) gets its body named after it.
+    #[test]
+    fn resizing_to_another_screws_size_keeps_seat_names_apart() {
+        let mut s = Session::default();
+        run(&mut s, "solid.box", json!({"length": 60, "width": 30, "height": 10, "body_name": "Plate"}));
+        run(&mut s, "solid.hole", json!({"position": [15, 15, 10], "diameter": 8.4}));
+        run(&mut s, "solid.hole", json!({"position": [45, 15, 10], "diameter": 6.4}));
+        run(&mut s, "parts.insert", json!({"family": "socket_head_cap_screw", "size": "M8", "length": 25, "at": [19.2, 15, 10]}));
+        let small = run(&mut s, "parts.insert", json!({"family": "socket_head_cap_screw", "size": "M6", "length": 20, "at": [48.2, 15, 10]}));
+        let small = small["component"].as_u64().unwrap_or(0);
+        run(&mut s, "parts.resize", json!({"component": small, "size": "M8", "length": 25}));
+        let mut names: Vec<String> = s.doc.assembly.joints.iter().map(|j| j.name.clone()).collect();
+        names.sort();
+        assert_eq!(names, ["SHCS M8x25 seat", "SHCS M8x25 seat (2)"]);
+        // Resized again, the numbered seat follows the new size.
+        run(&mut s, "parts.resize", json!({"component": small, "size": "M8", "length": 30}));
+        let mut names: Vec<String> = s.doc.assembly.joints.iter().map(|j| j.name.clone()).collect();
+        names.sort();
+        assert_eq!(names, ["SHCS M8x25 seat", "SHCS M8x30 seat"]);
+        run(&mut s, "component.rename", json!({"component": small, "name": "Bolt A"}));
+        run(&mut s, "parts.resize", json!({"component": small, "size": "M8", "length": 30}));
+        assert_eq!(super::component_bodies(&s, small), ["Bolt A"]);
     }
 
     /// A hole picked at its centre (where no face is) seats like a rim pick (#134).

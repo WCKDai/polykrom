@@ -517,7 +517,10 @@ fn export_to(s: &Session, path: &str, format: Format, bodies: &[String]) -> Resu
         // file the design's properties where the format has a place for them.
         solidcraft_io::export_with_metadata(&s.doc.painted(&s.world_state()), bodies, format, &name, &s.doc.metadata)?
     };
-    solidcraft_io::vfs::write(path, &bytes).map_err(|e| EngineError::Other(format!("{path}: {e}")))?;
+    let io = |e: std::io::Error| EngineError::Other(format!("{path}: {e}"));
+    // A missing folder is made, inside an agent's folders only (#171).
+    solidcraft_io::vfs::create_parent_dirs(path).map_err(io)?;
+    solidcraft_io::vfs::write(path, &bytes).map_err(io)?;
     Ok(json!({"path": path, "bytes": bytes.len(), "format": format!("{format:?}")}))
 }
 
@@ -567,9 +570,10 @@ fn robot_doc<'a>(s: &'a Session, path: &str, p: &Value) -> Result<(std::borrow::
     Ok((doc, stem, held))
 }
 
-/// Write a robot package: every path is checked before anything is written; the meshes go
-/// first, next to `path`, and the model file last.
+/// Write a robot package: its folder is made when missing and every path is checked before
+/// anything is written; the meshes go first, next to `path`, and the model file last.
 fn write_package(path: &str, meshes: &[(String, Vec<u8>)], xml: &str) -> Result<Vec<String>> {
+    solidcraft_io::vfs::create_parent_dirs(path).map_err(|e| EngineError::Other(format!("{path}: {e}")))?;
     let dir = std::path::Path::new(path).parent().unwrap_or(std::path::Path::new(""));
     let mut targets: Vec<(String, &[u8])> = meshes.iter().map(|(n, b)| (dir.join(n).to_string_lossy().to_string(), b.as_slice())).collect();
     targets.push((path.to_string(), xml.as_bytes()));
@@ -620,7 +624,26 @@ fn export_mjcf(s: &Session, path: &str, p: &Value) -> Result<Value> {
     let mut pkg = solidcraft_io::mjcf(&doc, &doc.painted(&s.model.state()), &stem, &options)?;
     pkg.warnings.extend(held);
     let written = write_package(path, &pkg.meshes, &pkg.xml)?;
-    Ok(json!({"path": path, "format": "Mjcf", "files": written, "bodies": pkg.model.links.len(), "warnings": pkg.warnings}))
+    // What the model holds, so an agent that can't read the file can check it (#171).
+    let m = &pkg.summary;
+    // To nine significant digits, so a small force or mass is not rounded away.
+    let r = |x: f64| {
+        if x == 0.0 || !x.is_finite() {
+            return x;
+        }
+        let k = 10f64.powi(8 - x.abs().log10().floor() as i32);
+        (x * k).round() / k
+    };
+    let actuators: Vec<Value> = m
+        .actuators
+        .iter()
+        .map(|a| json!({"name": a.name, "joint": a.joint, "force": [r(a.force.0), r(a.force.1)], "ctrl": a.ctrl.map(|(lo, hi)| [r(lo), r(hi)])}))
+        .collect();
+    Ok(json!({
+        "path": path, "format": "Mjcf", "files": written,
+        "bodies": pkg.model.links.len(), "joints": m.joints, "actuators": m.actuators.len(), "meshes": pkg.meshes.len(),
+        "free_root": m.free_root, "mass_kg": r(m.mass), "keyframe": m.keyframe, "actuator_ranges": actuators, "warnings": pkg.warnings,
+    }))
 }
 
 fn save_mesh(s: &mut Session, p: &Value) -> Result<Value> {

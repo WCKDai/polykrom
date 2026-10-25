@@ -93,8 +93,10 @@ fn results_with_base_design_and_quiet_still_report_and_save() {
 #[test]
 fn results_propagate_output_errors() {
     let dir = Scratch::new();
+    // Missing folders are made (#171): a folder below a file can't be.
+    std::fs::write(dir.0.join("blocker"), b"").unwrap();
     for flag in ["--save", "--out"] {
-        let path = dir.0.join("missing").join(if flag == "--save" { "box.solidcraft" } else { "box.stl" });
+        let path = dir.0.join("blocker").join(if flag == "--save" { "box.solidcraft" } else { "box.stl" });
         let output = cli().arg("run").arg(dir.script()).arg("--results").arg(flag).arg(&path).output().unwrap();
         assert_eq!(output.status.code(), Some(1));
         assert!(!output.stderr.is_empty());

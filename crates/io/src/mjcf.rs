@@ -59,6 +59,32 @@ pub struct MjcfPackage {
     pub meshes: Vec<(String, Vec<u8>)>,
     pub model: UrdfModel,
     pub warnings: Vec<String>,
+    pub summary: MjcfSummary,
+}
+
+/// What the model holds beyond its bodies, for the export's reply (#171): an agent can't read
+/// the file to check it.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct MjcfSummary {
+    /// Hinge and slide joints (the free root's joint not counted).
+    pub joints: usize,
+    /// The root body has a `<freejoint/>`.
+    pub free_root: bool,
+    /// Every body's mass together (kg), as MuJoCo reads it.
+    pub mass: f64,
+    pub actuators: Vec<MjcfActuator>,
+    /// The `design` keyframe (the design's pose, actuators holding it) was written.
+    pub keyframe: bool,
+}
+
+/// A position actuator: its joint, force limit (N m turning, N sliding) and control range
+/// (rad or m; `None` when the joint has no limits).
+#[derive(Clone, Debug, PartialEq)]
+pub struct MjcfActuator {
+    pub name: String,
+    pub joint: String,
+    pub force: (f64, f64),
+    pub ctrl: Option<(f64, f64)>,
 }
 
 fn positive(x: Option<f64>) -> Option<f64> {
@@ -240,6 +266,7 @@ pub fn mjcf(doc: &Document, st: &ModelState, stem: &str, options: &MjcfOptions) 
     let kp = positive(options.kp).unwrap_or(DEFAULT_KP);
     let mut ctrl = Vec::new();
     let mut unrated = Vec::new();
+    let mut actuators = Vec::new();
     let driven: Vec<&UrdfJoint> = moving.iter().copied().filter(|j| j.mimic.is_none()).collect();
     if !driven.is_empty() {
         s += "  <actuator>\n";
@@ -250,12 +277,14 @@ pub fn mjcf(doc: &Document, st: &ModelState, stem: &str, options: &MjcfOptions) 
                 urdf::DEFAULT_EFFORT
             });
             s += &format!("    <position name=\"{}\" joint=\"{}\" kp=\"{}\" dampratio=\"1\"", attr(&j.name), attr(&j.name), num(kp));
-            if let Some((lo, hi)) = j.limit {
-                let scale = if j.step == Step::Prismatic { 1e-3 } else { 1.0 };
-                s += &format!(" ctrlrange=\"{} {}\" ctrllimited=\"true\"", num(lo * scale), num(hi * scale));
+            let scale = if j.step == Step::Prismatic { 1e-3 } else { 1.0 };
+            let range = j.limit.map(|(lo, hi)| (lo * scale, hi * scale));
+            if let Some((lo, hi)) = range {
+                s += &format!(" ctrlrange=\"{} {}\" ctrllimited=\"true\"", num(lo), num(hi));
             }
             s += &format!(" forcerange=\"{} {}\" forcelimited=\"true\"/>\n", num(-force), num(force));
             ctrl.push(value(j));
+            actuators.push(MjcfActuator { name: j.name.clone(), joint: j.name.clone(), force: (-force, force), ctrl: range });
         }
         s += "  </actuator>\n";
     }
@@ -276,7 +305,9 @@ pub fn mjcf(doc: &Document, st: &ModelState, stem: &str, options: &MjcfOptions) 
         s += "/>\n  </keyframe>\n";
     }
     s += "</mujoco>\n";
-    Ok(MjcfPackage { xml: s, meshes: pkg.meshes, model, warnings })
+    let mass = model.links.iter().map(|l| l.inertial.unwrap_or_else(urdf::token).mass).sum();
+    let summary = MjcfSummary { joints: moving.len(), free_root: floating, mass, actuators, keyframe: !qpos.is_empty() };
+    Ok(MjcfPackage { xml: s, meshes: pkg.meshes, model, warnings, summary })
 }
 
 /// `from` and the links fixed to it, through fixed joints.

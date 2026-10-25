@@ -124,9 +124,12 @@ The working folder the server was started in does not count by itself, so `~/.ss
 `~/.bashrc` and other dotfiles are never in reach by default. stderr lists the folders at
 start-up and says when the `--in` design's folder was left out; `--allow-path` adds it back.
 
-Paths are resolved before they are compared, so `..` and symlinks that lead out are refused
-(saving through a link writes the file it points to, so the link's target is what counts), and
-a new file must go into a folder that exists (a missing folder inside an allowed one is reported as missing; it is not created and does not call for a wider `--allow-path`). On Windows a path must be on a local drive
+Paths and folders are both resolved before they are compared, so `/tmp/…` and `/private/tmp/…`
+on macOS are the same folder, and `..` and symlinks that lead out are refused (saving through a
+link writes the file it points to, so the link's target is what counts). `file.export` (the
+`export` tool) makes the missing folders of the file it writes, inside an allowed folder only;
+other commands write into a folder that exists (a missing folder inside an allowed one is
+reported as missing and does not call for a wider `--allow-path`). On Windows a path must be on a local drive
 (`C:\…` or `\\?\C:\…`): UNC, device and NT paths in any spelling (`\\server\share`,
 `//server/share`, `\\?\UNC\…`, `\??\…`, `\\.\…`), drive-relative paths (`C:file`), a `:` in a
 file name (alternate data streams), reserved device names with any extension (`NUL`, `CON`,

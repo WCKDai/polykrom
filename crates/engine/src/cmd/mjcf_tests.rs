@@ -144,6 +144,45 @@ fn mjcf_actuator_force_comes_from_ratings() {
     let _ = std::fs::remove_dir_all(&d);
 }
 
+/// The reply says what the model holds, as the file does, for an agent that can't read the file;
+/// a package goes into a folder that doesn't exist yet (#171).
+#[test]
+fn mjcf_reply_says_what_the_model_holds() {
+    let mut s = arm();
+    let ratings = json!({"kind": "servo", "stall_torque_nm": 1.912, "speed_rpm": 50});
+    let values = serde_json::Map::from_iter([(crate::cmd::parts::RATINGS_KEY.to_string(), ratings)]);
+    run(&mut s, "component.metadata.set", json!({"component": "Arm", "values": values}));
+    let d = temp("reply");
+    let (r, xml) = export(&mut s, &d, "dog-mjcf/meshes-here/arm.xml", json!({}));
+    assert!(xml.contains(r#"forcerange="-1.912 1.912""#), "{xml}");
+    let files = r["files"].as_array().map_or(0, Vec::len);
+    assert_eq!(files, 3, "{r}");
+    for (k, want) in [
+        ("bodies", json!(3)),
+        ("joints", json!(1)),
+        ("actuators", json!(1)),
+        ("meshes", json!(2)),
+        ("free_root", json!(false)),
+        ("keyframe", json!(true)),
+    ] {
+        assert_eq!(r[k], want, "{k}: {r}");
+    }
+    let a = &r["actuator_ranges"];
+    assert_eq!(a.as_array().map(Vec::len), Some(1), "{r}");
+    assert_eq!((&a[0]["name"], &a[0]["joint"], &a[0]["force"]), (&json!("Elbow"), &json!("Elbow"), &json!([-1.912, 1.912])), "{r}");
+    // ±60° in radians, to the reply's 1e-6 rounding.
+    let lim = 60f64.to_radians();
+    for (k, want) in [(0, -lim), (1, lim)] {
+        assert!((a[0]["ctrl"][k].as_f64().unwrap_or(0.0) - want).abs() < 1e-6, "{r}");
+    }
+    // The total is every body's `mass` in the file (tolerance: the reply's 1e-6 kg rounding).
+    let total: f64 = xml.split("mass=\"").skip(1).filter_map(|m| m.split('"').next()?.parse::<f64>().ok()).sum();
+    assert!((r["mass_kg"].as_f64().unwrap_or(0.0) - total).abs() < 1e-6, "{total} kg: {r}");
+    let (r, _) = export(&mut s, &d, "f.xml", json!({"floating": true}));
+    assert_eq!(r["free_root"], true, "{r}");
+    let _ = std::fs::remove_dir_all(&d);
+}
+
 /// Nothing grounded, or `floating`: the root is free, so the robot falls onto the floor.
 #[test]
 fn mjcf_floating_base_gets_a_freejoint() {

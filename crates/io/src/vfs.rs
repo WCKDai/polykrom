@@ -50,9 +50,9 @@ mod imp {
         check(path)?;
         std::fs::remove_file(path)
     }
-    /// A folder and the folders above it, where missing.
+    /// A folder and the folders above it, where missing (inside an agent's folders only).
     pub fn create_dir_all(path: &str) -> Result<()> {
-        check(path)?;
+        check_creating(path)?;
         std::fs::create_dir_all(path)
     }
 }
@@ -221,8 +221,15 @@ impl PathScope {
         &self.design_roots
     }
 
-    /// Whether `path` lies inside one of the folders, after following symlinks and `..`.
+    /// Whether `path` lies inside one of the folders, after following symlinks and `..`. A path
+    /// whose folder is missing is reported as missing ([`create_dir_all`] makes it).
     pub fn check(&self, path: &str) -> Result<()> {
+        self.check_with(path, false)
+    }
+
+    /// [`PathScope::check`], with the folders above `path` (and `path` itself) allowed to be
+    /// missing when `creating` them.
+    fn check_with(&self, path: &str, creating: bool) -> Result<()> {
         let refused = || {
             let roots: Vec<String> = self.roots.iter().chain(&self.design_roots).map(|r| r.display().to_string()).collect();
             Error::new(
@@ -241,52 +248,33 @@ impl PathScope {
         {
             return Err(windows(why));
         }
-        let resolved = match resolve(std::path::Path::new(path)) {
-            Ok(r) => r,
-            Err(e) if e.kind() == ErrorKind::NotFound => return Err(self.missing_folder(path).unwrap_or_else(refused)),
-            Err(_) => return Err(refused()),
-        };
+        // Both sides resolved: the roots when the scope was made, the path here (through the
+        // nearest folder that exists), so `/tmp` and `/private/tmp` on macOS are one folder.
+        let Ok((resolved, missing)) = resolve(std::path::Path::new(path)) else { return Err(refused()) };
         // Judged again once resolved: a link or junction inside an allowed folder may lead to a
         // network share or a device even though the path given looked local.
         if cfg!(windows) && !local_drive_path(&resolved) {
             return Err(windows("only paths on a local drive"));
         }
-        if self.contains(&resolved) { Ok(()) } else { Err(refused()) }
+        if !self.contains(&resolved) {
+            return Err(refused());
+        }
+        // Said only inside the scope: which folder is missing must not become a way to probe the
+        // disk outside it.
+        if missing > 0 && !creating {
+            let existing = resolved.ancestors().nth(missing + 1).unwrap_or(&resolved);
+            return Err(Error::new(
+                ErrorKind::NotFound,
+                format!("{path}: its folder does not exist (nothing exists below {}); create the folder first", existing.display()),
+            ));
+        }
+        Ok(())
     }
 
     /// Whether the resolved path `p` lies inside one of the folders.
     fn contains(&self, p: &std::path::Path) -> bool {
         let inside_design = || self.design_roots.iter().any(|r| p.strip_prefix(r).is_ok_and(|rel| !rel.components().any(|c| hidden(c.as_os_str()))));
         self.roots.iter().any(|r| p.starts_with(r)) || inside_design()
-    }
-
-    /// The "folder does not exist" error for a path whose folder is missing, but only when the
-    /// nearest folder that does exist is one of the scope's own: telling the user which folder is
-    /// missing must not become a way to probe the disk outside it.
-    fn missing_folder(&self, path: &str) -> Option<Error> {
-        let given = std::path::Path::new(path);
-        // A dangling link (the path itself, or in its folders) is not a missing folder: it leads
-        // somewhere, and that is refused.
-        let mut missing = given.parent()?;
-        let existing = loop {
-            let here = if missing.as_os_str().is_empty() { std::path::Path::new(".") } else { missing };
-            if let Ok(c) = std::fs::canonicalize(here) {
-                break c;
-            }
-            if std::fs::symlink_metadata(here).is_ok() {
-                return None;
-            }
-            missing = missing.parent()?;
-        };
-        if std::fs::symlink_metadata(given).is_ok() {
-            return None;
-        }
-        self.contains(&existing).then(|| {
-            Error::new(
-                ErrorKind::NotFound,
-                format!("{path}: its folder does not exist (nothing exists below {}); create the folder first", existing.display()),
-            )
-        })
     }
 }
 
@@ -391,18 +379,25 @@ pub fn temp_dir() -> std::path::PathBuf {
     long_names(&std::env::temp_dir())
 }
 
-/// `path` with symlinks and `..` resolved. A file that doesn't exist yet resolves through its
-/// folder, which must exist; a symlink whose target is missing is refused (writing through it
-/// would land wherever it points).
-fn resolve(path: &std::path::Path) -> Result<std::path::PathBuf> {
-    match std::fs::canonicalize(path) {
-        Ok(p) => Ok(p),
-        Err(e) if e.kind() == ErrorKind::NotFound && std::fs::symlink_metadata(path).is_err() => {
-            let (Some(parent), Some(name)) = (path.parent(), path.file_name()) else { return Err(e) };
-            let parent = if parent.as_os_str().is_empty() { std::path::Path::new(".") } else { parent };
-            Ok(std::fs::canonicalize(parent)?.join(name))
+/// `path` with symlinks and `..` resolved, and how many folders above it are missing. A path
+/// that doesn't exist yet resolves through the nearest folder above it that does, with the
+/// missing names appended. A symlink whose target is missing is refused (writing through it
+/// would land wherever it points), and so is `..` among the missing names (what it climbs out of
+/// doesn't exist, so it can't be resolved).
+fn resolve(path: &std::path::Path) -> Result<(std::path::PathBuf, usize)> {
+    let mut names: Vec<&std::ffi::OsStr> = Vec::new();
+    let mut at = path;
+    loop {
+        let here = if at.as_os_str().is_empty() { std::path::Path::new(".") } else { at };
+        match std::fs::canonicalize(here) {
+            Ok(p) => return Ok((names.iter().rev().fold(p, |p, n| p.join(n)), names.len().saturating_sub(1))),
+            Err(e) if e.kind() == ErrorKind::NotFound && std::fs::symlink_metadata(here).is_err() => {
+                let (Some(std::path::Component::Normal(name)), Some(parent)) = (at.components().next_back(), at.parent()) else { return Err(e) };
+                names.push(name);
+                at = parent;
+            }
+            Err(e) => return Err(e),
         }
-        Err(e) => Err(e),
     }
 }
 
@@ -436,6 +431,22 @@ pub fn check(path: &str) -> Result<()> {
         return Ok(());
     }
     SCOPE.with(|s| s.borrow().as_ref().map_or(Ok(()), |scope| scope.check(path)))
+}
+
+/// [`check`] for folders about to be made: `path` and the folders above it may be missing, but
+/// what exists of it must lie inside the scope.
+#[cfg(not(target_arch = "wasm32"))]
+fn check_creating(path: &str) -> Result<()> {
+    SCOPE.with(|s| s.borrow().as_ref().map_or(Ok(()), |scope| scope.check_with(path, true)))
+}
+
+/// Make the missing folders above `path`, a file about to be written: inside an agent's folders
+/// only (#171). In the browser there are no folders to make.
+pub fn create_parent_dirs(path: &str) -> Result<()> {
+    match std::path::Path::new(path).parent() {
+        Some(dir) if !dir.as_os_str().is_empty() && !dir.is_dir() => create_dir_all(&dir.to_string_lossy()),
+        _ => Ok(()),
+    }
 }
 
 /// A file's text, at most `max` bytes.
@@ -564,6 +575,42 @@ mod tests {
         }
         super::scoped(Some(scope), || assert!(super::write(&s(a.join("link/new.txt")), b"x").is_err()));
         assert!(!out.join("new.txt").exists() && !a.join("missing").exists());
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    /// #171: the folders and the path are both resolved before they are compared, so a folder
+    /// allowed through a link (`/tmp` on macOS leads to `/private/tmp`) admits the path spelled
+    /// either way, also below folders that don't exist yet; those are made inside the scope only.
+    #[cfg(all(unix, not(target_arch = "wasm32")))]
+    #[test]
+    fn a_folder_and_a_path_meet_whichever_way_each_is_spelled() {
+        use super::{PathScope, scoped};
+        let base = std::env::temp_dir().join(format!("solidcraft-vfs-spelling-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&base);
+        let (real, link, out) = (base.join("real"), base.join("link"), base.join("out"));
+        std::fs::create_dir_all(&real).unwrap();
+        std::fs::create_dir_all(&out).unwrap();
+        std::os::unix::fs::symlink(&real, &link).unwrap();
+        let s = |p: std::path::PathBuf| p.to_string_lossy().to_string();
+        for root in [&real, &link] {
+            let scope = PathScope::new([root.clone()]);
+            for dir in [&real, &link] {
+                assert!(scope.check(&s(dir.join("a.xml"))).is_ok(), "{} in {}", dir.display(), root.display());
+                let e = scope.check(&s(dir.join("new/deeper/a.xml"))).unwrap_err();
+                assert_eq!(e.kind(), std::io::ErrorKind::NotFound, "{e}");
+            }
+        }
+        scoped(Some(PathScope::new([link.clone()])), || {
+            super::create_parent_dirs(&s(real.join("new/deeper/a.xml"))).unwrap();
+            super::write(&s(link.join("new/deeper/a.xml")), b"ok").unwrap();
+            for refused in [out.join("new/a.xml"), real.join("new/../../out/x/a.xml"), real.join("x/../../out/y/a.xml")] {
+                let e = super::create_parent_dirs(&s(refused.clone())).unwrap_err();
+                assert!(e.to_string().contains("outside the folders this agent may use"), "{}: {e}", refused.display());
+            }
+        });
+        assert_eq!(std::fs::read(real.join("new/deeper/a.xml")).unwrap(), b"ok");
+        assert_eq!(std::fs::read_dir(&out).unwrap().count(), 0, "nothing made outside");
+        assert!(!real.join("x").exists());
         let _ = std::fs::remove_dir_all(&base);
     }
 
