@@ -578,3 +578,15 @@ A frame whose meshes the GPU refuses to stage (device lost or out of memory) is
 skipped with a warning instead of panicking (#1469).
 Paint callbacks are prepared only after a drawable is acquired, so a skipped
 surface frame cannot strand cached meshes without their GPU initialization.
+
+## Site media (on the `media` branch, fetched by `site/build.py`)
+
+| File | Author | Source | Licence |
+|---|---|---|---|
+| media:dog/dog.polykrom | Polykrom contributors | D3 robot dog designed by an AI agent (Claude Opus 5.5) through Polykrom's MCP tools from an empty design (#101); library parts are Polykrom's own parametric models | MIT OR Apache-2.0 |
+| media:dog/dog-walk.mp4, media:dog/dog-walk.jpg | Polykrom contributors | MuJoCo 3 (Apache-2.0) rendering of the dog's exported MJCF replaying its Crawl study (`site/dog/mujoco-replay.py`); procedural checker floor and sky, no external assets | MIT OR Apache-2.0 |
+| media:dog/dog-gait.mp4, media:dog/dog-gait.jpg | Polykrom contributors | Polykrom's headless GIF export of the dog's Crawl motion study, re-encoded | MIT OR Apache-2.0 |
+| media:dog/dog-render.jpg | Polykrom contributors | Polykrom's render workspace, of the dog design | MIT OR Apache-2.0 |
+| media:dog/review/*.jpg | Polykrom contributors | screenshots of polykrom.app pages for review | MIT OR Apache-2.0 |
+| media:printer/printer.polykrom | Polykrom contributors | D2 CoreXY printer designed by an AI agent through Polykrom's MCP tools (#100) | MIT OR Apache-2.0 |
+| media:printer/printer-iso.jpg, media:printer/printer-render.jpg, media:printer/printer-print.mp4, media:printer/printer-print.jpg | Polykrom contributors | Polykrom's renders and motion-study export of the printer design | MIT OR Apache-2.0 |

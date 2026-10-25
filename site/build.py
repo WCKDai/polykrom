@@ -78,7 +78,7 @@ def loop_svg():
 
 # Pictures on the home page and the printer and dog showcases (with their designs), from the media
 # branch (screenshots aren't committed), pinned by hash. A name with a folder keeps it under media/.
-MEDIA_AT = 'https://raw.githubusercontent.com/wckdboy/polykrom/e40338a6/'
+MEDIA_AT = 'https://raw.githubusercontent.com/wckdboy/polykrom/77cf687a/'
 MEDIA = {
     'site-lime-workspace.jpg': 'ebaf83fb49e7092e19ab710a989da6914a518d77ae84b39ce6c43be7a0c8274a',
     'site-follow-along-agent.jpg': '9750599c533542fc5de52cd527e4accf17c1fe0392923ede2859350ae42b912f',
@@ -90,8 +90,8 @@ MEDIA = {
     'printer/printer-print.jpg': 'c5ac7e95f5013f327a095832ca7dc55931d3b4c1fb13f18ed021b7cd6425df36',
     'printer/printer-render.jpg': 'fe79338fa677596852308252350e16183c008b051f7634c467333a7de6de0d52',
     'dog/dog.polykrom': '192a92185caeec1c76cfdd4c68a0e3405abaa41e7f7b53744ab02c2cf3c29c06',
-    'dog/dog-walk.mp4': '87491c9584c5590d0d02b47b56e92af02975a0499475be3eb9b68698366303d3',
-    'dog/dog-walk.jpg': 'dcf2cad70833e54fa32da2abc2250d76154b4618be74741255d29b3fa1e74069',
+    'dog/dog-walk.mp4': '1def0a5d4b73b40f49d043357b18baa870e76b53d3a11be066524d3c7754805f',
+    'dog/dog-walk.jpg': '98d8838617ff3683bf2b47a38b26155956cc6bb71455f754ff7e914722bca33e',
     'dog/dog-gait.mp4': '668aa7a527cf668cb0f9cd00376edb1b0f9ab7eab6688298c8febd35448a874d',
     'dog/dog-gait.jpg': '8f7642aad5c8df570da81ba582e42d8212ed52b47fa5dea754493200dd376cf9',
     'dog/dog-render.jpg': '5cbe5e793af13535d0a145e57afb0c4e0712f49e9a61e563e2e6637306cf13fb',

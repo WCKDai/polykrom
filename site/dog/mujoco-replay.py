@@ -29,17 +29,19 @@ m.vis.global_.offwidth, m.vis.global_.offheight = 1280, 800
 renderer = mujoco.Renderer(m, 600, 960) if out else None
 frames, worst_tilt, trail = [], 0.0, []
 fps, sub = 25, max(1, int(round(step_s / m.opt.timestep)))
+t_walk, next_frame = d.time, d.time  # frames at 1/fps of simulated time, so the video plays in real time
 for k in range(steps * cycles):
     for i in range(sub):
         d.ctrl[:] = targets(k + i / sub)
         mujoco.mj_step(m, d)
+        if renderer and d.time >= next_frame:
+            next_frame += 1 / fps
+            cam = mujoco.MjvCamera(); cam.lookat[:] = [d.qpos[0], d.qpos[1], 0.08]; cam.distance = 0.62; cam.azimuth = -55; cam.elevation = -16
+            renderer.update_scene(d, cam); frames.append(renderer.render().copy())
     q = d.qpos[3:7]
     up = 1 - 2 * (q[1] ** 2 + q[2] ** 2)  # world z of the body's z axis
     worst_tilt = max(worst_tilt, math.degrees(math.acos(max(-1, min(1, up)))))
     trail.append((d.time, d.qpos[0] - x0, d.qpos[1], d.qpos[2]))
-    if renderer and (k * step_s * fps) % 1 < step_s * fps:
-        cam = mujoco.MjvCamera(); cam.lookat[:] = [d.qpos[0], d.qpos[1], 0.08]; cam.distance = 0.62; cam.azimuth = -55; cam.elevation = -16
-        renderer.update_scene(d, cam); frames.append(renderer.render().copy())
 ok = np.all(np.isfinite(d.qpos))
 print(json.dumps({"study": study_name, "cycles": cycles, "seconds": round(d.time, 2), "advance_mm": round((d.qpos[0] - x0) * 1000, 1),
     "per_cycle_mm": round((d.qpos[0] - x0) * 1000 / cycles, 1), "drift_y_mm": round((d.qpos[1]) * 1000, 1),
