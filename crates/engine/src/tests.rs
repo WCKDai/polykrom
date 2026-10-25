@@ -4148,6 +4148,24 @@ fn renaming_a_targeted_threaded_body_evaluates_nothing() {
     assert_eq!(s.evaluations, 0, "nor does its undo");
 }
 
+/// A sketch drawn on a face of the renamed body is solved again (its solved links name the body),
+/// so what it reports names the body by its new name, as evaluating the renamed design does.
+#[test]
+fn renaming_a_body_a_sketch_sits_on_evaluates_the_sketch_again() {
+    let mut s = Session::default();
+    run(&mut s, "solid.box", json!({"length": 30, "width": 20, "height": 10, "body_name": "Plate"}));
+    run(&mut s, "sketch.create", json!({"plane": {"face": [15, 10, 10]}, "name": "Top"}));
+    run(&mut s, "sketch.circle.center", json!({"center": [15, 10], "radius": 3}));
+    run(&mut s, "sketch.finish", json!({}));
+    s.evaluations = 0;
+    run(&mut s, "body.rename", json!({"body": "Plate", "name": "Base"}));
+    assert!(s.evaluations > 0, "the sketch on the face is solved again");
+    let solved = |s: &Session| format!("{:?}", s.model.state().sketches.iter().map(|k| &k.sketch.links).collect::<Vec<_>>());
+    let mut fresh = Session::new((*s.doc).clone());
+    fresh.refresh();
+    assert_eq!(solved(&s), solved(&fresh));
+}
+
 /// A body whose name later bodies' names are worked out from (`X` patterned into `X (2)`) is still
 /// renamed by evaluating the design, so the copies follow it as they would on opening it.
 #[test]

@@ -752,9 +752,16 @@ impl Session {
         let made = |id: u64| -> Vec<String> {
             model.result(id).map(|r| r.state.bodies.iter().filter(|b| b.feature == id).map(|b| b.name.clone()).collect()).unwrap_or_default()
         };
-        // A rename points later features' references at the new name too (#169).
+        // A rename points later features' references at the new name too (#169). Not a sketch's:
+        // a solved sketch keeps the links it was solved with, so one attached to or projecting
+        // from the body is solved again by evaluating.
         let made_by = |name: &str| model.state().body(name).map(|b| b.feature);
-        let refs = |d: &mut Document, old: &str, new: &str| made_by(old).is_some_and(|fid| cmd::browser::rename_body_refs(d, fid, old, new).is_ok());
+        let sketches_kept = |d: &Document| {
+            d.features.iter().zip(&previous.features).all(|(a, b)| !matches!(a.kind, solidcraft_doc::FeatureKind::Sketch { .. }) || a.kind == b.kind)
+        };
+        let refs = |d: &mut Document, old: &str, new: &str| {
+            made_by(old).is_some_and(|fid| cmd::browser::rename_body_refs(d, fid, old, new).is_ok()) && sketches_kept(d)
+        };
         let (old, new) = self.doc.body_rename_from(previous, made, refs)?;
         self.body_renames.push(BodyRename { before: Arc::downgrade(previous), after: Arc::downgrade(&self.doc), old: old.clone(), new: new.clone() });
         if self.body_renames.len() > MAX_UNDO {
