@@ -30,7 +30,11 @@ pub static COMMANDS: &[CommandSpec] = &[
         .at("SOLID", "CREATE")
         .icon("sketch")
         .params("plane: XY|XZ|YZ | construction plane name or id | {origin?: [x,y,z] numbers in mm, default [0,0,0] (not an expression), x_dir, y_dir} | {face: [world x,y,z], body?: exact world body, index?: face index, path?: complete occurrence ids, fixed?: bool}; new face attachments require a unique certified source (a flat face of a sheet metal body attaches to its panel instead, in the flat pattern's coordinates), fixed:true explicitly freezes the selected plane; offset?: expr, flip?: bool | \"x\" | \"y\" (not on a face: sketch the plane from its other side, so the normal and the default extrude direction are reversed; a half turn about the plane's own x or y axis, true picks the one keeping the sketch's y axis upward; offset still moves along the unflipped normal), project_edges?: bool, name?"),
-    CommandSpec::new("sketch.edit", "Edit Sketch", edit_sketch).noundo().icon("sketch").params("sketch: id or name"),
+    CommandSpec::new("sketch.edit", "Edit Sketch", edit_sketch).noundo().icon("sketch").params(
+        "sketch: id or name; roll?: bool (default false; true through MCP): roll the history marker to just after the sketch while it is \
+         open, so each change evaluates up to it only and the features after it once, at sketch.finish, which puts the marker back \
+         (sketch.cancel too); much faster for a sketch early in a long history",
+    ),
     CommandSpec::new("sketch.finish", "Finish Sketch", finish_sketch).at("SKETCH", "FINISH SKETCH").icon("finish").enabled(in_sketch).noundo(),
     CommandSpec::new("sketch.cancel", "Cancel Sketch", cancel_sketch)
         .at("SKETCH", "FINISH SKETCH")
@@ -796,7 +800,26 @@ fn edit_sketch(s: &mut Session, p: &Value) -> Result<Value> {
         s.active_occurrence_path = (!path.is_empty()).then_some(path);
     }
     if s.active_sketch != Some(id) || s.sketch_entry.as_ref().is_none_or(|entry| entry.sketch != id) {
-        s.sketch_entry = Some(SketchEntry { sketch: id, ..entry_point(s) });
+        // Where the marker stood before any sketch moved it (one sketch edited after another
+        // without finishing still goes back there).
+        let carried = s.sketch_entry.as_ref().and_then(|entry| entry.rolled_from);
+        let mut entry = SketchEntry { sketch: id, ..entry_point(s) };
+        // `roll`: a sketch in the past is edited with the timeline rolled to just after it, as
+        // the window's Edit Sketch does: each change then evaluates up to the sketch only, and
+        // the features after it once, at Finish (#159). A sketch the marker leaves out is rolled
+        // forward to, so it is built (#2716). Agents get it by default (the MCP server).
+        let n = s.doc.features.len();
+        if let Some(at) = s.doc.feature_index(id).filter(|_| bool_(p, "roll").unwrap_or(false)) {
+            let target = (at + 1 < n).then_some(at + 1);
+            let before = s.doc.marker;
+            if before != target {
+                s.doc_mut().marker = target;
+                entry.rolled_from = Some(carried.unwrap_or(before));
+            } else {
+                entry.rolled_from = carried;
+            }
+        }
+        s.sketch_entry = Some(entry);
     }
     s.active_sketch = Some(id);
     s.revision += 1;
@@ -805,7 +828,7 @@ fn edit_sketch(s: &mut Session, p: &Value) -> Result<Value> {
 
 /// The design and undo history as they are now, where a sketch is entered (its id set after).
 fn entry_point(s: &Session) -> SketchEntry {
-    SketchEntry { sketch: 0, doc: s.doc.clone(), undo_len: s.undo.len(), undo_top: s.undo.last().map(|snap| snap.doc.clone()) }
+    SketchEntry { sketch: 0, doc: s.doc.clone(), undo_len: s.undo.len(), undo_top: s.undo.last().map(|snap| snap.doc.clone()), rolled_from: None }
 }
 
 /// Cancel Sketch (#3838): the design as it was when the open sketch was entered. The entry is
@@ -844,7 +867,14 @@ fn cancel_sketch(s: &mut Session, _p: &Value) -> Result<Value> {
 
 fn finish_sketch(s: &mut Session, _p: &Value) -> Result<Value> {
     let id = s.active_sketch.take();
-    s.sketch_entry = None;
+    // The marker goes back where entering found it (a marker past the end is the end).
+    if let Some(before) = s.sketch_entry.take().and_then(|entry| entry.rolled_from) {
+        let n = s.doc.features.len();
+        let back = before.filter(|m| *m < n);
+        if s.doc.marker != back {
+            s.doc_mut().marker = back;
+        }
+    }
     s.revision += 1;
     let profiles = id.and_then(|i| s.model.state().sketch(i).map(|ss| ss.profiles.len())).unwrap_or(0);
     Ok(json!({"sketch": id, "profiles": profiles}))
