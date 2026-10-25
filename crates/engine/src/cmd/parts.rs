@@ -895,6 +895,15 @@ fn hole_wall(s: &Session, a: Vec3) -> Option<Vec3> {
             };
             ts.into_iter().filter_map(move |t| solidcraft_doc::mat_inverse(&t).map(|inv| (b, inv)))
         })
+        // Only parts within reach of the farthest step: a probe meshes the body it tries (#160).
+        .filter(|(b, inv)| {
+            let q = solidcraft_doc::apply_point(inv, a);
+            let bb = b.mesh().bounds();
+            let reach = 2.5;
+            (bb.min.x - reach..=bb.max.x + reach).contains(&q.x)
+                && (bb.min.y - reach..=bb.max.y + reach).contains(&q.y)
+                && (bb.min.z - reach..=bb.max.z + reach).contains(&q.z)
+        })
         .collect();
     for step in [0.2, 0.5, 1.0, 2.0] {
         for (b, inv) in &places {

@@ -429,15 +429,19 @@ fn thread_on_impl(
     turned: bool,
 ) -> Result<ThreadInfo> {
     let other = |b: &ModelBody| owner.is_some_and(|(doc, comp)| doc.model_body_component(b) != comp);
-    let (_, body, cyl) = st
-        .bodies
-        .iter()
-        .filter_map(|b| kernel::cylinder_face_at(&b.body, p).map(|c| (other(b), b.name.clone(), c)))
-        .min_by(|a, b| {
-            let dist = |c: &kernel::CylinderFace| ((p - c.axis_point - c.axis * (p - c.axis_point).dot(c.axis)).len() - c.radius).abs();
-            a.0.cmp(&b.0).then(dist(&a.2).total_cmp(&dist(&b.2)))
-        })
-        .ok_or_else(|| DocError::Invalid("no cylindrical face there to thread".into()))?;
+    let dist = |c: &kernel::CylinderFace| ((p - c.axis_point - c.axis * (p - c.axis_point).dot(c.axis)).len() - c.radius).abs();
+    // The thread's own component's bodies first, the others only when none of them has a
+    // cylinder there: finding one meshes the body, and a design of many library parts (each
+    // screw its own component, every part's bodies near its own origin) would otherwise mesh
+    // every body for every thread (#160: half of the D2 printer's evaluation).
+    let nearest = |theirs: bool| {
+        st.bodies
+            .iter()
+            .filter(|b| other(b) == theirs)
+            .filter_map(|b| kernel::cylinder_face_at(&b.body, p).map(|c| (b.name.clone(), c)))
+            .min_by(|a, b| dist(&a.1).total_cmp(&dist(&b.1)))
+    };
+    let (body, cyl) = nearest(false).or_else(|| nearest(true)).ok_or_else(|| DocError::Invalid("no cylindrical face there to thread".into()))?;
     let dia = cyl.radius * 2.0;
     let tapped_size = if tapped {
         let name = designation.ok_or_else(|| DocError::Invalid("a tapped hole needs a designation".into()))?;
