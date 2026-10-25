@@ -31,6 +31,13 @@ These are parametric generators in Rust, built like today's `parts.insert` faste
 
 Where datasheets disagree (SG90 heights differ, NEMA 17 screws can be M3 or M4), the generator takes the variant as a parameter and the part records which datasheet it follows.
 
+#### Shipped so far
+
+| Family | `parts.insert` | Dimensions from | Notes |
+|---|---|---|---|
+| `extrusion` | `2020`, `2040`, any length up +z | The series-5 / B-type slot 6 that 20 mm profiles share (Misumi HFS5, Bosch Rexroth, Item): 6.2 mm opening, 1.8 mm lip, 11 mm chamber, 6.1 mm slot depth, Ø4.2 core bore (an M5 tap drill) | The chamber narrows at 45° below 3 mm, as the makers' do. Their hollow core is solid here, so the section is 1.9 cm² against about 1.6, and the mass about 20 % high. Aluminium. |
+| `stepper` | `NEMA14-28/34`, `NEMA17-34/40/48`, `NEMA23-56/76` | NEMA ICS 16: body square, pilot (Ø22 for 14 and 17, Ø38.1 for 23), hole square (26, 31, 47.14 mm), shaft (Ø5; Ø6.35 for 23) | Ratings (holding torque, rated current, mass, 1.8° step) from typical datasheets of that body length, in the part's `app.polykrom.part` metadata. The body is a solid block, so its material mass is not the motor's: use `mass_kg`. NEMA 14 and 17 holes are tapped M3 (cosmetic threads). It seats in its pilot hole like a screw, shaft through the plate. |
+
 ### Tier 2: open catalogues fetched on demand (never bundled)
 
 The user picks a part and Polykrom downloads it from the source, pinned to a commit or release with a checksum. It caches the file locally and attaches licence and attribution metadata.
