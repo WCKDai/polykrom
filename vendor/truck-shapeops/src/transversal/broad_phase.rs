@@ -16,7 +16,7 @@ pub(super) struct Aabb([[f64; 2]; 3]);
 
 impl Aabb {
     /// The box of the bounds `[min, max]` per axis (the test hooks build boxes with it).
-    #[cfg(feature = "test-hooks")]
+    #[cfg(any(test, feature = "test-hooks"))]
     pub(super) fn new(bounds: [[f64; 2]; 3]) -> Aabb {
         Aabb(bounds)
     }
