@@ -83,3 +83,45 @@ fn sketch_perf() {
         );
     }
 }
+
+/// Editing a sketch in the past evaluates up to it, not the features after it, on each change
+/// (#159: in the D2 printer, 290 parts after a belt sketch, each line drawn in it took two
+/// minutes); Finish evaluates the rest once and puts the history marker back, as the window's
+/// own Edit Sketch does.
+#[test]
+fn editing_a_past_sketch_leaves_later_features_until_finish() {
+    let mut s = Session::default();
+    let run = |s: &mut Session, id: &str, p: serde_json::Value| s.execute(id, &p).unwrap_or_else(|e| panic!("{id} {p}: {e}"));
+    run(&mut s, "sketch.create", json!({"plane": "XY", "name": "Base"}));
+    run(&mut s, "sketch.rectangle.two_point", json!({"p0": [0, 0], "p1": [40, 30]}));
+    run(&mut s, "sketch.finish", json!({}));
+    run(&mut s, "solid.extrude", json!({"distance": 10, "body_name": "Plate"}));
+    for k in 0..6 {
+        run(&mut s, "solid.box", json!({"corner": [100.0 + 30.0 * k as f64, 0, 0], "length": 10, "width": 10, "height": 10, "operation": "new"}));
+    }
+    let n = s.doc.features.len();
+    let base = s.doc.find_feature("Base").map(|f| f.id).unwrap();
+    let at = s.doc.feature_index(base).unwrap();
+
+    run(&mut s, "sketch.edit", json!({"sketch": "Base", "roll": true}));
+    assert_eq!(s.doc.marker, Some(at + 1), "rolled to just after the sketch");
+    run(&mut s, "sketch.circle.center", json!({"center": [20, 15], "diameter": 6}));
+    assert!(s.model.last_recomputed <= 1, "only the sketch is evaluated: {} features", s.model.last_recomputed);
+    run(&mut s, "sketch.finish", json!({}));
+    assert_eq!(s.doc.marker, None, "the marker is back at the end");
+    assert_eq!(s.doc.features.len(), n);
+    assert_eq!(s.world_state().bodies.len(), 7, "the plate and the six boxes");
+
+    // Cancel puts the marker back too (with the design as it was).
+    run(&mut s, "sketch.edit", json!({"sketch": "Base", "roll": true}));
+    run(&mut s, "sketch.circle.center", json!({"center": [5, 5], "diameter": 2}));
+    run(&mut s, "sketch.cancel", json!({}));
+    assert_eq!(s.doc.marker, None);
+
+    // A sketch at the end of the timeline is edited in place: nothing to roll.
+    run(&mut s, "sketch.create", json!({"plane": "XY", "name": "Last"}));
+    run(&mut s, "sketch.finish", json!({}));
+    run(&mut s, "sketch.edit", json!({"sketch": "Last", "roll": true}));
+    assert_eq!(s.doc.marker, None);
+    run(&mut s, "sketch.finish", json!({}));
+}

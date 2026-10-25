@@ -427,7 +427,20 @@ pub fn call_tool(b: &mut dyn Backend, name: &str, args: &Value) -> Value {
 }
 
 fn exec(b: &mut dyn Backend, command: &str, params: Value) -> Result<Value, String> {
+    let params = agent_params(command, params);
     b.call("engine.execute", json!({"command": command, "params": params})).map_err(|error| command_error(command, error))
+}
+
+/// The defaults agents get over the engine's: Edit Sketch rolls the history marker to the
+/// sketch, so each change evaluates up to it and the rest once, at Finish (#159), as the
+/// window's Edit Sketch does. A `roll` the agent gives is kept.
+fn agent_params(command: &str, mut params: Value) -> Value {
+    if command == "sketch.edit"
+        && let Some(o) = params.as_object_mut()
+    {
+        o.entry("roll").or_insert(Value::Bool(true));
+    }
+    params
 }
 
 /// Enrich an unknown-id error without retrying or changing the command that was requested.
@@ -904,11 +917,23 @@ fn batch(b: &mut dyn Backend, a: &Map<String, Value>) -> Value {
     let mut filters: Vec<(usize, String)> = Vec::new();
     for (i, step) in steps.iter().enumerate() {
         match batch_step(step) {
-            Ok((command, _, _)) if command.is_empty() => mapped.push(step.clone()),
+            Ok((command, _, _)) if command.is_empty() => {
+                let mut step = step.clone();
+                let id = step.get("command").or_else(|| step.get("id")).and_then(Value::as_str).unwrap_or("").to_string();
+                // Only a step the agent defaults change is rewritten; the rest go as they are.
+                if id == "sketch.edit"
+                    && let Some(o) = step.as_object_mut()
+                {
+                    let params = o.remove("params").filter(|p| !p.is_null()).unwrap_or(json!({}));
+                    o.insert("params".into(), agent_params(&id, params));
+                }
+                mapped.push(step);
+            }
             Ok((command, params, filter)) => {
                 if let Some(f) = filter {
                     filters.push((i, f));
                 }
+                let params = agent_params(&command, params);
                 mapped.push(json!({"command": command, "params": params}));
             }
             // A step without a command fails where it stands, as before.

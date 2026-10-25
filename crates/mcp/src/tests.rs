@@ -2177,3 +2177,33 @@ fn unknown_commands_suggest_what_they_meant() {
         assert_eq!(first, format!("`{want}`"), "{guess}: {text}");
     }
 }
+
+/// Agents edit a past sketch with the timeline rolled to it, so each change evaluates up to the
+/// sketch only (#159); a `roll` they give is kept, and Finish puts the marker back.
+#[test]
+fn agents_edit_a_past_sketch_rolled_to_it() {
+    let mut s = server();
+    tool(
+        &mut s,
+        "batch",
+        json!({"commands": [
+            {"command": "sketch.create", "params": {"plane": "XY", "name": "Base"}},
+            {"command": "sketch.rectangle.two_point", "params": {"p0": [0, 0], "p1": [40, 30]}},
+            {"command": "sketch.finish"},
+            {"command": "solid.extrude", "params": {"distance": 10}},
+            {"command": "solid.box", "params": {"corner": [100, 0, 0], "length": 10, "width": 10, "height": 10, "operation": "new"}}
+        ]}),
+    );
+    let marker = |s: &mut Server| tool(s, "inspect_design", json!({"measure": false}))["marker"].clone();
+    let end = marker(&mut s);
+    tool(&mut s, "execute", json!({"command": "sketch.edit", "params": {"sketch": "Base"}}));
+    assert_eq!(marker(&mut s), json!(1), "rolled to just after the sketch");
+    tool(&mut s, "execute", json!({"command": "sketch.finish"}));
+    assert_eq!(marker(&mut s), end);
+    // In a batch too, and an explicit `roll: false` is kept.
+    tool(&mut s, "batch", json!({"commands": [{"command": "sketch.edit", "params": {"sketch": "Base"}}]}));
+    assert_eq!(marker(&mut s), json!(1));
+    tool(&mut s, "execute", json!({"command": "sketch.finish"}));
+    tool(&mut s, "execute", json!({"command": "sketch.edit", "params": {"sketch": "Base", "roll": false}}));
+    assert_eq!(marker(&mut s), end);
+}

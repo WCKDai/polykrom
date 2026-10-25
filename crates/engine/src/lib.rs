@@ -175,6 +175,10 @@ pub(crate) struct SketchEntry {
     pub(crate) doc: Arc<Document>,
     pub(crate) undo_len: usize,
     pub(crate) undo_top: Option<Arc<Document>>,
+    /// Where the history marker was before entering moved it to just after the sketch (a
+    /// sketch in the past: the features after it wait until Finish, #159); `None` when entering
+    /// left the marker alone.
+    pub(crate) rolled_from: Option<Option<usize>>,
 }
 
 /// A copy of a session that evaluates commands ahead of it ([`Session::ahead`]).
