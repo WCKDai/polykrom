@@ -867,6 +867,26 @@ mod tests {
         std::fs::remove_file(format!("{}.bak", path.display())).unwrap();
     }
 
+    /// A feature whose boolean took a fallback keeps its diagnostics in the saved model, and the
+    /// model is still taken from the file (#157: diagnostics with nothing rejected were written
+    /// without `rejected` and refused when read back, so every such design, the D2 printer among
+    /// them, was evaluated again on every open).
+    #[test]
+    fn a_saved_model_with_boolean_diagnostics_is_adopted() {
+        let mut session = Session::new(Document::new("Diagnostics"));
+        session.execute("solid.box", &json!({"length":10,"width":20,"height":30})).unwrap();
+        let fallback = json!({"events": [{"strategy": "planar_fallback", "translation_mm": 0.0, "rotation_rad": 0.0, "face_shift_mm": 0.0, "tolerance_mm": 0.0}], "truncated": false});
+        session.model.results[0].boolean_diagnostics = serde_json::from_value(fallback).unwrap();
+        let bytes = session.design_container(solidcraft_io::DesignCompression::Fast, false, true).unwrap();
+        let path = std::env::temp_dir().join(format!("polykrom-saved-diagnostics-{}.polykrom", std::process::id()));
+        std::fs::write(&path, &bytes).unwrap();
+        let mut reopened = Session::default();
+        reopened.execute("doc.open", &json!({"path":path})).unwrap();
+        std::fs::remove_file(&path).unwrap();
+        assert_eq!(reopened.model.results[0].ms, session.model.results[0].ms, "taken from the file, not evaluated");
+        assert_eq!(reopened.model.results[0].boolean_diagnostics, session.model.results[0].boolean_diagnostics);
+    }
+
     #[test]
     fn saved_model_needs_no_meshes_and_is_adopted_only_for_its_document() {
         let mut session = Session::new(Document::new("Saved model"));
