@@ -9,7 +9,7 @@
 
 use std::collections::VecDeque;
 
-use egui::{Align2, Color32, FontId, Pos2, Stroke, pos2, vec2};
+use egui::{Align2, Color32, FontId, Stroke, pos2, vec2};
 use serde_json::Value;
 use solidcraft_engine::geom::Vec3;
 
@@ -232,29 +232,46 @@ pub fn paint(app: &SolveApp, ctx: &egui::Context) {
         return;
     }
     let font = FontId::proportional(t.font_label);
-    let line = 18.0;
-    let rows = feed.entries.len() as f32 + 1.0;
     // In the viewport's bottom-right corner: the browser floats over its top-left, the view cube
     // sits top-right and the navigation bar bottom-centre.
     let width = 320.0_f32.min(rect.width() - 24.0).max(120.0);
-    let size = vec2(width, rows * line + 12.0);
+    let rows = rows(ctx, feed, font.clone(), width - 20.0, k);
+    let body = rows.last().map_or(0.0, |(top, g)| top + g.size().y.max(LINE));
+    let size = vec2(width, LINE + body + 12.0);
     let at = rect.right_bottom() - size - vec2(12.0, 64.0);
     let frame = egui::Rect::from_min_size(at, size);
     painter.rect_filled(frame, 6.0, t.panel.gamma_multiply(0.92 * k));
     painter.rect_stroke(frame, 6.0, Stroke::new(1.0, t.border.gamma_multiply(k)), egui::StrokeKind::Inside);
-    let mut y = at.y + 6.0;
-    let title = pos2(at.x + 10.0, y);
-    painter.circle_filled(title + vec2(4.0, line / 2.0), 4.0, crate::icons::pointer::agent().gamma_multiply(k));
-    painter.text(title + vec2(14.0, line / 2.0), Align2::LEFT_CENTER, tr("ui.agent_activity_title"), font.clone(), t.text.gamma_multiply(k));
-    y += line;
-    for e in &feed.entries {
-        let colour = if e.ok { t.text } else { t.interference };
-        let row: Pos2 = pos2(at.x + 10.0, y + line / 2.0);
-        let text = format!("{} · {}", e.label, e.outcome);
-        let galley = painter.layout(text, font.clone(), colour.gamma_multiply(k), width - 20.0);
-        painter.galley(row - vec2(0.0, galley.size().y / 2.0), galley, Color32::TRANSPARENT);
-        y += line;
+    let title = pos2(at.x + 10.0, at.y + 6.0);
+    painter.circle_filled(title + vec2(4.0, LINE / 2.0), 4.0, crate::icons::pointer::agent().gamma_multiply(k));
+    painter.text(title + vec2(14.0, LINE / 2.0), Align2::LEFT_CENTER, tr("ui.agent_activity_title"), font, t.text.gamma_multiply(k));
+    for (top, galley) in rows {
+        let pad = (LINE - galley.size().y).max(0.0) / 2.0;
+        painter.galley(pos2(title.x, title.y + LINE + top + pad), galley, Color32::TRANSPARENT);
     }
+}
+
+/// The height of a one-line row of the feed.
+const LINE: f32 = 18.0;
+
+/// The feed's entries laid out `width` wide, each at most two lines (a long failure is cut short),
+/// with each one's top below the title: rows follow each other by their laid-out height, so a
+/// wrapped entry doesn't run into the next (#93).
+fn rows(ctx: &egui::Context, feed: &Feed, font: FontId, width: f32, k: f32) -> Vec<(f32, std::sync::Arc<egui::Galley>)> {
+    let t = Tokens::get();
+    let mut top = 0.0;
+    feed.entries
+        .iter()
+        .map(|e| {
+            let colour = if e.ok { t.text } else { t.interference };
+            let mut job = egui::text::LayoutJob::simple(format!("{} · {}", e.label, e.outcome), font.clone(), colour.gamma_multiply(k), width);
+            job.wrap.max_rows = 2;
+            let galley = ctx.fonts_mut(|f| f.layout_job(job));
+            let row = (top, galley);
+            top += row.1.size().y.max(LINE);
+            row
+        })
+        .collect()
 }
 
 #[cfg(test)]
@@ -290,6 +307,29 @@ mod tests {
         assert!(matches!(m[1], Mark::Gap { mm, .. } if (mm - 0.1).abs() < 1e-12));
         // A modelling command keeps the last inspection's marks.
         assert!(marks("solid.extrude", &json!({})).is_none());
+    }
+
+    /// A failure long enough to wrap takes the room it needs, at most two lines, and the next
+    /// entry starts below it (#93).
+    #[test]
+    fn a_wrapped_entry_does_not_run_into_the_next() {
+        let mut feed = Feed::default();
+        let entry = |label: &str, outcome: &str, ok| Entry { at: 0.0, label: label.into(), outcome: outcome.into(), ok };
+        feed.entries.push_back(entry("Box", "done", true));
+        feed.entries.push_back(entry("select.bodies", &"failed: unknown command `select.bodies` ".repeat(8), false));
+        feed.entries.push_back(entry("Cylinder", "done", true));
+        let ctx = egui::Context::default();
+        let mut laid = Vec::new();
+        let mut out = ctx.run_ui(egui::RawInput::default(), |ui| laid = rows(ui.ctx(), &feed, FontId::proportional(12.0), 300.0, 1.0));
+        out.textures_delta.clear();
+        assert_eq!(laid.len(), 3);
+        let one = laid[0].1.size().y;
+        let long = &laid[1].1;
+        assert!(long.rows.len() == 2 && long.size().y > one * 1.5, "{} rows, {} tall", long.rows.len(), long.size().y);
+        for pair in laid.windows(2) {
+            let ((top, above), (next, _)) = (&pair[0], &pair[1]);
+            assert!(top + above.size().y <= *next + 1e-3, "{top} + {} runs into {next}", above.size().y);
+        }
     }
 
     #[test]
