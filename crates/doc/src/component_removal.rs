@@ -67,7 +67,7 @@ impl Document {
             .collect();
         let assembly = &mut self.assembly;
         assembly.joints.retain(|j| !joints.contains(&j.id));
-        assembly.links.retain(|l| !joints.contains(&l.a) && !joints.contains(&l.b));
+        assembly.links.retain(|l| !joints.iter().any(|j| l.uses(*j)));
         assembly.origins.retain(|o| !occurrences.contains(&o.origin.occurrence));
         for set in &mut assembly.contact_sets {
             set.occurrences.retain(|o| !occurrences.contains(o));

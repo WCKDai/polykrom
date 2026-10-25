@@ -53,7 +53,7 @@ pub static COMMANDS: &[CommandSpec] = &[
     CommandSpec::new("joint.motion_link", "Motion Link", motion_link)
         .at("SOLID", "ASSEMBLE")
         .icon("motion_link")
-        .params("a, b: joints; ratio (b = ratio · a + offset): b's units per a's (mm per deg for an angle driving a distance); offset?: in b's units (deg for an angle, mm for a distance, or an expression); ia?, ib?: value indices (default 0)"),
+        .params("a, b: joints; ratio (b = ratio · a + offset): b's units per a's (mm per deg for an angle driving a distance); offset?: in b's units (deg for an angle, mm for a distance, or an expression); ia?, ib?: value indices (default 0); also?: [{joint, index?, ratio}]: more values b follows, each added with its own ratio (b = ratio · a + Σ ratioᵢ · jointᵢ + offset: a CoreXY head's x from two motors, a differential)"),
     CommandSpec::new("joint.gear", "Gear", gear).at("SOLID", "ASSEMBLE").icon("gear").params(
         "a, b: joints that turn (revolute), b driven by a; ra, rb: the gears' pitch radii (or tooth counts): mm, an expression, or \
          {circle: [x,y,z], occurrence?}: the round face there, its radius (read again whenever the design changes, so the ratio follows \
@@ -251,7 +251,7 @@ fn occurrence_name(s: &Session, id: u64) -> String {
 pub(crate) fn cannot_move(s: &Session, sol: &joints::Solution, id: u64) -> Option<(String, Option<String>)> {
     let j = s.doc.assembly.joints.iter().find(|j| j.id == id)?;
     // Its value carries through motion links to joints that may move (a suppressed dial too).
-    if s.doc.assembly.links.iter().any(|l| l.a == id || l.b == id) {
+    if s.doc.assembly.links.iter().any(|l| l.uses(id)) {
         return None;
     }
     if j.suppressed {
@@ -961,9 +961,66 @@ fn motion_link(s: &mut Session, p: &Value) -> Result<Value> {
         None => 0.0,
     };
     let ratio = ratio * ratio_scale(s, a, ia, b, ib);
-    s.doc_mut().assembly.links.push(MotionLink { a, ia, b, ib, ratio, offset, coupling: None, lift: Vec::new() });
+    let also = also_param(s, p, cmd, (a, ia), (b, ib))?;
+    let link = MotionLink { a, ia, b, ib, ratio, offset, coupling: None, lift: Vec::new(), also };
+    if !link.also.is_empty() {
+        // Several values set b: none may already be set by b, and b may follow nothing else
+        // (#107).
+        let name = |id: u64| s.doc.assembly.joints.iter().find(|j| j.id == id).map(|j| j.name.clone()).unwrap_or_default();
+        let links = &s.doc.assembly.links;
+        if links.iter().any(|k| (k.b, k.ib) == (b, ib)) {
+            return Err(bad(cmd, format!("{} already follows a motion link", name(b))));
+        }
+        for (j, i, _) in link.sources() {
+            let mut reached = vec![(j, i)];
+            for _ in 0..=links.len() {
+                if reached.contains(&(b, ib)) {
+                    return Err(bad(cmd, format!("{} already drives {} through motion links", name(b), name(j))));
+                }
+                let next: Vec<(u64, usize)> = links
+                    .iter()
+                    .filter(|k| reached.contains(&(k.b, k.ib)))
+                    .flat_map(|k| k.sources().map(|(j, i, _)| (j, i)))
+                    .filter(|v| !reached.contains(v))
+                    .collect();
+                if next.is_empty() {
+                    break;
+                }
+                reached.extend(next);
+            }
+        }
+    }
+    s.doc_mut().assembly.links.push(link);
     let sol = resolve(s);
     Ok(sol_json(&sol, p))
+}
+
+/// `also`: the more values a motion link's b follows, each `{joint, index?, ratio}` with the
+/// ratio in b's units per that joint's (per degree for an angle), as for `a`.
+fn also_param(s: &Session, p: &Value, cmd: &str, a: (u64, usize), b: (u64, usize)) -> Result<Vec<joints::LinkTerm>> {
+    let Some(list) = p.get("also").filter(|v| !v.is_null()) else { return Ok(Vec::new()) };
+    let items =
+        list.as_array().filter(|l| l.len() <= joints::MAX_JOINTS).ok_or_else(|| bad(cmd, "`also` must be a list of {joint, index?, ratio}"))?;
+    let mut seen = vec![a];
+    let mut out = Vec::new();
+    for item in items {
+        let joint = joint_id(s, item.get("joint"), cmd)?;
+        let index = num(item, "index").unwrap_or(0.0).max(0.0) as usize;
+        let dofs = s.doc.assembly.joints.iter().find(|j| j.id == joint).map(|j| j.kind.dofs().len()).unwrap_or(0);
+        if index >= dofs {
+            return Err(bad(cmd, "a joint in `also` needs a moving value at that index"));
+        }
+        if (joint, index) == b {
+            return Err(bad(cmd, "b can't follow itself"));
+        }
+        if seen.contains(&(joint, index)) {
+            return Err(bad(cmd, "each value b follows may be named once"));
+        }
+        seen.push((joint, index));
+        let ratio = num(item, "ratio").filter(|r| r.is_finite()).ok_or_else(|| bad(cmd, "each of `also` needs a number `ratio`"))?;
+        out.push(joints::LinkTerm { joint, index, ratio: ratio * ratio_scale(s, joint, index, b.0, b.1) });
+    }
+    Ok(out)
 }
 
 /// A coupling length: a number (mm), an expression (kept as typed, so it follows the
@@ -1018,7 +1075,7 @@ fn gear(s: &mut Session, p: &Value) -> Result<Value> {
         internal: bool_(p, "internal").unwrap_or(false),
         reverse: reverse(p),
     };
-    couple(s, p, cmd, MotionLink { a, ia, b, ib, ratio: 1.0, offset: 0.0, coupling: Some(c), lift: Vec::new() })
+    couple(s, p, cmd, MotionLink { a, ia, b, ib, ratio: 1.0, offset: 0.0, coupling: Some(c), lift: Vec::new(), also: Vec::new() })
 }
 
 fn rack_pinion(s: &mut Session, p: &Value) -> Result<Value> {
@@ -1026,7 +1083,7 @@ fn rack_pinion(s: &mut Session, p: &Value) -> Result<Value> {
     let (a, b) = joint_pair(s, p, cmd)?;
     let (ia, ib) = turn_and_travel(s, a, b, cmd)?;
     let c = Coupling::RackPinion { radius: size_param(s, p, "radius", cmd)?, reverse: reverse(p) };
-    couple(s, p, cmd, MotionLink { a, ia, b, ib, ratio: 1.0, offset: 0.0, coupling: Some(c), lift: Vec::new() })
+    couple(s, p, cmd, MotionLink { a, ia, b, ib, ratio: 1.0, offset: 0.0, coupling: Some(c), lift: Vec::new(), also: Vec::new() })
 }
 
 fn screw(s: &mut Session, p: &Value) -> Result<Value> {
@@ -1046,7 +1103,7 @@ fn screw(s: &mut Session, p: &Value) -> Result<Value> {
         }
     };
     let c = Coupling::Screw { pitch: size_param(s, p, "pitch", cmd)?, reverse: reverse(p) };
-    couple(s, p, cmd, MotionLink { a, ia, b, ib, ratio: 1.0, offset: 0.0, coupling: Some(c), lift: Vec::new() })
+    couple(s, p, cmd, MotionLink { a, ia, b, ib, ratio: 1.0, offset: 0.0, coupling: Some(c), lift: Vec::new(), also: Vec::new() })
 }
 
 fn cam_cmd(s: &mut Session, p: &Value) -> Result<Value> {
@@ -1075,7 +1132,7 @@ fn cam_cmd(s: &mut Session, p: &Value) -> Result<Value> {
         None => None,
     };
     let mut c = Cam { profile: cam_profile(s, p, cmd)?, follower, tip, reverse: false };
-    let probe = MotionLink { a, ia: 0, b, ib: 0, ratio: 1.0, offset: 0.0, coupling: None, lift: Vec::new() };
+    let probe = MotionLink { a, ia: 0, b, ib: 0, ratio: 1.0, offset: 0.0, coupling: None, lift: Vec::new(), also: Vec::new() };
     let st = s.model.state();
     c.reverse = cam::default_reverse(&s.doc, &st, &probe, &c).map_err(|e| bad(cmd, e.to_string()))? != bool_(p, "flip").unwrap_or(false);
     let offset = cam::follower_offset(&s.doc, &st, &probe, &c).map_err(|e| bad(cmd, e.to_string()))?;
@@ -1348,7 +1405,7 @@ fn delete(s: &mut Session, p: &Value) -> Result<Value> {
     let id = joint_id(s, p.get("joint"), cmd)?;
     let doc = s.doc_mut();
     doc.assembly.joints.retain(|j| j.id != id);
-    doc.assembly.links.retain(|l| l.a != id && l.b != id);
+    doc.assembly.links.retain(|l| !l.uses(id));
     let sol = resolve(s);
     let mut out = sol_json(&sol, p);
     out["deleted"] = json!(id);
@@ -1392,6 +1449,14 @@ fn link_json(s: &Session, st: &solidcraft_doc::ModelState, l: &MotionLink) -> Va
     let offset = if angle { l.offset.to_degrees() } else { l.offset };
     let ratio = l.ratio / ratio_scale(s, l.a, l.ia, l.b, l.ib);
     let mut v = json!({"a": l.a, "ia": l.ia, "b": l.b, "ib": l.ib, "ratio": ratio, "offset": offset, "unit": if angle { "deg" } else { "mm" }});
+    if !l.also.is_empty() {
+        let also: Vec<Value> = l
+            .also
+            .iter()
+            .map(|t| json!({"joint": t.joint, "index": t.index, "ratio": t.ratio / ratio_scale(s, t.joint, t.index, l.b, l.ib)}))
+            .collect();
+        v["also"] = json!(also);
+    }
     if let Some(c) = &l.coupling {
         v["coupling"] = json!(c);
         if let Some(Err(e)) = joints::coupling_values(&s.doc, st, l) {

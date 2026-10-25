@@ -146,8 +146,8 @@ fn graph(s: &Session, t: &MotionTrace) -> (BTreeSet<u64>, BTreeSet<u64>) {
             }
         }
         for l in a.links.iter().take(joints::MAX_JOINTS) {
-            if ids.contains(&l.a) || ids.contains(&l.b) {
-                ids.extend([l.a, l.b]);
+            if ids.iter().any(|id| l.uses(*id)) {
+                ids.extend(l.sources().map(|(j, _, _)| j).chain([l.b]));
             }
         }
         let parents: Vec<_> = s.doc.occurrences.iter().filter(|o| occurrences.contains(&o.id)).flat_map(|o| s.doc.first_path(o.parent)).collect();
@@ -198,7 +198,7 @@ fn inputs(s: &Session, t: &MotionTrace) -> Result<Value> {
         .assembly
         .links
         .iter()
-        .filter(|l| ids.contains(&l.a) || ids.contains(&l.b))
+        .filter(|l| ids.iter().any(|id| l.uses(*id)))
         .map(|l| {
             let mut l = l.clone();
             l.coupling = None;

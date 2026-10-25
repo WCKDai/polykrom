@@ -393,7 +393,8 @@ fn set_values(asm: &Assembly) -> BTreeSet<(u64, usize)> {
 }
 
 /// Value of joint `b` (index `ib`) = ratio · value of joint `a` (index `ia`) + offset, or for a
-/// cam, its `lift` table at a's value + offset.
+/// cam, its `lift` table at a's value + offset; plus, for each of `also`, its factor times its
+/// value (a CoreXY head's x is half of one motor's turn plus half of the other's, #107).
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct MotionLink {
     pub a: u64,
@@ -415,9 +416,32 @@ pub struct MotionLink {
     /// offset left out); empty for every other link.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub lift: Vec<f64>,
+    /// More values b follows, each with its own factor (in b's units per its own, radians for an
+    /// angle), added to a's: none for a link from one joint, and none on a coupling.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub also: Vec<LinkTerm>,
+}
+
+/// One more value a motion link's b follows: `ratio` times joint `joint`'s value `index`.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct LinkTerm {
+    pub joint: u64,
+    #[serde(default)]
+    pub index: usize,
+    pub ratio: f64,
 }
 
 impl MotionLink {
+    /// Every value b follows, with its factor: a's, then each of `also`.
+    pub fn sources(&self) -> impl Iterator<Item = (u64, usize, f64)> + '_ {
+        std::iter::once((self.a, self.ia, self.ratio)).chain(self.also.iter().map(|t| (t.joint, t.index, t.ratio)))
+    }
+
+    /// Whether joint `id` is one this link reads or sets.
+    pub fn uses(&self, id: u64) -> bool {
+        self.b == id || self.sources().any(|(j, _, _)| j == id)
+    }
+
     /// b's value for a's value `x` (before b's limits). A cam's table that is not whole (a
     /// hand-edited file) gives no value, so b keeps where it is; a table on any other link is
     /// not read.
@@ -924,7 +948,11 @@ fn apply_links(asm: &Assembly, vals: &mut Values) {
         let before = linked(vals);
         for l in &asm.links {
             let Some(src) = vals.get(&l.a).and_then(|q| q.get(l.ia)).copied() else { continue };
-            let mut next = l.follow(src);
+            // Every other value b follows, or none of them: one missing (a hand-edited design)
+            // leaves b where it is.
+            let more: Option<f64> = l.also.iter().map(|t| vals.get(&t.joint).and_then(|q| q.get(t.index)).map(|v| t.ratio * v)).sum();
+            let Some(more) = more else { continue };
+            let mut next = l.follow(src) + more;
             // A hand-edited table (or source) that gives no number leaves b where it is.
             if !next.is_finite() {
                 continue;
@@ -1146,8 +1174,13 @@ fn link_chains(asm: &Assembly, tree: &Tree, around: &BTreeSet<u64>, linked: &BTr
         around.iter().filter_map(|id| tree.joints.get(id)).flat_map(|j| (0..j.kind.dofs().len()).map(|i| (j.id, i))).collect();
     let mut seen = frontier.clone();
     for _ in 0..MAX_LINK_PASSES {
-        let next: BTreeSet<(u64, usize)> =
-            asm.links.iter().filter(|l| frontier.contains(&(l.b, l.ib))).map(|l| (l.a, l.ia)).filter(|v| !seen.contains(v)).collect();
+        let next: BTreeSet<(u64, usize)> = asm
+            .links
+            .iter()
+            .filter(|l| frontier.contains(&(l.b, l.ib)))
+            .flat_map(|l| l.sources().map(|(j, i, _)| (j, i)))
+            .filter(|v| !seen.contains(v))
+            .collect();
         if next.is_empty() {
             break;
         }
@@ -1169,7 +1202,7 @@ fn link_chains(asm: &Assembly, tree: &Tree, around: &BTreeSet<u64>, linked: &BTr
 fn link_sources(asm: &Assembly) -> BTreeMap<(u64, usize), BTreeSet<(u64, usize)>> {
     let mut into: BTreeMap<(u64, usize), Vec<(u64, usize)>> = BTreeMap::new();
     for l in &asm.links {
-        into.entry((l.b, l.ib)).or_default().push((l.a, l.ia));
+        into.entry((l.b, l.ib)).or_default().extend(l.sources().map(|(j, i, _)| (j, i)));
     }
     let mut sources = BTreeMap::new();
     if into.is_empty() {
@@ -1444,7 +1477,8 @@ fn loop_dof(tree: &Tree, closing: &[u64], asm: &Assembly, vals: &Values, dof: &m
     // motion link carries any of these values into.
     let mut relevant: BTreeSet<u64> = groups.iter().flat_map(|(_, a, t)| a.iter().copied().chain(t.iter().map(|(j, _)| *j))).collect();
     for _ in 0..MAX_LINK_PASSES {
-        let more: Vec<u64> = asm.links.iter().filter(|l| relevant.contains(&l.a) && !relevant.contains(&l.b)).map(|l| l.b).collect();
+        let more: Vec<u64> =
+            asm.links.iter().filter(|l| l.sources().any(|(j, _, _)| relevant.contains(&j)) && !relevant.contains(&l.b)).map(|l| l.b).collect();
         if more.is_empty() {
             break;
         }
@@ -2229,8 +2263,10 @@ mod tests {
                 exprs: Default::default(),
             })
             .collect();
-        let links =
-            (1..n).rev().map(|a| MotionLink { a, ia: 0, b: a + 1, ib: 0, ratio: 2.0, offset: 0.0, coupling: None, lift: Vec::new() }).collect();
+        let links = (1..n)
+            .rev()
+            .map(|a| MotionLink { a, ia: 0, b: a + 1, ib: 0, ratio: 2.0, offset: 0.0, coupling: None, lift: Vec::new(), also: Vec::new() })
+            .collect();
         Assembly { joints, links, ..Assembly::default() }
     }
 
@@ -2245,7 +2281,8 @@ mod tests {
             assert_eq!(sources.get(&(b, 0)), Some(&BTreeSet::from([(1, 0)])), "J{b}: {sources:?}");
         }
         assert!(!sources.contains_key(&(1, 0)));
-        let link = |a: u64, ia: usize, b: u64| MotionLink { a, ia, b, ib: 0, ratio: 1.0, offset: 0.0, coupling: None, lift: Vec::new() };
+        let link =
+            |a: u64, ia: usize, b: u64| MotionLink { a, ia, b, ib: 0, ratio: 1.0, offset: 0.0, coupling: None, lift: Vec::new(), also: Vec::new() };
         asm.links.push(link(5, 0, 1));
         assert!(link_sources(&asm).values().all(BTreeSet::is_empty), "{:?}", link_sources(&asm));
         let mut asm = chain(2, 0.0);
@@ -2302,7 +2339,7 @@ mod tests {
         }
         let st = ModelState::default();
         let ratio = |a: u64, b: u64, c: Coupling| {
-            let l = MotionLink { a, ia: 0, b, ib: 0, ratio: 0.0, offset: 0.0, coupling: Some(c), lift: Vec::new() };
+            let l = MotionLink { a, ia: 0, b, ib: 0, ratio: 0.0, offset: 0.0, coupling: Some(c), lift: Vec::new(), also: Vec::new() };
             coupling_values(&doc, &st, &l).map(|r| r.map(|(ratio, _)| ratio).map_err(|e| e.to_string()))
         };
         let len = Size::Length;

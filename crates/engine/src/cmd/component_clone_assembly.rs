@@ -315,7 +315,7 @@ pub(super) fn clone_assembly(
         }
     }
     for old in &source.assembly.links {
-        if !touched_joints.contains(&old.a) && !touched_joints.contains(&old.b) {
+        if !touched_joints.iter().any(|j| old.uses(*j)) {
             continue;
         }
         let mut item = old.clone();
@@ -340,8 +340,10 @@ pub(super) fn clone_assembly(
             };
             sizes && tip && profile
         });
+        // Every value it follows must be on the copy too.
+        let also = item.also.iter_mut().all(|t| joints.get(&t.joint).map(|new| t.joint = *new).is_some());
         match (joints.get(&old.a), joints.get(&old.b)) {
-            (Some(aa), Some(bb)) if faces => {
+            (Some(aa), Some(bb)) if faces && also => {
                 item.a = *aa;
                 item.b = *bb;
                 a.links.push(item);
