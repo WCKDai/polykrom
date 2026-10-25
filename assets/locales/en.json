@@ -851,6 +851,7 @@
   "cmd.sheet_refold": "Refold",
   "cmd.sheet_rules": "List Sheet Metal Rules",
   "cmd.sheet_unfold": "Unfold",
+  "cmd.sim_mujoco": "Simulate in MuJoCo",
   "cmd.sketch_arc_center_point": "Center Point Arc",
   "cmd.sketch_arc_tangent": "Tangent Arc",
   "cmd.sketch_arc_three_point": "3-Point Arc",

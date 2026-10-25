@@ -9,6 +9,7 @@ position actuator on every moving joint, a floor and a light.
 - **Needs** MuJoCo 3.1.6 or later (the actuators' `dampratio`).
 - **MCP:** the `export` tool with `format: "mjcf"`
 - **CLI:** `polykrom-cli run script.json` with that `file.export` command
+- **Simulate:** `sim.mujoco` exports the model and runs it in MuJoCo ([mujoco.md](mujoco.md))
 
 MJCF always exports the whole assembly, so `bodies` is refused. Next to the model the export
 writes one binary STL per component in metres, named as for URDF (`robot-<component>.stl`).
