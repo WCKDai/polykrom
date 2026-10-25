@@ -1079,6 +1079,9 @@ pub struct FeatureResult {
     /// [`Model::adopt`] does before the model is used.
     #[serde(skip)]
     unkept: bool,
+    /// Its own inputs, as the evaluation cache keys them (0: not known), for rebasing it (#169).
+    #[serde(skip)]
+    local: u64,
     #[serde(skip)]
     pub state: Arc<ModelState>,
 }
@@ -1094,6 +1097,11 @@ pub struct Model {
     /// Features recomputed by every `evaluate` of this model (and of the model it was copied
     /// from) so far.
     pub recomputed: usize,
+    /// Features whose last result the last `evaluate` rebased onto the changed model before them
+    /// instead of recomputing them (#169, see `eval_rebase.rs`).
+    pub last_rebased: usize,
+    /// Features rebased by every `evaluate` of this model (and of the model it was copied from).
+    pub rebased: usize,
     /// Features whose result the last `evaluate` took from the cache instead of recomputing: the
     /// same feature on the same inputs was evaluated before (an edit set back, undo, redo, a
     /// configuration row). Their geometry did change since the previous evaluation.
@@ -1320,7 +1328,7 @@ fn chain_fingerprint(
 }
 
 /// Document-level inputs any feature may read: construction planes (resolved by name), sheet
-/// metal and plastic rules (and the parameters they use), components and body placement.
+/// metal and plastic rules (and the parameters they use), the component tree and body placement.
 fn context_digest(doc: &Document, vals: &BTreeMap<String, Value>) -> u64 {
     let mut h = std::collections::hash_map::DefaultHasher::new();
     for f in doc.features.iter().filter(|f| {
@@ -1331,7 +1339,11 @@ fn context_digest(doc: &Document, vals: &BTreeMap<String, Value>) -> u64 {
     doc.units.hash(&mut h);
     serde_json::to_string(&doc.sheet).unwrap_or_default().hash(&mut h);
     serde_json::to_string(&doc.plastic).unwrap_or_default().hash(&mut h);
-    serde_json::to_string(&doc.components).unwrap_or_default().hash(&mut h);
+    // Not a component's part properties and metadata, which the bill of materials reads and no
+    // feature does: resizing a library part sets them (#169).
+    for c in &doc.components {
+        (c.id, &c.name, c.parent).hash(&mut h);
+    }
     serde_json::to_string(&doc.body_components).unwrap_or_default().hash(&mut h);
     for e in doc.sheet.rules.iter().flat_map(|r| r.fields().map(|(_, e, _)| e)) {
         for n in expr::references(e) {
@@ -1840,9 +1852,13 @@ impl Model {
         let mut restored = 0;
         let marker = doc.marker.unwrap_or(usize::MAX);
         let ctx = context_digest(doc, &vals);
+        // The last results may be rebased when they were evaluated in this context (#169).
+        let rebasing = !self.no_cache && self.context == ctx && !self.is_stale() && !model_cache::has_legacy_names(doc);
+        let mut rebases = 0;
         self.context = ctx;
         self.step_digests = StepDigests::of(doc, &self.step_digests);
         let primed = self.primed.as_ref().filter(|(context, _)| !self.no_cache && *context == ctx).map(|(_, results)| results.clone());
+        let (previous, shadow) = (rebasing.then(|| rebase::Previous::of(&self.results)), rebase::shadow());
         // Each feature's component, for `Document::legacy_body_component` on every body after
         // every feature without searching the timeline for each (the first feature with an id).
         let mut feature_component: std::collections::HashMap<u64, u64> = std::collections::HashMap::with_capacity(doc.features.len());
@@ -1886,6 +1902,7 @@ impl Model {
                     stale: false,
                     fingerprint: fp,
                     unkept: false,
+                    local: 0,
                     state: state.clone(),
                 });
                 continue;
@@ -1896,7 +1913,8 @@ impl Model {
                 Arc::make_mut(&mut state).reserved_body_names.clone_from(&reserved);
             }
             // The same feature on the same inputs: its earlier result.
-            let key = cache_key(f, fp, fingerprint(0, f, &vals, false, &self.step_digests) ^ placement_digest(doc, f, Some(&state)), ctx, &state);
+            let local = fingerprint(0, f, &vals, false, &self.step_digests) ^ placement_digest(doc, f, Some(&state));
+            let key = cache_key(f, fp, local, ctx, &state);
             let kept = self.kept.0.as_ref().filter(|_| !self.no_cache);
             if !self.no_cache
                 && let Some(c) = self.cache.lock().ok().and_then(|mut m| m.get(key)).or_else(|| kept.and_then(|k| k.get(key)))
@@ -1921,6 +1939,7 @@ impl Model {
                     stale: false,
                     fingerprint: fp,
                     unkept: false,
+                    local,
                     state: state.clone(),
                 });
                 continue;
@@ -1935,6 +1954,27 @@ impl Model {
                 out.push(FeatureResult { state: state.clone(), unkept: false, ..r.clone() });
                 continue;
             }
+            // Its last result, when it only needs the change it made applied to the model as it
+            // is now (#169). In shadow mode the feature is evaluated as well, and the two compared.
+            let rebased = previous
+                .as_ref()
+                .filter(|_| param_names(f).iter().all(|n| !self.param_errors.contains_key(n)))
+                .and_then(|p| p.rebase(f, local, &state));
+            let rebased = match rebased {
+                Some((next, old)) if !shadow => {
+                    rebases += 1;
+                    state = Arc::new(ModelState { reserved_body_names: reserved.clone(), ..next });
+                    watched.offer(i + 1, doc, &state);
+                    let (warning, boolean_diagnostics) = (old.warning.clone(), old.boolean_diagnostics.clone());
+                    self.store(
+                        key,
+                        &CachedEval { error: None, warning, boolean_diagnostics, ms: old.ms, bytes: state.retained_bytes(), state: state.clone() },
+                    );
+                    out.push(FeatureResult { name: f.name.clone(), fingerprint: fp, local, state: state.clone(), ..old.clone() });
+                    continue;
+                }
+                shadowed => shadowed,
+            };
             recomputed += 1;
             let t0 = now();
             let mut next = (*state).clone();
@@ -2055,22 +2095,20 @@ impl Model {
                 }
                 Err(e) => Some(e.to_string().trim_start_matches("the operation failed: ").to_string()),
             };
-            if !self.no_cache {
-                let e = CachedEval {
-                    error: error.clone(),
-                    warning: warning.clone(),
-                    boolean_diagnostics: boolean_diagnostics.clone(),
-                    ms,
-                    bytes: state.retained_bytes(),
-                    state: state.clone(),
-                };
-                if let Some(k) = &self.kept.0 {
-                    k.put(key, &e);
-                }
-                if let Ok(mut m) = self.cache.lock() {
-                    m.put(key, e);
-                }
+            if let Some((next, old)) = rebased {
+                rebase::shadow_check(f, &next, old, &state, error.as_deref(), warning.as_deref(), &boolean_diagnostics);
+                rebases += 1;
+                state = Arc::new(ModelState { reserved_body_names: reserved.clone(), ..next });
             }
+            let e = CachedEval {
+                error: error.clone(),
+                warning: warning.clone(),
+                boolean_diagnostics: boolean_diagnostics.clone(),
+                ms,
+                bytes: state.retained_bytes(),
+                state: state.clone(),
+            };
+            self.store(key, &e);
             reuse &= error.is_none();
             out.push(FeatureResult {
                 id: f.id,
@@ -2083,13 +2121,29 @@ impl Model {
                 stale: false,
                 fingerprint: fp,
                 unkept: false,
+                local,
                 state: state.clone(),
             });
         }
         self.results = out;
         self.last_recomputed = recomputed;
         self.recomputed += recomputed;
+        self.last_rebased = rebases;
+        self.rebased += rebases;
         self.last_restored = restored;
+    }
+
+    /// Keep a result in the cache, and where this model keeps its results.
+    fn store(&self, key: u64, e: &CachedEval) {
+        if self.no_cache {
+            return;
+        }
+        if let Some(k) = &self.kept.0 {
+            k.put(key, e);
+        }
+        if let Ok(mut m) = self.cache.lock() {
+            m.put(key, e.clone());
+        }
     }
 }
 
@@ -5847,6 +5901,8 @@ fn replay(
 mod model_cache;
 #[path = "eval_more.rs"]
 mod more;
+#[path = "eval_rebase.rs"]
+mod rebase;
 pub use model_cache::SavedModel;
 #[path = "eval_frame.rs"]
 pub(crate) mod frame_member;

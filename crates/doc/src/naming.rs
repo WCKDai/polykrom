@@ -96,6 +96,16 @@ impl NameCell {
             ..NameCell::default()
         }
     }
+    /// The same names (shared) at `depth` in the chain of features naming the body: a result
+    /// rebased onto a model whose chain is deeper or shallower (#169), named on the same side of
+    /// [`MAX_DEPTH`].
+    pub(crate) fn at_depth(&self, depth: usize) -> Self {
+        let origin = self.origin.as_ref().map(|o| {
+            let (feature, before, mats, sheets) = (o.feature.clone(), o.before.clone(), o.mats.clone(), o.sheets.clone());
+            Arc::new(NamingOrigin { feature, before, depth, mats, sheets })
+        });
+        NameCell { origin, saved_depth: self.saved_depth.map(|_| depth), ..self.clone() }
+    }
     fn shared(names: Arc<Names>) -> Self {
         let cell = OnceLock::new();
         let _ = cell.set(names);
@@ -107,7 +117,7 @@ pub use crate::name_lookup::{EdgeHit, FaceHit, LEGACY_MARK, face_has_name, faces
 pub use crate::piece_names::parent_piece;
 
 /// Deeper chains than this are named by position only (bounded work and stack).
-const MAX_DEPTH: usize = 400;
+pub(crate) const MAX_DEPTH: usize = 400;
 
 /// Up to this many sample points per face.
 const SAMPLES: usize = 9;

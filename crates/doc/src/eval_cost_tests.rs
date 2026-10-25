@@ -354,3 +354,113 @@ fn a_tool_cutting_another_part_cuts_again_when_that_part_moves() {
     assert_eq!(model.last_recomputed, 0);
     assert!((volume(&model, &body) - (400.0 - 16.0)).abs() < 1e-6, "{}", volume(&model, &body));
 }
+
+/// A closed rectangle from `a` to `b`.
+fn rect_sketch(plane: PlaneRef, a: Vec2, b: Vec2) -> FeatureKind {
+    let mut sk = Sketch::new();
+    let pts: Vec<usize> = [a, Vec2::new(b.x, a.y), b, Vec2::new(a.x, b.y)].iter().map(|p| sk.add_point(*p, None).unwrap()).collect();
+    for k in 0..4 {
+        sk.add_line_pts(pts[k], pts[(k + 1) % 4], None).unwrap();
+    }
+    FeatureKind::Sketch { plane, sketch: sk }
+}
+
+fn extrude(sketch: u64, distance: &str, direction: Direction, operation: Operation) -> FeatureKind {
+    let extent = Extent {
+        convention: ExtrudeConvention::LegacyPerSide,
+        distance: distance.into(),
+        direction,
+        distance2: None,
+        start_offset: None,
+        through_all: false,
+        taper: None,
+        to: None,
+        to_offset: None,
+        from: None,
+    };
+    FeatureKind::Extrude { thin: None, sketch: SketchId(sketch), profiles: ProfileSel::All, extent, operation, targets: vec![] }
+}
+
+/// Part `i` in its own component, as a library part is built: a plate from its sketch, a bore cut
+/// by a box naming the plate, a pin, a socket cut by an extrude naming no target (which shapes its
+/// tool around every body), then a split. The id of the plate's extrude.
+fn library_part(doc: &mut Document, i: usize) -> u64 {
+    let comp = doc.add_component(Some(&format!("Part {i}")), 0).unwrap();
+    place(doc, comp, rigid(Vec3::new(40.0 * i as f64, 0.0, 0.0), Vec3::ZERO, Vec3::Z, 0.0));
+    let plate = format!("Plate {i}");
+    let mut add = |kind: FeatureKind, names: &[String], participants: &[String]| {
+        let id = doc.add_feature(kind, None).unwrap();
+        let f = doc.feature_mut(id).unwrap();
+        (f.component, f.body_names, f.participants) = (comp, names.to_vec(), participants.to_vec());
+        id
+    };
+    let xy = || PlaneRef::Origin { name: "XY".into() };
+    let sketch = add(rect_sketch(xy(), Vec2::ZERO, Vec2::new(20.0, 10.0)), &[], &[]);
+    let body = add(extrude(sketch, "4", Direction::Positive, Operation::NewBody), std::slice::from_ref(&plate), &[]);
+    let bore = |x: f64, op| FeatureKind::Box {
+        corner: point_expr(Vec3::new(x, 4.0, -1.0)),
+        length: "2".into(),
+        width: "2".into(),
+        height: "6".into(),
+        operation: op,
+    };
+    add(bore(4.0, Operation::Cut), &[], std::slice::from_ref(&plate));
+    add(bore(30.0, Operation::NewBody), &[format!("Pin {i}")], &[]);
+    let below = PlaneRef::Offset { base: Box::new(xy()), distance: "-1".into() };
+    let socket = add(rect_sketch(below, Vec2::new(2.0, 2.0), Vec2::new(4.0, 4.0)), &[], &[]);
+    add(extrude(socket, "7", Direction::Positive, Operation::Cut), &[], &[]);
+    let split = Plane::new(Vec3::new(10.0, 0.0, 0.0), Vec3::Y, Vec3::Z).unwrap();
+    let split = FeatureKind::Split { body: BodyName(plate.clone()), plane: PlaneRef::Custom { plane: split }, tool: None, sketch: None, line: None };
+    add(split, &[format!("{plate} half")], &[]);
+    body
+}
+
+/// Features the last evaluation of `model` evaluated (in shadow mode it evaluates the rebased
+/// ones too).
+fn evaluated(model: &Model) -> usize {
+    model.last_recomputed - if super::rebase::shadow() { model.last_rebased } else { 0 }
+}
+
+/// Every feature's result in `model` is what evaluating `doc` from scratch gives.
+fn assert_full_evaluation(doc: &Document, model: &Model) {
+    let mut full = Model { no_cache: true, ..Model::new() };
+    full.evaluate(doc);
+    assert_eq!(model.results.len(), full.results.len());
+    for (a, b) in model.results.iter().zip(&full.results) {
+        assert_eq!((a.id, &a.error, &a.warning), (b.id, &b.error, &b.warning));
+        assert_eq!(super::rebase::differs(&a.state, &b.state), None, "after {}", a.name);
+    }
+}
+
+#[test]
+fn an_edit_in_one_library_part_rebases_the_new_bodies_after_it() {
+    let mut doc = Document::new("library parts");
+    let unused = doc.add_feature(line_sketch(PlaneRef::Origin { name: "XZ".into() }, Vec2::new(5.0, 5.0)), None).unwrap();
+    let parts = 4;
+    let first = library_part(&mut doc, 0);
+    for i in 1..parts {
+        library_part(&mut doc, i);
+    }
+    let mut model = Model::new();
+    model.evaluate(&doc);
+    assert!(model.results.iter().all(|r| r.error.is_none()), "{:?}", model.results.iter().find(|r| r.error.is_some()));
+    assert_eq!(model.state().bodies.len(), parts * 3);
+
+    // The first part's plate made thicker: that plate is evaluated again, and every feature that
+    // reads a body (each part's cuts and split); the sketches, plates and pins are rebased.
+    let FeatureKind::Extrude { extent, .. } = &mut doc.feature_mut(first).unwrap().kind else { panic!("extrude") };
+    extent.distance = "5".into();
+    model.evaluate(&doc);
+    assert_eq!(evaluated(&model), 1 + 3 * parts, "rebased {}", model.last_rebased);
+    // The two features before the edit are taken as they were.
+    assert_eq!(model.last_rebased, doc.features.len() - 2 - evaluated(&model));
+    assert_full_evaluation(&doc, &model);
+    assert!((volume(&model, "Pin 0") - 24.0).abs() < 1e-9);
+
+    // An edit before every part: the same.
+    let Ok(sketch) = doc.sketch_mut(unused) else { panic!("sketch") };
+    sketch.points[1].pos = Vec2::new(6.0, 5.0);
+    model.evaluate(&doc);
+    assert_eq!((evaluated(&model), model.last_rebased), (1 + 3 * parts, doc.features.len() - 1 - 3 * parts));
+    assert_full_evaluation(&doc, &model);
+}
