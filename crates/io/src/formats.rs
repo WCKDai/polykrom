@@ -145,6 +145,13 @@ const URDF_OPTIONS: &[OptionSpec] = &[
     OptionSpec { param: "velocity", label: "Joint velocity", kind: OptionKind::Number { default: 10.0, min: 0.0, max: 1e9, unit: "" } },
 ];
 
+const MJCF_OPTIONS: &[OptionSpec] = &[
+    OptionSpec { param: "floating", label: "Free base (falls onto the floor)", kind: OptionKind::Bool { default: false } },
+    OptionSpec { param: "scene", label: "Floor and light", kind: OptionKind::Bool { default: true } },
+    OptionSpec { param: "kp", label: "Actuator gain", kind: OptionKind::Number { default: 1000.0, min: 0.0, max: 1e9, unit: "" } },
+    OptionSpec { param: "effort", label: "Joint effort", kind: OptionKind::Number { default: 1000.0, min: 0.0, max: 1e9, unit: "" } },
+];
+
 const VIEW_DXF_OPTIONS: &[OptionSpec] = &[
     OptionSpec {
         param: "hidden",
@@ -262,6 +269,14 @@ pub static FORMATS: &[FormatSpec] = &[
         role: Role::Artifact,
         import: None,
         export: Some(ExportSpec { command: "file.export", format: None, options: URDF_OPTIONS, scope: ExportScope::Design, lossless: false }),
+    },
+    FormatSpec {
+        id: "mjcf",
+        label: "MuJoCo MJCF robot",
+        extensions: &["xml", "mjcf"],
+        role: Role::Artifact,
+        import: None,
+        export: Some(ExportSpec { command: "file.export", format: Some("mjcf"), options: MJCF_OPTIONS, scope: ExportScope::Design, lossless: false }),
     },
     FormatSpec {
         id: "design-json",

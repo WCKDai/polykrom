@@ -1,6 +1,6 @@
 //! File formats. Designs use JSON or versioned containers (`.solidcraft`); the authoritative
 //! document rebuilds on load and optional display caches remain provisional. Bodies export
-//! as STL (binary or ASCII), OBJ, STEP and 3MF, and assemblies as URDF ([`urdf()`]); STEP, IGES,
+//! as STL (binary or ASCII), OBJ, STEP and 3MF, and assemblies as URDF ([`urdf()`]) and MJCF ([`mjcf()`]); STEP, IGES,
 //! FreeCAD and Rhino files import as a base feature (see [`step_import_feature`]), 3MF and
 //! STL files as mesh bodies (see [`mesh_import_feature`]).
 #![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::unimplemented, clippy::todo, clippy::unreachable)]
@@ -18,6 +18,7 @@ pub use design::{
     write_design_container_with_compression, write_design_container_with_preview, write_design_container_with_thumbnail,
 };
 mod legacy_dir;
+pub mod mjcf;
 #[cfg(test)]
 mod mutate;
 mod native_cad;
@@ -38,6 +39,7 @@ pub use svg::read_svg;
 mod gltf_in;
 pub use gltf_in::{GltfImport, Loader, MAX_GLTF_BYTES, MeshPlan, PlanPlace, glb_container, is_gltf_path, read_gltf};
 mod obj;
+pub use mjcf::{MjcfOptions, MjcfPackage, mjcf};
 pub use obj::read_obj;
 pub use threemf::{MAX_3MF_BYTES, MeshObject, model_xml, model_xml_with, read_3mf, weld, write_3mf, write_3mf_with};
 pub use urdf::{UrdfOptions, UrdfPackage, urdf};
@@ -68,7 +70,7 @@ pub const MAX_DESIGN_BYTES: usize = 256 << 20;
 
 #[derive(Debug, thiserror::Error)]
 pub enum IoError {
-    #[error("unsupported format `{0}` (use stl, obj, step, 3mf, urdf or polykrom)")]
+    #[error("unsupported format `{0}` (use stl, obj, step, 3mf, urdf, mjcf or polykrom)")]
     Format(String),
     #[error("nothing to export: the design has no bodies")]
     Empty,
@@ -333,6 +335,10 @@ pub enum Format {
     /// A robot description of the assembly with its mesh files ([`urdf()`]); written by the
     /// engine, since it is several files.
     Urdf,
+    /// A MuJoCo model of the assembly with its mesh files ([`mjcf()`]); written by the engine,
+    /// since it is several files. Chosen by name (`mjcf`) or a `.mjcf` path; `.xml` alone is not
+    /// enough.
+    Mjcf,
 }
 
 impl Format {
@@ -348,6 +354,7 @@ impl Format {
             "3mf" => Format::ThreeMf,
             "3mf-tagged" => Format::ThreeMfTagged,
             "urdf" => Format::Urdf,
+            "mjcf" => Format::Mjcf,
             "polykrom" | "solidcraft" | "solvecraft" | "json" => Format::Design,
             _ => return Err(IoError::Format(ext)),
         })
@@ -500,6 +507,7 @@ pub fn export_with_metadata(state: &ModelState, bodies: &[String], format: Forma
         }
         Format::Design => return Err(IoError::Format("solidcraft (save the document instead)".into())),
         Format::Urdf => return Err(IoError::Format("urdf (an assembly package; use file.export)".into())),
+        Format::Mjcf => return Err(IoError::Format("mjcf (an assembly package; use file.export)".into())),
     })
 }
 

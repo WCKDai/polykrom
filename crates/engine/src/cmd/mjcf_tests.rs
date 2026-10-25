@@ -1,0 +1,167 @@
+//! MJCF export (#27, docs/mjcf.md): bodies, hinges with their ranges, masses, actuators and the
+//! free root. The models load and hold their pose in MuJoCo (the PR's evidence); these tests
+//! check what the file says.
+
+use std::path::PathBuf;
+
+use serde_json::{Value, json};
+
+use crate::Session;
+
+fn run(s: &mut Session, id: &str, p: Value) -> Value {
+    match s.execute(id, &p) {
+        Ok(v) => v,
+        Err(e) => panic!("{id} {p}: {e}"),
+    }
+}
+
+fn temp(tag: &str) -> PathBuf {
+    let d = solidcraft_io::vfs::temp_dir().join(format!("solidcraft-mjcf-{tag}-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&d);
+    let _ = std::fs::create_dir_all(&d);
+    d
+}
+
+/// A two-link arm in aluminium: a grounded `Base` and an `Arm` on the revolute joint `Elbow`
+/// (±60°) about x, each a 40 x 30 x 3 plate (3600 mm³) with an r4 x 40 knuckle (640π mm³) as a
+/// second body, driven to 30° so the arm hangs out under gravity.
+fn arm() -> Session {
+    let mut s = Session::default();
+    for name in ["Base", "Arm"] {
+        run(&mut s, "component.activate", json!({"component": "root"}));
+        run(&mut s, "component.create", json!({"name": name}));
+        run(&mut s, "solid.box", json!({"length": 40, "width": 30, "height": 3, "corner": [0, 0, 0]}));
+        run(&mut s, "solid.cylinder", json!({"base": [0, 33, 4], "axis": [1, 0, 0], "radius": 4, "height": 40, "operation": "new"}));
+    }
+    let bodies: Vec<String> = s.model.state().bodies.iter().map(|b| b.name.clone()).collect();
+    run(&mut s, "material.assign", json!({"bodies": bodies, "material": "Aluminum"}));
+    let base = s.doc.find_component("Base").and_then(|c| s.doc.occurrence_of(c)).map(|o| o.id).unwrap_or(0);
+    run(&mut s, "occurrence.ground", json!({"occurrence": base, "grounded": true}));
+    run(
+        &mut s,
+        "joint.create",
+        json!({"type": "revolute", "a": {"occurrence": "Base", "circle": [1, 37, 4]}, "b": {"occurrence": "Arm", "circle": [1, 37, 4]},
+               "flip": true, "name": "Elbow", "limits": [[-60, 60]]}),
+    );
+    run(&mut s, "joint.drive", json!({"joint": "Elbow", "value": 30}));
+    s
+}
+
+/// Export to `dir/name` and read the XML back.
+fn export(s: &mut Session, dir: &std::path::Path, name: &str, extra: Value) -> (Value, String) {
+    let path = dir.join(name);
+    let mut p = json!({"path": path.to_string_lossy(), "format": "mjcf"});
+    if let (Some(p), Some(extra)) = (p.as_object_mut(), extra.as_object()) {
+        p.extend(extra.clone());
+    }
+    let r = run(s, "file.export", p);
+    let xml = std::fs::read_to_string(&path).unwrap_or_default();
+    (r, xml)
+}
+
+/// The `mass` of the body named `body`'s inertial.
+fn mass(xml: &str, body: &str) -> f64 {
+    let at = xml.find(&format!("<body name=\"{body}\"")).unwrap_or_else(|| panic!("no body {body} in\n{xml}"));
+    let rest = &xml[at..];
+    let m = rest.find("mass=\"").map(|i| &rest[i + 6..]).unwrap_or("");
+    m.split('"').next().and_then(|v| v.parse().ok()).unwrap_or(f64::NAN)
+}
+
+#[test]
+fn mjcf_of_a_two_link_arm() {
+    let mut s = arm();
+    let d = temp("arm");
+    let (r, xml) = export(&mut s, &d, "arm.xml", json!({}));
+    assert_eq!(r["format"], "Mjcf", "{r}");
+    let mut files: Vec<String> = std::fs::read_dir(&d).unwrap().map(|e| e.unwrap().file_name().to_string_lossy().to_string()).collect();
+    files.sort();
+    assert_eq!(files, ["arm-Arm.stl", "arm-Base.stl", "arm.xml"]);
+    super::urdf_tests::well_formed(&xml).unwrap_or_else(|e| panic!("{e}\n{xml}"));
+    let (lo, hi, q) = ((-60f64).to_radians(), 60f64.to_radians(), 30f64.to_radians());
+    for want in [
+        r#"<mujoco model="arm">"#.to_string(),
+        r#"<compiler angle="radian" meshdir="." balanceinertia="true"/>"#.into(),
+        r#"<mesh name="arm-Arm" file="arm-Arm.stl"/>"#.into(),
+        r#"<body name="base_link" pos="0 0 0" quat="1 0 0 0">"#.into(),
+        r#"<body name="Base" "#.into(),
+        r#"<body name="Arm" "#.into(),
+        format!(r#"<joint name="Elbow" type="hinge" axis="0 0 1" ref="{q}" range="{lo} {hi}" limited="true"/>"#),
+        r#"<geom name="Arm" type="mesh" mesh="arm-Arm" "#.into(),
+        format!(
+            r#"<position name="Elbow" joint="Elbow" kp="1000" dampratio="1" ctrlrange="{lo} {hi}" ctrllimited="true" forcerange="-1000 1000" forcelimited="true"/>"#
+        ),
+        format!(r#"<key name="design" qpos="{q}" ctrl="{q}"/>"#),
+        r#"<geom name="floor" type="plane""#.into(),
+        r#"<joint damping="0.1" armature="0.01"/>"#.into(),
+    ] {
+        assert!(xml.contains(&want), "{want} missing from\n{xml}");
+    }
+    // The arm hangs in the base, and the base in base_link: welded, with no joint of its own.
+    let (base, arm, elbow) = (xml.find(r#"<body name="Base""#), xml.find(r#"<body name="Arm""#), xml.find(r#"<joint name="Elbow""#));
+    assert!(base < arm && arm < elbow, "{xml}");
+    assert!(!xml.contains("freejoint"), "grounded: fixed in the world\n{xml}");
+    // MuJoCo would let the arm collide with a base welded to the world: the pair is excluded.
+    assert!(
+        xml.contains(
+            r#"<contact>
+    <exclude body1="Base" body2="Arm"/>
+  </contact>"#
+        ),
+        "{xml}"
+    );
+    // Mass is density x volume: 2.7 g/cm³ over 3600 + 640π mm³. Tolerance 0.5%: the knuckle is
+    // a tessellated cylinder, which loses under 0.3% of its 2011 mm³.
+    let want = 2.7e-6 * (3600.0 + 640.0 * std::f64::consts::PI);
+    for body in ["Base", "Arm"] {
+        let m = mass(&xml, body);
+        assert!((m - want).abs() < 5e-3 * want, "{body}: {m} kg, expected {want}");
+    }
+    let warnings = r["warnings"].as_array().cloned().unwrap_or_default();
+    assert!(warnings.iter().any(|w| w.as_str().is_some_and(|w| w.contains("no rated actuator drives Elbow"))), "{r}");
+    let _ = std::fs::remove_dir_all(&d);
+}
+
+/// A rated library actuator at the joint limits its actuator's force; `effort` limits the rest.
+#[test]
+fn mjcf_actuator_force_comes_from_ratings() {
+    let mut s = arm();
+    let d = temp("ratings");
+    let (_, xml) = export(&mut s, &d, "a.xml", json!({"effort": 4.5, "kp": 7}));
+    assert!(xml.contains(r#"kp="7" dampratio="1""#) && xml.contains(r#"forcerange="-4.5 4.5""#), "{xml}");
+    let ratings = json!({"kind": "servo", "stall_torque_nm": 2.94, "speed_rpm": 50});
+    let values = serde_json::Map::from_iter([(crate::cmd::parts::RATINGS_KEY.to_string(), ratings)]);
+    run(&mut s, "component.metadata.set", json!({"component": "Arm", "values": values}));
+    let (r, xml) = export(&mut s, &d, "a.xml", json!({"effort": 4.5}));
+    assert!(xml.contains(r#"forcerange="-2.94 2.94""#), "{xml}");
+    assert!(r["warnings"].as_array().is_some_and(|w| w.iter().all(|w| !w.as_str().unwrap_or("").contains("rated"))), "{r}");
+    for bad in [json!({"kp": 0}), json!({"floating": "yes"}), json!({"bodies": ["Body1"]})] {
+        let mut p = json!({"path": d.join("b.xml").to_string_lossy(), "format": "mjcf"});
+        if let (Some(p), Some(bad)) = (p.as_object_mut(), bad.as_object()) {
+            p.extend(bad.clone());
+        }
+        assert!(s.execute("file.export", &p).is_err(), "{p}");
+    }
+    let _ = std::fs::remove_dir_all(&d);
+}
+
+/// Nothing grounded, or `floating`: the root is free, so the robot falls onto the floor.
+#[test]
+fn mjcf_floating_base_gets_a_freejoint() {
+    let mut s = arm();
+    let d = temp("free");
+    let (_, xml) = export(&mut s, &d, "f.mjcf", json!({"floating": true, "scene": false}));
+    let q = 30f64.to_radians();
+    assert!(xml.contains(r#"<freejoint name="root"/>"#), "{xml}");
+    assert!(xml.contains(&format!(r#"<key name="design" qpos="0 0 0 1 0 0 0 {q}" ctrl="{q}"/>"#)), "{xml}");
+    assert!(!xml.contains("floor") && !xml.contains("<light") && !xml.contains("<exclude"), "{xml}");
+    // The freejoint is on the root body, before any other joint.
+    assert!(xml.find("<freejoint").zip(xml.find(r#"<body name="Base""#)).is_some_and(|(f, b)| f < b), "{xml}");
+
+    let base = s.doc.find_component("Base").and_then(|c| s.doc.occurrence_of(c)).map(|o| o.id).unwrap_or(0);
+    run(&mut s, "occurrence.ground", json!({"occurrence": base, "grounded": false}));
+    let (_, xml) = export(&mut s, &d, "g.xml", json!({}));
+    assert!(xml.contains(r#"<freejoint name="root"/>"#), "nothing grounded\n{xml}");
+    let (_, xml) = export(&mut s, &d, "h.xml", json!({"floating": false}));
+    assert!(!xml.contains("freejoint"), "{xml}");
+    let _ = std::fs::remove_dir_all(&d);
+}

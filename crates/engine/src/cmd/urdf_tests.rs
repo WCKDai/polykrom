@@ -601,7 +601,7 @@ fn urdf_robot_name_is_xml_safe() {
 }
 
 /// The XML is well formed: every element closes, in order.
-fn well_formed(xml: &str) -> Result<(), String> {
+pub(super) fn well_formed(xml: &str) -> Result<(), String> {
     let mut stack: Vec<String> = Vec::new();
     let mut rest = xml;
     while let Some(i) = rest.find('<') {

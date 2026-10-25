@@ -116,6 +116,6 @@ the copies move together, which a URDF could only express with `<mimic>`.) The e
 
 - `<mimic>` for motion links.
 - Simplified collision shapes: the collision mesh is the visual mesh.
-- SDF and MJCF export, and URDF import.
+- SDF export and URDF import. MJCF (MuJoCo) export builds on the same tree: [mjcf.md](mjcf.md).
 - Joint motion inside the copies of a component placed several times.
 - Drive dynamics: `effort` and `velocity` are limits you choose.

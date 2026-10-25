@@ -48,7 +48,9 @@ pub static COMMANDS: &[CommandSpec] = &[
     CommandSpec::new("file.export", "Export", export)
         .icon("export")
         .noundo()
-        .params("path; format?: stl|stla|obj|step|3mf|3mf-tagged|urdf|json (default from extension; 3mf-tagged: 3MF whose triangles carry their B-rep face, at full precision, for meshing and analysis tools; docs/formats/3mf-face-tags.md; urdf: the whole assembly as a robot, with STL meshes written next to it; docs/urdf.md); bodies?: [names] (JSON and URDF export the complete design); urdf only: mesh_prefix? (before each mesh file name, e.g. package://robot/meshes/), effort? (default 1000), velocity? (default 10)"),
+        .params("path; format?: stl|stla|obj|step|3mf|3mf-tagged|urdf|mjcf|json (default from extension; 3mf-tagged: 3MF whose triangles carry their B-rep face, at full precision, for meshing and analysis tools; docs/formats/3mf-face-tags.md; urdf: the whole assembly as a robot, with STL meshes written next to it; docs/urdf.md); bodies?: [names] (JSON and URDF export the complete design); urdf only: mesh_prefix? (before each mesh file name, e.g. package://robot/meshes/), velocity? (default 10); urdf and mjcf: effort? (default 1000; mjcf: the actuator force limit of a joint no rated library actuator drives); \
+                 mjcf (a .mjcf path, or format mjcf for .xml: the assembly as a MuJoCo model with STL meshes next to it; docs/mjcf.md): floating?: bool (a free root that falls onto the floor; default: when nothing is grounded), \
+                 scene?: bool (floor at z = 0 and a light; default true), kp? (position actuator gain, N m/rad or N/m, default 1000), damping? (default 0.1), armature? (default 0.01)"),
     CommandSpec::new("file.save_mesh", "Save As Mesh", save_mesh)
         .at("INSERT", "FILES")
         .icon("mesh_export")
@@ -522,54 +524,55 @@ fn export_to(s: &Session, path: &str, format: Format, bodies: &[String]) -> Resu
 fn export(s: &mut Session, p: &Value) -> Result<Value> {
     let path = path_arg(p, "file.export")?;
     let format = Format::from_name(str_(p, "format").unwrap_or(path))?;
-    if format == Format::Urdf {
-        return export_urdf(s, path, p);
+    match format {
+        Format::Urdf => export_urdf(s, path, p),
+        Format::Mjcf => export_mjcf(s, path, p),
+        _ => export_to(s, path, format, &string_list(p, "bodies")),
     }
-    export_to(s, path, format, &string_list(p, "bodies"))
 }
 
-/// The assembly as a URDF and its meshes next to it (docs/urdf.md). Every path is checked before
-/// anything is written; the meshes go first and the `.urdf` last.
-fn export_urdf(s: &Session, path: &str, p: &Value) -> Result<Value> {
-    let cmd = "file.export";
-    if !string_list(p, "bodies").is_empty() {
-        return Err(bad(cmd, "urdf exports the whole assembly; omit bodies"));
-    }
-    let positive = |k: &str| match p.get(k) {
+/// A positive number parameter, `None` when absent.
+fn positive(p: &Value, k: &str) -> Result<Option<f64>> {
+    match p.get(k) {
         None | Some(Value::Null) => Ok(None),
-        Some(_) => num(p, k).filter(|x| *x > 0.0).map(Some).ok_or_else(|| bad(cmd, format!("`{k}` must be a positive number"))),
-    };
-    // `io::urdf` refuses a prefix XML cannot hold.
-    let mesh_prefix = str_(p, "mesh_prefix").unwrap_or("").to_string();
-    let options = solidcraft_io::UrdfOptions { mesh_prefix, effort: positive("effort")?, velocity: positive("velocity")? };
-    let file = std::path::Path::new(path);
-    let stem = file.file_stem().map(|x| x.to_string_lossy().to_string()).unwrap_or_else(|| s.doc.name.clone());
-    // Occurrences where they are shown, uncaptured moves included, except those the joint solver
-    // places: it puts them back as soon as a joint moves, so the move must not become part of
-    // their links.
-    let st = s.model.state();
+        Some(_) => num(p, k).filter(|x| *x > 0.0).map(Some).ok_or_else(|| bad("file.export", format!("`{k}` must be a positive number"))),
+    }
+}
+
+/// The design a robot export reads, its file stem and the moves it can't keep: occurrences
+/// where they are shown, uncaptured moves included, except those the joint solver places (it
+/// puts them back as soon as a joint moves, so the move must not become part of their links).
+fn robot_doc<'a>(s: &'a Session, path: &str, p: &Value) -> Result<(std::borrow::Cow<'a, Document>, String, Vec<String>)> {
+    if !string_list(p, "bodies").is_empty() {
+        return Err(bad("file.export", "robot formats export the whole assembly; omit bodies"));
+    }
+    let stem = std::path::Path::new(path).file_stem().map(|x| x.to_string_lossy().to_string()).unwrap_or_else(|| s.doc.name.clone());
     let mut held = Vec::new();
     let doc = if s.pending_moves.is_empty() {
         std::borrow::Cow::Borrowed(&*s.doc)
     } else {
-        let placed = solidcraft_doc::joints::solve(&s.doc, &st).world;
+        let placed = solidcraft_doc::joints::solve(&s.doc, &s.model.state()).world;
         let mut doc = (*s.doc).clone();
         for o in &mut doc.occurrences {
             match s.pending_moves.get(&o.id) {
-                Some(_) if placed.contains_key(&o.id) => held.push(o.name.clone()),
+                Some(_) if placed.contains_key(&o.id) => {
+                    held.push(format!("`{}` was moved but the move is not captured: exported where its joints place it", o.name))
+                }
                 Some(t) => o.transform = *t,
                 None => {}
             }
         }
         std::borrow::Cow::Owned(doc)
     };
-    let mut pkg = solidcraft_io::urdf(&doc, &doc.painted(&st), &stem, &options)?;
-    for name in held {
-        pkg.warnings.push(format!("`{name}` was moved but the move is not captured: exported where its joints place it"));
-    }
-    let dir = file.parent().unwrap_or(std::path::Path::new(""));
-    let mut targets: Vec<(String, &[u8])> = pkg.meshes.iter().map(|(n, b)| (dir.join(n).to_string_lossy().to_string(), b.as_slice())).collect();
-    targets.push((path.to_string(), pkg.xml.as_bytes()));
+    Ok((doc, stem, held))
+}
+
+/// Write a robot package: every path is checked before anything is written; the meshes go
+/// first, next to `path`, and the model file last.
+fn write_package(path: &str, meshes: &[(String, Vec<u8>)], xml: &str) -> Result<Vec<String>> {
+    let dir = std::path::Path::new(path).parent().unwrap_or(std::path::Path::new(""));
+    let mut targets: Vec<(String, &[u8])> = meshes.iter().map(|(n, b)| (dir.join(n).to_string_lossy().to_string(), b.as_slice())).collect();
+    targets.push((path.to_string(), xml.as_bytes()));
     for (t, _) in &targets {
         solidcraft_io::vfs::check(t).map_err(|e| EngineError::Other(format!("{t}: {e}")))?;
     }
@@ -581,9 +584,43 @@ fn export_urdf(s: &Session, path: &str, p: &Value) -> Result<Value> {
         }
         written.push(t.clone());
     }
+    Ok(written)
+}
+
+/// The assembly as a URDF and its meshes next to it (docs/urdf.md).
+fn export_urdf(s: &Session, path: &str, p: &Value) -> Result<Value> {
+    // `io::urdf` refuses a prefix XML cannot hold.
+    let mesh_prefix = str_(p, "mesh_prefix").unwrap_or("").to_string();
+    let options = solidcraft_io::UrdfOptions { mesh_prefix, effort: positive(p, "effort")?, velocity: positive(p, "velocity")? };
+    let (doc, stem, held) = robot_doc(s, path, p)?;
+    let mut pkg = solidcraft_io::urdf(&doc, &doc.painted(&s.model.state()), &stem, &options)?;
+    pkg.warnings.extend(held);
+    let written = write_package(path, &pkg.meshes, &pkg.xml)?;
     Ok(
         json!({"path": path, "format": "Urdf", "files": written, "links": pkg.model.links.len(), "joints": pkg.model.joints.len(), "warnings": pkg.warnings}),
     )
+}
+
+/// The assembly as a MuJoCo model and its meshes next to it (docs/mjcf.md).
+fn export_mjcf(s: &Session, path: &str, p: &Value) -> Result<Value> {
+    let flag = |k: &str| match p.get(k) {
+        None | Some(Value::Null) => Ok(None),
+        Some(_) => bool_(p, k).map(Some).ok_or_else(|| bad("file.export", format!("`{k}` must be true or false"))),
+    };
+    let options = solidcraft_io::MjcfOptions {
+        floating: flag("floating")?,
+        scene: flag("scene")?.unwrap_or(true),
+        kp: positive(p, "kp")?,
+        damping: positive(p, "damping")?,
+        armature: positive(p, "armature")?,
+        effort: positive(p, "effort")?,
+        torques: super::parts::rated_torques(&s.doc),
+    };
+    let (doc, stem, held) = robot_doc(s, path, p)?;
+    let mut pkg = solidcraft_io::mjcf(&doc, &doc.painted(&s.model.state()), &stem, &options)?;
+    pkg.warnings.extend(held);
+    let written = write_package(path, &pkg.meshes, &pkg.xml)?;
+    Ok(json!({"path": path, "format": "Mjcf", "files": written, "bodies": pkg.model.links.len(), "warnings": pkg.warnings}))
 }
 
 fn save_mesh(s: &mut Session, p: &Value) -> Result<Value> {
@@ -671,6 +708,10 @@ fn recovery_discard(_s: &mut Session, p: &Value) -> Result<Value> {
     }
     Ok(json!({"discarded": ids}))
 }
+
+#[cfg(test)]
+#[path = "mjcf_tests.rs"]
+mod mjcf_tests;
 
 #[cfg(test)]
 #[path = "urdf_tests.rs"]
