@@ -41,7 +41,9 @@ points along its travel). Give bodies real materials (`material.list`, `material
 Check fits with `inspect.clearance` and `inspect.interference` (a threaded shank in a hole tapped at the drill size is listed under \
 threaded, not as a clash: put a cosmetic thread on it with `solid.thread`, library screws have one), find how far a joint can move with `joint.sweep {joint, from, to}`, \
 run mechanisms with `motion.study {name, steps, keys}`, check them with `motion.interference` and record them with \
-`motion.export_animation {study, path}`; check strength with `analysis.static_stress`, and that a robot stands and walks with `sim.mujoco {study?}`. Before modelling, state the numbers the result \
+`motion.export_animation {study, path}`; check strength with `analysis.static_stress`, and that a robot stands and walks with `sim.mujoco {study?}`. Once it works, polish \
+the finish in passes with `polish {apply: safe, views: true}` (`inspect.polish` measures sharp edges, radius family, boxiness, \
+printability and tidiness; `polish.apply` applies its safe fillets and chamfers) until the score stops rising. Before modelling, state the numbers the result \
 must meet (sizes, volume, mass, clearances, travel); before saying it is done, check each with `measure` or the inspect commands. \
 On large designs keep replies small with a select list on `execute` and on each `batch` step (dotted paths, * for list items: \
 [\"total.mass_g\", \"bodies.*.name\"]), check whole assemblies with `inspect.interference {method: mesh}` (seconds) before exact \
