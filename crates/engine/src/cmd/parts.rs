@@ -1,14 +1,17 @@
 //! Standard parts: ISO metric fasteners, dowel pins and ball bearings, generated in code from
 //! the dimensions in the public standards tables (no vendor geometry), and motion hardware
-//! (T-slot extrusions, NEMA stepper motors) from the common dimensions their makers share
-//! (docs/parts-library-plan.md). Each part is inserted as
+//! (T-slot extrusions, NEMA stepper motors, GT2 pulleys, miniature linear rails, T8 lead
+//! screws) from the common dimensions their makers share (docs/parts-library-plan.md). Each part is inserted as
 //! its own component, built by ordinary features (so it stays parametric and editable), with a
 //! cosmetic thread where it has one; at a hole it gets a rigid joint that puts its axis on the
 //! hole's and seats it on the face.
 //!
 //! Part frame: the seating plane is z = 0 (the underside of a head, the bottom of a nut or
 //! washer, the top of a set screw or pin, a stepper's mounting face); the shank runs down −z (a
-//! stepper's pilot and shaft too, its body up +z). An extrusion runs up +z from z = 0.
+//! stepper's pilot and shaft too, its body up +z; a lead screw nut's body too). An extrusion, a
+//! rail and a lead screw run up +z from z = 0; a rail's mounting face is y = 0, and its
+//! carriage, inserted at the same point and direction, sits on it at z = 0. A pulley's bore is
+//! along z, its hub from z = 0.
 
 use serde_json::{Value, json};
 use solidcraft_geom::Vec3;
@@ -25,9 +28,10 @@ pub static COMMANDS: &[CommandSpec] = &[
         "the Insert Part dialog's command (same as parts.insert): family, size, length?, at?|point?+direction?, name?",
     ),
     CommandSpec::new("parts.insert", "Insert Part", insert).icon("fastener").params(
-        "family (socket_head_cap_screw | hex_bolt | hex_nut | washer | set_screw | dowel_pin | bearing | extrusion | stepper); size (\"M6\", \"608\" for \
-         bearings, \"2020\" or \"2040\" for extrusions, \"NEMA17-40\" for steppers: parts.library lists them); \
-         length? (mm; screws, bolts, set screws, pins, extrusions; default a standard length near 2.5 d, 200 for an extrusion); \
+        "family (socket_head_cap_screw | hex_bolt | hex_nut | washer | set_screw | dowel_pin | bearing | extrusion | stepper | gt2_pulley | \
+         linear_rail | linear_carriage | lead_screw | lead_nut); size (\"M6\", \"608\" for bearings, \"2020\" for extrusions, \"NEMA17-40\", \"20T-5\", \
+         \"MGN12\", \"MGN12H\", \"T8\": parts.library lists them); \
+         length? (mm; screws, bolts, set screws, pins, extrusions, rails, lead screws; default a standard length near 2.5 d, 200 for the others); \
          at?: [x,y,z] on a hole's rim or wall (the part seats on the hole's face with a rigid joint) | point?: [x,y,z] with direction?: [x,y,z] (no joint); name?",
     ),
     CommandSpec::new("parts.resize", "Change Part Size", resize_atomic).icon("scale")
@@ -35,7 +39,7 @@ pub static COMMANDS: &[CommandSpec] = &[
 ];
 
 /// A family: (id, name, standard).
-const FAMILIES: [(&str, &str, &str); 9] = [
+const FAMILIES: [(&str, &str, &str); 14] = [
     ("socket_head_cap_screw", "Socket head cap screw", "ISO 4762"),
     ("hex_bolt", "Hex head bolt / screw", "ISO 4014 / ISO 4017"),
     ("hex_nut", "Hex nut", "ISO 4032"),
@@ -45,7 +49,25 @@ const FAMILIES: [(&str, &str, &str); 9] = [
     ("bearing", "Deep groove ball bearing (envelope)", "ISO 15 (6000/6200/600 series)"),
     ("extrusion", "Aluminium T-slot extrusion, 20 mm series (slot 6)", "series 5 / B-type"),
     ("stepper", "Hybrid stepper motor (body, pilot, D-shaft)", "NEMA ICS 16"),
+    ("gt2_pulley", "GT2 timing pulley, 2 mm pitch, 6 mm belt", "GT2 (2 mm)"),
+    ("linear_rail", "Miniature linear guide rail", "MGN series"),
+    ("linear_carriage", "Miniature linear guide carriage (standard, H)", "MGN series"),
+    ("lead_screw", "Trapezoidal lead screw, 8 mm lead (4 starts)", "T8x8"),
+    ("lead_nut", "Flanged lead screw nut", "T8x8"),
 ];
+
+/// GT2 pulleys: (size, teeth, bore). Pitch diameter = teeth · 2 mm / π; the outside diameter
+/// is 0.254 mm in from it each side; the 6 mm belt runs on 7 mm of teeth between 1 mm flanges,
+/// over a 7 mm hub.
+const PULLEYS: [(&str, u32, f64); 4] = [("16T-5", 16, 5.0), ("20T-5", 20, 5.0), ("20T-8", 20, 8.0), ("40T-8", 40, 8.0)];
+/// Rails: (size, width, height, hole Ø, counterbore Ø, counterbore depth, hole pitch); and their
+/// standard (H) carriages: (size, width, length, height over the rail's base, clearance under
+/// it, hole spacing across, along). As the MGN catalogues list them (HIWIN, and the makers that
+/// follow it).
+const RAILS: [(&str, f64, f64, f64, f64, f64, f64); 3] =
+    [("MGN9", 9.0, 6.5, 3.5, 6.0, 3.5, 20.0), ("MGN12", 12.0, 8.0, 3.5, 6.0, 4.5, 25.0), ("MGN15", 15.0, 10.0, 4.5, 7.5, 5.3, 40.0)];
+const CARRIAGES: [(&str, f64, f64, f64, f64, f64, f64); 3] =
+    [("MGN9H", 20.0, 39.9, 10.0, 2.0, 15.0, 16.0), ("MGN12H", 27.0, 45.4, 13.0, 3.0, 20.0, 20.0), ("MGN15H", 32.0, 58.8, 16.0, 4.0, 25.0, 25.0)];
 
 /// A 20 mm T-slot extrusion module (series 5, slot 6): slot opening, lip, chamber width under
 /// the lip, depth where the chamber starts to narrow, slot depth from the face, core bore. The
@@ -189,6 +211,16 @@ enum Shape {
     Extrusion { modules: u8, len: f64 },
     /// A stepper motor, one row of `STEPPERS`.
     Stepper { row: usize },
+    /// A GT2 pulley, one row of `PULLEYS`.
+    Pulley { row: usize },
+    /// A rail (one row of `RAILS`), z 0…len.
+    Rail { row: usize, len: f64 },
+    /// A carriage, one row of `CARRIAGES`, on the rail of the same row.
+    Carriage { row: usize },
+    /// A T8 lead screw, z 0…len.
+    LeadScrew { len: f64 },
+    /// A T8 flanged nut.
+    LeadNut,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -249,6 +281,17 @@ fn shape(family: &str, size: &str, length: Option<f64>) -> std::result::Result<S
             let row = STEPPERS.iter().position(|r| r.0.eq_ignore_ascii_case(size.trim())).ok_or_else(|| need("stepper"))?;
             Shape::Stepper { row }
         }
+        "gt2_pulley" => Shape::Pulley { row: PULLEYS.iter().position(|r| r.0.eq_ignore_ascii_case(size.trim())).ok_or_else(|| need("GT2 pulley"))? },
+        "linear_rail" => Shape::Rail {
+            row: RAILS.iter().position(|r| r.0.eq_ignore_ascii_case(size.trim())).ok_or_else(|| need("rail"))?,
+            len: length.unwrap_or(200.0),
+        },
+        "linear_carriage" => {
+            Shape::Carriage { row: CARRIAGES.iter().position(|r| r.0.eq_ignore_ascii_case(size.trim())).ok_or_else(|| need("carriage"))? }
+        }
+        "lead_screw" if size.trim().eq_ignore_ascii_case("T8") => Shape::LeadScrew { len: length.unwrap_or(200.0) },
+        "lead_nut" if size.trim().eq_ignore_ascii_case("T8") => Shape::LeadNut,
+        "lead_screw" | "lead_nut" => return Err(need("lead screw")),
         o => return Err(format!("unknown part family `{o}` (parts.library lists them)")),
     })
 }
@@ -299,6 +342,58 @@ fn prism(s: &mut Session, outlines: &[Vec<[f64; 2]>], circles: &[([f64; 2], f64)
     run(s, "sketch.finish", json!({}))?;
     run(s, "solid.extrude", json!({"distance": format!("{dist} mm"), "direction": "positive", "operation": op}))?;
     Ok(())
+}
+
+/// Circles in the XZ plane at height y0 (centres given as (x, z)), extruded `dist` along +y.
+fn holes_y(s: &mut Session, centres: &[(f64, f64)], d: f64, y0: f64, dist: f64, op: &str) -> Result<()> {
+    run(s, "sketch.create", json!({"plane": "XZ", "offset": format!("{y0} mm")}))?;
+    for (x, z) in centres {
+        // The XZ sketch's second axis is −z.
+        run(s, "sketch.circle.center", json!({"center": [x, -z], "radius": d / 2.0}))?;
+    }
+    run(s, "sketch.finish", json!({}))?;
+    run(s, "solid.extrude", json!({"distance": format!("{dist} mm"), "direction": "positive", "operation": op}))?;
+    Ok(())
+}
+
+/// A pulley's pitch, outside, flange and hub diameters.
+fn pulley_dims(teeth: u32) -> (f64, f64, f64, f64) {
+    let pd = f64::from(teeth) * 2.0 / std::f64::consts::PI;
+    let od = pd - 0.508;
+    (pd, od, od + 4.0, (od + 3.5).max(13.0))
+}
+
+/// A GT2 pulley's toothed outline, outside radius `o`: a land on the outside diameter, then a
+/// tooth space (an R0.555 arc whose deepest point is 0.75 mm in), for each tooth.
+fn teeth_outline(teeth: u32, o: f64) -> Vec<[f64; 2]> {
+    let (r, depth) = (0.555, 0.75);
+    let c = o + r - depth;
+    // Where the space's arc meets the outside circle, as an angle about the pulley's axis.
+    let phi = ((o * o + c * c - r * r) / (2.0 * o * c)).clamp(-1.0, 1.0).acos();
+    let step = std::f64::consts::TAU / f64::from(teeth);
+    let mut out = Vec::new();
+    for i in 0..teeth {
+        let a = step * f64::from(i);
+        // The space, from its leading edge round its deepest point to its trailing edge.
+        let (sx, sy) = ((a - phi).cos() * o - c * a.cos(), (a - phi).sin() * o - c * a.sin());
+        let (ex, ey) = ((a + phi).cos() * o - c * a.cos(), (a + phi).sin() * o - c * a.sin());
+        let (from, mut to) = (sy.atan2(sx), ey.atan2(ex));
+        // The long way round, through the side facing the axis.
+        if to < from {
+            to += std::f64::consts::TAU;
+        }
+        let to = to - std::f64::consts::TAU;
+        for k in 0..=8 {
+            let t = from + (to - from) * f64::from(k) / 8.0;
+            out.push([c * a.cos() + r * t.cos(), c * a.sin() + r * t.sin()]);
+        }
+        // The land up to the next space.
+        for k in 1..4 {
+            let t = a + phi + (step - 2.0 * phi) * f64::from(k) / 4.0;
+            out.push([o * t.cos(), o * t.sin()]);
+        }
+    }
+    out
 }
 
 /// The T-slot of a module centred at (cx, cy), in the face whose outward normal is (nx, ny):
@@ -415,6 +510,62 @@ fn build(s: &mut Session, sh: &Shape) -> Result<()> {
                 }
             }
         }
+        Shape::Pulley { row } => {
+            let Some(&(_, teeth, bore)) = PULLEYS.get(row) else { return Err(bad("parts.insert", "no such pulley")) };
+            let (_, od, flange, hub) = pulley_dims(teeth);
+            let (b, o) = (bore / 2.0, od / 2.0);
+            // The toothed band first, its grooves cut on their own (GT2's 0.75 mm deep, R0.56
+            // tooth spaces), then the hub with its flange and the far flange joined to it.
+            // Three bodies that touch, each made in one step: the hub with its flange, the toothed
+            // band (its outline drawn once) and the far flange. Joining them into one solid, or
+            // cutting the grooves from a plain band, took truck's booleans 14 s to minutes.
+            revolve(s, &[(b, 0.0), (hub / 2.0, 0.0), (hub / 2.0, 7.0), (flange / 2.0, 7.0), (flange / 2.0, 8.0), (b, 8.0)], "new")?;
+            prism(s, &[teeth_outline(teeth, o)], &[([0.0, 0.0], b)], 8.0, 7.0, "new")?;
+            revolve(s, &[(b, 15.0), (flange / 2.0, 15.0), (flange / 2.0, 16.0), (b, 16.0)], "new")?;
+        }
+        Shape::Rail { row, len } => {
+            let Some(&(_, w, h, hole, cb, cb_depth, pitch)) = RAILS.get(row) else { return Err(bad("parts.insert", "no such rail")) };
+            run(
+                s,
+                "solid.box",
+                json!({"length": format!("{w} mm"), "width": format!("{h} mm"), "height": format!("{len} mm"), "corner": [-w / 2.0, 0, 0]}),
+            )?;
+            // The ball tracks along each side, 1 mm square, 2 mm under the top.
+            let track = |x: f64| vec![[x - 1.0, h - 3.0], [x + 1.0, h - 3.0], [x + 1.0, h - 2.0], [x - 1.0, h - 2.0]];
+            prism(s, &[track(-w / 2.0), track(w / 2.0)], &[], -1.0, len + 2.0, "cut")?;
+            // Mounting holes on the pitch, centred along the rail, counterbored from the top.
+            let n = ((len / pitch).floor() as usize).max(1);
+            let first = (len - (n as f64 - 1.0) * pitch) / 2.0;
+            let centres: Vec<(f64, f64)> = (0..n).map(|i| (0.0, first + i as f64 * pitch)).collect();
+            holes_y(s, &centres, hole, -1.0, h + 2.0, "cut")?;
+            holes_y(s, &centres, cb, h - cb_depth, cb_depth + 1.0, "cut")?;
+        }
+        Shape::Carriage { row } => {
+            let (Some(&(_, w, l, top, under, across, along)), Some(&(_, rail_w, rail_h, ..))) = (CARRIAGES.get(row), RAILS.get(row)) else {
+                return Err(bad("parts.insert", "no such carriage"));
+            };
+            run(
+                s,
+                "solid.box",
+                json!({"length": format!("{w} mm"), "width": format!("{} mm", top - under), "height": format!("{l} mm"), "corner": [-w / 2.0, under, 0]}),
+            )?;
+            // The channel it rides the rail in: 0.25 mm clear of each side, 0.5 mm over the top.
+            let c = rail_w / 2.0 + 0.25;
+            prism(s, &[vec![[-c, under - 1.0], [c, under - 1.0], [c, rail_h + 0.5], [-c, rail_h + 0.5]]], &[], -1.0, l + 2.0, "cut")?;
+            let holes: Vec<(f64, f64)> =
+                [(1.0, 1.0), (-1.0, 1.0), (-1.0, -1.0), (1.0, -1.0)].iter().map(|(x, z)| (x * across / 2.0, l / 2.0 + z * along / 2.0)).collect();
+            holes_y(s, &holes, 2.5, top - 3.5, 4.5, "cut")?;
+            for (x, z) in &holes {
+                thread(s, 3.0, 0.5, Vec3::new(x + 1.25, top - 1.75, *z));
+            }
+        }
+        Shape::LeadScrew { len } => {
+            revolve(s, &[(0.0, 0.0), (4.0, 0.0), (4.0, len), (0.0, len)], "new")?;
+        }
+        Shape::LeadNut => {
+            revolve(s, &[(4.0, -11.5), (5.1, -11.5), (5.1, 0.0), (11.0, 0.0), (11.0, 3.5), (4.0, 3.5)], "new")?;
+            prism(s, &[], &[([8.0, 0.0], 1.75), ([0.0, 8.0], 1.75), ([-8.0, 0.0], 1.75), ([0.0, -8.0], 1.75)], -0.5, 4.5, "cut")?;
+        }
     }
     Ok(())
 }
@@ -440,12 +591,34 @@ fn library(_s: &mut Session, p: &Value) -> Result<Value> {
                            "holding_torque_nm": r.11, "rated_current_a": r.12, "mass_kg": r.13, "step_angle_deg": 1.8})
                 })
                 .collect(),
+            "gt2_pulley" => PULLEYS
+                .iter()
+                .map(|r| {
+                    let (pd, od, flange, hub) = pulley_dims(r.1);
+                    json!({"size": r.0, "teeth": r.1, "bore": r.2, "pitch_diameter": pd, "outside_diameter": od, "flange": flange, "hub": hub,
+                           "belt_mm_per_deg": f64::from(r.1) * 2.0 / 360.0})
+                })
+                .collect(),
+            "linear_rail" => RAILS
+                .iter()
+                .map(|r| json!({"size": r.0, "width": r.1, "height": r.2, "hole": r.3, "counterbore": r.4, "counterbore_depth": r.5, "hole_pitch": r.6}))
+                .collect(),
+            "linear_carriage" => CARRIAGES
+                .iter()
+                .map(|r| json!({"size": r.0, "width": r.1, "length": r.2, "height": r.3, "clearance": r.4, "holes_across": r.5, "holes_along": r.6, "holes": "M3"}))
+                .collect(),
+            "lead_screw" => vec![json!({"size": "T8", "d": 8.0, "lead": 8.0, "pitch": 2.0, "starts": 4})],
+            "lead_nut" => vec![json!({"size": "T8", "flange": 22.0, "flange_thickness": 3.5, "body": 10.2, "length": 15.0, "holes": 3.5, "hole_circle": 16.0})],
             _ => Vec::new(),
         };
         let (_, name, standard) = FAMILIES.iter().find(|f| f.0 == id).copied().unwrap_or(("", "", ""));
         let lengths = matches!(id, "socket_head_cap_screw" | "hex_bolt" | "set_screw" | "dowel_pin").then_some(LENGTHS.to_vec());
         // Any length (mm) for an extrusion.
-        let lengths = if id == "extrusion" { Some(vec![100.0, 200.0, 250.0, 300.0, 350.0, 400.0, 500.0, 1000.0]) } else { lengths };
+        let lengths = if matches!(id, "extrusion" | "linear_rail" | "lead_screw") {
+            Some(vec![100.0, 200.0, 250.0, 300.0, 350.0, 400.0, 500.0, 1000.0])
+        } else {
+            lengths
+        };
         json!({"family": id, "name": name, "standard": standard, "sizes": sizes, "lengths": lengths})
     };
     match str_(p, "family") {
@@ -457,7 +630,9 @@ fn library(_s: &mut Session, p: &Value) -> Result<Value> {
 
 fn part_name(family: &str, size: &str, sh: &Shape) -> String {
     match sh {
-        Shape::Screw { len, .. } | Shape::Rod { len, .. } | Shape::Extrusion { len, .. } => format!("{} {size}x{len}", label(family)),
+        Shape::Screw { len, .. } | Shape::Rod { len, .. } | Shape::Extrusion { len, .. } | Shape::Rail { len, .. } | Shape::LeadScrew { len, .. } => {
+            format!("{} {size}x{len}", label(family))
+        }
         _ => format!("{} {size}", label(family)),
     }
 }
@@ -466,7 +641,9 @@ fn part_name(family: &str, size: &str, sh: &Shape) -> String {
 /// a bearing's designation, and the family's name with the size.
 fn identity(family: &str, size: &str, sh: &Shape) -> (String, String) {
     let size = match sh {
-        Shape::Screw { len, .. } | Shape::Rod { len, .. } | Shape::Extrusion { len, .. } => format!("{size}x{len}"),
+        Shape::Screw { len, .. } | Shape::Rod { len, .. } | Shape::Extrusion { len, .. } | Shape::Rail { len, .. } | Shape::LeadScrew { len, .. } => {
+            format!("{size}x{len}")
+        }
         _ => size.to_string(),
     };
     let standard = match family {
@@ -501,19 +678,27 @@ fn set_identity(s: &mut Session, comp: u64, now: (String, String), was: Option<(
     }
 }
 
-/// What motion hardware is made of, and a stepper's ratings in its metadata (`RATINGS_KEY`): an
-/// extrusion is aluminium; a stepper's body is too (its geometry is a solid block, so its mass
-/// comes from the datasheet's `mass_kg`, not the material).
+/// What motion hardware is made of, and its ratings in its metadata (`RATINGS_KEY`): a stepper's
+/// torque and mass (its body is a solid block, so its mass comes from the datasheet's
+/// `mass_kg`, not the material), a pulley's belt travel per degree, a lead screw's lead.
+/// Extrusions, steppers and pulleys are aluminium, a lead screw nut brass, the rest steel.
 fn fit_out(s: &mut Session, comp: u64, sh: &Shape) {
-    if !matches!(sh, Shape::Extrusion { .. } | Shape::Stepper { .. }) {
-        return;
-    }
+    let material = match sh {
+        Shape::Extrusion { .. } | Shape::Stepper { .. } | Shape::Pulley { .. } => "Aluminum",
+        Shape::LeadNut => "Brass",
+        Shape::LeadScrew { .. } => "Steel",
+        _ => return,
+    };
     let bodies: Vec<String> = s.model.state().bodies.iter().filter(|b| s.doc.model_body_component(b) == comp).map(|b| b.name.clone()).collect();
-    let _ = run(s, "material.assign", json!({"bodies": bodies, "material": "Aluminum"}));
+    let _ = run(s, "material.assign", json!({"bodies": bodies, "material": material}));
     let ratings = match *sh {
         Shape::Stepper { row } => STEPPERS.get(row).map(|r| {
             json!({"kind": "stepper", "holding_torque_nm": r.11, "rated_current_a": r.12, "mass_kg": r.13, "step_angle_deg": 1.8, "shaft_mm": r.9})
         }),
+        Shape::Pulley { row } => PULLEYS.get(row).map(|r| {
+            json!({"kind": "gt2_pulley", "teeth": r.1, "pitch_diameter_mm": pulley_dims(r.1).0, "belt_mm_per_deg": f64::from(r.1) * 2.0 / 360.0})
+        }),
+        Shape::LeadScrew { .. } | Shape::LeadNut => Some(json!({"kind": "lead_screw", "lead_mm": 8.0, "pitch_mm": 2.0, "starts": 4})),
         _ => None,
     };
     let Some(ratings) = ratings else { return };
@@ -537,6 +722,11 @@ fn label(family: &str) -> &'static str {
         "dowel_pin" => "Dowel Pin",
         "extrusion" => "Extrusion",
         "stepper" => "Stepper",
+        "gt2_pulley" => "GT2 Pulley",
+        "linear_rail" => "Rail",
+        "linear_carriage" => "Carriage",
+        "lead_screw" => "Lead Screw",
+        "lead_nut" => "Lead Nut",
         _ => "Bearing",
     }
 }
@@ -667,7 +857,9 @@ fn hole_wall(s: &Session, a: Vec3) -> Option<Vec3> {
 
 fn shape_len(sh: &Shape) -> Option<f64> {
     match sh {
-        Shape::Screw { len, .. } | Shape::Rod { len, .. } | Shape::Extrusion { len, .. } => Some(*len),
+        Shape::Screw { len, .. } | Shape::Rod { len, .. } | Shape::Extrusion { len, .. } | Shape::Rail { len, .. } | Shape::LeadScrew { len, .. } => {
+            Some(*len)
+        }
         _ => None,
     }
 }
@@ -856,6 +1048,81 @@ mod tests {
         // The body on the top face, the shaft through the hole below: the part's −z goes in.
         assert!((hi.z - (5.0 + 40.0)).abs() < 1e-6 && (lo.z - (5.0 - 24.0)).abs() < 1e-6, "{lo:?} {hi:?}");
         assert!(((lo.x + hi.x) / 2.0 - 30.0).abs() < 1e-6 && ((lo.y + hi.y) / 2.0 - 30.0).abs() < 1e-6);
+    }
+
+    fn ratings(s: &Session, comp: u64) -> Value {
+        s.doc.components.iter().find(|c| c.id == comp).and_then(|c| c.metadata.0.get(super::RATINGS_KEY).cloned()).unwrap_or_default()
+    }
+
+    /// A 20-tooth GT2 pulley on a 5 mm bore: pitch diameter 40/π, 0.254 mm deeper teeth, a groove
+    /// for each tooth, its belt travel per degree on the part (#106).
+    #[test]
+    fn a_gt2_pulley_has_its_teeth_and_belt_ratio() {
+        let mut s = Session::default();
+        let r = run(&mut s, "parts.insert", json!({"family": "gt2_pulley", "size": "20T-5"}));
+        let comp = r["component"].as_u64().unwrap_or(0);
+        let pd = 40.0 / std::f64::consts::PI;
+        let (lo, hi) = bbox(&s, "GT2 Pulley 20T-5");
+        assert!((lo.z).abs() < 1e-6 && (hi.z - 16.0).abs() < 1e-6, "{lo:?} {hi:?}");
+        // The flanges are the widest: outside diameter + 4.
+        assert!((hi.x - lo.x - (pd - 0.508 + 4.0)).abs() < 1e-3, "{lo:?} {hi:?}");
+        let rt = ratings(&s, comp);
+        assert!(
+            (rt["pitch_diameter_mm"].as_f64().unwrap_or(0.0) - pd).abs() < 1e-12
+                && (rt["belt_mm_per_deg"].as_f64().unwrap_or(0.0) - 40.0 / 360.0).abs() < 1e-12,
+            "{rt}"
+        );
+        // The teeth are cut: less than the plain band's volume, by 20 grooves' worth at most.
+        let band = std::f64::consts::PI * (((pd - 0.508) / 2.0).powi(2) - 2.5f64.powi(2)) * 7.0;
+        let flanges = std::f64::consts::PI * (((pd - 0.508 + 4.0) / 2.0).powi(2) - 2.5f64.powi(2)) * 2.0;
+        let hub = std::f64::consts::PI * (((pd - 0.508 + 3.5) / 2.0).powi(2) - 2.5f64.powi(2)) * 7.0;
+        let v = volume(&mut s, "GT2 Pulley 20T-5");
+        let groove = std::f64::consts::PI * 0.555 * 0.555 * 7.0;
+        assert!(v < band + flanges + hub - 1.0 && v > band + flanges + hub - 20.0 * groove, "{v} against {}", band + flanges + hub);
+    }
+
+    /// An MGN12 rail 300 long: 12 x 8 with its ball tracks and twelve counterbored holes on the
+    /// 25 mm pitch; its H carriage, inserted where the rail was, rides it without touching (#106).
+    #[test]
+    fn an_mgn_carriage_rides_its_rail() {
+        let mut s = Session::default();
+        run(&mut s, "parts.insert", json!({"family": "linear_rail", "size": "MGN12", "length": 300}));
+        let (lo, hi) = bbox(&s, "Rail MGN12x300");
+        assert!(
+            (hi.x - lo.x - 12.0).abs() < 1e-6 && (lo.y).abs() < 1e-6 && (hi.y - 8.0).abs() < 1e-6 && (hi.z - 300.0).abs() < 1e-6,
+            "{lo:?} {hi:?}"
+        );
+        let pi = std::f64::consts::PI;
+        let holes = 12.0 * (pi * 1.75 * 1.75 * (8.0 - 4.5) + pi * 3.0 * 3.0 * 4.5);
+        let rail = (12.0 * 8.0 - 2.0 * 1.0 * 1.0) * 300.0 - holes;
+        let v = volume(&mut s, "Rail MGN12x300");
+        assert!((v - rail).abs() < 1e-4 * rail, "{v} against {rail}");
+        run(&mut s, "parts.insert", json!({"family": "linear_carriage", "size": "MGN12H"}));
+        let (lo, hi) = bbox(&s, "Carriage MGN12H");
+        assert!(
+            (hi.x - lo.x - 27.0).abs() < 1e-6 && (lo.y - 3.0).abs() < 1e-6 && (hi.y - 13.0).abs() < 1e-6 && (hi.z - 45.4).abs() < 1e-6,
+            "{lo:?} {hi:?}"
+        );
+        let i = run(&mut s, "inspect.interference", json!({}));
+        assert_eq!(i["count"], 0, "{i}");
+        assert!(s.execute("parts.insert", &json!({"family": "linear_rail", "size": "MGN20"})).is_err());
+    }
+
+    /// A T8 lead screw and its flanged nut, the nut seated in its hole like a screw, with the lead
+    /// on both for a screw joint (#106).
+    #[test]
+    fn a_t8_nut_seats_and_carries_its_lead() {
+        let mut s = Session::default();
+        run(&mut s, "solid.box", json!({"length": 40, "width": 40, "height": 6, "body_name": "Plate"}));
+        run(&mut s, "solid.hole", json!({"position": [20, 20, 6], "diameter": 10.4}));
+        let r = run(&mut s, "parts.insert", json!({"family": "lead_nut", "size": "T8", "at": [25.2, 20, 6]}));
+        assert!(r["joint"].is_number(), "{r}");
+        let (lo, hi) = bbox(&s, "Lead Nut T8");
+        assert!((hi.z - (6.0 + 3.5)).abs() < 1e-6 && (lo.z - (6.0 - 11.5)).abs() < 1e-6 && (hi.x - lo.x - 22.0).abs() < 1e-6, "{lo:?} {hi:?}");
+        assert_eq!(ratings(&s, r["component"].as_u64().unwrap_or(0))["lead_mm"].as_f64(), Some(8.0));
+        let screw = run(&mut s, "parts.insert", json!({"family": "lead_screw", "size": "T8", "length": 350}));
+        assert_eq!(screw["name"], "Lead Screw T8x350");
+        assert!(s.execute("parts.insert", &json!({"family": "lead_screw", "size": "T10"})).is_err());
     }
 
     #[test]
