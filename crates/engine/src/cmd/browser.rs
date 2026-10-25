@@ -647,6 +647,9 @@ fn rename_body(s: &mut Session, p: &Value) -> Result<Value> {
         for b in f.participants.iter_mut().filter(|b| **b == old) {
             *b = name.to_string();
         }
+        for (b, _) in f.tool_frames.iter_mut().filter(|(b, _)| *b == old) {
+            *b = name.to_string();
+        }
         if let FeatureKind::Sketch { plane, .. } = &mut f.kind {
             solidcraft_doc::sheet::rename_plane_sheet_body(plane, &old, name);
         }

@@ -313,8 +313,10 @@ fn joint_pose_combine_relative_motion_rebuilds_the_cut() {
     assert_motion_matches_full_rebuild(&s);
 }
 
+/// #168: the notch keeps where its target was when it was cut, so an offset given to the
+/// target later moves the notch with it.
 #[test]
-fn joint_pose_target_body_offset_rebuilds_the_cut() {
+fn joint_pose_target_body_offset_keeps_the_cut() {
     let mut s = cross_component_motion_cut(false, "slider");
     assert!((motion_target_volume(&s) - 900.).abs() < 1e-6);
     let mut offset = crate::doc::IDENTITY;
@@ -322,7 +324,7 @@ fn joint_pose_target_body_offset_rebuilds_the_cut() {
     s.doc_mut().body_offsets.insert("Target".into(), offset);
     s.refresh();
     let volume = motion_target_volume(&s);
-    assert!((volume - 800.).abs() < 1e-6, "the input body's offset changes the tool frame: {volume}");
+    assert!((volume - 900.).abs() < 1e-6, "the offset moves the target and its notch together: {volume}");
     assert_motion_matches_full_rebuild(&s);
 }
 
@@ -353,14 +355,16 @@ fn joint_pose_implicit_union_reads_its_target_body_offset() {
     assert_motion_matches_full_rebuild(&s);
 }
 
+/// #168: driving a joint never reshapes a part. The target slides away from where its notch
+/// was drawn and takes the notch with it: still 900 mm³, and nothing is evaluated again.
 #[test]
-fn joint_pose_true_relative_target_motion_rebuilds_the_cut() {
+fn joint_pose_relative_target_motion_keeps_the_cut() {
     let mut s = cross_component_motion_cut(false, "slider");
     assert!((motion_target_volume(&s) - 900.).abs() < 1e-6);
     run(&mut s, "joint.drive", json!({"joint":"Motion","value":5}));
     let volume = motion_target_volume(&s);
-    assert!((volume - 800.).abs() < 1e-6, "relative motion should leave 800 mm³, got {volume}");
-    assert!(s.model.last_recomputed > 0, "a target moved relative to its tool");
+    assert!((volume - 900.).abs() < 1e-6, "the notch moves with its target: {volume}");
+    assert_eq!(s.model.last_recomputed, 0, "a joint driven evaluates nothing");
     assert_motion_matches_full_rebuild(&s);
 }
 

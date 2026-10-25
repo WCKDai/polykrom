@@ -2400,6 +2400,13 @@ pub struct Feature {
     /// its faces are named after them and references follow them through Update Links (#3330).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub link_faces: Vec<Vec<String>>,
+    /// A join, cut or intersect with drawn tools (a primitive, or a solid built from sketches):
+    /// where each body it changes in another component was placed when it was made, as the
+    /// matrix from this feature's frame into the body's (#168). Its tools meet the body there, so moving the
+    /// body's component (a joint driven) neither reshapes it nor evaluates the feature again.
+    /// A body without one is met where it is placed now, as designs made before this did.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tool_frames: Vec<(String, crate::Mat)>,
     #[serde(flatten)]
     pub kind: FeatureKind,
 }
@@ -3166,6 +3173,7 @@ impl Document {
             kernel_piece_order: false,
             inserted: false,
             link_faces: Vec::new(),
+            tool_frames: Vec::new(),
             kind,
         };
         self.place_feature(f);

@@ -920,6 +920,7 @@ impl Session {
             Ok((v, live_edit)) => {
                 let v = if changed { self.with_created(spec.id, params, &before, v) } else { v };
                 if changed {
+                    self.capture_tool_frames(&before.doc);
                     let render_only = self.render_only_change(&before);
                     let previous_doc = before.doc.clone();
                     if spec.undoable {
@@ -968,6 +969,33 @@ impl Session {
         let Ok(after) = self.doc.sketch(sk) else { return v };
         out.insert("created".into(), cmd::sketch_created(before.doc.sketch(sk).ok(), after));
         v
+    }
+
+    /// The joins, cuts and intersects with drawn tools that the last command made or retargeted
+    /// keep where the bodies they change in other components are placed now (#168): driving a
+    /// joint afterwards moves those bodies without reshaping them.
+    fn capture_tool_frames(&mut self, previous: &Document) {
+        let before: std::collections::HashMap<u64, &solidcraft_doc::Feature> = previous.features.iter().map(|f| (f.id, f)).collect();
+        let mut input = Arc::new(ModelState::default());
+        let mut frames: Vec<(u64, Vec<(String, solidcraft_doc::Mat)>)> = Vec::new();
+        for f in &self.doc.features {
+            // The state the feature starts from: the last evaluation's, after the feature before it.
+            if let Some(m) = solidcraft_doc::captured_tool_frames(&self.doc, f, before.get(&f.id).copied(), &input) {
+                frames.push((f.id, m));
+            }
+            if let Some(r) = self.model.result(f.id) {
+                input = r.state.clone();
+            }
+        }
+        if frames.is_empty() {
+            return;
+        }
+        let d = self.doc_mut();
+        for (id, m) in frames {
+            if let Some(f) = d.feature_mut(id) {
+                f.tool_frames = m;
+            }
+        }
     }
 
     /// Remember the design, active sketch, pending positions and undo history; returns the checkpoint's id.
