@@ -829,6 +829,7 @@
   "cmd.plastic_rest": "Rest",
   "cmd.plastic_rules": "List Plastic Rules",
   "cmd.plastic_snap_fit": "Snap Fit",
+  "cmd.polish_apply": "Apply Polish",
   "cmd.render_backends": "Render Backends",
   "cmd.render_cancel": "Cancel Render",
   "cmd.render_export": "Export Render Image",

@@ -829,6 +829,7 @@
   "cmd.plastic_rest": "レスト",
   "cmd.plastic_rules": "プラスチック ルールを一覧表示",
   "cmd.plastic_snap_fit": "スナップ フィット",
+  "cmd.polish_apply": "仕上げを適用",
   "cmd.render_backends": "レンダリング バックエンド",
   "cmd.render_cancel": "レンダリングをキャンセル",
   "cmd.render_export": "PNGをエクスポート",
