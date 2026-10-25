@@ -1404,7 +1404,8 @@ impl PlacementReads {
         if all || names.is_empty() {
             self.bodies.extend(st.bodies.iter().filter(|b| all || b.component == f.component || b.feature == f.id).map(|b| b.name.clone()));
         } else {
-            for name in names {
+            // A body met where it was placed when the feature was made reads no placement.
+            for name in names.iter().filter(|n| !f.tool_frames.iter().any(|(b, _)| b == *n)) {
                 self.placed_body(Some(st), name);
             }
         }
@@ -1492,12 +1493,17 @@ fn hash_placement(m: &Mat, h: &mut impl Hasher) {
 /// the bodies it mirrors (#1938).
 fn mirror_placements_digest(doc: &Document, f: &Feature, placements: &[Vec<u64>], bodies: &[crate::BodyName]) -> u64 {
     let mut h = std::collections::hash_map::DefaultHasher::new();
-    doc.component_transform(f.component).iter().flatten().for_each(|x| x.to_bits().hash(&mut h));
+    // The copy is the body mirrored in this feature's frame (its plane's), so only where the
+    // picked placement and the copy's component are relative to that frame changes it: a joint
+    // that turns them all together (the mirror made in the moving part) leaves it alone (#168).
+    let here = doc.component_transform(f.component);
+    let Some(inverse) = crate::mat_inverse(&here) else { return placements_hash(doc) };
     for placed in placements.iter().map(|path| mirror_copy_frame(doc, path)) {
         placed.is_some().hash(&mut h);
         if let Some((component, frame, picked)) = placed {
             component.hash(&mut h);
-            frame.iter().chain(&picked).flatten().for_each(|x| x.to_bits().hash(&mut h));
+            hash_placement(&crate::mat_mul(&inverse, &frame), &mut h);
+            hash_placement(&crate::mat_mul(&inverse, &picked), &mut h);
         }
     }
     for b in bodies {
@@ -7155,7 +7161,7 @@ impl ToolFrames {
     /// For a feature with drawn tools (see [`drawn_tools_change_bodies`]): the bodies placed
     /// differently from its component, so its tools meet them where they are shown (#3383).
     fn install(doc: &Document, f: &Feature, st: &ModelState) -> Option<ToolFrames> {
-        if !drawn_tools_change_bodies(&f.kind) || (doc.occurrences.is_empty() && doc.body_offsets.is_empty()) {
+        if !drawn_tools_change_bodies(&f.kind) || (doc.occurrences.is_empty() && doc.body_offsets.is_empty() && f.tool_frames.is_empty()) {
             return None;
         }
         let frame = doc.component_transform(f.component);
@@ -7163,6 +7169,10 @@ impl ToolFrames {
             .bodies
             .iter()
             .filter_map(|b| {
+                // Where it was placed when the feature was made (#168).
+                if let Some((_, m)) = f.tool_frames.iter().find(|(n, _)| *n == b.name) {
+                    return (*m != crate::IDENTITY).then(|| (b.name.clone(), *m));
+                }
                 let world = body_world(doc, b);
                 (world != frame).then(|| crate::mat_inverse(&world).map(|inv| (b.name.clone(), crate::mat_mul(&inv, &frame)))).flatten()
             })
@@ -7179,6 +7189,47 @@ impl Drop for ToolFrames {
         let before = std::mem::take(&mut self.0);
         TOOL_FRAMES.with(|t| *t.borrow_mut() = before);
     }
+}
+
+/// Feature `f`'s [`Feature::tool_frames`] as the bodies are placed now in `doc` (`st` holds them):
+/// one for each body it may change that lies in another component or is offset, so its drawn
+/// tools keep meeting the body where it was when the feature was made (#168). `previous` is the
+/// feature before the edit that made or changed it: bodies it already met keep their frames (as
+/// do the ones the edit gave it), and
+/// `None` is returned when its targets and component did not change (a design made before
+/// frames were kept stays as it was until then).
+pub fn captured_tool_frames(doc: &Document, f: &Feature, previous: Option<&Feature>, st: &ModelState) -> Option<Vec<(String, Mat)>> {
+    if !drawn_tools_change_bodies(&f.kind) {
+        return None;
+    }
+    let (_, targets) = feature_op(f);
+    if let Some(p) = previous
+        && p.participants == f.participants
+        && p.component == f.component
+        && feature_op(p).1 == targets
+    {
+        return None;
+    }
+    let names = if targets.is_empty() { &f.participants } else { &targets };
+    let frame = doc.component_transform(f.component);
+    let kept = previous.filter(|p| p.component == f.component).map_or(&[][..], |p| &p.tool_frames[..]);
+    let frames: Vec<(String, Mat)> = names
+        .iter()
+        .filter_map(|name| {
+            // Frames the edit itself set (a rename takes them along) stand.
+            if let Some(k) = f.tool_frames.iter().chain(kept).find(|(n, _)| n == name) {
+                return Some(k.clone());
+            }
+            let b = st.body(name)?;
+            if doc.model_body_component(b) == f.component && doc.model_body_offset(b).is_none() {
+                return None;
+            }
+            let world = body_world(doc, b);
+            let m = if world == frame { crate::IDENTITY } else { crate::mat_mul(&crate::mat_inverse(&world)?, &frame) };
+            Some((name.clone(), m))
+        })
+        .collect();
+    (frames != f.tool_frames).then_some(frames)
 }
 
 /// The matrix taking the evaluated feature's drawn tools into body `name`'s frame (`None`: the

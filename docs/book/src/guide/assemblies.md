@@ -19,6 +19,13 @@ components. Any number of parts may be grounded, or none; opening a design never
 anything. A grounded part refuses Move until it is ungrounded, and `component.create` takes
 `grounded: true` or `false` to choose for itself.
 
+A feature can change a body in another component: a box, an extrude or a hole drawn in the
+design that cuts a bracket in a leg's component. The cut belongs to the bracket from then on. It
+keeps the place on the bracket where it was made, so driving the leg's joints, playing a motion
+study or moving the bracket's occurrence moves the cut with the bracket and never reshapes it.
+Moving parts this way evaluates no features, which keeps joints, sweeps and gaits fast on large
+assemblies. Changing which bodies the feature cuts (its targets) takes their places again.
+
 **Drag a part to put it somewhere else.** With the design active, press the left button on a part
 and drag: the part follows the pointer, the point you grabbed moving in the plane through it that
 faces the view, and stays where you let go, with its position captured. The whole drag is one

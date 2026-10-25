@@ -801,6 +801,67 @@ fn combine_across_a_turned_occurrence_meets_the_tool_where_it_is_shown() {
     assert!((volume(&s, "Base") - want).abs() < 1e-6 * want, "{} vs {want}", volume(&s, "Base"));
 }
 
+/// #168: driving a joint never reshapes a part. A notch cut from the root into a jointed bar
+/// keeps where the bar was when it was cut: turned 90 degrees, the bar would otherwise be met by
+/// the notch where it no longer is (and keep all of its 4000 mm³), and every drive would evaluate
+/// the cut again. Renaming the bar keeps its frame with it.
+#[test]
+fn a_cut_into_a_jointed_part_keeps_its_place_when_the_joint_turns() {
+    let volume = |s: &Session, name: &str| s.model.state().body(name).map(|b| solidcraft_kernel::measure(&b.body).unwrap().volume).unwrap_or(0.0);
+    let mut s = Session::default();
+    created(&mut s, "Arm");
+    run(&mut s, "solid.box", json!({"length": 40, "width": 10, "height": 10, "body_name": "Bar"}));
+    run(&mut s, "component.activate", json!({"component": "root"}));
+    run(
+        &mut s,
+        "joint.as_built",
+        json!({"type": "revolute", "name": "Pivot", "a": 0, "b": "Arm", "at": {"occurrence": 0, "point": [0, 0, 0], "z": [0, 0, 1]}}),
+    );
+    run(&mut s, "solid.box", json!({"length": 4, "width": 4, "height": 20, "corner": [30, 3, -5], "operation": "cut", "targets": ["Bar"]}));
+    let want = 40.0 * 10.0 * 10.0 - 4.0 * 4.0 * 10.0;
+    assert!((volume(&s, "Bar") - want).abs() < 1e-6 * want, "{} vs {want}", volume(&s, "Bar"));
+    assert_eq!(s.doc.features.last().map(|f| f.tool_frames.len()), Some(1));
+    for angle in [30.0, 90.0] {
+        run(&mut s, "joint.drive", json!({"joint": "Pivot", "value": angle}));
+        assert_eq!(s.model.last_recomputed, 0, "driving to {angle} evaluated features again");
+        assert!((volume(&s, "Bar") - want).abs() < 1e-6 * want, "at {angle}: {} vs {want}", volume(&s, "Bar"));
+    }
+    run(&mut s, "body.rename", json!({"body": "Bar", "name": "Link"}));
+    assert_eq!(s.doc.features.last().and_then(|f| f.tool_frames.first()).map(|(n, _)| n.as_str()), Some("Link"));
+    run(&mut s, "joint.drive", json!({"joint": "Pivot", "value": 0}));
+    assert_eq!(s.model.last_recomputed, 0);
+    assert!((volume(&s, "Link") - want).abs() < 1e-6 * want, "{} vs {want}", volume(&s, "Link"));
+}
+
+/// #168: a mirror made in a jointed, turned part mirrors in that part's frame, so turning the
+/// joint further moves the copy with the part and changes nothing it made: the mirror, which keeps
+/// the placement its body was picked at, is not evaluated again.
+#[test]
+fn a_mirror_in_a_jointed_part_is_not_evaluated_again_when_the_joint_turns() {
+    let mut s = Session::default();
+    created(&mut s, "Arm");
+    run(&mut s, "solid.box", json!({"length": 10, "width": 10, "height": 10, "corner": [20, 5, 0], "body_name": "Lug"}));
+    run(&mut s, "component.activate", json!({"component": "root"}));
+    run(
+        &mut s,
+        "joint.as_built",
+        json!({"type": "revolute", "name": "Pivot", "a": 0, "b": "Arm", "at": {"occurrence": 0, "point": [0, 0, 0], "z": [0, 0, 1]}}),
+    );
+    run(&mut s, "joint.drive", json!({"joint": "Pivot", "value": 20}));
+    run(&mut s, "component.activate", json!({"component": "Arm"}));
+    run(&mut s, "solid.mirror", json!({"bodies": ["Lug"], "plane": "XZ"}));
+    let picked = |f: &solidcraft_doc::Feature| matches!(&f.kind, solidcraft_doc::FeatureKind::Mirror { placements, .. } if !placements.is_empty());
+    assert!(s.doc.features.last().is_some_and(picked), "the mirror keeps where the lug was picked");
+    let copy = s.model.state().bodies.last().map(|b| b.name.clone()).unwrap();
+    let centre = |s: &Session| s.model.state().body(&copy).map(|b| solidcraft_kernel::measure(&b.body).unwrap().centroid).unwrap();
+    let before = centre(&s);
+    for angle in [30.0, 90.0] {
+        run(&mut s, "joint.drive", json!({"joint": "Pivot", "value": angle}));
+        assert_eq!(s.model.last_recomputed, 0, "driving to {angle} evaluated features again");
+        assert!(centre(&s).dist(before) < 1e-9, "the copy moved in its part at {angle}");
+    }
+}
+
 /// #3383: a feature joining into a body of another, placed component draws its tool where the
 /// tool is shown, as Combine does. Part is moved 100 mm along x, so its 10 mm cubes sit at x 100..110
 /// and 120..130; a box and an extrude drawn from the root over each add 4 x 4 x 5 to it in one

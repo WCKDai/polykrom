@@ -920,6 +920,7 @@ impl Session {
             Ok((v, live_edit)) => {
                 let v = if changed { self.with_created(spec.id, params, &before, v) } else { v };
                 if changed {
+                    self.capture_tool_frames(&before.doc);
                     let render_only = self.render_only_change(&before);
                     let previous_doc = before.doc.clone();
                     if spec.undoable {
@@ -968,6 +969,29 @@ impl Session {
         let Ok(after) = self.doc.sketch(sk) else { return v };
         out.insert("created".into(), cmd::sketch_created(before.doc.sketch(sk).ok(), after));
         v
+    }
+
+    /// The joins, cuts and intersects with drawn tools that the last command made or retargeted
+    /// keep where the bodies they change in other components are placed now (#168): driving a
+    /// joint afterwards moves those bodies without reshaping them.
+    fn capture_tool_frames(&mut self, previous: &Document) {
+        let before: std::collections::HashMap<u64, &solidcraft_doc::Feature> = previous.features.iter().map(|f| (f.id, f)).collect();
+        let st = self.model.state();
+        let frames: Vec<(u64, Vec<(String, solidcraft_doc::Mat)>)> = self
+            .doc
+            .features
+            .iter()
+            .filter_map(|f| solidcraft_doc::captured_tool_frames(&self.doc, f, before.get(&f.id).copied(), &st).map(|m| (f.id, m)))
+            .collect();
+        if frames.is_empty() {
+            return;
+        }
+        let d = self.doc_mut();
+        for (id, m) in frames {
+            if let Some(f) = d.feature_mut(id) {
+                f.tool_frames = m;
+            }
+        }
     }
 
     /// Remember the design, active sketch, pending positions and undo history; returns the checkpoint's id.
