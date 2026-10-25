@@ -4,155 +4,162 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Polykrom</title>
-<meta name="description" content="Open-source parametric CAD in pure Rust for parts that have to work: model, check stress on the part, and design with an AI companion that uses the same commands you do.">
+<meta name="description" content="Open-source parametric CAD in pure Rust, built for people and their AI agents to design, verify and make machines for the physical world.">
 <meta property="og:title" content="Polykrom">
-<meta property="og:description" content="Open-source parametric CAD for parts that have to work.">
-<meta property="og:image" content="https://cad.polykrom.app/screens/polykrom.png">
-<meta name="theme-color" content="#111111">
+<meta property="og:description" content="CAD that people and their AI agents build real machines in: model, verify, simulate, make.">
+<meta property="og:image" content="https://polykrom.app/so101/so101-poster.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#111111" media="(prefers-color-scheme: dark)">
 <link rel="icon" href="mark.svg" type="image/svg+xml">
-<style>
-/* The WCKD family's kit (autobot-www brand/kit.json): white page, ink type, hairlines, JetBrains Mono,
-   lowercase headlines that end in the brand's square. Polykrom's lime is for marks only; it shows on
-   the ink hero band, where the p is large. */
-@font-face { font-family: "JetBrains Mono"; src: url("fonts/jetbrains-mono-latin.woff2") format("woff2"); font-weight: 100 800; font-display: swap; }
-:root {
-  --page: #FFFFFF; --wash: #F6F5F2; --rule: #E4E1DB; --strong: #D3D0C9; --muted: #6E6A64; --ink: #111111;
-  --ink-panel: #1C1B19; --ink-rule: #2F2D2A; --bone: #EFEAE2; --ash: #8E8A84; --lime: #CCFF00;
-  --mark: var(--ink);
-  /* The Facet icons' roles: line, then light, mid and deep facet, and the ground. */
-  --ln: var(--ink); --a1: #E6F9A8; --a2: #B8E600; --a3: #6E9900; --gp: #FFFFFF;
-  --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
-  color-scheme: light;
-}
-@media (prefers-color-scheme: dark) { :root {
-  --page: #111111; --wash: #1C1B19; --rule: #2F2D2A; --strong: #3A3834; --muted: #8E8A84; --ink: #EFEAE2;
-  --mark: var(--lime); --a1: #3B4A12; --a2: #CCFF00; --a3: #A3CC00; --gp: #111111; color-scheme: dark } }
-* { box-sizing: border-box }
-html { -webkit-text-size-adjust: 100% }
-body { margin: 0; background: var(--page); color: var(--ink); font: 400 16px/1.6 var(--mono) }
-a { color: inherit; text-underline-offset: 3px }
-.band { padding-left: max(20px, env(safe-area-inset-left)); padding-right: max(20px, env(safe-area-inset-right)) }
-.in { max-width: 1080px; margin: 0 auto }
-nav.band { padding-block: 16px; border-bottom: 2px solid var(--ink) }
-nav .in { display: flex; align-items: center; gap: 22px; flex-wrap: wrap }
-nav .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 18px; color: var(--ink); text-decoration: none; margin-right: auto }
-nav .brand svg { height: 18px; width: auto; color: var(--mark) }
-nav a.l { color: var(--muted); text-decoration: none } nav a.l:hover { color: var(--ink) }
-h1, h2 { font-weight: 700; text-transform: lowercase; text-wrap: balance; margin: 0 }
-h1::after, h2::after { content: ""; display: inline-block; width: .42em; height: .42em; margin-left: .32em; background: var(--sq, var(--mark)) }
-header.band { background: #111111; color: #EFEAE2; padding-block: 64px 56px; --sq: var(--lime) }
-header .in { display: grid; grid-template-columns: 1.2fr .8fr; gap: 48px; align-items: center }
-h1 { font-size: clamp(32px, 5.4vw, 56px); line-height: 1.05; letter-spacing: -0.02em; margin-bottom: 18px }
-.lede { font-size: 17px; color: #C9C4BB; max-width: 36em; margin: 0 0 28px }
-.cta { display: flex; gap: 12px; flex-wrap: wrap }
-.btn { display: inline-flex; align-items: center; gap: 8px; padding: 11px 18px; border-radius: 4px; font-weight: 600; text-decoration: none; border: 1px solid currentColor }
-.btn.go { background: var(--lime); color: #111111; border-color: var(--lime) }
-header .btn:not(.go) { color: #EFEAE2; border-color: #3A3834 }
-section .btn.go { background: var(--ink); color: var(--page); border-color: var(--ink) }
-.btn:focus-visible { outline: 3px solid var(--lime); outline-offset: 2px }
-.note { font-size: 13px; color: #8E8A84; margin-top: 14px }
-.p-mark { justify-self: center; width: min(100%, 300px) }
-.p-mark svg { width: 100%; height: auto; display: block; color: var(--lime) }
-@media (prefers-reduced-motion: no-preference) { .p-mark rect { animation: cell .42s cubic-bezier(.2,.9,.3,1.2) both; transform-box: fill-box; transform-origin: center } }
-@keyframes cell { from { opacity: 0; transform: scale(.2) } to { opacity: 1; transform: scale(1) } }
-.shot.band { padding-block: 40px 56px; border-bottom: 1px solid var(--rule) }
-.shot img { width: 100%; height: auto; display: block; border: 1px solid var(--rule); border-radius: 4px }
-section.band { padding-block: 56px; border-bottom: 1px solid var(--rule) }
-h2 { font-size: clamp(22px, 3vw, 30px); letter-spacing: -0.01em; margin-bottom: 12px }
-.sub { color: var(--muted); max-width: 46em; margin: 0 0 28px }
-.three { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border-top: 1px solid var(--rule) }
-.card { padding: 22px 22px 22px 0; display: grid; gap: 10px; align-content: start; min-width: 0 }
-.card + .card { padding-left: 22px; border-left: 1px solid var(--rule) }
-.card svg { width: 40px; height: 40px; --ln: var(--ink) }
-.card h3 { margin: 0; font-size: 17px; font-weight: 700; text-transform: lowercase }
-.card p, .card ul { margin: 0; color: var(--muted); font-size: 15px }
-.card ul { padding-left: 18px }
-.num { font-variant-numeric: tabular-nums; color: var(--ink); font-weight: 600 }
-.icons { display: grid; grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); gap: 16px 8px; margin-top: 8px }
-.icons svg { width: 40px; height: 40px; display: block; margin: 0 auto }
-.icons figure { margin: 0; text-align: center; font-size: 11px; color: var(--muted) }
-pre { font-family: var(--mono); font-size: 14px; background: var(--wash); border-left: 2px solid var(--ink); padding: 16px 18px; overflow-x: auto; margin: 0 }
-code { font-family: var(--mono) }
-.split { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; align-items: start }
-.split > * { min-width: 0 }
-.split img { width: 100%; height: auto; border: 1px solid var(--rule); border-radius: 4px }
-footer.band { padding-block: 36px 52px; border-top: 2px solid var(--ink); color: var(--muted); font-size: 14px }
-footer .in { display: grid; gap: 8px }
-@media (max-width: 860px) {
-  header .in, .split { grid-template-columns: 1fr } .p-mark { width: 180px; order: -1; justify-self: start }
-  .three { grid-template-columns: 1fr } .card, .card + .card { padding: 20px 0; border-left: 0; border-top: 1px solid var(--rule) }
-  header.band { padding-block: 40px 32px } }
-</style>
+<link rel="preload" href="fonts/jetbrains-mono-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="shared/kit.css">
+<script type="importmap">
+{"imports": {"three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}
+</script>
 </head>
 <body>
-<nav class="band"><div class="in">
-  <a class="brand" href="./">{{MARK}}polykrom</a>
-  <a class="l" href="app/">open in browser</a>
-  <a class="l" href="docs/">docs</a>
-  <a class="l" href="https://github.com/wckdboy/polykrom">github</a>
-</div></nav>
+{{NAV:home}}
 
-<header class="band"><div class="in">
+<header class="band ink"><div class="in hero">
   <div>
-    <h1>cad for parts that have to work</h1>
-    <p class="lede">Polykrom is open-source parametric CAD in pure Rust. Model a part, check the stress on it before you make it, and work with an AI companion that uses the same commands you do.</p>
-    <div class="cta">
-      <a class="btn go" href="app/">Open in your browser</a>
-      <a class="btn" href="https://github.com/wckdboy/polykrom">Build the desktop app</a>
+    <p class="kicker reveal">open-source cad · pure rust · ai-native</p>
+    <h1 class="reveal" style="--i:1">cad your ai builds <em>real machines</em> in</h1>
+    <p class="lede reveal" style="--i:2">Polykrom is parametric CAD for people and their AI agents. Design parts and assemblies, prove they work by measuring them, simulate them, and get them made. Every step an agent takes is a command you can see and undo, and every claim it makes is checked against the geometry.</p>
+    <div class="cta reveal" style="--i:3">
+      <a class="btn go" href="app/">Open in your browser <span class="arrow">→</span></a>
+      <a class="btn" href="https://github.com/wckdboy/polykrom">Source</a>
     </div>
-    <p class="note">MIT OR Apache-2.0. The browser version models and exports; stress analysis runs in the desktop app.</p>
+    <dl class="facts reveal" style="--i:4">
+      <div><dt>Kernel</dt><dd>pure Rust</dd></div>
+      <div><dt>Agents</dt><dd>MCP, any model</dd></div>
+      <div><dt>Licence</dt><dd>MIT or Apache</dd></div>
+      <div><dt>Telemetry</dt><dd>none</dd></div>
+    </dl>
   </div>
-  <div class="p-mark">{{GEM}}</div>
+  <div class="stage3d" id="hero3d" aria-label="The SO-101 robot arm, jointed by an AI agent in Polykrom, doing its pick and place">
+    <div class="poster p-mark" aria-hidden="true">{{GEM}}</div>
+    <span class="live-dot">SO-101 · jointed by an agent from its raw CAD · live</span>
+  </div>
 </div></header>
 
-<div class="shot band"><div class="in">
-  <img src="screens/polykrom.png" width="1600" height="996" alt="Polykrom with a sensor enclosure open: the design browser on the left, the model in the viewport, the timeline below.">
-</div></div>
-
-<section class="band"><div class="in split">
-  <div>
-    <h2>Raw CAD in, a working robot out</h2>
-    <p class="sub">An AI agent took the SO-101's published CAD, LeRobot's open-source arm, and turned it into a robot using Polykrom's tools: 97 parts organised into links, joints found from the servo geometry, a pick-and-place study, and a stress check on the printed arm. Its kinematics land within 0.81 mm of LeRobot's own URDF. The page shows everything it did, and where this version falls short.</p>
-    <div class="cta"><a class="btn go" href="so101/">See the SO-101 in 3D</a><a class="btn" href="kestrel/">Kestrel: designed from scratch</a></div>
+<section class="band" id="watch"><div class="in">
+  <div class="split wide">
+    <div>
+      <h2 class="reveal">watch an agent build</h2>
+      <p class="sub reveal" style="--i:1">Polykrom is an MCP server. Point Claude Code, or any agent, at it and ask for a part or a machine. With the app open you follow along: every command the agent runs and what it came to, overlaps and gaps marked on the model as it inspects, and its cursor where it works. It's the same app you use, with the same commands.</p>
+      <div class="cta reveal" style="--i:2"><a class="btn" href="docs/">How it works <span class="arrow">→</span></a></div>
+    </div>
+    <figure><img class="scan" src="media/site-lime-workspace.jpg" width="1500" height="941" alt="Polykrom's modelling workspace in lime on ink: the browser, a model, the assistant panel and the agent's activity feed." loading="lazy"></figure>
   </div>
-  <a href="so101/"><img src="so101/so101-poster.png" alt="The SO-101 robot arm, folded at rest" ></a>
+</div></section>
+
+<section class="band" id="ladder"><div class="in">
+  <h2 class="reveal">a ladder of machines</h2>
+  <p class="sub reveal" style="--i:1">Each demonstration is a machine built by an AI agent in Polykrom and verified by measurement. Whatever one exposes gets fixed before the next rung, so each starts from a better tool.</p>
+  <div class="ladder" data-stagger>
+    <a class="rung done" href="so101/" style="--p:100%"><span class="d">D1</span><h3>robotic arm</h3><p>The SO-101 from its raw CAD: 97 parts into links, joints from the servos, motion and URDF.</p><div class="bar"><i></i></div><span class="state">done</span></a>
+    <div class="rung now" style="--p:55%"><span class="d">D2</span><h3>3d printer</h3><p>CoreXY with its real kinematics, rails, belts and lead screws, and a verified build volume.</p><div class="bar"><i></i></div><span class="state">building now</span></div>
+    <div class="rung" style="--p:10%"><span class="d">D3</span><h3>robot dog</h3><p>Twelve actuated joints, a gait, the centre of mass over its feet, MuJoCo export.</p><div class="bar"><i></i></div><span class="state">next</span></div>
+    <div class="rung" style="--p:5%"><span class="d">D4</span><h3>humanoid</h3><p>About 25 joints, reach by IK, balance, linkage hands.</p><div class="bar"><i></i></div><span class="state">planned</span></div>
+    <div class="rung"><span class="d">D5</span><h3>car</h3><p>Suspension, steering and drivetrain, with bump steer and Ackermann checked.</p><div class="bar"><i></i></div><span class="state">planned</span></div>
+    <div class="rung"><span class="d">D6</span><h3>plane</h3><p>Airfoil wings, control surfaces, the centre of gravity against the neutral point.</p><div class="bar"><i></i></div><span class="state">planned</span></div>
+    <div class="rung"><span class="d">D7</span><h3>assembly line</h3><p>Robot cells and a conveyor, collision-free, with its cycle time.</p><div class="bar"><i></i></div><span class="state">planned</span></div>
+  </div>
+</div></section>
+
+<section class="band" id="loop"><div class="in loop">
+  <svg viewBox="-40 -10 480 420" role="img" aria-label="The loop: idea, design, verify, render, animate, simulate, make, measure, and back to the idea">
+    <circle class="ring" cx="200" cy="200" r="140"/>
+    <path class="arc" d="M200,60 A140,140 0 1,1 199.99,60"/>
+    {{LOOP}}
+    <circle class="runner" r="6" cx="200" cy="60"/>
+  </svg>
+  <div>
+    <h2 class="reveal">from an idea to a made part, and back</h2>
+    <p class="sub reveal" style="--i:1">An agent should be able to take an idea all the way to a part someone can make and test, then learn from what happened. Here is what that loop can do today, and what is next.</p>
+    <div class="stagelist" data-stagger>
+      <div><b>idea</b><span>Talk to the built-in assistant (Claude, Gemini, OpenAI or a local model) or bring your own agent over MCP</span><em class="y">today</em></div>
+      <div><b>design</b><span>Parametric parts, sketches with constraints, assemblies with joints, standard parts from the library</span><em class="y">today</em></div>
+      <div><b>verify</b><span>Exact measures, clearance and interference, joint sweeps to the true contact stops</span><em class="y">today</em></div>
+      <div><b>render</b><span>Studio renders of the design with its materials</span><em class="y">today</em></div>
+      <div><b>animate</b><span>Motion studies to GIF, and robot export to URDF</span><em class="y">today</em></div>
+      <div><b>simulate</b><span>Static stress on the part; modal, thermal and dynamics are next</span><em class="p">growing</em></div>
+      <div><b>make</b><span>STEP, 3MF, sheet-metal flat patterns, a slicer hand-off; printability checks and CAM are next</span><em class="p">growing</em></div>
+      <div><b>measure</b><span>As-built measurements and test results back into the design, for the next revision</span><em class="p">planned</em></div>
+    </div>
+  </div>
+</div></section>
+
+<section class="band" id="parts"><div class="in">
+  <h2 class="reveal">real parts, from their standards</h2>
+  <p class="sub reveal" style="--i:1">The library's parts are generated from published dimensions, so they are exact solids with named faces that agents can mate to, not meshes. Fasteners and bearings, T-slot extrusions, NEMA steppers with their ratings, GT2 pulleys with their teeth, MGN rails and carriages, T8 lead screws.</p>
+  <div class="split">
+    <figure><img class="scan" src="media/site-parts-extrusions-steppers.jpg" width="1500" height="843" alt="2020 and 2040 T-slot extrusions, a NEMA 17 and a NEMA 23 stepper" loading="lazy"><figcaption>Extrusions with their T-slots; NEMA steppers with pilot, D-shaft and mounting holes.</figcaption></figure>
+    <figure><img class="scan" src="media/site-parts-rails-pulleys-leadscrews.jpg" width="1500" height="843" alt="An MGN12 rail with its carriage, GT2 pulleys, a T8 lead screw and nut, and a stepper" loading="lazy"><figcaption>An MGN12 rail and carriage, toothed GT2 pulleys, a T8 screw with its brass nut.</figcaption></figure>
+  </div>
+</div></section>
+
+<section class="band" id="numbers"><div class="in">
+  <h2 class="reveal">measured, not claimed</h2>
+  <p class="sub reveal" style="--i:1">Every number here comes from measuring what was built.</p>
+  <div class="stats">
+    <div class="stat"><div class="n" data-count="10" data-unit="/10">0</div><div class="t">single parts an agent built exactly, volume within 0.2 %</div></div>
+    <div class="stat"><div class="n" data-count="97">0</div><div class="t">SO-101 parts an agent turned into a working robot</div></div>
+    <div class="stat"><div class="n" data-count="0.81" data-unit=" mm">0</div><div class="t">from LeRobot's own SO-101 kinematics</div></div>
+    <div class="stat"><div class="n" data-count="2.17">0</div><div class="t">safety factor of an agent-designed arm under 500 N, checked independently</div></div>
+    <div class="stat"><div class="n" data-count="5000" data-unit="+">0</div><div class="t">automated tests on every change</div></div>
+  </div>
+</div></section>
+
+<section class="band" id="agents"><div class="in split">
+  <div>
+    <h2 class="reveal">your agent, your tools</h2>
+    <p class="sub reveal" style="--i:1">Any MCP client can drive Polykrom: headless for scripts and evaluations, or the open app so you can watch. The agent gets the same commands as the menus, and the answers come back as measurements.</p>
+    <figure class="reveal" style="--i:2"><img src="media/site-follow-along-agent.jpg" width="1500" height="934" alt="Following an agent in the app: its activity feed and the overlaps it found marked on the model" loading="lazy"></figure>
+  </div>
+<pre><span class="prompt">$</span> claude mcp add polykrom -- polykrom-cli mcp
+
+<span data-type="&gt; Make an aluminium L-bracket, 80 × 40 × 50 mm,
+  5 mm thick, with two Ø8 holes, and tell me its mass."></span><span class="caret"></span></pre>
 </div></section>
 
 <section class="band"><div class="in">
-  <h2>Model, check, and design with a companion</h2>
-  <p class="sub">One program for the whole loop from an idea to a part you can trust.</p>
-  <div class="three">
-    <div class="card">{{ICON:extrude}}<h3>Model</h3>
-      <ul><li>Sketches with a constraint solver and dimensions driven by parameters</li><li>Extrude, revolve, sweep, loft, fillet, shell, holes, threads, patterns</li><li>Assemblies with joints and motion; sheet metal and plastic parts</li><li>STEP, IGES, 3MF, STL, OBJ, glTF and URDF</li></ul></div>
-    <div class="card">{{ICON:analysis_stress}}<h3>Check</h3>
-      <p>Static stress on the part: pick the held faces and the loaded ones, and read the peak stress, the deflection and the safety factor against the material's yield.</p>
-      <p>Checked against beam theory: a 200 mm cantilever bends within <span class="num">2%</span> of P L³ / 3 E I.</p></div>
-    <div class="card">{{ICON:agent_chat}}<h3>Design with a companion</h3>
-      <p>An AI agent drives Polykrom through the same commands as the menus, over the Model Context Protocol, and checks what it built by measuring it.</p>
-      <p>Asked for a steel arm that carries <span class="num">500 N</span> at a safety factor of two, an agent designed a hollow tube that passed an independent check: <span class="num">SF 2.17</span>, <span class="num">0.165 mm</span>, <span class="num">198 g</span>.</p></div>
-  </div>
-</div></section>
-
-<section class="band"><div class="in split">
-  <div>
-    <h2>Your agent, your tools</h2>
-    <p class="sub">Polykrom is an MCP server. Point Claude Code, or any MCP client, at it and ask for a part. With the app open it drives the app, so you can follow along: an Agent panel lists every command and what it found, and its checks are drawn on the model. With no app running it works headless.</p>
-  </div>
-<pre>claude mcp add polykrom -- polykrom-cli mcp
-
-&gt; Make an aluminium L-bracket, 80 × 40 × 50 mm,
-  5 mm thick, with two Ø8 holes, and tell me its mass.</pre>
-</div></section>
-
-<section class="band"><div class="in">
-  <h2>Drawn to be read at a glance</h2>
-  <p class="sub">Polykrom has its own icon language, Facet: each tool is a line drawing with one coloured facet, the face the command makes. The colour says what kind of work it is.</p>
-  <div class="icons">{{STRIP}}</div>
+  <h2 class="reveal">drawn to be read at a glance</h2>
+  <p class="sub reveal" style="--i:1">Polykrom has its own icon language, Facet: each tool is a line drawing with one lime facet, the face the command makes.</p>
+  <div class="icons" data-stagger>{{STRIP}}</div>
 </div></section>
 
 <footer class="band"><div class="in">
-  <div>Polykrom is a fork of <a href="https://github.com/tangency-labs/solidcraft">SolidCraft</a> by the SolidCraft contributors, and keeps its history. Fixes that help both go upstream. Stress analysis runs <a href="https://github.com/wckdboy/nightfall">Nightfall</a>'s verified solver as a separate program.</div>
-  <div>MIT OR Apache-2.0 · <a href="https://github.com/wckdboy/polykrom">Source</a> · <a href="docs/">Docs</a> · <a href="https://github.com/wckdboy/polykrom/issues">Issues</a></div>
+  <div>Polykrom is a fork of <a href="https://github.com/tangency-labs/solidcraft">SolidCraft</a> by the SolidCraft contributors, and keeps its history; fixes that help both go upstream. Stress analysis runs on <a href="https://nightfall.sh">Nightfall</a>'s verified solver.</div>
+  <div class="family"><a href="https://github.com/wckdboy/polykrom">Source</a><a href="docs/">Docs</a><a href="https://github.com/wckdboy/polykrom/blob/main/docs/ROADMAP.md">Roadmap</a><a href="https://nightfall.sh">Nightfall</a><a href="https://autobot.sh">Autobot</a><a href="https://invincible.sh">Invincible</a><a href="https://wckd.ai">WCKD</a></div>
+  <div>MIT OR Apache-2.0. Made by WCKD.</div>
 </div></footer>
+
+<script type="module" src="shared/motion.js"></script>
+<script type="module">
+// The hero's arm: the SO-101 showcase's own files, its pick and place on a loop. The poster stays
+// where WebGL or motion isn't available.
+if (!matchMedia("(prefers-reduced-motion: reduce)").matches) {
+  const root = document.getElementById("hero3d");
+  const start = async () => {
+    try {
+      const { mount } = await import("./shared/viewer.js");
+      const motion = await (await fetch("so101/motion.json")).json();
+      await mount(root, {
+        urdf: "so101/urdf/so101.urdf", motion, pack: { bin: "so101/meshes.bin", json: "so101/meshes.json" },
+        camera: { position: [0.36, -0.46, 0.3], target: [0.02, -0.06, 0.11] }, theme: "ink",
+        // In Polykrom's colours: the printed parts lime, the servos ink, the screws steel.
+        colors: (link) => /Screw|Nut|Washer/i.test(link) ? { color: "#8E8A84", metalness: 0.8, roughness: 0.35 }
+          : /Servo|ST3215|SCS|GE_|ZK_|SG-|XG-|MOTOR|Adapter|WaveShare|Component|[^\x00-\x7f]/i.test(link) ? { color: "#1C1B19", metalness: 0.1, roughness: 0.6 }
+          : { color: "#CCFF00", metalness: 0.05, roughness: 0.55 },
+      });
+      root.classList.add("live");
+    } catch (e) { console.warn("hero 3D view:", e); }
+  };
+  // After the page has drawn: the arm's meshes are a few MB.
+  "requestIdleCallback" in window ? requestIdleCallback(start, { timeout: 1500 }) : setTimeout(start, 600);
+}
+</script>
 </body>
 </html>

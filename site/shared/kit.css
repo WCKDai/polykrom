@@ -1,0 +1,240 @@
+/* Polykrom's site in the WCKD family (autobot-www brand/kit.json v4, BRAND.md): JetBrains Mono for
+   everything, ink on a white page (white on ink when the system asks for dark), hairlines and 2 px
+   rules, no cards or shadows. Lowercase headlines end in Polykrom's square. Lime (#CCFF00) is for
+   marks only: the p, the square, focus, link underlines, the live dot; on paper the p is ink.
+   Motion (shared/motion.js) only ever eases things into place, and none of it runs when the
+   system asks for reduced motion. Every page of the site uses this one sheet. */
+@font-face { font-family: "JetBrains Mono"; src: url("../fonts/jetbrains-mono-latin.woff2") format("woff2"); font-weight: 100 800; font-display: swap; }
+:root {
+  --page: #FFFFFF; --wash: #F6F5F2; --paper: #EFEAE2; --rule: #E4E1DB; --strong: #D3D0C9; --muted: #6E6A64; --ink: #111111;
+  --ink-panel: #1C1B19; --ink-rule: #2F2D2A; --bone: #EFEAE2; --ash: #8E8A84; --lime: #CCFF00;
+  --ok: #8E8A84; --warn: #E2C044; --bad: #B3250D;
+  --mark: var(--ink);
+  /* The Facet icons' roles: line, then light, mid and deep facet, and the ground. */
+  --ln: var(--ink); --a1: #E6F9A8; --a2: #B8E600; --a3: #6E9900; --gp: #FFFFFF;
+  --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --ease: cubic-bezier(.2, .7, .2, 1);
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) { :root {
+  --page: #111111; --wash: #1A1918; --paper: #1C1B19; --rule: #2A2826; --strong: #3A3733; --muted: #9A958C; --ink: #EEEBE5;
+  --mark: var(--lime); --bad: #FF6A47; --a1: #3B4A12; --a2: #CCFF00; --a3: #A3CC00; --gp: #111111; --ln: var(--ink); color-scheme: dark } }
+
+* { box-sizing: border-box }
+html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto } }
+body { margin: 0; background: var(--page); color: var(--ink); font: 400 16px/1.65 var(--mono); -webkit-font-smoothing: antialiased }
+::selection { background: color-mix(in srgb, var(--lime) 45%, var(--page)); color: var(--ink) }
+a { color: inherit; text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; transition: text-decoration-color .2s }
+a:hover { text-decoration-color: var(--lime); text-decoration-thickness: 2px }
+:focus-visible { outline: 2px solid var(--lime); outline-offset: 3px }
+img, svg, video, canvas { display: block; max-width: 100% }
+code { font-family: var(--mono); font-size: .94em }
+.band { padding-left: max(20px, env(safe-area-inset-left)); padding-right: max(20px, env(safe-area-inset-right)) }
+.in { max-width: 1120px; margin: 0 auto }
+
+/* masthead: the p, the name and the domain; links split by thin rules */
+nav.band { padding-block: 16px 14px; border-bottom: 2px solid var(--ink); position: sticky; top: 0; z-index: 20;
+  background: color-mix(in srgb, var(--page) 92%, transparent); backdrop-filter: saturate(1.4) blur(10px) }
+nav .in { display: flex; align-items: center; gap: 18px; flex-wrap: wrap }
+nav .brand { display: inline-flex; align-items: center; gap: 10px; font-weight: 700; font-size: 16px; text-decoration: none; margin-right: auto }
+nav .brand svg { height: 15px; width: auto; color: var(--mark) }
+nav .brand small { color: var(--muted); font-weight: 400; font-size: 13px }
+nav .links { display: flex; flex-wrap: wrap; font-size: 13px }
+nav .links a { color: var(--muted); text-decoration: none; padding: 0 12px; border-left: 1px solid var(--rule) }
+nav .links a:first-child { border-left: 0 }
+nav .links a:hover, nav .links a[aria-current] { color: var(--ink) }
+nav .links a[aria-current] { text-decoration: underline 2px var(--lime); text-underline-offset: 5px }
+
+/* headlines: lowercase, ending in the square */
+h1, h2, h3 { font-weight: 700; text-transform: lowercase; text-wrap: balance; margin: 0 }
+h1::after, h2::after { content: ""; display: inline-block; width: .42em; height: .42em; margin-left: .3em; background: var(--sq, var(--mark)) }
+h1 { font-size: clamp(32px, 5.6vw, 60px); line-height: 1.04; letter-spacing: -.025em; margin-bottom: 18px }
+h1 em, h2 em { font-style: normal; text-decoration: underline 4px var(--lime); text-underline-offset: .14em; text-decoration-skip-ink: none }
+h2 { font-size: clamp(22px, 3.2vw, 32px); letter-spacing: -.015em; margin-bottom: 12px }
+h3 { font-size: 16px }
+.kicker { font-size: 13px; color: var(--muted); margin: 0 0 12px; display: flex; align-items: center; gap: 8px }
+.kicker::before { content: ""; width: 8px; height: 8px; background: var(--lime); flex: none }
+.lede { font-size: 17px; max-width: 44em; margin: 0 0 26px; color: var(--muted) }
+.sub { color: var(--muted); max-width: 46em; margin: 0 0 28px }
+.small, .caption { font-size: 13px; color: var(--muted) }
+.caption { margin: 10px 0 0 }
+.num, td.n { font-variant-numeric: tabular-nums }
+
+/* the ink hero */
+header.band { padding-block: 56px 32px; border-bottom: 1px solid var(--rule) }
+header.ink { background: #111111; color: #EEEBE5; --mark: var(--lime); --muted: #A39E95; --rule: #2F2D2A; --ink: #EEEBE5; border-bottom: 0;
+  padding-block: 64px 56px; position: relative; overflow: hidden }
+header.ink .hero { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr); gap: 40px; align-items: center }
+header.ink .lede { color: #C9C4BB }
+
+/* actions: one primary in ink (lime on the ink hero) */
+.cta { display: flex; gap: 12px; flex-wrap: wrap; align-items: center }
+.btn { display: inline-flex; align-items: center; gap: 10px; padding: 11px 18px; border-radius: 4px; font: 600 14px var(--mono); text-decoration: none;
+  border: 1px solid var(--strong); color: var(--ink); background: transparent; cursor: pointer; transition: transform .25s var(--ease), border-color .2s, background .2s }
+.btn:hover { border-color: var(--ink); text-decoration: none; transform: translateY(-1px) }
+.btn.go { background: var(--ink); color: var(--page); border-color: var(--ink) }
+header.ink .btn.go { background: var(--lime); color: #111111; border-color: var(--lime) }
+header.ink .btn:not(.go) { color: #EEEBE5; border-color: #3A3733 } header.ink .btn:not(.go):hover { border-color: #EEEBE5 }
+.btn .arrow { transition: transform .25s var(--ease) } .btn:hover .arrow { transform: translateX(3px) }
+.note { font-size: 13px; color: var(--muted); margin-top: 14px }
+
+/* facts: a row of terms under the hero */
+.facts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin: 30px 0 0; border-top: 1px solid var(--rule) }
+.facts div { padding: 12px 14px 0 0; min-width: 0 } .facts div + div { padding-left: 14px; border-left: 1px solid var(--rule) }
+.facts dt { font-size: 12px; color: var(--muted) } .facts dd { margin: 2px 0 0; font-weight: 600 }
+
+/* the live 3D view */
+.stage3d { position: relative; height: min(70vh, 640px); min-height: 360px; border: 1px solid var(--rule); background: var(--wash); overflow: hidden }
+header.ink .stage3d { background: transparent; border: 0; height: min(62vh, 560px); min-height: 320px }
+.stage3d canvas { display: block; width: 100%; height: 100%; animation: fade 1.2s var(--ease) both }
+.stage3d .poster { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; transition: opacity .8s var(--ease) }
+.stage3d .poster.p-mark { display: grid; place-items: center } .stage3d .poster.p-mark svg { width: min(38%, 200px); height: auto }
+.stage3d.live .poster { opacity: 0 }
+.live-dot { position: absolute; left: 0; bottom: 0; font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 8px }
+.live-dot::before { content: ""; width: 7px; height: 7px; background: var(--lime); animation: blink 2.4s steps(1) infinite }
+.hud { position: absolute; left: 12px; right: 12px; bottom: 12px; display: flex; gap: 14px; align-items: center; flex-wrap: wrap;
+  background: color-mix(in srgb, var(--page) 88%, transparent); backdrop-filter: blur(8px); border: 1px solid var(--rule); padding: 10px 12px }
+.hud button { font: 600 13px var(--mono); color: var(--page); background: var(--ink); border: 0; border-radius: 4px; padding: 7px 14px; cursor: pointer; min-width: 72px }
+.hud input[type=range] { flex: 1 1 200px; accent-color: var(--ink); min-width: 0 }
+.hud .read { font-size: 12px; color: var(--muted); display: flex; gap: 12px; flex-wrap: wrap; font-variant-numeric: tabular-nums }
+.hud .read b { color: var(--ink); font-weight: 400 }
+.loading { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); font-size: 13px; text-align: center; padding: 20px }
+
+/* sections */
+section.band { padding-block: 72px; border-bottom: 1px solid var(--rule) }
+.viewer.band { padding-block: 28px 12px }
+.split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 40px; align-items: center }
+.split > * { min-width: 0 }
+.split.wide { grid-template-columns: minmax(0, .8fr) minmax(0, 1.2fr) }
+figure { margin: 0 }
+figure img, .shot img { width: 100%; height: auto; border: 1px solid var(--rule) }
+figure figcaption { font-size: 13px; color: var(--muted); margin-top: 10px }
+
+/* columns split by hairlines (no cards) */
+.three, .grid2, .grid3 { display: grid; border-top: 1px solid var(--rule) }
+.grid3 { grid-template-columns: repeat(3, minmax(0, 1fr)) }
+.three { grid-template-columns: repeat(3, minmax(0, 1fr)) } .grid2 { grid-template-columns: repeat(2, minmax(0, 1fr)) }
+.card { padding: 22px 22px 22px 0; display: grid; gap: 10px; align-content: start; min-width: 0 }
+.card + .card { padding-left: 22px; border-left: 1px solid var(--rule) }
+.grid2 .card:nth-child(odd) { padding-left: 0; border-left: 0 }
+.grid2 .card:nth-child(n+3) { border-top: 1px solid var(--rule) }
+.card svg { width: 40px; height: 40px }
+.card p, .card ul { margin: 0; color: var(--muted); font-size: 15px }
+.card ul { padding-left: 18px }
+
+/* numbers that count up */
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); margin: 28px 0 0; border-top: 2px solid var(--ink) }
+.stat { padding: 16px 16px 6px 0; min-width: 0 }
+.stat + .stat { padding-left: 16px; border-left: 1px solid var(--rule) }
+.stat .n { font-size: clamp(24px, 3vw, 34px); font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; letter-spacing: -.02em }
+.stat .t { color: var(--muted); font-size: 13px; margin-top: 6px }
+
+/* stages of a showcase, gaps it found */
+.stages, .short { display: grid; border-top: 1px solid var(--rule) }
+.st { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 24px; padding: 22px 0; border-bottom: 1px solid var(--rule) }
+.st .meta { font-size: 13px; color: var(--muted); display: grid; gap: 4px; align-content: start }
+.st .meta .name { font-size: 16px; font-weight: 700; color: var(--ink); text-transform: lowercase }
+.st .body { display: grid; gap: 10px; min-width: 0 }
+.st .ask { color: var(--muted); font-size: 14px; border-left: 2px solid var(--ink); padding-left: 12px; margin: 0 }
+.st ul { margin: 0; padding-left: 18px; display: grid; gap: 4px }
+.gap { display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: 18px; padding: 16px 0; border-bottom: 1px solid var(--rule) }
+.gap .area { font-size: 13px; color: var(--muted) }
+.gap .area::before { content: "! "; color: var(--warn) }
+.gap.fixed .area::before { content: "✓ "; color: var(--ash) }
+.gap p { margin: 0 } .gap p + p { color: var(--muted); font-size: 14px; margin-top: 6px }
+.tag { display: inline-block; font-size: 12px; padding: 0 8px; border: 1px solid var(--rule); color: var(--muted); margin-right: 6px; border-radius: 2px }
+.tag.v::before { content: "✓ "; color: var(--ash) } .tag.w::before { content: "! "; color: var(--warn) }
+
+/* the ladder of demonstrations */
+.ladder { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); border-top: 2px solid var(--ink); counter-reset: rung }
+.rung { padding: 16px 12px 10px 0; min-width: 0; position: relative; display: flex; flex-direction: column }
+.rung + .rung { padding-left: 12px; border-left: 1px solid var(--rule) }
+.rung .d { font-size: 12px; color: var(--muted) }
+.rung h3 { margin: 4px 0 6px; font-size: 15px }
+.rung p { margin: 0; font-size: 13px; color: var(--muted) }
+.rung .bar { height: 4px; background: var(--rule); margin: auto 0 8px; overflow: hidden }
+.rung p { margin-bottom: 14px }
+.rung .bar i { display: block; height: 100%; width: var(--p, 0%); background: var(--ink); transform-origin: left; animation: grow 1.4s var(--ease) both; animation-delay: calc(var(--i, 0) * 90ms) }
+.rung.now .bar i { background: var(--lime) }
+.rung .state { font-size: 12px }
+.rung.done .state::before { content: "✓ "; color: var(--ash) }
+.rung.now .state::before { content: ""; display: inline-block; width: 7px; height: 7px; margin-right: 7px; background: var(--lime); animation: blink 1.6s steps(1) infinite }
+a.rung { text-decoration: none; color: inherit } a.rung:hover h3 { text-decoration: underline 2px var(--lime); text-underline-offset: 4px }
+
+/* the loop from idea to a made, tested part */
+.loop { display: grid; grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); gap: 40px; align-items: center }
+.loop svg { width: 100%; height: auto; max-width: 440px; margin: 0 auto; overflow: visible }
+.loop .ring { fill: none; stroke: var(--rule); stroke-width: 2 }
+.loop .arc { fill: none; stroke: var(--ink); stroke-width: 2; stroke-dasharray: var(--len) var(--len); stroke-dashoffset: var(--len) }
+.loop.in-view .arc { animation: draw 2.6s var(--ease) forwards }
+.loop .node { fill: var(--page); stroke: var(--ink); stroke-width: 2 }
+.loop .node.has { fill: var(--ink) }
+.loop .lbl { font: 600 11px var(--mono); fill: var(--ink) }
+.loop .runner { fill: var(--lime); stroke: var(--ink); stroke-width: 1 }
+.stagelist { display: grid; border-top: 1px solid var(--rule) }
+.stagelist div { display: grid; grid-template-columns: 130px minmax(0, 1fr) auto; gap: 14px; padding: 10px 0; border-bottom: 1px solid var(--rule); font-size: 14px; align-items: baseline }
+.stagelist b { text-transform: lowercase }
+.stagelist span { color: var(--muted) }
+.stagelist em { font-style: normal; font-size: 12px; color: var(--muted) }
+.stagelist em.y::before { content: "✓ "; color: var(--ash) } .stagelist em.p::before { content: "· "; color: var(--warn) }
+
+/* code */
+pre { font: 14px/1.6 var(--mono); background: var(--wash); border-left: 2px solid var(--ink); padding: 18px 20px; overflow-x: auto; margin: 0; white-space: pre-wrap }
+pre .prompt { color: var(--muted) }
+pre .caret { display: inline-block; width: .6em; height: 1.1em; background: var(--lime); vertical-align: text-bottom; animation: blink 1s steps(1) infinite }
+
+/* the Facet icon strip */
+.icons { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 18px 8px; margin-top: 8px }
+.icons svg { width: 40px; height: 40px; margin: 0 auto; transition: transform .35s var(--ease) }
+.icons figure:hover svg { transform: translateY(-3px) }
+.icons figure { text-align: center; font-size: 11px; color: var(--muted); overflow-wrap: anywhere }
+
+/* tables */
+table { width: 100%; border-collapse: collapse; font-size: 14px }
+th, td { text-align: left; padding: 8px 10px 8px 0; border-bottom: 1px solid var(--rule); vertical-align: top }
+th { color: var(--muted); font-weight: 400; font-size: 12px }
+td.n { text-align: right }
+.scroll { overflow-x: auto }
+.dl { display: flex; gap: 10px; flex-wrap: wrap }
+
+footer.band { padding-block: 36px 52px; border-top: 2px solid var(--ink); color: var(--muted); font-size: 13px }
+footer .in { display: grid; gap: 10px }
+footer .family { display: flex; gap: 0; flex-wrap: wrap }
+footer .family a { padding: 0 12px; border-left: 1px solid var(--rule); text-decoration: none } footer .family a:first-child { padding-left: 0; border-left: 0 }
+
+/* the p, cell by cell */
+.p-mark svg { color: var(--lime); width: 100%; height: auto }
+@media (prefers-reduced-motion: no-preference) {
+  .p-mark rect { animation: cell .5s cubic-bezier(.2, .9, .3, 1.25) both; transform-box: fill-box; transform-origin: center }
+  /* Things that ease into place as they come into view (motion.js marks the page .motion when it
+     runs, then each thing .shown): without the script, nothing is ever hidden. */
+  .motion .reveal { opacity: 0; transform: translateY(14px); transition: opacity .8s var(--ease), transform .8s var(--ease); transition-delay: calc(var(--i, 0) * 80ms) }
+  .motion .reveal.shown { opacity: 1; transform: none }
+  /* Images drawn in from the top behind a lime scan line, like a part coming off the printer. */
+  .motion .scan { position: relative; clip-path: inset(0 0 100% 0) }
+  .motion .scan.shown { animation: scan 1.3s var(--ease) forwards }
+  .motion .scan::after { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 2px; background: var(--lime); opacity: 0 }
+  .motion .scan.shown::after { animation: scanline 1.3s var(--ease) forwards }
+}
+@keyframes cell { from { opacity: 0; transform: scale(.2) } to { opacity: 1; transform: scale(1) } }
+@keyframes fade { from { opacity: 0 } to { opacity: 1 } }
+@keyframes blink { 50% { opacity: 0 } }
+@keyframes grow { from { transform: scaleX(0) } to { transform: scaleX(1) } }
+@keyframes draw { to { stroke-dashoffset: 0 } }
+@keyframes scan { to { clip-path: inset(0 0 0 0) } }
+@keyframes scanline { 0% { top: 0; opacity: 1 } 90% { opacity: 1 } 100% { top: 100%; opacity: 0 } }
+@media (prefers-reduced-motion: reduce) { .rung .bar i, .loop.in-view .arc, .stage3d canvas { animation: none } .loop .arc { stroke-dashoffset: 0 } .live-dot::before, pre .caret, .rung.now .state::before { animation: none } }
+
+@media (max-width: 960px) {
+  header.ink .hero, .split, .split.wide, .loop { grid-template-columns: 1fr }
+  .ladder { grid-template-columns: repeat(2, minmax(0, 1fr)) }
+  .rung, .rung + .rung { padding: 14px 12px 10px 0; border-left: 0; border-top: 1px solid var(--rule) }
+  .rung:nth-child(even) { padding-left: 12px; border-left: 1px solid var(--rule) }
+  .three, .grid2, .grid3 { grid-template-columns: 1fr } .card, .card + .card, .grid2 .card:nth-child(odd) { padding: 20px 0; border-left: 0; border-top: 1px solid var(--rule) }
+  .facts { grid-template-columns: repeat(2, minmax(0, 1fr)) } .facts div:nth-child(3) { padding-left: 0; border-left: 0 }
+  .st, .gap { grid-template-columns: 1fr } .stagelist div { grid-template-columns: 100px minmax(0, 1fr) }
+  .stagelist em { grid-column: 2 }
+  nav .links a { padding: 0 9px }
+}
+@media (max-width: 480px) { .ladder { grid-template-columns: 1fr } .rung:nth-child(even) { padding-left: 0; border-left: 0 } .stat + .stat { padding-left: 0; border-left: 0 } }

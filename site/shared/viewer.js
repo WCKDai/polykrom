@@ -94,7 +94,7 @@ export function tracks(motion) {
   return { steps, at };
 }
 
-export async function mount(root, { urdf, motion, onStep, colors = {}, pack, camera: view }) {
+export async function mount(root, { urdf, motion, onStep, colors = {}, pack, camera: view, theme }) {
   const css = getComputedStyle(document.documentElement);
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
@@ -107,14 +107,18 @@ export async function mount(root, { urdf, motion, onStep, colors = {}, pack, cam
   const controls = new OrbitControls(camera, renderer.domElement);
   controls.target.set(...(view?.target || [0.03, 0, 0.16]));
   controls.enableDamping = true;
-  scene.add(new THREE.HemisphereLight(0xdfe9f2, 0x2a2b31, 1.6));
+  // On the ink hero the page scrolls past the view: it turns by dragging but doesn't take the wheel.
+  if (theme === "ink") controls.enableZoom = false;
+  // The WCKD kit's neutrals: warm white light, an ash grid with Polykrom's lime on its centre lines.
+  scene.add(new THREE.HemisphereLight(0xf4f1ea, 0x2a2826, 1.6));
   const key = new THREE.DirectionalLight(0xffffff, 2.2);
   key.position.set(0.6, -0.8, 1.2);
   scene.add(key);
-  const rim = new THREE.DirectionalLight(0x8be8f0, 0.9);
+  const rim = new THREE.DirectionalLight(0xeeebe5, 0.8);
   rim.position.set(-0.8, 0.7, 0.5);
   scene.add(rim);
-  const grid = new THREE.GridHelper(0.6, 24, 0x3fcad3, 0x3a3b42);
+  const dark = theme === "ink" || matchMedia("(prefers-color-scheme: dark)").matches;
+  const grid = new THREE.GridHelper(0.6, 24, 0xccff00, dark ? 0x3a3733 : 0xd3d0c9);
   grid.rotation.x = Math.PI / 2;
   grid.material.transparent = true;
   grid.material.opacity = 0.35;
@@ -129,7 +133,8 @@ export async function mount(root, { urdf, motion, onStep, colors = {}, pack, cam
   const robot = buildRobot(xml, (link, v, f) => {
     const mesh = kid(kid(v, "geometry"), "mesh");
     // The part's material look when the page gives one (by link), else the URDF's colour.
-    const look = colors[link];
+    // `colors`: looks by link name, or a function from the link's name to its look.
+    const look = typeof colors === "function" ? colors(link) : colors[link];
     const c = kid(v, "material") && kid(kid(v, "material"), "color");
     const [r, gg, b] = nums(c && c.getAttribute("rgba"), "0.7 0.72 0.76 1");
     const mat = new THREE.MeshStandardMaterial(look ? { ...look, color: new THREE.Color(look.color) } : { color: new THREE.Color(r, gg, b), metalness: 0.35, roughness: 0.45 });

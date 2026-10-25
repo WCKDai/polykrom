@@ -44,6 +44,76 @@ def p_mark(fill='currentColor', ground=None, animate=False):
     return '<svg viewBox="0 0 6 6" role="img" aria-label="Polykrom" shape-rendering="crispEdges"><g fill="%s">%s</g></svg>' % (fill, cells)
 
 
+# The masthead of every page: the p and the name, then the links split by rules (the WCKD kit).
+PAGES = [('home', 'overview', ''), ('so101', 'so-101', 'so101/'), ('kestrel', 'kestrel', 'kestrel/'), (None, 'open the app', 'app/'),
+         (None, 'docs', 'docs/'), (None, 'roadmap', 'https://github.com/wckdboy/polykrom/blob/main/docs/ROADMAP.md'),
+         (None, 'source', 'https://github.com/wckdboy/polykrom')]
+
+
+def nav(current, root):
+    """The masthead for page `current`, with links relative to `root` ('' at the top, '../' a level
+    down, '/' for pages served at any path)."""
+    links = ''.join('<a href="%s"%s>%s</a>' % (href if href.startswith('http') else root + href, ' aria-current="page"' if key == current else '', label)
+                    for key, label, href in PAGES)
+    return ('<nav class="band"><div class="in"><a class="brand" href="%s">%s polykrom <small>/ polykrom.app</small></a>'
+            '<div class="links">%s</div></div></nav>' % (root or './', p_mark(), links))
+
+
+# The loop on the home page: its stages round a circle, the ones that exist today filled in.
+LOOP = [('idea', True), ('design', True), ('verify', True), ('render', True), ('animate', True), ('simulate', True), ('make', False), ('measure', False)]
+
+
+def loop_svg():
+    import math
+    out = []
+    for i, (name, has) in enumerate(LOOP):
+        a = -math.pi / 2 + i * 2 * math.pi / len(LOOP)
+        x, y = 200 + 140 * math.cos(a), 200 + 140 * math.sin(a)
+        lx, ly = 200 + 178 * math.cos(a), 200 + 178 * math.sin(a) + 4
+        anchor = 'middle' if abs(math.cos(a)) < 0.3 else ('start' if math.cos(a) > 0 else 'end')
+        out.append('<rect class="node%s" x="%.1f" y="%.1f" width="12" height="12"/><text class="lbl" x="%.1f" y="%.1f" text-anchor="%s">%s</text>'
+                   % (' has' if has else '', x - 6, y - 6, lx, ly, anchor, name))
+    return ''.join(out)
+
+
+# Pictures on the home page, from the media branch (screenshots aren't committed), pinned by hash.
+MEDIA_AT = 'https://raw.githubusercontent.com/wckdboy/polykrom/9242139a/'
+MEDIA = {
+    'site-lime-workspace.jpg': 'ebaf83fb49e7092e19ab710a989da6914a518d77ae84b39ce6c43be7a0c8274a',
+    'site-follow-along-agent.jpg': '9750599c533542fc5de52cd527e4accf17c1fe0392923ede2859350ae42b912f',
+    'site-parts-extrusions-steppers.jpg': '1baa7c5b8297f706b026158c423a1515ebd9f7f50484f25b3209a99d14f52ec4',
+    'site-parts-rails-pulleys-leadscrews.jpg': '89d99f268879ca8a9cc1b942a91d874d9dd40cf6565a304b64f0edbe95a5b9af',
+}
+
+
+def media():
+    import hashlib, urllib.request
+    cache = ROOT / 'target' / 'showcase-cache'
+    cache.mkdir(parents=True, exist_ok=True)
+    (OUT / 'media').mkdir(parents=True, exist_ok=True)
+    for name, sha in MEDIA.items():
+        local = cache / ('%s-%s' % (sha[:12], name))
+        if not local.exists():
+            data = urllib.request.urlopen(MEDIA_AT + name, timeout=60).read()
+            if hashlib.sha256(data).hexdigest() != sha:
+                sys.exit('%s from the media branch does not match its pinned hash' % name)
+            local.write_bytes(data)
+        shutil.copy2(local, OUT / 'media' / name)
+
+
+def fill_navs():
+    """Every page's {{NAV:page}}: the copied showcases' too."""
+    for page in OUT.rglob('*.html'):
+        if page.is_relative_to(OUT / 'app') or page.is_relative_to(OUT / 'docs'):
+            continue
+        text = page.read_text()
+        if '{{NAV:' not in text:
+            continue
+        depth = len(page.relative_to(OUT).parts) - 1
+        root = '/' if page.name == '404.html' else '../' * depth
+        page.write_text(re.sub(r'\{\{NAV:(\w+)\}\}', lambda m: nav(m.group(1), root), text))
+
+
 def main():
     if OUT.exists():
         shutil.rmtree(OUT)
@@ -52,8 +122,8 @@ def main():
     page = page.replace('{{MARK}}', p_mark()).replace('{{GEM}}', p_mark(animate=True))
     page = re.sub(r'\{\{ICON:(\w+)\}\}', lambda m: icon(m.group(1), 'c-' + m.group(1))[0], page)
     strip = ''.join('<figure>%s<figcaption>%s</figcaption></figure>' % icon(n, 's-' + n) for n in STRIP)
-    page = page.replace('{{STRIP}}', strip)
-    if '{{' in page:
+    page = page.replace('{{STRIP}}', strip).replace('{{LOOP}}', loop_svg())
+    if re.search(r'\{\{(?!NAV:)', page):
         sys.exit('unfilled placeholder in site/index.html')
     (OUT / 'index.html').write_text(page)
     shutil.copy2(ROOT / 'site' / '404.html', OUT / '404.html')
@@ -69,8 +139,10 @@ def main():
         else:
             print('note: %s is missing, so /%s/ is not in this build' % (src.relative_to(ROOT), dst))
     precompress(OUT / 'app')
+    media()
     kestrel()
     so101()
+    fill_navs()
 
 
 # The SO-101 showcase design: LeRobot's arm (TheRobotStudio SO-ARM100, Apache-2.0, commit a758567c)
