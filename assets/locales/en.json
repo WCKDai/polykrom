@@ -752,6 +752,7 @@
   "cmd.inspect_interference": "Interference",
   "cmd.inspect_isocurve": "Isocurve Analysis",
   "cmd.inspect_minimum_radius": "Minimum Radius Analysis",
+  "cmd.inspect_printability": "Printability",
   "cmd.inspect_silhouette": "Silhouette",
   "cmd.inspect_zebra": "Zebra Analysis",
   "cmd.joint_as_built": "As-Built Joint",
@@ -2438,6 +2439,5 @@
   "update.update_now": "Update now",
   "update.you_have": "You have {version}.",
   "↑ ↓ choose · Enter / Tab complete · Esc dismiss": "↑ ↓ choose · Enter / Tab complete · Esc dismiss",
-  "↑ ↓ choose · Enter applies what you typed · Esc dismiss": "↑ ↓ choose · Enter applies what you typed · Esc dismiss",
-  "cmd.inspect_printability": "Printability"
+  "↑ ↓ choose · Enter applies what you typed · Esc dismiss": "↑ ↓ choose · Enter applies what you typed · Esc dismiss"
 }

@@ -752,6 +752,7 @@
   "cmd.inspect_interference": "干涉",
   "cmd.inspect_isocurve": "等参线分析",
   "cmd.inspect_minimum_radius": "最小半径分析",
+  "cmd.inspect_printability": "可打印性",
   "cmd.inspect_silhouette": "轮廓",
   "cmd.inspect_zebra": "斑马纹分析",
   "cmd.joint_as_built": "现状接头",
@@ -2438,6 +2439,5 @@
   "update.update_now": "立即更新",
   "update.you_have": "当前版本为 {version}。",
   "↑ ↓ choose · Enter / Tab complete · Esc dismiss": "↑ ↓ 选择 · Enter / Tab 补全 · Esc 关闭",
-  "↑ ↓ choose · Enter applies what you typed · Esc dismiss": "↑ ↓ 选择 · Enter 按原样应用 · Esc 关闭",
-  "cmd.inspect_printability": "可打印性"
+  "↑ ↓ choose · Enter applies what you typed · Esc dismiss": "↑ ↓ 选择 · Enter 按原样应用 · Esc 关闭"
 }
