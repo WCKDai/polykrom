@@ -807,6 +807,18 @@ fn combine_across_a_turned_occurrence_meets_the_tool_where_it_is_shown() {
 /// the cut again. Renaming the bar keeps its frame with it.
 #[test]
 fn a_cut_into_a_jointed_part_keeps_its_place_when_the_joint_turns() {
+    cut_into_a_jointed_part(json!(["Bar"]));
+}
+
+/// The same for a cut that may change every body (`targets: ["*"]`).
+#[test]
+fn a_cut_into_every_body_keeps_its_place_when_the_joint_turns() {
+    let mut s = cut_into_a_jointed_part(json!(["*"]));
+    run(&mut s, "joint.drive", json!({"joint": "Pivot", "value": 45}));
+    assert_eq!(s.model.last_recomputed, 0);
+}
+
+fn cut_into_a_jointed_part(targets: Value) -> Session {
     let volume = |s: &Session, name: &str| s.model.state().body(name).map(|b| solidcraft_kernel::measure(&b.body).unwrap().volume).unwrap_or(0.0);
     let mut s = Session::default();
     created(&mut s, "Arm");
@@ -817,7 +829,7 @@ fn a_cut_into_a_jointed_part_keeps_its_place_when_the_joint_turns() {
         "joint.as_built",
         json!({"type": "revolute", "name": "Pivot", "a": 0, "b": "Arm", "at": {"occurrence": 0, "point": [0, 0, 0], "z": [0, 0, 1]}}),
     );
-    run(&mut s, "solid.box", json!({"length": 4, "width": 4, "height": 20, "corner": [30, 3, -5], "operation": "cut", "targets": ["Bar"]}));
+    run(&mut s, "solid.box", json!({"length": 4, "width": 4, "height": 20, "corner": [30, 3, -5], "operation": "cut", "targets": targets}));
     let want = 40.0 * 10.0 * 10.0 - 4.0 * 4.0 * 10.0;
     assert!((volume(&s, "Bar") - want).abs() < 1e-6 * want, "{} vs {want}", volume(&s, "Bar"));
     assert_eq!(s.doc.features.last().map(|f| f.tool_frames.len()), Some(1));
@@ -831,6 +843,7 @@ fn a_cut_into_a_jointed_part_keeps_its_place_when_the_joint_turns() {
     run(&mut s, "joint.drive", json!({"joint": "Pivot", "value": 0}));
     assert_eq!(s.model.last_recomputed, 0);
     assert!((volume(&s, "Link") - want).abs() < 1e-6 * want, "{} vs {want}", volume(&s, "Link"));
+    s
 }
 
 /// #168: a mirror made in a jointed, turned part mirrors in that part's frame, so turning the

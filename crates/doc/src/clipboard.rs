@@ -204,7 +204,7 @@ impl crate::Feature {
         for n in &mut self.body_names {
             mapped_name(n, bodies);
         }
-        for n in &mut self.participants {
+        for n in self.participants.iter_mut().chain(self.tool_frames.iter_mut().map(|(n, _)| n)) {
             mapped_name(n, bodies);
         }
         for n in &mut self.param_names {

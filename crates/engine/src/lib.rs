@@ -976,13 +976,17 @@ impl Session {
     /// joint afterwards moves those bodies without reshaping them.
     fn capture_tool_frames(&mut self, previous: &Document) {
         let before: std::collections::HashMap<u64, &solidcraft_doc::Feature> = previous.features.iter().map(|f| (f.id, f)).collect();
-        let st = self.model.state();
-        let frames: Vec<(u64, Vec<(String, solidcraft_doc::Mat)>)> = self
-            .doc
-            .features
-            .iter()
-            .filter_map(|f| solidcraft_doc::captured_tool_frames(&self.doc, f, before.get(&f.id).copied(), &st).map(|m| (f.id, m)))
-            .collect();
+        let mut input = Arc::new(ModelState::default());
+        let mut frames: Vec<(u64, Vec<(String, solidcraft_doc::Mat)>)> = Vec::new();
+        for f in &self.doc.features {
+            // The state the feature starts from: the last evaluation's, after the feature before it.
+            if let Some(m) = solidcraft_doc::captured_tool_frames(&self.doc, f, before.get(&f.id).copied(), &input) {
+                frames.push((f.id, m));
+            }
+            if let Some(r) = self.model.result(f.id) {
+                input = r.state.clone();
+            }
+        }
         if frames.is_empty() {
             return;
         }

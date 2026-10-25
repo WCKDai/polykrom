@@ -1401,11 +1401,13 @@ impl PlacementReads {
         let (_, targets) = feature_op(f);
         let names = if targets.is_empty() { &f.participants } else { &targets };
         let all = names.len() == 1 && names.first().is_some_and(|n| n == "*");
+        // A body met where it was placed when the feature was made reads no placement (#168).
+        let live = |name: &String| !f.tool_frames.iter().any(|(b, _)| b == name);
         if all || names.is_empty() {
-            self.bodies.extend(st.bodies.iter().filter(|b| all || b.component == f.component || b.feature == f.id).map(|b| b.name.clone()));
+            self.bodies
+                .extend(st.bodies.iter().filter(|b| all || b.component == f.component || b.feature == f.id).map(|b| b.name.clone()).filter(live));
         } else {
-            // A body met where it was placed when the feature was made reads no placement.
-            for name in names.iter().filter(|n| !f.tool_frames.iter().any(|(b, _)| b == *n)) {
+            for name in names.iter().filter(|n| live(n)) {
                 self.placed_body(Some(st), name);
             }
         }
@@ -7191,7 +7193,8 @@ impl Drop for ToolFrames {
     }
 }
 
-/// Feature `f`'s [`Feature::tool_frames`] as the bodies are placed now in `doc` (`st` holds them):
+/// Feature `f`'s [`Feature::tool_frames`] as the bodies are placed now in `doc` (`st` is the state
+/// the feature starts from):
 /// one for each body it may change that lies in another component or is offset, so its drawn
 /// tools keep meeting the body where it was when the feature was made (#168). `previous` is the
 /// feature before the edit that made or changed it: bodies it already met keep their frames (as
@@ -7203,14 +7206,25 @@ pub fn captured_tool_frames(doc: &Document, f: &Feature, previous: Option<&Featu
         return None;
     }
     let (_, targets) = feature_op(f);
+    // Kept until its targets or component change; a feature made before frames were kept takes
+    // them at its first edit.
     if let Some(p) = previous
         && p.participants == f.participants
         && p.component == f.component
         && feature_op(p).1 == targets
+        && (!p.tool_frames.is_empty() || p == f)
     {
         return None;
     }
     let names = if targets.is_empty() { &f.participants } else { &targets };
+    // Every body (an assembly-level cut's scope): those there now.
+    let every: Vec<String>;
+    let names = if names.iter().any(|n| n == "*") {
+        every = st.bodies.iter().map(|b| b.name.clone()).collect();
+        &every
+    } else {
+        names
+    };
     let frame = doc.component_transform(f.component);
     let kept = previous.filter(|p| p.component == f.component).map_or(&[][..], |p| &p.tool_frames[..]);
     let frames: Vec<(String, Mat)> = names
