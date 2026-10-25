@@ -12,7 +12,11 @@ pub(crate) struct RecoveryMessage<'a> {
 
 pub(crate) struct RecentRow<'a> {
     pub title: &'a str,
+    /// Where it is, as the row shows it (short); `tooltip` has it in full.
     pub path: &'a str,
+    pub tooltip: &'a str,
+    /// The file is gone: the row is dimmed.
+    pub missing: bool,
     pub when: &'a str,
     pub workspace: &'a str,
     pub thumbnail: Option<(TextureId, Vec2)>,
@@ -292,7 +296,7 @@ impl FileView {
                 Rect::from_min_max(content.min, pos2(content.right(), half)),
                 row.title,
                 crate::fonts::medium(t.font_button),
-                t.form_ink,
+                if row.missing { t.file_dim } else { t.form_ink },
                 false,
             );
             paint_text(ui, Rect::from_min_max(pos2(left, half), content.max), row.path, FontId::monospace(t.font_body), t.file_dim, false);
@@ -309,7 +313,7 @@ impl FileView {
                 Rect::from_min_max(content.min, pos2(left + title_width, content.bottom())),
                 row.title,
                 crate::fonts::medium(t.font_button),
-                t.form_ink,
+                if row.missing { t.file_dim } else { t.form_ink },
                 false,
             );
             paint_text(
@@ -338,7 +342,7 @@ impl FileView {
                 false,
             );
         }
-        response.on_hover_text(row.path)
+        response.on_hover_text(row.tooltip)
     }
 
     pub(crate) fn sample_grid(ui: &mut Ui, id: &str, samples: &[SampleCard<'_>]) -> Vec<Response> {

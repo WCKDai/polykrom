@@ -834,14 +834,8 @@ pub fn tick(app: &mut SolveApp, ctx: &egui::Context) {
                 if let Kind::Recover { .. } = request.kind {
                     recovered(app, request);
                 } else {
-                    app.set_status(
-                        if let Some(w) = warnings.filter(|w| !w.is_empty()) {
-                            format!("imported with {} warning(s): {}", w.len(), w.first().and_then(Value::as_str).unwrap_or(""))
-                        } else {
-                            format!("{} done", if request.insert() { "Insert" } else { "Open" })
-                        },
-                        false,
-                    );
+                    let status = crate::opened_status(app, &request.path, request.insert(), warnings.map(Vec::as_slice).unwrap_or_default());
+                    app.set_status(status, false);
                 }
                 request.answer(Ok(made.result));
             }
@@ -1263,7 +1257,7 @@ mod tests {
             frames += 1;
         }
         assert_eq!(bodies(&app), 6, "{:?}", app.status);
-        assert!(app.status.as_ref().is_some_and(|s| s.0.contains("Insert done")), "{:?}", app.status);
+        assert!(app.status.as_ref().is_some_and(|s| s.0.starts_with("Inserted ")), "{:?}", app.status);
         // Cancelled after the parse: nothing is inserted, and nothing waits.
         let before = app.session.doc.clone();
         app.file_load.queued.push_back(Request::new(&path, Kind::Insert));

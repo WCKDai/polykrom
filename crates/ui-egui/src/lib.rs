@@ -1315,7 +1315,8 @@ impl SolveApp {
             self.fit_view();
             stand_up::offer(self, path, &before, Some(&r));
             if let Some(w) = r["warnings"].as_array().filter(|w| !w.is_empty()) {
-                self.set_status(format!("imported with {} warning(s): {}", w.len(), w.first().and_then(Value::as_str).unwrap_or("")), false);
+                let status = opened_status(self, path, true, w);
+                self.set_status(status, false);
             }
         }
     }
@@ -1991,3 +1992,15 @@ pub fn now_ms() -> f64 {
 mod picker_test_support;
 #[cfg(test)]
 mod test_support;
+
+/// The status line after a design is opened or a file inserted: the file's name, and the first of
+/// the import's warnings when it had any.
+pub(crate) fn opened_status(app: &SolveApp, path: &str, insert: bool, warnings: &[Value]) -> String {
+    let language = i18n::Locale::for_language(&app.preferences.language);
+    let name = std::path::Path::new(path).file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_else(|| path.to_string());
+    if let Some(first) = warnings.first() {
+        let count = warnings.len().to_string();
+        return language.format("ui.file_imported_warnings", &[("name", &name), ("count", &count), ("first", first.as_str().unwrap_or(""))]);
+    }
+    language.format(if insert { "ui.file_inserted" } else { "ui.file_opened" }, &[("name", &name)])
+}
