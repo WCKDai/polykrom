@@ -1893,3 +1893,31 @@ fn a_failed_installs_cause_comes_from_npms_error_codes() {
     assert_eq!(bridge::cause(&format!("{} 600 s", discover::STOPPED)), Cause::TimedOut);
     assert_eq!(bridge::cause("npm error code E404"), Cause::Other);
 }
+
+/// While the picker shows, its list alone chooses the agent (#136): no switcher above it, the rows
+/// inset like the rest of the panel, and Connect under the list for the chosen row. Once a chat
+/// has begun the picker folds and the switcher comes back.
+#[test]
+fn the_picker_list_alone_chooses_the_agent_and_connect_sits_under_it() {
+    use crate::scenario::{handle_at, rect_of};
+    let mut h = narrow_chat();
+    for (id, name) in [("one", "First agent"), ("two", "Second agent")] {
+        h.call("ui.agent_chat", json!({"add_agent": {"id": id, "name": name, "kind": "acp", "command": "true"}}));
+    }
+    h.frames(3);
+    assert!(rect_of("agent_chat:switcher").is_none(), "one control for the choice, not two");
+    let panel = rect_of("agent_chat:panel").expect("the panel");
+    let (one, two) = (rect_of("agent_chat:pick:one").expect("a row"), rect_of("agent_chat:pick:two").expect("a row"));
+    let inset = crate::theme::Tokens::get().space_12;
+    assert!(one.left() - panel.left() >= inset && panel.right() - one.right() >= inset, "{one:?} inset in {panel:?}");
+    let connect = handle_at("agent_chat:connect").expect("Connect");
+    assert!(connect.y > two.bottom(), "Connect sits under the list");
+    let pick = handle_at("agent_chat:pick:two").expect("the second row");
+    h.call("ui.click", json!({"x": pick.x, "y": pick.y}));
+    h.frames(2);
+    assert_eq!(agents::current(&h.app).map(|e| e.id).as_deref(), Some("two"), "Connect starts the chosen row");
+
+    h.app.agent_chat.items.push(Item::Notice { text: "a chat began".into(), error: false });
+    h.frames(3);
+    assert!(rect_of("agent_chat:pick:one").is_none() && rect_of("agent_chat:switcher").is_some(), "the picker folds into the switcher");
+}

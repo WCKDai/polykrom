@@ -673,7 +673,9 @@ fn dock_drag(app: &mut SolveApp, ui: &egui::Ui, drag: &egui::Response, left: boo
 fn body(app: &mut SolveApp, ui: &mut egui::Ui, left: bool) {
     header(app, ui, left);
     #[cfg(not(target_arch = "wasm32"))]
-    ui_kit::assistant_controls(ui, |ui| switcher(app, ui));
+    if switcher_shown(app) {
+        ui_kit::assistant_controls(ui, |ui| switcher(app, ui));
+    }
     #[cfg(target_arch = "wasm32")]
     {
         ui.label(tr("ui.agent_chat_desktop_only"));
@@ -898,7 +900,12 @@ fn switcher(app: &mut SolveApp, ui: &mut egui::Ui) {
     let t = Tokens::get();
     let all = agents::entries(app);
     let current = agents::current(app);
+    // While the picker shows, its list is how the agent is chosen: one control, not two.
+    let choosing = picker_open(app);
     ui.horizontal_wrapped(|ui| {
+        if choosing {
+            return;
+        }
         let label = current.as_ref().map_or_else(
             || tr(if app.agent_chat.detecting.is_some() { "ui.agent_chat_detecting" } else { "ui.agent_chat_none_found_short" }).to_string(),
             |e| e.name.clone(),
@@ -994,24 +1001,40 @@ fn switcher(app: &mut SolveApp, ui: &mut egui::Ui) {
             }
         }
     });
+    if !(choosing && !app.agent_chat.state().running()) {
+        connect_button(app, ui);
+    }
+    if let Some(a) = &app.agent_chat.auth_status {
+        ui.label(RichText::new(a).color(t.text_dim).size(crate::theme::Tokens::get().font_small));
+    }
+}
+
+/// Whether the header's controls band has anything to show: the switcher, the agent's modes and
+/// models, Connect or Stop, or the login state. Not while the picker alone chooses the agent.
+#[cfg(not(target_arch = "wasm32"))]
+fn switcher_shown(app: &SolveApp) -> bool {
+    !picker_open(app) || app.agent_chat.state().running() || app.agent_chat.auth_status.is_some()
+}
+
+/// Connect (or Stop, while an agent runs), for the chosen agent.
+#[cfg(not(target_arch = "wasm32"))]
+fn connect_button(app: &mut SolveApp, ui: &mut egui::Ui) {
     ui.horizontal(|ui| {
-        let b = if app.agent_chat.state().running() {
+        let running = app.agent_chat.state().running();
+        let b = if running {
             ui_kit::button(ui, tr("ui.agent_chat_stop"), ui_kit::Button::Normal).on_hover_text(tr("ui.agent_chat_stop_tip"))
         } else {
             ui_kit::button(ui, tr("ui.agent_chat_connect"), ui_kit::Button::Normal)
         };
         crate::scenario::publish_handle("agent_chat:connect", b.rect.center());
         if b.clicked() {
-            if app.agent_chat.state().running() {
+            if running {
                 disconnect(app);
             } else {
                 connect(app, ui.ctx());
             }
         }
     });
-    if let Some(a) = &app.agent_chat.auth_status {
-        ui.label(RichText::new(a).color(t.text_dim).size(crate::theme::Tokens::get().font_small));
-    }
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -1038,11 +1061,18 @@ pub(super) fn no_agents(ui: &mut egui::Ui) {
     }
 }
 
-/// Before the first connection: what's installed, how to install the rest, and Add agent.
+/// Whether the picker shows: before the first message of a chat (or when asked for). While it does,
+/// its list is how the agent is chosen and the header's switcher stays folded away.
+#[cfg(not(target_arch = "wasm32"))]
+fn picker_open(app: &SolveApp) -> bool {
+    app.agent_chat.picking.unwrap_or(!app.agent_chat.state().running() && app.agent_chat.items.is_empty())
+}
+
+/// Before the first connection: what's installed, how to install the rest, and Add agent. The
+/// chosen agent in the list is the one Connect starts.
 #[cfg(not(target_arch = "wasm32"))]
 fn picker(app: &mut SolveApp, ui: &mut egui::Ui) {
-    let open = app.agent_chat.picking.unwrap_or(!app.agent_chat.state().running() && app.agent_chat.items.is_empty());
-    if !open {
+    if !picker_open(app) {
         return;
     }
     let all = agents::entries(app);
@@ -1051,7 +1081,7 @@ fn picker(app: &mut SolveApp, ui: &mut egui::Ui) {
         ui_kit::text(ui, tr("ui.agent_chat_pick"), ui_kit::Text::Inline);
         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
             let refreshing = app.agent_chat.detecting.is_some();
-            if ui_kit::button(ui, tr("ui.agent_chat_refresh"), ui_kit::Button::Enabled(!refreshing)).clicked() {
+            if ui.add_enabled_ui(!refreshing, |ui| ui_kit::button(ui, tr("ui.agent_chat_refresh"), ui_kit::Button::Small)).inner.clicked() {
                 refresh(app, ui.ctx());
             }
             if ui_kit::button(ui, tr("ui.ai_add_agent"), ui_kit::Button::Small).clicked() {
@@ -1064,11 +1094,16 @@ fn picker(app: &mut SolveApp, ui: &mut egui::Ui) {
     }
     for e in &all {
         let selected = current.as_ref().is_some_and(|c| c.id == e.id);
-        let resp = ui_kit::list_picker(ui, &e.id, &e.name, selected).on_hover_text(format!("{} {}", e.detail(), e.login));
+        let detail = if e.kind == agents::Kind::Acp { e.version.clone().unwrap_or_default() } else { e.model.clone() };
+        let resp = ui_kit::pick_row(ui, &e.id, &e.name, &detail, selected).on_hover_text(format!("{} {}", e.detail(), e.login));
         crate::scenario::publish_handle(&format!("agent_chat:pick:{}", e.id), resp.rect.center());
+        crate::scenario::publish_rect(&format!("agent_chat:pick:{}", e.id), resp.rect);
         if resp.clicked() {
             app.agent_chat.agent_id = Some(e.id.clone());
         }
+    }
+    if !all.is_empty() && !app.agent_chat.state().running() {
+        connect_button(app, ui);
     }
     // A Set up that worked: the agent is now in the list above and chosen. The note goes once
     // another agent is chosen or a chat begins (the picker folds).
@@ -1098,11 +1133,11 @@ fn picker(app: &mut SolveApp, ui: &mut egui::Ui) {
         let heading = if none { tr("ui.agent_chat_none_found") } else { tr("ui.agent_chat_not_installed") };
         ui_kit::section(ui, "sc_agent_missing", heading, all.is_empty(), |ui| {
             for m in missing {
-                ui.horizontal(|ui| {
-                    ui_kit::text(ui, m.name, ui_kit::Text::Inline);
+                ui.allocate_ui_with_layout(vec2(ui.available_width(), Tokens::get().control_height), Layout::right_to_left(Align::Center), |ui| {
                     if ui_kit::button(ui, tr("ui.agent_chat_copy"), ui_kit::Button::Small).on_hover_text(m.install).clicked() {
                         ui.ctx().copy_text(m.install.to_string());
                     }
+                    ui.with_layout(Layout::left_to_right(Align::Center), |ui| ui_kit::text(ui, m.name, ui_kit::Text::Inline));
                 });
                 ui_kit::text(ui, m.install, ui_kit::Text::Report(m.name, false));
             }
