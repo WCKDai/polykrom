@@ -10,7 +10,7 @@ Any code adapted from other projects (MIT OR Apache-2.0) is noted in ATTRIBUTION
 Polykrom is a fork of SolidCraft (github.com/tangency-labs/solidcraft). Say Polykrom in
 everything a person reads: the UI, messages, docs, MCP descriptions, packaging names. Until the
 second rename stage, the internals keep SolidCraft's names: crates `solidcraft-*`, binaries
-`solidcraft` and `solidcraft-cli` (with `polykrom` and `polykrom-cli` aliases), the
+`solidcraft` and `polykrom-cli` (with `polykrom` and `polykrom-cli` aliases), the
 `solidcraft/N` format tag inside designs, settings and recovery folders and the bundle IDs.
 Variables read through `solidcraft_geom::env` are `POLYKROM_*`, with `SOLIDCRAFT_*` and
 `SOLVECRAFT_*` fallbacks; read new ones that way. Designs are saved as `.polykrom`
@@ -51,7 +51,7 @@ People trust Polykrom with their designs; a crash loses their work. **This outra
   panic restores the design and reports `EngineError::Internal`.
 - **Crash reports:** the desktop app writes every panic and every unclean exit to a local crash folder,
   with the design and the commands that reproduce it (`solidcraft_engine::crash`, docs/crash-reports.md).
-  When someone says the app crashed, look there first: `solidcraft-cli crashes`, `crashes show <id>`,
+  When someone says the app crashed, look there first: `polykrom-cli crashes`, `crashes show <id>`,
   `crashes replay <id>` (or the `diagnostics.crash_reports` command / MCP `crash_reports` tool).
 - **Prove it:** every crash fix lands with a regression test (see `hostile_params_never_panic`); a
   crash report's `design.solidcraft` + `replay.json` is the test's starting point.
@@ -198,9 +198,9 @@ before the draft is verified.
   - `{"id":2,"method":"ui.start","params":{"command":"sketch.create"}}` then `ui.click {x, y}`
   - `{"id":3,"method":"ui.screenshot","params":{"path":"/tmp/shot.png"}}` then read the PNG.
 - **For UI work, look at the result** (screenshot, read the PNG). Without a window use
-  `ui.render` or `solidcraft-cli snapshot`.
-- Headless: `solidcraft-cli run script.json --out part.step`, `solidcraft-cli eval design.polykrom`,
-  `solidcraft-cli snapshot script.json --out shot.png`, `solidcraft-cli commands`.
+  `ui.render` or `polykrom-cli snapshot`.
+- Headless: `polykrom-cli run script.json --out part.step`, `polykrom-cli eval design.polykrom`,
+  `polykrom-cli snapshot script.json --out shot.png`, `polykrom-cli commands`.
 - Reference tests: `cargo xtask oracle` replays `tests/oracle/*/recipe.json` and compares with
   each case's `expected.json` (analytic or FreeCAD values; writes `docs/oracle.md`). Expected
   values never come from a commercial CAD product.

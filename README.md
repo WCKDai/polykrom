@@ -70,14 +70,14 @@ More commands, the Windows cross-build and the browser build are in [docs/buildi
 
 ## AI agents (MCP)
 
-`solidcraft-cli mcp` is a [Model Context Protocol](https://modelcontextprotocol.io) server. Headless it
+`polykrom-cli mcp` is a [Model Context Protocol](https://modelcontextprotocol.io) server. Headless it
 runs its own design session, or with `--connect` it drives the running app so you can watch.
-Claude Code: `claude mcp add solidcraft -- solidcraft-cli mcp`. Tools, access rules and an
+Claude Code: `claude mcp add polykrom -- polykrom-cli mcp`. Tools, access rules and an
 example session: [docs/mcp.md](docs/mcp.md).
 
 ## Scripts
 
-A script is a JSON list of the same commands the UI runs, executed with `solidcraft-cli run`.
+A script is a JSON list of the same commands the UI runs, executed with `polykrom-cli run`.
 Format and example: [docs/scripts.md](docs/scripts.md). Pages can also be driven through the
 [browser command API](docs/browser-api.md).
 

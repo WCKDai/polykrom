@@ -76,10 +76,11 @@
 
   <Fragment>
     <ComponentGroup Id="SolidcraftFiles" Directory="INSTALLFOLDER">
-      <!-- A new GUID with the rename: the key file changed from solvecraft.exe to solidcraft.exe.
-           The UpgradeCode above is unchanged, so this MSI major-upgrades a pre-rename install. -->
-      <Component Id="SolidcraftApp" Guid="A379D509-D776-4B34-A3A4-71FBF5724971">
-        <File Id="SolidcraftExe" Source="$(var.BinDir)\solidcraft.exe" KeyPath="yes">
+      <!-- A new GUID with each rename of the key file: solvecraft.exe, then solidcraft.exe, now
+           polykrom.exe (#98). The UpgradeCode above is unchanged, so this MSI major-upgrades an
+           earlier install. -->
+      <Component Id="SolidcraftApp" Guid="1E181CCC-3314-4E51-A7BD-9C2028AF7FFD">
+        <File Id="SolidcraftExe" Source="$(var.BinDir)\polykrom.exe" KeyPath="yes">
           <Shortcut Id="StartMenuShortcut" Directory="ProgramMenuFolder" Name="Polykrom"
               Description="Polykrom parametric 3D CAD" WorkingDirectory="INSTALLFOLDER" Advertise="yes"
               Icon="SolidcraftIcon.exe" IconIndex="0" />
@@ -108,26 +109,34 @@
         <RegistryValue Root="HKLM" Key="Software\Classes\.3mf\OpenWithProgids" Name="Solidcraft.Model" Value="" Type="string" />
         <RegistryValue Root="HKLM" Key="Software\Classes\.stl\OpenWithProgids" Name="Solidcraft.Model" Value="" Type="string" />
 
-        <!-- "Open with" app list and the Run dialog (Win+R "solidcraft"). -->
-        <RegistryValue Root="HKLM" Key="Software\Classes\Applications\solidcraft.exe" Name="FriendlyAppName" Value="Polykrom" Type="string" />
-        <RegistryValue Root="HKLM" Key="Software\Classes\Applications\solidcraft.exe\shell\open\command" Value="&quot;[#SolidcraftExe]&quot; &quot;%1&quot;" Type="string" />
-        <RegistryValue Root="HKLM" Key="Software\Classes\Applications\solidcraft.exe\SupportedTypes" Name=".polykrom" Value="" Type="string" />
-        <RegistryValue Root="HKLM" Key="Software\Classes\Applications\solidcraft.exe\SupportedTypes" Name=".solidcraft" Value="" Type="string" />
-        <RegistryValue Root="HKLM" Key="Software\Classes\Applications\solidcraft.exe\SupportedTypes" Name=".solvecraft" Value="" Type="string" />
-        <RegistryValue Root="HKLM" Key="Software\Classes\Applications\solidcraft.exe\SupportedTypes" Name=".step" Value="" Type="string" />
-        <RegistryValue Root="HKLM" Key="Software\Classes\Applications\solidcraft.exe\SupportedTypes" Name=".stp" Value="" Type="string" />
-        <RegistryValue Root="HKLM" Key="Software\Classes\Applications\solidcraft.exe\SupportedTypes" Name=".igs" Value="" Type="string" />
-        <RegistryValue Root="HKLM" Key="Software\Classes\Applications\solidcraft.exe\SupportedTypes" Name=".iges" Value="" Type="string" />
-        <RegistryValue Root="HKLM" Key="Software\Classes\Applications\solidcraft.exe\SupportedTypes" Name=".3mf" Value="" Type="string" />
-        <RegistryValue Root="HKLM" Key="Software\Classes\Applications\solidcraft.exe\SupportedTypes" Name=".stl" Value="" Type="string" />
-        <RegistryValue Root="HKLM" Key="Software\Microsoft\Windows\CurrentVersion\App Paths\solidcraft.exe" Value="[#SolidcraftExe]" Type="string" />
+        <!-- "Open with" app list and the Run dialog (Win+R "polykrom"). -->
+        <RegistryValue Root="HKLM" Key="Software\Classes\Applications\polykrom.exe" Name="FriendlyAppName" Value="Polykrom" Type="string" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\Applications\polykrom.exe\shell\open\command" Value="&quot;[#SolidcraftExe]&quot; &quot;%1&quot;" Type="string" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\Applications\polykrom.exe\SupportedTypes" Name=".polykrom" Value="" Type="string" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\Applications\polykrom.exe\SupportedTypes" Name=".solidcraft" Value="" Type="string" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\Applications\polykrom.exe\SupportedTypes" Name=".solvecraft" Value="" Type="string" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\Applications\polykrom.exe\SupportedTypes" Name=".step" Value="" Type="string" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\Applications\polykrom.exe\SupportedTypes" Name=".stp" Value="" Type="string" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\Applications\polykrom.exe\SupportedTypes" Name=".igs" Value="" Type="string" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\Applications\polykrom.exe\SupportedTypes" Name=".iges" Value="" Type="string" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\Applications\polykrom.exe\SupportedTypes" Name=".3mf" Value="" Type="string" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\Applications\polykrom.exe\SupportedTypes" Name=".stl" Value="" Type="string" />
+        <RegistryValue Root="HKLM" Key="Software\Microsoft\Windows\CurrentVersion\App Paths\polykrom.exe" Value="[#SolidcraftExe]" Type="string" />
         <RegistryValue Root="HKLM" Key="Software\SolidCraft" Name="InstallDir" Value="[INSTALLFOLDER]" Type="string" />
       </Component>
 
-      <Component Id="SolidcraftCli">
-        <File Id="SolidcraftCliExe" Source="$(var.BinDir)\solidcraft-cli.exe" KeyPath="yes" />
+      <!-- The CLI's key file changed from solidcraft-cli.exe to polykrom-cli.exe (#98). -->
+      <Component Id="PolykromCli">
+        <File Id="PolykromCliExe" Source="$(var.BinDir)\polykrom-cli.exe" KeyPath="yes" />
       </Component>
-      <!-- Compatibility shim (docs/compatibility.md): the old CLI name, forwarding to solidcraft-cli. -->
+      <!-- Compatibility shims (docs/compatibility.md): the earlier names, forwarding to polykrom.exe
+           and polykrom-cli.exe. -->
+      <Component Id="SolidcraftAppAlias">
+        <File Id="SolidcraftAliasExe" Source="$(var.BinDir)\solidcraft.exe" KeyPath="yes" />
+      </Component>
+      <Component Id="SolidcraftCliAlias2">
+        <File Id="SolidcraftCliAliasExe" Source="$(var.BinDir)\solidcraft-cli.exe" KeyPath="yes" />
+      </Component>
       <Component Id="SolidcraftCliAlias">
         <File Id="SolvecraftCliAliasExe" Source="$(var.BinDir)\solvecraft-cli.exe" KeyPath="yes" />
       </Component>

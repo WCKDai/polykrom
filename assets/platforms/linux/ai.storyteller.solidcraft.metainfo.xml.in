@@ -53,6 +53,8 @@
     <control>pointing</control>
   </supports>
   <provides>
+    <binary>polykrom</binary>
+    <binary>polykrom-cli</binary>
     <binary>solidcraft</binary>
     <binary>solidcraft-cli</binary>
     <mediatype>application/x-solidcraft</mediatype>

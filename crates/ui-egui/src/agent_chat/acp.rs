@@ -49,7 +49,7 @@ pub fn initialize_params(version: &str) -> Value {
 /// keeps its own entry on a clash) can't shadow the bridge with a headless session.
 pub const BRIDGE_NAME: &str = "solidcraft-app";
 
-/// The MCP server the agent starts to reach the design: `solidcraft-cli mcp --connect` bridged to
+/// The MCP server the agent starts to reach the design: `polykrom-cli mcp --connect` bridged to
 /// this app's control port. The server finds the port's token in the token file the app wrote
 /// (docs/control-protocol.md), so the token never travels through the agent, and it keeps its
 /// default folder limits (docs/mcp.md): no `--allow-any-path`.
@@ -502,7 +502,7 @@ mod tests {
 
     #[test]
     fn the_session_gets_the_bridged_mcp_server_without_a_token_or_any_path() {
-        let b = McpBridge { cli: "/opt/solidcraft/solidcraft-cli".into(), port: 41234 };
+        let b = McpBridge { cli: "/opt/solidcraft/polykrom-cli".into(), port: 41234 };
         let p = session_new_params(std::path::Path::new("/home/u/designs"), Some(&b));
         let s = &p["mcpServers"][0];
         assert_eq!(s["name"], BRIDGE_NAME);

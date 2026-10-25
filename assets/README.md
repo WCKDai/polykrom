@@ -66,7 +66,7 @@ cp target/resources/macos-icon/Polykrom.icns assets/icons/app/macos/exports/icon
 Review and commit source changes and required exports together. Temporary renders,
 tool caches and package staging belong under ignored `target/` or `dist/`.
 Normal builds use the committed exports and require no design applications.
-The CLI still supports arbitrary PNG/ICO exports with `solidcraft-cli icon`.
+The CLI still supports arbitrary PNG/ICO exports with `polykrom-cli icon`.
 
 ## Platform bindings
 

@@ -8,7 +8,7 @@
 //! no fixture.
 //!
 //! ```text
-//! solidcraft-cli bench-agent [--scale F] [--script-out script.json] [--save design.solidcraft]
+//! polykrom-cli bench-agent [--scale F] [--script-out script.json] [--save design.solidcraft]
 //! ```
 //! prints one JSON line per hundred commands (mean and max milliseconds, bodies so far), then the
 //! build total, then the phases `bench-open` prints for the saved design.

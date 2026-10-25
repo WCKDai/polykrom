@@ -31,7 +31,7 @@ impl Drop for Scratch {
 }
 
 fn cli() -> Command {
-    Command::new(env!("CARGO_BIN_EXE_solidcraft-cli"))
+    Command::new(env!("CARGO_BIN_EXE_polykrom-cli"))
 }
 
 fn json_output(output: Output) -> Value {

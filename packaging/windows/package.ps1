@@ -5,7 +5,7 @@
 .DESCRIPTION
   Produces, in $env:DIST (default: dist/release):
     solidcraft-<version>-windows-<arch>.msi            per-machine installer (WiX v5)
-    solidcraft-<version>-windows-<arch>-portable.zip   solidcraft.exe + solidcraft-cli.exe + licences
+    solidcraft-<version>-windows-<arch>-portable.zip   polykrom.exe + polykrom-cli.exe (and the aliases) + licences
                                                        (+ the solvecraft-cli.exe compatibility alias)
     SolidCraft-<version>-windows-<arch>.exe            the app alone (x64 only: a plain download)
 
@@ -73,19 +73,20 @@ function Get-PeHeader([string] $Path) {
   return @{ Machine = [BitConverter]::ToUInt16($bytes, $pe + 4); Subsystem = [BitConverter]::ToUInt16($bytes, $pe + 0x5C) }
 }
 $Machine = switch ($Arch) { 'x64' { 0x8664 } 'x86' { 0x14C } 'arm64' { 0xAA64 } }
-# solvecraft-cli.exe: the old CLI name, forwarding to solidcraft-cli.exe (compatibility shim,
-# docs/compatibility.md). Built by `-p solidcraft-cli` with the CLI.
-foreach ($check in @(@('solidcraft.exe', 2), @('solidcraft-cli.exe', 3), @('solvecraft-cli.exe', 3))) {
+# solidcraft.exe, solidcraft-cli.exe and solvecraft-cli.exe: the earlier names, forwarding to
+# polykrom.exe and polykrom-cli.exe (compatibility shims, docs/compatibility.md).
+$Programs = @(@('polykrom.exe', 2), @('polykrom-cli.exe', 3), @('solidcraft.exe', 2), @('solidcraft-cli.exe', 3), @('solvecraft-cli.exe', 3))
+foreach ($check in $Programs) {
   $h = Get-PeHeader (Join-Path $Bin $check[0])
   if ($h.Machine -ne $Machine) { throw "$($check[0]) is for machine 0x$('{0:X}' -f $h.Machine), expected 0x$('{0:X}' -f $Machine) ($Arch)" }
   if ($h.Subsystem -ne $check[1]) { throw "$($check[0]) has PE subsystem $($h.Subsystem), expected $($check[1])" }
   Write-Output "ok $($check[0]): $Arch, PE subsystem $($h.Subsystem)"
 }
 $Stage = Join-Path $TargetDir "windows-package\$Arch"
-& (Join-Path $PSScriptRoot 'check-icon.ps1') -Path (Join-Path $Bin 'solidcraft.exe')
+& (Join-Path $PSScriptRoot 'check-icon.ps1') -Path (Join-Path $Bin 'polykrom.exe')
 Remove-Item -Recurse -Force $Stage -ErrorAction SilentlyContinue
 New-Item -ItemType Directory -Force -Path $Stage | Out-Null
-Copy-Item (Join-Path $Bin 'solidcraft.exe'), (Join-Path $Bin 'solidcraft-cli.exe'), (Join-Path $Bin 'solvecraft-cli.exe') $Stage
+foreach ($p in $Programs) { Copy-Item (Join-Path $Bin $p[0]) $Stage }
 foreach ($f in 'LICENSE-MIT', 'LICENSE-APACHE', 'NOTICE', 'THIRD-PARTY-LICENSES.txt') { Copy-Item (Join-Path $Root $f) $Stage }
 
 $Icon = if ($env:SOLIDCRAFT_ICONS) { Join-Path $env:SOLIDCRAFT_ICONS 'solidcraft.ico' } else { Join-Path $Root 'assets/icons/app/windows/exports/solidcraft.ico' }
@@ -120,13 +121,14 @@ Compress-Archive -Path $Portable -DestinationPath $Zip
 $Outputs = @($Msi, $Zip)
 if ($Arch -eq 'x64') {
   $Exe = Join-Path $Dist "SolidCraft-$Version-windows-$Arch.exe"
-  Copy-Item (Join-Path $Stage 'solidcraft.exe') $Exe
+  Copy-Item (Join-Path $Stage 'polykrom.exe') $Exe
   $Outputs += $Exe
 }
 
 if ($CanRun) {
+  Invoke-Native 'polykrom-cli --version' { & (Join-Path $Stage 'polykrom-cli.exe') --version }
   Invoke-Native 'solidcraft-cli --version' { & (Join-Path $Stage 'solidcraft-cli.exe') --version }
 } else {
-  Write-Output "skipping solidcraft-cli --version: an $Arch build doesn't run on this $HostArch machine"
+  Write-Output "skipping polykrom-cli --version: an $Arch build doesn't run on this $HostArch machine"
 }
 Get-Item $Outputs | Format-Table Name, Length

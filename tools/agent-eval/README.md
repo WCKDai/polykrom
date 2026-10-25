@@ -2,12 +2,12 @@
 
 `run.py` measures how well an AI agent designs real parts and mechanisms in Polykrom, and how
 fast. Each task is a plain-language spec with an answer worked out by hand. Claude Code runs
-headless with `solidcraft-cli mcp` as its only tool (shell, files and web are disallowed),
+headless with `polykrom-cli mcp` as its only tool (shell, files and web are disallowed),
 saves a design, and the harness grades the **saved design**, never the agent's own claims:
 
-- **parts** (rounds 1–4): body count, volume and bounding box from `solidcraft-cli eval`,
+- **parts** (rounds 1–4): body count, volume and bounding box from `polykrom-cli eval`,
   within tolerances stated per task (some tasks also check a URDF or an edited input design);
-- **systems** (rounds 5–6): commands replayed on the design with `solidcraft-cli run`. The
+- **systems** (rounds 5–6): commands replayed on the design with `polykrom-cli run`. The
   checks are:
   - joint types and names, and materials;
   - motion studies played to given steps (stroke, gear turns, rocker swing against the
@@ -17,7 +17,7 @@ saves a design, and the harness grades the **saved design**, never the agent's o
   - `motion.interference` clear over every sample;
   - the bill of materials written as CSV.
 
-It complements `solidcraft-cli bench-assistant`, upstream's standard test of the in-app
+It complements `polykrom-cli bench-assistant`, upstream's standard test of the in-app
 assistant (eleven single-part prompts through the app's chat). This harness tests an outside
 agent through the MCP server, on harder parts and on assemblies.
 
@@ -27,7 +27,7 @@ Needs the Claude Code CLI (`claude`), signed in, and a release build of the CLI:
 
 ```
 cargo build --release -p solidcraft-cli
-python3 tools/agent-eval/run.py --cli target/release/solidcraft-cli --out /tmp/agent-eval --round 5
+python3 tools/agent-eval/run.py --cli target/release/polykrom-cli --out /tmp/agent-eval --round 5
 ```
 
 - `--round N` runs one round;

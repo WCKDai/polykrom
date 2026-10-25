@@ -1,6 +1,6 @@
 //! `solvecraft-cli`: the CLI's former name, kept for at least one release so existing scripts
 //! and MCP client setups (`claude mcp add solvecraft -- solvecraft-cli mcp`) keep working.
-//! Compatibility shim: it runs `solidcraft-cli` (next to this executable, else on PATH) with the
+//! Compatibility shim: it runs `polykrom-cli` (next to this executable, else on PATH) with the
 //! same arguments and standard streams, after a one-line deprecation note on stderr (stdout
 //! stays clean for MCP's JSON-RPC), and exits with its status.
 #![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::unimplemented, clippy::todo, clippy::unreachable)]
@@ -8,10 +8,10 @@
 
 use std::process::{Command, ExitCode};
 
-const TARGET: &str = "solidcraft-cli";
+const TARGET: &str = "polykrom-cli";
 
 fn main() -> ExitCode {
-    eprintln!("solvecraft-cli is deprecated and will be removed in a later release: use solidcraft-cli");
+    eprintln!("solvecraft-cli is deprecated and will be removed in a later release: use polykrom-cli");
     let sibling = std::env::current_exe()
         .ok()
         .and_then(|exe| exe.parent().map(|dir| dir.join(format!("{TARGET}{}", std::env::consts::EXE_SUFFIX))))

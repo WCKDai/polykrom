@@ -15,7 +15,7 @@ From the repository root, build the CLI and generate the editable design:
 
 ```sh
 cargo build --release -p solidcraft-cli
-target/release/solidcraft-cli run examples/chebyshev-motion-trace.json --out target/chebyshev.solidcraft
+target/release/polykrom-cli run examples/chebyshev-motion-trace.json --out target/chebyshev.solidcraft
 ```
 
 On Windows the executable has the `.exe` extension. Open `target/chebyshev.solidcraft`
@@ -44,7 +44,7 @@ For a repeatable CLI comparison, save this as `target/change-chebyshev.json`:
 ```
 
 ```sh
-target/release/solidcraft-cli run target/change-chebyshev.json --in target/chebyshev.solidcraft --out target/chebyshev-length55.solidcraft --timings
+target/release/polykrom-cli run target/change-chebyshev.json --in target/chebyshev.solidcraft --out target/chebyshev-length55.solidcraft --timings
 ```
 
 Use `trace_sweep` and `180 deg` in that command to demonstrate the driving-range
@@ -84,14 +84,14 @@ design. This uses SolidCraft's renderer and motion driver to export a looping GI
 ```
 
 ```sh
-target/release/solidcraft-cli run target/animate-chebyshev.json --in target/chebyshev.solidcraft
+target/release/polykrom-cli run target/animate-chebyshev.json --in target/chebyshev.solidcraft
 ```
 
 For comparable still images, use the same camera before and after the edit:
 
 ```sh
-target/release/solidcraft-cli snapshot --in target/chebyshev.solidcraft --out target/chebyshev-before.png --width 900 --height 650 --camera '{"target":[25,40,5],"yaw":0,"pitch":1.25,"distance":215,"fov":0}' --no-grid --no-axes
-target/release/solidcraft-cli snapshot --in target/chebyshev-length55.solidcraft --out target/chebyshev-after.png --width 900 --height 650 --camera '{"target":[25,40,5],"yaw":0,"pitch":1.25,"distance":215,"fov":0}' --no-grid --no-axes
+target/release/polykrom-cli snapshot --in target/chebyshev.solidcraft --out target/chebyshev-before.png --width 900 --height 650 --camera '{"target":[25,40,5],"yaw":0,"pitch":1.25,"distance":215,"fov":0}' --no-grid --no-axes
+target/release/polykrom-cli snapshot --in target/chebyshev-length55.solidcraft --out target/chebyshev-after.png --width 900 --height 650 --camera '{"target":[25,40,5],"yaw":0,"pitch":1.25,"distance":215,"fov":0}' --no-grid --no-axes
 ```
 
 `--timings` reports command execution separately from process startup and file

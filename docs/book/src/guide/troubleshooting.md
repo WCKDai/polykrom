@@ -15,7 +15,7 @@ start), skips the "Recover unsaved design?" offer and draws with the software re
 - Windows: run `solidcraft.exe --safe-mode` from a terminal in the install folder, or add
   ` --safe-mode` to the end of a shortcut's *Target*.
 - macOS: `open -a Polykrom --args --safe-mode`
-- Linux: `solidcraft --safe-mode` (Flatpak: `flatpak run ai.storyteller.solidcraft --safe-mode`)
+- Linux: `polykrom --safe-mode` (Flatpak: `flatpak run ai.storyteller.solidcraft --safe-mode`)
 
 Setting `SOLIDCRAFT_SAFE_MODE=1` does the same. From 0.10.2, if two launches in a row stop
 before the window opens, the next one starts in safe mode by itself. `SOLIDCRAFT_RENDERER=cpu`
@@ -59,7 +59,7 @@ saying what failed (earlier versions closed without a word). Things to try:
 
 - Install the graphics driver from the GPU maker (Intel, AMD, NVIDIA) rather than Windows Update.
 - In a virtual machine, turn on 3D acceleration. Over Remote Desktop, try it on the machine itself.
-- Run `solidcraft --crash-log` to list recent crash reports, and attach the newest one to an
+- Run `polykrom --crash-log` to list recent crash reports, and attach the newest one to an
   issue.
 
 ## The desktop stutters or freezes while Polykrom builds bodies

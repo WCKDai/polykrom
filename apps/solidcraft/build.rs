@@ -12,6 +12,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     std::fs::copy(icon, &copy)?;
     let rc = out.join("solidcraft.rc");
     std::fs::write(&rc, format!("1 ICON \"{}\"\n", copy.display().to_string().replace('\\', "/")))?;
-    embed_resource::compile_for(&rc, ["solidcraft"], embed_resource::NONE).manifest_required()?;
+    embed_resource::compile_for(&rc, ["polykrom", "solidcraft"], embed_resource::NONE).manifest_required()?;
     Ok(())
 }

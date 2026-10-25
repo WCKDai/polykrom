@@ -4,23 +4,23 @@ description = "Polykrom headless CLI: run command scripts, measure, export, rend
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-default-run = "solidcraft-cli"
+default-run = "polykrom-cli"
 
 [lints]
 workspace = true
 
 [[bin]]
-name = "solidcraft-cli"
+name = "polykrom-cli"
 path = "src/main.rs"
 
-# Polykrom's name for the CLI: runs solidcraft-cli, the program itself until packaging moves to
-# the new name (docs/compatibility.md).
+# SolidCraft's name for the CLI, kept so scripts and MCP registrations (`solidcraft-cli mcp`)
+# keep working: it runs polykrom-cli (docs/compatibility.md).
 [[bin]]
-name = "polykrom-cli"
-path = "src/polykrom.rs"
+name = "solidcraft-cli"
+path = "src/solidcraft.rs"
 
-# Compatibility alias for the CLI's former name: forwards to solidcraft-cli with a deprecation
-# note on stderr. Shipped in every package for at least one release.
+# Compatibility alias for the CLI's first name: forwards to polykrom-cli with a deprecation
+# note on stderr.
 [[bin]]
 name = "solvecraft-cli"
 path = "src/alias.rs"

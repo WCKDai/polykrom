@@ -14,7 +14,7 @@ id: ai.storyteller.solidcraft
 runtime: org.freedesktop.Platform
 runtime-version: '26.08'
 sdk: org.freedesktop.Sdk
-command: solidcraft
+command: polykrom
 finish-args:
   # Display: Wayland first; X11 only when no Wayland compositor is running.
   - --socket=wayland
@@ -38,9 +38,12 @@ modules:
   - name: solidcraft
     buildsystem: simple
     build-commands:
+      - install -Dm755 bin/polykrom /app/bin/polykrom
+      - install -Dm755 bin/polykrom-cli /app/bin/polykrom-cli
+      # The earlier names, forwarding to polykrom and polykrom-cli (compatibility shims,
+      # docs/compatibility.md).
       - install -Dm755 bin/solidcraft /app/bin/solidcraft
       - install -Dm755 bin/solidcraft-cli /app/bin/solidcraft-cli
-      # The old CLI name, forwarding to solidcraft-cli (compatibility shim, docs/compatibility.md).
       - install -Dm755 bin/solvecraft-cli /app/bin/solvecraft-cli
       - install -Dm644 share/applications/ai.storyteller.solidcraft.desktop /app/share/applications/ai.storyteller.solidcraft.desktop
       - install -Dm644 share/mime/packages/ai.storyteller.solidcraft.xml /app/share/mime/packages/ai.storyteller.solidcraft.xml

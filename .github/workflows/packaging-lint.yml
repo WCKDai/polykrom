@@ -60,6 +60,6 @@ jobs:
           grep -qF -e '--end-of-life-rebase=' packaging/flatpak-site.sh
           sed -e 's/@VERSION@/0.0.0/' -e 's/@DATE@/2026-01-01/' assets/platforms/linux/ai.storyteller.solidcraft.metainfo.xml.in >"$RUNNER_TEMP/ai.storyteller.solidcraft.metainfo.xml"
           appstreamcli validate --no-net --explain "$RUNNER_TEMP/ai.storyteller.solidcraft.metainfo.xml"
-          python3 -c "import yaml; m = yaml.safe_load(open('packaging/linux/flatpak/ai.storyteller.solidcraft.bundle.yml')); assert m['id'] == 'ai.storyteller.solidcraft' and m['command'] == 'solidcraft'"
-          python3 -c "import yaml; m = yaml.safe_load(open('packaging/linux/snap/snapcraft.yaml')); assert m['name'] == 'solidcraft' and m['confinement'] == 'strict' and m['apps']['solidcraft']['command'] == 'usr/bin/solidcraft'"
+          python3 -c "import yaml; m = yaml.safe_load(open('packaging/linux/flatpak/ai.storyteller.solidcraft.bundle.yml')); assert m['id'] == 'ai.storyteller.solidcraft' and m['command'] == 'polykrom'"
+          python3 -c "import yaml; m = yaml.safe_load(open('packaging/linux/snap/snapcraft.yaml')); assert m['name'] == 'solidcraft' and m['confinement'] == 'strict' and m['apps']['solidcraft']['command'] == 'usr/bin/polykrom' and m['apps']['cli']['command'] == 'usr/bin/polykrom-cli'"
           python3 -m py_compile packaging/linux/snap-smoke.py

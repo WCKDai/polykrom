@@ -1,12 +1,13 @@
-//! `polykrom`: Polykrom's name for the desktop app. It runs `solidcraft` (next to this executable, else on PATH)
-//! with the same arguments and standard streams and exits with its status, until the packages move
-//! to the new name (docs/compatibility.md).
+//! `solidcraft`: SolidCraft's name for the desktop app, kept so scripts and shortcuts that start it
+//! keep working. It runs `polykrom` (next to this executable, else on PATH) with the same arguments
+//! and standard streams and exits with its status (docs/compatibility.md).
+#![cfg_attr(all(target_os = "windows", not(debug_assertions)), windows_subsystem = "windows")]
 #![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::unimplemented, clippy::todo, clippy::unreachable)]
 #![forbid(unsafe_code)]
 
 use std::process::{Command, ExitCode};
 
-const TARGET: &str = "solidcraft";
+const TARGET: &str = "polykrom";
 
 fn main() -> ExitCode {
     let sibling = std::env::current_exe()
@@ -20,7 +21,7 @@ fn main() -> ExitCode {
             None => ExitCode::FAILURE,
         },
         Err(e) => {
-            eprintln!("polykrom: could not run {}: {e}", program.to_string_lossy());
+            eprintln!("solidcraft: could not run {}: {e}", program.to_string_lossy());
             ExitCode::FAILURE
         }
     }

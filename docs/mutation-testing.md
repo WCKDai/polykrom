@@ -29,7 +29,7 @@ the black-box suites would miss once the kernel is swapped.
 cargo install cargo-mutants --locked
 CARGO_TARGET_DIR=$PWD/target cargo mutants --in-place \
   -f crates/kernel/src/measure.rs \
-  --test-package solidcraft-cli --test-package solidcraft-engine \
+  --test-package polykrom-cli --test-package solidcraft-engine \
   --baseline skip --timeout 900 --build-timeout 900
 ```
 

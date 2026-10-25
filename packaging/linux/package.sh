@@ -63,17 +63,19 @@ STAGE="$WORK/root"
 rm -rf "$WORK"
 
 # ---- stage an FHS tree (shared by every format) -------------------------------------------------
-install -Dm755 "$BIN/solidcraft" "$STAGE/usr/bin/solidcraft"
-install -Dm755 "$BIN/solidcraft-cli" "$STAGE/usr/bin/solidcraft-cli"
-# Compatibility shim (docs/compatibility.md): the old CLI name forwards to solidcraft-cli.
-install -Dm755 "$BIN/solvecraft-cli" "$STAGE/usr/bin/solvecraft-cli"
-strip "$STAGE/usr/bin/solidcraft" "$STAGE/usr/bin/solidcraft-cli" "$STAGE/usr/bin/solvecraft-cli" 2>/dev/null || true
+install -Dm755 "$BIN/polykrom" "$STAGE/usr/bin/polykrom"
+install -Dm755 "$BIN/polykrom-cli" "$STAGE/usr/bin/polykrom-cli"
+# Compatibility shims (docs/compatibility.md): the earlier names forward to polykrom and polykrom-cli.
+for alias in solidcraft solidcraft-cli solvecraft-cli; do
+  install -Dm755 "$BIN/$alias" "$STAGE/usr/bin/$alias"
+done
+strip "$STAGE"/usr/bin/* 2>/dev/null || true
 install -Dm644 "$ROOT/assets/platforms/linux/$APP_ID.desktop" "$STAGE/usr/share/applications/$APP_ID.desktop"
 install -Dm644 "$ROOT/assets/platforms/linux/$APP_ID.mime.xml" "$STAGE/usr/share/mime/packages/$APP_ID.xml"
 mkdir -p "$STAGE/usr/share/metainfo"
 sed -e "s/@VERSION@/$VERSION/g" -e "s/@DATE@/$SOLIDCRAFT_BUILD_DATE/g" \
   "$ROOT/assets/platforms/linux/$APP_ID.metainfo.xml.in" >"$STAGE/usr/share/metainfo/$APP_ID.metainfo.xml"
-make_icons "$STAGE/usr/bin/solidcraft-cli" "$WORK/icons"
+make_icons "$STAGE/usr/bin/polykrom-cli" "$WORK/icons"
 mkdir -p "$STAGE/usr/share/icons"
 cp -R "$WORK/icons/hicolor" "$STAGE/usr/share/icons/"
 mkdir -p "$STAGE/usr/share/doc/solidcraft"
@@ -155,6 +157,7 @@ if has appimage; then
   fi
 fi
 
+"$STAGE/usr/bin/polykrom-cli" --version
 "$STAGE/usr/bin/solidcraft-cli" --version
 echo "==> done"
 ls -lh "$DIST"

@@ -10,7 +10,8 @@ below:
 
 | Kept | Why |
 | --- | --- |
-| Crates `solidcraft-*`, binaries `solidcraft` and `solidcraft-cli` | Renaming them breaks every script and MCP registration; `polykrom` and `polykrom-cli` are aliases that run the same program |
+| Crates `solidcraft-*` | Internal names: renaming them changes no program, file or setting, and keeps pulling SolidCraft's fixes cheap |
+| Binaries `solidcraft` and `solidcraft-cli` | Since #98 the programs are `polykrom` and `polykrom-cli`. The old names ship as small aliases that run them, so scripts, shortcuts and MCP registrations keep working (section 5) |
 | The `solidcraft/N` format tag inside designs | Polykrom saves `.polykrom` files, but their contents are SolidCraft's container, so a renamed file still opens in SolidCraft. `.solidcraft` (and the older `.solvecraft`) open in Polykrom and save as `.polykrom` |
 | Settings, preferences, autosave, recovery and thumbnail folders | Moving them needs a one-time migration, like section 4 |
 | Bundle and package IDs (`ai.storyteller.solidcraft`), the MSI UpgradeCode, `SolidCraft.app`, installer folders and registry keys, the agent-chat keychain service | Changing them makes a second, separate install or loses saved keys; until then a Polykrom install replaces a SolidCraft one |
@@ -105,8 +106,12 @@ at least one release (since 0.5.0). It prints a one-line deprecation note to std
 and MCP client configs that call `solvecraft-cli` keep working. Test: `apps/solidcraft-cli/tests/legacy_alias.rs` (forwards `--version` and the exit status;
 the note goes to stderr only, so stdout stays clean for MCP).
 
-There is no alias for the desktop binary: launchers, file associations and Start-menu entries
-installed by the packages point at `solidcraft`.
+Since #98 the programs are `polykrom` and `polykrom-cli`, and every package also ships
+`solidcraft` and `solidcraft-cli` as aliases built the same way (`apps/solidcraft/src/solidcraft.rs`,
+`apps/solidcraft-cli/src/solidcraft.rs`). They forward without a note, because MCP clients
+registered with `solidcraft-cli mcp` show anything on stderr as an error. `solvecraft-cli` now
+forwards to `polykrom-cli`. Launchers, file associations, Start-menu entries, App Paths and the
+Flatpak and Snap commands point at `polykrom`. Test: `legacy_alias.rs` covers both CLI aliases.
 
 ## 6. MCP
 
@@ -117,10 +122,11 @@ server is added, so an existing setup such as
 claude mcp add solvecraft -- solvecraft-cli mcp
 ```
 
-keeps working (through the alias above). New setups use:
+keeps working (through the alias above), as does `claude mcp add solidcraft -- solidcraft-cli mcp`.
+New setups use:
 
 ```sh
-claude mcp add solidcraft -- solidcraft-cli mcp
+claude mcp add polykrom -- polykrom-cli mcp
 ```
 
 Switch before the alias is removed. Resources are listed as `solidcraft://design` and
