@@ -305,3 +305,22 @@ fn a_watt_six_bar_output_meets_a_stop() {
     let names = [r["stopped_by"]["a"].as_str(), r["stopped_by"]["b"].as_str()];
     assert!(names.contains(&Some("Output:1")) && names.contains(&Some("Stop:1")), "{r}");
 }
+
+/// A joint that follows others through motion links doesn't move on its own: sweeping it says
+/// which joints to sweep instead, rather than "nothing moves" (the D2 printer's agent swept a
+/// CoreXY follower three times before finding out).
+#[test]
+fn sweeping_a_follower_names_the_joints_that_drive_it() {
+    let mut s = door();
+    run(
+        &mut s,
+        "joint.create",
+        json!({"type": "revolute", "a": {"occurrence": 0, "point": [70, 40, 0]}, "b": {"occurrence": "Block", "point": [70, 40, 0]}, "name": "Turntable"}),
+    );
+    run(&mut s, "joint.motion_link", json!({"a": "Hinge", "b": "Turntable", "ratio": 1}));
+    let e = s.execute("joint.sweep", &json!({"joint": "Turntable", "from": 0, "to": 30})).map(|_| ()).unwrap_err().to_string();
+    assert!(e.contains("follows") && e.contains("Hinge") && e.contains("sweep"), "{e}");
+    // The joint that drives it sweeps as before.
+    let r = run(&mut s, "joint.sweep", json!({"joint": "Hinge", "from": 0, "to": 10}));
+    assert!(r["samples"].is_array(), "{r}");
+}
