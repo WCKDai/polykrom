@@ -214,7 +214,11 @@ fn sol_json(sol: &joints::Solution, p: &Value) -> Value {
     });
     if !bool_(p, "quiet").unwrap_or(false) {
         out["dof"] = sol.dof.iter().map(|(o, d)| json!({"occurrence": o, "dof": d})).collect();
-        out["fixed"] = json!(sol.fixed);
+        // Grounded (and the root); the solve's reference apart, as it is not grounded.
+        out["fixed"] = json!(sol.fixed.iter().filter(|o| Some(**o) != sol.reference).collect::<Vec<_>>());
+        if let Some(r) = sol.reference {
+            out["reference"] = json!({"occurrence": r, "why": "nothing it is joined to is grounded: held where it is for the solve, not grounded"});
+        }
     }
     out
 }
