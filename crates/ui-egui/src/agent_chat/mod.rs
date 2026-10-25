@@ -10,6 +10,7 @@
 //! - `backend.rs`: the [`backend::ChatBackend`] seam; `acp_client.rs` is the ACP backend.
 //! - `gate.rs`: what the agent's tool requests may do (run, ask the user first, or never).
 //! - `panel.rs`: the panel itself (docking, minimising, the picker, the conversation).
+//! - `discover.rs`: the agents installed here; `bridge.rs`: Set up for one missing its adapter.
 //! - Here: the conversation, turns (each one undoes as one step), and the requests waiting for
 //!   Allow or Deny.
 
@@ -24,6 +25,8 @@ pub mod agents;
 mod api_client;
 pub mod attach;
 pub mod backend;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod bridge;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod discover;
 pub mod gate;
@@ -387,6 +390,12 @@ pub struct AgentChat {
     detection: Option<discover::Detection>,
     #[cfg(not(target_arch = "wasm32"))]
     detecting: Option<Receiver<discover::Detection>>,
+    /// Where discovery looks instead of the usual folders: a test's folder of stand-in programs.
+    #[cfg(not(target_arch = "wasm32"))]
+    search_in: Option<Vec<std::path::PathBuf>>,
+    /// The last Set up of an agent's adapter, running or with its outcome.
+    #[cfg(not(target_arch = "wasm32"))]
+    setup: Option<bridge::Job>,
 }
 
 impl Drop for AgentChat {
@@ -1441,6 +1450,8 @@ pub fn poll(app: &mut SolveApp, ctx: &egui::Context) {
         app.agent_chat.detection = Some(d);
         app.agent_chat.detecting = None;
     }
+    #[cfg(not(target_arch = "wasm32"))]
+    bridge::poll(app, ctx);
     // AI features turned off: nothing keeps running, nothing is looked for.
     if !shown(app) {
         if app.agent_chat.backend.is_some() || app.agent_chat.open {
@@ -1482,8 +1493,9 @@ pub fn refresh(app: &mut SolveApp, ctx: &egui::Context) {
     }
     let (tx, rx) = std::sync::mpsc::channel();
     let ctx = ctx.clone();
+    let dirs = app.agent_chat.search_in.clone();
     std::thread::spawn(move || {
-        let _ = tx.send(discover::detect());
+        let _ = tx.send(discover::detect_in(&dirs.unwrap_or_else(discover::search_dirs)));
         ctx.request_repaint();
     });
     app.agent_chat.detecting = Some(rx);
@@ -1531,8 +1543,8 @@ pub fn set_mode(app: &mut SolveApp, mode: &str) {
 }
 
 /// `ui.agent_chat` on the control channel (tests and screenshots): `enabled`, `command`, `open`,
-/// `side`, `minimized`, `width`, `refresh`, `connect`, `stop`, `attach` (a file's path, for the
-/// next message), `remove_file` (index), `send`, `attach_view`, `permission` (an option id, or
+/// `side`, `minimized`, `width`, `refresh`, `setup` (the id of an agent ready to set up: installs its
+/// ACP adapter in the background), `connect`, `stop`, `attach` (a file's path, for the next message), `remove_file` (index), `send`, `attach_view`, `permission` (an option id, or
 /// `"cancel"`), `approve` (`true`/`false`, the oldest held
 /// request), `cancel` (Stop), `send_now` (steer: stop, then send the queue), `remove_pending` (index), `undo` (the newest message's changes); returns the panel's state.
 pub fn control(app: &mut SolveApp, ctx: &egui::Context, p: &Value) -> Result<Value, String> {
@@ -1640,6 +1652,9 @@ pub fn control(app: &mut SolveApp, ctx: &egui::Context, p: &Value) -> Result<Val
         if p.get("refresh").and_then(Value::as_bool) == Some(true) {
             refresh(app, ctx);
         }
+        if let Some(id) = p.get("setup").and_then(Value::as_str) {
+            bridge::start(app, ctx, id)?;
+        }
         if p.get("stop").and_then(Value::as_bool) == Some(true) {
             disconnect(app);
         }
@@ -1708,11 +1723,23 @@ pub fn status(app: &SolveApp) -> Value {
         json!({
             "found": d.found.iter().map(|f| json!({"id": f.id, "name": f.name, "argv": f.argv, "version": f.version, "login": f.login.id()})).collect::<Vec<_>>(),
             "missing": d.missing.iter().map(|m| json!({"id": m.id, "install": m.install})).collect::<Vec<_>>(),
+            "setup": d.setup.iter().map(|s| json!({"id": s.id, "name": s.name, "cli": s.cli, "install": s.install})).collect::<Vec<_>>(),
+            "npm": d.npm,
             "ms": d.took_ms,
         })
     });
+    #[cfg(not(target_arch = "wasm32"))]
+    let setup = c.setup.as_ref().map(|j| {
+        let error = match &j.progress {
+            bridge::Progress::Failed(e) => Some(e.as_str()),
+            _ => None,
+        };
+        json!({"id": j.id, "state": j.progress.id(), "error": error})
+    });
     #[cfg(target_arch = "wasm32")]
     let detection: Option<Value> = None;
+    #[cfg(target_arch = "wasm32")]
+    let setup: Option<Value> = None;
     let pid = c.backend.as_ref().and_then(|b| b.pid());
     json!({
         "features": app.preferences.ai_features,
@@ -1745,6 +1772,7 @@ pub fn status(app: &SolveApp) -> Value {
         "stopped": c.stopped,
         "turn": c.turn.as_ref().map(|t| json!({"changes": t.changes, "requests": t.requests})),
         "detection": detection,
+        "setup": setup,
         "items": items,
     })
 }

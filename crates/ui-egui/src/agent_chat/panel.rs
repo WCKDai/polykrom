@@ -706,11 +706,19 @@ fn desktop_body(app: &mut SolveApp, ui: &mut egui::Ui) {
     }
     // Discovery/install guidance must leave room for the pinned composer even when
     // several agents are listed, or when a long message grows the editor.
+    // Before the first message the picker is all there is to read, so it may take half the height.
+    // Its scroll bar stays visible when the list is longer, so a row cut at the edge reads as more
+    // to scroll rather than as a stray mark.
+    let share = if app.agent_chat.items.is_empty() { 0.5 } else { 1.0 / 3.0 };
     egui::ScrollArea::vertical()
         .id_salt("sc_agent_chat_picker_scroll")
-        .max_height(ui.available_height() / 3.0)
+        .max_height(ui.available_height() * share)
         .auto_shrink([false, true])
-        .show(ui, |ui| picker(app, ui));
+        .scroll_bar_visibility(egui::scroll_area::ScrollBarVisibility::VisibleWhenNeeded)
+        .show(ui, |ui| {
+            // The same side inset as the switcher above and the conversation below.
+            egui::Frame::NONE.inner_margin(egui::Margin::symmetric(Tokens::get().space_12 as i8, 0)).show(ui, |ui| picker(app, ui));
+        });
     if state == State::NeedsAuth {
         auth_box(app, ui);
     }
@@ -1062,15 +1070,32 @@ fn picker(app: &mut SolveApp, ui: &mut egui::Ui) {
             app.agent_chat.agent_id = Some(e.id.clone());
         }
     }
+    // A Set up that worked: the agent is now in the list above and chosen. The note goes once
+    // another agent is chosen or a chat begins (the picker folds).
+    if let Some(j) = &app.agent_chat.setup
+        && j.progress == super::bridge::Progress::Done
+        && current.as_ref().is_some_and(|c| c.found && c.id == j.id)
+    {
+        ui_kit::text(ui, &trf("ui.agent_chat_set_up_done", &[("name", j.name)]), ui_kit::Text::Note("setup_done"));
+    }
     // In the Flatpak the hint already says nothing was found, so the install list below is
     // headed "Not installed" instead of repeating it.
     let flatpak_hint = all.is_empty() && app.agent_chat.detecting.is_none() && std::env::var_os("FLATPAK_ID").is_some();
     if flatpak_hint {
         no_agents(ui);
     }
+    let (setup, npm) = app.agent_chat.detection.as_ref().map(|d| (d.setup.clone(), d.npm.is_some())).unwrap_or_default();
+    if !setup.is_empty() {
+        ui_kit::section(ui, "sc_agent_setup", tr("ui.agent_chat_ready_to_set_up"), true, |ui| {
+            for s in &setup {
+                setup_row(app, ui, s, npm);
+            }
+        });
+    }
     let missing: Vec<discover::Missing> = app.agent_chat.detection.as_ref().map(|d| d.missing.clone()).unwrap_or_default();
     if !missing.is_empty() {
-        let heading = if all.is_empty() && !flatpak_hint { tr("ui.agent_chat_none_found") } else { tr("ui.agent_chat_not_installed") };
+        let none = all.is_empty() && setup.is_empty() && !flatpak_hint;
+        let heading = if none { tr("ui.agent_chat_none_found") } else { tr("ui.agent_chat_not_installed") };
         ui_kit::section(ui, "sc_agent_missing", heading, all.is_empty(), |ui| {
             for m in missing {
                 ui.horizontal(|ui| {
@@ -1082,6 +1107,109 @@ fn picker(app: &mut SolveApp, ui: &mut egui::Ui) {
                 ui_kit::text(ui, m.install, ui_kit::Text::Report(m.name, false));
             }
         });
+    }
+}
+
+/// An agent whose own command line is here without its ACP adapter, as a list item: its name, and
+/// Set up (Retry after a failure, Copy without npm) on the right; under it, one line saying what
+/// Set up does, that it is installing, or why it failed with npm's own output folded away.
+#[cfg(not(target_arch = "wasm32"))]
+fn setup_row(app: &mut SolveApp, ui: &mut egui::Ui, s: &discover::Setup, npm: bool) {
+    use super::bridge::{self, Progress};
+    let t = Tokens::get();
+    let busy = bridge::running(app);
+    let progress = app.agent_chat.setup.as_ref().filter(|j| j.id == s.id).map(|j| j.progress.clone());
+    let failed = matches!(progress, Some(Progress::Failed(_)));
+    let row = ui.allocate_ui_with_layout(vec2(ui.available_width(), t.control_height), Layout::left_to_right(Align::Center), |ui| {
+        ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+            let label = tr(if !npm {
+                "ui.agent_chat_copy"
+            } else if failed {
+                "ui.agent_chat_set_up_retry"
+            } else {
+                "ui.agent_chat_set_up"
+            });
+            let button = ui.add_enabled_ui(!npm || !busy, |ui| ui_kit::button(ui, label, ui_kit::Button::Small)).inner.on_hover_text(s.install);
+            crate::scenario::publish_handle(&format!("agent_chat:setup:{}", s.id), button.rect.center());
+            if button.clicked() {
+                if npm {
+                    // A failure to start is kept as the row's outcome, shown below.
+                    let _ = bridge::start(app, ui.ctx(), s.id);
+                } else {
+                    ui.ctx().copy_text(s.install.to_string());
+                }
+            }
+            ui.with_layout(Layout::left_to_right(Align::Center), |ui| ui_kit::text(ui, s.name, ui_kit::Text::Inline));
+        });
+    });
+    crate::scenario::publish_rect(&format!("agent_chat:setup_row:{}", s.id), row.response.rect);
+    match progress {
+        Some(Progress::Running) => {
+            ui.horizontal(|ui| {
+                ui.spacing_mut().item_spacing.x = t.space_6;
+                ui_kit::assistant_tool_status(ui, ui_kit::AssistantToolState::Running);
+                ui_kit::text(ui, tr("ui.agent_chat_set_up_installing"), ui_kit::Text::Note("setup_running"));
+            });
+        }
+        Some(Progress::Failed(why)) => setup_failure(ui, s, &why, row.response.rect),
+        // Installed, yet discovery (once it has looked again) still can't find the adapter.
+        Some(Progress::Done) if app.agent_chat.detecting.is_none() => {
+            ui_kit::text(ui, &trf("ui.agent_chat_set_up_not_found", &[("name", s.name)]), ui_kit::Text::Note("setup_not_found"));
+        }
+        _ if npm => {
+            ui_kit::text(ui, &trf("ui.agent_chat_set_up_note", &[("name", s.name)]), ui_kit::Text::Note(s.id));
+        }
+        _ => {
+            ui_kit::text(ui, tr("ui.agent_chat_set_up_needs_npm"), ui_kit::Text::Note(s.id));
+            ui_kit::text(ui, s.install, ui_kit::Text::Report(s.name, false));
+        }
+    }
+}
+
+/// A failed Set up in its row: what went wrong in plain words, in the error style, a hint, and
+/// the command with npm's last lines under a folded Details, in a box of bounded height.
+#[cfg(not(target_arch = "wasm32"))]
+fn setup_failure(ui: &mut egui::Ui, s: &discover::Setup, why: &str, row: egui::Rect) {
+    use super::bridge::Cause;
+    let t = Tokens::get();
+    let (what, hint) = match super::bridge::cause(why) {
+        Cause::Permission => ("ui.agent_chat_set_up_permission", "ui.agent_chat_set_up_permission_hint"),
+        Cause::Network => ("ui.agent_chat_set_up_network", "ui.agent_chat_set_up_network_hint"),
+        Cause::TimedOut => ("ui.agent_chat_set_up_timeout", "ui.agent_chat_set_up_timeout_hint"),
+        Cause::Other => ("ui.agent_chat_set_up_other", "ui.agent_chat_set_up_other_hint"),
+    };
+    ui_kit::text(ui, tr(what), ui_kit::Text::Error("setup_error"));
+    ui_kit::text(ui, tr(hint), ui_kit::Text::Note("setup_hint"));
+    // Folded for each new launch of the app: the fold is kept for this session only.
+    let id = ui.id().with(("sc_agent_setup_details", s.id));
+    let mut open = ui.data(|d| d.get_temp::<bool>(id)).unwrap_or(false);
+    let head = ui.allocate_ui_with_layout(vec2(ui.available_width(), t.control_height), Layout::left_to_right(Align::Center), |ui| {
+        ui.spacing_mut().item_spacing.x = t.space_4;
+        let (rect, _) = ui.allocate_exact_size(vec2(t.space_14, t.space_14), Sense::hover());
+        ui_kit::disclosure(ui.painter(), rect.center(), open, t.form_dim);
+        ui.label(RichText::new(tr("ui.agent_chat_set_up_details")).size(t.font_small).color(t.form_dim));
+    });
+    let click = ui.interact(head.response.rect, id.with("head"), Sense::click()).on_hover_cursor(egui::CursorIcon::PointingHand);
+    crate::scenario::publish_handle("agent_chat:setup_details", head.response.rect.center());
+    if click.clicked() {
+        open = !open;
+        ui.data_mut(|d| d.insert_temp(id, open));
+    }
+    if !open {
+        return;
+    }
+    let output = format!("$ {}\n{why}", s.install);
+    let box_ = ui_kit::assistant_tool_detail(ui, |ui| {
+        ui.set_width(ui.available_width());
+        egui::ScrollArea::vertical().id_salt(("sc_agent_setup_output", s.id)).max_height(t.control_height * 5.0).show(ui, |ui| {
+            ui.add(egui::Label::new(RichText::new(output).monospace().size(t.font_small).color(t.form_ink)).selectable(true).wrap());
+        });
+    });
+    crate::scenario::publish_rect("agent_chat:setup_output", box_.response.rect);
+    // Unfolded, the picker scrolls to show it from the row's name down: the name stays in view and
+    // the box isn't cut at the picker's edge.
+    if click.clicked() {
+        ui.scroll_to_rect(row.union(box_.response.rect), Some(Align::Min));
     }
 }
 
