@@ -109,3 +109,25 @@ Deno.test("creased normals keep a cube's corners sharp and a cylinder's side smo
     close(cn[3 * c + 2], 0, 1e-6, `cylinder corner ${c} z`);
   }
 });
+
+Deno.test("a mirrored leg: the same joint value on a frame rolled half a turn swings its link the mirrored way", () => {
+  // The dog's right legs are its left legs mirrored: each joint's frame is rolled by π, so its z
+  // points down and the same angle swings the leg the other way, as a mirror image across y = 0.
+  const robot = buildRobot(parseXml(`<robot name="m">
+    <link name="body"/><link name="l"/><link name="lt"/><link name="r"/><link name="rt"/>
+    <joint name="L" type="revolute"><parent link="body"/><child link="l"/><origin xyz="0 0.1 0" rpy="0 0 0"/><axis xyz="0 0 1"/></joint>
+    <joint name="Lt" type="fixed"><parent link="l"/><child link="lt"/><origin xyz="0.1 0 0" rpy="0 0 0"/></joint>
+    <joint name="R" type="revolute"><parent link="body"/><child link="r"/><origin xyz="0 -0.1 0" rpy="${Math.PI} 0 0"/><axis xyz="0 0 1"/></joint>
+    <joint name="Rt" type="fixed"><parent link="r"/><child link="rt"/><origin xyz="0.1 0 0" rpy="0 0 0"/></joint>
+  </robot>`));
+  const play = tracks({ joints: [{ name: "L", unit: "deg", value: [0, 30] }, { name: "R", unit: "deg", value: [0, 30] }] });
+  const tip = (name: string) => new THREE.Vector3().applyMatrix4(robot.links.get(name)!.matrixWorld);
+  for (const [s, deg] of [[0, 0], [1, 30], [0.5, 15]]) {
+    play.at(s, robot.set);
+    robot.roots[0].updateMatrixWorld(true);
+    const a = (deg * Math.PI) / 180, l = tip("lt"), r = tip("rt");
+    close(l.x, 0.1 * Math.cos(a), 1e-12, `left x at ${deg}°`); close(l.y, 0.1 + 0.1 * Math.sin(a), 1e-12, `left y at ${deg}°`);
+    close(r.x, l.x, 1e-12, `right x mirrors left at ${deg}°`); close(r.y, -l.y, 1e-12, `right y mirrors left at ${deg}°`);
+    close(r.z, 0, 1e-12, `right z at ${deg}°`); close(l.z, 0, 1e-12, `left z at ${deg}°`);
+  }
+});
