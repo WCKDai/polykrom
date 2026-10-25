@@ -146,7 +146,6 @@ fn clicked_image_controls_complete_cancel_and_export_without_dirtying_the_design
         let mut h = Harness::new();
         h.app.preferences.language = language.into();
         h.frames(1);
-        let check = h.app.tr("cmd.render_preflight").to_string();
         let start = h.app.tr("render.image_start").to_string();
         let export = h.app.tr("render.image_export").to_string();
         let cancel = h.app.tr("cmd.render_cancel").to_string();
@@ -158,8 +157,7 @@ fn clicked_image_controls_complete_cancel_and_export_without_dirtying_the_design
         h.frames(3);
         let doc = h.app.session.doc.clone();
         let undo = h.app.session.undo.len();
-        h.step(&json!({"widget":check})).unwrap();
-        h.step(&json!({"widget":start})).unwrap();
+        click_in_panel(&mut h, &start);
         for _ in 0..50 {
             h.frames(1);
             if h.app.render_workspace.view.completed.is_some() {
@@ -171,7 +169,7 @@ fn clicked_image_controls_complete_cancel_and_export_without_dirtying_the_design
         assert!(h.dir.join("render.png").is_file());
         h.app.render_workspace.view.draft.width = 1024;
         h.app.render_workspace.view.draft.height = 768;
-        h.step(&json!({"widget":start})).unwrap();
+        click_in_panel(&mut h, &start);
         h.step(&json!({"widget":cancel})).unwrap();
         h.frames(5);
         assert_eq!(h.app.render_workspace.view.completed, Some(good));
@@ -185,6 +183,112 @@ fn clicked_image_controls_complete_cancel_and_export_without_dirtying_the_design
     }
 }
 
+/// The centre of the settings panel's widget labelled `text` ("Render" also names the tab), and
+/// whether it is enabled.
+fn in_panel(h: &Harness, text: &str) -> Option<([f64; 2], bool)> {
+    let panel = crate::scenario::rect_of("render:settings")?;
+    h.output.accesskit_update.as_ref()?.nodes.iter().find_map(|(_, n)| {
+        let b = n.bounds()?;
+        let centre = [(b.x0 + b.x1) / 2.0, (b.y0 + b.y1) / 2.0];
+        (n.label() == Some(text) && panel.contains(egui::pos2(centre[0] as f32, centre[1] as f32))).then_some((centre, !n.is_disabled()))
+    })
+}
+
+fn click_in_panel(h: &mut Harness, text: &str) {
+    let ([x, y], enabled) = in_panel(h, text).unwrap_or_else(|| panic!("no `{text}` in the render panel"));
+    assert!(enabled, "`{text}` is disabled");
+    h.step(&json!({"click":[x, y]})).unwrap();
+}
+
+/// The panel reads as Scene / Camera / Output with one accent action, Render, which progress
+/// and Cancel replace in place while the job runs; Export follows the finished image.
+#[test]
+fn render_panel_has_three_sections_and_one_primary_render_action() {
+    let mut h = Harness::new();
+    h.app.run("solid.box", json!({"length":10,"width":20,"height":5})).unwrap();
+    h.call("ui.resize", json!({"width":1600,"height":1000}));
+    enter(&mut h.app, true).unwrap();
+    h.frames(3);
+    let tr = |key: &str| h.app.tr(key).to_string();
+    let (render, cancel, export) = (tr("render.image_start"), tr("cmd.render_cancel"), tr("render.image_export"));
+    let preflight = tr("cmd.render_preflight");
+    let mut tops = Vec::new();
+    for key in ["render.section_scene", "render.section_camera", "render.section_output"] {
+        let rect = crate::scenario::rect_of(&format!("dialog:section:{}", tr(key))).unwrap_or_else(|| panic!("{key} section"));
+        tops.push(rect.top());
+    }
+    assert!(tops.is_sorted(), "sections in order: {tops:?}");
+    assert!(in_panel(&h, &render).is_some() && in_panel(&h, &cancel).is_none());
+    assert_eq!(in_panel(&h, &export).map(|(_, enabled)| enabled), Some(false), "Export waits for an image");
+    assert!(in_panel(&h, &preflight).is_none(), "no debug-weight actions");
+    h.app.render_workspace.view.draft.width = 1024;
+    h.app.render_workspace.view.draft.height = 768;
+    click_in_panel(&mut h, &render);
+    let job = h.app.render_workspace.view.job.expect("Render starts a job");
+    h.frames(1);
+    assert!(in_panel(&h, &render).is_none(), "progress replaces Render while it runs");
+    assert!(in_panel(&h, &cancel).is_some());
+    click_in_panel(&mut h, &cancel);
+    h.frames(3);
+    assert_eq!(h.app.session.execute("render.status", &json!({"job":job})).unwrap()["progress"]["phase"], "cancelled");
+    assert!(in_panel(&h, &render).is_some() && h.app.render_workspace.view.completed.is_none());
+    h.app.render_workspace.view.draft.width = 16;
+    h.app.render_workspace.view.draft.height = 16;
+    click_in_panel(&mut h, &render);
+    for _ in 0..50 {
+        h.frames(1);
+        if h.app.render_workspace.view.completed.is_some() {
+            break;
+        }
+    }
+    h.frames(1);
+    assert!(h.app.render_workspace.view.completed.is_some());
+    let note = crate::scenario::rect_of("dialog:note:render_status").expect("the finished image's status shows in place");
+    assert!(crate::scenario::rect_of("render:settings").unwrap().contains_rect(note));
+    assert_eq!(in_panel(&h, &export).map(|(_, enabled)| enabled), Some(true));
+}
+
+/// Every control stays inside the fixed-width panel, in English and in longer languages.
+#[test]
+fn render_panel_controls_fit_the_narrow_panel_in_long_languages() {
+    for language in ["en", "de", "ru", "ja"] {
+        let mut h = Harness::new();
+        h.app.preferences.language = language.into();
+        h.app.run("solid.box", json!({"length":10,"width":20,"height":5})).unwrap();
+        h.call("ui.resize", json!({"width":1000,"height":1400}));
+        enter(&mut h.app, true).unwrap();
+        h.frames(3);
+        let panel = crate::scenario::rect_of("render:settings").unwrap();
+        assert!(panel.width() <= 300.0, "{language}: {panel:?}");
+        let tree = h.output.accesskit_update.as_ref().unwrap();
+        let mut inside = 0;
+        for (_, node) in &tree.nodes {
+            let Some(b) = node.bounds() else { continue };
+            if b.x1 <= b.x0 || f64::from(panel.left()) > b.x0 || b.y0 < f64::from(panel.top()) {
+                continue;
+            }
+            inside += 1;
+            assert!(b.x1 <= f64::from(panel.right()) + 0.5, "{language}: {:?} {:?} overflows {panel:?}", node.label(), b);
+        }
+        assert!(inside > 10, "{language}: {inside} widgets in the panel");
+    }
+}
+
+#[test]
+fn dark_theme_previews_the_default_background_on_a_dark_backdrop_but_keeps_picked_colours() {
+    let previous = crate::theme::is_dark();
+    let default = RenderSetup::default();
+    crate::theme::set_dark(true);
+    assert_eq!(themed_backdrop(&default), Some(Tokens::get().viewport_top));
+    assert!(Tokens::get().viewport_top.r() < 80, "a dark neutral");
+    assert_eq!(themed_backdrop(&RenderSetup { background: [21, 43, 65], ..default.clone() }), None);
+    crate::theme::set_dark(false);
+    assert_eq!(themed_backdrop(&default), None, "the light theme previews the setup's own background");
+    crate::theme::set_dark(previous);
+    // Rendered images keep the saved background: the backdrop is only the preview's.
+    assert_eq!(RenderSetup::default().background, [236, 240, 245]);
+}
+
 #[test]
 fn saved_camera_survives_frames_and_product_fit_ignores_selection() {
     let mut h = Harness::new();
@@ -196,7 +300,7 @@ fn saved_camera_survives_frames_and_product_fit_ignores_selection() {
     let design = h.app.cam;
     enter(&mut h.app, true).unwrap();
     h.frames(3);
-    h.step(&json!({"widget":"Restore Saved Camera"})).unwrap();
+    h.step(&json!({"widget":"Restore Saved"})).unwrap();
     h.frames(3);
     assert_eq!(h.app.cam, camera);
     assert_eq!(h.app.render_workspace.view.draft.background, [21, 43, 65]);

@@ -282,8 +282,8 @@ impl TabAccent {
             "MESH" => (t.mesh_fill, t.mesh_ink, t.mesh_soft),
             "FORM" => (t.form_fill, t.form_tab_ink, t.form_soft),
             "SHEET METAL" => (t.sheet_fill, t.sheet_ink, t.sheet_soft),
-            "RENDER" => (t.render_fill, t.render_ink, t.render_soft),
-            // Model and shared utility tabs retain their existing selection exactly.
+            // Model, Render (a workspace, like Design, so it takes Polykrom's accent as its
+            // workspace icon does) and shared utility tabs retain their existing selection exactly.
             _ => (t.accent, t.selected_ink, t.accent_soft),
         };
         let ink = if contrast_ratio(ink, soft) >= 4.5 {
@@ -931,14 +931,13 @@ mod tests {
                     ("MESH", t.mesh_fill, t.mesh_ink, t.mesh_soft),
                     ("FORM", t.form_fill, t.form_tab_ink, t.form_soft),
                     ("SHEET METAL", t.sheet_fill, t.sheet_ink, t.sheet_soft),
-                    ("RENDER", t.render_fill, t.render_ink, t.render_soft),
                 ] {
                     let accent = super::TabAccent::for_tab(&t, tab);
                     assert_eq!(accent, super::TabAccent { color, ink, soft });
                     assert_ne!(accent.soft, color);
                     assert_ne!(accent.soft, t.panel);
                 }
-                for tab in ["MODEL", "SOLID", "ASSEMBLE", "INSERT", "INSPECT", "MANAGE", "VIEW", "unknown"] {
+                for tab in ["MODEL", "RENDER", "SOLID", "ASSEMBLE", "INSERT", "INSPECT", "MANAGE", "VIEW", "unknown"] {
                     assert_eq!(super::TabAccent::for_tab(&t, tab), super::TabAccent { color: t.accent, ink: t.selected_ink, soft: t.accent_soft });
                 }
             }
@@ -954,7 +953,6 @@ mod tests {
             ("MESH", [0xe0b200, 0x8a6d00, 0xfff8dc], [0xc6a800, 0xd4b726, 0x41391a]),
             ("FORM", [0x7349cd, 0x7349cd, 0xeee8fa], [0x8a6fcc, 0xb39bee, 0x372f4f]),
             ("SHEET METAL", [0x0e747e, 0x0e747e, 0xe0f1f3], [0x128590, 0x4bb7c3, 0x1d3c3f]),
-            ("RENDER", [0xa8326e, 0xa8326e, 0xf8e6ef], [0xc8588f, 0xe074ae, 0x402336]),
         ] {
             for (t, values) in [(super::Tokens::light(), light), (super::Tokens::dark(), dark)] {
                 let [color, ink, soft] = values.map(rgb);
@@ -966,7 +964,10 @@ mod tests {
         // Polykrom's lime Model accent (#91): a deep lime in the light theme, #CCFF00 in the dark.
         for (t, values) in [(super::Tokens::light(), [0x4d7c0f, 0x365408, 0xa0ce2c]), (super::Tokens::dark(), [0xccff00, 0xebffb4, 0x647800])] {
             let [color, ink, soft] = values.map(rgb);
-            assert_eq!(super::TabAccent::for_tab(&t, "MODEL"), super::TabAccent { color, ink, soft });
+            // Render is a workspace like Design and shares its accent, as its workspace icon does.
+            for tab in ["MODEL", "RENDER"] {
+                assert_eq!(super::TabAccent::for_tab(&t, tab), super::TabAccent { color, ink, soft }, "{tab}");
+            }
         }
     }
 

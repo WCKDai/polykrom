@@ -706,7 +706,9 @@ mod tests {
             let t = resolve(file);
             assert!(t.icon_palette.is_some(), "{} has no icon palette", file.id);
             let mut fills = std::collections::HashSet::new();
-            for tab in ["MODEL", "SURFACE", "MESH", "FORM", "SHEET METAL", "RENDER", "SKETCH"] {
+            // Render is a workspace like Design and shares its accent on purpose.
+            assert_eq!(TabAccent::for_tab(&t, "RENDER"), TabAccent::for_tab(&t, "MODEL"), "{}", file.id);
+            for tab in ["MODEL", "SURFACE", "MESH", "FORM", "SHEET METAL", "SKETCH"] {
                 let accent = TabAccent::for_tab(&t, tab);
                 assert!(fills.insert(accent.color), "{} repeats {tab}", file.id);
                 assert!(contrast_ratio(accent.ink, accent.soft) >= 4.5, "{} {tab} soft text", file.id);

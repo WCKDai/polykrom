@@ -630,6 +630,9 @@ const ELEMENTS: &[Element] = &[
     element!("bounded_cell_editor", |ui, s| {
         bounded_cell_editor(ui, ui.id().with("name"), &mut s.value, "Name", false, 128);
     }),
+    element!("bounded_name_field", |ui, s| {
+        bounded_name_field(ui, ui.id().with("plain_name"), &mut s.value, "Name", 128);
+    }),
     element!("password_field", |ui, s| {
         password_field(ui, ui.id().with("secret"), &mut s.value, "API key");
     }),

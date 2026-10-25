@@ -903,6 +903,7 @@ mod tests {
         KitCall { name: "dropdown", args: &[3], id: false, trim: &[] },
         KitCall { name: "cell_editor", args: &[3], id: false, trim: &[] },
         KitCall { name: "bounded_cell_editor", args: &[3], id: false, trim: &[] },
+        KitCall { name: "bounded_name_field", args: &[3], id: false, trim: &[] },
         KitCall { name: "search_field", args: &[3], id: false, trim: &[] },
         KitCall { name: "placement_field", args: &[3], id: false, trim: &[] },
         KitCall { name: "library_cell", args: &[3], id: false, trim: &[] },
@@ -1577,7 +1578,7 @@ mod tests {
     /// The names the hand-written kit probes import, exactly as a UI file would.
     const KIT_IMPORTS: &str = concat!(
         "use crate::ui_kit::{row, expr_row, hint_row, text_row, choice_row, section, section_count, ",
-        "multiline_text_field, dropdown, cell_editor, bounded_cell_editor, search_field, placement_field, ",
+        "multiline_text_field, dropdown, cell_editor, bounded_cell_editor, bounded_name_field, search_field, placement_field, ",
         "library_cell, icon_button_at, icon_button_colored, footer, button, primary_button, ",
         "wide_primary_button, action_menu, compact_button, icon_label_button, command_menu_button, ",
         "checkbox_grid, options, checkbox_row, toggle_icon, removable_header, bin_button, ",
@@ -1613,6 +1614,7 @@ mod tests {
             ("dropdown(ui, id, selected, &[\"dropdown option\"])", &["dropdown option"]),
             ("cell_editor(ui, id, value, \"cell_editor\", invalid)", &["cell_editor"]),
             ("bounded_cell_editor(ui, id, value, \"bounded_cell_editor\", invalid, limit)", &["bounded_cell_editor"]),
+            ("bounded_name_field(ui, id, value, \"bounded_name_field\", limit)", &["bounded_name_field"]),
             ("search_field(ui, id, value, \"search_field\")", &["search_field"]),
             ("placement_field(ui, id, value, \"placement_field\")", &["placement_field"]),
             ("library_cell(ui, id, value, \"library_cell\", |ui| {})", &["library_cell"]),

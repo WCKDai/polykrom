@@ -342,18 +342,20 @@ blends. Browser rows and selected ribbon labels use `ink` directly.
 
 | Tab id | Fill token | Ink token | Soft token |
 | --- | --- | --- | --- |
-| `MODEL` / default | `accent` | `selected_ink` | `accent_soft` |
+| `MODEL`, `RENDER` / default | `accent` | `selected_ink` | `accent_soft` |
 | `SKETCH` | `sketch_accent` | `sketch_ink` | `sketch_soft` |
 | `SURFACE` | `surface_fill` | `surface_ink` | `surface_soft` |
 | `MESH` | `mesh_fill` | `mesh_ink` | `mesh_soft` |
 | `FORM` | `form_fill` | `form_tab_ink` | `form_soft` |
 | `SHEET METAL` | `sheet_fill` | `sheet_ink` | `sheet_soft` |
-| `RENDER` | `render_fill` | `render_ink` | `render_soft` |
 
 `form_tab_ink` is separate from the existing `form_ink` used for form controls.
 Sketch reuses its existing fill in both themes. Surface and Form fills match their
 existing accents in light mode but need independent dark values; Mesh and Render
 fills also differ from their existing `mesh_accent` and `render_accent` values.
+Render is a workspace, like Design, so its tab takes Polykrom's accent, as the workspace
+icon and switcher strip do; `render_fill`, `render_ink` and `render_soft` stay in theme files for
+compatibility but no tab reads them.
 All existing tokens, including Model's fill, ink and tint, retain their values.
 The Model/default mapping preserves its existing appearance rather than adopting
 the proposed Model colours from the board.
