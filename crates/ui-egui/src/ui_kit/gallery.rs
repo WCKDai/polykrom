@@ -681,6 +681,9 @@ const ELEMENTS: &[Element] = &[
     element!("list_picker", "dialog:list:gallery", Some("dialog:list:gallery"), |ui, _| {
         list_picker(ui, "gallery", "Preset", true);
     }),
+    element!("pick_row", "dialog:list:gallery_pick", Some("dialog:list:gallery_pick"), |ui, _| {
+        pick_row(ui, "gallery_pick", "Claude Code", "2.1.0", true);
+    }),
     element!("inline_text", "dialog:inline:Active", Some("dialog:inline:Active"), |ui, _| {
         text(ui, "Active", Text::Inline);
     }),

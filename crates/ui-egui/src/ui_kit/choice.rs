@@ -308,6 +308,32 @@ pub(crate) fn list_picker(ui: &mut Ui, key: &str, text: &str, selected: bool) ->
     response
 }
 
+/// Left-aligned list item: a name, and a short dim detail (a version, say) on the right. The chosen
+/// one has the accent fill with the selected ink. Tokens: control_radius, space_8, accent_soft,
+/// selected_ink, hover, form_ink/dim, font_label/small.
+pub(crate) fn pick_row(ui: &mut Ui, key: &str, name: &str, detail: &str, selected: bool) -> egui::Response {
+    let t = Tokens::get();
+    let (rect, response) = ui.allocate_exact_size(vec2(dimension(ui.available_width()), row_height()), egui::Sense::click());
+    if selected {
+        ui.painter().rect_filled(rect, t.control_radius, t.accent_soft);
+    } else if response.hovered() || response.has_focus() {
+        ui.painter().rect_filled(rect, t.control_radius, t.hover);
+    }
+    let inner = rect.shrink2(vec2(t.space_8, 0.0));
+    let small = egui::FontId::proportional(t.font_small);
+    let detail_width = if detail.is_empty() { 0.0 } else { ui.painter().layout_no_wrap(detail.to_owned(), small.clone(), t.form_dim).size().x };
+    let detail_width = detail_width.min(inner.width() / 2.0);
+    if detail_width > 0.0 {
+        let at = egui::Rect::from_min_max(egui::pos2(inner.right() - detail_width, inner.top()), inner.max);
+        paint_text(ui, at, detail, small, if selected { t.selected_ink } else { t.form_dim }, false);
+    }
+    let name_rect = egui::Rect::from_min_max(inner.min, egui::pos2((inner.right() - detail_width - t.space_8).max(inner.left()), inner.bottom()));
+    paint_text(ui, name_rect, name, egui::FontId::proportional(t.font_label), if selected { t.selected_ink } else { t.form_ink }, false);
+    response.widget_info(|| egui::WidgetInfo::selected(egui::WidgetType::SelectableLabel, ui.is_enabled(), selected, name));
+    crate::scenario::publish_target(&format!("dialog:list:{key}"), rect);
+    response.on_hover_cursor(egui::CursorIcon::PointingHand)
+}
+
 /// A reusable draggable document-colour sample; caller supplies the existing domain payload.
 /// Tokens: control_height/radius, border, accent, hover.
 pub(crate) fn color_swatch<T: Send + Sync + 'static>(

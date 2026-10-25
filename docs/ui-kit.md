@@ -113,6 +113,7 @@ table. Panel/Window/Confirm compositions also have dedicated geometry and intera
 | `text_emphasis` | Bold/italic with translated accessible names | form control/font tokens |
 | `tool_choices`, `ToolChoice`, `toggle_icon` | Wrapped command modes or independent icon toggles | sketch mode/icon tokens, `accent` |
 | `list_picker` | Selectable row with caller identity and native checked state | `control_height`, form selection tokens |
+| `pick_row` | Left-aligned selectable row: a name and a dim detail on the right; the chosen one in the accent fill | `control_radius`, `space_8`, `accent_soft`, `selected_ink`, `hover`, `form_ink`/`form_dim`, `font_label`/`font_small` |
 | `popup_list`, `PopupOption` | Focus-neutral suggestions; owner retains keyboard routing | `space_2`, `form_label_width`, `control_height`, form tokens |
 | `color_swatch`, `swatch_grid`, `color_thumbnail` | 30 pt draggable samples, 6 pt grid step gap, selected outer ring and checker pattern under transparent colours; caller payloads retained; local-library thumbnails use 16 pt | `control_height/radius`, `border`, `form_primary`, `control_fill`, `space_2/6/8` |
 | `assistant_entry`, `AssistantEntryState` | Application-bar chat icon with quiet, ready, busy, auth, stopped and approval count marks; caller owns state and target | `app_bar`, `agent_ok/busy`, `warning/error`, `font_badge` |
