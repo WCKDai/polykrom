@@ -209,3 +209,15 @@ fn timings_and_profile_report_each_command() {
     assert!(!output.status.success());
     assert!(String::from_utf8_lossy(&output.stderr).contains("--timings needs a script"));
 }
+
+/// #174: a script run `--in` a saved design starts from the model the file keeps, as Open does,
+/// instead of evaluating the whole design again first.
+#[test]
+fn a_script_in_a_saved_design_adopts_its_model() {
+    let scratch = Scratch::new();
+    let design = scratch.0.join("base.polykrom");
+    let saved = cli().args(["run", scratch.script().to_str().unwrap(), "--save", design.to_str().unwrap(), "--quiet"]).output().unwrap();
+    assert!(saved.status.success(), "{}", String::from_utf8_lossy(&saved.stderr));
+    let t = json_output(cli().args(["run", scratch.script().to_str().unwrap(), "--in", design.to_str().unwrap(), "--timings"]).output().unwrap());
+    assert_eq!(t["open"]["recomputed"], 0, "{t}");
+}

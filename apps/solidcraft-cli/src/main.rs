@@ -57,7 +57,7 @@ struct Command {
 }
 
 /// `run`'s lines in the usage.
-const USAGE_RUN: &str = "  polykrom-cli run <script.json|design.polykrom|part.step> [--in design.polykrom|part.step] [--out FILE]... [--save FILE] [--quiet] [--results] [--timings] [--profile] [--json-out FILE] [--allow-errors]\n  polykrom-cli run --in <design.polykrom|part.step> [--out FILE]...\n      (a timeline feature that fails fails the run and nothing is written; --allow-errors writes anyway)\n      (--timings prints {timings: [{index, command, ms}], total_ms} for a script, with --results its results too;\n       --profile adds each command's profile: {boolean_ms, tessellate_ms, other_ms}, the kernel's share)\n";
+const USAGE_RUN: &str = "  polykrom-cli run <script.json|design.polykrom|part.step> [--in design.polykrom|part.step] [--out FILE]... [--save FILE] [--quiet] [--results] [--timings] [--profile] [--json-out FILE] [--allow-errors]\n  polykrom-cli run --in <design.polykrom|part.step> [--out FILE]...\n      (a timeline feature that fails fails the run and nothing is written; --allow-errors writes anyway)\n      (--timings prints {timings: [{index, command, ms}], total_ms} for a script, with --results its results too\n       and with --in open: {ms, recomputed}, what opening the design took (a saved model is adopted);\n       --profile adds each command's profile: {boolean_ms, tessellate_ms, other_ms}, the kernel's share)\n";
 /// `eval`'s lines in the usage.
 const USAGE_EVAL: &str = "  polykrom-cli eval <script.json|design.polykrom|part.step> [--json-out FILE]     (alias: inspect; or --in FILE)\n      (--json-out FILE writes the JSON that run (with --results, else the measurement) and eval print to FILE instead of stdout,\n       as plain UTF-8: a shell's > can re-encode it, e.g. Windows PowerShell adds a byte-order mark)\n";
 /// `script`'s lines in the usage.
@@ -263,14 +263,20 @@ fn load_checked(path: &str, check: solidcraft_engine::schema::ParamCheck) -> Res
         s.execute("doc.open", &json!({"path": path})).map_err(|e| e.to_string())?;
         return Ok(s);
     }
-    let bytes = solidcraft_engine::io::vfs::read(path, solidcraft_engine::io::MAX_DESIGN_BYTES).map_err(|e| format!("{path}: {e}"))?;
-    if solidcraft_engine::io::is_design_container(&bytes) {
-        let doc = solidcraft_engine::io::read_design(&bytes).map_err(|e| format!("{path}: {e}"))?;
-        let mut session = Session::new(doc);
+    // A container is told by its first bytes; Open then reads it once (#174).
+    let mut head = [0u8; 4];
+    let container = std::fs::File::open(path).and_then(|mut f| std::io::Read::read_exact(&mut f, &mut head)).is_ok()
+        && solidcraft_engine::io::is_design_container(&head);
+    if container {
+        // As Open reads it: with the model the file keeps, so a design is not evaluated again (#174).
+        let (doc, saved) =
+            solidcraft_engine::io::read_design_file(path, None::<fn(solidcraft_engine::io::DesignPreview)>).map_err(|e| format!("{path}: {e}"))?;
+        let mut session = Session::opened(doc, saved.as_ref());
         session.path = Some(path.to_owned());
         session.param_check = check;
         return Ok(session);
     }
+    let bytes = solidcraft_engine::io::vfs::read(path, solidcraft_engine::io::MAX_DESIGN_BYTES).map_err(|e| format!("{path}: {e}"))?;
     let v: Value = serde_json::from_slice(&bytes).map_err(|e| format!("{path}: {e}"))?;
     if v.get("format").and_then(Value::as_str).is_some_and(|f| solidcraft_engine::doc::format::version_of(f).is_some()) {
         s.execute("doc.open", &json!({"path": path})).map_err(|e| e.to_string())?;
@@ -355,16 +361,24 @@ fn cmd_run(args: &[String]) -> Result<(), String> {
     let timings = profile || args.iter().any(|a| a == "--timings");
     let (mut s, results) = if want_results || timings {
         // Collect every command's result or time (scripts only), then process requested files too.
+        let t0 = std::time::Instant::now();
         let mut s = match base {
             Some(b) => load(b)?,
             None => Session::default(),
         };
+        // What opening `--in` took: a saved design adopts the model its file keeps (#174).
+        let opened = base.map(|_| json!({"ms": t0.elapsed().as_secs_f64() * 1000.0, "recomputed": s.model.last_recomputed}));
         let needs = if want_results { "--results needs a script" } else { "--timings needs a script" };
         let v = read_json(path.ok_or(needs)?)?;
         let out = if timings {
             let (r, mut t) = s.run_script_timed(&v, profile).map_err(|e| e.to_string())?;
-            if want_results && let Some(o) = t.as_object_mut() {
-                o.insert("results".into(), Value::Array(r));
+            if let Some(o) = t.as_object_mut() {
+                if want_results {
+                    o.insert("results".into(), Value::Array(r));
+                }
+                if let Some(opened) = opened {
+                    o.insert("open".into(), opened);
+                }
             }
             t
         } else {
