@@ -607,22 +607,7 @@ fn export_urdf(s: &Session, path: &str, p: &Value) -> Result<Value> {
 
 /// The assembly as a MuJoCo model and its meshes next to it (docs/mjcf.md).
 fn export_mjcf(s: &Session, path: &str, p: &Value) -> Result<Value> {
-    let flag = |k: &str| match p.get(k) {
-        None | Some(Value::Null) => Ok(None),
-        Some(_) => bool_(p, k).map(Some).ok_or_else(|| bad("file.export", format!("`{k}` must be true or false"))),
-    };
-    let options = solidcraft_io::MjcfOptions {
-        floating: flag("floating")?,
-        scene: flag("scene")?.unwrap_or(true),
-        kp: positive(p, "kp")?,
-        damping: positive(p, "damping")?,
-        armature: positive(p, "armature")?,
-        effort: positive(p, "effort")?,
-        torques: super::parts::rated_torques(&s.doc),
-    };
-    let (doc, stem, held) = robot_doc(s, path, p)?;
-    let mut pkg = solidcraft_io::mjcf(&doc, &doc.painted(&s.model.state()), &stem, &options)?;
-    pkg.warnings.extend(held);
+    let pkg = mjcf_package(s, path, p)?;
     let written = write_package(path, &pkg.meshes, &pkg.xml)?;
     // What the model holds, so an agent that can't read the file can check it (#171).
     let m = &pkg.summary;
@@ -644,6 +629,27 @@ fn export_mjcf(s: &Session, path: &str, p: &Value) -> Result<Value> {
         "bodies": pkg.model.links.len(), "joints": m.joints, "actuators": m.actuators.len(), "meshes": pkg.meshes.len(),
         "free_root": m.free_root, "mass_kg": r(m.mass), "keyframe": m.keyframe, "actuator_ranges": actuators, "warnings": pkg.warnings,
     }))
+}
+
+/// The MuJoCo model `file.export` writes at `path`, built but not written (`sim.mujoco` runs it).
+pub(super) fn mjcf_package(s: &Session, path: &str, p: &Value) -> Result<solidcraft_io::MjcfPackage> {
+    let flag = |k: &str| match p.get(k) {
+        None | Some(Value::Null) => Ok(None),
+        Some(_) => bool_(p, k).map(Some).ok_or_else(|| bad("file.export", format!("`{k}` must be true or false"))),
+    };
+    let options = solidcraft_io::MjcfOptions {
+        floating: flag("floating")?,
+        scene: flag("scene")?.unwrap_or(true),
+        kp: positive(p, "kp")?,
+        damping: positive(p, "damping")?,
+        armature: positive(p, "armature")?,
+        effort: positive(p, "effort")?,
+        torques: super::parts::rated_torques(&s.doc),
+    };
+    let (doc, stem, held) = robot_doc(s, path, p)?;
+    let mut pkg = solidcraft_io::mjcf(&doc, &doc.painted(&s.model.state()), &stem, &options)?;
+    pkg.warnings.extend(held);
+    Ok(pkg)
 }
 
 fn save_mesh(s: &mut Session, p: &Value) -> Result<Value> {

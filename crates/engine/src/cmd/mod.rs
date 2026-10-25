@@ -73,6 +73,7 @@ mod render;
 mod script_tests;
 mod sheet;
 mod silhouette;
+mod sim;
 mod sketch;
 pub(crate) use sketch::author_path_for_rebind;
 pub(crate) use sketch::created as sketch_created;
@@ -304,6 +305,7 @@ pub fn command_specs() -> Vec<&'static CommandSpec> {
     v.extend(metadata::COMMANDS.iter());
     v.extend(inspect::COMMANDS.iter());
     v.extend(analysis::COMMANDS.iter());
+    v.extend(sim::COMMANDS.iter());
     v.extend(compare::COMMANDS.iter());
     v.extend(silhouette::COMMANDS.iter());
     v.extend(materials::COMMANDS.iter());

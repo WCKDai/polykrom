@@ -204,3 +204,96 @@ fn mjcf_floating_base_gets_a_freejoint() {
     assert!(!xml.contains("freejoint"), "{xml}");
     let _ = std::fs::remove_dir_all(&d);
 }
+
+/// `sim.mujoco` (#128, docs/mujoco.md): the arm with the study `Swing`, Elbow 30° → 55° → 30°
+/// over 20 steps (up, away from the floor).
+fn swinging_arm() -> Session {
+    let mut s = arm();
+    run(&mut s, "motion.study", json!({"name": "Swing", "steps": 20, "keys": [{"joint": "Elbow", "points": [[20, 30], [0, 30], [10, 55]]}]}));
+    s
+}
+
+/// The job `sim.mujoco` gives the runner: the study's keys become the actuator's track in
+/// radians, sorted by step, with the times and limits; no MuJoCo is needed.
+#[test]
+fn mujoco_job_of_a_study() {
+    let s = swinging_arm();
+    let model = super::mjcf_package(&s, "arm.xml", &crate::cmd::sim::export_options(&json!({}))).unwrap().model;
+    let p = json!({"study": "Swing", "cycles": 2, "step_s": 0.02, "video": "swing.mp4"});
+    let (job, warnings) = crate::cmd::sim::job(&s, &p, "arm.xml", Some(&model)).unwrap();
+    assert!(warnings.is_empty(), "{warnings:?}");
+    let tracks = job["tracks"].as_array().unwrap();
+    assert_eq!(tracks.len(), 1, "{job}");
+    assert_eq!(tracks[0]["actuator"], "Elbow", "{job}");
+    let points: Vec<(f64, f64)> = tracks[0]["points"].as_array().unwrap().iter().map(|p| (p[0].as_f64().unwrap(), p[1].as_f64().unwrap())).collect();
+    let (a, b, tol) = (30f64.to_radians(), 55f64.to_radians(), 1e-12);
+    for ((step, value), (want_step, want)) in points.iter().zip([(0.0, a), (10.0, b), (20.0, a)]) {
+        assert!((step - want_step).abs() < tol && (value - want).abs() < tol, "{points:?}");
+    }
+    assert_eq!(points.len(), 3);
+    let mut rest = job.clone();
+    rest.as_object_mut().unwrap().remove("tracks");
+    assert_eq!(
+        rest,
+        json!({"mjcf": "arm.xml", "mode": "study", "settle_s": 0.5, "fall_tilt_deg": 45.0, "video": "swing.mp4", "steps": 20, "step_s": 0.02, "cycles": 2.0})
+    );
+
+    // Without a study it holds the design's pose.
+    let (stand, _) = crate::cmd::sim::job(&s, &json!({"hold_s": 3, "fall_height_mm": 40}), "arm.xml", None).unwrap();
+    // A second key on the same joint value merges into its actuator's one track, in step order.
+    let mut twice = Session::new((*s.doc).clone());
+    if let Some(study) = twice.doc_mut().assembly.studies.iter_mut().find(|st| st.name == "Swing") {
+        let mut extra = study.keys[0].clone();
+        extra.points = vec![(15.0, 40f64.to_radians())];
+        study.keys.push(extra);
+    }
+    let (merged, _) = crate::cmd::sim::job(&twice, &p, "arm.xml", Some(&model)).unwrap();
+    assert_eq!(merged["tracks"].as_array().map(Vec::len), Some(1), "{merged}");
+    let steps: Vec<f64> = merged["tracks"][0]["points"].as_array().unwrap().iter().map(|q| q[0].as_f64().unwrap()).collect();
+    assert_eq!(steps, [0.0, 10.0, 15.0, 20.0]);
+    assert_eq!(stand, json!({"mjcf": "arm.xml", "mode": "stand", "settle_s": 0.5, "fall_tilt_deg": 45.0, "fall_height_mm": 40.0, "hold_s": 3.0}));
+    for bad in [
+        json!({"mode": "walk"}),
+        json!({"mode": "study"}),
+        json!({"study": "Nope"}),
+        json!({"study": "Swing", "cycles": 0}),
+        json!({"step_s": -1, "study": "Swing"}),
+    ] {
+        assert!(crate::cmd::sim::job(&s, &bad, "arm.xml", Some(&model)).is_err(), "{bad}");
+    }
+}
+
+/// The runner on the exported arm, fixed to the world: it holds its 30° and swings through the
+/// study. Skipped, with a note, where Python has no MuJoCo (`POLYKROM_MUJOCO_PYTHON`, else python3).
+#[test]
+fn mujoco_runs_the_arm() {
+    let python = crate::geom::env::var_os("MUJOCO_PYTHON").unwrap_or_else(|| "python3".into());
+    if !std::process::Command::new(&python).args(["-c", "import mujoco, numpy"]).status().is_ok_and(|s| s.success()) {
+        eprintln!("skipped: {} has no MuJoCo (pip install mujoco numpy, or set POLYKROM_MUJOCO_PYTHON)", python.to_string_lossy());
+        return;
+    }
+    let mut s = swinging_arm();
+    let stand = run(&mut s, "sim.mujoco", json!({"floating": false}));
+    assert_eq!(stand["mode"], "stand", "{stand}");
+    assert_eq!((stand["ok"].as_bool(), stand["finite"].as_bool(), stand["resets"].as_u64()), (Some(true), Some(true), Some(0)), "{stand}");
+    assert!(stand["fell"].is_null() && stand["free_base"] == false, "a fixed base can't fall: {stand}");
+    let elbow = &stand["actuators"][0];
+    assert_eq!(elbow["name"], "Elbow", "{stand}");
+    // Gravity on a 15 g arm against a 1000 N m/rad servo: far under a hundredth of a degree.
+    assert!(elbow["error_deg"].as_f64().is_some_and(|e| e < 0.01), "{stand}");
+    assert!(elbow["peak_force"].as_f64().zip(elbow["force_limit"].as_f64()).is_some_and(|(f, l)| f > 0.0 && f < l), "{stand}");
+    let mjcf = stand["mjcf"].as_str().unwrap_or_default().to_string();
+    assert!(std::path::Path::new(&mjcf).is_file(), "{stand}");
+
+    // The study on the model just exported.
+    let swing = run(&mut s, "sim.mujoco", json!({"study": "Swing", "mjcf": mjcf, "step_s": 0.05, "cycles": 2}));
+    assert_eq!((swing["mode"].as_str(), swing["ok"].as_bool(), swing["cycles"].as_u64()), (Some("study"), Some(true), Some(2)), "{swing}");
+    // 2 cycles of 20 steps of 0.05 s after 0.5 s settling.
+    assert!(swing["seconds"].as_f64().is_some_and(|t| (t - 2.5).abs() < 0.01), "{swing}");
+    // A critically damped servo lags a ramp by 2 sqrt(J / kp) × speed: about 0.3° at 25° per 0.5 s
+    // with the export's 0.01 kg m² armature.
+    let elbow = &swing["actuators"][0];
+    assert!(elbow["max_error_deg"].as_f64().is_some_and(|e| e > 0.1 && e < 1.0), "{swing}");
+    let _ = std::fs::remove_dir_all(swing["folder"].as_str().unwrap_or_default());
+    let _ = std::fs::remove_dir_all(stand["folder"].as_str().unwrap_or_default());
+}

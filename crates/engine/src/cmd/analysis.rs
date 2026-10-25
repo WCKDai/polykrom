@@ -101,7 +101,7 @@ fn study_spec(cmd: &str, p: &Value, e: f64, nu: f64, size: f64) -> Result<Value>
 }
 
 #[cfg(not(target_arch = "wasm32"))]
-mod native {
+pub(super) mod native {
     use std::io::Read;
     use std::time::{Duration, Instant};
 
@@ -157,7 +157,7 @@ mod native {
         let budget = Duration::from_secs_f64(num(p, "budget_s").filter(|b| *b > 0.0 && b.is_finite()).unwrap_or(600.0).min(86_400.0));
         let step = solidcraft_kernel::step_export(&[&body.body], "Polykrom").map_err(|e| bad(cmd, format!("STEP export: {e}")))?;
 
-        let dir = scratch(cmd)?;
+        let dir = scratch(cmd, "analysis")?;
         let result = solve(cmd, &nf, &dir, &step, &spec, size, bool_(p, "refine").unwrap_or(false), budget);
         let _ = std::fs::remove_dir_all(&dir);
         let out = result?;
@@ -197,12 +197,12 @@ mod native {
 
     /// A new folder of this run's own in the temporary folder. Created exclusively: a name already
     /// there (left over, or planted) is never written into; another name is tried.
-    fn scratch(cmd: &str) -> Result<std::path::PathBuf> {
+    pub(in crate::cmd) fn scratch(cmd: &str, tag: &str) -> Result<std::path::PathBuf> {
         static RUNS: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
         let nanos = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.subsec_nanos()).unwrap_or(0);
         for _ in 0..16 {
             let run = RUNS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-            let dir = std::env::temp_dir().join(format!("solidcraft-analysis-{}-{nanos}-{run}", std::process::id()));
+            let dir = std::env::temp_dir().join(format!("solidcraft-{tag}-{}-{nanos}-{run}", std::process::id()));
             match std::fs::create_dir(&dir) {
                 Ok(()) => return Ok(dir),
                 Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => continue,

@@ -23,7 +23,12 @@ def fail(kind, message, code=2):
 
 
 def main():
-    job = json.load(open(sys.argv[1]) if len(sys.argv) > 1 else sys.stdin)
+    try:
+        job = json.load(open(sys.argv[1]) if len(sys.argv) > 1 else sys.stdin)
+    except (OSError, ValueError) as e:
+        fail("job", f"the job is not readable JSON: {e}")
+    if not isinstance(job, dict):
+        fail("job", "the job must be a JSON object")
     if job.get("mode") not in ("stand", "study"):
         fail("job", "`mode` must be stand or study")
     if not isinstance(job.get("mjcf"), str):
@@ -68,10 +73,17 @@ def main():
     hold = d.ctrl.copy()
     idx = {a: i for i, a in enumerate(acts)}
     tracks = []
+    if not isinstance(job.get("tracks", []), list):
+        fail("job", "`tracks` must be a list")
     for t in job.get("tracks", []):
+        pairs = t.get("points") if isinstance(t, dict) else None
+        ok = isinstance(pairs, list) and len(pairs) > 0 and all(
+            isinstance(q, list) and len(q) == 2 and all(isinstance(x, (int, float)) and not isinstance(x, bool) and math.isfinite(x) for x in q) for q in pairs)
+        if not ok or not isinstance(t.get("actuator"), str):
+            fail("job", "each track is {actuator, points: [[step, value], ...]} with finite numbers")
         if t["actuator"] not in idx:
             fail("track", f"the model has no actuator `{t['actuator']}`: export it again from this design")
-        pts = np.array(sorted(t["points"]), dtype=float).reshape(-1, 2)
+        pts = np.array(sorted(pairs), dtype=float)
         tracks.append((idx[t["actuator"]], pts[:, 0], pts[:, 1]))
     steps = steps_n
 
@@ -88,8 +100,11 @@ def main():
             renderer = mujoco.Renderer(m, h, w)
         except Exception as e:
             fail("video", f"MuJoCo cannot render here ({e}); on a machine without a display set MUJOCO_GL=egl or osmesa")
-        writer = imageio_ffmpeg.write_frames(job["video"], (w, h), fps=30, macro_block_size=8)
-        writer.send(None)
+        try:
+            writer = imageio_ffmpeg.write_frames(job["video"], (w, h), fps=30, macro_block_size=8)
+            writer.send(None)
+        except Exception as e:
+            fail("video", f"cannot write {job['video']}: {e}")
         cam = mujoco.MjvCamera()
         cam.distance, cam.azimuth, cam.elevation = 1.7 * m.stat.extent, -55, -16
     stats = {"tilt": 0.0, "com_min": float(d.subtree_com[root][2]), "peak": np.zeros(m.nu), "err": np.zeros(m.nu), "frame": 0.0, "at_limit": np.zeros(m.nu)}
@@ -116,9 +131,15 @@ def main():
             stats["frame"] += 1 / 30
             cam.lookat[:] = d.subtree_com[root]
             renderer.update_scene(d, cam)
-            writer.send(np.ascontiguousarray(renderer.render()))
+            try:
+                writer.send(np.ascontiguousarray(renderer.render()))
+            except Exception as e:
+                fail("video", f"cannot write {job['video']}: {e}")
 
     dt = m.opt.timestep
+    # A study step shorter than the model's time step still takes one.
+    if settle_s + hold_s + steps * cycles_n * max(1, round(step_s / dt)) * dt > MAX_SIM_S:
+        fail("job", f"the job asks for more than {MAX_SIM_S:.0f} s of simulated time at this model's time step")
     mm = lambda x: round(float(x) * 1000, 1)
     com0 = float(d.subtree_com[root][2])
     for _ in range(int(round(settle_s / dt))):
@@ -149,7 +170,10 @@ def main():
         mujoco.mj_forward(m, d)
         out["base_drop_mm"] = mm(com0 - d.subtree_com[root][2])
     if writer is not None:
-        writer.close()
+        try:
+            writer.close()
+        except Exception as e:
+            fail("video", f"cannot write {job['video']}: {e}")
         out["video"] = job["video"]
     resets = warned() - resets0
     finite = bool(np.all(np.isfinite(d.qpos)))
