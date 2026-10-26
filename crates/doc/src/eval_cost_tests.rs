@@ -432,23 +432,32 @@ fn assert_full_evaluation(doc: &Document, model: &Model) {
     }
 }
 
-#[test]
-fn an_edit_in_one_library_part_rebases_the_parts_after_it() {
+/// Library parts after an unused sketch, their cuts made now (`scoped`) or as older designs made
+/// them; evaluated.
+fn library_parts(parts: usize, scoped: bool) -> (Document, u64, u64, Model) {
     let mut doc = Document::new("library parts");
     let unused = doc.add_feature(line_sketch(PlaneRef::Origin { name: "XZ".into() }, Vec2::new(5.0, 5.0)), None).unwrap();
-    let parts = 4;
     let first = library_part(&mut doc, 0);
     for i in 1..parts {
         library_part(&mut doc, i);
+    }
+    for f in &mut doc.features {
+        f.scoped_surroundings &= scoped;
     }
     let mut model = Model::new();
     model.evaluate(&doc);
     assert!(model.results.iter().all(|r| r.error.is_none()), "{:?}", model.results.iter().find(|r| r.error.is_some()));
     assert_eq!(model.state().bodies.len(), parts * 3);
+    (doc, unused, first, model)
+}
 
-    // The first part's plate made thicker: that part is evaluated again, and the socket cut of
-    // every other part (its tool is shaped around every body) with the split of what it cut; the
-    // rest is rebased.
+#[test]
+fn an_edit_in_one_library_part_rebases_the_parts_after_it() {
+    let parts = 4;
+    let (mut doc, unused, first, mut model) = library_parts(parts, false);
+    // As older designs made the socket cuts, naming no target, each shapes its tool around every
+    // body. The first part's plate made thicker: that part is evaluated again, and the socket cut
+    // of every other part with the split of what it cut; the rest is rebased.
     let FeatureKind::Extrude { extent, .. } = &mut doc.feature_mut(first).unwrap().kind else { panic!("extrude") };
     extent.distance = "5".into();
     model.evaluate(&doc);
@@ -463,6 +472,19 @@ fn an_edit_in_one_library_part_rebases_the_parts_after_it() {
     sketch.points[1].pos = Vec2::new(6.0, 5.0);
     model.evaluate(&doc);
     assert_eq!((evaluated(&model), model.last_rebased), (1, doc.features.len() - 1));
+    assert_full_evaluation(&doc, &model);
+}
+
+#[test]
+fn a_scoped_cut_is_rebased_when_another_part_changes() {
+    let parts = 4;
+    let (mut doc, _, first, mut model) = library_parts(parts, true);
+    // Socket cuts made now shape their tools around their own part's bodies (#219): only the
+    // edited part is evaluated again.
+    let FeatureKind::Extrude { extent, .. } = &mut doc.feature_mut(first).unwrap().kind else { panic!("extrude") };
+    extent.distance = "5".into();
+    model.evaluate(&doc);
+    assert_eq!((evaluated(&model), model.last_rebased), (4, doc.features.len() - 2 - 4));
     assert_full_evaluation(&doc, &model);
 }
 

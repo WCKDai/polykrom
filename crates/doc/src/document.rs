@@ -2407,6 +2407,13 @@ pub struct Feature {
     /// A body without one is met where it is placed now, as designs made before this did.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub tool_frames: Vec<(String, crate::Mat)>,
+    /// An Extrude or Revolve join or cut naming no target shapes its tool (ends run on past
+    /// coplanar faces, profiles grown, holes over voids filled, through all) around the bodies it
+    /// can change: its participants, else its component's bodies (#219). Set on the features made
+    /// since; those of older designs keep shaping it around every body, so they evaluate as they
+    /// did.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub scoped_surroundings: bool,
     #[serde(flatten)]
     pub kind: FeatureKind,
 }
@@ -3163,6 +3170,7 @@ impl Document {
             Some(n) if !n.trim().is_empty() => n.trim().to_string(),
             _ => self.unique_name(kind.base_name()),
         };
+        let scoped_surroundings = matches!(kind, FeatureKind::Extrude { .. } | FeatureKind::Revolve { .. });
         let f = Feature {
             id,
             name,
@@ -3179,6 +3187,7 @@ impl Document {
             inserted: false,
             link_faces: Vec::new(),
             tool_frames: Vec::new(),
+            scoped_surroundings,
             kind,
         };
         self.place_feature(f);
