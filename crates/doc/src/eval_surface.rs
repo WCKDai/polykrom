@@ -409,11 +409,7 @@ pub(super) fn eval(doc: &Document, vals: &BTreeMap<String, Value>, f: &Feature, 
                         .ok_or_else(|| DocError::Unknown(format!("sketch {} (it must come earlier in the timeline)", sec.sketch)))?,
                     f.component,
                 )?;
-                let profiles = match (&sec.profiles, sec.curves.is_empty()) {
-                    (None, true) => Some(&ProfileSel::All),
-                    (p, _) => p.as_ref(),
-                };
-                let mut chains = sheet_chains(&ss, profiles, &sec.curves)?.into_iter();
+                let mut chains = section_chains(&ss, sec)?.into_iter();
                 let (Some(chain), None) = (chains.next(), chains.next()) else {
                     return Err(DocError::Invalid(
                         "each loft section must be one chain: one profile without holes, or curves meeting end to end".into(),
@@ -746,6 +742,23 @@ fn mutual_trim(st: &mut ModelState, i: usize, other: &str, keeps: kernel::TrimKe
 
 /// What a surface builder sweeps: the boundary loops of the picked profiles, then the picked
 /// curves chained end to end.
+/// A loft section's chains: its curves and profiles as picked. A section that picks neither is
+/// the sketch's profiles, or, in a sketch that has none, its drawn curves (one open chain, such
+/// as one fit-point spline: a section an agent need not name the curve of).
+fn section_chains(ss: &SolvedSketch, sec: &SheetSection) -> Result<Vec<Vec<Seg2>>> {
+    if sec.profiles.is_none() && sec.curves.is_empty() {
+        if ss.profiles.is_empty() {
+            let drawn: Vec<String> =
+                ss.sketch.curves.iter().filter(|c| !c.construction && !c.centerline && c.link.is_none()).map(|c| c.id.clone()).collect();
+            if !drawn.is_empty() {
+                return sheet_chains(ss, None, &drawn);
+            }
+        }
+        return sheet_chains(ss, Some(&ProfileSel::All), &[]);
+    }
+    sheet_chains(ss, sec.profiles.as_ref(), &sec.curves)
+}
+
 fn sheet_chains(ss: &SolvedSketch, profiles: Option<&ProfileSel>, curves: &[String]) -> Result<Vec<Vec<Seg2>>> {
     let mut chains: Vec<Vec<Seg2>> = Vec::new();
     if let Some(sel) = profiles {
@@ -845,11 +858,7 @@ fn loft_blend(
             st.sketch(sec.sketch.0).ok_or_else(|| DocError::Unknown(format!("sketch {} (it must come earlier in the timeline)", sec.sketch)))?,
             f.component,
         )?;
-        let profiles = match (&sec.profiles, sec.curves.is_empty()) {
-            (None, true) => Some(&ProfileSel::All),
-            (p, _) => p.as_ref(),
-        };
-        let mut chains = sheet_chains(&ss, profiles, &sec.curves)?.into_iter();
+        let mut chains = section_chains(&ss, sec)?.into_iter();
         let (Some(chain), None) = (chains.next(), chains.next()) else {
             return Err(DocError::Invalid("each loft section must be one chain: one profile without holes, or curves meeting end to end".into()));
         };
