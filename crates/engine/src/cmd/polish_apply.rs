@@ -350,25 +350,20 @@ fn batch_groups(s: &mut Session, fixes: &[Fix], groups: &[(String, Vec<usize>)],
     }
     let touched: BTreeSet<String> = groups.iter().map(|(b, _)| b.clone()).collect();
     let was = state(s, run, &touched);
+    // Before each body's fixes: the design, and what had been settled as skipped (a fix a
+    // tentative one made disappear, or one refused on the changed body, may yet work).
     let mut marks = Vec::new();
     let mut done: Vec<Vec<(usize, Value)>> = Vec::new();
     let mut changed = run.changed.clone();
     for (_, g) in groups {
-        marks.push(s.checkpoint());
+        marks.push((s.mark(), run.skipped.len(), run.out.clone()));
         done.push(run_fixes(s, fixes, g, run, &mut changed));
     }
-    let first = marks.first().copied();
     if done.iter().all(Vec::is_empty) {
-        if let Some(m) = first {
-            s.drop_checkpoint(m);
-        }
         return Ok(());
     }
     let now = state(s, run, &touched);
     let Some((_, at_fault)) = worse(&was, &now, run.mass_tol) else {
-        if let Some(m) = first {
-            s.drop_checkpoint(m);
-        }
         for d in done {
             accept(run, fixes, d, &was, &now);
         }
@@ -376,14 +371,13 @@ fn batch_groups(s: &mut Session, fixes: &[Fix], groups: &[(String, Vec<usize>)],
     };
     // Keep the bodies before the first one at fault; settle the rest body by body.
     let from = groups.iter().position(|(b, _)| at_fault.contains(b)).unwrap_or(0);
-    if let Some(m) = marks.get(from).copied() {
-        s.restore_checkpoint(m)?;
+    if let Some((mark, skipped, out)) = marks.into_iter().nth(from) {
+        s.go_back(mark);
+        run.skipped.truncate(skipped);
+        run.out = out;
     }
     for d in done.drain(..from) {
         accept(run, fixes, d, &was, &now);
-    }
-    if let Some(m) = first.filter(|_| from > 0) {
-        s.drop_checkpoint(m);
     }
     for (_, g) in groups.iter().skip(from) {
         settle(s, fixes, g, run)?;
@@ -404,7 +398,9 @@ fn jointed_bodies(s: &Session) -> BTreeSet<String> {
         .filter(|o| !o.snap.face_names().is_empty())
         .map(|o| o.occurrence)
         .collect();
-    let comps: BTreeSet<u64> = s.doc.occurrences.iter().filter(|o| held.contains(&o.id)).map(|o| o.component).collect();
+    // Occurrence 0 is the root, component 0.
+    let comps: BTreeSet<u64> =
+        s.doc.occurrences.iter().filter(|o| held.contains(&o.id)).map(|o| o.component).chain(held.contains(&0).then_some(0)).collect();
     s.world_state().bodies.iter().filter(|b| comps.contains(&b.component)).map(|b| b.name.clone()).collect()
 }
 
@@ -417,21 +413,20 @@ fn settle(s: &mut Session, fixes: &[Fix], which: &[usize], run: &mut Run) -> Res
     }
     let touched: BTreeSet<String> = which.iter().filter_map(|i| fixes.get(*i)).map(|f| f.body.clone()).collect();
     let was = state(s, run, &touched);
-    let mark = s.checkpoint();
+    let (mark, skipped, out) = (s.mark(), run.skipped.len(), run.out.clone());
     let mut changed = run.changed.clone();
     let done = run_fixes(s, fixes, &which, run, &mut changed);
     if done.is_empty() {
-        s.drop_checkpoint(mark);
         return Ok(());
     }
     let now = state(s, run, &touched);
     match worse(&was, &now, run.mass_tol) {
-        None => {
-            s.drop_checkpoint(mark);
-            accept(run, fixes, done, &was, &now);
-        }
+        None => accept(run, fixes, done, &was, &now),
         Some((reason, at_fault)) => {
-            s.restore_checkpoint(mark)?;
+            // Back to before the batch, what it settled as skipped too.
+            s.go_back(mark);
+            run.skipped.truncate(skipped);
+            run.out = out;
             if let [(i, _)] = done.as_slice() {
                 if let Some(fix) = fixes.get(*i) {
                     run.skipped.push(json!({"id": fix.id, "body": fix.body, "command": fix.command, "reason": reason}));
@@ -548,7 +543,8 @@ fn state(s: &mut Session, run: &mut Run, touched: &BTreeSet<String>) -> State {
         }
     }
     // Joints on the touched bodies' occurrences only, with the touched bodies each holds.
-    let component_of = |occ: u64| s.doc.occurrences.iter().find(|o| o.id == occ).map(|o| o.component);
+    // Occurrence 0 is the root, component 0.
+    let component_of = |occ: u64| if occ == 0 { Some(0) } else { s.doc.occurrences.iter().find(|o| o.id == occ).map(|o| o.component) };
     let mut joint_bodies: BTreeMap<u64, BTreeSet<String>> = BTreeMap::new();
     for j in &s.doc.assembly.joints {
         for occ in [j.a.occurrence, j.b.occurrence] {

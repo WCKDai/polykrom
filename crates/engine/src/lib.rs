@@ -1037,6 +1037,32 @@ impl Session {
     pub fn restore_checkpoint(&mut self, id: u64) -> Result<()> {
         let i = self.checkpoints.iter().position(|c| c.id == id).ok_or_else(|| EngineError::Other(format!("no checkpoint {id}")))?;
         let Some(c) = self.checkpoints.drain(i..).next() else { return Err(EngineError::Other(format!("no checkpoint {id}"))) };
+        self.go_to(c);
+        Ok(())
+    }
+
+    /// A point to go back to with [`Session::go_back`], kept by the caller rather than on the
+    /// checkpoint stack (which holds the last [`MAX_CHECKPOINTS`] and drops older ones): for a
+    /// command that tries changes and takes some back. The undo history isn't part of it.
+    pub(crate) fn mark(&self) -> Checkpoint {
+        Checkpoint {
+            id: 0,
+            doc: self.doc.clone(),
+            active_sketch: self.active_sketch,
+            pending_moves: self.pending_moves.clone(),
+            undo: Vec::new(),
+            redo: Vec::new(),
+        }
+    }
+
+    /// Go back to `mark` (from [`Session::mark`]), keeping the undo history as it is.
+    pub(crate) fn go_back(&mut self, mut mark: Checkpoint) {
+        mark.undo = std::mem::take(&mut self.undo);
+        mark.redo = std::mem::take(&mut self.redo);
+        self.go_to(mark);
+    }
+
+    fn go_to(&mut self, c: Checkpoint) {
         let before =
             Snapshot { label: String::new(), doc: self.doc.clone(), active_sketch: self.active_sketch, pending_moves: self.pending_moves.clone() };
         self.doc = c.doc;
@@ -1050,7 +1076,6 @@ impl Session {
         } else if !Arc::ptr_eq(&self.doc, &before.doc) || self.active_sketch != before.active_sketch || self.pending_moves != before.pending_moves {
             self.refresh();
         }
-        Ok(())
     }
 
     /// Forget checkpoint `id` (and later ones) without going back.
