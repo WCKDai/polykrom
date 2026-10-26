@@ -3711,6 +3711,7 @@ fn shell_round_a_hole_closer_to_a_chamfer_than_the_wall() {
     let s = shell(&body, &[Vec3::new(20.0, 3.0, 0.0)], t).unwrap();
     assert!(s.validity().is_empty(), "{:?}", s.validity());
     assert_eq!(s.solid.boundaries().len(), 1);
+    assert!(s.history().is_some(), "the shell's faces trace back to the block's");
     // Every vertex of the shell's mesh off the body's surface, measured to the body's mesh
     // (fine, so that its chords are well under the slack): within the fit (0.02) and the
     // Boolean's intersection tolerance (1e-3 of the size), which places the edges where a
@@ -3737,6 +3738,7 @@ fn shell_round_a_hole_closer_to_a_chamfer_than_the_wall_on_planes() {
     let s = shell(&body, &[Vec3::new(20.0, 3.0, 0.0)], t).unwrap();
     assert!(s.validity().is_empty(), "{:?}", s.validity());
     assert_eq!(s.solid.boundaries().len(), 1);
+    assert!(s.history().is_some(), "the shell's faces trace back to the block's");
     // Every vertex of the shell's mesh off the body's surface, measured to the body's mesh
     // (fine, so that its chords are well under the slack): within the fit (0.02) and the
     // Boolean's intersection tolerance (1e-3 of the size), which places the edges where a
@@ -3746,6 +3748,23 @@ fn shell_round_a_hole_closer_to_a_chamfer_than_the_wall_on_planes() {
     let slack = 0.02 + body.size() * 1e-3;
     for (p, d) in walls {
         assert!(d > t - slack, "wall {d} at {p:?}");
+    }
+}
+
+/// A barrel loft shelled a thousandth of a millimetre thick: the wall check's chord is at most
+/// a twentieth of the wall, which once put its upper bound under its lower one (a panic, caught
+/// as an internal error). A shell or a refusal, never that.
+#[test]
+fn shell_of_a_loft_far_thinner_than_its_chord_does_not_panic() {
+    let body = loft(&[
+        (plane_at_z(0.0), Loop2::circle(Vec2::ZERO, 20.0)),
+        (plane_at_z(30.0), Loop2::circle(Vec2::ZERO, 26.0)),
+        (plane_at_z(60.0), Loop2::circle(Vec2::ZERO, 21.0)),
+    ])
+    .unwrap();
+    match shell(&body, &[Vec3::new(0.0, 0.0, 60.0)], 0.001) {
+        Ok(s) => assert!(s.validity().is_empty(), "{:?}", s.validity()),
+        Err(e) => assert!(!matches!(e, KernelError::Internal(_)), "{e}"),
     }
 }
 

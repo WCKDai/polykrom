@@ -638,7 +638,14 @@ pub(crate) fn shell_free(b: &Body, opened: &[usize], thickness: f64) -> Result<O
 /// ones): the cavity's mesh points measured to the body's mesh, both at a chord well under the
 /// wall, so trimmed faces count only where they are.
 pub(crate) fn too_thin(b: &Body, cavity: &Body, opened: &[usize], thickness: f64, tolerance: f64) -> Result<Option<Vec3>> {
-    let chord = (b.size() * 1e-3).clamp(1e-4, thickness * 0.05);
+    // A wall within ten times the fit's tolerance of nothing can't be told from the fit's own
+    // error: nothing to check (and no mesh fine enough to check it with).
+    let slack = (tolerance * 10.0).max(thickness * 0.01);
+    if thickness <= slack {
+        return Ok(None);
+    }
+    // At most a twentieth of the wall.
+    let chord = (b.size() * 1e-3).max(1e-4).min(thickness * 0.05);
     let (outer, inner) = (b.tessellate(chord)?, cavity.tessellate(chord)?);
     let open = |f: &u32| opened.contains(&(*f as usize));
     // The outer triangles by cell (a cell at least as wide as the wall, so the cells round a
@@ -665,7 +672,7 @@ pub(crate) fn too_thin(b: &Body, cavity: &Body, opened: &[usize], thickness: f64
             }
         }
     }
-    let limit = thickness - (tolerance * 10.0).max(thickness * 0.01) - chord;
+    let limit = thickness - slack - chord;
     let mut seen = std::collections::HashSet::new();
     for (t, f) in inner.triangles.iter().zip(&inner.tri_face) {
         if open(f) {

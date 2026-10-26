@@ -17,11 +17,14 @@ use solidcraft_geom::{Aabb3, Vec3};
 use truck_modeling as mt;
 
 use crate::body::{Body, Solid, from_p3};
+use crate::history::{FaceOrigin, History};
 use crate::offset::{Surf, surf_of};
 use crate::{KernelError, Result, guard};
 
 /// Most holes a shell fills and grows.
 const MAX_HOLES: usize = 64;
+/// Most faces a body may have for its holes to be found (as the free-form offset takes).
+const MAX_FACES: usize = 512;
 
 /// A hole: the faces that line it (indices in the body's face order) and the inner loops of
 /// planar faces where it opens (each with the plane's face index).
@@ -57,6 +60,9 @@ fn wire_area(w: &mt::Wire, n: Vec3) -> f64 {
 /// body: a hole, not a boss standing on the face).
 fn holes(b: &Body) -> Vec<Hole> {
     let faces: Vec<mt::Face> = b.solid.face_iter().cloned().collect();
+    if faces.len() > MAX_FACES {
+        return Vec::new();
+    }
     let tol = (b.size() * 1e-7).max(1e-9) * 100.0;
     let planes: Vec<Option<(Vec3, f64)>> =
         faces.iter().map(|f| if let Some(Surf::Plane { n, d }) = surf_of(f, tol) { Some((n, d)) } else { None }).collect();
@@ -92,9 +98,6 @@ fn holes(b: &Body) -> Vec<Hole> {
                 continue;
             }
             part.push(f);
-            if part.len() * 2 > faces.len() {
-                break;
-            }
             let Some(face) = faces.get(f) else { continue };
             for e in face.edge_iter() {
                 if stops.contains(&e.id()) {
@@ -103,7 +106,9 @@ fn holes(b: &Body) -> Vec<Hole> {
                 todo.extend(efaces.get(&e.id()).into_iter().flatten().copied());
             }
         }
-        if part.is_empty() || part.len() * 2 > faces.len() {
+        // Not a hole where the faces across the loop reach every other face (no inner loop
+        // bounds them); the side test below tells a hole from a boss.
+        if part.is_empty() || part.len() + 1 >= faces.len() {
             continue;
         }
         // Behind the face: every vertex of the hole not on the face's plane lies inside it.
@@ -122,6 +127,9 @@ fn holes(b: &Body) -> Vec<Hole> {
             .cloned()
             .collect();
         found.push(Hole { faces: part, rims });
+        if found.len() > MAX_HOLES {
+            break;
+        }
     }
     found
 }
@@ -252,7 +260,43 @@ pub(crate) fn shell_round_holes(b: &Body, opened: &[usize], thickness: f64, tole
                 crate::ops::boolean(&cavity, g, crate::BoolOp::Cut)?.ok_or_else(|| KernelError::Failed("shell: the holes fill the cavity".into()))?;
         }
     }
-    crate::ops::boolean(b, &cavity, crate::BoolOp::Cut)?.ok_or_else(|| KernelError::Failed("the shell removed everything".into())).map(Some)
+    let walls = cavity_history(b, &cavity, thickness)?;
+    let r = crate::ops::boolean(b, &cavity, crate::BoolOp::Cut)?.ok_or_else(|| KernelError::Failed("the shell removed everything".into()))?;
+    // Over `[b]`: its own faces kept, each wall of the cavity an offset of the face it lines.
+    let h = crate::boolean_record::of_pair(&r, &crate::boolean_record::kept(b, 0, 1), &walls);
+    Ok(Some(r.with_checked_history(h, &crate::record::counts(&[b]))))
+}
+
+/// The cavity's history over `[b]`: each of its faces an offset of the face of `b` it lines, the
+/// face a wall out from it (from the middle of its largest triangle, along the triangle's
+/// outward normal).
+fn cavity_history(b: &Body, cavity: &Body, thickness: f64) -> Result<Option<History>> {
+    let mesh = cavity.tessellate((cavity.size() * 2e-3).max(1e-3))?;
+    let outer = b.tessellate((b.size() * 2e-3).max(1e-3))?;
+    let mut best: HashMap<u32, (f64, Vec3)> = HashMap::new();
+    for (t, f) in mesh.triangles.iter().zip(&mesh.tri_face) {
+        let Some(tri) = mesh.tri(t) else { continue };
+        let [x, y, z] = tri;
+        let n = (y - x).cross(z - x);
+        let area = n.len();
+        let Some(n) = n.normalized() else { continue };
+        if best.get(f).is_none_or(|(a, _)| area > *a) {
+            best.insert(*f, (area, (x + y + z) / 3.0 + n * thickness));
+        }
+    }
+    let mut faces = Vec::with_capacity(cavity.face_count());
+    for i in 0..cavity.face_count() {
+        let Some((_, p)) = u32::try_from(i).ok().and_then(|k| best.get(&k)) else { return Ok(None) };
+        let near = outer
+            .triangles
+            .iter()
+            .zip(&outer.tri_face)
+            .filter_map(|(t, f)| outer.tri(t).map(|[x, y, z]| (crate::polyhedron::point_tri(*p, x, y, z), *f)))
+            .min_by(|a, c| a.0.total_cmp(&c.0));
+        let Some((_, f)) = near else { return Ok(None) };
+        faces.push(crate::record::generated(vec![FaceOrigin::Offset { operand: 0, face: f as usize }]));
+    }
+    Ok(Some(crate::record::from_faces(&cavity.solid, 1, faces)))
 }
 
 fn tri_area(t: &[Vec3; 3]) -> f64 {
