@@ -3306,3 +3306,31 @@ fn split_through_a_face_lying_in_the_plane() {
         }
     }
 }
+
+/// A split with no face of the body in the plane goes straight to the boolean: the direct split
+/// (#190) is not even begun. One with such a face is divided directly.
+#[test]
+fn a_split_with_no_face_in_the_plane_skips_the_direct_split() {
+    let count = || crate::splitface::DIRECT_SPLITS.with(|c| c.get());
+    let block = box_solid(Vec3::new(0.0, 0.0, 0.0), Vec3::new(40.0, 20.0, 10.0)).unwrap();
+    let across = Plane { origin: Vec3::new(0.0, 0.0, 4.0), x: Vec3::X, y: Vec3::Y };
+    let before = count();
+    let (part, _) = half_space(&block, &across, true).unwrap();
+    assert!(rel(measure(&part.unwrap()).unwrap().volume, 40.0 * 20.0 * 6.0) < 1e-9);
+    assert_eq!(count(), before, "the plane holds no face of the block");
+    let step = Region2 {
+        outer: Loop2::polygon(&[
+            Vec2::new(0.0, 0.0),
+            Vec2::new(40.0, 0.0),
+            Vec2::new(40.0, 10.0),
+            Vec2::new(20.0, 10.0),
+            Vec2::new(20.0, 25.0),
+            Vec2::new(0.0, 25.0),
+        ]),
+        holes: vec![],
+    };
+    let stepped = extrude(&Plane::XZ, &[step], 0.0, 15.0).unwrap().pop().unwrap();
+    let at_step = Plane { origin: Vec3::new(0.0, 0.0, -10.0), x: Vec3::X, y: Vec3::Y };
+    half_space(&stepped, &at_step, true).unwrap();
+    assert_eq!(count(), before + 1, "the plane holds the step's face");
+}

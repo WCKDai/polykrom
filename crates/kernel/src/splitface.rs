@@ -1431,6 +1431,12 @@ pub fn split_body(body: &Body, tool: &SplitTool) -> Result<Vec<Body>> {
     })
 }
 
+#[cfg(test)]
+thread_local! {
+    /// How many splits [`plane_parts`] divided (past its test for a face lying in the plane).
+    pub(crate) static DIRECT_SPLITS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
 /// The parts of `body` on the back and on the front of `plane` (in that order), as the boolean of
 /// `body` and `tool` (a box with a face in the plane, [`crate::ops::half_box`]) makes the part on
 /// the box's side, each with its history over `[body, tool]`: the section is a piece of the box's
@@ -1448,6 +1454,14 @@ pub(crate) fn plane_parts(body: &Body, plane: &solidcraft_geom::Plane, tool: &Bo
             _ => false,
         })
         .ok_or_else(|| KernelError::Failed("the tool has no face in the plane".into()))?;
+    // Asked first, from the faces' corners (and only where they all lie in the plane, a mesh): a
+    // split with no face in the plane is the boolean's, and is not divided here for nothing.
+    let g = Field::Plane { o: plane.origin, n };
+    if !body.solid.face_iter().any(|f| lies_in(f, &g, body.size())) {
+        return Err(KernelError::Failed("no face of the body lies in the plane".into()));
+    }
+    #[cfg(test)]
+    DIRECT_SPLITS.with(|c| c.set(c.get() + 1));
     let Some(mut sides) = split_sides(body, &SplitTool::Plane(*plane))? else {
         return Err(KernelError::Failed("the plane misses the body".into()));
     };
