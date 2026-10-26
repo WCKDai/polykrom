@@ -446,10 +446,14 @@ impl Session {
             geometry.as_ref().ok(),
             thumbnail.as_deref(),
         )?;
-        let report = match geometry {
-            Ok(_) if solidcraft_io::has_model_cache(&bytes) => json!({"saved": true}),
-            Ok(_) => json!({"saved": false, "reason": "the model did not fit in the file (or could not be encoded)"}),
-            Err(reason) => json!({"saved": false, "reason": reason}),
+        let report = match (geometry, solidcraft_io::model_cache_kept(&bytes)) {
+            (Ok(_), Some((kept, all))) if kept == all => json!({"saved": true}),
+            (Ok(_), Some((kept, all))) => json!({
+                "saved": true, "states": kept, "features": all,
+                "reason": "thinned to fit the file: opening evaluates the features whose states were left out",
+            }),
+            (Ok(_), None) => json!({"saved": false, "reason": "the model did not fit in the file or could not be encoded (the log says which)"}),
+            (Err(reason), _) => json!({"saved": false, "reason": reason}),
         };
         if report["saved"] == false && cache {
             log::warn!("{}: saved without its model ({}): opening it evaluates the design in full", design.name, report["reason"]);
@@ -467,10 +471,12 @@ fn saved_geometry(s: &Session, design: &Document) -> std::result::Result<solidcr
     if !s.pending_moves.is_empty() {
         return Err("moved parts are not captured yet".into());
     }
+    // The model's own reasons first: a first feature in error leaves no bodies, and says so.
+    let saved = s.model.saved_or_why(design)?;
     if s.model.state().bodies.is_empty() {
         return Err("the design has no bodies".into());
     }
-    s.model.saved_or_why(design)
+    Ok(saved)
 }
 
 /// Cache only warm display geometry. A save never waits for an unevaluated mesh.
@@ -998,7 +1004,8 @@ mod tests {
         let path = std::env::temp_dir().join(format!("polykrom-save-report-{}.polykrom", std::process::id()));
         let saved = session.execute("file.save", &json!({"path": path})).unwrap();
         assert_eq!(saved["model_cache"], json!({"saved": true}), "{saved}");
-        assert!(solidcraft_io::has_model_cache(&std::fs::read(&path).unwrap()));
+        let kept = solidcraft_io::model_cache_kept(&std::fs::read(&path).unwrap());
+        assert!(kept.is_some_and(|(kept, all)| kept == all && all > 0), "{kept:?}");
         let off = session.execute("file.save", &json!({"path": path, "cache": false})).unwrap();
         assert_eq!(off["model_cache"]["saved"], false, "{off}");
         assert!(!solidcraft_io::has_model_cache(&std::fs::read(&path).unwrap()));

@@ -13,8 +13,8 @@ mod dxf;
 mod dxf_out;
 pub mod formats;
 pub use design::{
-    DesignCompression, DesignContainerReader, DesignPreview, THUMBNAIL_SIZE, has_model_cache, is_design_container, read_design_file,
-    read_design_geometry, read_design_preview, read_design_thumbnail, read_design_thumbnail_file, write_design_container,
+    DesignCompression, DesignContainerReader, DesignPreview, THUMBNAIL_SIZE, has_model_cache, is_design_container, model_cache_kept,
+    read_design_file, read_design_geometry, read_design_preview, read_design_thumbnail, read_design_thumbnail_file, write_design_container,
     write_design_container_with_cache, write_design_container_with_compression, write_design_container_with_preview,
     write_design_container_with_thumbnail,
 };
