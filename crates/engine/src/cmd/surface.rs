@@ -1980,10 +1980,24 @@ mod tests {
                 "surface.blend",
                 json!({"from": {"body": "Low", "edges": low}, "to": {"body": "High", "edges": high}, "continuity": [g, g]}),
             );
-            // The boundary is a cubic through the stations on the rims: between them it strays
-            // by the interpolation error, about 0.01 mm on rims 290 mm round.
+            // The boundary is a cubic through the stations on the rims: they are added until it
+            // is within a stitch's default tolerance of these smooth rims (1e-6 of the size and
+            // 1e-6 mm; 0.009 mm at the blend's 41 stations before, #195).
             let gap = blend_gap(&r);
-            assert!(gap < 0.02, "{g}: the blend's boundary strays {gap} mm from the rims: {r}");
+            assert!(gap < 2e-4, "{g}: the blend's boundary strays {gap} mm from the rims: {r}");
+        }
+        // So a plain stitch sews the last blend onto both tubes: the rims are seams between two
+        // faces, and the G2 blend meets each wall smoothly.
+        let blend = s.world_state().bodies.last().map(|b| b.name.clone()).unwrap_or_default();
+        run(&mut s, "surface.stitch", json!({"bodies": ["Low", blend, "High"]}));
+        for rim in [&low, &high] {
+            let v = run(&mut s, "inspect.continuity", json!({"body": "Low", "edges": rim}));
+            let seams = v["bodies"][0]["edges"].as_array().cloned().unwrap_or_default();
+            assert_eq!(seams.len(), 8, "{v}");
+            for e in &seams {
+                let angle = e["normal_angle_deg"]["value"].as_f64().unwrap_or(f64::NAN);
+                assert!(angle < 0.1, "G2 at the rims: {angle}° in {e}");
+            }
         }
     }
 
@@ -2026,15 +2040,26 @@ mod tests {
             json!({"from": {"body": "Peg", "edges": [[45, 0, 30], [45, 0, 20]]}, "to": {"body": "Bottle", "edges": hole}, "continuity": ["g1", "g1"], "body_name": "Neck"}),
         );
         assert_eq!(r["created_bodies"], json!(["Neck"]), "{r}");
-        // The boundary is a cubic through the stations on the rims; between them it strays by
-        // the interpolation error (0.014 mm here, with the tube's rim 31 mm round).
+        // The boundary is a cubic through the stations on the rims. The hole's rim is four traced
+        // edges meeting at slight kinks, where more stations help only slowly: 0.014 mm at the
+        // blend's 41 stations before, about 0.001 mm now (#195).
         let gap = blend_gap(&r);
-        assert!(gap < 0.02, "the blend's boundary strays {gap} mm from the rims: {r}");
+        assert!(gap < 2e-3, "the blend's boundary strays {gap} mm from the rims: {r}");
         // A tube's rim (radius 5) to the hole (radius 7) 13 to 15 mm away: a short flared neck,
         // near the straight frustum between the two (π·12·13).
         let a = area(&s, "Neck");
         let straight = std::f64::consts::PI * (5.0 + 7.0) * 13.0;
         assert!((a - straight).abs() < straight * 0.25, "{a} vs {straight}");
+        // A stitch within that closes the seams: the hole's edges are seams between the bottle and
+        // the neck, and the neck meets the bottle tangentially there.
+        run(&mut s, "surface.stitch", json!({"bodies": ["Bottle", "Neck", "Peg"], "tolerance": 0.005}));
+        let v = run(&mut s, "inspect.continuity", json!({"body": "Bottle", "edges": hole}));
+        let seams = v["bodies"][0]["edges"].as_array().cloned().unwrap_or_default();
+        assert_eq!(seams.len(), 4, "{v}");
+        for e in &seams {
+            let angle = e["normal_angle_deg"]["value"].as_f64().unwrap_or(f64::NAN);
+            assert!(angle < 1.0, "G1 at the hole: {angle}° in {e}");
+        }
     }
 
     /// A tube whose top face is taken off (`surface.unstitch`), and points round its rim.
