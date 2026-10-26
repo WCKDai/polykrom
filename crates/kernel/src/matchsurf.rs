@@ -268,40 +268,17 @@ fn ranges(face: &mt::Face) -> Result<[(f64, f64); 2]> {
     Ok([u, v])
 }
 
-/// The parameters of the surface's point nearest `p`: a free search, and one started from the
-/// nearest point of a grid over the surface's bounded ranges, whichever lands nearer. A free
-/// search on a curved face can settle on another local minimum, and which one can turn on the
-/// last digit of a library function (it did, on Linux, for a loft's trimmed face).
-fn nearest_uv(surf: &mt::Surface, p: Vec3) -> Option<(f64, f64)> {
-    const GRID: usize = 16;
-    let dist = |uv: (f64, f64)| from_p3(surf.subs(uv.0, uv.1)).dist(p);
-    let free = surf.search_nearest_parameter(p3(p), None, 100);
-    let started = match surf.try_range_tuple() {
-        (Some((u0, u1)), Some((v0, v1))) => {
-            let at = |i: usize, n: f64, a: f64, b: f64| a + (b - a) * i as f64 / n;
-            // Each grid point's distance worked out once, then the nearest taken.
-            let hint = (0..=GRID)
-                .flat_map(|i| (0..=GRID).map(move |j| (at(i, GRID as f64, u0, u1), at(j, GRID as f64, v0, v1))))
-                .map(|uv| (dist(uv), uv))
-                .min_by(|a, b| a.0.total_cmp(&b.0));
-            hint.and_then(|(_, h)| surf.search_nearest_parameter(p3(p), Some(h), 100))
-        }
-        _ => None,
-    };
-    [free, started].into_iter().flatten().map(|uv| (dist(uv), uv)).filter(|(d, _)| d.is_finite()).min_by(|a, b| a.0.total_cmp(&b.0)).map(|(_, uv)| uv)
-}
-
 /// How far `p` is from the face's own surface.
 fn face_distance(face: &mt::Face, p: Vec3) -> Option<f64> {
     let surf = face.surface();
-    let (u, v) = nearest_uv(&surf, p)?;
+    let (u, v) = surf.search_nearest_parameter(p3(p), None, 100)?;
     Some(from_p3(surf.subs(u, v)).dist(p))
 }
 
 /// The surface's unit normal at the point nearest `p`, and how far `p` is from that point.
 fn normal_near(face: &mt::Face, p: Vec3) -> Option<(Vec3, f64)> {
     let surf = face.surface();
-    let (u, v) = nearest_uv(&surf, p)?;
+    let (u, v) = surf.search_nearest_parameter(p3(p), None, 100)?;
     let n = surf.normal(u, v);
     let n = Vec3::new(n.x, n.y, n.z).normalized()?;
     Some((n, from_p3(surf.subs(u, v)).dist(p)))
@@ -353,9 +330,20 @@ fn chain_polyline(chain: &[mt::Edge]) -> Result<Vec<Vec3>> {
     Ok(out)
 }
 
-/// The point at the middle of a chain, by length.
+/// The point at the middle of a chain, by length: on the edge's own curve, at the parameter
+/// between the two samples it falls between (a point between them on the chord would stand off
+/// a curved edge by up to the chord's sagitta).
 fn chain_mid(chain: &[mt::Edge]) -> Result<Vec3> {
     let poly = chain_polyline(chain)?;
+    // Each sample's edge and parameter, in the order `chain_polyline` takes them.
+    let params: Vec<(usize, f64)> = chain
+        .iter()
+        .enumerate()
+        .flat_map(|(i, e)| {
+            let (t0, t1) = e.oriented_curve().range_tuple();
+            (0..=PER_EDGE).map(move |k| (i, t0 + (t1 - t0) * k as f64 / PER_EDGE as f64))
+        })
+        .collect();
     let mut cum = Vec::with_capacity(poly.len());
     cum.push(0.0);
     for w in poly.windows(2) {
@@ -377,6 +365,17 @@ fn chain_mid(chain: &[mt::Edge]) -> Result<Vec3> {
     };
     let span = up - lo;
     let t = if span > 1e-12 { (half - lo) / span } else { 0.0 };
+    // Both samples on one edge: that edge's curve between their parameters. (Consecutive samples
+    // on two edges are the same point, the vertex they share.)
+    if let (Some(&(ea, ta)), Some(&(eb, tb))) = (params.get(hi - 1), params.get(hi))
+        && ea == eb
+        && let Some(e) = chain.get(ea)
+    {
+        let p = from_p3(e.oriented_curve().subs(ta + (tb - ta) * t));
+        if p.is_finite() {
+            return Ok(p);
+        }
+    }
     Ok(*a + (*b - *a) * t)
 }
 
