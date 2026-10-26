@@ -389,3 +389,21 @@ fn polish_apply_chamfers_an_edge_the_kernel_cannot_round() {
     let again = run(&mut s, "polish.apply", json!({}));
     assert!(again["applied"][0]["fallback"].as_str().unwrap().contains("refused before"), "{again}");
 }
+
+#[test]
+fn polish_apply_batches_many_bodies_without_using_up_checkpoints() {
+    // 17 blocks and a cube whose round the 1% mass limit rolls back: the batch's eighteen
+    // groups go back past the session's sixteen checkpoints, and a checkpoint taken before is
+    // still there.
+    let mut s = Session::default();
+    for k in 0..17 {
+        let p = json!({"length": 40, "width": 20, "height": 10, "corner": [k * 50, 0, 0], "operation": "new_body", "body_name": format!("Block{k}")});
+        run(&mut s, "solid.box", p);
+    }
+    run(&mut s, "solid.box", json!({"length": 4, "width": 4, "height": 4, "corner": [0, 100, 0], "operation": "new_body", "body_name": "Cube"}));
+    let mark = run(&mut s, "edit.checkpoint", json!({}))["checkpoint"].clone();
+    let r = run(&mut s, "polish.apply", json!({"mass_tol": 0.01, "max_fixes": 20}));
+    assert_eq!(r["applied"].as_array().map(Vec::len), Some(17), "{r}");
+    assert_eq!(r["skipped"].as_array().map(Vec::len), Some(1), "{r}");
+    assert_eq!(run(&mut s, "edit.restore_checkpoint", json!({"checkpoint": mark}))["restored"], true);
+}
