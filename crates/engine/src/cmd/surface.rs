@@ -1858,6 +1858,48 @@ mod tests {
         }
     }
 
+    /// The largest gap a blend's reply warns of between its boundary and the rims (0 without a
+    /// warning).
+    fn blend_gap(r: &Value) -> f64 {
+        r["warning"].as_str().map_or(0.0, |w| w.split_whitespace().find_map(|t| t.parse::<f64>().ok()).unwrap_or(f64::INFINITY))
+    }
+
+    /// A closed spline outline extruded as a tube, and a smaller copy extruded above it: a blend
+    /// between their rims stays on them. Some of a rim's edges run against the chain the picks
+    /// make; they were sampled the wrong way, so the blend's boundary strayed up to 5.27 mm from
+    /// the rims and the stitch left it open (#195).
+    #[test]
+    fn surface_blend_between_spline_tube_rims_stays_on_them() {
+        let mut s = Session::default();
+        let outline = [(55.0, 0.0), (40.0, 26.0), (0.0, 31.0), (-40.0, 28.0), (-55.0, 0.0), (-40.0, -28.0), (0.0, -31.0), (40.0, -26.0)];
+        for (name, z, k, height) in [("Low", 0.0, 1.0, 18.0), ("High", 28.0, 0.8, 8.0)] {
+            run(&mut s, "sketch.create", json!({"plane": "XY", "offset": z, "name": name}));
+            let points: Vec<[f64; 2]> = outline.iter().map(|(x, y)| [x * k, y * k]).collect();
+            run(&mut s, "sketch.spline.fit_point", json!({"points": points, "periodic": true}));
+            run(&mut s, "sketch.finish", json!({}));
+            run(&mut s, "surface.extrude", json!({"sketch": name, "distance": height, "body_name": name}));
+        }
+        // A point on each rim edge: the edges' midpoints, from the bodies' own edges.
+        let rim = |s: &Session, body: &str, z: f64| -> Value {
+            let st = s.world_state();
+            let edges = st.body(body).unwrap().body.edges(0.01).unwrap();
+            json!(edges.iter().map(|e| e.mid).filter(|m| (m.z - z).abs() < 1e-6).map(|m| json!([m.x, m.y, m.z])).collect::<Vec<_>>())
+        };
+        let (low, high) = (rim(&s, "Low", 18.0), rim(&s, "High", 28.0));
+        assert_eq!(low.as_array().map(Vec::len), Some(8), "{low}");
+        for g in ["g0", "g1", "g2"] {
+            let r = run(
+                &mut s,
+                "surface.blend",
+                json!({"from": {"body": "Low", "edges": low}, "to": {"body": "High", "edges": high}, "continuity": [g, g]}),
+            );
+            // The boundary is a cubic through the stations on the rims: between them it strays
+            // by the interpolation error, about 0.01 mm on rims 290 mm round.
+            let gap = blend_gap(&r);
+            assert!(gap < 0.02, "{g}: the blend's boundary strays {gap} mm from the rims: {r}");
+        }
+    }
+
     /// A tube whose top face is taken off (`surface.unstitch`), and points round its rim.
     fn open_tube() -> (Session, Value) {
         let mut s = Session::default();
