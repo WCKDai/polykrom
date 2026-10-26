@@ -77,6 +77,12 @@ fn reads(f: &Feature) -> Option<(Reads<'_>, Option<u64>)> {
         FeatureKind::Sketch { plane, sketch } if plane_is_fixed(plane) && sketch.links.is_empty() && sketch.wires.is_empty() => {
             Some((Reads::Nothing, None))
         }
+        // One made with `scoped_surroundings` shapes its tool around what it can change (#219).
+        FeatureKind::Extrude { sketch, operation, targets, .. } | FeatureKind::Revolve { sketch, operation, targets, .. }
+            if f.scoped_surroundings && targets.is_empty() && matches!(operation, Operation::Cut | Operation::Join) && to_free(f) =>
+        {
+            Some((primitive(operation)?, Some(sketch.0)))
+        }
         FeatureKind::Extrude { sketch, extent, operation, targets, .. } if extent.to.is_none() && extent.from.is_none() => {
             let new_through_all = *operation == Operation::NewBody && extent.through_all;
             Some((solid(f, operation, targets).filter(|_| !new_through_all)?, Some(sketch.0)))
@@ -93,6 +99,15 @@ fn reads(f: &Feature) -> Option<(Reads<'_>, Option<u64>)> {
         }
         FeatureKind::BodyTransfer { bodies, .. } => Some((named(bodies), None)),
         _ => None,
+    }
+}
+
+/// An Extrude or Revolve that reads no object (To / From Object) or construction axis.
+fn to_free(f: &Feature) -> bool {
+    match &f.kind {
+        FeatureKind::Extrude { extent, .. } => extent.to.is_none() && extent.from.is_none(),
+        FeatureKind::Revolve { axis, to, .. } => to.is_none() && !matches!(axis, AxisRef::Construction { .. }),
+        _ => false,
     }
 }
 
@@ -182,7 +197,10 @@ fn rebase(f: &Feature, was: &ModelState, after: &ModelState, now: &ModelState) -
         return None;
     }
     let (old, new) = (read_bodies(f, was, &reads)?, read_bodies(f, now, &reads)?);
-    if old.len() != new.len() || !old.iter().zip(&new).all(|(a, b)| same_body(a, b)) {
+    // A scoped cut with no body to change shapes its tool around a name no body is given (see
+    // `shaping_targets`): it is evaluated.
+    let scoped_none = f.scoped_surroundings && matches!(reads, Reads::Component) && old.is_empty();
+    if scoped_none || old.len() != new.len() || !old.iter().zip(&new).all(|(a, b)| same_body(a, b)) {
         return None;
     }
     let read = |n: &str| matches!(reads, Reads::All) || old.iter().any(|b| b.name == n);
