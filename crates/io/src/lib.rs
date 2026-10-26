@@ -388,9 +388,12 @@ pub struct SolidMesh {
 pub fn solid_mesh(b: &solidcraft_kernel::Body) -> Result<SolidMesh> {
     let tol = (b.size() * 2e-4).max(1e-3);
     let eps = weld_eps(b);
+    // Each triangle keeps its face through the weld and the fin removal, so coverage is read
+    // off the triangles that are left.
     let welded = |m: &Mesh, eps: f64| {
-        let (positions, triangles) = weld(&m.positions, &m.triangles, eps);
-        Mesh { positions, triangles: without_fins(triangles), ..Mesh::default() }
+        let (positions, triangles, faces) = threemf::weld_tagged(&m.positions, &m.triangles, &m.tri_face, eps);
+        let (triangles, tri_face) = without_fins(triangles, faces);
+        Mesh { positions, triangles, tri_face, ..Mesh::default() }
     };
     let mut tries: Vec<Mesh> = Vec::new();
     if let Ok(m) = b.display_mesh(tol) {
@@ -401,7 +404,7 @@ pub fn solid_mesh(b: &solidcraft_kernel::Body) -> Result<SolidMesh> {
     for wide in [eps, (tol * 0.1).max(eps)] {
         for m in &tries {
             let w = welded(m, wide);
-            if w.is_closed() && (b.is_mesh() || covers_every_face(&m.tri_face, b.face_count())) {
+            if w.is_closed() && (b.is_mesh() || (m.tri_face.len() == m.triangles.len() && covers_every_face(&w.tri_face, b.face_count()))) {
                 return Ok(SolidMesh { mesh: w, closed: true });
             }
             first.get_or_insert(w);
@@ -424,8 +427,8 @@ fn covers_every_face(tri_face: &[u32], faces: usize) -> bool {
 /// `triangles` without the fins a weld can leave: a triangle and its twin with the other
 /// orientation (two faces' slivers welded onto each other) bound no volume and leave their edges
 /// used three or four times, so both go; a triangle repeated with the same orientation is kept
-/// once.
-fn without_fins(triangles: Vec<[u32; 3]>) -> Vec<[u32; 3]> {
+/// once. `tags` (one per triangle) are kept with the triangles that stay.
+fn without_fins(triangles: Vec<[u32; 3]>, tags: Vec<u32>) -> (Vec<[u32; 3]>, Vec<u32>) {
     // A triangle's corners rotated to start at the smallest, so its orientation is kept.
     let key = |t: &[u32; 3]| {
         let k = (0..3).min_by_key(|&i| t[i]).unwrap_or(0);
@@ -436,8 +439,9 @@ fn without_fins(triangles: Vec<[u32; 3]>) -> Vec<[u32; 3]> {
         *count.entry(key(t)).or_insert(0) += 1;
     }
     let mut out = Vec::with_capacity(triangles.len());
+    let mut out_tags = Vec::with_capacity(triangles.len());
     let mut kept: std::collections::HashSet<[u32; 3]> = std::collections::HashSet::new();
-    for t in triangles {
+    for (i, t) in triangles.into_iter().enumerate() {
         let k = key(&t);
         let flipped = key(&[t[0], t[2], t[1]]);
         let (same, other) = (count.get(&k).copied().unwrap_or(0), count.get(&flipped).copied().unwrap_or(0));
@@ -445,9 +449,10 @@ fn without_fins(triangles: Vec<[u32; 3]>) -> Vec<[u32; 3]> {
         // once.
         if same > other && kept.insert(k) {
             out.push(t);
+            out_tags.push(tags.get(i).copied().unwrap_or(0));
         }
     }
-    out
+    (out, out_tags)
 }
 
 /// Distance within which an exported mesh's vertices are welded (STL and 3MF alike).
@@ -1201,8 +1206,11 @@ mod tests {
         let tetra = vec![[0, 2, 1], [0, 1, 3], [1, 2, 3], [0, 3, 2]];
         let mut with = tetra.clone();
         with.extend([[1, 3, 4], [1, 4, 3], [0, 1, 3]]);
-        let cleaned = without_fins(with);
+        // Each triangle's face goes with it: the fin's faces (5, 6) go with the fin.
+        let (cleaned, faces) = without_fins(with, vec![0, 1, 2, 3, 5, 6, 1]);
         assert_eq!(cleaned, tetra);
+        assert_eq!(faces, vec![0, 1, 2, 3]);
+        assert!(!covers_every_face(&faces, 7), "faces 4 to 6 have no triangles left");
         let positions = vec![Vec3::ZERO, Vec3::X, Vec3::Y, Vec3::Z, Vec3::new(1.0, 1.0, 1.0)];
         let m = Mesh { positions, triangles: cleaned, ..Mesh::default() };
         assert!(m.is_closed());
