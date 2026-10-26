@@ -268,17 +268,38 @@ fn ranges(face: &mt::Face) -> Result<[(f64, f64); 2]> {
     Ok([u, v])
 }
 
+/// The parameters of the surface's point nearest `p`: a free search, and one started from the
+/// nearest point of a grid over the surface's bounded ranges, whichever lands nearer. A free
+/// search on a curved face can settle on another local minimum, and which one can turn on the
+/// last digit of a library function (it did, on Linux, for a loft's trimmed face).
+fn nearest_uv(surf: &mt::Surface, p: Vec3) -> Option<(f64, f64)> {
+    const GRID: usize = 16;
+    let dist = |uv: (f64, f64)| from_p3(surf.subs(uv.0, uv.1)).dist(p);
+    let free = surf.search_nearest_parameter(p3(p), None, 100);
+    let started = match surf.try_range_tuple() {
+        (Some((u0, u1)), Some((v0, v1))) => {
+            let at = |i: usize, n: f64, a: f64, b: f64| a + (b - a) * i as f64 / n;
+            let hint = (0..=GRID)
+                .flat_map(|i| (0..=GRID).map(move |j| (at(i, GRID as f64, u0, u1), at(j, GRID as f64, v0, v1))))
+                .min_by(|a, b| dist(*a).total_cmp(&dist(*b)));
+            hint.and_then(|h| surf.search_nearest_parameter(p3(p), Some(h), 100))
+        }
+        _ => None,
+    };
+    [free, started].into_iter().flatten().filter(|uv| dist(*uv).is_finite()).min_by(|a, b| dist(*a).total_cmp(&dist(*b)))
+}
+
 /// How far `p` is from the face's own surface.
 fn face_distance(face: &mt::Face, p: Vec3) -> Option<f64> {
     let surf = face.surface();
-    let (u, v) = surf.search_nearest_parameter(p3(p), None, 100)?;
+    let (u, v) = nearest_uv(&surf, p)?;
     Some(from_p3(surf.subs(u, v)).dist(p))
 }
 
 /// The surface's unit normal at the point nearest `p`, and how far `p` is from that point.
 fn normal_near(face: &mt::Face, p: Vec3) -> Option<(Vec3, f64)> {
     let surf = face.surface();
-    let (u, v) = surf.search_nearest_parameter(p3(p), None, 100)?;
+    let (u, v) = nearest_uv(&surf, p)?;
     let n = surf.normal(u, v);
     let n = Vec3::new(n.x, n.y, n.z).normalized()?;
     Some((n, from_p3(surf.subs(u, v)).dist(p)))
@@ -454,24 +475,33 @@ fn support_faces(target: &Body, chain: &[mt::Edge], leave: Vec3) -> Result<Vec<(
     let length: f64 = poly.windows(2).filter_map(|w| Some(w.first()?.dist(*w.get(1)?))).sum();
     let tol = (length * 1e-4).max(target.size() * 1e-6 + 1e-9);
     let mut out: Vec<(mt::Face, f64)> = Vec::new();
+    // What the faces bounded by the chain came to, for the refusal: (how far, how much of the
+    // leave direction their tangent plane holds).
+    let mut seen: Vec<(f64, f64)> = Vec::new();
     for face in target.solid.face_iter() {
         if !chain.iter().all(|e| face.edge_iter().any(|f| f.id() == e.id())) {
             continue;
         }
-        let Some((n, d)) = normal_near(face, mid) else { continue };
-        if d > tol {
+        let Some((n, d)) = normal_near(face, mid) else {
+            seen.push((f64::INFINITY, 0.0));
             continue;
-        }
+        };
         let score = (leave - n * leave.dot(n)).len();
-        if score.is_finite() && score >= 0.2 {
+        seen.push((d, score));
+        if d <= tol && score.is_finite() && score >= 0.2 {
             out.push((face.clone(), score));
         }
     }
     if out.is_empty() {
-        return Err(KernelError::Invalid(
-            "no face of the target holds the picked edges in the direction the match leaves in: pick the chain of a face the surface can continue"
-                .into(),
-        ));
+        let found = if seen.is_empty() {
+            "no face is bounded by all the picked edges".to_string()
+        } else {
+            let each: Vec<String> = seen.iter().map(|(d, s)| format!("{d:.1e} mm off (within {tol:.1e}), holding {s:.2} of it")).collect();
+            format!("the faces they bound: {}", each.join("; "))
+        };
+        return Err(KernelError::Invalid(format!(
+            "no face of the target holds the picked edges in the direction the match leaves in ({found}): pick the chain of a face the surface can continue"
+        )));
     }
     out.sort_by(|a, b| b.1.total_cmp(&a.1));
     Ok(out)
