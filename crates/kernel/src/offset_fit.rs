@@ -47,8 +47,10 @@ pub(crate) struct Jet {
 impl Jet {
     /// The unit normal `su × sv`, `None` where the surface has none (a pole, a crease).
     pub(crate) fn normal(&self) -> Option<Vec3> {
+        // Against the product of the two lengths, so a parameter scaled however it is (an
+        // imported surface's knots) doesn't make a regular point look singular.
         let n = self.su.cross(self.sv);
-        (n.len() > 1e-12 * (self.su.len2() + self.sv.len2()).max(1e-300)).then(|| n.normalized()).flatten()
+        (n.len() > 1e-12 * (self.su.len() * self.sv.len()).max(1e-300)).then(|| n.normalized()).flatten()
     }
 }
 
@@ -239,6 +241,13 @@ pub(crate) fn fit_offset(base: &Extended, span: [f64; 4], d: f64, tolerance: f64
     };
     let (ku, kv) = base.breaks();
     let ((mut us, bu), (mut vs, bv)) = (pieces(u0, u1, ku), pieces(v0, v1, kv));
+    if us.len() > MAX_LINES || vs.len() > MAX_LINES {
+        return Err(KernelError::TooLarge(format!(
+            "offset: a surface with too many knots to fit its offset ({} × {} sample lines, at most {MAX_LINES})",
+            us.len(),
+            vs.len()
+        )));
+    }
     fold_check(base, span, d)?;
     loop {
         let rows: Vec<Vec<Vec3>> = us.iter().map(|u| vs.iter().map(|v| at(*u, *v).map(|x| x.0)).collect::<Result<_>>()).collect::<Result<_>>()?;
