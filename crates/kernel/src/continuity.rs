@@ -93,12 +93,13 @@ impl Spread {
     /// The worst value, where, and the spread; `None` with no stations.
     fn summary(&self) -> Option<SeamWorst> {
         let end = |f: f64| f <= 1e-12 || f >= 1.0 - 1e-12;
-        // The largest value; where several stations share it (a straight seam's constant angle),
+        // The largest value, reported as it is (the verdict compares it with the tolerance); where
+        // several stations share it to rounding (a straight seam's constant angle), it is placed at
         // the first one inside the edge, so that a corner is named only when it is worse.
-        let top = self.values.iter().map(|v| v.0).fold(f64::NEG_INFINITY, f64::max);
-        let tie = 1e-9 * top.abs().max(1.0);
-        let worst = |v: &&(f64, Vec3, f64)| v.0 >= top - tie;
-        let &(value, at, edge_fraction) = self.values.iter().filter(worst).find(|v| !end(v.2)).or_else(|| self.values.iter().find(worst))?;
+        let value = self.values.iter().map(|v| v.0).fold(f64::NEG_INFINITY, f64::max);
+        let tie = 1e-9 * value.abs().max(1.0);
+        let worst = |v: &&(f64, Vec3, f64)| v.0 >= value - tie;
+        let &(_, at, edge_fraction) = self.values.iter().filter(worst).find(|v| !end(v.2)).or_else(|| self.values.iter().find(worst))?;
         let n = self.values.len();
         let mean = self.values.iter().map(|v| v.0).sum::<f64>() / n as f64;
         let mut sorted: Vec<f64> = self.values.iter().map(|v| v.0).collect();
@@ -496,6 +497,13 @@ mod tests {
         }
         let w = flat.summary().unwrap();
         assert!(!w.at_end && w.edge_fraction == 0.25 && w.mean == 90.0 && w.p95 == 90.0 && w.interior == 90.0, "{w:?}");
+        // A worst value at an end only a rounding above the interior's is still the one reported
+        // (a gap tolerance of 0 sees it), placed inside the edge.
+        let mut tied = Spread::default();
+        tied.push(0.0, Vec3::ZERO, 0.5);
+        tied.push(1e-10, Vec3::X, 1.0);
+        let w = tied.summary().unwrap();
+        assert!(w.value == 1e-10 && !w.at_end && w.edge_fraction == 0.5, "{w:?}");
         assert!(Spread::default().summary().is_none());
     }
 
