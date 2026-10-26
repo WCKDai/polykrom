@@ -99,6 +99,9 @@ fn inside_intervals<C: Clone + 'static, S>(face: &Face<Point3, C, S>, (p, n): (P
     }).collect())
 }
 
+/// Below this |n0 × n1| (the sine of the planes' angle) a plane pair is left to the mesh collision.
+const NEAR_PARALLEL: f64 = 1e-6;
+
 /// The exact intersection of two faces as the polylines the mesh collision would chain (each a
 /// straight segment here), or `None` for a pair it leaves to the mesh collision.
 pub(super) fn exact_intersection<C: Clone + 'static, S: 'static>(face0: &Face<Point3, C, S>, face1: &Face<Point3, C, S>) -> Option<Vec<PolylineCurve<Point3>>>
@@ -109,17 +112,19 @@ where S: Clone {
     let (p0, n0) = plane_of(&face0.surface())?;
     let (p1, n1) = plane_of(&face1.surface())?;
     let d = n0.cross(n1);
-    if d.magnitude() < 1e-9 {
-        // Parallel planes apart meet nowhere; coinciding ones are the mesh collision's.
-        return ((p1 - p0).dot(n0).abs() > TOLERANCE).then(Vec::new);
+    // Parallel or nearly so (their line far off or ill-conditioned): the mesh collision's, which
+    // finds what meets within the faces either way.
+    if d.magnitude() < NEAR_PARALLEL {
+        return None;
     }
     let d = d.normalize();
-    // The point of the line nearest p0: in both planes, along n0 x d and d x ... solved exactly.
-    let (c0, c1) = (n0.dot(p0.to_vec()), n1.dot(p1.to_vec()));
+    // A point of the line, solved relative to p0 so faces far from the origin keep their digits:
+    // o = p0 + a n0 + b n1 with n0·(o - p0) = 0 and n1·(o - p1) = 0.
+    let c1 = n1.dot(p1 - p0);
     let n01 = n0.dot(n1);
     let det = 1.0 - n01 * n01;
-    let (a, b) = ((c0 - c1 * n01) / det, (c1 - c0 * n01) / det);
-    let o = Point3::from_vec(n0 * a + n1 * b);
+    let (a, b) = ((-c1 * n01) / det, c1 / det);
+    let o = p0 + n0 * a + n1 * b;
     if !o.to_vec().magnitude2().is_finite() {
         return None;
     }

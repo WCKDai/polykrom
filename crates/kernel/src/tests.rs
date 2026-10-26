@@ -3367,10 +3367,15 @@ fn plane_pairs_intersect_exactly_as_the_mesh_collision_did() {
     let block = box_solid(Vec3::new(4.0, 3.0, 2.0), Vec3::new(22.0, 16.0, 14.0)).unwrap();
     let corner = box_solid(Vec3::new(30.0, 0.0, 6.0), Vec3::new(36.0, 8.0, 12.0)).unwrap();
     let tol = 0.05;
+    // Far from the origin (the line is solved relative to a point on the face), and turned by a
+    // hair, so pairs of nearly parallel planes go to the mesh collision while the rest are exact.
+    let far = |b: &Body| crate::transform(b, Vec3::new(1.0e5, -2.0e5, 3.0e4), Vec3::new(0.0, 0.0, 0.0), Vec3::new(0.0, 0.0, 1.0), 0.0).unwrap();
     for (name, a, b) in [
         ("turned block", plate.clone(), turned(&block, 23.0)),
         ("turned plate", turned(&plate, 11.0), block.clone()),
         ("corner", plate.clone(), turned(&corner, 7.0)),
+        ("far from the origin", far(&plate), far(&turned(&block, 23.0))),
+        ("nearly parallel", plate.clone(), turned(&block, 1e-5)),
     ] {
         for (and, invert) in [(true, false), (true, true), (false, false)] {
             let run = || {
