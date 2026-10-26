@@ -2078,6 +2078,35 @@ mod tests {
         assert!(s.model.state().threads.iter().any(|t| t.designation == "M8" && (t.pitch - 1.25).abs() < 1e-9));
     }
 
+    /// Resizing a screw rebases the parts built after it that never read it, rather than
+    /// building them again (#169), and the model is the one a full evaluation gives.
+    #[test]
+    fn resizing_a_screw_rebases_the_parts_after_it() {
+        let mut s = Session::default();
+        let screws: Vec<u64> = ["A", "B", "C"]
+            .iter()
+            .map(|name| run(&mut s, "parts.insert", json!({"family": "socket_head_cap_screw", "size": "M3", "length": 6, "name": name})))
+            .map(|r| r["component"].as_u64().unwrap_or(0))
+            .collect();
+        run(&mut s, "solid.box", json!({"length": 20, "width": 10, "height": 4, "body_name": "Plate"}));
+        run(&mut s, "solid.box", json!({"corner": [4, 4, -1], "length": 2, "width": 2, "height": 6, "operation": "cut", "targets": ["Plate"]}));
+        let rebased = s.model.rebased;
+        run(&mut s, "parts.resize", json!({"component": screws[0], "length": 8}));
+        assert!(s.model.rebased > rebased, "nothing rebased");
+        let mut full = solidcraft_doc::Model::default();
+        full.no_cache = true;
+        full.evaluate(&s.doc);
+        let (now, fresh) = (s.model.state(), full.state());
+        assert_eq!(now.bodies.len(), fresh.bodies.len());
+        for (a, b) in now.bodies.iter().zip(&fresh.bodies) {
+            assert_eq!((&a.name, a.component), (&b.name, b.component));
+            let volume = |m: &solidcraft_doc::ModelBody| crate::kernel::measure(&m.body).map(|m| m.volume).unwrap_or(f64::NAN);
+            assert!((volume(a) - volume(b)).abs() < 1e-9, "{}: {} vs {}", a.name, volume(a), volume(b));
+            assert_eq!(solidcraft_doc::naming::face_names(a), solidcraft_doc::naming::face_names(b), "{}", a.name);
+        }
+        assert_eq!(now.threads, fresh.threads);
+    }
+
     /// A resize keeps the names someone gave (the part, its body, its seat); names made from the
     /// old size follow the new one (#171).
     #[test]

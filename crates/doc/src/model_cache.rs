@@ -40,7 +40,7 @@ fn bad(what: &str) -> DocError {
 /// A design whose stored face or edge names were saved before format 14 (marked
 /// [`crate::naming::LEGACY_MARK`]) finds them through names worked out from geometry on demand,
 /// which a saved model does not keep.
-fn has_legacy_names(doc: &Document) -> bool {
+pub(super) fn has_legacy_names(doc: &Document) -> bool {
     let mark = format!("\"{}", crate::naming::LEGACY_MARK);
     doc.features.iter().any(|f| match &f.kind {
         FeatureKind::Import { .. } => f.face_names.iter().any(|n| n.starts_with(crate::naming::LEGACY_MARK)),
@@ -565,6 +565,7 @@ impl Model {
                 stale: false,
                 fingerprint: prev,
                 unkept: state.is_none(),
+                local: 0,
                 state: state.unwrap_or_else(|| before.clone()),
             };
             if !result.skipped {
@@ -573,7 +574,7 @@ impl Model {
             }
             results.push(result);
         }
-        let mut model = Model { results, param_errors, step_digests, ..Model::default() };
+        let mut model = Model { results, param_errors, step_digests, context: ctx, ..Model::default() };
         let unkept = model.results.iter().filter(|r| r.unkept).count();
         if unkept > 0 {
             // The features whose state the file did not keep, each evaluated again from the state
@@ -590,8 +591,10 @@ impl Model {
         // finds it again rather than evaluating the feature anew.
         let mut before = Arc::new(ModelState::default());
         if let Ok(mut cache) = model.cache.lock() {
-            for (f, r) in doc.features.iter().zip(&model.results).filter(|(_, r)| !r.skipped && r.error.is_none()) {
+            for (f, r) in doc.features.iter().zip(model.results.iter_mut()).filter(|(_, r)| !r.skipped && r.error.is_none()) {
                 let local = fingerprint(0, f, &vals, false, &model.step_digests) ^ placement_digest(doc, f, Some(&before));
+                // What an edit rebasing this result compares its inputs with (#169).
+                r.local = local;
                 cache.put(
                     cache_key(f, r.fingerprint, local, ctx, &before),
                     CachedEval {

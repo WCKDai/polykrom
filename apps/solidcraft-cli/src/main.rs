@@ -407,7 +407,11 @@ fn cmd_run(args: &[String]) -> Result<(), String> {
         let m = s.execute("inspect.measure", &json!({})).map_err(|e| e.to_string())?;
         print_json(&m, json_out)?;
     }
-    Ok(())
+    // A shadow run (`POLYKROM_REBASE_SHADOW`) fails when a rebased result differed (#169).
+    match solidcraft_engine::doc::rebase_shadow_mismatches() {
+        0 => Ok(()),
+        n => Err(format!("{n} rebased feature results differed from evaluating them (see the log)")),
+    }
 }
 
 /// The session `run` and `snapshot` start from: `--in` (a design or STEP file) with the

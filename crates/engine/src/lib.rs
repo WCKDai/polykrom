@@ -674,6 +674,8 @@ impl Session {
         #[cfg(test)]
         {
             self.evaluations += 1;
+            // Shadow mode (`POLYKROM_REBASE_SHADOW`): no rebased result may differ (#169).
+            assert_eq!(solidcraft_doc::rebase_shadow_mismatches(), 0, "a rebased result differed from evaluating the feature");
         }
         self.revision += 1;
         self.prune_occurrence_state();
@@ -1261,8 +1263,15 @@ impl Session {
             let p = c.get("params").cloned().unwrap_or(Value::Null);
             let r = match profile {
                 Some(profile) => {
+                    let counts = (self.model.recomputed, self.model.rebased);
                     let (r, step) = timing::time(profile, || self.execute(id, &p));
-                    steps.push(step.to_json(i, id));
+                    let mut step = step.to_json(i, id);
+                    // Features the command evaluated again, and those it rebased (#169).
+                    if let Some(o) = step.as_object_mut() {
+                        o.insert("recomputed".into(), self.model.recomputed.saturating_sub(counts.0).into());
+                        o.insert("rebased".into(), self.model.rebased.saturating_sub(counts.1).into());
+                    }
+                    steps.push(step);
                     r
                 }
                 None => self.execute(id, &p),
