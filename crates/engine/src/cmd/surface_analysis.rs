@@ -51,7 +51,7 @@ pub static COMMANDS: &[CommandSpec] = &[
              gap_tolerance_mm? (default 0.001), angle_tolerance_deg? (default 1), curvature_tolerance_per_mm? (default 0.01); \
              add?: true keeps the seams already shaded and adds these (measuring an edge again replaces it); \
              clear?: true turns the analysis off. → each edge's worst gap (G0), normal angle (G1) and curvature jump (G2) as \
-             {value, at: [x,y,z], edge_fraction}, its verdict (smooth, curvature_jump, sharp or gap) and a summary; \
+             {value, at: [x,y,z], edge_fraction, at_end (the worst is at an end of the edge, a corner), mean, p95, interior (the worst away from the ends)}, its verdict (smooth, curvature_jump, sharp or gap) and a summary; \
              the seams are shaded in the viewport",
     ),
 ];
@@ -367,6 +367,11 @@ mod tests {
             assert_eq!(e["normal_angle_deg"]["at"].as_array().map(Vec::len), Some(3), "{e}");
             let f = e["normal_angle_deg"]["edge_fraction"].as_f64().unwrap();
             assert!((0.0..=1.0).contains(&f), "{e}");
+            // A right angle all along: the spread is the angle itself, and no corner is worse.
+            for key in ["mean", "p95", "interior"] {
+                assert!((e["normal_angle_deg"][key].as_f64().unwrap() - 90.0).abs() < 1e-9, "{key} in {e}");
+            }
+            assert_eq!(e["normal_angle_deg"]["at_end"], json!(false), "{e}");
         }
         assert_eq!(v["analysis"], json!("continuity"));
         assert_eq!(v["samples"], json!(33));
