@@ -1,6 +1,7 @@
 # RFC 0001: PolyCore, Polykrom's Rust kernel
 
-- **Status:** Draft, for the maintainer's decision
+- **Status:** Accepted, 2026-10-26. The owner's ten decisions are recorded under
+  [Decisions](#decisions).
 - **Author:** Claude (agent), for the maintainer
 - **Created:** 2026-10-26
 - **Builds on:** [docs/ENGINES.md](../ENGINES.md) (kernel stages K0 to K7). This RFC does not
@@ -24,9 +25,9 @@ OpenCASCADE stays where it is useful without its licence reaching us: a separate
 answers the same questions, so PolyCore can be scored against it. Graded answers are analytic,
 hand-calculated or invariants. OCCT is a cross-check, never the answer key.
 
-## Decisions recorded (owner, 2026-10-26)
+## Direction (owner, 2026-10-26)
 
-| Decision | Consequence |
+| Direction | Consequence |
 |---|---|
 | One kernel, in Rust, named **PolyCore** | All kernel work goes into PolyCore. No second kernel is started. |
 | **Polykrom** is the product and PolyCore's only consumer | No C ABI, no external kernel protocol, no Swift or C++ client. The API is a Rust API. |
@@ -67,18 +68,21 @@ Other kernels and code we can draw on:
 |---|---|---|
 | Polykrom, Nightfall | Yes | Our own code (Apache-2.0, and MIT OR Apache-2.0 in Polykrom). Port freely, keep the history in commit messages. |
 | truck | Yes | Keep behind adapters until replaced; port pieces where they pass the corpus. |
-| SMLib and SM_API (`source/SMLib`, `source/SM_API` in usd-brep) | Yes | Read as a reference implementation; port algorithms with attribution: NVIDIA's copyright line in the file header, an `ATTRIBUTION.md` row, `NOTICE` updated. Not linked. |
-| solidcore | Yes | Same as SMLib. Can be a dependency for a unit if it wins on the corpus. |
+| SMLib and SM_API (`source/SMLib`, `source/SM_API` in usd-brep) | Yes | Read as a reference implementation; port algorithms with attribution: NVIDIA's copyright line in the file header, an `ATTRIBUTION.md` row, a `NOTICE` entry. Not linked. |
+| solidcore | Yes | Same as SMLib. A unit that wins on our corpus is ported; bugs we find go upstream as reports or PRs. |
 | usd-brep `omniSolid` schema | Yes (the schema and its docs) | A data format: PolyCore reads and writes it with its own code. |
 | usd-brep's OCCT converters (`tools/occt_to_usd`, `tools/usd_to_occt`, `OCCT_BREP_IMPORT`) | **No** | They are built on OCCT headers. Skip those directories. |
 | OpenCASCADE | **No** | Public documentation only (for example the Boolean Operations specification and the test-system guide), and black-box runs as a separate program. Never read, copied or ported. |
-| FreeCAD, Netgen | **No** | Separate programs only (FreeCAD's oracle already works this way). |
+| FreeCAD | **No** | A separate program only (`tools/freecad-oracle` already works this way). |
+| Netgen | **No** | Not used: dropped with Nightfall's study stack (decision 8). |
+| fTetWild | Not needed | MPL-2.0. Run as a separate program by the study sidecar; not vendored or linked. |
+| MFEM | Not needed | BSD-3-Clause. Run as a separate program by the study sidecar. |
+| faer | Yes | MIT. A Rust dependency of the study sidecar for the sparse direct solve. |
 | Papers and books | Yes | Jackson's local tolerances, Patrikalakis–Maekawa, the 2026 ACM TOG NURBS SSI papers, Rossignac–Requicha offsets, Choi–Ju and Várady–Rockwood blends, generalised winding numbers for trimmed NURBS. Full list in ENGINES.md. |
-| Commercial CAD | **No** | No data, measurements or files made with them (AGENTS.md). |
+| Commercial CAD | **No** | No data, measurements or files made with them (AGENTS.md). This rules out the ABC, Fusion 360 Gallery and NIST model sets (decision 6). |
 
-Licence of PolyCore itself: the Polykrom workspace is MIT OR Apache-2.0. Code ported from
-SMLib or solidcore is Apache-2.0 only, so those files stay Apache-2.0 only and say so in their
-header. See [Open decisions](#open-decisions).
+Licence: the `polycore-*` crates are Apache-2.0 only, with a `NOTICE` entry for anything
+ported from SMLib or solidcore. The rest of the workspace stays MIT OR Apache-2.0 (decision 9).
 
 ## Scope
 
@@ -104,7 +108,7 @@ header. See [Open decisions](#open-decisions).
 | `solidcraft-doc` | Parameters, expressions, units, configurations, the feature timeline, dependency-aware rebase, persistent names (`lineage.rs` turns kernel histories into names), face attachments, components, joints, motion studies | Explicit geometry and operation specs: profiles, distances, edge sets. Never parameters, features or names. |
 | `solidcraft-sketch` | The 2D constraint solver and profiles | Profiles as curves |
 | `solidcraft-engine`, `solidcraft-mcp`, control channel | Commands, MCP, scripts, undo | Through the document, never directly for modelling |
-| Studies and simulation | MuJoCo (`tools/mujoco/runner.py`), the FEA study runner (below) | Files and processes: meshes, inertia, face tags |
+| Studies and simulation | MuJoCo (`tools/mujoco/runner.py`), the [study sidecar](#the-study-sidecar) | Files and processes: meshes, inertia, face tags |
 
 The boundary rule: PolyCore takes values and returns values plus history. It never reads a
 design, a parameter or a feature. The document decides what a face is called; PolyCore
@@ -134,8 +138,9 @@ crate depends on a Polykrom crate.
 | `polycore-io` | STEP, IGES, schema 3, 3MF meshes, USD | `step_in/`, `step_out.rs`, `iges_*`, `native/` |
 | `polycore` | The public API: the `Kernel` trait, types, re-exports | `crates/kernel/src/lib.rs` |
 | `polycore-legacy` | Every remaining truck call, behind the same types. Shrinks every phase; deleted in Phase 6. | The truck-facing parts of `crates/kernel` |
-| `polycore-bench` (dev only, not shipped) | Corpus runner, bake-off scoring, the oracle client, the minimiser | `xtask kernel-cases`, Nightfall `tools/bakeoff` (harvested) |
+| `polycore-bench` (dev only, not shipped) | Corpus runner, bake-off scoring, the client for the OCCT reference program, the minimiser | `xtask kernel-cases`, Nightfall `tools/bakeoff` (harvested) |
 
+The crates live in the Polykrom workspace as `crates/polycore-*` (decision 1).
 Dependencies point one way: math ← geom ← topo ← (ops, mesh, naming, props, io) ← polycore.
 Polykrom crates depend on `polycore` only.
 
@@ -284,9 +289,10 @@ standing score. OCCT 7.9.3 runs as a separate program. Its results are never the
 
 Corpus: the 20 reference parts from Nightfall's bake-off (re-expressed as Polykrom recipes with
 their analytic answers), kernel-cases, the ladder, the reference tests and the 119-case SSI
-corpus. ABC and Fusion 360 Gallery models wait for a licence decision ([Open decisions](#open-decisions)).
+corpus, plus permissively licensed models made in open tools. No model made in commercial CAD
+is used (AGENTS.md; decision 6), so the ABC set that Nightfall's bake-off sampled is out.
 
-Targets, as a share of OCCT's weighted score on the same corpus and machine:
+Targets (decision 5), as a share of OCCT's weighted score on the same corpus and machine:
 
 | Phase | Target |
 |---|---|
@@ -299,8 +305,8 @@ Targets, as a share of OCCT's weighted score on the same corpus and machine:
 
 | Phase | ENGINES | What | Phase-specific exit gate | Effort (eng.-months, AI-assisted) |
 |---|---|---|---|---|
-| **0 Harness and boundary** | K0 | Rename `crates/kernel` to `polycore`; extract the `Kernel` trait over today's code with no behaviour change; `polycore-bench` with the oracle client and the RFC 0001 rubric; import Nightfall's 20 reference parts; commit the TinyRex spec; record every baseline above. Move `analysis.static_stress` off Nightfall's `nf` (see [Studies](#harvest-from-nightfall)). | Baselines recorded; first bake-off score published; TinyRex baseline run on truck. | 1–2 |
-| **1 Own geometry and topology** | K1 | `polycore-math`, `-geom`, `-topo`, `-mesh`; analytic surfaces first-class; absolute model resolution, tolerant edges and vertices, p-curves; the validity checker; tessellation and STEP export off truck; mass properties from the exact B-rep; analytic contact primitives. Truck survives only in `polycore-legacy`. | Tessellation 14/14; #216 closed (watertight meshes and B-rep inertia in MJCF); volume and area within 1e-6 relative on every analytic reference test; every corpus body round-trips truck ↔ PolyCore exactly. | 2–4 |
+| **0 Harness and boundary** | K0 | Rename `crates/kernel` to `polycore`; extract the `Kernel` trait over today's code with no behaviour change; `polycore-bench` with the oracle client and the RFC 0001 rubric; import Nightfall's 20 reference parts; commit the TinyRex spec; record every baseline above. Build and pin the [OCCT reference program](#the-occt-reference-program). Move `analysis.static_stress` and the stress field to the [study sidecar](#the-study-sidecar). | Baselines recorded; first bake-off score published; TinyRex baseline run on truck; the study sidecar's cantilever and thermal checks within 2 %; the harvest list done. | 1–2 |
+| **1 Own geometry and topology** | K1 | `polycore-math`, `-geom`, `-topo`, `-mesh`; analytic surfaces first-class; absolute model resolution of 1e-6 mm (decision 4), tolerant edges and vertices, p-curves; the validity checker; tessellation and STEP export off truck; mass properties from the exact B-rep; analytic contact primitives. Truck survives only in `polycore-legacy`. At the end, re-evaluate adopting solidcore wholesale (decision 2). | Tessellation 14/14; #216 closed (watertight meshes and B-rep inertia in MJCF); volume and area within 1e-6 relative on every analytic reference test; every corpus body round-trips truck ↔ PolyCore exactly; the solidcore re-evaluation published. | 2–4 |
 | **2 Booleans** | K2 | General-fuse pipeline (coincidences settled lowest dimension first), the analytic SSI table, the existing BVH broad phase, procedural intersection curves, classification by ray casting with winding numbers as fallback. truck-shapeops, the retry ladder and the special-case modules are deleted as their cases pass. | Booleans ≥ 84/89 and crashes 10/10 in kernel-cases; ladder tier 02 20/20; no hangs; boolean median time ≤ half of truck's; bake-off target. | 4–8 |
 | **3 Free-form SSI, sweeps, lofts** | K3 | Subdivision seeding with normal-cone loop tests, marching, tangent and overlap handling; sweeps and lofts on PolyCore topology. | SSI corpus 119/119; sweeps ≥ 78/83; surfaces ≥ 6/8; import ≥ 22/23; bake-off target. | 6–12 |
 | **4 Blends** | K4 | Rolling-ball fillets, chamfers and vertex blends on PolyCore topology, porting today's `loopblend`, `curveblend`, `blend_corner`; SMLib and solidcore's fillet units read as references. | Fillets ≥ 47/50; ladder tier 07 17/17; action-matrix fillet failures (#556, 986 today) ≤ 250; bake-off target. | 6–12 |
@@ -316,7 +322,7 @@ crate, renamed), on desktop and in the browser.
 | Project | Decision | Why |
 |---|---|---|
 | truck | **Replace piecewise, then drop** (Phase 6) | Its numeric design (mesh-seeded SSI, no local tolerances, no p-curves) is the root cause of most failures. Fixes that help truck users still go upstream. |
-| solidcore | **Learn from and port units that win** | Apache-2.0, safe Rust, deterministic, wasm goals: aligned. But it mirrors SMLib's API, which has no history, and SMLib scored 50.7. When solidcore builds solids end to end, run it through the bake-off; any unit that beats PolyCore on its area of the corpus can be ported or depended on. |
+| solidcore | **A reference to port from; re-evaluated at the end of Phase 1** | Apache-2.0, safe Rust, deterministic, wasm goals: aligned. But it mirrors SMLib's API, which has no history, and SMLib scored 50.7. Any unit that beats PolyCore on its area of our corpus is ported; bugs we find go upstream as reports or PRs. At the end of Phase 1, adopting solidcore wholesale as the base of `polycore-geom` and `polycore-ops` is re-evaluated on our corpus (decision 2). |
 | SMLib / usd-brep kernel | **Learn from; never link** | Readable, Apache-2.0, complete. As a C++ library it had 250 memory-safety errors per 1,000 sanitised operations. The `kernel-smlib` and `smlib-link` branches stay experiments, not merged. |
 | usd-brep `omniSolid` schema | **Interop only** | A data format for exact solids in USD. |
 | OpenCASCADE | **Black-box oracle only** | Scores and cross-checks. Never code. |
@@ -331,7 +337,7 @@ Nightfall is Apache-2.0 and our own, so anything can move. Only what earns its p
 | Rust NURBS math (RFC 0008) | `nightfall-math`: checked knot vectors, basis functions, NURBS curves and surfaces, mixed partial derivatives, fixed stack workspaces (degree ≤ 9), finite-difference and property tests, probes and a bench | `polycore-math` | Copy the crate's source and tests in Phase 1. Merge with `solidcraft-geom::bspline`; keep the one that passes both test sets faster. |
 | Bake-off (RFC 0001) | The rubric, the decision rule, the per-process runner (crashes become results), sanitiser runs, the history probe, the 20 reference parts, findings F1–F13 | `polycore-bench`, `tests/oracle/` | Phase 0. Port the Python runner and scoring; re-express the 20 parts as Polykrom recipes with their analytic answers. The C++ kernel drivers stay behind (OCCT-specific). |
 | Selectors and feature IR (RFC 0005) | References by how an entity came to be, narrowed by geometry; cardinality (`expect`); content hashes per feature | Polykrom's document and MCP | Polykrom's names already follow exact kernel history, which is stronger than generative names plus OCCT's `Modified`/`Generated`. Take three ideas: a reference that resolves to the wrong count is an error with a pointer, never a guess; geometric filters (`type`, `normal`, `near`, `radius`, `convex`) as an agent-facing query in MCP, so an agent can name a face without a pick; per-feature content hashes, measured against today's dependency-aware rebase before adopting. The IR schema itself is not taken. |
-| Studies (RFC 0014) | `services/study`: a study runner, MFEM physics (P2 elasticity and heat), Netgen meshing, a sparse Cholesky solve (Accelerate on macOS), unit handling; the P2 surface field (mid-edge nodes, each P2 triangle drawn as four); the cantilever and thermal checks within 2 % | A `polykrom-study` sidecar program, plus `crates/engine` analysis commands | Polykrom's `analysis.static_stress` calls Nightfall's `nf study solve` today, and its stress contours (#29) read `nf`'s field. Move the runner, the MFEM physics and the field format into a sidecar Polykrom owns, in Phase 0. Netgen stays a separate process and meshes PolyCore's watertight, face-tagged surface mesh instead of an OCCT shape, so no OCCT enters the sidecar. Off macOS the direct solve needs a replacement for Accelerate. |
+| Studies (RFC 0014) | `services/study`: a study runner, MFEM physics (P2 elasticity and heat), Netgen meshing, a sparse Cholesky solve (Accelerate on macOS), unit handling; the P2 surface field (mid-edge nodes, each P2 triangle drawn as four); the cantilever and thermal checks within 2 % | The [study sidecar](#the-study-sidecar), plus `crates/engine` analysis commands | Polykrom's `analysis.static_stress` calls Nightfall's `nf study solve` today, and its stress contours (#29) read `nf`'s field. Phase 0 moves the runner, the MFEM physics, the field format and the checks to a sidecar Polykrom owns. Netgen is dropped. |
 | USD exchange plan (RFC 0002) | Exact solids in USD through usd-brep's `omniSolid` `BrepArray` | `polycore-io` | Take the plan, not the build: PolyCore writes and reads `BrepArray` prims as `.usda` with its own code. OpenUSD and usd-brep's validator run in CI as separate checking tools. Nothing of OpenUSD is linked. |
 | Assemblies and URDF (RFC 0013) | IR v2 components, occurrences and joints; `nightfall-assembly` with residual, rank and DOF diagnostics; URDF export in C++ | Tests in `crates/doc` | Polykrom already has joints, closed loops with DOF and rank, motion studies, URDF and MJCF. Take the four-bar and slider-crank closure cases (residuals < 1e-9) and the URDF test expectations as extra tests. The code is not needed. |
 | Evals harness (`agent/evals`) | build, edit and repair tasks over reference parts; a deterministic `reference` runner that checks the harness and the MCP contract without a model; `SKIP` for sessions that could not start; `--resume`; the rule that the pass rate may not drop | `tools/agent-eval` | Polykrom's harness is already broader (parts and systems). Add the edit and repair task kinds, the reference runner, `SKIP` and `--resume`, and the rule. TinyRex is a task there. |
@@ -348,15 +354,49 @@ Not worth keeping:
 | The OpenUSD and SMLib C++ builds | Interop is through file formats. |
 | Nightfall's vendored copy of Polykrom's sketch solver | It came from Polykrom. |
 
-What OCCT still is: a program that answers the bake-off's questions. Phase 0 decides whether
-that program is a frozen, unmodified Nightfall `nf` build kept only for scoring, or FreeCAD's
-existing oracle ([Open decisions](#open-decisions)).
+### The study sidecar
+
+`polykrom-study` replaces `nf study solve` (decision 8). Polykrom starts it as a separate
+program, as it does MuJoCo; nothing of it is in the browser build.
+
+| Step | Tool | Licence | How |
+|---|---|---|---|
+| Surface | PolyCore | ours | A watertight, face-tagged surface mesh of the body. |
+| Volume mesh | fTetWild, a separate process | MPL-2.0 | Tetrahedra from that surface mesh; face tags carried to the boundary triangles. Quadratic (P2) elements. |
+| Physics | MFEM, a separate process | BSD-3-Clause | Nightfall's `physics.cpp` (our code, Apache-2.0) assembles P2 elasticity and heat, as today. The assembled system goes to the solver as a CSR matrix, the interface `sparse_cholesky.hpp` already uses. |
+| Direct solve | faer, in the Rust sidecar | MIT | faer 0.24.4 (MIT, checked on crates.io 2026-10-26) has sparse Cholesky: symbolic analysis with AMD ordering, simplicial and supernodal LLᵀ and LDLᵀ. Used on every platform; Accelerate stays optional on macOS. |
+| Field | the sidecar | ours | Nightfall's P2 surface field format, read by Polykrom's stress contours (#29). |
+
+### The OCCT reference program
+
+What OCCT still is: a program that answers the bake-off's questions. It is a frozen, pinned
+Nightfall `nf` build, used as a tool, because `nf kernel serve` reports every result face's
+history (RFC 0015), which the history metric needs (decision 3). It is never changed.
+
+| | |
+|---|---|
+| Source | wckdboy/nightfall at `08035ea591f22891694d40fa47172e7d55ada457` (`origin/main`, 2026-10-26). Tag it `oracle-occt-1` before the repository is archived. |
+| OCCT | 7.9.3 at `a016080bf6738d6aeae020badee4e888ad1540a5`, built by `third_party/build-occt.sh`, dynamically linked (LGPL-2.1). |
+| Platform | macOS on Apple silicon: the CMake presets fix `arm64` and deployment target 15.0. A Linux runner needs a preset change in a copy kept with the bench, not in the frozen tree. |
+| Use | `nf kernel serve`: one JSON request per line on stdin, STEP operands in, STEP results with face history out. |
+
+Build recipe (Phase 0 runs it and records the binary's SHA-256 next to the bench):
+
+```sh
+git clone https://github.com/wckdboy/nightfall nightfall-oracle
+cd nightfall-oracle
+git checkout 08035ea591f22891694d40fa47172e7d55ada457
+third_party/build-occt.sh --jobs 4
+cmake --preset occt -DNF_WITH_STUDIES=OFF   # no Netgen or MFEM needed for the oracle
+cmake --build --preset occt --target nf
+build/occt/tools/cli/nf kernel serve --timeout 120
+```
 
 ## Interchange
 
 | Format | Direction | Owner | Plan |
 |---|---|---|---|
-| STEP AP203/AP214 | read, write | `polycore-io` | Import is ours today (`step_in/`); export moves off truck-stepio in Phase 1. AP242 B-rep next. Checked on `tests/step-conformance`, `tests/step-regressions` and public NIST models, with OCCT reading our files back as a black-box cross-check. |
+| STEP AP203/AP214 | read, write | `polycore-io` | Import is ours today (`step_in/`); export moves off truck-stepio in Phase 1. AP242 B-rep next. Checked on `tests/step-conformance`, `tests/step-regressions` and permissively licensed files made in open tools, with OCCT reading our files back as a black-box cross-check. |
 | IGES | read, write | `polycore-io` | As today. |
 | Native schema 3 | read, write | `polycore-io` | PolyCore's persistent body format inside designs. A change bumps the schema; old versions still read. |
 | USD `omniSolid` | read, write | `polycore-io` | `BrepArray` prims with analytic and NURBS faces, as the schema defines (Apache-2.0). Our own `.usda` reader and writer. Phase 3. |
@@ -402,9 +442,10 @@ existing oracle ([Open decisions](#open-decisions)).
 | A phase stalls | Each phase is useful alone: Phase 1 already fixes #216 and the MJCF masses. The corpus shows the stall early. |
 | An accidental read of OCCT or other LGPL code | The sources table above; reviewers check where an algorithm came from; usd-brep's OCCT converters are named as off limits. |
 | Designs change meaning when topology changes | Persistent names follow history, and the naming tests run in every phase. Schema 3 is versioned. |
-| The oracle rots once Nightfall is frozen | Pin it; FreeCAD's oracle is a second black box. |
+| The oracle rots once Nightfall is frozen | A pinned commit, a recorded recipe and a recorded binary hash; FreeCAD's oracle is a second black box for volume and area. |
 | Polykrom drifts from upstream SolidCraft, which is moving to solidcore | Keep upstream merges outside `crates/kernel` working; schema 3 lets bodies cross between the two kernels if upstream wants it. |
 | Agent runs vary | TinyRex is judged on the median of three runs. |
+| The study sidecar regresses when Netgen goes | The cantilever and thermal checks within 2 % gate Phase 0. |
 
 ### Effort
 
@@ -431,25 +472,19 @@ claim otherwise.
 - **PolyCore** is the kernel. Crates are `polycore` and `polycore-*`. Internal names keep the
   rules in AGENTS.md: `solidcraft-*` crates above the kernel are not renamed piecemeal.
 
-## Open decisions
+## Decisions
 
-1. **Where PolyCore lives.** In the Polykrom workspace (one CI, corpus next to the code, atomic
-   PRs) or in its own repository. Proposed: in the workspace until the API is stable at the end
-   of Phase 2.
-2. **solidcore.** Treat it as a reference and a parts bin (proposed), or contribute to it and
-   adopt it as PolyCore's base, as upstream SolidCraft does.
-3. **The OCCT oracle.** A frozen Nightfall `nf` build kept only for scoring (it already reports
-   history), or FreeCAD's oracle (already wired, but no history probe).
-4. **Model resolution.** An absolute length tolerance for tolerant topology. Proposed 1e-6 mm,
-   fixed in Phase 1 after measuring the corpus.
-5. **Bake-off targets.** The shares of OCCT's score above are proposals.
-6. **Datasets.** ENGINES.md lists ABC and Fusion 360 Gallery, but those models were made in
-   commercial CAD, which AGENTS.md rules out as test data. Decide whether they are allowed.
-7. **TinyRex in public.** The spec and checks would be committed to `tools/agent-eval`. Confirm
-   that is fine, and that the median of three runs is the right rule.
-8. **The study sidecar.** Mesher input (Netgen from a surface mesh, or fTetWild), and the
-   direct solver off macOS.
-9. **Licence of ported files.** Files ported from SMLib or solidcore are Apache-2.0 only inside
-   an MIT OR Apache-2.0 workspace. Accept that, or make PolyCore Apache-2.0 only.
-10. **Nightfall's freeze.** When to archive the repository, after Phase 0 has moved the study
-    runner and the harvest is done.
+Made by the owner on 2026-10-26.
+
+| # | Topic | Decision |
+|---|---|---|
+| 1 | Where PolyCore lives | In the Polykrom workspace, at least until the API is stable after Phase 2. Revisit then. |
+| 2 | solidcore | A reference to port from. Any unit that wins on our corpus is ported; bugs we find go upstream as reports or PRs. At the end of Phase 1, re-evaluate adopting solidcore wholesale as the base of `polycore-geom` and `polycore-ops`, judged on our corpus. |
+| 3 | OCCT reference program | A frozen, pinned Nightfall `nf` build used as a tool, since it reports operation history. Commit and build recipe under [The OCCT reference program](#the-occt-reference-program). |
+| 4 | Model tolerance | 1e-6 mm, fixed in Phase 1 after measuring the corpus. |
+| 5 | Bake-off targets | As listed under [The bake-off against OCCT](#the-bake-off-against-occt). |
+| 6 | Test datasets | Follow AGENTS.md: no models made in commercial CAD. ABC, Fusion 360 Gallery and NIST are out, and ENGINES.md says so. The corpus is our own generated and analytic cases, plus permissively licensed models made in open tools. |
+| 7 | TinyRex in public | Yes. Its spec is committed to `tools/agent-eval`; the median of three runs is the rule. |
+| 8 | Study program | Mesher: fTetWild (MPL-2.0) as a separate process, from PolyCore's watertight surface mesh. FEA: MFEM, a separate process. Direct solver: faer's sparse Cholesky (pure Rust, MIT) on every platform, Accelerate optional on macOS. Netgen is dropped. See [The study sidecar](#the-study-sidecar). |
+| 9 | Licence | The `polycore-*` crates are Apache-2.0 only, with `NOTICE` entries for anything ported from SMLib or solidcore. The rest of the workspace stays MIT OR Apache-2.0. |
+| 10 | Nightfall archive | Once Phase 0 has moved the study runner and the harvest list is done. |
