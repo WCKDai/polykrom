@@ -871,3 +871,25 @@ fn rolling_ball_round_on_a_sloped_loft_matches_its_volume() {
     let got = crate::measure(&round).unwrap().volume;
     assert!((got - want).abs() < 3e-5 * want, "{got} against {want}");
 }
+
+#[test]
+fn smooth_neighbours_are_judged_at_the_seam_through_the_vertex() {
+    // Two walls sharing two seams: a 270 degree arc and a Bezier leaving its end tangentially and
+    // coming back into its start at a corner. Smooth along the first seam, sharp along the other.
+    use solidcraft_geom::{Loop2, Plane, Region2, Seg2, Vec2};
+    let outline = Region2 {
+        outer: Loop2 {
+            segs: vec![
+                Seg2::Arc { center: Vec2::ZERO, radius: 10.0, start: 0.0, sweep: 1.5 * std::f64::consts::PI },
+                Seg2::Cubic { p0: Vec2::new(0.0, -10.0), p1: Vec2::new(6.0, -10.0), p2: Vec2::new(12.0, -6.0), p3: Vec2::new(10.0, 0.0) },
+            ],
+        },
+        holes: vec![],
+    };
+    let body = crate::extrude(&Plane::XY, &[outline], 0.0, 5.0).unwrap().pop().unwrap();
+    let walls: Vec<&mt::Face> = body.solid.face_iter().filter(|f| !matches!(f.oriented_surface(), mt::Surface::Plane(_))).collect();
+    let [a, b] = walls[..] else { panic!("{} walls", walls.len()) };
+    let at = |x: f64, y: f64| a.vertex_iter().find(|v| crate::blend::vtx(v).dist(Vec3::new(x, y, 0.0)) < 1e-6).unwrap();
+    assert!(meet_smoothly(a, b, &at(0.0, -10.0)), "the tangent seam");
+    assert!(!meet_smoothly(a, b, &at(10.0, 0.0)), "the corner");
+}

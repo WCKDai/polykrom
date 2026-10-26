@@ -866,19 +866,24 @@ fn nearest_on(surface: &mt::Surface, last: &std::cell::Cell<Option<(f64, f64)>>,
     Some((from_p3(surface.subs(uv.0, uv.1)), Vec3::new(n.x, n.y, n.z).normalized()?, uv))
 }
 
-/// The faces `own` with those of `near` that meet one of them smoothly ([`meet_smoothly`]).
-fn with_smooth_neighbours<'a>(own: Vec<&'a mt::Face>, near: Vec<&'a mt::Face>) -> Vec<&'a mt::Face> {
-    let extra: Vec<&mt::Face> =
-        near.into_iter().filter(|f| !own.iter().any(|g| g.id() == f.id()) && own.iter().any(|g| meet_smoothly(g, f))).collect();
-    own.into_iter().chain(extra).collect()
+/// The faces `own` with those of `near` that meet one of them smoothly along their seam through
+/// the vertex each comes with ([`meet_smoothly`]).
+fn with_smooth_neighbours<'a>(own: Vec<&'a mt::Face>, near: Vec<(&'a mt::Face, mt::Vertex)>) -> Vec<&'a mt::Face> {
+    let mut out = own.clone();
+    for (f, v) in near {
+        if !out.iter().any(|g| g.id() == f.id()) && own.iter().any(|g| meet_smoothly(g, f, &v)) {
+            out.push(f);
+        }
+    }
+    out
 }
 
-/// Whether two faces sharing an edge meet smoothly along it (their normals agree, within a degree,
-/// at five points along it): pieces of one smooth wall, such as a loft's faces between tangent
-/// pieces of its sections.
-fn meet_smoothly(a: &mt::Face, b: &mt::Face) -> bool {
+/// Whether two faces meet smoothly along their shared edge through vertex `v` (their normals
+/// agree, within a degree, at five points along it): pieces of one smooth wall, such as a loft's
+/// faces between tangent pieces of its sections. Faces that share no edge there don't.
+fn meet_smoothly(a: &mt::Face, b: &mt::Face, v: &mt::Vertex) -> bool {
     use mt::{BoundedCurve, ParametricCurve};
-    let Some(e) = a.edge_iter().find(|e| b.edge_iter().any(|x| x.id() == e.id())) else { return false };
+    let Some(e) = a.edge_iter().find(|e| (e.front() == v || e.back() == v) && b.edge_iter().any(|x| x.id() == e.id())) else { return false };
     let c = e.curve();
     let (t0, t1) = c.range_tuple();
     (1..=5).all(|k| {
@@ -1262,16 +1267,25 @@ fn curve_blend_sized(solid: &Solid, ids: &[mt::EdgeID], size: f64, size_law: Siz
     // (a lofted wall's pieces): a ball near the end of edge k whose contact lies past the seam on
     // the next piece. Only where edge k's own faces leave the ball without a section.
     let beside = |k: usize| -> (Vec<&mt::Face>, Vec<&mt::Face>) {
-        let mut ks = vec![k];
-        if closed || k > 0 {
-            ks.push((k + n - 1) % n);
-        }
-        if closed || k + 1 < n {
-            ks.push((k + 1) % n);
+        // Each neighbouring edge with the chain vertex it shares with edge k, where the seam
+        // between its faces and edge k's runs.
+        let mut next: Vec<(usize, mt::Vertex)> = Vec::new();
+        if let Some(e) = chain.get(k) {
+            if closed || k > 0 {
+                next.push(((k + n - 1) % n, e.front().clone()));
+            }
+            if closed || k + 1 < n {
+                next.push(((k + 1) % n, e.back().clone()));
+            }
         }
         let (own1, own2) = edge_sides(&[k]);
-        let (all1, all2) = edge_sides(&ks);
-        (with_smooth_neighbours(own1, all1), with_smooth_neighbours(own2, all2))
+        let (mut near1, mut near2) = (Vec::new(), Vec::new());
+        for (j, v) in next {
+            let (a1, a2) = edge_sides(&[j]);
+            near1.extend(a1.into_iter().map(|f| (f, v.clone())));
+            near2.extend(a2.into_iter().map(|f| (f, v.clone())));
+        }
+        (with_smooth_neighbours(own1, near1), with_smooth_neighbours(own2, near2))
     };
     // Convex or concave, from the first edge as its side-1 face runs it.
     let e0 = chain.first().ok_or_else(|| KernelError::Failed("chain".into()))?;
