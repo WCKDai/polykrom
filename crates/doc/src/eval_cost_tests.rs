@@ -534,3 +534,35 @@ fn a_shadow_mismatch_is_counted_and_fails_the_tests() {
         std::panic::resume_unwind(e);
     }
 }
+
+#[test]
+fn a_saved_model_keeps_which_names_came_from_geometry() {
+    let mut doc = Document::new("dimple");
+    let id = doc
+        .add_feature(
+            FeatureKind::Box {
+                corner: point_expr(Vec3::ZERO),
+                length: "10".into(),
+                width: "10".into(),
+                height: "4".into(),
+                operation: Operation::NewBody,
+            },
+            None,
+        )
+        .unwrap();
+    doc.feature_mut(id).unwrap().body_names = vec!["A".into()];
+    doc.add_feature(FeatureKind::Sphere { center: point_expr(Vec3::new(5.0, 5.0, 4.0)), radius: "2".into(), operation: Operation::Cut }, None)
+        .unwrap();
+    let mut model = Model::new();
+    model.evaluate(&doc);
+    assert!(crate::naming::names(model.state().body("A").unwrap()).geometric);
+    let mut saved = model.saved(&doc).unwrap();
+    // Even where every face's name reads as verified, the flag is taken as saved (#217 review).
+    for n in saved.records["names"].as_array_mut().unwrap() {
+        for info in n["info"].as_array_mut().unwrap() {
+            info[2] = true.into();
+        }
+    }
+    let adopted = Model::adopt(&doc, &saved).unwrap();
+    assert!(crate::naming::names(adopted.state().body("A").unwrap()).geometric);
+}

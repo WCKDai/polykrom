@@ -1959,7 +1959,7 @@ impl Model {
             let rebased = previous
                 .as_ref()
                 .filter(|_| param_names(f).iter().all(|n| !self.param_errors.contains_key(n)))
-                .and_then(|p| p.rebase(doc, f, local, &state));
+                .and_then(|p| p.rebase(f, local, &state));
             let rebased = match rebased {
                 Some((next, old)) if !shadow => {
                     rebases += 1;

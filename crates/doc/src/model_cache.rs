@@ -119,7 +119,9 @@ impl Writer {
         }
         let names = crate::naming::names(b);
         let info: Vec<Json> = names.info.iter().map(|i| json!([i.aliases, i.bounds, i.verified])).collect();
-        self.names.push(json!({"faces": *names.faces, "info": info}));
+        // Whether any face was named from geometry: not always told by the faces' verified flags
+        // (a stage named from geometry can qualify exact faces), and a rebase reads it (#169).
+        self.names.push(json!({"faces": *names.faces, "info": info, "geometric": names.geometric}));
         self.names_index.insert(id, self.names.len() - 1);
         self.names.len() - 1
     }
@@ -246,8 +248,8 @@ impl SavedModel {
                 return Err(bad("saved model: names"));
             }
             let info: Vec<FaceInfo> = info.into_iter().map(|(aliases, bounds, verified)| FaceInfo { aliases, bounds, verified }).collect();
-            // Names from geometry are never verified: all verified, none were.
-            let geometric = !info.iter().all(|i| i.verified);
+            // As saved; a record without it is taken as from geometry unless every face is verified.
+            let geometric = n.get("geometric").and_then(Json::as_bool).unwrap_or_else(|| !info.iter().all(|i| i.verified));
             names.push(Arc::new(Names { faces: Arc::new(faces), info, geometric }));
         }
         let mut sketches = Vec::new();

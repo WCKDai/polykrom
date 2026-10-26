@@ -140,8 +140,10 @@ fn depth(st: &ModelState) -> usize {
 }
 
 /// The bodies of `st` that `reads` takes, in their order.
-fn read_bodies<'a>(doc: &Document, f: &Feature, st: &'a ModelState, reads: &Reads) -> Option<Vec<&'a ModelBody>> {
-    let mine = |b: &&ModelBody| b.component == f.component || b.feature == f.id || doc.model_body_component(b) == f.component;
+/// Its component's bodies are those a join or cut with no participants changes (see
+/// `apply_traced`): owned by the feature's component, or made by the feature.
+fn read_bodies<'a>(f: &Feature, st: &'a ModelState, reads: &Reads) -> Option<Vec<&'a ModelBody>> {
+    let mine = |b: &&ModelBody| b.component == f.component || b.feature == f.id;
     Some(match reads {
         Reads::Nothing => Vec::new(),
         Reads::Named(names) => names.iter().map(|n| st.body(n)).collect::<Option<_>>()?,
@@ -162,7 +164,7 @@ fn operands_read(lineage: &crate::lineage::Lineage, read: &dyn Fn(&str) -> bool)
 
 /// `f`'s result `after`, evaluated from `was`, as `f` would leave `now` instead: `None` when that
 /// cannot be shown (see the module notes).
-fn rebase(doc: &Document, f: &Feature, was: &ModelState, after: &ModelState, now: &ModelState) -> Option<ModelState> {
+fn rebase(f: &Feature, was: &ModelState, after: &ModelState, now: &ModelState) -> Option<ModelState> {
     let (reads, sketch) = reads(f)?;
     // Nothing either model holds that the change does not carry: sheets, construction geometry,
     // blends, the body counter; and names worked out as deep in both.
@@ -179,7 +181,7 @@ fn rebase(doc: &Document, f: &Feature, was: &ModelState, after: &ModelState, now
     if !untouched || (was_depth < deep) != (now_depth < deep) || !sketch.is_none_or(|id| same_sketch(was, now, id)) {
         return None;
     }
-    let (old, new) = (read_bodies(doc, f, was, &reads)?, read_bodies(doc, f, now, &reads)?);
+    let (old, new) = (read_bodies(f, was, &reads)?, read_bodies(f, now, &reads)?);
     if old.len() != new.len() || !old.iter().zip(&new).all(|(a, b)| same_body(a, b)) {
         return None;
     }
@@ -272,11 +274,11 @@ impl<'a> Previous<'a> {
 
     /// Feature `f` (`local`: its own inputs, as the cache keys them) rebased onto `now`: the state
     /// and its last result (for its warnings and time).
-    pub(super) fn rebase(&self, doc: &Document, f: &Feature, local: u64, now: &ModelState) -> Option<(ModelState, &'a FeatureResult)> {
+    pub(super) fn rebase(&self, f: &Feature, local: u64, now: &ModelState) -> Option<(ModelState, &'a FeatureResult)> {
         let i = *self.at.get(&f.id)?;
         let old = self.results.get(i).filter(|r| r.local == local && r.local != 0 && !r.skipped && !r.stale && !r.unkept && r.error.is_none())?;
         let was = self.results.get(..i)?.iter().rev().find(|r| !r.skipped).filter(|r| !r.unkept && !r.stale)?;
-        Some((rebase(doc, f, &was.state, &old.state, now)?, old))
+        Some((rebase(f, &was.state, &old.state, now)?, old))
     }
 }
 
