@@ -1418,7 +1418,13 @@ fn curve_blend_sized(solid: &Solid, ids: &[mt::EdgeID], size: f64, size_law: Siz
             // sharper edge is left to the sections.)
             let setback = {
                 let (a1, a2) = edge_sides(&[k]);
+                // As the sections are: on the edge's own faces, else with the neighbouring faces
+                // that run on smoothly from them (contacts within their faces).
                 solve(&a1, &a2, pm, tm, r, sigma, cusp, None, tol * 100.0)
+                    .or_else(|| {
+                        let (b1, b2) = beside(k);
+                        solve_from(&b1, &b2, pm, tm, r, sigma, cusp, None, tol * 100.0, None, true)
+                    })
                     .map(|s| (if side == 1 { s.q1 } else { s.q2 } - pm).dot(np.cross(tm)))
                     .filter(|d| d.is_finite() && *d > 0.0)
                     .map_or(r, |d| d.min(r))
