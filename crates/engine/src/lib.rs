@@ -290,6 +290,9 @@ pub struct Session {
     /// Bodies `inspect.measure` measured, by their geometry where they stand (shared with scratch
     /// copies): a body that did not change or move is not measured again.
     measure_cache: std::sync::Arc<std::sync::Mutex<cmd::inspect::MeasureCache>>,
+    /// Fixes polish.apply's kernel refused, by body geometry, command and parameters (shared
+    /// with scratch copies): a later pass doesn't try them again.
+    pub(crate) polish_refused: std::sync::Arc<std::sync::Mutex<std::collections::HashMap<u64, String>>>,
     /// Recent body renames: the design before and after each, and the names, so undo and redo
     /// follow them without evaluating either.
     body_renames: Vec<BodyRename>,
@@ -455,6 +458,7 @@ impl Session {
             removed_later_cache: Default::default(),
             clearance_cache: Default::default(),
             measure_cache: Default::default(),
+            polish_refused: Default::default(),
             body_renames: Vec::new(),
             contact_meshes: Default::default(),
             clipboard: Vec::new(),
@@ -1082,6 +1086,7 @@ impl Session {
             removed_later_cache: Default::default(),
             clearance_cache: self.clearance_cache.clone(),
             measure_cache: self.measure_cache.clone(),
+            polish_refused: self.polish_refused.clone(),
             body_renames: Vec::new(),
             contact_meshes: self.contact_meshes.clone(),
             clipboard: self.clipboard.clone(),
