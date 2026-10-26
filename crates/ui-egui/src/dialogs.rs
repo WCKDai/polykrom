@@ -4512,12 +4512,6 @@ pub fn for_feature(app: &SolveApp, id: u64, marker: Option<usize>) -> Option<Dia
             {
                 d.extra.insert("corner".into(), json!("g2"));
             }
-            // A radius per edge, in the order of the edges.
-            if let FeatureKind::Fillet { edge_radii, .. } = &f.kind
-                && !edge_radii.is_empty()
-            {
-                d.extra.insert("edge_radii".into(), json!(edge_radii));
-            }
             // A fillet that reduces or tapers a radius too large for its edges.
             if let FeatureKind::Fillet { fit, .. } = &f.kind {
                 use solidcraft_engine::doc::FilletFit;
@@ -4567,8 +4561,16 @@ pub fn for_feature(app: &SolveApp, id: u64, marker: Option<usize>) -> Option<Dia
                     }
                 }
             }
+            let found: Vec<(usize, Sel)> = edges.iter().enumerate().filter_map(|(i, p)| edge_pick(i, p.0).map(|x| (i, x))).collect();
+            // A radius per edge: those of the edges found again, in their order.
+            if let FeatureKind::Fillet { edge_radii, .. } = &f.kind
+                && !edge_radii.is_empty()
+            {
+                let radii: Vec<_> = found.iter().filter_map(|(i, _)| edge_radii.get(*i)).collect();
+                d.extra.insert("edge_radii".into(), json!(radii));
+            }
             if let Some(inp) = d.inputs.first_mut() {
-                inp.items = edges.iter().enumerate().filter_map(|(i, p)| edge_pick(i, p.0)).collect();
+                inp.items = found.into_iter().map(|(_, x)| x).collect();
                 d.picked_edges = inp.items.clone();
             }
             d.chain_applied = false;
