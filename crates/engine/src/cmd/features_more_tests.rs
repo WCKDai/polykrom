@@ -1749,3 +1749,45 @@ fn duplicate_and_excess_profile_picks_are_refused_quickly() {
     // One pick of the profile still builds.
     run(&mut s, "solid.loft", json!({"sections": [{"sketch": "Bottom", "profiles": [0]}, {"sketch": "Top"}]}));
 }
+
+#[test]
+fn fillet_with_a_radius_per_edge() {
+    use std::f64::consts::FRAC_PI_4;
+    // Two parallel edges of a 40 x 30 x 20 box, R2 and R5 at once: each round takes
+    // (1 - pi/4) r^2 off along the 40 mm edge.
+    let mut s = Session::default();
+    run(&mut s, "solid.box", json!({"length": 40, "width": 30, "height": 20, "body_name": "Box"}));
+    let out = run(&mut s, "solid.fillet", json!({"edges": [[20, 0, 20], [20, 30, 0]], "radius": 2, "edge_radii": [2, "5 mm"]}));
+    assert!(out.get("feature").is_some(), "{out}");
+    let want = 24000.0 - (1.0 - FRAC_PI_4) * (4.0 + 25.0) * 40.0;
+    assert!(rel(volume(&mut s), want) < 1e-4, "{} against {want}", volume(&mut s));
+    // Saved with the radii, and evaluated the same from the saved design.
+    let saved = s.doc.to_json();
+    assert!(saved.contains("edge_radii"), "{saved}");
+    let mut again = Session::new(solidcraft_doc::Document::from_json(&saved).unwrap());
+    assert!(rel(volume(&mut again), want) < 1e-4);
+    // One radius per edge, and a constant-radius exact fillet only.
+    let mut t = Session::default();
+    run(&mut t, "solid.box", json!({"length": 40, "width": 30, "height": 20}));
+    assert!(t.execute("solid.fillet", &json!({"edges": [[20, 0, 20], [20, 30, 0]], "radius": 2, "edge_radii": [2]})).is_err());
+    assert!(t.execute("solid.fillet", &json!({"edges": [[20, 0, 20]], "radius": 2, "edge_radii": [2], "fit": "reduce"})).is_err());
+    // Without `edge_radii`, `radius` for every edge, saved as before (no `edge_radii`).
+    run(&mut t, "solid.fillet", json!({"edges": [[20, 0, 20], [20, 30, 0]], "radius": 2}));
+    assert!(!t.doc.to_json().contains("edge_radii"));
+    let want = 24000.0 - (1.0 - FRAC_PI_4) * 8.0 * 40.0;
+    assert!(rel(volume(&mut t), want) < 1e-4, "{} against {want}", volume(&mut t));
+}
+
+#[test]
+fn fillet_with_a_radius_per_edge_closes_a_corner_of_three_radii() {
+    // R1, R2, R3 at once on the three edges at a box corner: one corner patch.
+    let mut s = Session::default();
+    run(&mut s, "solid.box", json!({"length": 40, "width": 30, "height": 20, "body_name": "Box"}));
+    run(&mut s, "solid.fillet", json!({"edges": [[20, 0, 20], [0, 15, 20], [0, 0, 10]], "radius": 1, "edge_radii": [1, 2, 3]}));
+    let st = s.model.state();
+    let body = &st.body("Box").unwrap().body;
+    assert!(body.validity().is_empty(), "{:?}", body.validity());
+    let v = body.tessellate_with(1e-3, true).unwrap().measure().volume;
+    // Less than the box, more than the box less three full-length rounds of R3.
+    assert!(v < 24000.0 && v > 24000.0 - (1.0 - std::f64::consts::FRAC_PI_4) * 9.0 * 90.0, "{v}");
+}
