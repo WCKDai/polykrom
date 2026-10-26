@@ -464,3 +464,28 @@ fn an_edit_in_one_library_part_rebases_the_new_bodies_after_it() {
     assert_eq!((evaluated(&model), model.last_rebased), (1 + 3 * parts, doc.features.len() - 1 - 3 * parts));
     assert_full_evaluation(&doc, &model);
 }
+
+#[test]
+#[should_panic(expected = "rebase shadow check: MISMATCH")]
+fn a_shadow_mismatch_is_counted_and_fails_the_tests() {
+    let mut doc = Document::new("shadow");
+    let kind =
+        FeatureKind::Box { corner: point_expr(Vec3::ZERO), length: "1".into(), width: "1".into(), height: "1".into(), operation: Operation::NewBody };
+    let id = doc.add_feature(kind, None).unwrap();
+    let mut model = Model::new();
+    model.evaluate(&doc);
+    let (f, old) = (doc.feature(id).unwrap(), model.result(id).unwrap());
+    let before = super::rebase::shadow_mismatches();
+    let same = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        super::rebase::shadow_check(f, &old.state, old, &old.state, None, old.warning.as_deref(), &old.boolean_diagnostics)
+    }));
+    assert!(matches!(same, Ok(true)));
+    // A rebased model without the box: logged, counted, and a failure in this crate's tests.
+    let failed = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        super::rebase::shadow_check(f, &ModelState::default(), old, &old.state, None, None, &old.boolean_diagnostics)
+    }));
+    assert!(super::rebase::shadow_mismatches() > before);
+    if let Err(e) = failed {
+        std::panic::resume_unwind(e);
+    }
+}

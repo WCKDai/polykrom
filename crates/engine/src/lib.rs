@@ -674,6 +674,8 @@ impl Session {
         #[cfg(test)]
         {
             self.evaluations += 1;
+            // Shadow mode (`POLYKROM_REBASE_SHADOW`): no rebased result may differ (#169).
+            assert_eq!(solidcraft_doc::rebase_shadow_mismatches(), 0, "a rebased result differed from evaluating the feature");
         }
         self.revision += 1;
         self.prune_occurrence_state();

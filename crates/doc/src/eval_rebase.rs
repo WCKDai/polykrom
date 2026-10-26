@@ -24,7 +24,8 @@
 //!   before format 14.
 //!
 //! `POLYKROM_REBASE_SHADOW` (tests and diagnostics only) evaluates every rebased feature as well
-//! and compares the two; a difference stops the process, so that no test can pass over it.
+//! and compares the two. A difference is logged and counted ([`shadow_mismatches`]; a shadow run
+//! passes only with none, and this crate's tests fail on it), and the evaluated result is kept.
 
 use super::*;
 
@@ -165,9 +166,19 @@ pub(super) fn shadow() -> bool {
     solidcraft_geom::env::var_os("REBASE_SHADOW").is_some_and(|v| !v.is_empty() && v != "0")
 }
 
-/// Shadow mode: `rebased` must be what evaluating `f` gave (`evaluated`, with its `error`,
-/// `warning` and diagnostics) in every way a later feature or the user can see. A difference
-/// stops the process. With a file for the variable's value, each check is noted there.
+/// Rebased results that shadow mode found differing from an evaluation, in this process.
+static MISMATCHES: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+
+/// How many rebased results shadow mode (`POLYKROM_REBASE_SHADOW`) found differing from an
+/// evaluation in this process: a shadow run passes only with none.
+pub fn shadow_mismatches() -> usize {
+    MISMATCHES.load(std::sync::atomic::Ordering::Relaxed)
+}
+
+/// Shadow mode: whether `rebased` is what evaluating `f` gave (`evaluated`, with its `error`,
+/// `warning` and diagnostics) in every way a later feature or the user can see. A difference is
+/// logged (and noted in the file the variable names, with every other check) and counted
+/// ([`shadow_mismatches`]); the evaluated result is then kept. The crate's own tests fail on it.
 pub(super) fn shadow_check(
     f: &Feature,
     rebased: &ModelState,
@@ -176,7 +187,7 @@ pub(super) fn shadow_check(
     error: Option<&str>,
     warning: Option<&str>,
     diagnostics: &kernel::BooleanDiagnostics,
-) {
+) -> bool {
     let difference = differs(rebased, evaluated).or_else(|| match () {
         _ if error.is_some() => Some(format!("evaluating it failed: {error:?}")),
         _ if old.warning.as_deref() != warning => Some(format!("warning {:?} vs {warning:?}", old.warning)),
@@ -194,10 +205,14 @@ pub(super) fn shadow_check(
         }
     }
     if difference.is_some() {
+        MISMATCHES.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         log::error!("rebase shadow check: {note}");
         eprintln!("rebase shadow check: {note}");
-        std::process::abort();
     }
+    // This crate's tests fail on it.
+    #[cfg(test)]
+    assert!(difference.is_none(), "rebase shadow check: {note}");
+    difference.is_none()
 }
 
 /// What tells two models apart (`None`: nothing): bodies by name, owner, exact geometry, volume

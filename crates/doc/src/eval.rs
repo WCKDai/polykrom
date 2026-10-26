@@ -2095,8 +2095,11 @@ impl Model {
                 }
                 Err(e) => Some(e.to_string().trim_start_matches("the operation failed: ").to_string()),
             };
-            if let Some((next, old)) = rebased {
-                rebase::shadow_check(f, &next, old, &state, error.as_deref(), warning.as_deref(), &boolean_diagnostics);
+            // Shadow mode: the rebased result carries on where it is the evaluated one, so later
+            // features are rebased from it as they would be; else the evaluated result does.
+            if let Some((next, old)) = rebased
+                && rebase::shadow_check(f, &next, old, &state, error.as_deref(), warning.as_deref(), &boolean_diagnostics)
+            {
                 rebases += 1;
                 state = Arc::new(ModelState { reserved_body_names: reserved.clone(), ..next });
             }
@@ -5904,6 +5907,7 @@ mod more;
 #[path = "eval_rebase.rs"]
 mod rebase;
 pub use model_cache::SavedModel;
+pub use rebase::shadow_mismatches as rebase_shadow_mismatches;
 #[path = "eval_frame.rs"]
 pub(crate) mod frame_member;
 #[path = "eval_surface.rs"]
