@@ -260,8 +260,11 @@ fn parts(doc: &Document, st: &ModelState, stem: &str, names: &mut Names, out: &m
             match (brep, welded.mass_properties_open().filter(|m| m.volume > 0.0)) {
                 (Some(m), Some(mp)) => {
                     let centroid = doc.model_body_offset(b).map_or(m.centroid, |o| apply_point(o, m.centroid));
+                    // The mesh's tensor is about its own centre: moved to the B-rep's (the
+                    // parallel-axis theorem), then scaled to the B-rep's volume.
+                    let inertia = parallel_axis(mp.inertia, mp.volume, centroid - mp.centroid);
                     let scale = m.volume / mp.volume;
-                    masses.push((rho * m.volume, centroid, mp.inertia.map(|r| r.map(|x| x * rho * scale))));
+                    masses.push((rho * m.volume, centroid, inertia.map(|r| r.map(|x| x * rho * scale))));
                     out.warnings.push(format!(
                         "the mesh of body `{}` has gaps that could not be closed: its mass and inertia come from the B-rep, and it gets no collision",
                         b.name
@@ -670,6 +673,20 @@ pub(crate) fn token() -> Inertial {
     Inertial { mass: TOKEN_MASS, com: Vec3::ZERO, inertia: [[TOKEN_INERTIA, 0.0, 0.0], [0.0, TOKEN_INERTIA, 0.0], [0.0, 0.0, TOKEN_INERTIA]] }
 }
 
+/// `inertia` of a `mass` about its centre, moved to a point `d` from it (the parallel-axis
+/// theorem): I + m (|d|² 1 - d dᵀ).
+fn parallel_axis(inertia: [[f64; 3]; 3], mass: f64, d: Vec3) -> [[f64; 3]; 3] {
+    let dv = [d.x, d.y, d.z];
+    let d2 = d.dot(d);
+    let mut out = inertia;
+    for (i, (row, di)) in out.iter_mut().zip(dv).enumerate() {
+        for (j, (x, dj)) in row.iter_mut().zip(dv).enumerate() {
+            *x += mass * (if i == j { d2 } else { 0.0 } - di * dj);
+        }
+    }
+    out
+}
+
 /// Bodies' masses (component frame) combined in the link frame (`to_link`: component to link).
 fn inertial(masses: &[BodyMass], to_link: &Mat) -> Option<Inertial> {
     let mass: f64 = masses.iter().map(|m| m.0).sum();
@@ -845,6 +862,19 @@ mod tests {
     use std::f64::consts::FRAC_PI_2;
 
     use quick_xml::events::Event;
+
+    /// A unit cube's tensor about its centre (1/6 on the diagonal) moved to points off it: the
+    /// fallback mass of a cracked mesh is moved this way to the B-rep's centre (#216).
+    #[test]
+    fn parallel_axis_moves_a_tensor_off_the_centre() {
+        let cube = [[1.0 / 6.0, 0.0, 0.0], [0.0, 1.0 / 6.0, 0.0], [0.0, 0.0, 1.0 / 6.0]];
+        let near = |a: [[f64; 3]; 3], b: [[f64; 3]; 3]| a.iter().flatten().zip(b.iter().flatten()).all(|(x, y)| (x - y).abs() < 1e-12);
+        let up = parallel_axis(cube, 1.0, Vec3::new(0.0, 0.5, 0.0));
+        assert!(near(up, [[1.0 / 6.0 + 0.25, 0.0, 0.0], [0.0, 1.0 / 6.0, 0.0], [0.0, 0.0, 1.0 / 6.0 + 0.25]]), "{up:?}");
+        let diagonal = parallel_axis(cube, 2.0, Vec3::new(1.0, 1.0, 0.0));
+        assert!(near(diagonal, [[1.0 / 6.0 + 2.0, -2.0, 0.0], [-2.0, 1.0 / 6.0 + 2.0, 0.0], [0.0, 0.0, 1.0 / 6.0 + 4.0]]), "{diagonal:?}");
+        assert!(near(parallel_axis(cube, 3.0, Vec3::ZERO), cube));
+    }
 
     /// Rotations that stress the decomposition: general ones, gimbal lock (pitch ±90°, which a
     /// hinge whose axis lies along x gives) and next to it.
