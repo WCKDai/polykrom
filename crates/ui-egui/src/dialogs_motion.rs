@@ -275,8 +275,11 @@ pub fn study_params(s: &Session, name: &str, study: Option<&str>, steps: &str, t
     }
     let mut p = json!({"name": name, "steps": steps, "keys": keys});
     // The id as a number: a study may be named like another's id.
+    // The dialog holds the study's whole set of keys: an edit replaces them all (a track
+    // cleared in it goes).
     if let Some(st) = study {
         p["study"] = st.parse::<u64>().map_or_else(|_| json!(st), |id| json!(id));
+        p["replace_keys"] = json!(true);
     }
     Ok(p)
 }

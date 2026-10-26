@@ -1006,3 +1006,45 @@ fn an_in_context_sketch_follows_only_the_parts_it_reads() {
     assert!(std::sync::Arc::ptr_eq(&model, &s.model.state()));
     same_bodies(&s.model.state(), &rebuilt(&s));
 }
+
+/// #242: editing a study's keys changes only the keys passed. Keys on three slider joints; an
+/// edit of one joint's key leaves the other two bit for bit, and says what changed. The whole set
+/// is replaced only when asked.
+#[test]
+fn editing_a_study_changes_only_the_keys_passed() {
+    let mut s = Session::default();
+    for (name, corner) in [("A", [0, 0, 0]), ("B", [20, 0, 0]), ("C", [0, 20, 0]), ("D", [0, 0, 20])] {
+        run(&mut s, "component.activate", json!({"component": "root"}));
+        run(&mut s, "component.create", json!({"name": name}));
+        run(&mut s, "solid.box", json!({"length": 10, "width": 10, "height": 10, "corner": corner}));
+    }
+    run(&mut s, "component.activate", json!({"component": "root"}));
+    let a = occ(&s, "A");
+    run(&mut s, "occurrence.ground", json!({"occurrence": a, "grounded": true}));
+    for (name, fa, fb) in [("X", [10, 5, 5], [20, 5, 5]), ("Y", [5, 10, 5], [5, 20, 5]), ("Z", [5, 5, 10], [5, 5, 20])] {
+        run(&mut s, "joint.create", json!({"type": "slider", "a": {"face": fa}, "b": {"face": fb}, "name": name}));
+    }
+    let keys = json!([
+        {"joint": "X", "points": [[0, 0], [10, 5], [20, 0]]},
+        {"joint": "Y", "points": [[0, 0], [20, 3]]},
+        {"joint": "Z", "points": [[0, 1], [5, 2], [20, 4]]},
+    ]);
+    run(&mut s, "motion.study", json!({"name": "Walk", "steps": 20, "keys": keys}));
+    let keys_of = |s: &Session, joint: &str| {
+        let id = s.doc.assembly.joints.iter().find(|j| j.name == joint).map(|j| j.id).unwrap();
+        let m = s.doc.assembly.studies.iter().find(|m| m.name == "Walk").unwrap();
+        serde_json::to_value(m.keys.iter().filter(|k| k.joint == id).collect::<Vec<_>>()).unwrap()
+    };
+    let (y0, z0) = (keys_of(&s, "Y"), keys_of(&s, "Z"));
+    let r = run(&mut s, "motion.study", json!({"study": "Walk", "keys": [{"joint": "X", "points": [[0, 1], [20, 2]]}]}));
+    assert_eq!(r["keys"], 3, "{r}");
+    assert_eq!(r["keys_changed"], json!({"replaced": 1, "added": 0, "kept": 2, "removed": 0}), "{r}");
+    assert_eq!(keys_of(&s, "Y"), y0);
+    assert_eq!(keys_of(&s, "Z"), z0);
+    assert_eq!(keys_of(&s, "X")[0]["points"].as_array().map(Vec::len), Some(2));
+    // Replacing the whole set is asked for explicitly.
+    let r = run(&mut s, "motion.study", json!({"study": "Walk", "replace_keys": true, "keys": [{"joint": "Y", "points": [[0, 0], [20, 1]]}]}));
+    assert_eq!(r["keys"], 1, "{r}");
+    assert_eq!(r["keys_changed"], json!({"replaced": 0, "added": 1, "kept": 0, "removed": 3}), "{r}");
+    assert_eq!(keys_of(&s, "X"), json!([]));
+}
