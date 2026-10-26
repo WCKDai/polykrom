@@ -245,8 +245,10 @@ impl SavedModel {
             if info.len() != faces.len() {
                 return Err(bad("saved model: names"));
             }
-            let info = info.into_iter().map(|(aliases, bounds, verified)| FaceInfo { aliases, bounds, verified }).collect();
-            names.push(Arc::new(Names { faces: Arc::new(faces), info }));
+            let info: Vec<FaceInfo> = info.into_iter().map(|(aliases, bounds, verified)| FaceInfo { aliases, bounds, verified }).collect();
+            // Names from geometry are never verified: all verified, none were.
+            let geometric = !info.iter().all(|i| i.verified);
+            names.push(Arc::new(Names { faces: Arc::new(faces), info, geometric }));
         }
         let mut sketches = Vec::new();
         for s in list("sketches")? {

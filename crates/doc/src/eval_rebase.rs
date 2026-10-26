@@ -5,23 +5,26 @@
 //! part of a large assembly building its bodies from its own sketches. A feature whose own inputs
 //! are unchanged, and whose last evaluation started from a model that is the same as the model
 //! now in everything the feature reads, made a change to that model that it would make again:
-//! the bodies it added, the sketch it solved. That change is applied to the model as it is now
-//! instead of evaluating the feature.
+//! the bodies it added, replaced or removed, the sketch it solved, the threads it added. That
+//! change is applied to the model as it is now instead of evaluating the feature.
 //!
 //! Only what can be shown to hold is rebased; everything else is evaluated:
 //! - the feature's own inputs: its definition, the parameters it uses and the placements it reads
 //!   (the cache's local key), and the document context, are those of its last evaluation;
-//! - its kind reads no body ([`reads`]): a sketch on a fixed plane without projections, a new
-//!   body from its own sketch (not To / From Object, through all or a construction axis), a new
-//!   primitive. Never a pattern or mirror, or a feature with face references (found by name over
-//!   every body);
-//! - what it reads is the same in both models: its solved sketch; no sheet metal anywhere before it;
-//! - the change is only added: the bodies it made after all the others, named as the feature
-//!   stores them (never `BodyN` from the counter, a `(k)` number or a name the model now has), the
-//!   sketch it solved, nothing else;
-//! - its new bodies' faces are named from their own roles, named the same way however deep the
-//!   chain of features naming them is now (whose depth they take); the design has no names saved
-//!   before format 14.
+//! - its kind is one whose reads are known ([`reads`]): a sketch on a fixed plane without
+//!   projections, a new body from its own sketch or a primitive, a join or cut (its named targets,
+//!   its component's bodies, or every body when it names none, as the tool shaping then looks at
+//!   every body), a split by a fixed plane, a body transfer. Never a pattern or mirror, a feature
+//!   with face references (found by name over every body), To / From Object or a construction axis;
+//! - what it reads is the same in both models: the same bodies (shared geometry, names, key,
+//!   owner) in the same order, the same solved sketches; no sheet metal anywhere before it;
+//! - the change can be told and applied by name: bodies kept in their order, bodies it made after
+//!   them, named as the feature stores them (never `BodyN` from the counter, a `(k)` number or a
+//!   name the model now has), a cut or join making no new bodies, threads only added;
+//! - the names of the faces it made read only what it read: from the history of its operands, or
+//!   a new body's own roles, never the geometry of bodies near it; named the same way however deep
+//!   the chain of features naming them is now (whose depth they take), and the design has no names
+//!   saved before format 14.
 //!
 //! `POLYKROM_REBASE_SHADOW` (tests and diagnostics only) evaluates every rebased feature as well
 //! and compares the two. A difference is logged and counted ([`shadow_mismatches`]; a shadow run
@@ -29,29 +32,80 @@
 
 use super::*;
 
-/// The sketch feature `f` reads, when it is of a kind that may be rebased (`Some(None)`: none).
-fn reads(f: &Feature) -> Option<Option<u64>> {
-    let new = |op: &Operation, targets: &[crate::BodyName]| *op == Operation::NewBody && targets.is_empty() && f.participants.is_empty();
+/// What of the model before it a feature reads, besides its own sketches.
+enum Reads<'a> {
+    /// Nothing of the bodies.
+    Nothing,
+    /// These bodies, by name.
+    Named(Vec<&'a str>),
+    /// Its component's bodies.
+    Component,
+    /// Every body.
+    All,
+}
+
+/// Bodies named by a feature: every body for none or `*`.
+fn named(names: &[crate::BodyName]) -> Reads<'_> {
+    match names.iter().any(|n| n.0 == "*") || names.is_empty() {
+        true => Reads::All,
+        false => Reads::Named(names.iter().map(|n| n.0.as_str()).collect()),
+    }
+}
+
+/// The bodies and sketches feature `f` reads, when it is of a kind that may be rebased.
+fn reads(f: &Feature) -> Option<(Reads<'_>, Option<u64>)> {
+    // A new body from its own sketch, or a join or cut: its named targets, else every body (the
+    // tool is shaped around every body then).
+    fn solid<'a>(f: &Feature, op: &Operation, targets: &'a [crate::BodyName]) -> Option<Reads<'a>> {
+        match op {
+            Operation::NewBody => (targets.is_empty() && f.participants.is_empty()).then_some(Reads::Nothing),
+            Operation::Cut | Operation::Join => Some(named(targets)),
+            _ => None,
+        }
+    }
+    let primitive = |op: &Operation| match (op, f.participants.as_slice()) {
+        (Operation::NewBody, []) => Some(Reads::Nothing),
+        (Operation::Cut | Operation::Join, []) => Some(Reads::Component),
+        (Operation::Cut | Operation::Join, p) if p.iter().any(|n| n == "*") => Some(Reads::All),
+        (Operation::Cut | Operation::Join, p) => Some(Reads::Named(p.iter().map(String::as_str).collect())),
+        _ => None,
+    };
     if f.shell_piece_order || f.face_names.iter().any(|n| !n.is_empty()) {
         return None;
     }
     match &f.kind {
-        FeatureKind::Sketch { plane, sketch } if plane_is_fixed(plane) && sketch.links.is_empty() && sketch.wires.is_empty() => Some(None),
-        FeatureKind::Extrude { sketch, extent, operation, targets, .. }
-            if extent.to.is_none() && extent.from.is_none() && !extent.through_all && new(operation, targets) =>
-        {
-            Some(Some(sketch.0))
+        FeatureKind::Sketch { plane, sketch } if plane_is_fixed(plane) && sketch.links.is_empty() && sketch.wires.is_empty() => {
+            Some((Reads::Nothing, None))
         }
-        FeatureKind::Revolve { sketch, axis, operation, targets, to: None, .. }
-            if !matches!(axis, AxisRef::Construction { .. }) && new(operation, targets) =>
-        {
-            Some(Some(sketch.0))
+        FeatureKind::Extrude { sketch, extent, operation, targets, .. } if extent.to.is_none() && extent.from.is_none() => {
+            let new_through_all = *operation == Operation::NewBody && extent.through_all;
+            Some((solid(f, operation, targets).filter(|_| !new_through_all)?, Some(sketch.0)))
+        }
+        FeatureKind::Revolve { sketch, axis, operation, targets, to: None, .. } if !matches!(axis, AxisRef::Construction { .. }) => {
+            Some((solid(f, operation, targets)?, Some(sketch.0)))
         }
         FeatureKind::Box { operation, .. }
         | FeatureKind::Cylinder { operation, .. }
         | FeatureKind::Sphere { operation, .. }
-        | FeatureKind::Torus { operation, .. } => new(operation, &[]).then_some(None),
+        | FeatureKind::Torus { operation, .. } => Some((primitive(operation)?, None)),
+        FeatureKind::Split { body, plane, tool: None, sketch: None, line: None } if plane_is_fixed(plane) => {
+            Some((Reads::Named(vec![body.0.as_str()]), None))
+        }
+        FeatureKind::BodyTransfer { bodies, .. } => Some((named(bodies), None)),
         _ => None,
+    }
+}
+
+/// A body's faces are named from geometry only over nothing but itself: a new solid of its own.
+fn names_its_own(f: &Feature) -> bool {
+    match &f.kind {
+        FeatureKind::Box { operation, .. }
+        | FeatureKind::Cylinder { operation, .. }
+        | FeatureKind::Sphere { operation, .. }
+        | FeatureKind::Torus { operation, .. }
+        | FeatureKind::Extrude { operation, .. }
+        | FeatureKind::Revolve { operation, .. } => *operation == Operation::NewBody,
+        _ => false,
     }
 }
 
@@ -85,19 +139,39 @@ fn depth(st: &ModelState) -> usize {
     st.bodies.iter().filter_map(|b| b.names.depth()).max().unwrap_or(0)
 }
 
+/// The bodies of `st` that `reads` takes, in their order.
+fn read_bodies<'a>(doc: &Document, f: &Feature, st: &'a ModelState, reads: &Reads) -> Option<Vec<&'a ModelBody>> {
+    let mine = |b: &&ModelBody| b.component == f.component || b.feature == f.id || doc.model_body_component(b) == f.component;
+    Some(match reads {
+        Reads::Nothing => Vec::new(),
+        Reads::Named(names) => names.iter().map(|n| st.body(n)).collect::<Option<_>>()?,
+        Reads::Component => st.bodies.iter().filter(mine).collect(),
+        Reads::All => st.bodies.iter().collect(),
+    })
+}
+
+/// Whether the operands a body's faces are named from are among `read` (bodies by name).
+fn operands_read(lineage: &crate::lineage::Lineage, read: &dyn Fn(&str) -> bool) -> bool {
+    use crate::lineage::Operand;
+    lineage.operands.iter().all(|op| match op.as_ref() {
+        Operand::Body(n) | Operand::Copy { body: n, .. } | Operand::Inner(n) => read(n),
+        Operand::Stage(stage) => operands_read(&stage.lineage, read),
+        Operand::Made(_) | Operand::CopiedTool { .. } => true,
+    })
+}
+
 /// `f`'s result `after`, evaluated from `was`, as `f` would leave `now` instead: `None` when that
 /// cannot be shown (see the module notes).
-fn rebase(f: &Feature, was: &ModelState, after: &ModelState, now: &ModelState) -> Option<ModelState> {
-    let sketch = reads(f)?;
+fn rebase(doc: &Document, f: &Feature, was: &ModelState, after: &ModelState, now: &ModelState) -> Option<ModelState> {
+    let (reads, sketch) = reads(f)?;
     // Nothing either model holds that the change does not carry: sheets, construction geometry,
-    // blends, the body counter, threads.
+    // blends, the body counter; and names worked out as deep in both.
     let untouched = [was, after, now].iter().all(|s| s.sheets.is_empty())
         && after.body_counter == was.body_counter
         && after.construct == was.construct
         && after.blend_edges == was.blend_edges
         && after.fitted == was.fitted
-        && after.tapered == was.tapered
-        && after.threads == was.threads;
+        && after.tapered == was.tapered;
     // The chain of features naming what it makes is as deep as the model now makes it, named the
     // same way (past `MAX_DEPTH` by position).
     let (was_depth, now_depth) = (depth(was) + 1, depth(now) + 1);
@@ -105,32 +179,77 @@ fn rebase(f: &Feature, was: &ModelState, after: &ModelState, now: &ModelState) -
     if !untouched || (was_depth < deep) != (now_depth < deep) || !sketch.is_none_or(|id| same_sketch(was, now, id)) {
         return None;
     }
-    // Every body before it kept as it was, in its order; the new ones after them.
-    let kept = after.bodies.get(..was.bodies.len())?;
-    let made = after.bodies.get(was.bodies.len()..)?;
-    if !kept.iter().zip(&was.bodies).all(|(a, b)| same_body(a, b)) {
+    let (old, new) = (read_bodies(doc, f, was, &reads)?, read_bodies(doc, f, now, &reads)?);
+    if old.len() != new.len() || !old.iter().zip(&new).all(|(a, b)| same_body(a, b)) {
         return None;
     }
-    // New bodies take the names the feature stores, in order, free in the model now, named at
-    // the depth the feature made them.
-    let named = made.iter().enumerate().all(|(k, b)| {
-        f.body_names.get(k).is_some_and(|n| !n.trim().is_empty() && *n == b.name) && now.body(&b.name).is_none() && b.names.depth() == Some(was_depth)
+    let read = |n: &str| matches!(reads, Reads::All) || old.iter().any(|b| b.name == n);
+    // The bodies before and after, by name: kept in their order, changed in place, gone, or made
+    // after all of them.
+    let position: std::collections::HashMap<&str, usize> = was.bodies.iter().enumerate().map(|(i, b)| (b.name.as_str(), i)).collect();
+    if position.len() != was.bodies.len() {
+        return None;
+    }
+    let (mut last, mut changed, mut made) = (None, std::collections::HashMap::new(), Vec::new());
+    for b in &after.bodies {
+        match position.get(b.name.as_str()) {
+            Some(i) if made.is_empty() && last.is_none_or(|l| *i > l) => {
+                last = Some(*i);
+                if !was.bodies.get(*i).is_some_and(|w| same_body(w, b)) {
+                    changed.insert(b.name.as_str(), b);
+                }
+            }
+            Some(_) => return None,
+            None => made.push(b),
+        }
+    }
+    let kept: std::collections::HashSet<&str> = after.bodies.iter().map(|b| b.name.as_str()).collect();
+    let gone: Vec<&str> = was.bodies.iter().map(|b| b.name.as_str()).filter(|n| !kept.contains(n)).collect();
+    let boolean = matches!(&f.kind, FeatureKind::Extrude { operation, .. } | FeatureKind::Revolve { operation, .. } | FeatureKind::Box { operation, .. }
+        | FeatureKind::Cylinder { operation, .. } | FeatureKind::Sphere { operation, .. } | FeatureKind::Torus { operation, .. } if *operation != Operation::NewBody);
+    // New bodies take the names the feature stores, in order, free in the model now.
+    let named = made
+        .iter()
+        .enumerate()
+        .all(|(k, b)| f.body_names.get(k).is_some_and(|n| !n.trim().is_empty() && *n == b.name) && now.body(&b.name).is_none());
+    if (boolean && !made.is_empty()) || !named || !changed.keys().chain(&gone).all(|n| read(n)) {
+        return None;
+    }
+    // The names of what it made read only what it read.
+    let transfer = matches!(f.kind, FeatureKind::BodyTransfer { .. });
+    let names_read = changed.values().chain(&made).all(|b| {
+        transfer
+            || (b.names.depth() == Some(was_depth)
+                && b.lineage().is_none_or(|l| operands_read(&l, &read))
+                && (names_its_own(f) || !crate::naming::names(b).geometric))
     });
+    // Threads only added, none on a body the feature removes.
+    let threads = after.threads.strip_prefix(was.threads.as_slice())?;
+    if !names_read || now.threads.iter().any(|t| gone.contains(&t.body.as_str())) {
+        return None;
+    }
     // The sketch it solved, after the others.
     let others: Vec<&Arc<SolvedSketch>> = was.sketches.iter().filter(|s| s.feature != f.id).collect();
     let solved = after.sketches.get(others.len()..)?;
-    if !named || !others.iter().zip(&after.sketches).all(|(a, b)| Arc::ptr_eq(a, b)) || solved.iter().any(|s| s.feature != f.id) {
+    if !others.iter().zip(&after.sketches).all(|(a, b)| Arc::ptr_eq(a, b)) || solved.iter().any(|s| s.feature != f.id) {
         return None;
     }
-    let deepened = |b: &ModelBody| match now_depth == was_depth {
+    let deepened = |b: &ModelBody| match transfer || now_depth == was_depth {
         true => b.clone(),
         false => ModelBody { names: b.names.at_depth(now_depth), ..b.clone() },
     };
     let mut st = now.clone();
-    for b in &mut st.bodies {
-        b.made = crate::lineage::Made::Before;
-    }
-    st.bodies.extend(made.iter().map(deepened));
+    st.bodies = now
+        .bodies
+        .iter()
+        .filter(|b| !gone.contains(&b.name.as_str()))
+        .map(|b| match changed.get(b.name.as_str()) {
+            Some(c) => deepened(c),
+            None => ModelBody { made: crate::lineage::Made::Before, ..b.clone() },
+        })
+        .chain(made.into_iter().map(deepened))
+        .collect();
+    st.threads.extend_from_slice(threads);
     st.sketches.retain(|s| s.feature != f.id);
     st.sketches.extend(solved.iter().cloned());
     match after.sketch_keys.get(&f.id) {
@@ -153,11 +272,11 @@ impl<'a> Previous<'a> {
 
     /// Feature `f` (`local`: its own inputs, as the cache keys them) rebased onto `now`: the state
     /// and its last result (for its warnings and time).
-    pub(super) fn rebase(&self, f: &Feature, local: u64, now: &ModelState) -> Option<(ModelState, &'a FeatureResult)> {
+    pub(super) fn rebase(&self, doc: &Document, f: &Feature, local: u64, now: &ModelState) -> Option<(ModelState, &'a FeatureResult)> {
         let i = *self.at.get(&f.id)?;
         let old = self.results.get(i).filter(|r| r.local == local && r.local != 0 && !r.skipped && !r.stale && !r.unkept && r.error.is_none())?;
         let was = self.results.get(..i)?.iter().rev().find(|r| !r.skipped).filter(|r| !r.unkept && !r.stale)?;
-        Some((rebase(f, &was.state, &old.state, now)?, old))
+        Some((rebase(doc, f, &was.state, &old.state, now)?, old))
     }
 }
 

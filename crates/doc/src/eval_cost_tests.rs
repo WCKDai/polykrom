@@ -433,7 +433,7 @@ fn assert_full_evaluation(doc: &Document, model: &Model) {
 }
 
 #[test]
-fn an_edit_in_one_library_part_rebases_the_new_bodies_after_it() {
+fn an_edit_in_one_library_part_rebases_the_parts_after_it() {
     let mut doc = Document::new("library parts");
     let unused = doc.add_feature(line_sketch(PlaneRef::Origin { name: "XZ".into() }, Vec2::new(5.0, 5.0)), None).unwrap();
     let parts = 4;
@@ -446,22 +446,67 @@ fn an_edit_in_one_library_part_rebases_the_new_bodies_after_it() {
     assert!(model.results.iter().all(|r| r.error.is_none()), "{:?}", model.results.iter().find(|r| r.error.is_some()));
     assert_eq!(model.state().bodies.len(), parts * 3);
 
-    // The first part's plate made thicker: that plate is evaluated again, and every feature that
-    // reads a body (each part's cuts and split); the sketches, plates and pins are rebased.
+    // The first part's plate made thicker: that part is evaluated again, and the socket cut of
+    // every other part (its tool is shaped around every body) with the split of what it cut; the
+    // rest is rebased.
     let FeatureKind::Extrude { extent, .. } = &mut doc.feature_mut(first).unwrap().kind else { panic!("extrude") };
     extent.distance = "5".into();
     model.evaluate(&doc);
-    assert_eq!(evaluated(&model), 1 + 3 * parts, "rebased {}", model.last_rebased);
+    assert_eq!(evaluated(&model), 4 + 2 * (parts - 1), "rebased {}", model.last_rebased);
     // The two features before the edit are taken as they were.
     assert_eq!(model.last_rebased, doc.features.len() - 2 - evaluated(&model));
     assert_full_evaluation(&doc, &model);
     assert!((volume(&model, "Pin 0") - 24.0).abs() < 1e-9);
 
-    // An edit before every part: the same.
+    // A change that leaves every body as it was rebases even the socket cuts.
     let Ok(sketch) = doc.sketch_mut(unused) else { panic!("sketch") };
     sketch.points[1].pos = Vec2::new(6.0, 5.0);
     model.evaluate(&doc);
-    assert_eq!((evaluated(&model), model.last_rebased), (1 + 3 * parts, doc.features.len() - 1 - 3 * parts));
+    assert_eq!((evaluated(&model), model.last_rebased), (1, doc.features.len() - 1));
+    assert_full_evaluation(&doc, &model);
+}
+
+#[test]
+fn a_cut_named_from_the_geometry_around_it_is_evaluated_again() {
+    let mut doc = Document::new("dimples");
+    let unused = doc.add_feature(line_sketch(PlaneRef::Origin { name: "XZ".into() }, Vec2::new(5.0, 5.0)), None).unwrap();
+    let mut add = |kind: FeatureKind, names: &[&str], participants: &[&str]| {
+        let id = doc.add_feature(kind, None).unwrap();
+        let f = doc.feature_mut(id).unwrap();
+        f.body_names = names.iter().map(|n| n.to_string()).collect();
+        f.participants = participants.iter().map(|n| n.to_string()).collect();
+        id
+    };
+    let block = |x: f64, operation| FeatureKind::Box {
+        corner: point_expr(Vec3::new(x, 0.0, 0.0)),
+        length: "10".into(),
+        width: "10".into(),
+        height: "4".into(),
+        operation,
+    };
+    add(block(0.0, Operation::NewBody), &["A"], &[]);
+    add(block(20.0, Operation::NewBody), &["B"], &[]);
+    // A sphere's faces have no roles: those it leaves in the cut are named from the geometry of
+    // the bodies near them, which the cut does not read.
+    let dimple =
+        add(FeatureKind::Sphere { center: point_expr(Vec3::new(5.0, 5.0, 4.0)), radius: "2".into(), operation: Operation::Cut }, &[], &["A"]);
+    let bore = FeatureKind::Box {
+        corner: point_expr(Vec3::new(24.0, 4.0, -1.0)),
+        length: "2".into(),
+        width: "2".into(),
+        height: "6".into(),
+        operation: Operation::Cut,
+    };
+    add(bore, &[], &["B"]);
+    let mut model = Model::new();
+    model.evaluate(&doc);
+    assert!(model.results.iter().all(|r| r.error.is_none()), "{:?}", model.results.iter().find(|r| r.error.is_some()));
+    assert!(crate::naming::names(model.result(dimple).unwrap().state.body("A").unwrap()).geometric);
+    // An edit before them, which changes no body: the dimple is evaluated again, the bore rebased.
+    let Ok(sketch) = doc.sketch_mut(unused) else { panic!("sketch") };
+    sketch.points[1].pos = Vec2::new(6.0, 5.0);
+    model.evaluate(&doc);
+    assert_eq!((evaluated(&model), model.last_rebased), (2, doc.features.len() - 2));
     assert_full_evaluation(&doc, &model);
 }
 
