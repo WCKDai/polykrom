@@ -188,7 +188,7 @@ fn delete(s: &mut Session, p: &Value) -> Result<Value> {
 
 /// The features that worked (`worked`) and fail now: `[{feature, error}]`.
 pub(super) fn newly_failing(s: &Session, worked: &std::collections::BTreeSet<u64>) -> Vec<Value> {
-    s.model
+    whole_history(s)
         .results
         .iter()
         .filter(|r| worked.contains(&r.id))
@@ -199,7 +199,20 @@ pub(super) fn newly_failing(s: &Session, worked: &std::collections::BTreeSet<u64
 /// The features that work now (before a delete), for [`settle_tool_features`] and
 /// [`newly_failing`] after it.
 pub(super) fn working_features(s: &Session) -> std::collections::BTreeSet<u64> {
-    s.model.results.iter().filter(|r| r.error.is_none() && !r.skipped).map(|r| r.id).collect()
+    whole_history(s).results.iter().filter(|r| r.error.is_none() && !r.skipped).map(|r| r.id).collect()
+}
+
+/// The session's model with the whole history evaluated: with the history rolled back, a copy
+/// evaluated past the marker (sharing the cache), so a feature after it counts too (#3471).
+fn whole_history(s: &Session) -> std::borrow::Cow<'_, solidcraft_doc::Model> {
+    if s.doc.marker.is_none() {
+        return std::borrow::Cow::Borrowed(&s.model);
+    }
+    let mut doc = (*s.doc).clone();
+    doc.marker = None;
+    let mut model = s.model.clone();
+    model.evaluate(&doc);
+    std::borrow::Cow::Owned(model)
 }
 
 /// After a delete (#241): a join, cut or intersect that worked (`worked`) and now fails because a
@@ -209,11 +222,13 @@ pub(super) fn working_features(s: &Session) -> std::collections::BTreeSet<u64> {
 pub(super) fn settle_tool_features(s: &mut Session, worked: &std::collections::BTreeSet<u64>) -> Vec<Value> {
     let mut done = Vec::new();
     for _ in 0..16 {
-        let broken: Vec<u64> = s.model.results.iter().filter(|r| worked.contains(&r.id) && r.error.is_some()).map(|r| r.id).collect();
+        // A feature after a rolled-back marker is settled too.
+        let model = whole_history(s).into_owned();
+        let broken: Vec<u64> = model.results.iter().filter(|r| worked.contains(&r.id) && r.error.is_some()).map(|r| r.id).collect();
         let mut changed = false;
         for id in broken {
             let Some(FeatureKind::Combine { target, tools, .. }) = s.doc.feature(id).map(|f| f.kind.clone()) else { continue };
-            let before = s.model.state_before(id);
+            let before = model.state_before(id);
             if before.body(&target).is_none() {
                 continue;
             }

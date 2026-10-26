@@ -188,6 +188,8 @@ fn apply(s: &mut Session, p: &Value) -> Result<Value> {
         return Err(bad(cmd, skipped.first().cloned().unwrap_or_else(|| "nothing to delete".into())));
     }
     s.refresh();
+    // A feature settled by one step and deleted by a later one is not reported.
+    tool_features.retain(|t| t.get("feature").and_then(Value::as_str).is_some_and(|n| s.doc.find_feature(n).is_some()));
     let deleted: Vec<&String> = features_before.iter().filter(|(id, _)| s.doc.feature(*id).is_none()).map(|(_, n)| n).collect();
     // Features after a rolled-back marker count too (#3471).
     let would_fail: Vec<String> =
@@ -473,5 +475,29 @@ mod tests {
         let r = run(&mut s, "selection.delete", json!({"components": ["Fastener"]}));
         assert_eq!(r["tool_features"], dry["tool_features"], "{r}");
         assert!(errors(&s).is_empty(), "{:?}", errors(&s));
+        // With the history rolled back to before the cut, the cut is settled too.
+        let mut s = Session::default();
+        run(&mut s, "solid.box", json!({"length": 40, "width": 20, "height": 5, "body_name": "Plate"}));
+        run(&mut s, "solid.cylinder", json!({"base": [10, 10, -5], "radius": 2, "height": 20, "body_name": "Screw", "name": "ScrewFeature"}));
+        run(&mut s, "solid.box", json!({"length": 5, "width": 5, "height": 5, "corner": [60, 0, 0], "body_name": "Spacer", "name": "SpacerFeature"}));
+        run(&mut s, "solid.combine", json!({"target": "Plate", "tools": ["Screw"], "operation": "cut", "keep_tools": true, "name": "Cut"}));
+        run(&mut s, "timeline.roll_to", json!({"feature": "SpacerFeature"}));
+        let r = run(&mut s, "timeline.delete", json!({"feature": "ScrewFeature"}));
+        assert_eq!(r["tool_features"], json!([{"feature": "Cut", "suppressed": true, "tools_removed": ["Screw"]}]), "{r}");
+        run(&mut s, "timeline.roll_to", json!({}));
+        assert!(errors(&s).is_empty(), "{:?}", errors(&s));
+        // A cut deleted with its component in the same command is not reported as settled.
+        let mut s = Session::default();
+        run(&mut s, "solid.cylinder", json!({"base": [10, 10, -5], "radius": 2, "height": 20, "body_name": "Screw", "name": "ScrewFeature"}));
+        run(&mut s, "component.create", json!({"name": "Part"}));
+        run(&mut s, "solid.box", json!({"length": 40, "width": 20, "height": 5, "body_name": "Plate"}));
+        run(&mut s, "solid.combine", json!({"target": "Plate", "tools": ["Screw"], "operation": "cut", "keep_tools": true, "name": "Cut"}));
+        run(&mut s, "component.activate", json!({"component": "root"}));
+        let screw = s.doc.find_feature("ScrewFeature").unwrap().id;
+        for dry_run in [true, false] {
+            let r = run(&mut s, "selection.delete", json!({"items": [{"type": "feature", "id": screw}], "components": ["Part"], "dry_run": dry_run}));
+            assert_eq!(r["tool_features"], json!([]), "{r}");
+        }
+        assert!(s.doc.find_feature("Cut").is_none());
     }
 }
