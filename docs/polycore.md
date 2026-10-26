@@ -24,5 +24,4 @@ accepted on 2026-10-26. In short:
 - **Test models:** our own cases, plus permissively licensed models made in open tools. No models
   made in commercial CAD.
 
-The kernel stages K0–K7 in [ENGINES.md](ENGINES.md) are unchanged; the RFC says how the code
-gets there.
+The RFC says how the code gets through the kernel stages K0–K7 in [ENGINES.md](ENGINES.md).
