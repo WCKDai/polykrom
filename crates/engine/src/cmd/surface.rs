@@ -51,7 +51,7 @@ pub static COMMANDS: &[CommandSpec] = &[
     CommandSpec::new("surface.loft", "Surface Loft", surface_loft)
         .at("SURFACE", "CREATE")
         .icon("surface_loft")
-        .params("sections: [{sketch, curves?: [curve ids], profiles?} | {body, edges: [[x,y,z]]}] (2…50 in order; each one chain: a profile without holes, or curves meeting end to end; all open or all closed; a body edge chain takes the face the chain bounds as the surface the end repeats); continuity?: [g0|g1|g2|g3, g0|g1|g2|g3] (each end, default g0: how much of the surface at the first and last section the loft repeats — the tangent plane, the curvature, or how that curvature changes); crown?: [number, number] (default 0: how full each end leaves, -0.9 flattest to 3 fullest); rails?, rail_fit? (as solid.loft; sketch sections only, both ends g0); name?, body_name? (a surface body: ruled between two sections, smooth through three or more; no caps)"),
+        .params("sections: [{sketch, curves?: [curve ids], profiles?} (neither: the sketch's profiles, or in a sketch without one its drawn curves) | {body, edges: [[x,y,z]]}] (2…50 in order; each one chain: a profile without holes, or curves meeting end to end; all open or all closed; a body edge chain takes the face the chain bounds as the surface the end repeats); continuity?: [g0|g1|g2|g3, g0|g1|g2|g3] (each end, default g0: how much of the surface at the first and last section the loft repeats — the tangent plane, the curvature, or how that curvature changes); crown?: [number, number] (default 0: how full each end leaves, -0.9 flattest to 3 fullest); rails?, rail_fit? (as solid.loft; sketch sections only, both ends g0); name?, body_name? (a surface body: ruled between two sections, smooth through three or more; no caps)"),
     CommandSpec::new("surface.offset", "Offset Surface", offset)
         .at("SURFACE", "CREATE")
         .icon("surface_offset")
@@ -1030,6 +1030,21 @@ mod tests {
         assert!(
             s.execute("surface.loft", &json!({"sections": [{"sketch": "A", "curves": ["a", "apart"]}, {"sketch": "B", "curves": ["b"]}]})).is_err()
         );
+        // A sketch with no profile and one open curve is that curve without naming it (it was
+        // refused as "has no closed profiles", #195); two separate curves are still refused.
+        run(&mut s, "sketch.create", json!({"plane": "XY", "name": "C"}));
+        run(&mut s, "sketch.line", json!({"points": [[0, 0], [10, 0]]}));
+        run(&mut s, "sketch.finish", json!({}));
+        run(&mut s, "sketch.create", json!({"plane": "Mid", "name": "D"}));
+        run(&mut s, "sketch.line", json!({"points": [[0, 0], [10, 0]]}));
+        run(&mut s, "sketch.finish", json!({}));
+        run(&mut s, "surface.loft", json!({"sections": [{"sketch": "C"}, {"sketch": "D"}], "body_name": "Bare"}));
+        assert!((area(&s, "Bare") - 50.0).abs() < 1e-6, "{}", area(&s, "Bare"));
+        run(&mut s, "sketch.create", json!({"plane": "XY", "offset": 10, "name": "E"}));
+        run(&mut s, "sketch.line", json!({"points": [[0, 0], [10, 0]]}));
+        run(&mut s, "sketch.line", json!({"points": [[0, 3], [10, 3]]}));
+        run(&mut s, "sketch.finish", json!({}));
+        assert!(s.execute("surface.loft", &json!({"sections": [{"sketch": "D"}, {"sketch": "E"}]})).is_err());
     }
 
     /// Each wall of a surface built from sketch curves is named after the curve it comes from,
