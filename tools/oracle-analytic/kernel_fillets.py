@@ -44,6 +44,21 @@ def offset_loft():
     return loft - a * (l0 - 2 * math.pi * xb)
 
 
+def flared_tray():
+    """126-fillet-flared-loft-corner-arcs-equal-to-setback: 40x30 r2 lofted to the same offset out
+    by 20 at z 20 (walls at 45 deg), R = 2 + 2 sqrt 2, whose setback r tan(22.5 deg) is the arcs' 2."""
+    r = 2 * (1 + math.sqrt(2))
+    a, xb = corner_section(math.radians(135), r)
+    a0, l0 = 1200 - 4 * (4 - math.pi), 124 + 4 * math.pi
+    return 20 * a0 + 200 * l0 + 8000 * math.pi / 3 - a * (l0 - 2 * math.pi * xb)
+
+
+def all_edges_box():
+    """126-fillet-all-twelve-box-edges-r2: the 36 x 26 x 16 inner box grown by the ball r 2."""
+    r, a, b, c = 2.0, 36.0, 26.0, 16.0
+    return a * b * c + 2 * r * (a * b + b * c + c * a) + math.pi * r * r * (a + b + c) + 4 / 3 * math.pi * r ** 3
+
+
 def frustum():
     """126-fillet-revolved-frustum-bottom-circle: r 20 to 15 over 30, R4 (Pappus)."""
     a, xb = corner_section(math.atan2(30, 5), 4)
@@ -186,6 +201,8 @@ def elliptic_loft(a0, b0, a1, b1, height, r, nt, nl, ns):
 if __name__ == "__main__":
     print(f"126-fillet-loft-bottom-chain-constant-slope  {offset_loft():.4f}")
     print(f"126-fillet-revolved-frustum-bottom-circle    {frustum():.4f}")
+    print(f"126-fillet-flared-loft-corner-arcs-equal-to-setback  {flared_tray():.4f}")
+    print(f"126-fillet-all-twelve-box-edges-r2           {all_edges_box():.4f}")
     print(f"126-fillet-cylinder-sloped-top-rim           {sloped_cylinder(*((360, 80) if FINE else (90, 20))):.4f}")
     res = (90, 8000, 2880) if FINE else (45, 500, 720)
     loft, removed = elliptic_loft(20, 20, 15, 15, 30, 4, *res)
