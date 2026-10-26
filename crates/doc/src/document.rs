@@ -1521,6 +1521,11 @@ pub enum FeatureKind {
         /// Sew the blend onto its two bodies where the boundaries meet.
         #[serde(default, skip_serializing_if = "std::ops::Not::not")]
         stitch: bool,
+        /// How fast each end leaves its boundary, as a share of the chord across: [from, to]. A
+        /// blend saved without it keeps the third it was built with
+        /// (`kernel::LEGACY_BLEND_TANGENT`); new blends save `kernel::BLEND_TANGENT`.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        tangent: Option<[f64; 2]>,
     },
     /// One surface patch through a network of two to four boundary curves of a sketch
     /// (`surface.boundary`, issue #763): the patch runs through the curves in loop order and leaves
