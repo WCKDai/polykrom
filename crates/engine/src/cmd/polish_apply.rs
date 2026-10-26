@@ -10,7 +10,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use serde_json::{Map, Value, json};
 
 use super::CommandSpec;
-use crate::params::{bad, num, string_list};
+use crate::params::{bad, num};
 use crate::{Result, Session};
 
 pub static COMMANDS: &[CommandSpec] = &[CommandSpec::new("polish.apply", "Apply Polish", apply).icon("polish").params(
@@ -26,6 +26,21 @@ pub static COMMANDS: &[CommandSpec] = &[CommandSpec::new("polish.apply", "Apply 
 
 /// The inspect.polish parameters a run passes on.
 const PASSED: [&str; 4] = ["bodies", "printed", "skip", "sharp_deg"];
+/// The categories inspect.polish reports.
+const CATEGORIES: [&str; 6] = ["look", "print", "strength", "mass", "tidy", "assembly"];
+
+/// A list of strings parameter (`None`: not given); anything else in it is refused, so a
+/// malformed selection never widens to every fix.
+fn strings(p: &Value, k: &str, cmd: &str) -> Result<Vec<String>> {
+    match p.get(k).filter(|v| !v.is_null()) {
+        None => Ok(Vec::new()),
+        Some(Value::Array(a)) => {
+            a.iter().map(|v| v.as_str().map(str::to_string).ok_or_else(|| bad(cmd, format!("`{k}` must list strings")))).collect()
+        }
+        Some(_) => Err(bad(cmd, format!("`{k}` must be a list of strings"))),
+    }
+}
+
 /// How far a fix may lower a body's score (rounding) or deepen a clash (mm) and still stay.
 const SCORE_SLACK: f64 = 0.5;
 const DEPTH_SLACK: f64 = 0.05;
@@ -54,7 +69,10 @@ fn apply(s: &mut Session, p: &Value) -> Result<Value> {
     ask.insert("max_fixes".into(), json!(max));
     let ask = Value::Object(ask);
     let before = s.execute("inspect.polish", &ask)?;
-    let (ids, categories) = (string_list(p, "fixes"), string_list(p, "categories"));
+    let (ids, categories) = (strings(p, "fixes", cmd)?, strings(p, "categories", cmd)?);
+    if let Some(c) = categories.iter().find(|c| !CATEGORIES.contains(&c.as_str())) {
+        return Err(bad(cmd, format!("unknown category `{c}` ({})", CATEGORIES.join(", "))));
+    }
     let all = before["fixes"].as_array().cloned().unwrap_or_default();
     if let Some(missing) = ids.iter().find(|id| !all.iter().any(|f| f["id"] == id.as_str())) {
         return Err(bad(cmd, format!("no fix `{missing}` (inspect.polish lists them)")));
@@ -68,7 +86,6 @@ fn apply(s: &mut Session, p: &Value) -> Result<Value> {
     // The whole run is one undo step: the fixes run with the history set aside, so they neither
     // add steps nor push the oldest ones out, and the outer command records the one step.
     let (history, redo) = (std::mem::take(&mut s.undo), std::mem::take(&mut s.redo));
-    let mut failure = None;
     let (mut applied, mut skipped) = (Vec::new(), Vec::new());
     let mut changed: BTreeSet<String> = BTreeSet::new();
     for fix in chosen {
@@ -91,7 +108,8 @@ fn apply(s: &mut Session, p: &Value) -> Result<Value> {
         // own frame that a command run on its own gets: map them here.
         let params = crate::frames::to_local(s, &command, &params).unwrap_or(params);
         let was = state(s, &ask, &body);
-        let mark = s.checkpoint();
+        // A mark of polish.apply's own, so the session's checkpoints are left as they are.
+        let mark = s.mark();
         let (why, now) = match s.execute(&command, &params) {
             Err(e) => (Some(format!("refused: {e}")), None),
             Ok(_) => {
@@ -101,14 +119,10 @@ fn apply(s: &mut Session, p: &Value) -> Result<Value> {
         };
         match why {
             Some(reason) => {
-                if let Err(e) = s.restore_checkpoint(mark) {
-                    failure = Some(e);
-                    break;
-                }
+                s.go_back(mark);
                 skip(reason);
             }
             None => {
-                s.drop_checkpoint(mark);
                 applied.push(
                     json!({"id": fix["id"], "body": body, "command": command, "params": params, "score_before": was.score, "score_after": now}),
                 );
@@ -117,9 +131,6 @@ fn apply(s: &mut Session, p: &Value) -> Result<Value> {
         }
     }
     (s.undo, s.redo) = (history, redo);
-    if let Some(e) = failure {
-        return Err(e);
-    }
     let after = s.execute("inspect.polish", &ask)?;
     let rank = |v: &Value| match v["severity"].as_str() {
         Some("high") => 0,
@@ -179,11 +190,14 @@ fn state(s: &mut Session, ask: &Value, body: &str) -> State {
     let me = st.body(body);
     let volume = me.and_then(|b| solidcraft_kernel::measure(&b.body).ok()).map(|m| m.volume);
     let invalid = me.map_or(usize::MAX, |b| b.body.validity().len());
-    // The neighbours: bodies whose boxes come within a millimetre.
-    let mut around = vec![body.to_string()];
-    if let Some(b) = me {
+    // Every placement of the body's part (a fix changes them all) and the bodies whose boxes
+    // come within a millimetre of one.
+    let placements: Vec<&solidcraft_doc::ModelBody> =
+        me.map(|m| st.bodies.iter().filter(|o| o.definition_name() == m.definition_name()).collect()).unwrap_or_default();
+    let mut around: BTreeSet<String> = std::iter::once(body.to_string()).chain(placements.iter().map(|o| o.name.clone())).collect();
+    for b in &placements {
         let bx = b.mesh().bounds().inflated(1.0);
-        around.extend(st.bodies.iter().filter(|o| o.name != body && o.mesh().bounds().meets(&bx)).map(|o| o.name.clone()));
+        around.extend(st.bodies.iter().filter(|o| o.mesh().bounds().meets(&bx)).map(|o| o.name.clone()));
     }
     let joint_errors = if s.doc.assembly.joints.is_empty() { 0 } else { solidcraft_doc::joints::solve(&s.doc, &s.model.state()).errors.len() };
     let clashes = s
@@ -216,6 +230,10 @@ fn worse(was: &State, now: &State, mass_tol: f64) -> Option<String> {
     }
     if let Some(((a, b), _)) = now.clashes.iter().find(|(k, d)| was.clashes.get(*k).is_none_or(|w| **d > w + DEPTH_SLACK)) {
         return Some(format!("{a} and {b} interfere"));
+    }
+    // What can't be measured after the fix isn't known to be fine.
+    if now.volume.is_none() || now.score.is_none() {
+        return Some("the body could not be measured after the fix".into());
     }
     match (was.score, now.score) {
         (Some(a), Some(b)) if b < a - SCORE_SLACK => Some(format!("the score fell from {a} to {b}")),
