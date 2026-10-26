@@ -1900,6 +1900,56 @@ mod tests {
         }
     }
 
+    /// A handle meets a bottle: a revolved spline sheet with a hole trimmed through its near side
+    /// by a sketch circle, and a tube standing off it along the hole's axis. The hole's edges are
+    /// traced across the revolved faces, about a micron off them, and the blend found no face
+    /// holding them; then the direction towards the tube was the sheet's normal there, which no
+    /// face holds (#195). It now leaves the hole straight across its edge, as the sheet goes on.
+    #[test]
+    fn surface_blend_reaches_a_hole_trimmed_into_a_revolved_sheet() {
+        let mut s = Session::default();
+        run(&mut s, "sketch.create", json!({"plane": {"origin": [0, 0, 0], "x_dir": [1, 0, 0], "y_dir": [0, 0, 1]}, "name": "Profile"}));
+        run(&mut s, "sketch.spline.fit_point", json!({"points": [[30, 0], [32, 30], [30, 60], [20, 85], [12, 100], [12, 115]]}));
+        run(&mut s, "sketch.finish", json!({}));
+        run(&mut s, "surface.revolve", json!({"sketch": "Profile", "curves": ["s1"], "axis": "Z", "body_name": "Bottle"}));
+        run(&mut s, "sketch.create", json!({"plane": {"origin": [0, 0, 0], "x_dir": [0, 1, 0], "y_dir": [0, 0, 1]}, "name": "Hole"}));
+        run(&mut s, "sketch.circle.center", json!({"center": [0, 25], "radius": 7}));
+        run(&mut s, "sketch.finish", json!({}));
+        run(&mut s, "surface.trim", json!({"body": "Bottle", "curves": {"sketch": "Hole"}, "keep": [[-30, 0, 40]]}));
+        run(&mut s, "sketch.create", json!({"plane": {"origin": [45, 0, 0], "x_dir": [0, 1, 0], "y_dir": [0, 0, 1]}, "name": "Peg"}));
+        run(&mut s, "sketch.circle.center", json!({"center": [0, 25], "radius": 5}));
+        run(&mut s, "sketch.finish", json!({}));
+        run(&mut s, "surface.extrude", json!({"sketch": "Peg", "distance": 10, "body_name": "Peg"}));
+        // The hole's rim: the bottle's boundary edges near the hole (its other boundaries are the
+        // base and the neck).
+        let hole: Vec<Value> = {
+            let st = s.world_state();
+            let edges = st.body("Bottle").unwrap().body.edges(0.01).unwrap();
+            edges
+                .iter()
+                .map(|e| e.mid)
+                .filter(|m| m.x > 20.0 && (m.z - 25.0).abs() < 8.0 && m.y.abs() > 0.01)
+                .map(|m| json!([m.x, m.y, m.z]))
+                .collect()
+        };
+        assert_eq!(hole.len(), 4, "the hole's rim crosses the bottle's faces in four edges: {hole:?}");
+        let r = run(
+            &mut s,
+            "surface.blend",
+            json!({"from": {"body": "Peg", "edges": [[45, 0, 30], [45, 0, 20]]}, "to": {"body": "Bottle", "edges": hole}, "continuity": ["g1", "g1"], "body_name": "Neck"}),
+        );
+        assert_eq!(r["created_bodies"], json!(["Neck"]), "{r}");
+        // The boundary is a cubic through the stations on the rims; between them it strays by
+        // the interpolation error (0.014 mm here, with the tube's rim 31 mm round).
+        let gap = blend_gap(&r);
+        assert!(gap < 0.02, "the blend's boundary strays {gap} mm from the rims: {r}");
+        // A tube's rim (radius 5) to the hole (radius 7) 13 to 15 mm away: a short flared neck,
+        // near the straight frustum between the two (π·12·13).
+        let a = area(&s, "Neck");
+        let straight = std::f64::consts::PI * (5.0 + 7.0) * 13.0;
+        assert!((a - straight).abs() < straight * 0.25, "{a} vs {straight}");
+    }
+
     /// A tube whose top face is taken off (`surface.unstitch`), and points round its rim.
     fn open_tube() -> (Session, Value) {
         let mut s = Session::default();
