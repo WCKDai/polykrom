@@ -1169,30 +1169,30 @@ static SHOT: AtomicU64 = AtomicU64::new(0);
 fn polish(b: &mut dyn Backend, a: &Map<String, Value>) -> Result<Value, String> {
     let categories: Vec<&str> =
         a.get("categories").and_then(Value::as_array).map(|v| v.iter().filter_map(Value::as_str).collect()).unwrap_or_default();
+    let wanted = |v: &Value| categories.is_empty() || categories.iter().any(|c| v["category"] == *c);
     let mut out = match str_arg(a, "apply").unwrap_or("none") {
         "safe" => exec(b, "polish.apply", pick(a, &["bodies", "categories", "printed", "skip", "max_fixes"]))?,
         "none" => {
             let r = exec(b, "inspect.polish", pick(a, &["bodies", "printed", "skip", "max_fixes"]))?;
-            let fixes: Vec<Value> = r["fixes"]
-                .as_array()
-                .into_iter()
-                .flatten()
-                .filter(|f| categories.is_empty() || categories.iter().any(|c| f["category"] == *c))
-                .cloned()
-                .collect();
             let findings: Vec<Value> = r["bodies"]
                 .as_array()
                 .into_iter()
                 .flatten()
                 .flat_map(|body| body["findings"].as_array().into_iter().flatten().map(move |f| json!({"body": body["body"], "category": f["category"], "severity": f["severity"], "kind": f["kind"], "message": f["message"]})))
-                .filter(|f| categories.is_empty() || categories.iter().any(|c| f["category"] == *c))
+                .chain(r["assembly"].as_array().into_iter().flatten().cloned())
                 .take(50)
                 .collect();
             let score = json!({"score": r["score"], "scores": r["scores"]});
-            json!({"before": score, "after": score, "applied": [], "skipped": [], "fixes": fixes, "recommendations": findings, "bodies": r["bodies"]})
+            json!({"before": score, "after": score, "applied": [], "skipped": [], "fixes": r["fixes"], "recommendations": findings, "bodies": r["bodies"]})
         }
         other => return Err(format!("`apply` is safe or none, not `{other}`")),
     };
+    // Only the categories asked for, whichever way the pass ran.
+    for k in ["fixes", "recommendations", "applied", "skipped"] {
+        if let Some(list) = out.get_mut(k).and_then(Value::as_array_mut) {
+            list.retain(|v| v.get("category").is_none() || wanted(v));
+        }
+    }
     if a.get("views").and_then(Value::as_bool).unwrap_or(false) {
         let dir = crate::scratch_dir().unwrap_or_else(vfs::temp_dir);
         let n = SHOT.fetch_add(1, Ordering::Relaxed);

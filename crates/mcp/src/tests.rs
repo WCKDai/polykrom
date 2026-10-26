@@ -2239,3 +2239,24 @@ fn polish_measures_applies_and_renders_four_views() {
     let r = raw_tool(&mut s, "polish", json!({"apply": "all"}));
     assert_eq!(r["error"]["code"], -32602, "the schema refuses it: {r}");
 }
+
+/// `polish` keeps to the categories asked for, applying or not, and measuring alone lists the
+/// assembly's findings too.
+#[test]
+fn polish_keeps_to_its_categories_and_lists_assembly_findings() {
+    let mut s = server();
+    tool(&mut s, "execute", json!({"command": "component.create", "params": {"name": "Part"}}));
+    tool(&mut s, "execute", json!({"command": "solid.box", "params": {"length": 40, "width": 20, "height": 10}}));
+    tool(&mut s, "execute", json!({"command": "component.activate", "params": {"component": "root"}}));
+    // A second part, neither grounded nor jointed: nothing holds it.
+    tool(&mut s, "execute", json!({"command": "component.create", "params": {"name": "Lid"}}));
+    tool(&mut s, "execute", json!({"command": "solid.box", "params": {"length": 10, "width": 10, "height": 2, "corner": [0, 40, 0]}}));
+    tool(&mut s, "execute", json!({"command": "component.activate", "params": {"component": "root"}}));
+    let look = tool(&mut s, "polish", json!({}));
+    assert!(look["recommendations"].as_array().unwrap().iter().any(|r| r["kind"] == "not_held"), "{look}");
+    let print = tool(&mut s, "polish", json!({"apply": "safe", "categories": ["print"]}));
+    assert_eq!(print["applied"], json!([]), "{print}");
+    for k in ["fixes", "recommendations"] {
+        assert!(print[k].as_array().unwrap().iter().all(|v| v["category"] == "print"), "{k}: {print}");
+    }
+}
