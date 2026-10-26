@@ -601,7 +601,12 @@ fn build(
                 .filter_map(|p| frame(i, *p).map(|x| x.2))
                 .fold(None, |m: Option<f64>, x| Some(m.map_or(x, |m| m.max(x))))
                 .map_or(r, |x| x.min(r));
-            if toward && (a.dist(c) - r).abs() <= tol * 10.0 && !mitre.get(i).copied().unwrap_or(true) && !mitre.get(nxt(i)).copied().unwrap_or(true)
+            // An arc as large as that setback: the ball turns on the spot there, and the piece is
+            // a patch of its sphere (beside a square wall, an arc of the blend's radius).
+            if toward
+                && (a.dist(c) - reach).abs() <= tol * 10.0
+                && !mitre.get(i).copied().unwrap_or(true)
+                && !mitre.get(nxt(i)).copied().unwrap_or(true)
             {
                 if let Some(x) = collapsed.get_mut(i) {
                     *x = true;
