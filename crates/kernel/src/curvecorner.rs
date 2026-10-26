@@ -833,9 +833,28 @@ pub(crate) fn corner_blend_style(solid: &Solid, ids: &[mt::EdgeID], size: f64, r
                 // seen along the round's axis, which its contact with the third face runs along.
                 let third = eids.iter().find(|x| *x != *id && *x != g).and_then(|x| edges.get(x)).and_then(leaves);
                 let seen = super::circle_of(e, tol * 1e3).map(|c| c.1).or_else(|| third.and_then(|a| radius_along(e, a, tol * 1e3)));
+                // The ball touches the faces at the arc its setback in from it: r where they meet
+                // square, r tan(θ/2) for the angle θ between their normals (more beside a wall
+                // leaning in over the face, less beside one leaning out). It ends in the arc only
+                // if it turns there on the spot, the arc as large as that setback (an earlier
+                // round's end beside a square wall); an arc short of it is too large. (An arc
+                // of the blend's radius beside a sloping wall is no earlier round of it.)
+                let setback = on_edge
+                    .get(g)
+                    .and_then(|fs| match fs[..] {
+                        [a, b] => Some((faces.get(a)?, faces.get(b)?)),
+                        _ => None,
+                    })
+                    .and_then(|(a, b)| {
+                        let m = crate::blend::edge_mid(e)?;
+                        let (na, nb) = (super::project(a, m, None)?.1, super::project(b, m, None)?.1);
+                        Some(r * (na.dot(nb).clamp(-1.0, 1.0).acos() * 0.5).tan())
+                    })
+                    .filter(|t| t.is_finite() && *t > 0.0)
+                    .unwrap_or(r);
                 match seen {
-                    Some(rho) if (rho - r).abs() <= tol * 1e3 => {}
-                    Some(rho) if rho < r => return Err(too_large("the blend is larger than a corner radius")),
+                    Some(rho) if (rho - setback).abs() <= tol * 1e3 => {}
+                    Some(rho) if rho < setback => return Err(too_large("the blend is larger than a corner radius")),
                     _ => return Err(unsupported("a blend running on smoothly into an edge not blended")),
                 }
             }

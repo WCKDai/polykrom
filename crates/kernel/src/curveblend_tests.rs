@@ -1057,3 +1057,29 @@ fn a_corner_arc_short_of_a_sharper_walls_setback_is_no_sphere() {
         assert!(matches!(rolled, Err(crate::KernelError::TooLarge(_))), "R{r} rolling ball: {rolled:?}");
     }
 }
+
+#[test]
+fn a_fillet_beside_walls_leaning_in_is_right_or_refused() {
+    // #222: the loft of a_corner_arc_short_of_a_sharper_walls_setback_is_no_sphere, its walls
+    // leaning in to about 53 deg (setback about 1.9 r) over r2 floor arcs. The loop blend and the
+    // rolling ball refuse R2 and R 4/3 as too large; the corner blend after them took the floor's
+    // arc of the blend's radius for an earlier round to end in, and built a round 1.8 mm off its
+    // radius. Whatever `fillet` gives must be right, else a refusal as too large.
+    use solidcraft_geom::Plane;
+    let block = crate::loft_regions(&[
+        (Plane::XY, rounded_outline(-20.0, 20.0, -15.0, 15.0, 2.0, 2.0)),
+        (Plane::XY.offset(10.0), rounded_outline(-12.5, 12.5, -7.5, 7.5, 0.5, 0.5)),
+    ])
+    .unwrap();
+    for r in [2.0, 4.0 / 3.0] {
+        match fillet(&block, &[Vec3::new(0.0, -15.0, 0.0)], r) {
+            Ok(round) => {
+                assert!(round.validity().is_empty(), "R{r}: {:?}", round.validity());
+                let (radius, angle, _, _) = round_errors(&block, &round, 0.0, r);
+                assert!(radius < 1e-3, "R{r}: the ball's centre is {radius} mm off its radius");
+                assert!(angle < 0.5, "R{r}: the round meets its neighbours at {angle} degrees");
+            }
+            Err(e) => assert!(matches!(e, crate::KernelError::TooLarge(_)), "R{r}: {e:?}"),
+        }
+    }
+}
