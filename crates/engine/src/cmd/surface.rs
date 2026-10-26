@@ -2007,11 +2007,27 @@ mod tests {
                 "surface.blend",
                 json!({"from": {"body": "Low", "edges": low}, "to": {"body": "High", "edges": high}, "continuity": [g, g]}),
             );
-            // The boundary is a cubic through the stations on the rims: between them it strays
-            // by the interpolation error, about 0.01 mm on rims 290 mm round.
+            // The boundary is a cubic through the stations on the rims: they are added until it
+            // is within a stitch's default tolerance of these smooth rims (1e-6 of the size and
+            // 1e-6 mm; 0.009 mm at the blend's 41 stations before, #195).
             let gap = blend_gap(&r);
-            assert!(gap < 0.02, "{g}: the blend's boundary strays {gap} mm from the rims: {r}");
+            assert!(gap < 2e-4, "{g}: the blend's boundary strays {gap} mm from the rims: {r}");
         }
+        // So a plain stitch closes them: a G2 blend from the low tube's top rim to the high one's
+        // bottom rim, flat lids on the open ends, all sewn with the stitch's default tolerance,
+        // make one closed solid (at 41 stations the boundary lay 0.009 mm off and the stitch left
+        // both rims open).
+        let r = run(
+            &mut s,
+            "surface.blend",
+            json!({"from": {"body": "Low", "edges": low}, "to": {"body": "High", "edges": high}, "continuity": ["g2", "g2"], "body_name": "Neck"}),
+        );
+        assert!(blend_gap(&r) < 2e-4, "{r}");
+        let lift = |rim: &Value, z: f64| json!(rim.as_array().unwrap().iter().map(|p| json!([p[0], p[1], z])).collect::<Vec<_>>());
+        run(&mut s, "surface.patch", json!({"body": "Low", "edges": lift(&low, 0.0), "body_name": "Floor"}));
+        run(&mut s, "surface.patch", json!({"body": "High", "edges": lift(&high, 36.0), "body_name": "Lid"}));
+        run(&mut s, "surface.stitch", json!({"bodies": ["Low", "Neck", "High", "Floor", "Lid"]}));
+        assert!(!s.world_state().body("Low").unwrap().body.is_surface(), "one closed solid");
     }
 
     /// A handle meets a bottle: a revolved spline sheet with a hole trimmed through its near side
@@ -2053,10 +2069,11 @@ mod tests {
             json!({"from": {"body": "Peg", "edges": [[45, 0, 30], [45, 0, 20]]}, "to": {"body": "Bottle", "edges": hole}, "continuity": ["g1", "g1"], "body_name": "Neck"}),
         );
         assert_eq!(r["created_bodies"], json!(["Neck"]), "{r}");
-        // The boundary is a cubic through the stations on the rims; between them it strays by
-        // the interpolation error (0.014 mm here, with the tube's rim 31 mm round).
+        // The boundary is a cubic through the stations on the rims. The hole's rim is four traced
+        // edges meeting at slight kinks, where more stations help only slowly: 0.014 mm at the
+        // blend's 41 stations before, about 0.001 mm now (#195).
         let gap = blend_gap(&r);
-        assert!(gap < 0.02, "the blend's boundary strays {gap} mm from the rims: {r}");
+        assert!(gap < 2e-3, "the blend's boundary strays {gap} mm from the rims: {r}");
         // A tube's rim (radius 5) to the hole (radius 7) 13 to 15 mm away: a short flared neck,
         // near the straight frustum between the two (π·12·13).
         let a = area(&s, "Neck");
