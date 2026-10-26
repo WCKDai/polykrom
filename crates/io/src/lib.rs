@@ -367,6 +367,76 @@ pub fn export_mesh(b: &solidcraft_kernel::Body) -> Result<Mesh> {
     Ok(b.tessellate((b.size() * 2e-4).max(1e-3))?)
 }
 
+/// A solid's export mesh, welded, and whether it is closed (see [`solid_mesh`]).
+#[derive(Clone, Debug, Default)]
+pub struct SolidMesh {
+    pub mesh: Mesh,
+    /// Every edge shared by two triangles crossing it opposite ways: a mass and a collision can
+    /// be worked out from it.
+    pub closed: bool,
+}
+
+/// The welded export mesh of a body meant as a closed solid (the parts of a URDF or MJCF model,
+/// whose masses and collisions need closed meshes). The reference tessellation
+/// ([`export_mesh`]) meshes each face on its own, so a seam or a trimmed edge can leave a crack
+/// between two faces' points. Tried in turn, the first closed one kept: the body's display mesh
+/// (its faces share each edge's points), the reference tessellation, and each of them welded
+/// within a tenth of the chord tolerance (closing cracks narrower than that). When none closes,
+/// the display mesh (or the reference one, where the body has no display mesh), marked open.
+pub fn solid_mesh(b: &solidcraft_kernel::Body) -> Result<SolidMesh> {
+    let tol = (b.size() * 2e-4).max(1e-3);
+    let eps = weld_eps(b);
+    let welded = |m: &Mesh, eps: f64| {
+        let (positions, triangles) = weld(&m.positions, &m.triangles, eps);
+        Mesh { positions, triangles: without_fins(triangles), ..Mesh::default() }
+    };
+    let mut tries: Vec<Mesh> = Vec::new();
+    if let Ok(m) = b.display_mesh(tol) {
+        tries.push(m);
+    }
+    tries.push(export_mesh(b)?);
+    let mut first: Option<Mesh> = None;
+    for wide in [eps, (tol * 0.1).max(eps)] {
+        for m in &tries {
+            let w = welded(m, wide);
+            if w.is_closed() {
+                return Ok(SolidMesh { mesh: w, closed: true });
+            }
+            first.get_or_insert(w);
+        }
+    }
+    Ok(SolidMesh { mesh: first.unwrap_or_default(), closed: false })
+}
+
+/// `triangles` without the fins a weld can leave: a triangle and its twin with the other
+/// orientation (two faces' slivers welded onto each other) bound no volume and leave their edges
+/// used three or four times, so both go; a triangle repeated with the same orientation is kept
+/// once.
+fn without_fins(triangles: Vec<[u32; 3]>) -> Vec<[u32; 3]> {
+    // A triangle's corners rotated to start at the smallest, so its orientation is kept.
+    let key = |t: &[u32; 3]| {
+        let k = (0..3).min_by_key(|&i| t[i]).unwrap_or(0);
+        [t[k], t[(k + 1) % 3], t[(k + 2) % 3]]
+    };
+    let mut count: std::collections::HashMap<[u32; 3], i64> = std::collections::HashMap::new();
+    for t in &triangles {
+        *count.entry(key(t)).or_insert(0) += 1;
+    }
+    let mut out = Vec::with_capacity(triangles.len());
+    let mut kept: std::collections::HashSet<[u32; 3]> = std::collections::HashSet::new();
+    for t in triangles {
+        let k = key(&t);
+        let flipped = key(&[t[0], t[2], t[1]]);
+        let (same, other) = (count.get(&k).copied().unwrap_or(0), count.get(&flipped).copied().unwrap_or(0));
+        // Opposite twins cancel pair by pair; what is left of the more common orientation stays,
+        // once.
+        if same > other && kept.insert(k) {
+            out.push(t);
+        }
+    }
+    out
+}
+
 /// Distance within which an exported mesh's vertices are welded (STL and 3MF alike).
 fn weld_eps(b: &solidcraft_kernel::Body) -> f64 {
     (b.size() * 1e-6).max(1e-7)
@@ -1095,5 +1165,21 @@ mod tests {
         let mut xml = String::new();
         zip.by_name("3D/3dmodel.model").unwrap().read_to_string(&mut xml).unwrap();
         assert!(!xml.contains("ft:"));
+    }
+
+    /// A weld that lands two faces' slivers on each other leaves a triangle and its flipped twin
+    /// (a fin, its edges used three and four times) and repeats: both twins go, a repeat is kept
+    /// once, and a tetrahedron with them is closed again (#216).
+    #[test]
+    fn welded_fins_are_taken_out() {
+        let tetra = vec![[0, 2, 1], [0, 1, 3], [1, 2, 3], [0, 3, 2]];
+        let mut with = tetra.clone();
+        with.extend([[1, 3, 4], [1, 4, 3], [0, 1, 3]]);
+        let cleaned = without_fins(with);
+        assert_eq!(cleaned, tetra);
+        let positions = vec![Vec3::ZERO, Vec3::X, Vec3::Y, Vec3::Z, Vec3::new(1.0, 1.0, 1.0)];
+        let m = Mesh { positions, triangles: cleaned, ..Mesh::default() };
+        assert!(m.is_closed());
+        assert!((m.mass_properties().map_or(0.0, |p| p.volume) - 1.0 / 6.0).abs() < 1e-12);
     }
 }

@@ -297,3 +297,76 @@ fn mujoco_runs_the_arm() {
     let _ = std::fs::remove_dir_all(swing["folder"].as_str().unwrap_or_default());
     let _ = std::fs::remove_dir_all(stand["folder"].as_str().unwrap_or_default());
 }
+
+/// The `name="…"` attribute's numbers in the inertial of the body named `body`.
+fn inertial(xml: &str, body: &str, name: &str) -> Vec<f64> {
+    let at = xml.find(&format!("<body name=\"{body}\"")).unwrap_or_else(|| panic!("no body {body} in\n{xml}"));
+    let rest = &xml[at..];
+    let rest = &rest[rest.find("<inertial").unwrap_or(0)..];
+    let v = rest.find(&format!(" {name}=\"")).map(|i| &rest[i + name.len() + 3..]).unwrap_or("");
+    v.split('"').next().unwrap_or("").split_whitespace().filter_map(|x| x.parse().ok()).collect()
+}
+
+/// Every edge of a binary STL's mesh (corners equal to the bit) shared by exactly two triangles
+/// running it opposite ways: a closed, consistently oriented mesh.
+fn stl_closed(bytes: &[u8]) -> bool {
+    let n = bytes.get(80..84).map_or(0, |b| u32::from_le_bytes([b[0], b[1], b[2], b[3]]) as usize);
+    let mut index: std::collections::HashMap<[u32; 3], u32> = std::collections::HashMap::new();
+    let mut half: std::collections::HashMap<(u32, u32), u32> = std::collections::HashMap::new();
+    for t in 0..n {
+        let mut ids = [0u32; 3];
+        for (k, id) in ids.iter_mut().enumerate() {
+            let o = 84 + t * 50 + 12 + k * 12;
+            let p = [0, 4, 8].map(|d| bytes.get(o + d..o + d + 4).map_or(0, |b| u32::from_le_bytes([b[0], b[1], b[2], b[3]])));
+            let next = index.len() as u32;
+            *id = *index.entry(p).or_insert(next);
+        }
+        for (a, b) in [(ids[0], ids[1]), (ids[1], ids[2]), (ids[2], ids[0])] {
+            *half.entry((a, b)).or_insert(0) += 1;
+        }
+    }
+    n > 0 && half.iter().all(|(&(a, b), &c)| c == 1 && half.get(&(b, a)) == Some(&1))
+}
+
+/// A hollow box (#216): 40 x 30 x 20 with a 36 x 26 x 16 void 2 mm in from every side, in
+/// aluminium. Its body's mass and inertia tensor about the centre are the outer box's less the
+/// void's, m = ρ(V₁ - V₂) and I_xx = ρ/12 (V₁(b₁² + c₁²) - V₂(b₂² + c₂²)) and so on, and its
+/// mesh is closed (MuJoCo works out nothing from it).
+#[test]
+fn mjcf_hollow_shell_has_its_mass_and_inertia_and_a_closed_mesh() {
+    let mut s = Session::default();
+    run(&mut s, "component.create", json!({"name": "Shell"}));
+    run(&mut s, "solid.box", json!({"length": 40, "width": 30, "height": 20, "corner": [0, 0, 0], "body_name": "Hollow"}));
+    run(&mut s, "solid.box", json!({"length": 36, "width": 26, "height": 16, "corner": [2, 2, 2], "operation": "cut"}));
+    run(&mut s, "material.assign", json!({"bodies": ["Hollow"], "material": "Aluminum"}));
+    let occ = s.doc.find_component("Shell").and_then(|c| s.doc.occurrence_of(c)).map(|o| o.id).unwrap_or(0);
+    run(&mut s, "occurrence.ground", json!({"occurrence": occ, "grounded": true}));
+    let d = temp("hollow");
+    let (r, xml) = export(&mut s, &d, "h.xml", json!({}));
+    let warnings = r["warnings"].as_array().cloned().unwrap_or_default();
+    assert!(!warnings.iter().any(|w| w.as_str().is_some_and(|w| w.contains("closed"))), "{r}");
+    // Aluminium, 2.7 g/cm³ = 2.7e-6 kg/mm³; the tensor in kg m² (1e-6 per kg mm²).
+    let rho = 2.7e-6;
+    let (v1, v2) = (40.0 * 30.0 * 20.0, 36.0 * 26.0 * 16.0);
+    let want_mass = rho * (v1 - v2);
+    let moment = |b1: f64, c1: f64, b2: f64, c2: f64| rho / 12.0 * (v1 * (b1 * b1 + c1 * c1) - v2 * (b2 * b2 + c2 * c2)) * 1e-6;
+    let want = [moment(30.0, 20.0, 26.0, 16.0), moment(40.0, 20.0, 36.0, 16.0), moment(40.0, 30.0, 36.0, 26.0)];
+    let m = inertial(&xml, "Shell", "mass");
+    assert!((m[0] - want_mass).abs() < 1e-6 * want_mass, "{m:?} vs {want_mass}");
+    let full = inertial(&xml, "Shell", "fullinertia");
+    assert_eq!(full.len(), 6, "{xml}");
+    for (k, w) in want.iter().enumerate() {
+        assert!((full[k] - w).abs() < 1e-6 * w, "I[{k}] {} vs {w}\n{xml}", full[k]);
+    }
+    for off in &full[3..] {
+        assert!(off.abs() < 1e-9 * want[0], "products of inertia vanish: {full:?}");
+    }
+    // Its centre: the box's, (20, 15, 10) mm, in the link frame (the component sits at the origin).
+    let pos = inertial(&xml, "Shell", "pos");
+    for (k, w) in [0.020, 0.015, 0.010].iter().enumerate() {
+        assert!((pos[k] - w).abs() < 1e-9, "{pos:?}");
+    }
+    let stl = std::fs::read(d.join("h-Shell.stl")).unwrap_or_default();
+    assert!(stl_closed(&stl), "the shell's mesh is closed");
+    let _ = std::fs::remove_dir_all(&d);
+}

@@ -15,7 +15,7 @@ use solidcraft_doc::joints::{self, Joint, JointKind};
 use solidcraft_doc::{Document, IDENTITY, MAX_PLACEMENT_DEPTH, MAX_PLACEMENTS, Mat, ModelState, Occurrence, apply_point, mat_inverse, mat_mul};
 use solidcraft_geom::{Mesh, Vec3};
 
-use crate::{IoError, Result, export_mesh, stl_binary, weld, weld_eps};
+use crate::{IoError, Result, SolidMesh, solid_mesh, stl_binary};
 
 /// Mass (kg) and inertia (kg m²) of a link with no massive body: Gazebo drops massless links.
 const TOKEN_MASS: f64 = 1e-6;
@@ -235,28 +235,39 @@ fn parts(doc: &Document, st: &ModelState, stem: &str, names: &mut Names, out: &m
         let (mut visual, mut collision) = (Mesh::default(), Mesh::default());
         let (mut masses, mut color, mut open) = (Vec::new(), None, false);
         for b in st.bodies.iter().filter(|b| doc.model_body_component(b) == c) {
-            let mut m = export_mesh(&b.body)?;
+            let SolidMesh { mesh: mut welded, closed } = solid_mesh(&b.body)?;
             if let Some(o) = doc.model_body_offset(b) {
-                for p in &mut m.positions {
+                for p in &mut welded.positions {
                     *p = apply_point(o, *p);
                 }
             }
-            let (positions, triangles) = weld(&m.positions, &m.triangles, weld_eps(&b.body));
-            let welded = Mesh { positions, triangles, ..Mesh::default() };
             let opacity = b.body.paint().map(|p| p.opacity).filter(|o| o.is_finite()).map_or(1.0, |o| o.clamp(0.0, 1.0));
             color = color.or(b.body.color().map(|[r, g, b]| [r, g, b, opacity]));
             append(&mut visual, &welded);
-            match welded.mass_properties() {
-                Some(mp) => {
-                    // g/cm³ to kg/mm³.
-                    let rho = doc.density(&b.name) * 1e-6;
-                    masses.push((rho * mp.volume, mp.centroid, mp.inertia.map(|r| r.map(|x| x * rho))));
-                    append(&mut collision, &welded);
+            // g/cm³ to kg/mm³.
+            let rho = doc.density(&b.name) * 1e-6;
+            if closed && let Some(mp) = welded.mass_properties() {
+                masses.push((rho * mp.volume, mp.centroid, mp.inertia.map(|r| r.map(|x| x * rho))));
+                append(&mut collision, &welded);
+                continue;
+            }
+            open = true;
+            // A solid whose mesh keeps a crack still has its mass: the B-rep's volume and centre
+            // (placed as the mesh is), and the inertia of the cracked mesh about its own centre,
+            // scaled to that volume. An open sheet has none.
+            let solid = !b.body.is_surface();
+            let brep = if solid { solidcraft_kernel::measure_mass(&b.body).ok().filter(|m| m.volume > 0.0) } else { None };
+            match (brep, welded.mass_properties_open().filter(|m| m.volume > 0.0)) {
+                (Some(m), Some(mp)) => {
+                    let centroid = doc.model_body_offset(b).map_or(m.centroid, |o| apply_point(o, m.centroid));
+                    let scale = m.volume / mp.volume;
+                    masses.push((rho * m.volume, centroid, mp.inertia.map(|r| r.map(|x| x * rho * scale))));
+                    out.warnings.push(format!(
+                        "the mesh of body `{}` has gaps that could not be closed: its mass and inertia come from the B-rep, and it gets no collision",
+                        b.name
+                    ));
                 }
-                None => {
-                    open = true;
-                    out.warnings.push(format!("body `{}` is not a closed solid: it is drawn but adds no mass or collision", b.name));
-                }
+                _ => out.warnings.push(format!("body `{}` is not a closed solid: it is drawn but adds no mass or collision", b.name)),
             }
         }
         let mut part = Part { visual: None, collision: None, color, masses };
