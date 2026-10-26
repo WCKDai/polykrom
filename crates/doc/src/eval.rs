@@ -1976,124 +1976,16 @@ impl Model {
                 shadowed => shadowed,
             };
             recomputed += 1;
-            let t0 = now();
-            let mut next = (*state).clone();
-            // The names the design must not use again travel with the state (#4957, #4302).
-            next.reserved_body_names.clone_from(&reserved);
-            for b in &mut next.bodies {
-                b.made = crate::lineage::Made::Before;
-            }
-            let mut warning = None;
-            // Face references by name: move each face point onto its named face (on the body the
-            // feature names, when it names one and the face is there).
-            let renamed;
-            // Cylindrical emboss resolves its named face in the selected body's frame
-            // and certifies an analytic anchor; mesh projection here would undo that.
-            let explicit_emboss = matches!(&f.kind, FeatureKind::Emboss { face: Some(_), .. });
-            let f = if !explicit_emboss && f.face_names.iter().any(|n| !n.is_empty()) {
-                let mut g = f.clone();
-                let mut notes = Vec::new();
-                // A hole's position is a place on its face, not a pick of the face: it follows
-                // the face along the hole's axis and never slides sideways to the face's nearest
-                // point when the face no longer reaches it.
-                let hole_axis = match &f.kind {
-                    FeatureKind::Hole { direction, points: None | Some(crate::SketchPoints { single: true, .. }), .. } => direction.normalized(),
-                    _ => None,
-                };
-                let fst = face_point_state(doc, &state, &f.kind, f.component);
-                for (k, (p, n)) in g.kind.face_points_mut().into_iter().zip(&f.face_names).enumerate() {
-                    if n.is_empty() {
-                        continue;
-                    }
-                    match crate::name_lookup::locate_face_on_body(&fst, f.kind.face_body(), n, *p) {
-                        Some(hit) => {
-                            if let Some(note) = hit.note(n) {
-                                notes.push(note);
-                            }
-                            match (k, hole_axis) {
-                                (0, Some(axis)) => match hit.along(&fst, *p, axis) {
-                                    Some(q) => *p = q,
-                                    // The place still lies on the face (the axis may run along it).
-                                    None if hit.on_point => {}
-                                    None => notes.push(format!(
-                                        "the hole's position [{}, {}, {}] is no longer on face `{n}`: it stays where it was placed",
-                                        p.x, p.y, p.z
-                                    )),
-                                },
-                                _ => *p = hit.point,
-                            }
-                        }
-                        None => notes.push(format!("face `{n}` no longer exists; using the face at the picked point")),
-                    }
-                }
-                if !notes.is_empty() {
-                    warning = Some(notes.join("; "));
-                }
-                renamed = g;
-                &renamed
-            } else {
-                f
-            };
-            // A parameter with an error fails the features using it, with that error.
-            let bad_param = param_names(f).into_iter().find_map(|n| self.param_errors.get(&n).map(|e| format!("parameter `{n}`: {e}")));
-            let (r, mut boolean_diagnostics) = kernel::capture_boolean_diagnostics(|| match bad_param {
-                Some(e) => Err(kernel::KernelError::Failed(e)),
-                None => kernel::guard(&f.name, || {
-                    eval_feature(doc, &vals, f, &mut next, &mut warning).map_err(|e| kernel::KernelError::Failed(e.to_string()))
-                }),
-            });
-            if r.is_ok() {
-                // Profiles picked by curves that no longer bound a profile exactly were found
-                // by their best match: say which.
-                let thin = matches!(&f.kind, FeatureKind::Extrude { thin: Some(_), .. });
-                for (sketch, sel) in f.kind.profile_sels() {
-                    if let (false, Some(ss)) = (thin, state.sketch(sketch)) {
-                        for note in crate::profile_fallback_notes(ss, sel) {
-                            append_warning(&mut warning, note);
-                        }
-                    }
-                }
-                if let Some(note) = boolean_diagnostics.warning() {
-                    append_warning(&mut warning, note);
-                }
-                track_altered_sheets(&state, &mut next, f, &mut warning);
-                note_join_apart(&state, &next, f, &mut warning);
-            } else {
-                boolean_diagnostics = Default::default();
-            }
-            let ms = t0.elapsed().as_secs_f64() * 1000.0;
-            let error = match r {
-                Ok(()) => {
-                    // Copies are named after their sources through the instance transforms.
-                    let mats = match &f.kind {
-                        FeatureKind::Pattern { pattern, .. } => pattern_transforms(doc, &vals, &state, f.component, pattern).unwrap_or_default(),
-                        FeatureKind::Mirror { plane, .. } => {
-                            doc.resolve_plane_in(&vals, plane, 0, Some(&state)).map(|pl| vec![mirror_matrix(&pl)]).unwrap_or_default()
-                        }
-                        _ => Vec::new(),
-                    };
-                    // Copies made through a pattern or mirror among the sources come after (#395).
-                    let mats = match &f.kind {
-                        FeatureKind::Pattern { features, bodies, .. } | FeatureKind::Mirror { features, bodies, .. } if bodies.is_empty() => {
-                            copy_instances(doc, &vals, &state, &crate::plain(features), &mats).unwrap_or(mats)
-                        }
-                        _ => mats,
-                    };
-                    next.stamp(&state, f, key, mats);
-                    for b in &mut next.bodies {
-                        if !b.transferred {
-                            b.component = match doc.body_components.get(&b.name) {
-                                Some(c) => *c,
-                                None => feature_component.get(&b.feature).copied().unwrap_or(0),
-                            };
-                        }
-                    }
+            let computed = evaluate_feature(doc, &vals, &self.param_errors, &feature_component, f, &state, &reserved, key);
+            let Computed { warning, boolean_diagnostics, ms, .. } = computed;
+            let error = match computed.result {
+                Ok(next) => {
                     state = Arc::new(next);
                     // A window opening the design can show what is built so far.
                     watched.offer(i + 1, doc, &state);
                     None
                 }
-                Err(e) => Some(e.to_string().trim_start_matches("the operation failed: ").to_string()),
+                Err(e) => Some(e),
             };
             // Shadow mode: the rebased result carries on where it is the evaluated one, so later
             // features are rebased from it as they would be; else the evaluated result does.
@@ -2148,6 +2040,147 @@ impl Model {
             m.put(key, e.clone());
         }
     }
+}
+
+/// One feature evaluated from `state` (the model before it; `reserved`: the names the design must
+/// not use again): the model after it, or its error, with its warning, boolean diagnostics and
+/// time. `key` is its evaluation's cache key, which the bodies it makes take.
+#[allow(clippy::too_many_arguments)]
+fn evaluate_feature(
+    doc: &Document,
+    vals: &BTreeMap<String, Value>,
+    param_errors: &BTreeMap<String, String>,
+    feature_component: &std::collections::HashMap<u64, u64>,
+    f: &Feature,
+    state: &Arc<ModelState>,
+    reserved: &std::collections::BTreeSet<String>,
+    key: u64,
+) -> Computed {
+    let t0 = now();
+    let mut next = (**state).clone();
+    // The names the design must not use again travel with the state (#4957, #4302).
+    next.reserved_body_names.clone_from(reserved);
+    for b in &mut next.bodies {
+        b.made = crate::lineage::Made::Before;
+    }
+    let mut warning = None;
+    // Face references by name: move each face point onto its named face (on the body the
+    // feature names, when it names one and the face is there).
+    let renamed;
+    // Cylindrical emboss resolves its named face in the selected body's frame
+    // and certifies an analytic anchor; mesh projection here would undo that.
+    let explicit_emboss = matches!(&f.kind, FeatureKind::Emboss { face: Some(_), .. });
+    let f = if !explicit_emboss && f.face_names.iter().any(|n| !n.is_empty()) {
+        let mut g = f.clone();
+        let mut notes = Vec::new();
+        // A hole's position is a place on its face, not a pick of the face: it follows
+        // the face along the hole's axis and never slides sideways to the face's nearest
+        // point when the face no longer reaches it.
+        let hole_axis = match &f.kind {
+            FeatureKind::Hole { direction, points: None | Some(crate::SketchPoints { single: true, .. }), .. } => direction.normalized(),
+            _ => None,
+        };
+        let fst = face_point_state(doc, state, &f.kind, f.component);
+        for (k, (p, n)) in g.kind.face_points_mut().into_iter().zip(&f.face_names).enumerate() {
+            if n.is_empty() {
+                continue;
+            }
+            match crate::name_lookup::locate_face_on_body(&fst, f.kind.face_body(), n, *p) {
+                Some(hit) => {
+                    if let Some(note) = hit.note(n) {
+                        notes.push(note);
+                    }
+                    match (k, hole_axis) {
+                        (0, Some(axis)) => match hit.along(&fst, *p, axis) {
+                            Some(q) => *p = q,
+                            // The place still lies on the face (the axis may run along it).
+                            None if hit.on_point => {}
+                            None => notes.push(format!(
+                                "the hole's position [{}, {}, {}] is no longer on face `{n}`: it stays where it was placed",
+                                p.x, p.y, p.z
+                            )),
+                        },
+                        _ => *p = hit.point,
+                    }
+                }
+                None => notes.push(format!("face `{n}` no longer exists; using the face at the picked point")),
+            }
+        }
+        if !notes.is_empty() {
+            warning = Some(notes.join("; "));
+        }
+        renamed = g;
+        &renamed
+    } else {
+        f
+    };
+    // A parameter with an error fails the features using it, with that error.
+    let bad_param = param_names(f).into_iter().find_map(|n| param_errors.get(&n).map(|e| format!("parameter `{n}`: {e}")));
+    let (r, mut boolean_diagnostics) = kernel::capture_boolean_diagnostics(|| match bad_param {
+        Some(e) => Err(kernel::KernelError::Failed(e)),
+        None => {
+            kernel::guard(&f.name, || eval_feature(doc, vals, f, &mut next, &mut warning).map_err(|e| kernel::KernelError::Failed(e.to_string())))
+        }
+    });
+    if r.is_ok() {
+        // Profiles picked by curves that no longer bound a profile exactly were found
+        // by their best match: say which.
+        let thin = matches!(&f.kind, FeatureKind::Extrude { thin: Some(_), .. });
+        for (sketch, sel) in f.kind.profile_sels() {
+            if let (false, Some(ss)) = (thin, state.sketch(sketch)) {
+                for note in crate::profile_fallback_notes(ss, sel) {
+                    append_warning(&mut warning, note);
+                }
+            }
+        }
+        if let Some(note) = boolean_diagnostics.warning() {
+            append_warning(&mut warning, note);
+        }
+        track_altered_sheets(state, &mut next, f, &mut warning);
+        note_join_apart(state, &next, f, &mut warning);
+    } else {
+        boolean_diagnostics = Default::default();
+    }
+    let ms = t0.elapsed().as_secs_f64() * 1000.0;
+    let result = match r {
+        Ok(()) => {
+            // Copies are named after their sources through the instance transforms.
+            let mats = match &f.kind {
+                FeatureKind::Pattern { pattern, .. } => pattern_transforms(doc, vals, state, f.component, pattern).unwrap_or_default(),
+                FeatureKind::Mirror { plane, .. } => {
+                    doc.resolve_plane_in(vals, plane, 0, Some(state)).map(|pl| vec![mirror_matrix(&pl)]).unwrap_or_default()
+                }
+                _ => Vec::new(),
+            };
+            // Copies made through a pattern or mirror among the sources come after (#395).
+            let mats = match &f.kind {
+                FeatureKind::Pattern { features, bodies, .. } | FeatureKind::Mirror { features, bodies, .. } if bodies.is_empty() => {
+                    copy_instances(doc, vals, state, &crate::plain(features), &mats).unwrap_or(mats)
+                }
+                _ => mats,
+            };
+            next.stamp(state, f, key, mats);
+            for b in &mut next.bodies {
+                if !b.transferred {
+                    b.component = match doc.body_components.get(&b.name) {
+                        Some(c) => *c,
+                        None => feature_component.get(&b.feature).copied().unwrap_or(0),
+                    };
+                }
+            }
+            Ok(next)
+        }
+        Err(e) => Err(e.to_string().trim_start_matches("the operation failed: ").to_string()),
+    };
+    Computed { result, warning, boolean_diagnostics, ms }
+}
+
+/// What evaluating one feature gave ([`evaluate_feature`]).
+pub(super) struct Computed {
+    pub result: std::result::Result<ModelState, String>,
+    pub warning: Option<String>,
+    pub boolean_diagnostics: kernel::BooleanDiagnostics,
+    pub ms: f64,
 }
 
 impl Model {
