@@ -13,7 +13,7 @@ pub static COMMANDS: &[CommandSpec] = &[
         .icon("measure")
         .key("I")
         .noundo()
-        .params("bodies?: [names] (default all); or items: [1-2 selections: {type: face|edge, body, point: [x,y,z] on it} (body_topology gives each face's and edge's point), {type: body, name}] → length/area/volume; diameter, radius, circumference or arc_length/angle_deg of circles, arcs and cylinders; slot sizes; min (distance_mm, from, to), max, center_distance (centre to centre, or from an axis) and angle"),
+        .params("bodies?: [names] (default all; an open surface body gives its area with open: true, and no volume, centre of mass or mass); or items: [1-2 selections: {type: face|edge, body, point: [x,y,z] on it} (body_topology gives each face's and edge's point), {type: body, name}] → length/area/volume; diameter, radius, circumference or arc_length/angle_deg of circles, arcs and cylinders; slot sizes; min (distance_mm, from, to), max, center_distance (centre to centre, or from an axis) and angle"),
     CommandSpec::new("document.inspect", "Inspect Design", inspect).icon("inspect").noundo().params("measure?: bool (include body measurements)"),
     CommandSpec::new("sketch.inspect", "Inspect Sketch", sketch_inspect).icon("inspect").noundo().params("sketch?: id|name (default active)"),
     CommandSpec::new("model.edges", "List Edges", model_edges).icon("inspect").noundo().params("body: name"),
@@ -62,6 +62,20 @@ const MAX_MEASURED: usize = 20_000;
 
 pub fn measure_json(b: &solidcraft_doc::ModelBody) -> Value {
     match solidcraft_kernel::measure(&b.body) {
+        // An open sheet encloses nothing: its area, box and counts, and no volume, centre of mass
+        // or mass (what the divergence theorem gives an open shell means nothing, and is often
+        // negative).
+        Ok(m) if b.body.is_surface() => json!({
+            "name": b.name,
+            "open": true,
+            "area_mm2": m.area,
+            "bbox": {"min": m.bbox.min, "max": m.bbox.max},
+            "faces": m.merged.faces,
+            "edges": m.merged.edges,
+            "vertices": m.merged.vertices,
+            "face_types": m.merged.face_types,
+            "kernel": {"faces": m.faces, "edges": m.edges, "vertices": m.vertices, "shells": m.shells},
+        }),
         Ok(m) => json!({
             "name": b.name,
             "volume_mm3": m.volume,
