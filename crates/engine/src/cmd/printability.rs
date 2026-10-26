@@ -23,18 +23,18 @@ pub static COMMANDS: &[CommandSpec] =
     )];
 
 /// The six ways a part can stand on the bed, its axes up.
-const AXES: [[f64; 3]; 6] = [[0.0, 0.0, 1.0], [0.0, 0.0, -1.0], [1.0, 0.0, 0.0], [-1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, -1.0, 0.0]];
+pub(super) const AXES: [[f64; 3]; 6] = [[0.0, 0.0, 1.0], [0.0, 0.0, -1.0], [1.0, 0.0, 0.0], [-1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, -1.0, 0.0]];
 /// Filaments by the material names Polykrom's library uses; anything else prints as PLA.
 const FILAMENTS: [&str; 7] = ["PLA", "PETG", "ABS", "ASA", "Nylon", "TPU", "Polycarbonate"];
 const PLA_DENSITY: f64 = 1.24;
 const MAX_BODIES: usize = 2000;
 
 /// One way up: the measures of one body's triangles with `up` as the build direction.
-struct Way {
+pub(super) struct Way {
     size: [f64; 3],
-    bed_contact: f64,
-    overhang: f64,
-    projected: f64,
+    pub(super) bed_contact: f64,
+    pub(super) overhang: f64,
+    pub(super) projected: f64,
 }
 
 fn printability(s: &mut Session, p: &Value) -> Result<Value> {
@@ -121,7 +121,7 @@ fn printability(s: &mut Session, p: &Value) -> Result<Value> {
 /// One body's triangles printed with `up` as the build direction: its size across the bed and up,
 /// the area lying on the bed, and the area hanging over steeper than the limit (`sin` of it), with
 /// that overhang's footprint on the bed.
-fn measure(tris: &[[Vec3; 3]], up: Vec3, sin: f64) -> Way {
+pub(super) fn measure(tris: &[[Vec3; 3]], up: Vec3, sin: f64) -> Way {
     let u = up.cross(if up.x.abs() < 0.9 { Vec3::X } else { Vec3::Y }).normalized().unwrap_or(Vec3::X);
     let v = up.cross(u);
     let (mut lo, mut hi) = ([f64::INFINITY; 3], [f64::NEG_INFINITY; 3]);
