@@ -674,24 +674,28 @@ fn study(s: &mut Session, p: &Value) -> Result<Value> {
                 // others stay, unless the whole set is to be replaced.
                 let replace_all = p.get("replace_keys").and_then(Value::as_bool).unwrap_or(false);
                 let before = m.keys.len();
-                let (mut replaced, mut added) = (0usize, 0usize);
                 if replace_all {
-                    added = keys.len();
+                    let added = keys.len();
                     m.keys = keys;
                     changed = Some(json!({"replaced": 0, "added": added, "kept": 0, "removed": before}));
                 } else {
+                    // The study's slots replaced, each counted once: a joint value passed twice
+                    // keeps the last key passed for it.
+                    let mut replaced = std::collections::BTreeSet::new();
                     for k in keys {
-                        match m.keys.iter_mut().find(|x| x.joint == k.joint && x.index == k.index) {
-                            Some(slot) => {
-                                *slot = k;
-                                replaced += 1;
+                        match m.keys.iter().position(|x| x.joint == k.joint && x.index == k.index) {
+                            Some(at) => {
+                                if at < before {
+                                    replaced.insert(at);
+                                }
+                                if let Some(slot) = m.keys.get_mut(at) {
+                                    *slot = k;
+                                }
                             }
-                            None => {
-                                m.keys.push(k);
-                                added += 1;
-                            }
+                            None => m.keys.push(k),
                         }
                     }
+                    let (replaced, added) = (replaced.len(), m.keys.len() - before);
                     changed = Some(json!({"replaced": replaced, "added": added, "kept": before - replaced, "removed": 0}));
                 }
             }

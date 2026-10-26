@@ -1047,4 +1047,15 @@ fn editing_a_study_changes_only_the_keys_passed() {
     assert_eq!(r["keys"], 1, "{r}");
     assert_eq!(r["keys_changed"], json!({"replaced": 0, "added": 1, "kept": 0, "removed": 3}), "{r}");
     assert_eq!(keys_of(&s, "X"), json!([]));
+    // A joint value passed twice counts once, and the last key passed for it wins.
+    let twice = json!([{"joint": "Y", "points": [[0, 0], [20, 2]]}, {"joint": "Y", "points": [[0, 0], [10, 1], [20, 3]]}]);
+    let r = run(&mut s, "motion.study", json!({"study": "Walk", "keys": twice}));
+    assert_eq!(r["keys"], 1, "{r}");
+    assert_eq!(r["keys_changed"], json!({"replaced": 1, "added": 0, "kept": 0, "removed": 0}), "{r}");
+    assert_eq!(keys_of(&s, "Y")[0]["points"].as_array().map(Vec::len), Some(3));
+    let twice = json!([{"joint": "Z", "points": [[0, 0], [20, 2]]}, {"joint": "Z", "points": [[0, 1], [20, 3]]}]);
+    let r = run(&mut s, "motion.study", json!({"study": "Walk", "keys": twice}));
+    assert_eq!(r["keys"], 2, "{r}");
+    assert_eq!(r["keys_changed"], json!({"replaced": 0, "added": 1, "kept": 1, "removed": 0}), "{r}");
+    assert_eq!(keys_of(&s, "Z")[0]["points"], json!([[0.0, 1.0], [20.0, 3.0]]));
 }
