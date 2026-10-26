@@ -428,7 +428,7 @@ fn assert_full_evaluation(doc: &Document, model: &Model) {
     assert_eq!(model.results.len(), full.results.len());
     for (a, b) in model.results.iter().zip(&full.results) {
         assert_eq!((a.id, &a.error, &a.warning), (b.id, &b.error, &b.warning));
-        assert_eq!(super::rebase::differs(&a.state, &b.state), None, "after {}", a.name);
+        assert_eq!(super::rebase::differs(&a.state, &b.state, false), None, "after {}", a.name);
     }
 }
 
@@ -543,13 +543,20 @@ fn a_shadow_mismatch_is_counted_and_fails_the_tests() {
     model.evaluate(&doc);
     let (f, old) = (doc.feature(id).unwrap(), model.result(id).unwrap());
     let before = super::rebase::shadow_mismatches();
+    let rebased = |state: ModelState| super::rebase::Rebased {
+        state,
+        warning: old.warning.clone(),
+        boolean_diagnostics: old.boolean_diagnostics.clone(),
+        ms: old.ms,
+        keyed: true,
+    };
     let same = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        super::rebase::shadow_check(f, &old.state, old, &old.state, None, old.warning.as_deref(), &old.boolean_diagnostics)
+        super::rebase::shadow_check(f, &rebased((*old.state).clone()), &old.state, None, old.warning.as_deref(), &old.boolean_diagnostics)
     }));
     assert!(matches!(same, Ok(true)));
     // A rebased model without the box: logged, counted, and a failure in this crate's tests.
     let failed = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        super::rebase::shadow_check(f, &ModelState::default(), old, &old.state, None, None, &old.boolean_diagnostics)
+        super::rebase::shadow_check(f, &rebased(ModelState::default()), &old.state, None, old.warning.as_deref(), &old.boolean_diagnostics)
     }));
     assert!(super::rebase::shadow_mismatches() > before);
     if let Err(e) = failed {
@@ -587,4 +594,25 @@ fn a_saved_model_keeps_which_names_came_from_geometry() {
     }
     let adopted = Model::adopt(&doc, &saved).unwrap();
     assert!(crate::naming::names(adopted.state().body("A").unwrap()).geometric);
+}
+
+#[test]
+fn opening_a_design_evaluates_its_parts_side_by_side() {
+    // Every library part in a lane of its own (#234), against a serial evaluation: the same
+    // results to the bit, body keys included.
+    let parts = 8;
+    let (doc, _, _, model) = library_parts(parts, true);
+    if std::thread::available_parallelism().map(usize::from).unwrap_or(1) >= 3 {
+        assert!(model.last_ahead >= parts * 5, "taken from lanes: {}", model.last_ahead);
+    }
+    assert_eq!(model.last_recomputed, doc.features.len());
+    let mut serial = Model { no_cache: true, ..Model::new() };
+    serial.evaluate(&doc);
+    assert_eq!(serial.last_ahead, 0);
+    assert_eq!(model.results.len(), serial.results.len());
+    for (a, b) in model.results.iter().zip(&serial.results) {
+        assert_eq!((a.id, &a.error, &a.warning, a.fingerprint), (b.id, &b.error, &b.warning, b.fingerprint));
+        assert_eq!(super::rebase::differs(&a.state, &b.state, true), None, "after {}", a.name);
+        assert_eq!(a.state.digest(), b.state.digest(), "after {}", a.name);
+    }
 }

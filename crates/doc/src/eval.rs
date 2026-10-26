@@ -787,6 +787,9 @@ pub struct ModelState {
     /// The radius spline of each edge a fillet tapered (a point on the edge with it, by feature
     /// id, see `FilletFit::Taper`).
     tapered: BTreeMap<u64, Vec<(Vec3, kernel::Taper)>>,
+    /// The depth the chain of features naming its bodies starts from (see `ModelState::stamp`):
+    /// 0, but for a lane's model (#234), which starts about as deep as the timeline is there.
+    naming_floor: usize,
 }
 
 impl ModelState {
@@ -841,7 +844,7 @@ impl ModelState {
     /// [`quantize`]); the rest keep theirs.
     fn stamp(&mut self, before: &Arc<ModelState>, f: &Feature, key: u64, mats: Vec<Mat>) {
         let feature = f.id;
-        let depth = before.bodies.iter().filter_map(|b| b.names.depth()).max().unwrap_or(0) + 1;
+        let depth = before.bodies.iter().filter_map(|b| b.names.depth()).max().unwrap_or(0).max(before.naming_floor) + 1;
         let sheets = if f.kind.is_sheet() { self.sheets.clone() } else { Vec::new() };
         let origin = Arc::new(crate::naming::NamingOrigin { feature: f.clone(), before: before.clone(), depth, mats, sheets });
         // Pieces a cut left are named after their faces, not the kernel's shell order (unless
@@ -1102,6 +1105,9 @@ pub struct Model {
     pub last_rebased: usize,
     /// Features rebased by every `evaluate` of this model (and of the model it was copied from).
     pub rebased: usize,
+    /// Features the last `evaluate` took from their component's lane, evaluated ahead on another
+    /// thread (#234, see `eval_lanes.rs`); counted as recomputed too.
+    pub last_ahead: usize,
     /// Features whose result the last `evaluate` took from the cache instead of recomputing: the
     /// same feature on the same inputs was evaluated before (an edit set back, undo, redo, a
     /// configuration row). Their geometry did change since the previous evaluation.
@@ -1854,7 +1860,7 @@ impl Model {
         let ctx = context_digest(doc, &vals);
         // The last results may be rebased when they were evaluated in this context (#169).
         let rebasing = !self.no_cache && self.context == ctx && !self.is_stale() && !model_cache::has_legacy_names(doc);
-        let mut rebases = 0;
+        let (mut rebases, mut taken) = (0, 0);
         self.context = ctx;
         self.step_digests = StepDigests::of(doc, &self.step_digests);
         let primed = self.primed.as_ref().filter(|(context, _)| !self.no_cache && *context == ctx).map(|(_, results)| results.clone());
@@ -1865,6 +1871,10 @@ impl Model {
         for f in &doc.features {
             feature_component.entry(f.id).or_insert(f.component);
         }
+        // Opening a design: the components' features evaluated ahead, side by side (#234).
+        let lanes = (self.results.is_empty() && !self.no_cache)
+            .then(|| lanes::Lanes::start(doc, &vals, &self.param_errors, &feature_component, marker))
+            .flatten();
         let watched = crate::progress::begin(doc.features.len());
         for (i, f) in doc.features.iter().enumerate() {
             let rolled_back = i >= marker;
@@ -1956,21 +1966,40 @@ impl Model {
             }
             // Its last result, when it only needs the change it made applied to the model as it
             // is now (#169). In shadow mode the feature is evaluated as well, and the two compared.
-            let rebased = previous
-                .as_ref()
-                .filter(|_| param_names(f).iter().all(|n| !self.param_errors.contains_key(n)))
-                .and_then(|p| p.rebase(f, local, &state));
+            // Or its lane's result, when the design is being opened (#234).
+            let usable = param_names(f).iter().all(|n| !self.param_errors.contains_key(n));
+            let rebased = previous.as_ref().filter(|_| usable).and_then(|p| p.rebase(f, local, &state)).or_else(|| {
+                let ahead = lanes.as_ref().filter(|_| usable && rebase::rebasable(f)).and_then(|l| l.take(f.id))?;
+                rebase::take_lane(f, &ahead, &state, key)
+            });
             let rebased = match rebased {
-                Some((next, old)) if !shadow => {
-                    rebases += 1;
-                    state = Arc::new(ModelState { reserved_body_names: reserved.clone(), ..next });
+                Some(r) if !shadow => {
+                    // Evaluated this time, on its lane's thread.
+                    if r.keyed {
+                        (recomputed, taken) = (recomputed + 1, taken + 1);
+                    } else {
+                        rebases += 1;
+                    }
+                    state = Arc::new(ModelState { reserved_body_names: reserved.clone(), ..r.state });
                     watched.offer(i + 1, doc, &state);
-                    let (warning, boolean_diagnostics) = (old.warning.clone(), old.boolean_diagnostics.clone());
-                    self.store(
-                        key,
-                        &CachedEval { error: None, warning, boolean_diagnostics, ms: old.ms, bytes: state.retained_bytes(), state: state.clone() },
-                    );
-                    out.push(FeatureResult { name: f.name.clone(), fingerprint: fp, local, state: state.clone(), ..old.clone() });
+                    let (warning, boolean_diagnostics, ms) = (r.warning, r.boolean_diagnostics, r.ms);
+                    let e = CachedEval { error: None, warning, boolean_diagnostics, ms, bytes: state.retained_bytes(), state: state.clone() };
+                    self.store(key, &e);
+                    let CachedEval { warning, boolean_diagnostics, .. } = e;
+                    out.push(FeatureResult {
+                        id: f.id,
+                        name: f.name.clone(),
+                        error: None,
+                        warning,
+                        boolean_diagnostics,
+                        ms,
+                        skipped: false,
+                        stale: false,
+                        fingerprint: fp,
+                        unkept: false,
+                        local,
+                        state: state.clone(),
+                    });
                     continue;
                 }
                 shadowed => shadowed,
@@ -1989,11 +2018,15 @@ impl Model {
             };
             // Shadow mode: the rebased result carries on where it is the evaluated one, so later
             // features are rebased from it as they would be; else the evaluated result does.
-            if let Some((next, old)) = rebased
-                && rebase::shadow_check(f, &next, old, &state, error.as_deref(), warning.as_deref(), &boolean_diagnostics)
+            if let Some(r) = rebased
+                && rebase::shadow_check(f, &r, &state, error.as_deref(), warning.as_deref(), &boolean_diagnostics)
             {
-                rebases += 1;
-                state = Arc::new(ModelState { reserved_body_names: reserved.clone(), ..next });
+                if r.keyed {
+                    taken += 1;
+                } else {
+                    rebases += 1;
+                }
+                state = Arc::new(ModelState { reserved_body_names: reserved.clone(), ..r.state });
             }
             let e = CachedEval {
                 error: error.clone(),
@@ -2024,6 +2057,7 @@ impl Model {
         self.last_recomputed = recomputed;
         self.recomputed += recomputed;
         self.last_rebased = rebases;
+        self.last_ahead = taken;
         self.rebased += rebases;
         self.last_restored = restored;
     }
@@ -5971,6 +6005,8 @@ fn replay(
     Ok(())
 }
 
+#[path = "eval_lanes.rs"]
+mod lanes;
 #[path = "model_cache.rs"]
 mod model_cache;
 #[path = "eval_more.rs"]
