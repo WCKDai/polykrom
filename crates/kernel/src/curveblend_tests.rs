@@ -1049,8 +1049,11 @@ fn a_corner_arc_short_of_a_sharper_walls_setback_is_no_sphere() {
         .map(|e| e.id())
         .collect();
     assert_eq!(ids.len(), 8);
-    let looped = crate::loopblend::loop_blend(&block.solid, &ids, block.size(), 2.0, true);
-    assert!(matches!(looped, Some(Err(crate::KernelError::TooLarge(_)))), "loop blend: {:?}", looped.map(|r| r.map(|_| ())));
-    let rolled = crate::guard("rolling ball", || curve_blend(&block.solid, &ids, block.size(), 2.0, true)).map(|_| ());
-    assert!(matches!(rolled, Err(crate::KernelError::TooLarge(_))), "rolling ball: {rolled:?}");
+    // R2 (the arcs' radius) and R 4/3 (the arcs 1.5 r, still short of the setback).
+    for r in [2.0, 4.0 / 3.0] {
+        let looped = crate::loopblend::loop_blend(&block.solid, &ids, block.size(), r, true);
+        assert!(matches!(looped, Some(Err(crate::KernelError::TooLarge(_)))), "R{r} loop blend: {:?}", looped.map(|x| x.map(|_| ())));
+        let rolled = crate::guard("rolling ball", || curve_blend(&block.solid, &ids, block.size(), r, true)).map(|_| ());
+        assert!(matches!(rolled, Err(crate::KernelError::TooLarge(_))), "R{r} rolling ball: {rolled:?}");
+    }
 }
