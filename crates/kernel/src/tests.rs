@@ -3655,6 +3655,55 @@ fn shell_of_a_loft_deeper_than_its_corner_radius_is_refused() {
     assert!(e.contains("radius") && e.contains("fold"), "{e}");
 }
 
+/// A block with a window of a cubic arch cut through it (a free-form wall), its top back edge
+/// chamfered 2 and a hole of radius 1.65 through it 3.35 from the back face, closer to the
+/// chamfer (0.95) than the wall: moved in by 1.5, the ring of the top face between the hole and
+/// the chamfer vanishes, which the topology-preserving offset can't do. The shell goes through
+/// the block with its holes filled, less each hole grown by the wall: a valid closed solid
+/// whose inner walls are all at least the wall from the outer faces. (The ladder's running
+/// part shelled 1.5, #194.)
+#[test]
+fn shell_round_a_hole_closer_to_a_chamfer_than_the_wall() {
+    let block = box_solid(Vec3::ZERO, Vec3::new(40.0, 20.0, 20.0)).unwrap();
+    let xz = Plane::new(Vec3::ZERO, Vec3::X, Vec3::Z).unwrap();
+    let arch = Region2 {
+        outer: Loop2 {
+            segs: vec![
+                Seg2::Line { a: Vec2::new(10.0, 6.0), b: Vec2::new(30.0, 6.0) },
+                Seg2::Cubic { p0: Vec2::new(30.0, 6.0), p1: Vec2::new(27.0, 15.0), p2: Vec2::new(13.0, 15.0), p3: Vec2::new(10.0, 6.0) },
+            ],
+        },
+        holes: vec![],
+    };
+    let window = extrude(&xz, &[arch], -30.0, 10.0).unwrap().pop().unwrap();
+    let cut = boolean(&block, &window, BoolOp::Cut).unwrap().unwrap();
+    let chamfered = chamfer(&cut, &[Vec3::new(20.0, 20.0, 20.0)], 2.0).unwrap();
+    let drill = cylinder(Vec3::new(5.0, 15.0, -1.0), Vec3::Z, 1.65, 22.0).unwrap();
+    let body = boolean(&chamfered, &drill, BoolOp::Cut).unwrap().unwrap();
+    let t = 1.5;
+    let s = shell(&body, &[Vec3::new(20.0, 3.0, 0.0)], t).unwrap();
+    assert!(s.validity().is_empty(), "{:?}", s.validity());
+    assert_eq!(s.solid.boundaries().len(), 1);
+    // Every vertex of the shell's mesh off the body's surface is measured to the body's mesh
+    // (fine, so that its chords are well under the slack): within the fit (0.02) and the
+    // Boolean's intersection tolerance (1e-3 of the size), which places the edges where the
+    // grown hole meets the cavity, nothing is closer than the wall.
+    let outer = body.tessellate(0.005).unwrap();
+    let tris: Vec<[Vec3; 3]> = outer.triangles.iter().filter_map(|t| outer.tri(t)).collect();
+    let near = |p: Vec3| tris.iter().map(|[a, b, c]| crate::polyhedron::point_tri(p, *a, *b, *c)).fold(f64::INFINITY, f64::min);
+    let slack = 0.02 + body.size() * 1e-3;
+    let inner = s.tessellate(0.05).unwrap();
+    let mut measured = 0;
+    for p in inner.positions.iter().step_by(5) {
+        let d = near(*p);
+        if d > t / 2.0 {
+            measured += 1;
+            assert!(d > t - slack, "wall {d} at {p:?}");
+        }
+    }
+    assert!(measured > 100, "{measured} points");
+}
+
 /// A dumbbell-shaped section: the chord from (−30, 0) to (30, 0) and, over it, two cubic lobes
 /// about 8 high meeting `neck` above the chord's middle.
 fn dumbbell_section(neck: f64) -> Loop2 {
