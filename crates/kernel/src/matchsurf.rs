@@ -279,14 +279,16 @@ fn nearest_uv(surf: &mt::Surface, p: Vec3) -> Option<(f64, f64)> {
     let started = match surf.try_range_tuple() {
         (Some((u0, u1)), Some((v0, v1))) => {
             let at = |i: usize, n: f64, a: f64, b: f64| a + (b - a) * i as f64 / n;
+            // Each grid point's distance worked out once, then the nearest taken.
             let hint = (0..=GRID)
                 .flat_map(|i| (0..=GRID).map(move |j| (at(i, GRID as f64, u0, u1), at(j, GRID as f64, v0, v1))))
-                .min_by(|a, b| dist(*a).total_cmp(&dist(*b)));
-            hint.and_then(|h| surf.search_nearest_parameter(p3(p), Some(h), 100))
+                .map(|uv| (dist(uv), uv))
+                .min_by(|a, b| a.0.total_cmp(&b.0));
+            hint.and_then(|(_, h)| surf.search_nearest_parameter(p3(p), Some(h), 100))
         }
         _ => None,
     };
-    [free, started].into_iter().flatten().filter(|uv| dist(*uv).is_finite()).min_by(|a, b| dist(*a).total_cmp(&dist(*b)))
+    [free, started].into_iter().flatten().map(|uv| (dist(uv), uv)).filter(|(d, _)| d.is_finite()).min_by(|a, b| a.0.total_cmp(&b.0)).map(|(_, uv)| uv)
 }
 
 /// How far `p` is from the face's own surface.
