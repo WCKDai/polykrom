@@ -177,6 +177,11 @@ pub fn check_step_storable(step: &str) -> Result<()> {
 /// Write a compact container, deduplicating payloads by SHA-256. Mesh arrays are
 /// stored directly for low save/open latency; STEP sources and small metadata use
 /// fast Deflate. Use the explicit Compact option to compress meshes too.
+/// Whether a design container keeps a model cache (a save reports when it was left out, #199).
+pub fn has_model_cache(bytes: &[u8]) -> bool {
+    zip::ZipArchive::new(std::io::Cursor::new(bytes)).is_ok_and(|mut z| z.by_name(native_cache::ENTRIES[0]).is_ok())
+}
+
 pub fn write_design_container(doc: &Document) -> Result<Vec<u8>> {
     write_design_container_with_compression(doc, DesignCompression::Fast)
 }
