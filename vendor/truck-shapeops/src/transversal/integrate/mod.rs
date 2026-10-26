@@ -288,6 +288,15 @@ pub mod test_hooks {
         r
     }
 
+    /// `f` with every intersection point's search evaluating its own grid of the surfaces'
+    /// points, as before the grids were evaluated once per polyline (#125), on this thread.
+    pub fn uncached<R>(f: impl FnOnce() -> R) -> R {
+        let before = intersection_curve::UNCACHED.with(|c| c.replace(true));
+        let r = f();
+        intersection_curve::UNCACHED.with(|c| c.set(before));
+        r
+    }
+
     /// `f`, and how many face pairs it intersected exactly (on this thread).
     pub fn exact_pairs<R>(f: impl FnOnce() -> R) -> (R, usize) {
         let before = analytic::EXACT.with(|c| c.replace(0));
