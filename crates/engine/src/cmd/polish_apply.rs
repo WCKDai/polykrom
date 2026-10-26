@@ -25,8 +25,8 @@ pub static COMMANDS: &[CommandSpec] = &[CommandSpec::new("polish.apply", "Apply 
      share of a body's volume a fix may change, 0…1 (default 0.05); batch?: bool (default true: every fix at once, checked once, and \
      split by the bodies a failed check points at, then in halves; false: one fix at a time, each checked) → before: {score, scores}, after: {score, scores}, \
      applied: [{id, body, command, params, score_before, score_after, ms (in the command), fallback? (a fillet the kernel refused, applied as a chamfer \
-     as wide as its radius, and why)}], skipped: [{id, body, command, reason, ms?}] (refused by the kernel (remembered for the body as it is, so a later run \
-     skips it at once), \
+     as wide as its radius, and why)}], skipped: [{id, body, command, reason, ms?}] (refused by the kernel (remembered by body, command and parameters, so a \
+     later run skips it at once), \
      every edge on a face a joint origin names, invalid body, new interference, joints no longer resolve, mass changed, score fell, or already fixed \
      by an earlier fix), held_edges: [{id, edges}] (edges left out of a fix because they lie on a face a joint origin names), fixes (what \
      inspect.polish still suggests), fixes_left (how many of them are safe: run again), recommendations: [findings, most severe first; \
@@ -213,8 +213,8 @@ fn run_fixes(s: &mut Session, fixes: &[Fix], which: &[usize], run: &mut Run, cha
         };
         // A refused fix leaves the design as it was: nothing to check or roll back. A refused
         // fillet is tried again as a chamfer as wide as its radius (a spline or curved edge the
-        // kernel can't round yet, #184, walls too narrow for the ball). A refusal is remembered
-        // for the body as it is, so a later pass doesn't spend the kernel's time on it again.
+        // kernel can't round yet, #184, walls too narrow for the ball). A refusal is remembered,
+        // so a later pass doesn't spend the kernel's time on it again.
         let started = web_time::Instant::now();
         let mut chamfer = json!({"edges": params["edges"], "distance": params["radius"]});
         if let Some(b) = params.get("body") {
@@ -245,14 +245,15 @@ fn run_fixes(s: &mut Session, fixes: &[Fix], which: &[usize], run: &mut Run, cha
     done
 }
 
-/// [`exec`], unless the kernel refused the same command on the same body as it is before (in
-/// this session): then the refusal again, at once. A refusal is remembered.
+/// [`exec`], unless the kernel refused the same command with the same parameters (the same
+/// edges, by point, and size) on the same body before, in this session: then the refusal again,
+/// at once. Another fix on the body seldom makes a refused one work, and trying costs the kernel
+/// up to minutes. A refusal is remembered.
 fn attempt(s: &mut Session, body: &str, command: &str, params: &Value) -> std::result::Result<Value, String> {
     use std::hash::{Hash, Hasher};
-    let geometry = s.world_state().body(body).and_then(|b| b.geometry_key());
-    let key = geometry.map(|g| {
+    let key = Some({
         let mut h = std::collections::hash_map::DefaultHasher::new();
-        (g, command, params.to_string()).hash(&mut h);
+        (body, command, params.to_string()).hash(&mut h);
         h.finish()
     });
     if let Some(why) = key.and_then(|k| s.polish_refused.lock().ok()?.get(&k).cloned()) {
