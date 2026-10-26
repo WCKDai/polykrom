@@ -1029,3 +1029,28 @@ fn a_corner_arc_whose_setback_varies_is_no_sphere() {
         Err(e) => assert!(matches!(e, crate::KernelError::TooLarge(_) | crate::KernelError::Failed(_)), "{e:?}"),
     }
 }
+
+#[test]
+fn a_corner_arc_short_of_a_sharper_walls_setback_is_no_sphere() {
+    // Walls leaning in (the outline shrinks 7.5 over 10 up) meet the floor at about 53 deg, so the
+    // ball's setback is about 1.9 r. Its r2 corner arcs equal the round's radius, as a square
+    // wall's sphere corner would need, but the contacts would run past the arcs' centres: the
+    // loop blend must not take them for sphere corners, and neither it nor the rolling ball may
+    // take the arcs as large enough (their setbacks compared uncapped).
+    use solidcraft_geom::Plane;
+    let block = crate::loft_regions(&[
+        (Plane::XY, rounded_outline(-20.0, 20.0, -15.0, 15.0, 2.0, 2.0)),
+        (Plane::XY.offset(10.0), rounded_outline(-12.5, 12.5, -7.5, 7.5, 0.5, 0.5)),
+    ])
+    .unwrap();
+    let ids: Vec<mt::EdgeID> = crate::body::Body::unique_edges(&block.solid)
+        .into_iter()
+        .filter(|e| [e.front(), e.back()].iter().all(|v| crate::blend::vtx(v).z.abs() < 1e-9))
+        .map(|e| e.id())
+        .collect();
+    assert_eq!(ids.len(), 8);
+    let looped = crate::loopblend::loop_blend(&block.solid, &ids, block.size(), 2.0, true);
+    assert!(matches!(looped, Some(Err(crate::KernelError::TooLarge(_)))), "loop blend: {:?}", looped.map(|r| r.map(|_| ())));
+    let rolled = crate::guard("rolling ball", || curve_blend(&block.solid, &ids, block.size(), 2.0, true)).map(|_| ());
+    assert!(matches!(rolled, Err(crate::KernelError::TooLarge(_))), "rolling ball: {rolled:?}");
+}
