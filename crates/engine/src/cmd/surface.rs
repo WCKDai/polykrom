@@ -63,7 +63,7 @@ pub static COMMANDS: &[CommandSpec] = &[
     CommandSpec::new("surface.blend", "Blend Surface", blend)
         .at("SURFACE", "CREATE")
         .icon("surface_blend")
-        .params("from, to: {body, edges: [[x,y,z]]} (points on the edges of one chain of each body: two picks on the same edge is that one edge, more chain up); continuity?: [g0|g1|g2|g3, g0|g1|g2|g3] (each end, default g1: how much of the surface at the picked edges the blend repeats — the tangent plane, the curvature, or how that curvature changes); bulge?: [number, number] (default 0: how full each end leaves, -0.9 flattest to 3 fullest); align?: [[x,y,z], [x,y,z]] (a point each end leaves towards, when the faces at the picks do not say); seam?: [[x,y,z], [x,y,z]] (a point on each chain its stations start from: two closed chains otherwise pair the way that keeps the blend from twisting; an open chain starts at the end nearer its point; a closed chain blends only to a closed chain); stitch?: bool (sew the blend onto its two bodies where the boundaries meet, replacing them); name?, body_name?"),
+        .params("from, to: {body, edges: [[x,y,z]]} (points on the edges of one chain of each body: two picks on the same edge is that one edge, more chain up); continuity?: [g0|g1|g2|g3, g0|g1|g2|g3] (each end, default g1: how much of the surface at the picked edges the blend repeats — the tangent plane, the curvature, or how that curvature changes); bulge?: [number, number] (default 0: how full each end leaves, -0.9 flattest to 3 fullest); tangent?: [number, number] (default [1, 1]: how fast each end leaves, a share of the chord across, 0.05…3; blends saved before it was saved leave at a third); align?: [[x,y,z], [x,y,z]] (a point each end leaves towards, when the faces at the picks do not say); seam?: [[x,y,z], [x,y,z]] (a point on each chain its stations start from: two closed chains otherwise pair the way that keeps the blend from twisting; an open chain starts at the end nearer its point; a closed chain blends only to a closed chain); stitch?: bool (sew the blend onto its two bodies where the boundaries meet, replacing them); name?, body_name?"),
     CommandSpec::new("surface.untrim", "Untrim", untrim)
         .at("SURFACE", "MODIFY")
         .icon("surface_untrim")
@@ -237,10 +237,24 @@ fn blend(s: &mut Session, p: &Value) -> Result<Value> {
             [one(list.first())?, one(list.get(1))?]
         }
     };
+    let tangent = match p.get("tangent") {
+        None => [solidcraft_kernel::BLEND_TANGENT; 2],
+        Some(v) => {
+            let list = v.as_array().filter(|a| a.len() == 2).ok_or_else(|| bad(cmd, "`tangent` must be two numbers, one per end"))?;
+            let range = solidcraft_kernel::BLEND_TANGENT_RANGE;
+            let one = |x: Option<&Value>| -> Result<f64> {
+                x.and_then(Value::as_f64).filter(|x| range.contains(x)).ok_or_else(|| {
+                    bad(cmd, format!("each `tangent` entry must be between {} and {} (a share of the chord)", range.start(), range.end()))
+                })
+            };
+            [one(list.first())?, one(list.get(1))?]
+        }
+    };
     let align = point_pair(p, cmd, "align", "one per end")?;
     let seam = point_pair(p, cmd, "seam", "one on each chain")?;
     let stitch = bool_(p, "stitch").unwrap_or(false);
-    add_feature(s, p, FeatureKind::SurfaceBlend { from, to, continuity, bulge, align, seam, stitch })
+    // The share is saved even at its default, so that a later default leaves this blend's shape.
+    add_feature(s, p, FeatureKind::SurfaceBlend { from, to, continuity, bulge, align, seam, stitch, tangent: Some(tangent) })
 }
 
 /// An optional pair of points `key` (`null` as none): `which` says what each one is.
@@ -1805,6 +1819,79 @@ mod tests {
             s.execute("surface.blend", &json!({"from": {"body": "Nope", "edges": [[0, 0, 0]]}, "to": {"body": "Seam", "edges": [[20, 20, 10]]}}))
                 .is_err()
         );
+    }
+
+    /// A new blend leaves each boundary at the chord's speed and saves that share, so a blend in a
+    /// design saved before keeps the third it was built with: two offset box rims, blended now,
+    /// bridged by the fuller Hermite strip, and the same feature without `tangent` (as an older
+    /// design has it) by the legacy one (#195).
+    #[test]
+    fn surface_blend_saves_how_fast_it_leaves() {
+        let mut s = Session::default();
+        run(&mut s, "solid.box", json!({"length": 40, "width": 10, "height": 10, "corner": [0, 0, 0], "body_name": "A"}));
+        run(&mut s, "solid.box", json!({"length": 40, "width": 10, "height": 10, "corner": [0, 20, 5], "body_name": "B"}));
+        let blend = json!({"from": {"body": "A", "edges": [[20, 10, 10]]}, "to": {"body": "B", "edges": [[20, 20, 15]]}, "body_name": "Strip"});
+        run(&mut s, "surface.blend", blend.clone());
+        let saved: Value = serde_json::from_str(&s.doc.to_json()).unwrap();
+        let mut found = Vec::new();
+        fn tangents(v: &Value, out: &mut Vec<Value>) {
+            match v {
+                Value::Object(m) => {
+                    if m.contains_key("bulge") {
+                        out.push(m.get("tangent").cloned().unwrap_or(Value::Null));
+                    }
+                    m.values().for_each(|x| tangents(x, out));
+                }
+                Value::Array(a) => a.iter().for_each(|x| tangents(x, out)),
+                _ => {}
+            }
+        }
+        tangents(&saved, &mut found);
+        assert_eq!(found, vec![json!([1.0, 1.0])], "the share is saved with the blend");
+        // Each cross-section is the cubic Bézier (10, 10), (10 + h, 10), (20 - h, 15), (20, 15)
+        // in (y, z), 40 long: h = chord/3 now, chord/9 for the legacy third.
+        let strip = |h: f64| {
+            let p = [(10.0, 10.0), (10.0 + h, 10.0), (20.0 - h, 15.0), (20.0, 15.0)];
+            let n = 4000;
+            let at = |t: f64| {
+                let w = [(1.0 - t).powi(3), 3.0 * t * (1.0 - t).powi(2), 3.0 * t * t * (1.0 - t), t.powi(3)];
+                p.iter().zip(w).fold((0.0, 0.0), |(y, z), ((py, pz), w)| (y + py * w, z + pz * w))
+            };
+            let length: f64 = (0..n)
+                .map(|k| {
+                    let (a, b) = (at(k as f64 / n as f64), at((k + 1) as f64 / n as f64));
+                    ((b.0 - a.0).powi(2) + (b.1 - a.1).powi(2)).sqrt()
+                })
+                .sum();
+            40.0 * length
+        };
+        let chord = 125f64.sqrt();
+        assert!((area(&s, "Strip") - strip(chord / 3.0)).abs() < 1e-3 * strip(chord / 3.0), "{} vs {}", area(&s, "Strip"), strip(chord / 3.0));
+        // The same design as an older build saved it: no `tangent`, the legacy third.
+        let mut old = saved.clone();
+        fn strip_tangent(v: &mut Value) {
+            match v {
+                Value::Object(m) => {
+                    if m.contains_key("bulge") {
+                        m.remove("tangent");
+                    }
+                    m.values_mut().for_each(strip_tangent);
+                }
+                Value::Array(a) => a.iter_mut().for_each(strip_tangent),
+                _ => {}
+            }
+        }
+        strip_tangent(&mut old);
+        let cold = Session::new(solidcraft_doc::Document::from_json(&old.to_string()).unwrap());
+        assert!((area(&cold, "Strip") - strip(chord / 9.0)).abs() < 1e-3 * strip(chord / 9.0), "{} vs {}", area(&cold, "Strip"), strip(chord / 9.0));
+        // An explicit share, and one out of range.
+        let mut thin = blend.clone();
+        thin["tangent"] = json!([0.5, 0.5]);
+        thin["body_name"] = json!("Thin");
+        run(&mut s, "surface.blend", thin.clone());
+        assert!((area(&s, "Thin") - strip(chord / 6.0)).abs() < 1e-3 * strip(chord / 6.0), "{} vs {}", area(&s, "Thin"), strip(chord / 6.0));
+        thin["tangent"] = json!([0.0, 1.0]);
+        assert!(s.execute("surface.blend", &thin).is_err());
     }
 
     /// `surface.blend` between two tube rims: each rim runs along both halves of its tube's wall

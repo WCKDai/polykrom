@@ -141,19 +141,20 @@ pub(super) fn eval(doc: &Document, vals: &BTreeMap<String, Value>, f: &Feature, 
             }
             Ok(())
         }
-        FeatureKind::SurfaceBlend { from, to, continuity, bulge, align, seam, stitch } => {
+        FeatureKind::SurfaceBlend { from, to, continuity, bulge, align, seam, stitch, tangent } => {
             let a = st.body(&from.body).ok_or_else(|| DocError::Unknown(format!("body `{}`", from.body)))?.body.clone();
             let b = st.body(&to.body).ok_or_else(|| DocError::Unknown(format!("body `{}`", to.body)))?.body.clone();
             if from.edges.is_empty() || to.edges.is_empty() {
                 return Err(DocError::Invalid("a blend needs a chain of edges at each end".into()));
             }
-            let (made, gap) = kernel::blend_between(
+            let (made, gap) = kernel::blend_between_tangent(
                 &a,
                 &crate::plain(&from.edges),
                 &b,
                 &crate::plain(&to.edges),
                 *continuity,
                 *bulge,
+                tangent.unwrap_or([kernel::LEGACY_BLEND_TANGENT; 2]),
                 align.map(|[p, q]| [p.0, q.0]),
                 seam.map(|[p, q]| [p.0, q.0]),
                 BLEND_STATIONS,
