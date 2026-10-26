@@ -1004,3 +1004,28 @@ fn a_round_whose_floor_arcs_equal_its_setback_turns_on_the_spot() {
     let got = crate::measure(&round).unwrap().volume;
     assert!((got - want).abs() < 1e-4 * want, "{got} against {want}");
 }
+
+#[test]
+fn a_corner_arc_whose_setback_varies_is_no_sphere() {
+    // The floor's r2 corner arcs meet walls leaning out 45 deg on one side and 26.6 deg on the
+    // other (the outline grows 20 in x and 10 in y over 20 up), so along each arc the ball's
+    // setback runs from 0.414 r to 0.618 r. With r = 1 + sqrt 5 it reaches the arc's radius only
+    // at one end: the ball doesn't turn on the spot, and the corner must not be a patch of one
+    // sphere. A round made anyway must keep its radius; a refusal is clean.
+    use solidcraft_geom::Plane;
+    let tray = crate::loft_regions(&[
+        (Plane::XY, rounded_outline(-20.0, 20.0, -15.0, 15.0, 2.0, 2.0)),
+        (Plane::XY.offset(20.0), rounded_outline(-40.0, 40.0, -25.0, 25.0, 22.0, 22.0)),
+    ])
+    .unwrap();
+    let r = 1.0 + 5f64.sqrt();
+    match fillet(&tray, &[Vec3::new(0.0, -15.0, 0.0)], r) {
+        Ok(round) => {
+            assert!(round.validity().is_empty(), "{:?}", round.validity());
+            let (radius, angle, _, _) = round_errors(&tray, &round, 0.0, r);
+            assert!(radius < 1e-3, "the ball's centre is {radius} mm off radius {r}");
+            assert!(angle < 0.5, "the round meets its neighbours at {angle} degrees");
+        }
+        Err(e) => assert!(matches!(e, crate::KernelError::TooLarge(_) | crate::KernelError::Failed(_)), "{e:?}"),
+    }
+}

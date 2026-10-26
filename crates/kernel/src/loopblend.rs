@@ -596,14 +596,16 @@ fn build(
             // meets the face at along the arc: r beside a square wall, less beside one that leans
             // out (a flared lofted wall), the largest of its ends and middle. (Never more than r
             // here: a sharper wall is left to the corners.)
-            let reach = [s.start(), mid, s.end()]
-                .iter()
-                .filter_map(|p| frame(i, *p).map(|x| x.2))
-                .fold(None, |m: Option<f64>, x| Some(m.map_or(x, |m| m.max(x))))
-                .map_or(r, |x| x.min(r));
-            // An arc as large as that setback: the ball turns on the spot there, and the piece is
-            // a patch of its sphere (beside a square wall, an arc of the blend's radius).
+            let setbacks: Vec<f64> = [s.start(), mid, s.end()].iter().filter_map(|p| frame(i, *p).map(|x| x.2)).collect();
+            let reach = setbacks.iter().copied().fold(None, |m: Option<f64>, x| Some(m.map_or(x, |m| m.max(x)))).map_or(r, |x| x.min(r));
+            let least = setbacks.iter().copied().fold(None, |m: Option<f64>, x| Some(m.map_or(x, |m| m.min(x)))).map_or(r, |x| x.min(r));
+            // An arc as large as that setback all along it: the ball turns on the spot there, and
+            // the piece is a patch of its sphere (beside a square wall, an arc of the blend's
+            // radius). Where the wall's angle to the face changes along the arc (a lofted wall),
+            // so does the setback, and the ball doesn't stay put: no sphere.
+            let constant = reach - least <= tol * 10.0;
             if toward
+                && constant
                 && (a.dist(c) - reach).abs() <= tol * 10.0
                 && !mitre.get(i).copied().unwrap_or(true)
                 && !mitre.get(nxt(i)).copied().unwrap_or(true)
