@@ -919,7 +919,7 @@ pub fn for_feature(app: &SolveApp, kind: &FeatureKind, frame: &Mat) -> Option<(K
             extra.insert("convention".into(), json!(extent.convention));
             return Some((Kind::Surface(k), ins, extra));
         }
-        FeatureKind::Patch { sketch, edges, crown, continuity, points, .. } => {
+        FeatureKind::Patch { sketch, edges, crown, continuity, points, speed, .. } => {
             let mut sels: Vec<Sel> = edges.iter().filter_map(edge).collect();
             if let Some(sk) = sketch {
                 let st = s.world_state();
@@ -940,6 +940,10 @@ pub fn for_feature(app: &SolveApp, kind: &FeatureKind, frame: &Mat) -> Option<(K
             }
             if through.len() != points.len() {
                 extra.insert("points".into(), json!(points.iter().map(|p| pt(p.0)).collect::<Vec<_>>()));
+            }
+            // And how fast it leaves: a patch saved before that was saved keeps its speed.
+            if !edges.is_empty() {
+                extra.insert("speed".into(), json!(speed.unwrap_or(solidcraft_engine::doc::LEGACY_FILL_SPEED)));
             }
             let k = Surf::Patch { continuity: index };
             let mut ins = inputs(&k);

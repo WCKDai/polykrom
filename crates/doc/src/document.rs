@@ -1308,6 +1308,12 @@ pub enum FeatureKind {
         /// Points a patch on edges passes through.
         #[serde(default, skip_serializing_if = "Vec::is_empty")]
         points: Vec<Position>,
+        /// How fast a patch on edges leaves its G1/G2 edges, a multiple of the loop's own speed.
+        /// A patch saved without it keeps the speed it was filled with
+        /// (`solidcraft_geom::fill_general::LEGACY_FILL_SPEED`); new ones save
+        /// `solidcraft_geom::fill_general::FILL_SPEED`, which rises fair to the loop.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        speed: Option<f64>,
     },
     /// Surface bodies sewn along shared edges into the first one (a solid when they close).
     Stitch {

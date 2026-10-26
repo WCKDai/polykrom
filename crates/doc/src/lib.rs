@@ -76,6 +76,8 @@ pub use expr::Expr;
 pub use names::{BodyName, FeatureName, SketchId};
 pub use params::{ParamRow, ParamUser, cycles};
 pub use points::{Dir, FacePick, Position, plain};
+/// How fast patches leave their G1/G2 edges: what new ones save, what older ones were filled with.
+pub use solidcraft_geom::fill_general::{FILL_SPEED, LEGACY_FILL_SPEED};
 pub use solidcraft_kernel as kernel;
 pub use solidcraft_sketch as sketch;
 

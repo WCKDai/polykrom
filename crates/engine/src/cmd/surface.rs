@@ -19,7 +19,7 @@ pub static COMMANDS: &[CommandSpec] = &[
     CommandSpec::new("surface.patch", "Patch", patch)
         .at("SURFACE", "CREATE")
         .icon("surface_patch")
-        .params("sketch?: id|name and profiles? (planar patches of sketch regions) | edges: [[x,y,z]] (points on a closed loop of a body's edges: one face on them, planar when the loop is, else a smooth B-spline surface) and body?; continuity?: g0|g1|g2 (edges only, default g0: how the patch meets the faces beside the loop — g1 their tangent planes, g2 also their curvature across the edges) or [{edge: [x,y,z], g: g0|g1|g2}] (those edges so, the rest g0) or {all, edges}; points?: [[x,y,z]] (edges only, up to 64: points the patch passes through); crown?: number −0.9…3 (default 0: only a fitted patch, whose middle becomes fuller by this many times the loop's size — the bump vanishes on the loop, so the face still meets the picked edges and the continuity across them; a loop that is planar and g0 is the exact plane whatever the crown; with points, crown needs a g1 or g2 edge); name?, body_name?"),
+        .params("sketch?: id|name and profiles? (planar patches of sketch regions) | edges: [[x,y,z]] (points on a closed loop of a body's edges: one face on them, planar when the loop is, else a smooth B-spline surface) and body?; continuity?: g0|g1|g2 (edges only, default g0: how the patch meets the faces beside the loop — g1 their tangent planes, g2 also their curvature across the edges) or [{edge: [x,y,z], g: g0|g1|g2}] (those edges so, the rest g0) or {all, edges}; points?: [[x,y,z]] (edges only, up to 64: points the patch passes through); crown?: number −0.9…3 (default 0: only a fitted patch, whose middle becomes fuller by this many times the loop's size — the bump vanishes on the loop, so the face still meets the picked edges and the continuity across them; a loop that is planar and g0 is the exact plane whatever the crown; with points, crown needs a g1 or g2 edge); speed?: number 0.25…4 (edges only, default 2: how fast the patch leaves its g1/g2 edges, a multiple of the loop's own speed — 2 rises over a round rim like a hemisphere, fair to it; patches saved before it was saved leave at 1, flatter and curling tighter at the rim); name?, body_name?"),
     CommandSpec::new("surface.stitch", "Stitch", stitch)
         .at("SURFACE", "MODIFY")
         .icon("surface_stitch")
@@ -91,6 +91,15 @@ fn patch(s: &mut Session, p: &Value) -> Result<Value> {
     let crown = crown_param(p, cmd)?;
     let continuity = patch_continuity(p, cmd)?;
     let points: Vec<Position> = patch_points(p, cmd)?.into_iter().map(Position).collect();
+    let speed = match p.get("speed") {
+        None => solidcraft_geom::fill_general::FILL_SPEED,
+        Some(v) => {
+            let range = solidcraft_geom::fill_general::FILL_SPEED_RANGE;
+            v.as_f64().filter(|x| range.contains(x)).ok_or_else(|| {
+                bad(cmd, format!("`speed` must be between {} and {} (a multiple of the loop's own speed)", range.start(), range.end()))
+            })?
+        }
+    };
     let edges: Vec<solidcraft_geom::Vec3> = p.get("edges").and_then(Value::as_array).map(|a| a.iter().filter_map(vec3).collect()).unwrap_or_default();
     let mut v = if !edges.is_empty() {
         if edges.len() > 10_000 {
@@ -108,6 +117,8 @@ fn patch(s: &mut Session, p: &Value) -> Result<Value> {
                 crown,
                 continuity: continuity.clone(),
                 points,
+                // Saved even at its default, so that a later default leaves this patch's shape.
+                speed: Some(speed),
             },
         )?
     } else {
@@ -124,6 +135,7 @@ fn patch(s: &mut Session, p: &Value) -> Result<Value> {
             crown,
             continuity: PatchContinuity::default(),
             points,
+            speed: None,
         };
         add_feature(s, p, kind)?
     };
@@ -2013,6 +2025,43 @@ mod tests {
         run(&mut s, "sketch.rectangle.two_point", json!({"p0": [30, 0], "p1": [40, 10]}));
         let sketch_patch = json!({"sketch": 1, "continuity": "g1"});
         assert!(s.execute("surface.patch", &sketch_patch).is_err(), "continuity on a sketch patch");
+    }
+
+    /// A new G1 patch on a tube's rim rises like a hemisphere (its middle about 10 over a rim of
+    /// radius 10) and saves the speed it left the rim at; the same feature without it, as an older
+    /// design saved it, keeps the flatter cap it was built with, half as high (#195).
+    #[test]
+    fn a_patch_saves_how_fast_it_leaves_its_edges() {
+        let top = |s: &Session, name: &str| s.world_state().body(name).unwrap().body.tessellate(0.05).unwrap().bounds().max.z;
+        let (mut s, rim) = open_tube();
+        run(&mut s, "surface.patch", json!({"edges": rim, "body": "Tube", "continuity": "g1", "body_name": "Cap"}));
+        let fair = top(&s, "Cap");
+        assert!((fair - 40.0).abs() < 0.5, "a hemisphere's height over the rim: {fair}");
+        let saved: Value = serde_json::from_str(&s.doc.to_json()).unwrap();
+        fn without_speed(v: &mut Value, seen: &mut usize) {
+            match v {
+                Value::Object(m) => {
+                    if m.contains_key("edges") && m.remove("speed").is_some() {
+                        *seen += 1;
+                    }
+                    m.values_mut().for_each(|x| without_speed(x, seen));
+                }
+                Value::Array(a) => a.iter_mut().for_each(|x| without_speed(x, seen)),
+                _ => {}
+            }
+        }
+        let (mut old, mut seen) = (saved.clone(), 0);
+        without_speed(&mut old, &mut seen);
+        assert_eq!(seen, 1, "the speed is saved with the patch");
+        let cold = Session::new(solidcraft_doc::Document::from_json(&old.to_string()).unwrap());
+        let legacy = top(&cold, "Cap");
+        assert!((legacy - 35.0).abs() < 0.5, "an older design's cap, half as high: {legacy}");
+        // Asked for explicitly, the old speed gives the old cap; out of range is refused.
+        run(&mut s, "surface.patch", json!({"edges": rim, "body": "Tube", "continuity": "g1", "speed": 1, "body_name": "Flat"}));
+        assert!((top(&s, "Flat") - legacy).abs() < 1e-6);
+        for bad in [json!(0), json!(5), json!("fast")] {
+            assert!(s.execute("surface.patch", &json!({"edges": rim, "body": "Tube", "continuity": "g1", "speed": bad})).is_err(), "{bad}");
+        }
     }
     /// The energies the reply's warning carries: the fairness energy before and after.
     fn energies(reply: &Value) -> (f64, f64) {
