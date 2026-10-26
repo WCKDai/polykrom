@@ -33,11 +33,11 @@ pub static COMMANDS: &[CommandSpec] = &[
         .icon("save")
         .key("Ctrl+S")
         .noundo()
-        .params("path? (default: current file); format?: container|json (default: json for .json, otherwise container); compression?: fast|compact (default: fast); cache?: bool (the evaluated model, so the design opens without rebuilding; default: true); preview?: bool (saved display meshes, default: false)"),
+        .params("path? (default: current file); format?: container|json (default: json for .json, otherwise container); compression?: fast|compact (default: fast); cache?: bool (the evaluated model, so the design opens without rebuilding; default: true); preview?: bool (saved display meshes, default: false) → model_cache: {saved, reason?}: whether the model was kept, and why not (then the next open evaluates the design in full)"),
     CommandSpec::new("file.save_as", "Save As", save_as)
         .icon("save")
         .noundo()
-        .params("path; format?: container|json (default: json for .json, otherwise container); compression?: fast|compact (default: fast); cache?: bool (the evaluated model, so the design opens without rebuilding; default: true); preview?: bool (saved display meshes, default: false)"),
+        .params("path; format?: container|json (default: json for .json, otherwise container); compression?: fast|compact (default: fast); cache?: bool (the evaluated model, so the design opens without rebuilding; default: true); preview?: bool (saved display meshes, default: false) → model_cache: {saved, reason?}: whether the model was kept, and why not (then the next open evaluates the design in full)"),
     CommandSpec::new("doc.recovery_list", "Recoverable Designs", recovery_list).icon("restore")
         .noundo()
         .params("dir? (default: the recovery folder) → designs autosaved by apps that crashed or closed with unsaved changes"),
@@ -392,16 +392,16 @@ fn write_bytes(
     preview: bool,
     cache: bool,
 ) -> Result<Value> {
-    let bytes = match format {
-        "container" => s.design_container(compression, preview, cache)?,
-        "json" => solidcraft_io::write_design(&s.design()),
+    let (bytes, model_cache) = match format {
+        "container" => s.design_container_reporting(compression, preview, cache)?,
+        "json" => (solidcraft_io::write_design(&s.design()), json!({"saved": false, "reason": "a JSON design keeps no model"})),
         _ => return Err(bad("file.save", "format must be container or json")),
     };
     // Atomic, keeping the version being replaced as `<file>.bak`.
     solidcraft_io::write_atomic(std::path::Path::new(path), &bytes, true).map_err(|e| EngineError::Other(format!("{path}: {e}")))?;
     s.path = Some(path.to_string());
     s.mark_saved();
-    Ok(json!({"path": path, "bytes": bytes.len(), "name": s.doc.name}))
+    Ok(json!({"path": path, "bytes": bytes.len(), "name": s.doc.name, "model_cache": model_cache}))
 }
 
 impl Session {
@@ -424,21 +424,59 @@ impl Session {
     /// Container bytes for desktop and browser saves. Only already evaluated bodies
     /// and warm meshes are eligible; saving never forces evaluation or tessellation.
     pub fn design_container(&self, compression: solidcraft_io::DesignCompression, preview: bool, cache: bool) -> solidcraft_io::Result<Vec<u8>> {
+        self.design_container_reporting(compression, preview, cache).map(|(bytes, _)| bytes)
+    }
+
+    /// [`Session::design_container`] and what became of the model cache: `{saved}`, with
+    /// `reason` when it was left out, so a save can say the next open evaluates in full (#199).
+    pub fn design_container_reporting(
+        &self,
+        compression: solidcraft_io::DesignCompression,
+        preview: bool,
+        cache: bool,
+    ) -> solidcraft_io::Result<(Vec<u8>, Value)> {
         let design = self.design();
-        let geometry = cache.then(|| saved_geometry(self, &design)).flatten();
+        let geometry = if cache { saved_geometry(self, &design) } else { Err("not asked for (cache: false)".into()) };
         let preview = preview.then(|| saved_preview(self)).flatten();
         let thumbnail = cache.then(|| thumbnail::saved(self)).flatten();
-        solidcraft_io::write_design_container_with_thumbnail(&design, compression, preview.as_ref(), geometry.as_ref(), thumbnail.as_deref())
+        let bytes = solidcraft_io::write_design_container_with_thumbnail(
+            &design,
+            compression,
+            preview.as_ref(),
+            geometry.as_ref().ok(),
+            thumbnail.as_deref(),
+        )?;
+        let report = match (geometry, solidcraft_io::model_cache_kept(&bytes)) {
+            (Ok(_), Some((kept, all))) if kept == all => json!({"saved": true}),
+            (Ok(_), Some((kept, all))) => json!({
+                "saved": true, "states": kept, "features": all,
+                "reason": "thinned to fit the file: opening evaluates the features whose states were left out",
+            }),
+            (Ok(_), None) => json!({"saved": false, "reason": "the model did not fit in the file or could not be encoded (the log says which)"}),
+            (Err(reason), _) => json!({"saved": false, "reason": reason}),
+        };
+        if report["saved"] == false && cache {
+            log::warn!("{}: saved without its model ({}): opening it evaluates the design in full", design.name, report["reason"]);
+        }
+        Ok((bytes, report))
     }
 }
 
 /// The evaluated model a save keeps, so opening need not rebuild it: only the finished evaluation
 /// of `design`, the document saved (no sketch being edited, no uncaptured moves, no feature errors).
-fn saved_geometry(s: &Session, design: &Document) -> Option<solidcraft_doc::SavedModel> {
-    if s.active_sketch.is_some() || !s.pending_moves.is_empty() || s.model.state().bodies.is_empty() {
-        return None;
+fn saved_geometry(s: &Session, design: &Document) -> std::result::Result<solidcraft_doc::SavedModel, String> {
+    if s.active_sketch.is_some() {
+        return Err("a sketch is being edited".into());
     }
-    s.model.saved(design)
+    if !s.pending_moves.is_empty() {
+        return Err("moved parts are not captured yet".into());
+    }
+    // The model's own reasons first: a first feature in error leaves no bodies, and says so.
+    let saved = s.model.saved_or_why(design)?;
+    if s.model.state().bodies.is_empty() {
+        return Err("the design has no bodies".into());
+    }
+    Ok(saved)
 }
 
 /// Cache only warm display geometry. A save never waits for an unevaluated mesh.
@@ -875,7 +913,7 @@ mod tests {
         }
         *s.world_cache.lock().unwrap() = None;
         assert!(saved_preview(&s).is_none());
-        assert!(saved_geometry(&s, &s.doc).is_some(), "the timeline's bodies need no placement");
+        assert!(saved_geometry(&s, &s.doc).is_ok(), "the timeline's bodies need no placement");
         assert!(s.world_cache.lock().unwrap().is_none(), "saving must not prepare cold placements");
         for body in &s.world_state().bodies {
             body.mesh();
@@ -887,7 +925,7 @@ mod tests {
         }
         assert!(!s.pending_moves.is_empty());
         assert!(saved_preview(&s).is_none(), "uncaptured positions are not in the saved document");
-        assert!(saved_geometry(&s, &s.doc).is_none());
+        assert!(saved_geometry(&s, &s.doc).is_err());
         s.execute("component.capture_position", &json!({})).unwrap();
         for body in &s.world_state().bodies {
             body.mesh();
@@ -902,7 +940,7 @@ mod tests {
         }
         assert!(editing.active_sketch.is_some());
         assert!(saved_preview(&editing).is_none());
-        assert!(saved_geometry(&editing, &editing.doc).is_none());
+        assert!(saved_geometry(&editing, &editing.doc).is_err());
     }
 
     #[test]
@@ -955,6 +993,26 @@ mod tests {
         std::fs::remove_file(&path).unwrap();
         assert_eq!(reopened.model.results[0].ms, session.model.results[0].ms, "taken from the file, not evaluated");
         assert_eq!(reopened.model.results[0].boolean_diagnostics, session.model.results[0].boolean_diagnostics);
+    }
+
+    /// A save says whether it kept the model, and why not when it didn't: a design saved without
+    /// it is evaluated in full when it is next opened (#199, a 966-feature design took 24 min).
+    #[test]
+    fn a_save_reports_whether_it_kept_the_model() {
+        let mut session = Session::default();
+        session.execute("solid.box", &json!({"length":10,"width":20,"height":30})).unwrap();
+        let path = std::env::temp_dir().join(format!("polykrom-save-report-{}.polykrom", std::process::id()));
+        let saved = session.execute("file.save", &json!({"path": path})).unwrap();
+        assert_eq!(saved["model_cache"], json!({"saved": true}), "{saved}");
+        let kept = solidcraft_io::model_cache_kept(&std::fs::read(&path).unwrap());
+        assert!(kept.is_some_and(|(kept, all)| kept == all && all > 0), "{kept:?}");
+        let off = session.execute("file.save", &json!({"path": path, "cache": false})).unwrap();
+        assert_eq!(off["model_cache"]["saved"], false, "{off}");
+        assert!(!solidcraft_io::has_model_cache(&std::fs::read(&path).unwrap()));
+        session.execute("sketch.create", &json!({"plane": "XY"})).unwrap();
+        let editing = session.execute("file.save", &json!({"path": path})).unwrap();
+        assert_eq!(editing["model_cache"], json!({"saved": false, "reason": "a sketch is being edited"}), "{editing}");
+        let _ = std::fs::remove_file(&path);
     }
 
     #[test]

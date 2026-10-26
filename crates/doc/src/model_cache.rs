@@ -200,8 +200,23 @@ impl Model {
     /// error, holds no mesh bodies, and `doc` keeps no names saved before format 14. Works out
     /// the face names not asked for yet (a saved model keeps them as worked out).
     pub fn saved(&self, doc: &Document) -> Option<SavedModel> {
-        if self.results.is_empty() || self.results.iter().any(|r| r.error.is_some()) || !self.is_current(doc) || has_legacy_names(doc) {
-            return None;
+        self.saved_or_why(doc).ok()
+    }
+
+    /// [`Model::saved`], or why the model can't be kept with the design (a save reports it: a
+    /// design saved without its model is evaluated in full when it is next opened, #199).
+    pub fn saved_or_why(&self, doc: &Document) -> std::result::Result<SavedModel, String> {
+        if self.results.is_empty() {
+            return Err("the design has not been evaluated".into());
+        }
+        if let Some(r) = self.results.iter().find(|r| r.error.is_some()) {
+            return Err(format!("feature `{}` has an error", r.name));
+        }
+        if !self.is_current(doc) {
+            return Err("the model is not current: the design changed since it was evaluated".into());
+        }
+        if has_legacy_names(doc) {
+            return Err("the design keeps face names from before format 14".into());
         }
         kernel::guard("save the model", || {
             let mut w = Writer::default();
@@ -222,7 +237,7 @@ impl Model {
             });
             Ok(SavedModel { records, bodies: w.bodies })
         })
-        .ok()
+        .map_err(|e| format!("the model could not be encoded: {e}"))
     }
 }
 

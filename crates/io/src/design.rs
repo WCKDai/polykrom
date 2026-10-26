@@ -177,6 +177,21 @@ pub fn check_step_storable(step: &str) -> Result<()> {
 /// Write a compact container, deduplicating payloads by SHA-256. Mesh arrays are
 /// stored directly for low save/open latency; STEP sources and small metadata use
 /// fast Deflate. Use the explicit Compact option to compress meshes too.
+/// Whether a design container keeps a model cache (a save reports when it was left out, #199).
+pub fn has_model_cache(bytes: &[u8]) -> bool {
+    zip::ZipArchive::new(std::io::Cursor::new(bytes)).is_ok_and(|mut z| z.by_name(native_cache::ENTRIES[0]).is_ok())
+}
+
+/// How many of the design's features keep their state in its model cache, and how many there
+/// are: fewer kept means the cache was thinned to fit, so opening evaluates some again (#199).
+/// `None` without a cache.
+pub fn model_cache_kept(bytes: &[u8]) -> Option<(usize, usize)> {
+    let mut zip = zip::ZipArchive::new(std::io::Cursor::new(bytes)).ok()?;
+    let manifest: Value = serde_json::from_reader(zip.by_name(native_cache::ENTRIES[0]).ok()?).ok()?;
+    let features = manifest.get("model")?.get("features")?.as_array()?;
+    Some((features.iter().filter(|f| f.get("state").is_some()).count(), features.len()))
+}
+
 pub fn write_design_container(doc: &Document) -> Result<Vec<u8>> {
     write_design_container_with_compression(doc, DesignCompression::Fast)
 }
@@ -276,7 +291,13 @@ fn write_container(
     writer.part("container.json", &serde_json::to_vec(&json!({"format": VERSION})).map_err(invalid)?, false)?;
     // The model cache is optional: one that does not fit the container keeps fewer states, or is
     // left out, never a failed save.
-    let cache = geometry.and_then(|g| native_cache::encode_model(g, &metadata, writer.space(2, budget)).ok());
+    let cache = geometry.and_then(|g| match native_cache::encode_model(g, &metadata, writer.space(2, budget)) {
+        Ok(c) => Some(c),
+        Err(e) => {
+            log::warn!("the model cache is left out of the design: {e}");
+            None
+        }
+    });
     if let Some((manifest, data)) = cache {
         let [manifest_entry, payload_entry] = native_cache::ENTRIES;
         // Deflated whatever the policy: the encoded bodies shrink about fourfold to tenfold, faster
