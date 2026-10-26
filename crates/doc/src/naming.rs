@@ -270,7 +270,12 @@ pub(crate) fn names(b: &ModelBody) -> Arc<Names> {
             let names = match b.names.origin.as_ref() {
                 Some(o) if o.depth < MAX_DEPTH => b.names.lineage.as_ref().and_then(|l| crate::history_names::derive(b, o, l)).unwrap_or_else(|| {
                     let centres = || face_centres(b);
-                    Names::unverified(geometric_names(b, o, face_count(b)), &mesh_adjacency(b), crate::history_names::by_place(&o.feature, &centres))
+                    let names = Names::unverified(
+                        geometric_names(b, o, face_count(b)),
+                        &mesh_adjacency(b),
+                        crate::history_names::by_place(&o.feature, &centres),
+                    );
+                    Names { geometric: true, ..names }
                 }),
                 _ => Names::unverified((0..face_count(b)).map(|k| format!("{}:face:{k}", b.name)).collect(), &[], None),
             };
