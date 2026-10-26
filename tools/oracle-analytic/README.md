@@ -15,6 +15,11 @@ python3 tools/oracle-analytic/cases_fillets.py      # 77-81: variable, chord-len
 python3 tools/oracle-analytic/cases_surfaces.py     # 83: boundary surfaces
 ```
 
+`kernel_fillets.py` prints (and doesn't write) the volumes of the curved-edge fillet cases in
+[`tests/kernel-cases/fillets/`](../../tests/kernel-cases/fillets/) that have no closed form: a
+round is the solid opened by the ball, integrated numerically (`--fine` for the resolutions the
+cases quote).
+
 Where a value depends on a Polykrom convention rather than on geometry alone (a shell's sharp
 inner corner, a sheet-metal corner relief, where a flange height is measured), `method` or
 `note` says which convention is used. Never change a value to match Polykrom's output: if they
