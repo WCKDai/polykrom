@@ -447,7 +447,12 @@ fn side_edges(face: &mt::Face, side: Side, tol: f64) -> Result<Vec<mt::Edge>> {
 /// best first: the face a match continues from, and the ones it might have been read from.
 fn support_faces(target: &Body, chain: &[mt::Edge], leave: Vec3) -> Result<Vec<(mt::Face, f64)>> {
     let mid = chain_mid(chain)?;
-    let tol = target.size() * 1e-6 + 1e-9;
+    // The chain's edges are the face's own, so its middle only has to land as near the face as
+    // the target's shape is read there (`bridge::frames`, a ten-thousandth of the chain): an edge
+    // a trim traced across a face lies that near it, not on it to the last digit.
+    let poly = chain_polyline(chain)?;
+    let length: f64 = poly.windows(2).filter_map(|w| Some(w.first()?.dist(*w.get(1)?))).sum();
+    let tol = (length * 1e-4).max(target.size() * 1e-6 + 1e-9);
     let mut out: Vec<(mt::Face, f64)> = Vec::new();
     for face in target.solid.face_iter() {
         if !chain.iter().all(|e| face.edge_iter().any(|f| f.id() == e.id())) {

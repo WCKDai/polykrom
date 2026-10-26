@@ -760,6 +760,35 @@ mod tests {
         solidcraft_kernel::measure(&s.world_state().body(name).unwrap().body).unwrap().area
     }
 
+    /// `surface.match` onto an edge a trim traced: a strip lofted between two arcs, cut by the
+    /// plane x = 20 (the cut edge lies about a micron off the strip's surface, where the match
+    /// looked for it within 1e-6 of the body's size and found no face, #195), and a second strip
+    /// beyond it matched onto the cut at G1 and at G2.
+    #[test]
+    fn surface_match_reaches_a_trimmed_edge() {
+        let mut s = Session::default();
+        for (name, x, z) in [("A0", 0.0, 0.0), ("A1", 30.0, 1.0), ("B0", 26.0, 1.5), ("B1", 40.0, 2.0)] {
+            run(&mut s, "sketch.create", json!({"plane": {"origin": [x, 0, 0], "x_dir": [0, 1, 0], "y_dir": [0, 0, 1]}, "name": name}));
+            run(&mut s, "sketch.arc.three_point", json!({"start": [0, z], "end": [20, z], "through": [10, z + 4.0]}));
+            run(&mut s, "sketch.finish", json!({}));
+        }
+        run(&mut s, "surface.loft", json!({"sections": [{"sketch": "A0", "curves": ["a1"]}, {"sketch": "A1", "curves": ["a1"]}], "body_name": "A"}));
+        run(&mut s, "surface.loft", json!({"sections": [{"sketch": "B0", "curves": ["a1"]}, {"sketch": "B1", "curves": ["a1"]}], "body_name": "B"}));
+        run(&mut s, "surface.trim", json!({"body": "A", "plane": {"origin": [20, 0, 0], "normal": [1, 0, 0]}, "keep": [5, 10, 0]}));
+        // The cut edge: the edge of A at x = 20, picked at its midpoint.
+        let cut: Vec<f64> = {
+            let st = s.world_state();
+            let edges = st.body("A").unwrap().body.edges(0.01).unwrap();
+            let m = edges.iter().map(|e| e.mid).find(|m| (m.x - 20.0).abs() < 1e-3).unwrap();
+            vec![m.x, m.y, m.z]
+        };
+        for order in ["g1", "g2"] {
+            let r =
+                run(&mut s, "surface.match", json!({"body": "B", "faces": [[33, 10, 5.75]], "target": "A", "edges": [cut.clone()], "order": order}));
+            assert_eq!(r["changed_bodies"], json!(["B"]), "{order}: {r}");
+        }
+    }
+
     /// Surface Extrude of open curves: a line and an arc joined end to end (listed in either
     /// order) make one sheet of two walls; both sides of the sketch; undo, redo and reopening
     /// give the same sheet.
