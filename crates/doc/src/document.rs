@@ -596,6 +596,12 @@ pub enum FeatureKind {
         /// (default) or a G2 patch repeating each blend up to the second order.
         #[serde(default, skip_serializing_if = "FilletCorner::is_rolling")]
         corner: FilletCorner,
+        /// A radius for each edge of `edges`, in order (a constant-radius fillet only): the
+        /// edges are rounded together, corners where rounds of different radii meet closed by
+        /// one patch. Empty (the default, and every design before it): `radius` for all.
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        #[walk(length = "Edge radius")]
+        edge_radii: Vec<Expr>,
     },
     Chamfer {
         edges: Vec<Position>,

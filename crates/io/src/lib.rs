@@ -960,6 +960,7 @@ mod tests {
                 style: Default::default(),
                 fit: Default::default(),
                 corner: Default::default(),
+                edge_radii: Vec::new(),
             },
             None,
         )
@@ -1045,6 +1046,7 @@ mod tests {
                 style: Default::default(),
                 fit: Default::default(),
                 corner: Default::default(),
+                edge_radii: Vec::new(),
             },
             None,
         )
