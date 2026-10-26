@@ -40,3 +40,28 @@ fn measurements_are_kept_until_the_body_changes_or_moves() {
     let grown = run(&mut s, "inspect.measure", json!({}));
     assert!((body(&grown, "B")["volume_mm3"].as_f64().unwrap_or(0.0) - 2000.0).abs() < 1e-6, "{grown}");
 }
+
+/// An open sheet encloses no volume: it reports its area and `open`, without the meaningless
+/// (often negative) volume, centre of mass and mass a closed body has (#195).
+#[test]
+fn an_open_sheet_reports_its_area_and_no_volume() {
+    let mut s = Session::default();
+    run(&mut s, "sketch.create", json!({"plane": "XY", "name": "S"}));
+    run(&mut s, "sketch.line", json!({"points": [[0, 0], [10, 0]], "ids": ["l"]}));
+    run(&mut s, "sketch.finish", json!({}));
+    run(&mut s, "surface.extrude", json!({"sketch": "S", "curves": ["l"], "distance": 5, "body_name": "Sheet"}));
+    run(&mut s, "solid.box", json!({"length": 2, "width": 2, "height": 2, "corner": [20, 0, 0], "body_name": "Box"}));
+    let m = run(&mut s, "inspect.measure", json!({}));
+    let sheet = body(&m, "Sheet");
+    assert_eq!(sheet["open"], json!(true), "{m}");
+    assert!((sheet["area_mm2"].as_f64().unwrap_or(0.0) - 50.0).abs() < 1e-9, "{m}");
+    for key in ["volume_mm3", "center_of_mass", "mass_g"] {
+        assert!(sheet.get(key).is_none(), "{key} in {sheet}");
+    }
+    // Its material's density stays: it doesn't need a volume.
+    assert!(sheet["density_g_cm3"].as_f64().is_some_and(|d| d > 0.0), "{sheet}");
+    // The closed box keeps its volume; the totals count only it.
+    assert!(body(&m, "Box").get("open").is_none());
+    assert!((m["total"]["volume_mm3"].as_f64().unwrap_or(0.0) - 8.0).abs() < 1e-9, "{m}");
+    assert!((m["total"]["area_mm2"].as_f64().unwrap_or(0.0) - 74.0).abs() < 1e-9, "{m}");
+}

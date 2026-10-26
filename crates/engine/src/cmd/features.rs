@@ -48,7 +48,7 @@ pub static COMMANDS: &[CommandSpec] = &[
         .at("SOLID", "MODIFY")
         .icon("fillet")
         .key("F")
-        .params("edges: [[x,y,z] point on edge | {body, index}]; radius: expr; body?; type?: constant|curvature (alias g2: curvature-continuous quintic between planar faces along straight edges, one planar end face at each end (including sloped ends); radius sets the equivalent circular setback, not constant curvature; exact fit only)|chord (radius is the width across)|variable (radius at the end nearest start, radius2 at the other; one end may be 0, where the round closes to the corner)|spline (the radius along the edge is a clamped B-spline from the end nearest start: radius is its first control radius, radii the rest, knots its knot vector from 0 to 1; one end may be 0); radius2?; start?: [x,y,z]; radii?: [expr, …]; knots?: [number, …]; mid?: [[position 0…1 from start, radius expr], …] (variable radii between the ends); smooth?: bool (smooth instead of straight between the radii); corner?: rolling|g2 (rolling, the default: the corners where three blended edges meet are pieces of the rolling ball's sphere, tangent to each blend; g2: a patch repeating each blend's surface up to the second order, constant-radius exact fillets only, refused where it cannot be built); fit?: exact|reduce|taper (exact, the default: a radius too large for the geometry around the edges is refused; reduce: where it doesn't fit it is reduced to the largest that does, one radius for edges sharing a face; the smallest used is returned as `radius_applied`, each edge's as `radii_applied: [{edge: [x,y,z], radius}]`, and noted in the feature's warning; taper: along each straight edge between planar faces where it doesn't fit, the radius follows the room there as a smooth spline, down to 0 where a face closes to a point, noted in the feature's warning)"),
+        .params("edges: [[x,y,z] point on edge | {body, index}]; radius: expr; edge_radii?: [expr] (a radius for each edge, in the order of `edges`, rounded together; constant type, exact fit and rolling corners only; `radius` is still required); body?; type?: constant|curvature (alias g2: curvature-continuous quintic between planar faces along straight edges, one planar end face at each end (including sloped ends); radius sets the equivalent circular setback, not constant curvature; exact fit only)|chord (radius is the width across)|variable (radius at the end nearest start, radius2 at the other; one end may be 0, where the round closes to the corner)|spline (the radius along the edge is a clamped B-spline from the end nearest start: radius is its first control radius, radii the rest, knots its knot vector from 0 to 1; one end may be 0); radius2?; start?: [x,y,z]; radii?: [expr, …]; knots?: [number, …]; mid?: [[position 0…1 from start, radius expr], …] (variable radii between the ends); smooth?: bool (smooth instead of straight between the radii); corner?: rolling|g2 (rolling, the default: the corners where three blended edges meet are pieces of the rolling ball's sphere, tangent to each blend; g2: a patch repeating each blend's surface up to the second order, constant-radius exact fillets only, refused where it cannot be built); fit?: exact|reduce|taper (exact, the default: a radius too large for the geometry around the edges is refused; reduce: where it doesn't fit it is reduced to the largest that does, one radius for edges sharing a face; the smallest used is returned as `radius_applied`, each edge's as `radii_applied: [{edge: [x,y,z], radius}]`, and noted in the feature's warning; taper: along each straight edge between planar faces where it doesn't fit, the radius follows the room there as a smooth spline, down to 0 where a face closes to a point, noted in the feature's warning)"),
     CommandSpec::new("solid.chamfer", "Chamfer", chamfer).at("SOLID", "MODIFY").icon("chamfer").params("edges: [[x,y,z] | {body, index}]; distance: expr; distance2?: expr (along the second face) | angle?: expr (from the first face); flip?: bool (which face is first: by default the one facing up most); body?"),
     CommandSpec::new("solid.combine", "Combine", combine).at("SOLID", "MODIFY").icon("combine").params("target: body; tools: [body]; operation?: join|cut|intersect; keep_tools?: bool; new_component?: bool (the result goes into a new component; component_name?)"),
     CommandSpec::new("solid.pattern.rectangular", "Rectangular Pattern", pattern_rect)
@@ -1298,6 +1298,31 @@ fn fillet(s: &mut Session, p: &Value) -> Result<Value> {
     if !corner.is_rolling() && (!style.is_constant() || !fit.is_exact()) {
         return Err(bad(cmd, "`corner: g2` is built for a constant-radius fillet (`type: constant`, `fit: exact`) only"));
     }
+    // A radius for each edge, in the order of `edges` (else `radius` for all).
+    let mut edge_radii: Vec<Expr> = Vec::new();
+    if let Some(list) = p.get("edge_radii") {
+        let list = list
+            .as_array()
+            .ok_or_else(|| bad(cmd, "`edge_radii` is a list: one radius (a number or an expression) per edge, in the order of `edges`"))?;
+        if list.len() != edges.len() {
+            return Err(bad(cmd, format!("`edge_radii` has {} radii for {} edges: give one per edge", list.len(), edges.len())));
+        }
+        for r in list {
+            let r = match r {
+                Value::String(x) => x.clone(),
+                Value::Number(n) => n.to_string(),
+                _ => return Err(bad(cmd, "an edge radius is a number or an expression")),
+            };
+            check_expr(s, &r, Kind::Length, cmd, "edge radius")?;
+            edge_radii.push(Expr::from(r));
+        }
+        if !style.is_constant() || !fit.is_exact() || !corner.is_rolling() {
+            return Err(bad(
+                cmd,
+                "`edge_radii` round each edge with a constant radius of its own (`type: constant`, `fit: exact`, `corner: rolling`)",
+            ));
+        }
+    }
     let mut out = add_feature(
         s,
         p,
@@ -1308,6 +1333,7 @@ fn fillet(s: &mut Session, p: &Value) -> Result<Value> {
             style,
             fit,
             corner,
+            edge_radii,
         },
     )?;
     // The radii the fillet used, when `fit: reduce` reduced it.

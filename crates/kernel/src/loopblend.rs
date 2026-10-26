@@ -582,7 +582,7 @@ fn build(
     // to a point (a rounded corner rounded again: the blend there is a sphere).
     let mut collapsed = vec![false; k.max(nj)];
     for (i, s) in segs.iter().enumerate() {
-        if let Seg::Arc { a, c, .. } = *s {
+        if let Seg::Arc { a, c, mid, .. } = *s {
             let toward = into(s, a).dot(c - a) > 0.0;
             // An unequal chamfer's offset on the face; it never ends in a point (a cone's apex).
             if sides.is_some() {
@@ -592,12 +592,23 @@ fn build(
                 }
                 continue;
             }
-            if toward && (a.dist(c) - r).abs() <= tol * 10.0 && !mitre.get(i).copied().unwrap_or(true) && !mitre.get(nxt(i)).copied().unwrap_or(true)
-            {
+            // The round touches the face its setback in from the edge, from the angle the wall
+            // meets the face at along the arc (its ends and middle): r beside a square wall, less
+            // beside one that leans out (a flared lofted wall), more beside one that leans in.
+            let setbacks: Vec<f64> = [s.start(), mid, s.end()].iter().filter_map(|p| frame(i, *p).map(|x| x.2)).collect();
+            let held = if setbacks.is_empty() { vec![r] } else { setbacks };
+            let reach = held.iter().copied().fold(0.0, f64::max);
+            // An arc as large as the setback all along it: the ball turns on the spot there, and
+            // the piece is a patch of its sphere (beside a square wall, an arc of the blend's
+            // radius). Where the wall's angle to the face changes along the arc (a lofted wall),
+            // so does the setback, and the ball doesn't stay put: no sphere. An arc short of the
+            // setback anywhere along it would turn the contacts inside out: too large.
+            let on_the_spot = held.iter().all(|x| (a.dist(c) - x).abs() <= tol * 10.0);
+            if toward && on_the_spot && !mitre.get(i).copied().unwrap_or(true) && !mitre.get(nxt(i)).copied().unwrap_or(true) {
                 if let Some(x) = collapsed.get_mut(i) {
                     *x = true;
                 }
-            } else if toward && a.dist(c) <= r + tol {
+            } else if toward && a.dist(c) <= reach + tol {
                 return Err(too_large("the blend is larger than a corner radius"));
             }
         }

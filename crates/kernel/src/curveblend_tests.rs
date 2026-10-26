@@ -830,8 +830,24 @@ fn rolling_ball_round_on_a_lofted_torso_bottom_chain() {
     assert!(angle < 0.5, "the round meets its neighbours at {angle} degrees");
     // The loft is its own interpolation: no volume to check here (the sloped loft below has one).
     assert!(crate::measure(&round).unwrap().volume < crate::measure(&body).unwrap().volume);
-    // #184 case 1: R11, larger than the floor's r9 arcs, is still refused as too large.
-    assert!(matches!(fillet(&body, &[Vec3::new(0.0, -39.0, 210.0)], 11.0), Err(crate::KernelError::TooLarge(_))));
+    // R30 is: its floor contact would lie past the centres of the r9 floor arcs.
+    assert!(matches!(fillet(&body, &[Vec3::new(0.0, -39.0, 210.0)], 30.0), Err(crate::KernelError::TooLarge(_))));
+}
+
+#[test]
+fn rolling_ball_rounds_larger_than_the_floor_arcs_of_a_flared_loft() {
+    // #184 case 1: R10 to R12 on the torso's bottom chain, larger than its r9 floor arcs. The wall
+    // leans out so far that the ball touches the floor only a few millimetres in from the edge,
+    // inside the arcs. R10 is picked where the report picked it, 6 mm off the edge.
+    let body = torso();
+    for (r, pick) in [(10.0, Vec3::new(38.0, 0.0, 210.0)), (11.0, Vec3::new(0.0, -39.0, 210.0)), (12.0, Vec3::new(0.0, -39.0, 210.0))] {
+        let round = fillet(&body, &[pick], r).unwrap_or_else(|e| panic!("R{r}: {e}"));
+        assert!(round.validity().is_empty(), "R{r}: {:?}", round.validity());
+        let (radius, angle, count, _) = round_errors(&body, &round, 210.0, r);
+        assert_eq!(count, 8, "R{r}: one blend face per edge of the chain");
+        assert!(radius < 1e-3, "R{r}: the ball's centre is {radius} mm off its radius from the floor or the walls");
+        assert!(angle < 0.5, "R{r}: the round meets its neighbours at {angle} degrees");
+    }
 }
 
 #[test]
@@ -892,4 +908,203 @@ fn smooth_neighbours_are_judged_at_the_seam_through_the_vertex() {
     let at = |x: f64, y: f64| a.vertex_iter().find(|v| crate::blend::vtx(v).dist(Vec3::new(x, y, 0.0)) < 1e-6).unwrap();
     assert!(meet_smoothly(a, b, &at(0.0, -10.0)), "the tangent seam");
     assert!(!meet_smoothly(a, b, &at(10.0, 0.0)), "the corner");
+}
+
+/// A mesh's sides used by one triangle (open) and by more than two (over-shared), with corners
+/// closer than `weld` as one.
+fn open_and_over_shared(mesh: &solidcraft_geom::Mesh, weld: f64) -> (usize, usize) {
+    let key = |p: Vec3| [(p.x / weld).round() as i64, (p.y / weld).round() as i64, (p.z / weld).round() as i64];
+    let mut uses: std::collections::HashMap<([i64; 3], [i64; 3]), usize> = std::collections::HashMap::new();
+    for t in &mesh.triangles {
+        let Some(tri) = mesh.tri(t) else { continue };
+        for k in 0..3 {
+            let (a, c) = (key(tri[k]), key(tri[(k + 1) % 3]));
+            if a != c {
+                *uses.entry(if a < c { (a, c) } else { (c, a) }).or_default() += 1;
+            }
+        }
+    }
+    (uses.values().filter(|n| **n == 1).count(), uses.values().filter(|n| **n > 2).count())
+}
+
+/// The largest angle (degrees) between the normals of `face` and each face it shares an edge with,
+/// at seven points along each of its edges.
+fn seam_angle(body: &Body, face: &mt::Face) -> f64 {
+    let mut angle: f64 = 0.0;
+    for e in face.edge_iter() {
+        let Some(other) = body.solid.face_iter().find(|g| g.id() != face.id() && g.edge_iter().any(|x| x.id() == e.id())) else { continue };
+        let c = e.curve();
+        let (t0, t1) = c.range_tuple();
+        for k in 1..8 {
+            let m = from_p3(c.subs(t0 + (t1 - t0) * k as f64 / 8.0));
+            if let (Some((_, a, _)), Some((_, b, _))) = (project(face, m, None), project(other, m, None)) {
+                angle = angle.max(a.dot(b).clamp(-1.0, 1.0).acos().to_degrees());
+            }
+        }
+    }
+    angle
+}
+
+#[test]
+fn three_rounds_of_different_radii_close_a_corner_watertight() {
+    // R1, R2, R3 one after another on the three edges at a box corner: the last fillet blends all
+    // three again with a corner patch, three-sided, closed at one corner. Its mesh had a triangle
+    // with two corners at that pole, which made a side over-shared
+    // (tests/kernel-cases/fillets/126-fillet-box-corner-unequal-radii-one-after-another).
+    let bx = crate::build::box_solid(Vec3::ZERO, Vec3::new(40.0, 30.0, 20.0)).unwrap();
+    let b = fillet(&bx, &[Vec3::new(20.0, 0.0, 20.0)], 1.0).unwrap();
+    let b = fillet(&b, &[Vec3::new(0.0, 15.0, 20.0)], 2.0).unwrap();
+    let b = fillet(&b, &[Vec3::new(0.0, 0.0, 10.0)], 3.0).unwrap();
+    assert!(b.validity().is_empty(), "{:?}", b.validity());
+    for tol in [0.01, 0.05] {
+        let (open, over) = open_and_over_shared(&b.tessellate_with(tol, true).unwrap(), 1e-4);
+        assert_eq!((open, over), (0, 0), "mesh at {tol} mm: open and over-shared sides");
+    }
+    // The corner patch meets the three rounds tangentially.
+    let corner: Vec<&mt::Face> =
+        b.solid.face_iter().filter(|f| f.edge_iter().count() == 3 && !matches!(f.oriented_surface(), mt::Surface::Plane(_))).collect();
+    assert_eq!(corner.len(), 1);
+    let angle = seam_angle(&b, corner[0]);
+    assert!(angle < 0.5, "the corner patch meets its rounds at {angle} degrees");
+}
+
+#[test]
+fn a_round_whose_floor_arcs_equal_its_setback_turns_on_the_spot() {
+    // A loft whose walls all lean out 45 deg, its floor corners r2 arcs, rounded with
+    // R = 2 + 2 sqrt 2: the ball touches the floor exactly 2 in from the edge, so at each corner
+    // its centre stays on the arc's axis and the round there is a patch of its sphere.
+    // tests/kernel-cases/fillets/126-fillet-flared-loft-corner-arcs-equal-to-setback
+    use solidcraft_geom::Plane;
+    use std::f64::consts::PI;
+    let tray = crate::loft_regions(&[
+        (Plane::XY, rounded_outline(-20.0, 20.0, -15.0, 15.0, 2.0, 2.0)),
+        (Plane::XY.offset(20.0), rounded_outline(-40.0, 40.0, -35.0, 35.0, 22.0, 22.0)),
+    ])
+    .unwrap();
+    let r = 2.0 * (1.0 + 2f64.sqrt());
+    let round = fillet(&tray, &[Vec3::new(0.0, -15.0, 0.0)], r).unwrap();
+    assert!(round.validity().is_empty(), "{:?}", round.validity());
+    let (open, over) = open_and_over_shared(&round.tessellate_with(0.01, true).unwrap(), 1e-4);
+    assert_eq!((open, over), (0, 0));
+    let (radius, angle, _, _) = round_errors(&tray, &round, 0.0, r);
+    assert!(radius < 1e-3, "the ball's centre is {radius} mm off radius {r}");
+    assert!(angle < 0.5, "the round meets its neighbours at {angle} degrees");
+    // Steiner, as in the case: the section in the 135 deg corner swept square to the outline.
+    let phi = 0.75 * PI;
+    let t = r / (phi / 2.0).tan();
+    let alpha = PI - phi;
+    let section = t * r - r * r * alpha / 2.0;
+    let triangle = |a: (f64, f64), b: (f64, f64)| (a.0 * b.1 - a.1 * b.0) / 2.0 * (a.0 + b.0) / 3.0;
+    let kite = triangle((t, 0.0), (t, r)) + triangle((t, r), (t * phi.cos(), t * phi.sin()));
+    let reach = 2.0 * r * (alpha / 2.0).sin() / (3.0 * alpha / 2.0);
+    let sector = r * r * alpha / 2.0 * (t + reach * (-PI / 2.0 - alpha / 2.0).cos());
+    let centroid = (kite - sector) / section;
+    let (a0, l0) = (1200.0 - 4.0 * (4.0 - PI), 124.0 + 4.0 * PI);
+    let want = 20.0 * a0 + 200.0 * l0 + 8000.0 * PI / 3.0 - section * (l0 - 2.0 * PI * centroid);
+    let got = crate::measure(&round).unwrap().volume;
+    assert!((got - want).abs() < 1e-4 * want, "{got} against {want}");
+}
+
+#[test]
+fn a_corner_arc_whose_setback_varies_is_no_sphere() {
+    // The floor's r2 corner arcs meet walls leaning out 45 deg on one side and 26.6 deg on the
+    // other (the outline grows 20 in x and 10 in y over 20 up), so along each arc the ball's
+    // setback runs from 0.414 r to 0.618 r. With r = 1 + sqrt 5 it reaches the arc's radius only
+    // at one end: the ball doesn't turn on the spot, and the corner must not be a patch of one
+    // sphere. A round made anyway must keep its radius; a refusal is clean.
+    use solidcraft_geom::Plane;
+    let tray = crate::loft_regions(&[
+        (Plane::XY, rounded_outline(-20.0, 20.0, -15.0, 15.0, 2.0, 2.0)),
+        (Plane::XY.offset(20.0), rounded_outline(-40.0, 40.0, -25.0, 25.0, 22.0, 22.0)),
+    ])
+    .unwrap();
+    let r = 1.0 + 5f64.sqrt();
+    match fillet(&tray, &[Vec3::new(0.0, -15.0, 0.0)], r) {
+        Ok(round) => {
+            assert!(round.validity().is_empty(), "{:?}", round.validity());
+            let (radius, angle, _, _) = round_errors(&tray, &round, 0.0, r);
+            assert!(radius < 1e-3, "the ball's centre is {radius} mm off radius {r}");
+            assert!(angle < 0.5, "the round meets its neighbours at {angle} degrees");
+        }
+        Err(e) => assert!(matches!(e, crate::KernelError::TooLarge(_) | crate::KernelError::Failed(_)), "{e:?}"),
+    }
+}
+
+#[test]
+fn a_corner_arc_short_of_a_sharper_walls_setback_is_no_sphere() {
+    // Walls leaning in (the outline shrinks 7.5 over 10 up) meet the floor at about 53 deg, so the
+    // ball's setback is about 1.9 r. Its r2 corner arcs equal the round's radius, as a square
+    // wall's sphere corner would need, but the contacts would run past the arcs' centres: the
+    // loop blend must not take them for sphere corners, and neither it nor the rolling ball may
+    // take the arcs as large enough (their setbacks compared uncapped).
+    use solidcraft_geom::Plane;
+    let block = crate::loft_regions(&[
+        (Plane::XY, rounded_outline(-20.0, 20.0, -15.0, 15.0, 2.0, 2.0)),
+        (Plane::XY.offset(10.0), rounded_outline(-12.5, 12.5, -7.5, 7.5, 0.5, 0.5)),
+    ])
+    .unwrap();
+    let ids: Vec<mt::EdgeID> = crate::body::Body::unique_edges(&block.solid)
+        .into_iter()
+        .filter(|e| [e.front(), e.back()].iter().all(|v| crate::blend::vtx(v).z.abs() < 1e-9))
+        .map(|e| e.id())
+        .collect();
+    assert_eq!(ids.len(), 8);
+    // R2 (the arcs' radius) and R 4/3 (the arcs 1.5 r, still short of the setback).
+    for r in [2.0, 4.0 / 3.0] {
+        let looped = crate::loopblend::loop_blend(&block.solid, &ids, block.size(), r, true);
+        assert!(matches!(looped, Some(Err(crate::KernelError::TooLarge(_)))), "R{r} loop blend: {:?}", looped.map(|x| x.map(|_| ())));
+        let rolled = crate::guard("rolling ball", || curve_blend(&block.solid, &ids, block.size(), r, true)).map(|_| ());
+        assert!(matches!(rolled, Err(crate::KernelError::TooLarge(_))), "R{r} rolling ball: {rolled:?}");
+    }
+}
+
+#[test]
+fn a_fillet_beside_walls_leaning_in_is_right_or_refused() {
+    // #222: the loft of a_corner_arc_short_of_a_sharper_walls_setback_is_no_sphere, its walls
+    // leaning in to about 53 deg (setback about 1.9 r) over r2 floor arcs. The loop blend and the
+    // rolling ball refuse R2 and R 4/3 as too large; the corner blend after them took the floor's
+    // arc of the blend's radius for an earlier round to end in, and built a round 1.8 mm off its
+    // radius. Whatever `fillet` gives must be right, else a refusal as too large.
+    use solidcraft_geom::Plane;
+    let block = crate::loft_regions(&[
+        (Plane::XY, rounded_outline(-20.0, 20.0, -15.0, 15.0, 2.0, 2.0)),
+        (Plane::XY.offset(10.0), rounded_outline(-12.5, 12.5, -7.5, 7.5, 0.5, 0.5)),
+    ])
+    .unwrap();
+    for r in [2.0, 4.0 / 3.0] {
+        match fillet(&block, &[Vec3::new(0.0, -15.0, 0.0)], r) {
+            Ok(round) => {
+                assert!(round.validity().is_empty(), "R{r}: {:?}", round.validity());
+                let (radius, angle, _, _) = round_errors(&block, &round, 0.0, r);
+                assert!(radius < 1e-3, "R{r}: the ball's centre is {radius} mm off its radius");
+                assert!(angle < 0.5, "R{r}: the round meets its neighbours at {angle} degrees");
+            }
+            Err(e) => assert!(matches!(e, crate::KernelError::TooLarge(_)), "R{r}: {e:?}"),
+        }
+    }
+}
+
+#[test]
+fn a_fillet_whose_setback_varies_along_a_floor_arc_is_right_or_refused() {
+    // #233 review: the r2 floor arcs of a loft whose walls lean 45 deg on one side of each corner
+    // and 26.6 deg on the other, rounded with R4: the setback, 0.414 r to 0.618 r along each arc,
+    // is about the arc's 2 at its middle only. The corner blend must not end the round in the arc
+    // there as if the ball turned on the spot: whatever `fillet` gives must be right, else a
+    // refusal as too large.
+    use solidcraft_geom::Plane;
+    let tray = crate::loft_regions(&[
+        (Plane::XY, rounded_outline(-20.0, 20.0, -15.0, 15.0, 2.0, 2.0)),
+        (Plane::XY.offset(20.0), rounded_outline(-40.0, 40.0, -25.0, 25.0, 22.0, 22.0)),
+    ])
+    .unwrap();
+    let r = 4.0;
+    match fillet(&tray, &[Vec3::new(0.0, -15.0, 0.0)], r) {
+        Ok(round) => {
+            assert!(round.validity().is_empty(), "{:?}", round.validity());
+            let (radius, angle, _, _) = round_errors(&tray, &round, 0.0, r);
+            assert!(radius < 1e-3, "the ball's centre is {radius} mm off radius {r}");
+            assert!(angle < 0.5, "the round meets its neighbours at {angle} degrees");
+        }
+        Err(e) => assert!(matches!(e, crate::KernelError::TooLarge(_)), "{e:?}"),
+    }
 }

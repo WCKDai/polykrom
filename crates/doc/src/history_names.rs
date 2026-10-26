@@ -29,6 +29,10 @@ use crate::naming::NamingOrigin;
 pub struct Names {
     pub faces: Arc<Vec<String>>,
     pub(crate) info: Vec<FaceInfo>,
+    /// Some face was named from geometry over the model before the feature (any body near it),
+    /// not from what the feature itself read: a feature result with such names is never rebased
+    /// (`eval::rebase`). Taken as set for saved names that are not all verified.
+    pub(crate) geometric: bool,
 }
 
 /// What a face answers to besides its name, and how sure its name is.
@@ -58,7 +62,7 @@ impl Names {
     /// Names given as they are (a moved copy keeps its source's), taken as exact.
     pub(crate) fn given(names: Arc<Vec<String>>) -> Names {
         let info = vec![FaceInfo { verified: true, ..FaceInfo::default() }; names.len()];
-        Names { faces: names, info }
+        Names { faces: names, info, geometric: false }
     }
 
     /// Whether face `index`'s name follows exact history.
@@ -88,6 +92,7 @@ pub(crate) fn derive(b: &ModelBody, o: &NamingOrigin, lineage: &Lineage) -> Opti
     let operands: Vec<OperandNames> = lineage.operands.iter().map(|op| OperandNames::new(op, o)).collect::<Option<_>>()?;
     let fid = o.feature.id;
     let mut named: Vec<Option<Named>> = h.faces.iter().map(|f| from_origins(f, &operands, fid)).collect();
+    let geometric = named.iter().any(Option::is_none) || operands.iter().any(|op| op.names.geometric && matches!(op.operand, Operand::Stage(_)));
     if named.iter().any(Option::is_none) {
         let geometric = crate::naming::geometric_names(b, o, named.len());
         for (slot, name) in named.iter_mut().zip(geometric) {
@@ -98,7 +103,7 @@ pub(crate) fn derive(b: &ModelBody, o: &NamingOrigin, lineage: &Lineage) -> Opti
     }
     let named: Vec<Named> = named.into_iter().collect::<Option<_>>()?;
     let centres = || crate::naming::face_centres(b);
-    Some(qualify_at(named, &adjacency(h), by_place(&o.feature, &centres)))
+    Some(Names { geometric, ..qualify_at(named, &adjacency(h), by_place(&o.feature, &centres)) })
 }
 
 /// Pairs of faces that share an edge, from a history.
@@ -144,7 +149,8 @@ impl<'a> OperandNames<'a> {
                         Arc::new(derive(body, o, &stage.lineage).unwrap_or_else(|| {
                             let names = crate::naming::geometric_names(body, o, body.body.face_count());
                             let centres = || crate::naming::face_centres(body);
-                            Names::unverified(names, &crate::naming::mesh_adjacency(body), by_place(&o.feature, &centres))
+                            let names = Names::unverified(names, &crate::naming::mesh_adjacency(body), by_place(&o.feature, &centres));
+                            Names { geometric: true, ..names }
                         }))
                     })
                     .clone();
@@ -391,7 +397,7 @@ fn qualify_at(named: Vec<Named>, adjacent: &[(usize, usize)], centres: Option<&d
         }
     }
     let info = named.into_iter().zip(bounds).zip(verified).map(|((x, bounds), verified)| FaceInfo { aliases: x.aliases, bounds, verified }).collect();
-    Names { faces: Arc::new(names), info }
+    Names { faces: Arc::new(names), info, geometric: false }
 }
 
 /// `origin` with the face or edge it names left out (its kind and operand kept).

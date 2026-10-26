@@ -1601,18 +1601,26 @@ fn shell_non_convex() {
 }
 
 /// A basin: a slab with a tapered pocket and a 4 mm front rim, shelled from below. A wall
-/// thicker than the rim (with the pocket's slope) would turn the top face inside out: refused,
-/// not a body with wrong mass properties.
+/// thicker than the rim (with the pocket's slope) would turn the top face inside out, which the
+/// offset refuses; the shell goes through the slab with the pocket filled, less the pocket
+/// grown by the wall (#194): a valid body, its walls nowhere thinner than asked (the rim stays
+/// solid), not a body with wrong mass properties.
 #[test]
-fn shell_thicker_than_a_rim_is_refused() {
+fn shell_thicker_than_a_rim_keeps_the_rim_solid() {
     let slab = box_solid(Vec3::ZERO, Vec3::new(100.0, 60.0, 30.0)).unwrap();
     let rect = |x0: f64, y0: f64, x1: f64, y1: f64| Loop2::polygon(&[Vec2::new(x0, y0), Vec2::new(x1, y0), Vec2::new(x1, y1), Vec2::new(x0, y1)]);
     let at = |z: f64| Plane::new(Vec3::new(0.0, 0.0, z), Vec3::X, Vec3::Y).unwrap();
     let pocket = loft(&[(at(30.0), rect(20.0, 4.0, 80.0, 50.0)), (at(10.0), rect(30.0, 20.0, 70.0, 40.0))]).unwrap();
     let basin = boolean(&slab, &pocket, BoolOp::Cut).unwrap().unwrap();
     let open = [Vec3::new(50.0, 30.0, 0.0)];
-    let e = shell(&basin, &open, 6.0).unwrap_err().to_string();
-    assert!(e.contains("rim or ledge"), "{e}");
+    let thick = shell(&basin, &open, 6.0).unwrap();
+    assert!(thick.validity().is_empty(), "{:?}", thick.validity());
+    let walls = shell_walls(&thick, &basin, open[0], 6.0);
+    assert!(walls.len() > 20, "{} points", walls.len());
+    let slack = 0.02 + basin.size() * 1e-3;
+    for (p, d) in walls {
+        assert!(d > 6.0 - slack, "wall {d} at {p:?}");
+    }
     let (whole, thin) = (measure(&basin).unwrap(), measure(&shell(&basin, &open, 1.0).unwrap()).unwrap());
     assert!(thin.volume > 0.0 && thin.volume < whole.volume, "{} vs {}", thin.volume, whole.volume);
     let (lo, hi) = (thin.bbox.min, thin.bbox.max);
@@ -3397,6 +3405,434 @@ fn plane_pairs_intersect_exactly_as_the_mesh_collision_did() {
             assert_eq!((me.faces, me.edges, me.vertices), (mm.faces, mm.edges, mm.vertices), "{what}");
             assert!(rel(me.volume, mm.volume) < 1e-9, "{what}: volume {} vs {}", me.volume, mm.volume);
             assert!(rel(me.area, mm.area) < 1e-9, "{what}: area {} vs {}", me.area, mm.area);
+        }
+    }
+}
+
+/// A rounded rectangle, counter-clockwise from its bottom edge, its corners of radius `r`.
+fn rounded_rect(x0: f64, y0: f64, x1: f64, y1: f64, r: f64) -> Loop2 {
+    use std::f64::consts::FRAC_PI_2 as Q;
+    let line = |a: Vec2, b: Vec2| Seg2::Line { a, b };
+    let arc = |center: Vec2, start: f64| Seg2::Arc { center, radius: r, start, sweep: Q };
+    Loop2 {
+        segs: vec![
+            line(Vec2::new(x0 + r, y0), Vec2::new(x1 - r, y0)),
+            arc(Vec2::new(x1 - r, y0 + r), -Q),
+            line(Vec2::new(x1, y0 + r), Vec2::new(x1, y1 - r)),
+            arc(Vec2::new(x1 - r, y1 - r), 0.0),
+            line(Vec2::new(x1 - r, y1), Vec2::new(x0 + r, y1)),
+            arc(Vec2::new(x0 + r, y1 - r), Q),
+            line(Vec2::new(x0, y1 - r), Vec2::new(x0, y0 + r)),
+            arc(Vec2::new(x0 + r, y0 + r), 2.0 * Q),
+        ],
+    }
+}
+
+fn plane_at_z(z: f64) -> Plane {
+    Plane::new(Vec3::new(0.0, 0.0, z), Vec3::X, Vec3::Y).unwrap()
+}
+
+/// The distance from `p` to the nearest point of `b`'s faces other than `skip`, each face's
+/// surface read on its own parameter range and a tenth past it (planes everywhere).
+fn distance_to_faces(b: &Body, skip: &[usize], p: Vec3) -> f64 {
+    use std::ops::Bound::Included;
+    use truck_modeling::{ParametricSurface, SearchNearestParameter};
+    let mut best = f64::INFINITY;
+    for (i, f) in b.solid.face_iter().enumerate() {
+        if skip.contains(&i) {
+            continue;
+        }
+        let s = f.surface();
+        let Some(start) = s.search_nearest_parameter(crate::body::p3(p), None, 100) else { continue };
+        // Continued a little past its range (along its tangents): the wall at the rim of an
+        // opening is measured square to the wall, though the outer face ends there.
+        let span = match s.parameter_range() {
+            ((Included(a), Included(b)), (Included(c), Included(d))) => [a - (b - a) * 0.1, b + (b - a) * 0.1, c - (d - c) * 0.1, d + (d - c) * 0.1],
+            _ => [-1e300, 1e300, -1e300, 1e300],
+        };
+        let base = crate::offset_fit::Extended::new(s);
+        let (u, v) = base.foot(p, start, span).unwrap_or(start);
+        best = best.min(base.jet(u, v).p.dist(p));
+    }
+    best
+}
+
+/// The points of the faces of `shell` that lie wholly off `outer` (its inner walls, or the far
+/// copy of a thickened surface), sampled over their meshes.
+fn inner_wall_points(shell: &Body, outer: &Body, skip: &[usize], gap: f64) -> Vec<Vec3> {
+    let mesh = shell.tessellate(0.05).unwrap();
+    let mut by_face: std::collections::BTreeMap<u32, Vec<Vec3>> = Default::default();
+    for (t, f) in mesh.triangles.iter().zip(&mesh.tri_face) {
+        by_face.entry(*f).or_default().extend(mesh.tri(t).unwrap());
+    }
+    // Every seventh point of a face, or every point of a small one (a flat wall's two triangles).
+    by_face
+        .into_values()
+        .filter(|pts| pts.iter().step_by(if pts.len() < 64 { 1 } else { 7 }).all(|p| distance_to_faces(outer, skip, *p) > gap))
+        .flatten()
+        .collect()
+}
+
+/// A loft through three rounded rectangles (free-form sides), shelled 2.5 open at the top: a
+/// valid closed solid whose every face but the top has an inner copy (8 sides and the floor),
+/// the top a rim; every point of the inner walls lies 2.5 from the outer faces, to within the
+/// fit's 0.01 mm and the mesh's chord. #194.
+#[test]
+fn shell_of_a_loft_keeps_its_wall_thickness() {
+    let body = loft(&[
+        (plane_at_z(0.0), rounded_rect(-30.0, -25.0, 30.0, 25.0, 10.0)),
+        (plane_at_z(30.0), rounded_rect(-40.0, -30.0, 40.0, 30.0, 20.0)),
+        (plane_at_z(60.0), rounded_rect(-36.0, -28.0, 36.0, 28.0, 18.0)),
+    ])
+    .unwrap();
+    let t = 2.5;
+    let s = shell(&body, &[Vec3::new(0.0, 0.0, 60.0)], t).unwrap();
+    assert!(s.validity().is_empty(), "{:?}", s.validity());
+    assert_eq!(s.face_count(), 2 * body.face_count() - 1);
+    let top = crate::surfaces::nearest_face(&body, Vec3::new(0.0, 0.0, 60.0)).unwrap();
+    let pts = inner_wall_points(&s, &body, &[top], t / 2.0);
+    assert!(pts.len() > 500, "{} points", pts.len());
+    for p in pts {
+        let d = distance_to_faces(&body, &[top], p);
+        assert!((d - t).abs() < 0.02, "wall {d} at {p:?}");
+    }
+    let (outer, hollow) = (measure(&body).unwrap().volume, measure(&s).unwrap().volume);
+    assert!(hollow > 0.0 && hollow < outer * 0.3, "{hollow} of {outer}");
+}
+
+/// A loft through three circles (a barrel, its sides free-form B-splines), shelled 2 open at
+/// the top. Its sides are a surface of revolution, so the cavity is the revolution of the
+/// meridian moved in by 2 along its normals: volume π∫r² dz from the floor (z = 2) to the
+/// open top, integrated over the meridian read off the outer surface. #194.
+#[test]
+fn shell_of_a_barrel_loft_has_the_volume_of_its_offset_meridian() {
+    use truck_modeling::{ParametricSurface, ParametricSurface3D, SearchNearestParameter};
+    let body = loft(&[
+        (plane_at_z(0.0), Loop2::circle(Vec2::ZERO, 20.0)),
+        (plane_at_z(30.0), Loop2::circle(Vec2::ZERO, 26.0)),
+        (plane_at_z(60.0), Loop2::circle(Vec2::ZERO, 21.0)),
+    ])
+    .unwrap();
+    let t = 2.0;
+    let s = shell(&body, &[Vec3::new(0.0, 0.0, 60.0)], t).unwrap();
+    assert!(s.validity().is_empty(), "{:?}", s.validity());
+    // The meridian at y = 0, x > 0, and its inner offset (r, z), from the side face there.
+    let side = body.solid.face_iter().find(|f| {
+        f.oriented_surface()
+            .search_nearest_parameter(crate::body::p3(Vec3::new(30.0, 0.0, 30.0)), None, 100)
+            .is_some_and(|(u, v)| crate::body::from_p3(f.oriented_surface().subs(u, v)).dist(Vec3::new(26.0, 0.0, 30.0)) < 0.5)
+    });
+    let surf = side.unwrap().oriented_surface();
+    let mut meridian: Vec<(f64, f64)> = Vec::new();
+    for k in 0..=4000 {
+        let q = Vec3::new(40.0, 0.0, -10.0 + 80.0 * k as f64 / 4000.0);
+        let (u, v) = surf.search_nearest_parameter(crate::body::p3(q), None, 100).unwrap();
+        let (p, n) = (crate::body::from_p3(surf.subs(u, v)), surf.normal(u, v));
+        assert!(p.y.abs() < 0.5 && p.x > 0.0, "{p:?}");
+        let q = p - Vec3::new(n.x, n.y, n.z) * t;
+        meridian.push(((q.x * q.x + q.y * q.y).sqrt(), q.z));
+    }
+    meridian.sort_by(|a, b| a.1.total_cmp(&b.1));
+    meridian.dedup_by(|a, b| (a.1 - b.1).abs() < 1e-9);
+    let mut cavity = 0.0;
+    for w in meridian.windows(2) {
+        let ((r0, z0), (r1, z1)) = (w[0], w[1]);
+        let (lo, hi) = (z0.max(t), z1.min(60.0));
+        if hi > lo {
+            let r = |z: f64| r0 + (r1 - r0) * (z - z0) / (z1 - z0);
+            let (a, b) = (r(lo), r(hi));
+            cavity += PI * (hi - lo) * (a * a + a * b + b * b) / 3.0;
+        }
+    }
+    let want = measure(&body).unwrap().volume - cavity;
+    let got = measure(&s).unwrap().volume;
+    assert!(rel(got, want) < 1e-3, "{got} vs {want}"); // (measured on meshes)
+}
+
+/// An N-sided patch (five sides on the cylinder that cut a pentagonal prism's top), thickened
+/// by 2: a valid closed solid of the two copies and five walls, the far copy 2 from the patch
+/// at every mesh point, to within the fit's 0.01 mm. #194.
+#[test]
+fn thicken_of_a_five_sided_patch_keeps_its_thickness() {
+    let pent: Vec<Vec2> = (0..5).map(|k| PI / 2.0 + 2.0 * PI * k as f64 / 5.0).map(|a| Vec2::new(15.0 * a.cos(), 15.0 * a.sin())).collect();
+    let prism = extrude(&Plane::XY, &[Region2 { outer: Loop2::polygon(&pent), holes: vec![] }], 0.0, 20.0).unwrap().pop().unwrap();
+    let tool = cylinder(Vec3::new(0.0, -60.0, 55.0), Vec3::Y, 40.0, 120.0).unwrap();
+    let cup = boolean(&prism, &tool, BoolOp::Cut).unwrap().unwrap();
+    let rim: Vec<Vec3> = (0..5)
+        .map(|k| {
+            let a = PI / 2.0 + PI / 5.0 + 2.0 * PI * k as f64 / 5.0;
+            let (x, y) = (15.0 * (PI / 5.0).cos() * a.cos(), 15.0 * (PI / 5.0).cos() * a.sin());
+            Vec3::new(x, y, 55.0 - (1600.0 - x * x).sqrt())
+        })
+        .collect();
+    let patch = patch_edges(&cup, &rim).unwrap();
+    let t = 2.0;
+    let thick = thicken(&patch, t, false).unwrap();
+    assert!(thick.validity().is_empty(), "{:?}", thick.validity());
+    assert_eq!(thick.face_count(), 7);
+    let far = inner_wall_points(&thick, &patch, &[], t * 0.9);
+    assert!(far.len() > 100, "{} points", far.len());
+    for p in far {
+        let d = distance_to_faces(&patch, &[], p);
+        assert!((d - t).abs() < 0.02, "thickness {d} at {p:?}");
+    }
+    let m = measure(&thick).unwrap();
+    let area = measure(&patch).unwrap().area;
+    assert!(rel(m.volume, area * t) < 0.05, "{} vs {}", m.volume, area * t);
+}
+
+/// A section of the creased loft: a chord `2w` wide, sides rising to `0.8h` and a top arching to
+/// about `0.9h`, each a cubic, meeting at creases (sharp corners). #195.
+fn creased_section(x: f64, w: f64, h: f64) -> (Plane, Vec<Seg2>) {
+    let p = |a: f64, b: f64| Vec2::new(a * w, b * h);
+    let plane = Plane::new(Vec3::new(x, 0.0, 0.0), Vec3::Y, Vec3::Z).unwrap();
+    let segs = vec![
+        Seg2::Cubic { p0: p(-1.0, 0.0), p1: p(-1.08, 0.35), p2: p(-0.95, 0.65), p3: p(-0.8, 0.8) },
+        Seg2::Cubic { p0: p(-0.8, 0.8), p1: p(-0.4, 0.9), p2: p(0.4, 0.9), p3: p(0.8, 0.8) },
+        Seg2::Cubic { p0: p(0.8, 0.8), p1: p(0.95, 0.65), p2: p(1.08, 0.35), p3: p(1.0, 0.0) },
+        Seg2::Line { a: p(1.0, 0.0), b: p(-1.0, 0.0) },
+    ];
+    (plane, segs)
+}
+
+/// A loft through creased sections (a skull's, #195: open at both ends, its four faces meeting
+/// at sharp edges) thickened 2 against its normals: the creases are inside corners on that side,
+/// where the faces' offsets are cut back to meet. A valid closed solid of the sheet, its offset
+/// (four faces sharing their moved edges) and eight walls round the open ends; every mesh point
+/// of the offset 2 from the sheet, to within the fit's 0.01 mm and the mesh.
+#[test]
+fn thicken_of_a_creased_loft_into_its_inside_corners() {
+    let sections: Vec<(Plane, Vec<Seg2>)> = [(15.0, 10.0, 14.0), (45.0, 16.0, 22.0), (75.0, 24.0, 34.0), (105.0, 32.0, 40.0), (130.0, 34.0, 36.0)]
+        .iter()
+        .map(|&(x, w, h)| creased_section(x, w, h))
+        .collect();
+    let sheet = loft_sheet(&sections).unwrap();
+    assert_eq!(sheet.face_count(), 4);
+    let t = 2.0;
+    let thick = thicken(&sheet, -t, false).unwrap();
+    assert!(thick.validity().is_empty(), "{:?}", thick.validity());
+    assert_eq!(thick.face_count(), 16);
+    let far = inner_wall_points(&thick, &sheet, &[], t * 0.9);
+    assert!(far.len() > 100, "{} points", far.len());
+    for p in far {
+        let d = distance_to_faces(&sheet, &[], p);
+        assert!((d - t).abs() < 0.02, "thickness {d} at {p:?}");
+    }
+}
+
+/// A revolved sheet (a bottle's wall) with two holes trimmed through it, thickened 2 inwards:
+/// the walls round the holes' rims run along closed edges, which truck's ruled face can't take
+/// (its wire would not be simple: a panic). A valid closed solid, the inner copy 2 from the
+/// sheet. #195.
+#[test]
+fn thicken_of_a_revolved_sheet_with_trimmed_holes() {
+    let xz = Plane::new(Vec3::ZERO, Vec3::X, Vec3::Z).unwrap();
+    let profile = vec![
+        Seg2::Cubic { p0: Vec2::new(30.0, 0.0), p1: Vec2::new(32.5, 20.0), p2: Vec2::new(32.5, 40.0), p3: Vec2::new(30.0, 60.0) },
+        Seg2::Cubic { p0: Vec2::new(30.0, 60.0), p1: Vec2::new(28.75, 70.0), p2: Vec2::new(12.0, 90.0), p3: Vec2::new(12.0, 100.0) },
+        Seg2::Cubic { p0: Vec2::new(12.0, 100.0), p1: Vec2::new(12.0, 105.0), p2: Vec2::new(12.0, 110.0), p3: Vec2::new(12.0, 115.0) },
+    ];
+    let bottle = revolve_sheet(&xz, &[profile], Vec2::ZERO, Vec2::new(0.0, 1.0), 0.0, 2.0 * PI).unwrap();
+    let yz = Plane::new(Vec3::ZERO, Vec3::Y, Vec3::Z).unwrap();
+    let holes = vec![Loop2::circle(Vec2::new(0.0, 25.0), 7.0).segs, Loop2::circle(Vec2::new(0.0, 75.0), 7.0).segs];
+    let tool = SplitTool::Curves { plane: yz, curves: holes, along: None };
+    let sheet = trim_keep(&bottle, &tool, TrimKeep::Regions(&[Vec3::new(-31.0, 0.0, 40.0)])).unwrap();
+    let t = 2.0;
+    let thick = thicken(&sheet, -t, false).unwrap();
+    assert!(thick.validity().is_empty(), "{:?}", thick.validity());
+    assert_eq!(thick.solid.boundaries().len(), 1);
+    let far = inner_wall_points(&thick, &sheet, &[], t * 0.9);
+    assert!(far.len() > 100, "{} points", far.len());
+    for p in far.iter().step_by(5) {
+        let d = distance_to_faces(&sheet, &[], *p);
+        assert!((d - t).abs() < 0.02, "thickness {d} at {p:?}");
+    }
+}
+
+/// A loft whose rounded corners (radius 3 to 4) are tighter than the wall: shelling it 5 would
+/// fold the inner corners over, which is refused, naming the radius. #194.
+#[test]
+fn shell_of_a_loft_deeper_than_its_corner_radius_is_refused() {
+    let body = loft(&[
+        (plane_at_z(0.0), rounded_rect(-30.0, -25.0, 30.0, 25.0, 3.0)),
+        (plane_at_z(30.0), rounded_rect(-34.0, -27.0, 34.0, 27.0, 4.0)),
+        (plane_at_z(60.0), rounded_rect(-32.0, -26.0, 32.0, 26.0, 3.5)),
+    ])
+    .unwrap();
+    let e = shell(&body, &[Vec3::new(0.0, 0.0, 60.0)], 5.0).unwrap_err().to_string();
+    assert!(e.contains("radius") && e.contains("fold"), "{e}");
+}
+
+/// The vertices of a shell's mesh (about 2000 of them) more than half the wall from the body's surface,
+/// each with its distance to the body's mesh (fine: chords of 0.005) but its open face (at `open`).
+fn shell_walls(shell: &Body, body: &Body, open: Vec3, t: f64) -> Vec<(Vec3, f64)> {
+    let outer = body.tessellate(0.005).unwrap();
+    let skip = outer
+        .triangles
+        .iter()
+        .zip(&outer.tri_face)
+        .filter_map(|(t, f)| outer.tri(t).map(|[a, b, c]| (crate::polyhedron::point_tri(open, a, b, c), *f)))
+        .min_by(|x, y| x.0.total_cmp(&y.0))
+        .unwrap()
+        .1;
+    let tris: Vec<[Vec3; 3]> = outer.triangles.iter().zip(&outer.tri_face).filter(|(_, f)| **f != skip).filter_map(|(t, _)| outer.tri(t)).collect();
+    let near = |p: Vec3| tris.iter().map(|[a, b, c]| crate::polyhedron::point_tri(p, *a, *b, *c)).fold(f64::INFINITY, f64::min);
+    let inner = shell.tessellate(0.05).unwrap();
+    let step = (inner.positions.len() / 2000).max(1);
+    inner.positions.iter().step_by(step).map(|p| (*p, near(*p))).filter(|(_, d)| *d > t / 2.0).collect()
+}
+
+/// A block with a window of a cubic arch cut through it (a free-form wall), its top back edge
+/// chamfered 2 and a hole of radius 1.65 through it 3.35 from the back face, closer to the
+/// chamfer (0.95) than the wall: moved in by 1.5, the ring of the top face between the hole and
+/// the chamfer vanishes, which the topology-preserving offset can't do. The shell goes through
+/// the block with its holes filled, less each hole grown by the wall: a valid closed solid
+/// whose inner walls are all at least the wall from the outer faces. (The ladder's running
+/// part shelled 1.5, #194.)
+#[test]
+fn shell_round_a_hole_closer_to_a_chamfer_than_the_wall() {
+    let block = box_solid(Vec3::ZERO, Vec3::new(40.0, 20.0, 20.0)).unwrap();
+    let xz = Plane::new(Vec3::ZERO, Vec3::X, Vec3::Z).unwrap();
+    let arch = Region2 {
+        outer: Loop2 {
+            segs: vec![
+                Seg2::Line { a: Vec2::new(10.0, 6.0), b: Vec2::new(30.0, 6.0) },
+                Seg2::Cubic { p0: Vec2::new(30.0, 6.0), p1: Vec2::new(27.0, 15.0), p2: Vec2::new(13.0, 15.0), p3: Vec2::new(10.0, 6.0) },
+            ],
+        },
+        holes: vec![],
+    };
+    let window = extrude(&xz, &[arch], -30.0, 10.0).unwrap().pop().unwrap();
+    let cut = boolean(&block, &window, BoolOp::Cut).unwrap().unwrap();
+    let chamfered = chamfer(&cut, &[Vec3::new(20.0, 20.0, 20.0)], 2.0).unwrap();
+    let drill = cylinder(Vec3::new(5.0, 15.0, -1.0), Vec3::Z, 1.65, 22.0).unwrap();
+    let body = boolean(&chamfered, &drill, BoolOp::Cut).unwrap().unwrap();
+    let t = 1.5;
+    let s = shell(&body, &[Vec3::new(20.0, 3.0, 0.0)], t).unwrap();
+    assert!(s.validity().is_empty(), "{:?}", s.validity());
+    assert_eq!(s.solid.boundaries().len(), 1);
+    assert!(s.history().is_some(), "the shell's faces trace back to the block's");
+    // Every vertex of the shell's mesh off the body's surface, measured to the body's mesh
+    // (fine, so that its chords are well under the slack): within the fit (0.02) and the
+    // Boolean's intersection tolerance (1e-3 of the size), which places the edges where a
+    // grown hole meets the cavity, nothing is closer than the wall.
+    let walls = shell_walls(&s, &body, Vec3::new(20.0, 3.0, 0.0), t);
+    assert!(walls.len() > 20, "{} points", walls.len());
+    let slack = 0.02 + body.size() * 1e-3;
+    for (p, d) in walls {
+        assert!(d > t - slack, "wall {d} at {p:?}");
+    }
+}
+
+/// The same block without the window (every face a plane or a cylinder), shelled 1.5: the
+/// analytic shell refuses where the hole's ring vanishes, and goes through the block with that
+/// hole filled the same way. A valid closed solid whose inner walls are all at least the wall
+/// from the outer faces. #194.
+#[test]
+fn shell_round_a_hole_closer_to_a_chamfer_than_the_wall_on_planes() {
+    let block = box_solid(Vec3::ZERO, Vec3::new(40.0, 20.0, 20.0)).unwrap();
+    let chamfered = chamfer(&block, &[Vec3::new(20.0, 20.0, 20.0)], 2.0).unwrap();
+    let drill = cylinder(Vec3::new(5.0, 15.0, -1.0), Vec3::Z, 1.65, 22.0).unwrap();
+    let body = boolean(&chamfered, &drill, BoolOp::Cut).unwrap().unwrap();
+    let t = 1.5;
+    let s = shell(&body, &[Vec3::new(20.0, 3.0, 0.0)], t).unwrap();
+    assert!(s.validity().is_empty(), "{:?}", s.validity());
+    assert_eq!(s.solid.boundaries().len(), 1);
+    assert!(s.history().is_some(), "the shell's faces trace back to the block's");
+    // Every vertex of the shell's mesh off the body's surface, measured to the body's mesh
+    // (fine, so that its chords are well under the slack): within the fit (0.02) and the
+    // Boolean's intersection tolerance (1e-3 of the size), which places the edges where a
+    // grown hole meets the cavity, nothing is closer than the wall.
+    let walls = shell_walls(&s, &body, Vec3::new(20.0, 3.0, 0.0), t);
+    assert!(walls.len() > 20, "{} points", walls.len());
+    let slack = 0.02 + body.size() * 1e-3;
+    for (p, d) in walls {
+        assert!(d > t - slack, "wall {d} at {p:?}");
+    }
+}
+
+/// A barrel loft shelled a thousandth of a millimetre thick: the wall check's chord is at most
+/// a twentieth of the wall, which once put its upper bound under its lower one (a panic, caught
+/// as an internal error). A shell or a refusal, never that.
+#[test]
+fn shell_of_a_loft_far_thinner_than_its_chord_does_not_panic() {
+    let body = loft(&[
+        (plane_at_z(0.0), Loop2::circle(Vec2::ZERO, 20.0)),
+        (plane_at_z(30.0), Loop2::circle(Vec2::ZERO, 26.0)),
+        (plane_at_z(60.0), Loop2::circle(Vec2::ZERO, 21.0)),
+    ])
+    .unwrap();
+    match shell(&body, &[Vec3::new(0.0, 0.0, 60.0)], 0.001) {
+        Ok(s) => assert!(s.validity().is_empty(), "{:?}", s.validity()),
+        Err(e) => assert!(!matches!(e, KernelError::Internal(_)), "{e}"),
+    }
+}
+
+/// A dumbbell-shaped section: the chord from (−30, 0) to (30, 0) and, over it, two cubic lobes
+/// about 8 high meeting `neck` above the chord's middle.
+fn dumbbell_section(neck: f64) -> Loop2 {
+    Loop2 {
+        segs: vec![
+            Seg2::Line { a: Vec2::new(-30.0, 0.0), b: Vec2::new(30.0, 0.0) },
+            Seg2::Cubic { p0: Vec2::new(30.0, 0.0), p1: Vec2::new(32.0, 16.0), p2: Vec2::new(6.0, neck), p3: Vec2::new(0.0, neck) },
+            Seg2::Cubic { p0: Vec2::new(0.0, neck), p1: Vec2::new(-6.0, neck), p2: Vec2::new(-32.0, 16.0), p3: Vec2::new(-30.0, 0.0) },
+        ],
+    }
+}
+
+/// A loft of dumbbell sections (a flat wall, and free-form lobes that come down to 4 above it in
+/// the middle) shelled open at one end: 1.5 makes a valid shell; at 2.5 the lobes' inner wall
+/// would pass the flat wall's in the neck, though every corner and edge still moves as it should,
+/// and is refused: the wall check measures to analytic faces too (#207).
+#[test]
+fn shell_whose_free_form_wall_would_cross_a_flat_one_is_refused() {
+    let body =
+        loft(&[(plane_at_z(0.0), dumbbell_section(4.0)), (plane_at_z(30.0), dumbbell_section(4.5)), (plane_at_z(60.0), dumbbell_section(4.0))])
+            .unwrap();
+    let open = [Vec3::new(-15.0, 3.0, 60.0)];
+    let s = shell(&body, &open, 1.5).unwrap();
+    assert!(s.validity().is_empty(), "{:?}", s.validity());
+    let e = shell(&body, &open, 2.5).unwrap_err().to_string();
+    assert!(e.contains("walls would meet"), "{e}");
+}
+
+/// The grid of surface points a search from no starting point takes the nearest of is evaluated
+/// once per intersection polyline (#125), not once per point, and every search goes on exactly as
+/// before: an oblique cut right round a revolved shaft and an extruded bar, and an oblique join
+/// of each with a slab, give the very results (counts, volume and area, bit for bit) of the
+/// searches that evaluate their own grids.
+#[test]
+fn presearch_grids_once_per_polyline_change_nothing() {
+    use truck_shapeops::broad_phase_test_hooks::uncached;
+    let profile =
+        Region2 { outer: Loop2::polygon(&[Vec2::new(0.0, 0.0), Vec2::new(12.0, 0.0), Vec2::new(12.0, 40.0), Vec2::new(0.0, 40.0)]), holes: vec![] };
+    let shaft = revolve(&Plane::XZ, &[profile], Vec2::ZERO, Vec2::Y, std::f64::consts::TAU).unwrap().pop().unwrap();
+    let bar = extrude(&Plane::XY, &[Region2 { outer: Loop2::circle(Vec2::ZERO, 12.0), holes: vec![] }], -40.0, 0.0).unwrap().pop().unwrap();
+    let slab = box_solid(Vec3::new(-30.0, -30.0, -24.0), Vec3::new(30.0, 30.0, -16.0)).unwrap();
+    let slab = crate::transform(&slab, Vec3::ZERO, Vec3::new(0.0, 0.0, -20.0), Vec3::new(0.4, 1.0, 0.0), 0.35).unwrap();
+    let tol = 0.05;
+    for (name, round) in [("shaft", &shaft), ("bar", &bar)] {
+        for (and, invert) in [(true, true), (false, false)] {
+            let run = || {
+                let (sa, mut sb) = (round.deep_copy(), slab.deep_copy());
+                if invert {
+                    sb.not();
+                }
+                guard("t", || Ok(if and { truck_shapeops::and(&sa, &sb, tol) } else { truck_shapeops::or(&sa, &sb, tol) })).unwrap()
+            };
+            let what = format!("{name} and {and} invert {invert}");
+            let (Some(cached), Some(plain)) = (run(), uncached(run)) else { panic!("{what}: no result") };
+            let (mc, mp) = (measure(&Body::new(cached).unwrap()).unwrap(), measure(&Body::new(plain).unwrap()).unwrap());
+            assert_eq!((mc.faces, mc.edges, mc.vertices), (mp.faces, mp.edges, mp.vertices), "{what}");
+            assert_eq!(
+                (mc.volume.to_bits(), mc.area.to_bits()),
+                (mp.volume.to_bits(), mp.area.to_bits()),
+                "{what}: {} {} vs {} {}",
+                mc.volume,
+                mc.area,
+                mp.volume,
+                mp.area
+            );
         }
     }
 }

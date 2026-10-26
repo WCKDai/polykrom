@@ -803,3 +803,24 @@ fn patterns_and_mirrors_of_patterns_and_mirrors() {
         assert!(rel(after, want) < 1e-5, "{what}: {after} mm³, {added} more holes than {before} = {want}");
     }
 }
+
+/// A pattern of a boss and its fillet with a radius per edge: each copy's edges take the radii
+/// their originals took (R1 and R2 on the boss's two top edges along x).
+#[test]
+fn pattern_of_a_fillet_with_a_radius_per_edge() {
+    use std::f64::consts::FRAC_PI_4;
+    let mut s = Session::default();
+    run(&mut s, "solid.box", json!({"length": 100, "width": 40, "height": 5, "body_name": "Plate"}));
+    run(
+        &mut s,
+        "solid.box",
+        json!({"corner": [10, 10, 5], "length": 10, "width": 10, "height": 10, "operation": "join", "targets": ["Plate"], "name": "Boss"}),
+    );
+    run(&mut s, "solid.fillet", json!({"edges": [[15, 10, 15], [15, 20, 15]], "radius": 1, "edge_radii": [1, 2], "name": "Round"}));
+    run(&mut s, "solid.pattern.rectangular", json!({"features": ["Boss", "Round"], "dir1": [1, 0, 0], "count1": 2, "spacing1": 30}));
+    let boss = 1000.0 - (1.0 - FRAC_PI_4) * (1.0 + 4.0) * 10.0;
+    let want = 100.0 * 40.0 * 5.0 + 2.0 * boss;
+    let st = s.model.state();
+    let got: f64 = st.bodies.iter().map(|b| b.body.tessellate_with(1e-4, true).unwrap().measure().volume).sum();
+    assert!((got - want).abs() < 1e-4 * want, "{got} against {want}");
+}

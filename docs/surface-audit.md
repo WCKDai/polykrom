@@ -2,12 +2,21 @@
 
 An agent built four organic parts with the `surface.*` commands only, one command at a time
 through `polykrom-cli mcp --headless` (the MCP `execute` tool, so every refusal is what an agent
-sees), on `main` at 9086d73c. Each part was meant to end as a closed, printable solid. Every
-refusal and every wrong result with a right answer that can be stated became a kernel case in
+sees), on `main` at 9086d73c. Each part was meant to end as a closed, printable solid. Only
+the refusals and wrong results with a right answer that can be stated became kernel cases, in
 `tests/kernel-cases/surfaces` or `tests/kernel-cases/shell` (see [kernel-cases.md](kernel-cases.md)).
-Three findings have no case, because what they measure is quality, not a right answer: patch
-fairness (finding 6), the default G1 blend speed (finding 7) and the continuity inspection's
-worst-only report (finding 8).
+These rows of the tables below have none:
+
+- refusals that are right, or about how a call is written rather than the geometry: "the edges
+  form more than one chain" (four of a loop's nine edges picked), "H0 has no closed profiles" (a
+  loft section of one open curve, its `curves` not named), and the refusals of a direction no
+  face holds once `align` is given;
+- refusals the geometry makes right: thickening a patch or blend by more than its smallest
+  radius (the skull's 0.7–1.2 mm patches, the hood's 0.48 mm blend), which come from patch
+  fairness (finding 6) and the default G1 blend speed (finding 7);
+- quality and reporting, which have no single right answer: a crown that balloons past its
+  loop, the continuity inspection's worst-only report (finding 8), `inspect.measure`'s volume
+  of an open sheet, and the time a sweep or a measure takes.
 
 ## How it was measured
 

@@ -19,7 +19,7 @@ pub static COMMANDS: &[CommandSpec] = &[
     CommandSpec::new("surface.patch", "Patch", patch)
         .at("SURFACE", "CREATE")
         .icon("surface_patch")
-        .params("sketch?: id|name and profiles? (planar patches of sketch regions) | edges: [[x,y,z]] (points on a closed loop of a body's edges: one face on them, planar when the loop is, else a smooth B-spline surface) and body?; continuity?: g0|g1|g2 (edges only, default g0: how the patch meets the faces beside the loop — g1 their tangent planes, g2 also their curvature across the edges) or [{edge: [x,y,z], g: g0|g1|g2}] (those edges so, the rest g0) or {all, edges}; points?: [[x,y,z]] (edges only, up to 64: points the patch passes through); crown?: number −0.9…3 (default 0: only a fitted patch, whose middle becomes fuller by this many times the loop's size — the bump vanishes on the loop, so the face still meets the picked edges and the continuity across them; a loop that is planar and g0 is the exact plane whatever the crown; with points, crown needs a g1 or g2 edge); name?, body_name?"),
+        .params("sketch?: id|name and profiles? (planar patches of sketch regions) | edges: [[x,y,z]] (points on a closed loop of a body's edges: one face on them, planar when the loop is, else a smooth B-spline surface) and body?; continuity?: g0|g1|g2 (edges only, default g0: how the patch meets the faces beside the loop — g1 their tangent planes, g2 also their curvature across the edges) or [{edge: [x,y,z], g: g0|g1|g2}] (those edges so, the rest g0) or {all, edges}; points?: [[x,y,z]] (edges only, up to 64: points the patch passes through); crown?: number −0.9…3 (default 0: only a fitted patch, whose middle becomes fuller by this many times the loop's size — the bump vanishes on the loop, so the face still meets the picked edges and the continuity across them; a loop that is planar and g0 is the exact plane whatever the crown; with points, crown needs a g1 or g2 edge); speed?: number 0.25…4 (edges only, default 2: how fast the patch leaves its g1/g2 edges, a multiple of the loop's own speed — 2 rises over a round rim like a hemisphere, fair to it; patches saved before it was saved leave at 1, flatter and curling tighter at the rim); name?, body_name?"),
     CommandSpec::new("surface.stitch", "Stitch", stitch)
         .at("SURFACE", "MODIFY")
         .icon("surface_stitch")
@@ -51,7 +51,7 @@ pub static COMMANDS: &[CommandSpec] = &[
     CommandSpec::new("surface.loft", "Surface Loft", surface_loft)
         .at("SURFACE", "CREATE")
         .icon("surface_loft")
-        .params("sections: [{sketch, curves?: [curve ids], profiles?} | {body, edges: [[x,y,z]]}] (2…50 in order; each one chain: a profile without holes, or curves meeting end to end; all open or all closed; a body edge chain takes the face the chain bounds as the surface the end repeats); continuity?: [g0|g1|g2|g3, g0|g1|g2|g3] (each end, default g0: how much of the surface at the first and last section the loft repeats — the tangent plane, the curvature, or how that curvature changes); crown?: [number, number] (default 0: how full each end leaves, -0.9 flattest to 3 fullest); rails?, rail_fit? (as solid.loft; sketch sections only, both ends g0); name?, body_name? (a surface body: ruled between two sections, smooth through three or more; no caps)"),
+        .params("sections: [{sketch, curves?: [curve ids], profiles?} (neither: the sketch's profiles, or in a sketch without one its drawn curves) | {body, edges: [[x,y,z]]}] (2…50 in order; each one chain: a profile without holes, or curves meeting end to end; all open or all closed; a body edge chain takes the face the chain bounds as the surface the end repeats); continuity?: [g0|g1|g2|g3, g0|g1|g2|g3] (each end, default g0: how much of the surface at the first and last section the loft repeats — the tangent plane, the curvature, or how that curvature changes); crown?: [number, number] (default 0: how full each end leaves, -0.9 flattest to 3 fullest); rails?, rail_fit? (as solid.loft; sketch sections only, both ends g0); name?, body_name? (a surface body: ruled between two sections, smooth through three or more; no caps)"),
     CommandSpec::new("surface.offset", "Offset Surface", offset)
         .at("SURFACE", "CREATE")
         .icon("surface_offset")
@@ -63,7 +63,7 @@ pub static COMMANDS: &[CommandSpec] = &[
     CommandSpec::new("surface.blend", "Blend Surface", blend)
         .at("SURFACE", "CREATE")
         .icon("surface_blend")
-        .params("from, to: {body, edges: [[x,y,z]]} (points on the edges of one chain of each body: two picks on the same edge is that one edge, more chain up); continuity?: [g0|g1|g2|g3, g0|g1|g2|g3] (each end, default g1: how much of the surface at the picked edges the blend repeats — the tangent plane, the curvature, or how that curvature changes); bulge?: [number, number] (default 0: how full each end leaves, -0.9 flattest to 3 fullest); align?: [[x,y,z], [x,y,z]] (a point each end leaves towards, when the faces at the picks do not say); seam?: [[x,y,z], [x,y,z]] (a point on each chain its stations start from: two closed chains otherwise pair the way that keeps the blend from twisting; an open chain starts at the end nearer its point; a closed chain blends only to a closed chain); stitch?: bool (sew the blend onto its two bodies where the boundaries meet, replacing them); name?, body_name?"),
+        .params("from, to: {body, edges: [[x,y,z]]} (points on the edges of one chain of each body: two picks on the same edge is that one edge, more chain up); continuity?: [g0|g1|g2|g3, g0|g1|g2|g3] (each end, default g1: how much of the surface at the picked edges the blend repeats — the tangent plane, the curvature, or how that curvature changes); bulge?: [number, number] (default 0: how full each end leaves, -0.9 flattest to 3 fullest); tangent?: [number, number] (default [1, 1]: how fast each end leaves, a share of the chord across, 0.05…3; blends saved before it was saved leave at a third; a tangent and bulge that together would fold the blend back on itself are refused); align?: [[x,y,z], [x,y,z]] (a point each end leaves towards, when the faces at the picks do not say); seam?: [[x,y,z], [x,y,z]] (a point on each chain its stations start from: two closed chains otherwise pair the way that keeps the blend from twisting; an open chain starts at the end nearer its point; a closed chain blends only to a closed chain); stitch?: bool (sew the blend onto its two bodies where the boundaries meet, replacing them); name?, body_name?"),
     CommandSpec::new("surface.untrim", "Untrim", untrim)
         .at("SURFACE", "MODIFY")
         .icon("surface_untrim")
@@ -91,6 +91,15 @@ fn patch(s: &mut Session, p: &Value) -> Result<Value> {
     let crown = crown_param(p, cmd)?;
     let continuity = patch_continuity(p, cmd)?;
     let points: Vec<Position> = patch_points(p, cmd)?.into_iter().map(Position).collect();
+    let speed = match p.get("speed") {
+        None => solidcraft_geom::fill_general::FILL_SPEED,
+        Some(v) => {
+            let range = solidcraft_geom::fill_general::FILL_SPEED_RANGE;
+            v.as_f64().filter(|x| range.contains(x)).ok_or_else(|| {
+                bad(cmd, format!("`speed` must be between {} and {} (a multiple of the loop's own speed)", range.start(), range.end()))
+            })?
+        }
+    };
     let edges: Vec<solidcraft_geom::Vec3> = p.get("edges").and_then(Value::as_array).map(|a| a.iter().filter_map(vec3).collect()).unwrap_or_default();
     let mut v = if !edges.is_empty() {
         if edges.len() > 10_000 {
@@ -108,6 +117,8 @@ fn patch(s: &mut Session, p: &Value) -> Result<Value> {
                 crown,
                 continuity: continuity.clone(),
                 points,
+                // Saved even at its default, so that a later default leaves this patch's shape.
+                speed: Some(speed),
             },
         )?
     } else {
@@ -124,6 +135,7 @@ fn patch(s: &mut Session, p: &Value) -> Result<Value> {
             crown,
             continuity: PatchContinuity::default(),
             points,
+            speed: None,
         };
         add_feature(s, p, kind)?
     };
@@ -237,10 +249,24 @@ fn blend(s: &mut Session, p: &Value) -> Result<Value> {
             [one(list.first())?, one(list.get(1))?]
         }
     };
+    let tangent = match p.get("tangent") {
+        None => [solidcraft_kernel::BLEND_TANGENT; 2],
+        Some(v) => {
+            let list = v.as_array().filter(|a| a.len() == 2).ok_or_else(|| bad(cmd, "`tangent` must be two numbers, one per end"))?;
+            let range = solidcraft_kernel::BLEND_TANGENT_RANGE;
+            let one = |x: Option<&Value>| -> Result<f64> {
+                x.and_then(Value::as_f64).filter(|x| range.contains(x)).ok_or_else(|| {
+                    bad(cmd, format!("each `tangent` entry must be between {} and {} (a share of the chord)", range.start(), range.end()))
+                })
+            };
+            [one(list.first())?, one(list.get(1))?]
+        }
+    };
     let align = point_pair(p, cmd, "align", "one per end")?;
     let seam = point_pair(p, cmd, "seam", "one on each chain")?;
     let stitch = bool_(p, "stitch").unwrap_or(false);
-    add_feature(s, p, FeatureKind::SurfaceBlend { from, to, continuity, bulge, align, seam, stitch })
+    // The share is saved even at its default, so that a later default leaves this blend's shape.
+    add_feature(s, p, FeatureKind::SurfaceBlend { from, to, continuity, bulge, align, seam, stitch, tangent: Some(tangent) })
 }
 
 /// An optional pair of points `key` (`null` as none): `which` says what each one is.
@@ -1059,6 +1085,21 @@ mod tests {
         assert!(
             s.execute("surface.loft", &json!({"sections": [{"sketch": "A", "curves": ["a", "apart"]}, {"sketch": "B", "curves": ["b"]}]})).is_err()
         );
+        // A sketch with no profile and one open curve is that curve without naming it (it was
+        // refused as "has no closed profiles", #195); two separate curves are still refused.
+        run(&mut s, "sketch.create", json!({"plane": "XY", "name": "C"}));
+        run(&mut s, "sketch.line", json!({"points": [[0, 0], [10, 0]]}));
+        run(&mut s, "sketch.finish", json!({}));
+        run(&mut s, "sketch.create", json!({"plane": "Mid", "name": "D"}));
+        run(&mut s, "sketch.line", json!({"points": [[0, 0], [10, 0]]}));
+        run(&mut s, "sketch.finish", json!({}));
+        run(&mut s, "surface.loft", json!({"sections": [{"sketch": "C"}, {"sketch": "D"}], "body_name": "Bare"}));
+        assert!((area(&s, "Bare") - 50.0).abs() < 1e-6, "{}", area(&s, "Bare"));
+        run(&mut s, "sketch.create", json!({"plane": "XY", "offset": 10, "name": "E"}));
+        run(&mut s, "sketch.line", json!({"points": [[0, 0], [10, 0]]}));
+        run(&mut s, "sketch.line", json!({"points": [[0, 3], [10, 3]]}));
+        run(&mut s, "sketch.finish", json!({}));
+        assert!(s.execute("surface.loft", &json!({"sections": [{"sketch": "D"}, {"sketch": "E"}]})).is_err());
     }
 
     /// Each wall of a surface built from sketch curves is named after the curve it comes from,
@@ -1836,6 +1877,79 @@ mod tests {
         );
     }
 
+    /// A new blend leaves each boundary at the chord's speed and saves that share, so a blend in a
+    /// design saved before keeps the third it was built with: two offset box rims, blended now,
+    /// bridged by the fuller Hermite strip, and the same feature without `tangent` (as an older
+    /// design has it) by the legacy one (#195).
+    #[test]
+    fn surface_blend_saves_how_fast_it_leaves() {
+        let mut s = Session::default();
+        run(&mut s, "solid.box", json!({"length": 40, "width": 10, "height": 10, "corner": [0, 0, 0], "body_name": "A"}));
+        run(&mut s, "solid.box", json!({"length": 40, "width": 10, "height": 10, "corner": [0, 20, 5], "body_name": "B"}));
+        let blend = json!({"from": {"body": "A", "edges": [[20, 10, 10]]}, "to": {"body": "B", "edges": [[20, 20, 15]]}, "body_name": "Strip"});
+        run(&mut s, "surface.blend", blend.clone());
+        let saved: Value = serde_json::from_str(&s.doc.to_json()).unwrap();
+        let mut found = Vec::new();
+        fn tangents(v: &Value, out: &mut Vec<Value>) {
+            match v {
+                Value::Object(m) => {
+                    if m.contains_key("bulge") {
+                        out.push(m.get("tangent").cloned().unwrap_or(Value::Null));
+                    }
+                    m.values().for_each(|x| tangents(x, out));
+                }
+                Value::Array(a) => a.iter().for_each(|x| tangents(x, out)),
+                _ => {}
+            }
+        }
+        tangents(&saved, &mut found);
+        assert_eq!(found, vec![json!([1.0, 1.0])], "the share is saved with the blend");
+        // Each cross-section is the cubic Bézier (10, 10), (10 + h, 10), (20 - h, 15), (20, 15)
+        // in (y, z), 40 long: h = chord/3 now, chord/9 for the legacy third.
+        let strip = |h: f64| {
+            let p = [(10.0, 10.0), (10.0 + h, 10.0), (20.0 - h, 15.0), (20.0, 15.0)];
+            let n = 4000;
+            let at = |t: f64| {
+                let w = [(1.0 - t).powi(3), 3.0 * t * (1.0 - t).powi(2), 3.0 * t * t * (1.0 - t), t.powi(3)];
+                p.iter().zip(w).fold((0.0, 0.0), |(y, z), ((py, pz), w)| (y + py * w, z + pz * w))
+            };
+            let length: f64 = (0..n)
+                .map(|k| {
+                    let (a, b) = (at(k as f64 / n as f64), at((k + 1) as f64 / n as f64));
+                    ((b.0 - a.0).powi(2) + (b.1 - a.1).powi(2)).sqrt()
+                })
+                .sum();
+            40.0 * length
+        };
+        let chord = 125f64.sqrt();
+        assert!((area(&s, "Strip") - strip(chord / 3.0)).abs() < 1e-3 * strip(chord / 3.0), "{} vs {}", area(&s, "Strip"), strip(chord / 3.0));
+        // The same design as an older build saved it: no `tangent`, the legacy third.
+        let mut old = saved.clone();
+        fn strip_tangent(v: &mut Value) {
+            match v {
+                Value::Object(m) => {
+                    if m.contains_key("bulge") {
+                        m.remove("tangent");
+                    }
+                    m.values_mut().for_each(strip_tangent);
+                }
+                Value::Array(a) => a.iter_mut().for_each(strip_tangent),
+                _ => {}
+            }
+        }
+        strip_tangent(&mut old);
+        let cold = Session::new(solidcraft_doc::Document::from_json(&old.to_string()).unwrap());
+        assert!((area(&cold, "Strip") - strip(chord / 9.0)).abs() < 1e-3 * strip(chord / 9.0), "{} vs {}", area(&cold, "Strip"), strip(chord / 9.0));
+        // An explicit share, and one out of range.
+        let mut thin = blend.clone();
+        thin["tangent"] = json!([0.5, 0.5]);
+        thin["body_name"] = json!("Thin");
+        run(&mut s, "surface.blend", thin.clone());
+        assert!((area(&s, "Thin") - strip(chord / 6.0)).abs() < 1e-3 * strip(chord / 6.0), "{} vs {}", area(&s, "Thin"), strip(chord / 6.0));
+        thin["tangent"] = json!([0.0, 1.0]);
+        assert!(s.execute("surface.blend", &thin).is_err());
+    }
+
     /// `surface.blend` between two tube rims: each rim runs along both halves of its tube's wall
     /// (two faces), the rims are closed, and the blend is the wall between them, straight up the
     /// axis. Picked `seam` points turn it, are saved with the design, and a closed rim does not
@@ -1922,11 +2036,27 @@ mod tests {
                 "surface.blend",
                 json!({"from": {"body": "Low", "edges": low}, "to": {"body": "High", "edges": high}, "continuity": [g, g]}),
             );
-            // The boundary is a cubic through the stations on the rims: between them it strays
-            // by the interpolation error, about 0.01 mm on rims 290 mm round.
+            // The boundary is a cubic through the stations on the rims: they are added until it
+            // is within a stitch's default tolerance of these smooth rims (1e-6 of the size and
+            // 1e-6 mm; 0.009 mm at the blend's 41 stations before, #195).
             let gap = blend_gap(&r);
-            assert!(gap < 0.02, "{g}: the blend's boundary strays {gap} mm from the rims: {r}");
+            assert!(gap < 2e-4, "{g}: the blend's boundary strays {gap} mm from the rims: {r}");
         }
+        // So a plain stitch closes them: a G2 blend from the low tube's top rim to the high one's
+        // bottom rim, flat lids on the open ends, all sewn with the stitch's default tolerance,
+        // make one closed solid (at 41 stations the boundary lay 0.009 mm off and the stitch left
+        // both rims open).
+        let r = run(
+            &mut s,
+            "surface.blend",
+            json!({"from": {"body": "Low", "edges": low}, "to": {"body": "High", "edges": high}, "continuity": ["g2", "g2"], "body_name": "Neck"}),
+        );
+        assert!(blend_gap(&r) < 2e-4, "{r}");
+        let lift = |rim: &Value, z: f64| json!(rim.as_array().unwrap().iter().map(|p| json!([p[0], p[1], z])).collect::<Vec<_>>());
+        run(&mut s, "surface.patch", json!({"body": "Low", "edges": lift(&low, 0.0), "body_name": "Floor"}));
+        run(&mut s, "surface.patch", json!({"body": "High", "edges": lift(&high, 36.0), "body_name": "Lid"}));
+        run(&mut s, "surface.stitch", json!({"bodies": ["Low", "Neck", "High", "Floor", "Lid"]}));
+        assert!(!s.world_state().body("Low").unwrap().body.is_surface(), "one closed solid");
     }
 
     /// A handle meets a bottle: a revolved spline sheet with a hole trimmed through its near side
@@ -1968,10 +2098,11 @@ mod tests {
             json!({"from": {"body": "Peg", "edges": [[45, 0, 30], [45, 0, 20]]}, "to": {"body": "Bottle", "edges": hole}, "continuity": ["g1", "g1"], "body_name": "Neck"}),
         );
         assert_eq!(r["created_bodies"], json!(["Neck"]), "{r}");
-        // The boundary is a cubic through the stations on the rims; between them it strays by
-        // the interpolation error (0.014 mm here, with the tube's rim 31 mm round).
+        // The boundary is a cubic through the stations on the rims. The hole's rim is four traced
+        // edges meeting at slight kinks, where more stations help only slowly: 0.014 mm at the
+        // blend's 41 stations before, about 0.001 mm now (#195).
         let gap = blend_gap(&r);
-        assert!(gap < 0.02, "the blend's boundary strays {gap} mm from the rims: {r}");
+        assert!(gap < 2e-3, "the blend's boundary strays {gap} mm from the rims: {r}");
         // A tube's rim (radius 5) to the hole (radius 7) 13 to 15 mm away: a short flared neck,
         // near the straight frustum between the two (π·12·13).
         let a = area(&s, "Neck");
@@ -2042,6 +2173,43 @@ mod tests {
         run(&mut s, "sketch.rectangle.two_point", json!({"p0": [30, 0], "p1": [40, 10]}));
         let sketch_patch = json!({"sketch": 1, "continuity": "g1"});
         assert!(s.execute("surface.patch", &sketch_patch).is_err(), "continuity on a sketch patch");
+    }
+
+    /// A new G1 patch on a tube's rim rises like a hemisphere (its middle about 10 over a rim of
+    /// radius 10) and saves the speed it left the rim at; the same feature without it, as an older
+    /// design saved it, keeps the flatter cap it was built with, half as high (#195).
+    #[test]
+    fn a_patch_saves_how_fast_it_leaves_its_edges() {
+        let top = |s: &Session, name: &str| s.world_state().body(name).unwrap().body.tessellate(0.05).unwrap().bounds().max.z;
+        let (mut s, rim) = open_tube();
+        run(&mut s, "surface.patch", json!({"edges": rim, "body": "Tube", "continuity": "g1", "body_name": "Cap"}));
+        let fair = top(&s, "Cap");
+        assert!((fair - 40.0).abs() < 0.5, "a hemisphere's height over the rim: {fair}");
+        let saved: Value = serde_json::from_str(&s.doc.to_json()).unwrap();
+        fn without_speed(v: &mut Value, seen: &mut usize) {
+            match v {
+                Value::Object(m) => {
+                    if m.contains_key("edges") && m.remove("speed").is_some() {
+                        *seen += 1;
+                    }
+                    m.values_mut().for_each(|x| without_speed(x, seen));
+                }
+                Value::Array(a) => a.iter_mut().for_each(|x| without_speed(x, seen)),
+                _ => {}
+            }
+        }
+        let (mut old, mut seen) = (saved.clone(), 0);
+        without_speed(&mut old, &mut seen);
+        assert_eq!(seen, 1, "the speed is saved with the patch");
+        let cold = Session::new(solidcraft_doc::Document::from_json(&old.to_string()).unwrap());
+        let legacy = top(&cold, "Cap");
+        assert!((legacy - 35.0).abs() < 0.5, "an older design's cap, half as high: {legacy}");
+        // Asked for explicitly, the old speed gives the old cap; out of range is refused.
+        run(&mut s, "surface.patch", json!({"edges": rim, "body": "Tube", "continuity": "g1", "speed": 1, "body_name": "Flat"}));
+        assert!((top(&s, "Flat") - legacy).abs() < 1e-6);
+        for bad in [json!(0), json!(5), json!("fast")] {
+            assert!(s.execute("surface.patch", &json!({"edges": rim, "body": "Tube", "continuity": "g1", "speed": bad})).is_err(), "{bad}");
+        }
     }
     /// The energies the reply's warning carries: the fairness energy before and after.
     fn energies(reply: &Value) -> (f64, f64) {

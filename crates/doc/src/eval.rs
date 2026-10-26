@@ -4414,6 +4414,8 @@ fn feature_tools_with_constructor(
     let unnamed = |bodies: Vec<Body>| -> Vec<Traced> { bodies.into_iter().map(Traced::unnamed).collect() };
     match &f.kind {
         FeatureKind::Extrude { sketch, profiles, extent, operation, targets, thin } => {
+            let scope: Vec<crate::BodyName> = shaping_targets(st, f, *operation, &crate::plain(targets)).into_iter().map(crate::BodyName).collect();
+            let targets = &scope;
             let ss = sketch_in_feature_frame(
                 doc,
                 st.sketch(sketch.0).ok_or_else(|| DocError::Unknown(format!("sketch {sketch} (it must come earlier in the timeline)")))?,
@@ -4790,7 +4792,9 @@ fn feature_tools_with_constructor(
             // To Object is in this feature's component frame: the model as seen from there.
             let tst = if to.is_some() { state_in_frame(doc, st, f.component) } else { std::borrow::Cow::Borrowed(st) };
             // Where the tool meets its targets is measured where they are shown (#3383).
-            let shown = targets_as_shown(st, f, &feature_op(f).1)?;
+            let (operation, targets) = feature_op(f);
+            let targets = shaping_targets(st, f, operation, &targets);
+            let shown = targets_as_shown(st, f, &targets)?;
             let st: &ModelState = &shown;
             let angles = if to.is_some() {
                 (0.0, None)
@@ -4827,7 +4831,6 @@ fn feature_tools_with_constructor(
                     }
                 })
                 .collect::<Result<Vec<_>>>()?;
-            let (operation, targets) = feature_op(f);
             let axis_w = ss.plane.dir_to_world(d);
             let origin_w = ss.plane.to_world(o);
             let surroundings = Surroundings::of(st, operation, &targets);
@@ -5366,6 +5369,24 @@ pub(crate) fn extent_sides(vals: &BTreeMap<String, Value>, extent: &crate::Exten
 }
 
 /// Operation and targets of a feature that makes tools.
+/// The bodies a join or cut shapes its drawn tools around: its `targets` (none: every body), or,
+/// for one naming none made with [`Feature::scoped_surroundings`], the bodies it can change: its
+/// participants, else its component's (#219).
+fn shaping_targets(st: &ModelState, f: &Feature, op: Operation, targets: &[String]) -> Vec<String> {
+    if !f.scoped_surroundings || !targets.is_empty() || !matches!(op, Operation::Cut | Operation::Join) || f.participants.iter().any(|p| p == "*") {
+        return targets.to_vec();
+    }
+    if !f.participants.is_empty() {
+        return f.participants.clone();
+    }
+    let mine: Vec<String> = st.bodies.iter().filter(|b| b.component == f.component || b.feature == f.id).map(|b| b.name.clone()).collect();
+    // None to change: a name no body has (no list means every body).
+    if mine.is_empty() { vec![NO_BODY.to_string()] } else { mine }
+}
+
+/// A body name no command gives (a scoped cut with no body to change reads this one only).
+pub(crate) const NO_BODY: &str = "\u{0}";
+
 fn feature_op(f: &Feature) -> (Operation, Vec<String>) {
     match &f.kind {
         FeatureKind::Extrude { operation, targets, .. } | FeatureKind::Revolve { operation, targets, .. } => (*operation, crate::plain(targets)),
@@ -5806,6 +5827,23 @@ fn replay(
                 let Some(mb) = st.bodies.get(ti).cloned() else { continue };
                 let nb = match &src.kind {
                     FeatureKind::Chamfer { distance2, angle, flip, .. } => chamfer_with(vals, &mb.body, &moved, r, distance2, angle, *flip)?,
+                    // A radius per edge: each copied edge with its own, if every edge was found.
+                    // A radius per edge: each copied edge with the radius its edge took in the
+                    // source (the edges it found, in order), else from the feature's own list.
+                    FeatureKind::Fillet { edge_radii, .. } if !edge_radii.is_empty() => {
+                        let radii = match st.fitted.get(&src.id) {
+                            Some(used) if used.len() == moved.len() => used.clone(),
+                            _ if edge_radii.len() == moved.len() => {
+                                let mut radii = Vec::with_capacity(edge_radii.len());
+                                for e in edge_radii {
+                                    radii.push(val(vals, e, Kind::Length)?);
+                                }
+                                radii
+                            }
+                            _ => return Err(DocError::Invalid("a copied fillet with a radius per edge needs each of its edges".into())),
+                        };
+                        kernel::fillet_each(&mb.body, &moved, &radii)?
+                    }
                     // A copy is congruent to the original: the radius it was reduced to first.
                     FeatureKind::Fillet { fit, .. } => match st.fitted.get(&src.id) {
                         Some(used) => {
@@ -6737,6 +6775,22 @@ fn eval_feature(doc: &Document, vals: &BTreeMap<String, Value>, f: &Feature, st:
             let r = val(vals, radius, Kind::Length)?;
             let ti = blend_target(st, body, &crate::plain(edges))?;
             let Some(mb) = st.bodies.get(ti) else { return Err(DocError::Invalid("body".into())) };
+            // A radius per edge: which picked edge each found edge came from.
+            let per_edge = match &f.kind {
+                FeatureKind::Fillet { edge_radii, style, fit, corner, .. } if !edge_radii.is_empty() => {
+                    if !style.is_constant() || !fit.is_exact() || !corner.is_rolling() {
+                        return Err(DocError::Invalid(
+                            "a radius per edge rounds each edge with a constant radius of its own (type constant, fit exact, rolling corners)".into(),
+                        ));
+                    }
+                    if edge_radii.len() != edges.len() {
+                        return Err(DocError::Invalid(format!("{} edge radii for {} edges: one radius per edge", edge_radii.len(), edges.len())));
+                    }
+                    true
+                }
+                _ => false,
+            };
+            let mut came_from: Vec<usize> = Vec::new();
             let edges = if f.edge_names.iter().any(|n| !n.is_empty()) {
                 // By name first; a name that is gone falls back to the point, with a warning.
                 let (mut out, mut notes) = (Vec::new(), Vec::new());
@@ -6747,6 +6801,7 @@ fn eval_feature(doc: &Document, vals: &BTreeMap<String, Value>, f: &Feature, st:
                                 notes.push(note);
                             }
                             out.push(hit.point);
+                            came_from.push(i);
                         }
                         Some((_, Err(_))) | None => {
                             let mut w = None;
@@ -6759,6 +6814,7 @@ fn eval_feature(doc: &Document, vals: &BTreeMap<String, Value>, f: &Feature, st:
                             if pick_lies_on_a_round_axis(&mb.body, p.0) {
                                 notes.push(skipped);
                             } else if let Ok(q) = resolve_edges(&mb.body, &[p.0], &refs, &mut w) {
+                                came_from.extend(std::iter::repeat_n(i, q.len()));
                                 out.extend(q);
                                 notes.push(match f.edge_names.get(i) {
                                     Some(n) if !n.is_empty() => format!("edge `{n}` no longer exists; using the edge at the picked point"),
@@ -6776,6 +6832,28 @@ fn eval_feature(doc: &Document, vals: &BTreeMap<String, Value>, f: &Feature, st:
                 }
                 if !notes.is_empty() {
                     *warning = Some(notes.join("; "));
+                }
+                out
+            } else if per_edge {
+                // One edge at a time, to keep each with its radius; one no longer found is skipped
+                // (as the whole list would skip it), and none found is an error.
+                let mut out = Vec::new();
+                let mut lost = 0;
+                for (i, p) in edges.iter().enumerate() {
+                    let refs: Vec<EdgeRef> = f.edge_refs.get(i).cloned().into_iter().collect();
+                    match resolve_edges(&mb.body, &[p.0], &refs, warning) {
+                        Ok(q) => {
+                            came_from.extend(std::iter::repeat_n(i, q.len()));
+                            out.extend(q);
+                        }
+                        Err(_) => lost += 1,
+                    }
+                }
+                if out.is_empty() {
+                    return Err(DocError::Invalid("none of the selected edges exist any more".into()));
+                }
+                if lost > 0 {
+                    append_warning(warning, format!("{lost} of the selected edges no longer exist and were skipped"));
                 }
                 out
             } else {
@@ -6820,6 +6898,18 @@ fn eval_feature(doc: &Document, vals: &BTreeMap<String, Value>, f: &Feature, st:
                     if !tapered.is_empty() {
                         st.tapered.insert(f.id, tapered);
                     }
+                    (b, input)
+                }
+                FeatureKind::Fillet { edge_radii, .. } if per_edge => {
+                    let mut radii = Vec::with_capacity(came_from.len());
+                    for i in &came_from {
+                        let e = edge_radii.get(*i).ok_or_else(|| DocError::Invalid("edge radius".into()))?;
+                        radii.push(val(vals, e, Kind::Length)?);
+                    }
+                    let b = kernel::fillet_each(&mb.body, &edges, &radii)?;
+                    // The radius each found edge took, for copies of the fillet (as a fit keeps the
+                    // radii it reduced to).
+                    st.fitted.insert(f.id, radii);
                     (b, input)
                 }
                 FeatureKind::Fillet { fit, .. } => {
@@ -7745,6 +7835,7 @@ mod chain_tests {
                 style: crate::FilletStyle::Constant,
                 fit: Default::default(),
                 corner: Default::default(),
+                edge_radii: Vec::new(),
             },
             None,
         )
@@ -7914,6 +8005,87 @@ mod coplanar_growth_tests {
         let post = kernel::box_solid(Vec3::new(-2.0, 5.0, 0.0), Vec3::new(8.0 - 7.977, 8.0 - 1.407, 20.0)).unwrap();
         let st = state(vec![block, post]);
         assert_eq!(grown(&st, 20.0, &face, -5.0, 0.0).0, face);
+    }
+
+    /// A plate in one part with a socket cut from its top face naming no target, and a block in
+    /// another part over the same place in its own frame, 0.2 mm above the plate's top: as old
+    /// designs made it (the block among the bodies the socket's tool is shaped around) or as
+    /// features are made now (`scoped_surroundings`). How high the socket's tool runs on.
+    fn socket_tool_top(scoped: bool, block: bool) -> f64 {
+        let mut doc = Document::new("socket");
+        let (plate, other) = (doc.add_component(Some("Plate"), 0).unwrap(), doc.add_component(Some("Other"), 0).unwrap());
+        let mut add = |kind: FeatureKind, comp: u64, name: &str| {
+            let id = doc.add_feature(kind, None).unwrap();
+            let f = doc.feature_mut(id).unwrap();
+            (f.component, f.body_names, f.suppressed) = (comp, vec![name.to_string()], name == "Block" && !block);
+            id
+        };
+        let cube = |hi: Vec3| FeatureKind::Box {
+            corner: crate::point_expr(Vec3::ZERO),
+            length: hi.x.to_string().as_str().into(),
+            width: hi.y.to_string().as_str().into(),
+            height: hi.z.to_string().as_str().into(),
+            operation: Operation::NewBody,
+        };
+        add(cube(Vec3::new(20.0, 10.0, 4.0)), plate, "Plate");
+        add(cube(Vec3::new(20.0, 10.0, 4.2)), other, "Block");
+        let mut sk = solidcraft_sketch::Sketch::new();
+        let pts: Vec<usize> =
+            [(2.0, 2.0), (4.0, 2.0), (4.0, 4.0), (2.0, 4.0)].iter().map(|(x, y)| sk.add_point(Vec2::new(*x, *y), None).unwrap()).collect();
+        for k in 0..4 {
+            sk.add_line_pts(pts[k], pts[(k + 1) % 4], None).unwrap();
+        }
+        let top = PlaneRef::Offset { base: Box::new(PlaneRef::Origin { name: "XY".into() }), distance: "4".into() };
+        let sketch = add(FeatureKind::Sketch { plane: top, sketch: sk }, plate, "");
+        let extent = crate::Extent {
+            convention: crate::ExtrudeConvention::LegacyPerSide,
+            distance: "1".into(),
+            direction: crate::Direction::Negative,
+            distance2: None,
+            start_offset: None,
+            through_all: false,
+            taper: None,
+            to: None,
+            to_offset: None,
+            from: None,
+        };
+        let kind = FeatureKind::Extrude {
+            thin: None,
+            sketch: crate::SketchId(sketch),
+            profiles: ProfileSel::All,
+            extent,
+            operation: Operation::Cut,
+            targets: vec![],
+        };
+        let socket = add(kind, plate, "");
+        doc.feature_mut(socket).unwrap().body_names.clear();
+        // Made now, it is scoped; saved before #219, it has no flag, which reads as not scoped.
+        let mut json = serde_json::to_value(doc.feature(socket).unwrap()).unwrap();
+        assert_eq!(json["scoped_surroundings"], true);
+        if !scoped {
+            json.as_object_mut().unwrap().remove("scoped_surroundings");
+            *doc.feature_mut(socket).unwrap() = serde_json::from_value(json).unwrap();
+        }
+        assert_eq!(doc.feature(socket).unwrap().scoped_surroundings, scoped);
+        let mut model = Model::new();
+        model.evaluate(&doc);
+        assert!(model.results.iter().all(|r| r.error.is_none()), "{:?}", model.results.iter().find(|r| r.error.is_some()));
+        let (f, before) = (doc.feature(socket).unwrap(), model.state_before(socket));
+        let tools = feature_tools_with_constructor(&doc, &evaluation_values(&doc).0, f, &before, &mut None).unwrap();
+        tools.iter().map(|t| t.body.outline_bounds().max.z).fold(f64::MIN, f64::max)
+    }
+
+    #[test]
+    fn a_cut_naming_no_target_is_shaped_around_the_bodies_it_can_change() {
+        // Made now: the socket runs on past the plate's top face whatever lies in the other part.
+        let (alone, beside) = (socket_tool_top(true, false), socket_tool_top(true, true));
+        assert!(alone > 4.0 + 1e-6, "{alone}");
+        assert_eq!(alone.to_bits(), beside.to_bits(), "{alone} vs {beside}");
+        // As older designs made it, the other part's block above the plate still stops it, so
+        // those designs evaluate as they did.
+        let (old_alone, old_beside) = (socket_tool_top(false, false), socket_tool_top(false, true));
+        assert_eq!(old_alone.to_bits(), alone.to_bits());
+        assert!((old_beside - old_alone).abs() > 1e-6, "{old_beside} vs {old_alone}");
     }
 }
 

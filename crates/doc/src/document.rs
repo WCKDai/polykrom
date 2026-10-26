@@ -596,6 +596,12 @@ pub enum FeatureKind {
         /// (default) or a G2 patch repeating each blend up to the second order.
         #[serde(default, skip_serializing_if = "FilletCorner::is_rolling")]
         corner: FilletCorner,
+        /// A radius for each edge of `edges`, in order (a constant-radius fillet only): the
+        /// edges are rounded together, corners where rounds of different radii meet closed by
+        /// one patch. Empty (the default, and every design before it): `radius` for all.
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        #[walk(length = "Edge radius")]
+        edge_radii: Vec<Expr>,
     },
     Chamfer {
         edges: Vec<Position>,
@@ -1308,6 +1314,12 @@ pub enum FeatureKind {
         /// Points a patch on edges passes through.
         #[serde(default, skip_serializing_if = "Vec::is_empty")]
         points: Vec<Position>,
+        /// How fast a patch on edges leaves its G1/G2 edges, a multiple of the loop's own speed.
+        /// A patch saved without it keeps the speed it was filled with
+        /// (`solidcraft_geom::fill_general::LEGACY_FILL_SPEED`); new ones save
+        /// `solidcraft_geom::fill_general::FILL_SPEED`, which rises fair to the loop.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        speed: Option<f64>,
     },
     /// Surface bodies sewn along shared edges into the first one (a solid when they close).
     Stitch {
@@ -1509,6 +1521,11 @@ pub enum FeatureKind {
         /// Sew the blend onto its two bodies where the boundaries meet.
         #[serde(default, skip_serializing_if = "std::ops::Not::not")]
         stitch: bool,
+        /// How fast each end leaves its boundary, as a share of the chord across: [from, to]. A
+        /// blend saved without it keeps the third it was built with
+        /// (`kernel::LEGACY_BLEND_TANGENT`); new blends save `kernel::BLEND_TANGENT`.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        tangent: Option<[f64; 2]>,
     },
     /// One surface patch through a network of two to four boundary curves of a sketch
     /// (`surface.boundary`, issue #763): the patch runs through the curves in loop order and leaves
@@ -2407,6 +2424,13 @@ pub struct Feature {
     /// A body without one is met where it is placed now, as designs made before this did.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub tool_frames: Vec<(String, crate::Mat)>,
+    /// An Extrude or Revolve join or cut naming no target shapes its tool (ends run on past
+    /// coplanar faces, profiles grown, holes over voids filled, through all) around the bodies it
+    /// can change: its participants, else its component's bodies (#219). Set on the features made
+    /// since; those of older designs keep shaping it around every body, so they evaluate as they
+    /// did.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub scoped_surroundings: bool,
     #[serde(flatten)]
     pub kind: FeatureKind,
 }
@@ -3163,6 +3187,7 @@ impl Document {
             Some(n) if !n.trim().is_empty() => n.trim().to_string(),
             _ => self.unique_name(kind.base_name()),
         };
+        let scoped_surroundings = matches!(kind, FeatureKind::Extrude { .. } | FeatureKind::Revolve { .. });
         let f = Feature {
             id,
             name,
@@ -3179,6 +3204,7 @@ impl Document {
             inserted: false,
             link_faces: Vec::new(),
             tool_frames: Vec::new(),
+            scoped_surroundings,
             kind,
         };
         self.place_feature(f);

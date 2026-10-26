@@ -842,7 +842,7 @@ pub fn for_feature(app: &SolveApp, kind: &FeatureKind, frame: &Mat) -> Option<(K
                 ],
             )
         }
-        FeatureKind::SurfaceBlend { from, to, continuity, bulge, align, seam, stitch } => {
+        FeatureKind::SurfaceBlend { from, to, continuity, bulge, align, seam, stitch, tangent } => {
             let index = |c: &solidcraft_engine::doc::kernel::Continuity| BLEND_CONTINUITY.iter().position(|(_, w)| *w == c.as_str()).unwrap_or(1);
             let k = Surf::Blend { continuity: continuity.each_ref().map(index), bulge: *bulge, stitch: *stitch };
             // What the dialog does not show is kept as it was: the leave directions and the seams.
@@ -852,6 +852,8 @@ pub fn for_feature(app: &SolveApp, kind: &FeatureKind, frame: &Mat) -> Option<(K
                     extra.insert(key.into(), json!([pt(p.0), pt(q.0)]));
                 }
             }
+            // And how fast it leaves: a blend saved before that was saved keeps its third.
+            extra.insert("tangent".into(), json!(tangent.unwrap_or([solidcraft_engine::doc::kernel::LEGACY_BLEND_TANGENT; 2])));
             let mut ins = inputs(&k);
             for (inp, side) in ins.iter_mut().zip([from, to]) {
                 inp.items = side.edges.iter().filter_map(edge).collect();
@@ -919,7 +921,7 @@ pub fn for_feature(app: &SolveApp, kind: &FeatureKind, frame: &Mat) -> Option<(K
             extra.insert("convention".into(), json!(extent.convention));
             return Some((Kind::Surface(k), ins, extra));
         }
-        FeatureKind::Patch { sketch, edges, crown, continuity, points, .. } => {
+        FeatureKind::Patch { sketch, edges, crown, continuity, points, speed, .. } => {
             let mut sels: Vec<Sel> = edges.iter().filter_map(edge).collect();
             if let Some(sk) = sketch {
                 let st = s.world_state();
@@ -940,6 +942,10 @@ pub fn for_feature(app: &SolveApp, kind: &FeatureKind, frame: &Mat) -> Option<(K
             }
             if through.len() != points.len() {
                 extra.insert("points".into(), json!(points.iter().map(|p| pt(p.0)).collect::<Vec<_>>()));
+            }
+            // And how fast it leaves: a patch saved before that was saved keeps its speed.
+            if !edges.is_empty() {
+                extra.insert("speed".into(), json!(speed.unwrap_or(solidcraft_engine::doc::LEGACY_FILL_SPEED)));
             }
             let k = Surf::Patch { continuity: index };
             let mut ins = inputs(&k);
