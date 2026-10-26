@@ -3,8 +3,11 @@
 An agent built four organic parts with the `surface.*` commands only, one command at a time
 through `polykrom-cli mcp --headless` (the MCP `execute` tool, so every refusal is what an agent
 sees), on `main` at 9086d73c. Each part was meant to end as a closed, printable solid. Every
-refusal and every bad result became a kernel case in `tests/kernel-cases/surfaces` or
-`tests/kernel-cases/shell` (see [kernel-cases.md](kernel-cases.md)).
+refusal and every wrong result with a right answer that can be stated became a kernel case in
+`tests/kernel-cases/surfaces` or `tests/kernel-cases/shell` (see [kernel-cases.md](kernel-cases.md)).
+Three findings have no case, because what they measure is quality, not a right answer: patch
+fairness (finding 6), the default G1 blend speed (finding 7) and the continuity inspection's
+worst-only report (finding 8).
 
 ## How it was measured
 
@@ -115,9 +118,18 @@ Each fix is its own pull request with a regression test in the existing test fil
   face (and no `align` was given), each side leaves straight across its edge. Test
   `surface_blend_reaches_a_hole_trimmed_into_a_revolved_sheet`.
 
-With all four, the hood's blends and match, the mouse's G2 cap and G2 blend, the skull's G2 snout
-and the bottle's handle blends build, and six of the eight `surfaces` cases pass; the two thicken
-cases stay with K5.
+With all four, all eight `surfaces` cases pass (measured on a build of the four fix branches
+merged). The two cases that still fail are both in `shell` and both K5 (#194):
+`shell/195-thicken-a-creased-loft-inwards` (not supported yet: thickening into an inside corner
+across a sharp edge) and `shell/195-thicken-a-revolved-sheet-with-two-trimmed-holes` (truck
+panics, "This wire is not simple"). The parts get this far:
+
+| Part | With the fixes | Measured | Still stops |
+|---|---|---|---|
+| Car hood | G1 and G2 blends into the fenders, G2 match, stitched panel | G2 seams 0.000°, 0.000/mm; G1 seams 0.000°, curvature jump 2.4/mm | 1 mm thicken refused: the default G1 blend turns in a 0.48 mm radius (finding 7) |
+| Mouse | G2 cap, G2 blend walls → crown, stitched, trimmed at the base, floor patched: one closed solid, V = 79 932 mm³ | cap seams 0.004°, 0.0001/mm | thicken: inwards a truck panic ("This wire is not simple"), outwards a 1.40 mm concave radius (K5) |
+| T-rex skull | G1 and G2 snout patches, closed solid, 2 mm outward wall (2.00 mm) | G1 snout 0.019° | inward thicken (K5; patch fairness) |
+| Bottle | both handle blends from the holes, G1, no `align` | handle seams 0.23° | the stitch leaves the hole seams open (the blend's boundary runs 0.014 mm off a traced rim, past the stitch's reach); thicken (K5) |
 
 ## Left for K4 and K5
 
