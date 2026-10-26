@@ -290,8 +290,8 @@ pub struct Session {
     /// Bodies `inspect.measure` measured, by their geometry where they stand (shared with scratch
     /// copies): a body that did not change or move is not measured again.
     measure_cache: std::sync::Arc<std::sync::Mutex<cmd::inspect::MeasureCache>>,
-    /// Fixes polish.apply's kernel refused, by body geometry, command and parameters (shared
-    /// with scratch copies): a later pass doesn't try them again.
+    /// Fixes polish.apply's kernel refused, by body, command and parameters (shared with scratch
+    /// copies): a later pass doesn't try them again.
     pub(crate) polish_refused: std::sync::Arc<std::sync::Mutex<std::collections::HashMap<u64, String>>>,
     /// Recent body renames: the design before and after each, and the names, so undo and redo
     /// follow them without evaluating either.

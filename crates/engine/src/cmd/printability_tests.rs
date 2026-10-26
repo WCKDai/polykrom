@@ -384,8 +384,7 @@ fn polish_apply_chamfers_an_edge_the_kernel_cannot_round() {
     assert_eq!(applied[0]["params"]["distance"], 1.0, "{r}");
     let after = run(&mut s, "inspect.polish", json!({}));
     assert_eq!(polish_body(&after, "Block")["sharp_edges"], 0, "the chamfer's faces aren't sharp edges: {after}");
-    // The refusal is remembered for the body as it was: run again from there, the fillet isn't
-    // tried a second time.
+    // The refusal is remembered: run again, the fillet isn't tried a second time.
     run(&mut s, "edit.undo", json!({}));
     let again = run(&mut s, "polish.apply", json!({}));
     assert!(again["applied"][0]["fallback"].as_str().unwrap().contains("refused before"), "{again}");
