@@ -631,18 +631,24 @@ where
             let meeting = [geom_shell0[face_index0].id(), geom_shell1[face_index1].id()];
             // SolidCraft: a pair with a closed form is intersected exactly (#125), the rest by
             // their meshes' collision.
-            let curves = match analytic::exact_intersection(&geom_shell0[face_index0], &geom_shell1[face_index1]) {
-                Some(polylines) => polylines
+            let exact = |polylines: Vec<PolylineCurve>| -> Vec<_> {
+                polylines
                     .into_iter()
                     .map(|polyline| {
                         let curve = IntersectionCurveWithParameters::try_new(surface0.clone(), surface1.clone(), polyline.clone(), tol);
                         (polyline, curve)
                     })
-                    .collect(),
+                    .collect()
+            };
+            let curves = match analytic::plane_pair(&geom_shell0[face_index0], &geom_shell1[face_index1]) {
+                Some(polylines) => exact(polylines),
                 None => {
                     let polygon0 = crate::tr!(poly_shell0[face_index0].surface(), "polygon0");
                     let polygon1 = crate::tr!(poly_shell1[face_index1].surface(), "polygon1");
-                    intersection_curve::intersection_curves(surface0.clone(), &polygon0, surface1.clone(), &polygon1, tol)
+                    match analytic::plane_cylinder_pair(&geom_shell0[face_index0], &polygon0, &geom_shell1[face_index1], &polygon1, tol) {
+                        Some(polylines) => exact(polylines),
+                        None => intersection_curve::intersection_curves(surface0.clone(), &polygon0, surface1.clone(), &polygon1, tol),
+                    }
                 }
             };
             curves

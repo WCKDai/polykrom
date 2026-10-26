@@ -297,6 +297,13 @@ pub mod test_hooks {
         r
     }
 
+    /// `f`, and how many plane and cylinder face pairs it intersected exactly (on this thread).
+    pub fn exact_circle_pairs<R>(f: impl FnOnce() -> R) -> (R, usize) {
+        let before = analytic::CIRCLES.with(|c| c.replace(0));
+        let r = f();
+        (r, analytic::CIRCLES.with(|c| c.replace(before)))
+    }
+
     /// `f`, and how many face pairs it intersected exactly (on this thread).
     pub fn exact_pairs<R>(f: impl FnOnce() -> R) -> (R, usize) {
         let before = analytic::EXACT.with(|c| c.replace(0));

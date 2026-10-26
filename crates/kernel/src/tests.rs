@@ -3723,3 +3723,35 @@ fn presearch_grids_once_per_polyline_change_nothing() {
         }
     }
 }
+
+/// A plate cut, joined and intersected with a round bar square to it (a hole's tool, longer than
+/// the plate is thick): the plate's faces meet the bar's side in circles, intersected exactly
+/// (#125) rather than by colliding meshes. The results have the faces the mesh collision gave and
+/// the analytic volume (plate less, plus or within the bar), to 1e-4 relative, and the exact
+/// pairs are taken.
+#[test]
+fn plane_cylinder_pairs_intersect_in_exact_circles() {
+    use truck_shapeops::broad_phase_test_hooks::{exact_circle_pairs, mesh_only};
+    let plate = box_solid(Vec3::new(0.0, 0.0, 0.0), Vec3::new(40.0, 30.0, 6.0)).unwrap();
+    let r = 5.0;
+    let bar = extrude(&Plane::XY, &[Region2 { outer: Loop2::circle(Vec2::new(17.0, 13.0), r), holes: vec![] }], -20.0, 30.0).unwrap().pop().unwrap();
+    let (vp, vb_in) = (40.0 * 30.0 * 6.0, PI * r * r * 6.0);
+    let vb = PI * r * r * 50.0;
+    let tol = 0.05;
+    for (and, invert, want) in [(true, true, vp - vb_in), (true, false, vb_in), (false, false, vp + vb - vb_in)] {
+        let run = || {
+            let (sa, mut sb) = (plate.deep_copy(), bar.deep_copy());
+            if invert {
+                sb.not();
+            }
+            guard("t", || Ok(if and { truck_shapeops::and(&sa, &sb, tol) } else { truck_shapeops::or(&sa, &sb, tol) })).unwrap()
+        };
+        let ((exact, pairs), mesh) = (exact_circle_pairs(run), mesh_only(run));
+        let what = format!("and {and} invert {invert}");
+        assert!(pairs >= 2, "{what}: {pairs} plane and cylinder pairs intersected exactly");
+        let (Some(exact), Some(mesh)) = (exact, mesh) else { panic!("{what}: no result") };
+        let (me, mm) = (measure(&Body::new(exact).unwrap()).unwrap(), measure(&Body::new(mesh).unwrap()).unwrap());
+        assert_eq!((me.faces, me.edges, me.vertices), (mm.faces, mm.edges, mm.vertices), "{what}");
+        assert!(rel(me.volume, want) < 1e-4, "{what}: volume {} want {want} (mesh collision {})", me.volume, mm.volume);
+    }
+}
