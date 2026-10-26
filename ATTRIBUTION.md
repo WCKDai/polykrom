@@ -363,6 +363,7 @@ Editable drawing code, native projects and shipped exports are collected under `
 | assets/icons/ui/design/svg/flat/stop.svg | Polykrom contributors | original Facet icon master (64 grid), drawn from code in assets/icons/ui/design/tools/author/facet_icons.py | MIT OR Apache-2.0 |
 | assets/icons/ui/design/svg/flat/shield.svg | Polykrom contributors | original Facet icon master (64 grid), drawn from code in assets/icons/ui/design/tools/author/facet_icons.py | MIT OR Apache-2.0 |
 | assets/icons/ui/design/svg/model/status_recovery.svg | Polykrom contributors | original Facet icon master (64 grid), drawn from code in assets/icons/ui/design/tools/author/facet_icons.py | MIT OR Apache-2.0 |
+| assets/icons/ui/design/svg/model/polish.svg | Polykrom contributors | original Facet icon master (64 grid) | MIT OR Apache-2.0 |
 | assets/icons/ui/design/svg/model/placeholder.svg | Polykrom contributors | original Facet icon master (64 grid), drawn from code in assets/icons/ui/design/tools/author/facet_icons.py | MIT OR Apache-2.0 |
 | assets/icons/ui/design/svg/model/plane.svg | Polykrom contributors | original Facet icon master (64 grid), drawn from code in assets/icons/ui/design/tools/author/facet_icons.py | MIT OR Apache-2.0 |
 | assets/icons/ui/design/svg/model/plane_angle.svg | Polykrom contributors | original Facet icon master (64 grid), drawn from code in assets/icons/ui/design/tools/author/facet_icons.py | MIT OR Apache-2.0 |

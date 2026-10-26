@@ -13,13 +13,14 @@ use super::CommandSpec;
 use crate::params::{bad, num, string_list};
 use crate::{Result, Session};
 
-pub static COMMANDS: &[CommandSpec] = &[CommandSpec::new("polish.apply", "Apply Polish", apply).icon("fillet").params(
+pub static COMMANDS: &[CommandSpec] = &[CommandSpec::new("polish.apply", "Apply Polish", apply).icon("polish").params(
     "fixes?: [ids from inspect.polish, such as \"F1\"] | categories?: [look|print|strength] (default every safe fix); bodies?, printed?, \
      skip?, sharp_deg? (as inspect.polish); max_fixes?: how many of inspect.polish's fixes to try, 1…100 (default 20); mass_tol?: the \
      share of a body's volume a fix may change, 0…1 (default 0.05) → before: {score, scores}, after: {score, scores}, applied: [{id, \
      body, command, params, score_before, score_after}], skipped: [{id, body, command, reason}] (refused by the kernel, invalid body, \
      new interference, joints no longer resolve, mass changed, score fell, or already fixed by an earlier fix), fixes (what inspect.polish \
-     still suggests), recommendations: [findings no fix applies to, most severe first]. Each fix runs in a checkpoint and is rolled back \
+     still suggests), fixes_left (how many of them are safe: run again), recommendations: [findings, most severe \
+     first; fix: [ids] on one a listed safe fix still covers]. Each fix runs in a checkpoint and is rolled back \
      when it fails a check; a fix on a body an earlier fix changed is worked out again from the body as it is now. One undo step",
 )];
 
@@ -64,7 +65,10 @@ fn apply(s: &mut Session, p: &Value) -> Result<Value> {
         .filter(|f| ids.is_empty() || ids.iter().any(|id| f["id"] == id.as_str()))
         .filter(|f| categories.is_empty() || categories.iter().any(|c| f["category"] == c.as_str()))
         .collect();
-    let undo = s.undo.len();
+    // The whole run is one undo step: the fixes run with the history set aside, so they neither
+    // add steps nor push the oldest ones out, and the outer command records the one step.
+    let (history, redo) = (std::mem::take(&mut s.undo), std::mem::take(&mut s.redo));
+    let mut failure = None;
     let (mut applied, mut skipped) = (Vec::new(), Vec::new());
     let mut changed: BTreeSet<String> = BTreeSet::new();
     for fix in chosen {
@@ -97,7 +101,10 @@ fn apply(s: &mut Session, p: &Value) -> Result<Value> {
         };
         match why {
             Some(reason) => {
-                s.restore_checkpoint(mark)?;
+                if let Err(e) = s.restore_checkpoint(mark) {
+                    failure = Some(e);
+                    break;
+                }
                 skip(reason);
             }
             None => {
@@ -109,8 +116,10 @@ fn apply(s: &mut Session, p: &Value) -> Result<Value> {
             }
         }
     }
-    // The outer command is the one undo step.
-    s.undo.truncate(undo);
+    (s.undo, s.redo) = (history, redo);
+    if let Some(e) = failure {
+        return Err(e);
+    }
     let after = s.execute("inspect.polish", &ask)?;
     let rank = |v: &Value| match v["severity"].as_str() {
         Some("high") => 0,
@@ -128,12 +137,26 @@ fn apply(s: &mut Session, p: &Value) -> Result<Value> {
         })
         .chain(after["assembly"].as_array().into_iter().flatten().cloned())
         .collect();
+    // A finding a listed safe fix still covers (max_fixes or a skip left it) says which, so an
+    // agent knows another run does it.
+    let left: Vec<&Value> = after["fixes"].as_array().into_iter().flatten().filter(|f| f["safe"] == true).collect();
+    for r in &mut recommendations {
+        let ids: Vec<Value> = left
+            .iter()
+            .filter(|f| f["body"] == r["body"] && f["category"] == r["category"])
+            .filter(|_| matches!(r["kind"].as_str(), Some("sharp_edges" | "first_layer_edges" | "inside_corners")))
+            .map(|f| f["id"].clone())
+            .collect();
+        if !ids.is_empty() {
+            r["fix"] = json!(ids);
+        }
+    }
     recommendations.sort_by_key(rank);
     recommendations.truncate(50);
     Ok(json!({
         "before": {"score": before["score"], "scores": before["scores"]},
         "after": {"score": after["score"], "scores": after["scores"]},
-        "applied": applied, "skipped": skipped, "fixes": after["fixes"], "recommendations": recommendations,
+        "applied": applied, "skipped": skipped, "fixes": after["fixes"], "fixes_left": left.len(), "recommendations": recommendations,
     }))
 }
 

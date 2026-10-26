@@ -269,3 +269,35 @@ fn polish_apply_rounds_a_part_placed_twice_where_it_is_placed() {
         assert_eq!(b["sharp_edges"], 0, "{after}");
     }
 }
+
+#[test]
+fn polish_apply_keeps_a_full_undo_history_but_its_oldest_step() {
+    let mut s = Session::default();
+    run(&mut s, "solid.box", json!({"length": 40, "width": 20, "height": 10, "body_name": "Block"}));
+    run(&mut s, "solid.box", json!({"length": 4, "width": 4, "height": 4, "corner": [60, 0, 0], "operation": "new_body", "body_name": "Cube"}));
+    for i in 0..200 {
+        run(&mut s, "parameters.add", json!({"name": format!("p{i}"), "expression": "1 mm"}));
+    }
+    let before: Vec<std::sync::Arc<solidcraft_doc::Document>> = s.undo.iter().map(|u| u.doc.clone()).collect();
+    let r = run(&mut s, "polish.apply", json!({}));
+    assert!(r["applied"].as_array().is_some_and(|a| a.len() >= 2), "{r}");
+    assert_eq!(s.undo.len(), before.len());
+    // One step in (the run), one out (the oldest): the rest are the same steps.
+    for (now, was) in s.undo.iter().zip(before.iter().skip(1)) {
+        assert!(std::sync::Arc::ptr_eq(&now.doc, was), "an older undo step was lost");
+    }
+    let last = s.undo.last().map(|u| u.label.clone());
+    assert_eq!(last.as_deref(), Some("Apply Polish"));
+}
+
+#[test]
+fn polish_apply_says_which_findings_another_run_would_fix() {
+    let mut s = Session::default();
+    run(&mut s, "solid.box", json!({"length": 40, "width": 20, "height": 10, "body_name": "Block"}));
+    run(&mut s, "solid.box", json!({"length": 4, "width": 4, "height": 4, "corner": [60, 0, 0], "operation": "new_body", "body_name": "Cube"}));
+    let r = run(&mut s, "polish.apply", json!({"max_fixes": 1}));
+    assert_eq!(r["applied"].as_array().map(Vec::len), Some(1), "{r}");
+    assert_eq!(r["fixes_left"], 1, "{r}");
+    let cube = r["recommendations"].as_array().unwrap().iter().find(|f| f["body"] == "Cube" && f["kind"] == "sharp_edges").cloned();
+    assert_eq!(cube.map(|f| f["fix"].clone()), Some(json!(["F1"])), "{r}");
+}
