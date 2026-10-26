@@ -158,13 +158,8 @@ fn polish(s: &mut Session, p: &Value) -> Result<Value> {
     // A body whose mesh can't be made is listed as skipped, not judged on nothing.
     let meshes: Vec<std::sync::Arc<Mesh>> =
         solidcraft_kernel::map_with_local_pools(&shown, usize::MAX, |b| Ok(b.mesh())).into_iter().map(|m| m.unwrap_or_default()).collect();
-    todo.retain(|i| {
-        let meshed = meshes.get(*i).is_some_and(|m| !m.triangles.is_empty());
-        if !meshed {
-            skipped.push(json!({"body": shown.get(*i).map(|b| b.name.clone()), "why": "no mesh (tessellation failed)"}));
-        }
-        meshed
-    });
+    let names: Vec<&str> = shown.iter().map(|b| b.name.as_str()).collect();
+    skipped.extend(unmeshed(&mut todo, &meshes, &names));
     let tols: Vec<f64> = shown.iter().map(|b| b.display_tol()).collect();
     let boxes: Vec<Aabb3> = meshes.iter().zip(&tols).map(|(m, t)| m.bounds().inflated(4.0 * t + 0.02)).collect();
     // Past the cap, contacts aren't all looked for: the reply says how many pairs were left out.
@@ -215,8 +210,27 @@ fn polish(s: &mut Session, p: &Value) -> Result<Value> {
     out["skipped"] = json!(skipped);
     if unpaired > 0 {
         out["contact_pairs_unchecked"] = json!(unpaired);
+        if let Some(list) = out["not_checked"].as_array_mut() {
+            list.push(json!(format!(
+                "seats and mates of {unpaired} pairs of bodies past the first {MAX_PAIRS}: their edges may be listed as exposed"
+            )));
+        }
     }
     Ok(out)
+}
+
+/// Drops from `todo` the bodies whose mesh is empty (tessellation failed): they are listed as
+/// skipped, never scored as if clean.
+fn unmeshed(todo: &mut Vec<usize>, meshes: &[std::sync::Arc<Mesh>], names: &[&str]) -> Vec<Value> {
+    let mut out = Vec::new();
+    todo.retain(|i| {
+        let meshed = meshes.get(*i).is_some_and(|m| !m.triangles.is_empty());
+        if !meshed {
+            out.push(json!({"body": names.get(*i), "why": "no mesh (tessellation failed)"}));
+        }
+        meshed
+    });
+    out
 }
 
 /// Overall score from category scores, weighted.
@@ -684,19 +698,22 @@ fn design(s: &Session, bodies: &mut [Report], max_fixes: usize) -> Value {
             if unique.is_empty() {
                 continue;
             }
-            let length: f64 = unique.iter().map(|(_, l, _)| l).sum();
-            let points: Vec<[f64; 3]> = unique.iter().take(MAX_FIX_EDGES).map(|(p, _, _)| [p.x, p.y, p.z].map(|x| (x * 1e4).round() / 1e4)).collect();
-            let (category, weight, command, params) = match *kind {
-                "chamfer" => ("print", 0.4, "solid.chamfer", json!({"body": body, "edges": points, "distance": size})),
-                "inside" => ("strength", 0.6, "solid.fillet", json!({"body": body, "edges": points, "radius": size, "fit": "reduce"})),
-                _ => ("look", 1.0, "solid.fillet", json!({"body": body, "edges": points, "radius": size, "fit": "reduce"})),
-            };
-            let kind = if *kind == "chamfer" { "chamfer" } else { "fillet" };
-            fixes.push((
-                length * weight,
-                json!({"category": category, "kind": kind, "safe": true, "body": body, "edges": points.len(), "length_mm": round(length),
-                "impact": round(length * weight), "command": command, "params": params}),
-            ));
+            // A command takes at most MAX_FIX_EDGES edges: more make several fixes.
+            for part in unique.chunks(MAX_FIX_EDGES) {
+                let length: f64 = part.iter().map(|(_, l, _)| l).sum();
+                let points: Vec<[f64; 3]> = part.iter().map(|(p, _, _)| [p.x, p.y, p.z].map(|x| (x * 1e4).round() / 1e4)).collect();
+                let (category, weight, command, params) = match *kind {
+                    "chamfer" => ("print", 0.4, "solid.chamfer", json!({"body": body, "edges": points, "distance": size})),
+                    "inside" => ("strength", 0.6, "solid.fillet", json!({"body": body, "edges": points, "radius": size, "fit": "reduce"})),
+                    _ => ("look", 1.0, "solid.fillet", json!({"body": body, "edges": points, "radius": size, "fit": "reduce"})),
+                };
+                let kind = if *kind == "chamfer" { "chamfer" } else { "fillet" };
+                fixes.push((
+                    length * weight,
+                    json!({"category": category, "kind": kind, "safe": true, "body": body, "edges": points.len(), "length_mm": round(length),
+                    "impact": round(length * weight), "command": command, "params": params}),
+                ));
+            }
         }
     }
     fixes.sort_by(|(a, x), (b, y)| {
@@ -726,4 +743,38 @@ fn design(s: &Session, bodies: &mut [Report], max_fixes: usize) -> Value {
         "fixes": fixes,
         "not_checked": ["load paths next to joints, horns and bosses (inside corners are listed without them)", "fasteners without a seat", "walls between sampled points"],
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_body_without_a_mesh_is_skipped_not_scored() {
+        let cube = solidcraft_kernel::box_solid(Vec3::ZERO, Vec3::new(1.0, 1.0, 1.0)).and_then(|b| b.tessellate(0.01)).unwrap();
+        let meshes = vec![std::sync::Arc::new(cube), std::sync::Arc::new(Mesh::default())];
+        let mut todo = vec![0, 1];
+        let skipped = unmeshed(&mut todo, &meshes, &["Good", "Broken"]);
+        assert_eq!(todo, vec![0]);
+        assert_eq!(skipped, vec![json!({"body": "Broken", "why": "no mesh (tessellation failed)"})]);
+    }
+
+    #[test]
+    fn a_fix_over_the_edge_limit_is_split_with_its_own_lengths() {
+        let edges: Vec<(Vec3, f64, Vec3)> = (0..450).map(|i| (Vec3::new(i as f64, 0.0, 0.0), 2.0, Vec3::new(i as f64, 0.0, 0.0))).collect();
+        let report = Report {
+            json: json!({"body": "Plate", "definition": "Plate"}),
+            scores: BTreeMap::new(),
+            area: 1.0,
+            component: 0,
+            fixes: vec![("fillet", 1.0, edges)],
+        };
+        let r = design(&Session::default(), &mut [report], 10);
+        let fixes = r["fixes"].as_array().unwrap();
+        let sizes: Vec<(u64, f64)> = fixes.iter().map(|f| (f["edges"].as_u64().unwrap(), f["length_mm"].as_f64().unwrap())).collect();
+        assert_eq!(sizes, vec![(200, 400.0), (200, 400.0), (50, 100.0)], "{r}");
+        for f in fixes {
+            assert_eq!(f["params"]["edges"].as_array().unwrap().len() as u64, f["edges"].as_u64().unwrap());
+        }
+    }
 }
