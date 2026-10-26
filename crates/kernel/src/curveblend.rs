@@ -874,15 +874,20 @@ fn with_smooth_neighbours<'a>(own: Vec<&'a mt::Face>, near: Vec<&'a mt::Face>) -
 }
 
 /// Whether two faces sharing an edge meet smoothly along it (their normals agree, within a degree,
-/// at its middle): pieces of one smooth wall, such as a loft's faces between tangent pieces of its
-/// sections.
+/// at five points along it): pieces of one smooth wall, such as a loft's faces between tangent
+/// pieces of its sections.
 fn meet_smoothly(a: &mt::Face, b: &mt::Face) -> bool {
+    use mt::{BoundedCurve, ParametricCurve};
     let Some(e) = a.edge_iter().find(|e| b.edge_iter().any(|x| x.id() == e.id())) else { return false };
-    let Some(m) = crate::blend::edge_mid(&e) else { return false };
-    match (project(a, m, None), project(b, m, None)) {
-        (Some((_, na, _)), Some((_, nb, _))) => na.dot(nb) > 1f64.to_radians().cos(),
-        _ => false,
-    }
+    let c = e.curve();
+    let (t0, t1) = c.range_tuple();
+    (1..=5).all(|k| {
+        let m = from_p3(c.subs(t0 + (t1 - t0) * k as f64 / 6.0));
+        match (project(a, m, None), project(b, m, None)) {
+            (Some((_, na, _)), Some((_, nb, _))) => na.dot(nb) > 1f64.to_radians().cos(),
+            _ => false,
+        }
+    })
 }
 
 /// The strip with parameters in proportion to its lengths across and along (the same surface).
