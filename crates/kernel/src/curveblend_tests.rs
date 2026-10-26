@@ -1083,3 +1083,28 @@ fn a_fillet_beside_walls_leaning_in_is_right_or_refused() {
         }
     }
 }
+
+#[test]
+fn a_fillet_whose_setback_varies_along_a_floor_arc_is_right_or_refused() {
+    // #233 review: the r2 floor arcs of a loft whose walls lean 45 deg on one side of each corner
+    // and 26.6 deg on the other, rounded with R4: the setback, 0.414 r to 0.618 r along each arc,
+    // is about the arc's 2 at its middle only. The corner blend must not end the round in the arc
+    // there as if the ball turned on the spot: whatever `fillet` gives must be right, else a
+    // refusal as too large.
+    use solidcraft_geom::Plane;
+    let tray = crate::loft_regions(&[
+        (Plane::XY, rounded_outline(-20.0, 20.0, -15.0, 15.0, 2.0, 2.0)),
+        (Plane::XY.offset(20.0), rounded_outline(-40.0, 40.0, -25.0, 25.0, 22.0, 22.0)),
+    ])
+    .unwrap();
+    let r = 4.0;
+    match fillet(&tray, &[Vec3::new(0.0, -15.0, 0.0)], r) {
+        Ok(round) => {
+            assert!(round.validity().is_empty(), "{:?}", round.validity());
+            let (radius, angle, _, _) = round_errors(&tray, &round, 0.0, r);
+            assert!(radius < 1e-3, "the ball's centre is {radius} mm off radius {r}");
+            assert!(angle < 0.5, "the round meets its neighbours at {angle} degrees");
+        }
+        Err(e) => assert!(matches!(e, crate::KernelError::TooLarge(_)), "{e:?}"),
+    }
+}
