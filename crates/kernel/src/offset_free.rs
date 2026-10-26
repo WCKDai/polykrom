@@ -619,10 +619,12 @@ pub(crate) fn shell_free(b: &Body, opened: &[usize], thickness: f64) -> Result<O
         Ok(shell) => Ok(Some(shell)),
         // A hole closer to another wall than the wall is thick: through the body with its holes
         // filled (`shell_holes`), else the first refusal.
-        Err(e @ (KernelError::Failed(_) | KernelError::Invalid(_))) => match crate::shell_holes::shell_round_holes(b, opened, thickness, tolerance) {
-            Ok(Some(shell)) => Ok(Some(shell)),
-            _ => Err(e),
-        },
+        Err(e @ (KernelError::Failed(_) | KernelError::Invalid(_))) => {
+            match crate::shell_holes::shell_round_holes(b, opened, thickness, tolerance, crate::shell_holes::refused_at(&e)) {
+                Ok(Some(shell)) => Ok(Some(shell)),
+                _ => Err(e),
+            }
+        }
         Err(e) => Err(e),
     }
 }

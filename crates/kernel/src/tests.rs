@@ -1601,18 +1601,26 @@ fn shell_non_convex() {
 }
 
 /// A basin: a slab with a tapered pocket and a 4 mm front rim, shelled from below. A wall
-/// thicker than the rim (with the pocket's slope) would turn the top face inside out: refused,
-/// not a body with wrong mass properties.
+/// thicker than the rim (with the pocket's slope) would turn the top face inside out, which the
+/// offset refuses; the shell goes through the slab with the pocket filled, less the pocket
+/// grown by the wall (#194): a valid body, its walls nowhere thinner than asked (the rim stays
+/// solid), not a body with wrong mass properties.
 #[test]
-fn shell_thicker_than_a_rim_is_refused() {
+fn shell_thicker_than_a_rim_keeps_the_rim_solid() {
     let slab = box_solid(Vec3::ZERO, Vec3::new(100.0, 60.0, 30.0)).unwrap();
     let rect = |x0: f64, y0: f64, x1: f64, y1: f64| Loop2::polygon(&[Vec2::new(x0, y0), Vec2::new(x1, y0), Vec2::new(x1, y1), Vec2::new(x0, y1)]);
     let at = |z: f64| Plane::new(Vec3::new(0.0, 0.0, z), Vec3::X, Vec3::Y).unwrap();
     let pocket = loft(&[(at(30.0), rect(20.0, 4.0, 80.0, 50.0)), (at(10.0), rect(30.0, 20.0, 70.0, 40.0))]).unwrap();
     let basin = boolean(&slab, &pocket, BoolOp::Cut).unwrap().unwrap();
     let open = [Vec3::new(50.0, 30.0, 0.0)];
-    let e = shell(&basin, &open, 6.0).unwrap_err().to_string();
-    assert!(e.contains("rim or ledge"), "{e}");
+    let thick = shell(&basin, &open, 6.0).unwrap();
+    assert!(thick.validity().is_empty(), "{:?}", thick.validity());
+    let walls = shell_walls(&thick, &basin, open[0], 6.0);
+    assert!(walls.len() > 20, "{} points", walls.len());
+    let slack = 0.02 + basin.size() * 1e-3;
+    for (p, d) in walls {
+        assert!(d > 6.0 - slack, "wall {d} at {p:?}");
+    }
     let (whole, thin) = (measure(&basin).unwrap(), measure(&shell(&basin, &open, 1.0).unwrap()).unwrap());
     assert!(thin.volume > 0.0 && thin.volume < whole.volume, "{} vs {}", thin.volume, whole.volume);
     let (lo, hi) = (thin.bbox.min, thin.bbox.max);
@@ -3655,6 +3663,25 @@ fn shell_of_a_loft_deeper_than_its_corner_radius_is_refused() {
     assert!(e.contains("radius") && e.contains("fold"), "{e}");
 }
 
+/// The vertices of a shell's mesh (about 2000 of them) more than half the wall from the body's surface,
+/// each with its distance to the body's mesh (fine: chords of 0.005) but its open face (at `open`).
+fn shell_walls(shell: &Body, body: &Body, open: Vec3, t: f64) -> Vec<(Vec3, f64)> {
+    let outer = body.tessellate(0.005).unwrap();
+    let skip = outer
+        .triangles
+        .iter()
+        .zip(&outer.tri_face)
+        .filter_map(|(t, f)| outer.tri(t).map(|[a, b, c]| (crate::polyhedron::point_tri(open, a, b, c), *f)))
+        .min_by(|x, y| x.0.total_cmp(&y.0))
+        .unwrap()
+        .1;
+    let tris: Vec<[Vec3; 3]> = outer.triangles.iter().zip(&outer.tri_face).filter(|(_, f)| **f != skip).filter_map(|(t, _)| outer.tri(t)).collect();
+    let near = |p: Vec3| tris.iter().map(|[a, b, c]| crate::polyhedron::point_tri(p, *a, *b, *c)).fold(f64::INFINITY, f64::min);
+    let inner = shell.tessellate(0.05).unwrap();
+    let step = (inner.positions.len() / 2000).max(1);
+    inner.positions.iter().step_by(step).map(|p| (*p, near(*p))).filter(|(_, d)| *d > t / 2.0).collect()
+}
+
 /// A block with a window of a cubic arch cut through it (a free-form wall), its top back edge
 /// chamfered 2 and a hole of radius 1.65 through it 3.35 from the back face, closer to the
 /// chamfer (0.95) than the wall: moved in by 1.5, the ring of the top face between the hole and
@@ -3684,24 +3711,42 @@ fn shell_round_a_hole_closer_to_a_chamfer_than_the_wall() {
     let s = shell(&body, &[Vec3::new(20.0, 3.0, 0.0)], t).unwrap();
     assert!(s.validity().is_empty(), "{:?}", s.validity());
     assert_eq!(s.solid.boundaries().len(), 1);
-    // Every vertex of the shell's mesh off the body's surface is measured to the body's mesh
+    // Every vertex of the shell's mesh off the body's surface, measured to the body's mesh
     // (fine, so that its chords are well under the slack): within the fit (0.02) and the
-    // Boolean's intersection tolerance (1e-3 of the size), which places the edges where the
+    // Boolean's intersection tolerance (1e-3 of the size), which places the edges where a
     // grown hole meets the cavity, nothing is closer than the wall.
-    let outer = body.tessellate(0.005).unwrap();
-    let tris: Vec<[Vec3; 3]> = outer.triangles.iter().filter_map(|t| outer.tri(t)).collect();
-    let near = |p: Vec3| tris.iter().map(|[a, b, c]| crate::polyhedron::point_tri(p, *a, *b, *c)).fold(f64::INFINITY, f64::min);
+    let walls = shell_walls(&s, &body, Vec3::new(20.0, 3.0, 0.0), t);
+    assert!(walls.len() > 20, "{} points", walls.len());
     let slack = 0.02 + body.size() * 1e-3;
-    let inner = s.tessellate(0.05).unwrap();
-    let mut measured = 0;
-    for p in inner.positions.iter().step_by(5) {
-        let d = near(*p);
-        if d > t / 2.0 {
-            measured += 1;
-            assert!(d > t - slack, "wall {d} at {p:?}");
-        }
+    for (p, d) in walls {
+        assert!(d > t - slack, "wall {d} at {p:?}");
     }
-    assert!(measured > 100, "{measured} points");
+}
+
+/// The same block without the window (every face a plane or a cylinder), shelled 1.5: the
+/// analytic shell refuses where the hole's ring vanishes, and goes through the block with that
+/// hole filled the same way. A valid closed solid whose inner walls are all at least the wall
+/// from the outer faces. #194.
+#[test]
+fn shell_round_a_hole_closer_to_a_chamfer_than_the_wall_on_planes() {
+    let block = box_solid(Vec3::ZERO, Vec3::new(40.0, 20.0, 20.0)).unwrap();
+    let chamfered = chamfer(&block, &[Vec3::new(20.0, 20.0, 20.0)], 2.0).unwrap();
+    let drill = cylinder(Vec3::new(5.0, 15.0, -1.0), Vec3::Z, 1.65, 22.0).unwrap();
+    let body = boolean(&chamfered, &drill, BoolOp::Cut).unwrap().unwrap();
+    let t = 1.5;
+    let s = shell(&body, &[Vec3::new(20.0, 3.0, 0.0)], t).unwrap();
+    assert!(s.validity().is_empty(), "{:?}", s.validity());
+    assert_eq!(s.solid.boundaries().len(), 1);
+    // Every vertex of the shell's mesh off the body's surface, measured to the body's mesh
+    // (fine, so that its chords are well under the slack): within the fit (0.02) and the
+    // Boolean's intersection tolerance (1e-3 of the size), which places the edges where a
+    // grown hole meets the cavity, nothing is closer than the wall.
+    let walls = shell_walls(&s, &body, Vec3::new(20.0, 3.0, 0.0), t);
+    assert!(walls.len() > 20, "{} points", walls.len());
+    let slack = 0.02 + body.size() * 1e-3;
+    for (p, d) in walls {
+        assert!(d > t - slack, "wall {d} at {p:?}");
+    }
 }
 
 /// A dumbbell-shaped section: the chord from (−30, 0) to (30, 0) and, over it, two cubic lobes
