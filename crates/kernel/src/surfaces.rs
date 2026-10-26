@@ -643,7 +643,7 @@ pub fn stitch(bodies: &[&Body], tol: f64) -> Result<Body> {
             vmap.insert(v.id(), c.clone());
             c
         };
-        let mut edges: Vec<(mt::Edge, mt::Point3)> = Vec::new();
+        let mut edges: Vec<mt::Edge> = Vec::new();
         let mut out = Vec::with_capacity(faces.len());
         let mut rec = Rebuild::default();
         for f in &faces {
@@ -654,17 +654,15 @@ pub fn stitch(bodies: &[&Body], tol: f64) -> Result<Body> {
                     let abs = if e.orientation() { e.clone() } else { e.inverse() };
                     let (a, b) = (canon(abs.front(), &mut verts), canon(abs.back(), &mut verts));
                     let c = abs.curve();
-                    let (t0, t1) = c.range_tuple();
-                    let mid = c.subs(0.5 * (t0 + t1));
-                    let found = edges.iter().find_map(|(x, m)| {
+                    let found = edges.iter().find_map(|x| {
                         let forward = x.front().id() == a.id() && x.back().id() == b.id();
                         if !forward && !(x.front().id() == b.id() && x.back().id() == a.id()) {
                             return None;
                         }
-                        // Curves through the same ends are one edge when the middle of the one
-                        // lies on the other: their parameters need not agree (a blend's boundary
-                        // along a rim's arc).
-                        if m.distance(mid) > tol * 10.0 && !lies_on(&x.curve(), mid, tol * 10.0) {
+                        // Curves through the same ends are one edge when each runs along the
+                        // other, whatever their parameters (a blend's boundary along a rim's arc);
+                        // a curve that bows away from the other between the ends is not.
+                        if !(runs_along(&x.curve(), &c, tol * 10.0) && runs_along(&c, &x.curve(), tol * 10.0)) {
                             return None;
                         }
                         Some(if forward { x.clone() } else { x.inverse() })
@@ -673,7 +671,7 @@ pub fn stitch(bodies: &[&Body], tol: f64) -> Result<Body> {
                         Some(x) => x,
                         None => {
                             let x = mt::Edge::new_unchecked(&a, &b, c);
-                            edges.push((x.clone(), mid));
+                            edges.push(x.clone());
                             x
                         }
                     };
@@ -723,6 +721,19 @@ pub fn stitch(bodies: &[&Body], tol: f64) -> Result<Body> {
     })
 }
 
+/// How many points of one curve [`runs_along`] checks on the other, between its ends.
+const ALONG_SAMPLES: usize = 9;
+
+/// Whether `curve` runs along `on`: [`ALONG_SAMPLES`] points evenly inside its parameter range
+/// each lie within `tol` of `on`.
+fn runs_along(on: &mt::Curve, curve: &mt::Curve, tol: f64) -> bool {
+    let (t0, t1) = curve.range_tuple();
+    if !(t1 > t0) || ![t0, t1].into_iter().all(f64::is_finite) {
+        return false;
+    }
+    (1..=ALONG_SAMPLES).all(|k| lies_on(on, curve.subs(t0 + (t1 - t0) * k as f64 / (ALONG_SAMPLES + 1) as f64), tol))
+}
+
 /// Whether `p` lies within `tol` of `curve`.
 fn lies_on(curve: &mt::Curve, p: mt::Point3, tol: f64) -> bool {
     const SEEDS: usize = 32;
@@ -756,18 +767,20 @@ fn split_at_corners(faces: &[mt::Face], tol: f64) -> (Vec<mt::Face>, HashMap<mt:
         }
     }
     let open = |e: &mt::Edge| uses.get(&e.id()).is_some_and(|(n, _)| *n == 1);
-    // The corners of the open edges, with the face each belongs to.
+    // The corners of the open edges, with the face each belongs to (each vertex once per face),
+    // sorted along x so that an edge looks only at the corners in its own box.
+    let mut seen: std::collections::HashSet<(mt::VertexID, usize)> = std::collections::HashSet::new();
     let mut corners: Vec<(mt::Point3, usize)> = Vec::new();
     for (i, f) in faces.iter().enumerate() {
         for e in f.edge_iter().filter(|e| open(e)) {
             for v in [e.front(), e.back()] {
-                let p = v.point();
-                if !corners.iter().any(|(q, j)| *j == i && q.distance(p) <= tol) {
-                    corners.push((p, i));
+                if seen.insert((v.id(), i)) {
+                    corners.push((v.point(), i));
                 }
             }
         }
     }
+    corners.sort_by(|a, b| a.0.x.total_cmp(&b.0.x));
     let mut pieces: HashMap<mt::EdgeID, mt::Edge> = HashMap::new();
     let mut out = Vec::with_capacity(faces.len());
     for (i, f) in faces.iter().enumerate() {
@@ -776,7 +789,7 @@ fn split_at_corners(faces: &[mt::Face], tol: f64) -> (Vec<mt::Face>, HashMap<mt:
         for w in f.absolute_boundaries() {
             let mut nw: Vec<mt::Edge> = Vec::new();
             for e in w.edge_iter() {
-                let split = if open(e) { split_edge(e, corners.iter().filter(|(_, j)| *j != i).map(|(p, _)| *p), tol) } else { None };
+                let split = if open(e) { split_edge(e, &corners, i, tol) } else { None };
                 match split {
                     Some(parts) => {
                         changed = true;
@@ -810,7 +823,7 @@ fn split_at_corners(faces: &[mt::Face], tol: f64) -> (Vec<mt::Face>, HashMap<mt:
 
 /// The edge `e` (as it runs in its face's absolute boundary) cut at those of `corners` that lie
 /// inside it within `tol`, in its absolute direction; `None` where none does.
-fn split_edge(e: &mt::Edge, corners: impl Iterator<Item = mt::Point3>, tol: f64) -> Option<Vec<mt::Edge>> {
+fn split_edge(e: &mt::Edge, corners: &[(mt::Point3, usize)], face: usize, tol: f64) -> Option<Vec<mt::Edge>> {
     let abs = if e.orientation() { e.clone() } else { e.inverse() };
     let curve = abs.curve();
     let (t0, t1) = curve.range_tuple();
@@ -822,8 +835,25 @@ fn split_edge(e: &mt::Edge, corners: impl Iterator<Item = mt::Point3>, tol: f64)
     const SEEDS: usize = 64;
     let seeds: Vec<(f64, mt::Point3)> = (0..=SEEDS).map(|k| t0 + (t1 - t0) * k as f64 / SEEDS as f64).map(|t| (t, curve.subs(t))).collect();
     let margin = (t1 - t0) * 1e-6;
+    // The edge's box: its seeds', grown by the tolerance and the longest step between two seeds
+    // (between them the curve stays within about that of the chord). Only the corners inside it,
+    // and of other faces, are looked at: `corners` is sorted along x.
+    let step = seeds.windows(2).filter_map(|w| Some(w.first()?.1.distance(w.get(1)?.1))).fold(0.0, f64::max);
+    let grow = tol + step;
+    let lo = seeds
+        .iter()
+        .fold(mt::Point3::new(f64::INFINITY, f64::INFINITY, f64::INFINITY), |m, (_, p)| mt::Point3::new(m.x.min(p.x), m.y.min(p.y), m.z.min(p.z)));
+    let hi = seeds.iter().fold(mt::Point3::new(f64::NEG_INFINITY, f64::NEG_INFINITY, f64::NEG_INFINITY), |m, (_, p)| {
+        mt::Point3::new(m.x.max(p.x), m.y.max(p.y), m.z.max(p.z))
+    });
+    let first = corners.partition_point(|(p, _)| p.x < lo.x - grow);
+    let inside = corners
+        .iter()
+        .skip(first)
+        .take_while(|(p, _)| p.x <= hi.x + grow)
+        .filter(|(p, j)| *j != face && p.y >= lo.y - grow && p.y <= hi.y + grow && p.z >= lo.z - grow && p.z <= hi.z + grow);
     let mut cuts: Vec<(f64, mt::Point3)> = Vec::new();
-    for q in corners {
+    for &(q, _) in inside {
         if q.distance(a) <= tol || q.distance(b) <= tol || cuts.iter().any(|(_, p)| p.distance(q) <= tol) {
             continue;
         }
@@ -1776,6 +1806,53 @@ mod tests {
         let closed = stitch(&[&open, &left, &right], 0.0).unwrap();
         assert!(!closed.is_surface(), "the halves close the box");
         assert!(rel(measure(&closed).unwrap().volume, 6000.0) < 1e-9);
+    }
+
+    /// Two sheets whose edges share both ends but not their path: a straight edge from (10, 0)
+    /// to (10, 10), and an S-shaped one that crosses it at its middle (its parameter midpoint
+    /// lies on the straight edge) but bows 0.6 mm to either side between. They are not one edge,
+    /// so the stitch leaves them apart.
+    #[test]
+    fn stitch_does_not_sew_a_curve_that_bows_away_between_shared_ends() {
+        use solidcraft_geom::bspline::{HPoint, NurbsSurface};
+        let square = Region2 {
+            outer: Loop2::polygon(&[Vec2::new(0.0, 0.0), Vec2::new(10.0, 0.0), Vec2::new(10.0, 10.0), Vec2::new(0.0, 10.0)]),
+            holes: vec![],
+        };
+        let a = patch_region(&Plane::XY, &square).unwrap();
+        // A flat sheet, its edge at v = 0 the cubic S through x = 10, 10.8, 9.2, 10 (0.6 mm off the
+        // line at its quarters, on it at its ends and middle).
+        let xs = [10.0, 10.8, 9.2, 10.0];
+        let mut points = Vec::new();
+        for shift in [0.0, 10.0] {
+            for (k, x) in xs.iter().enumerate() {
+                points.push(HPoint::weighted(Vec3::new(x + shift, 10.0 * k as f64 / 3.0, 0.0), 1.0));
+            }
+        }
+        let knots_u = vec![0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0];
+        let knots_v = vec![0.0, 0.0, 1.0, 1.0];
+        let nurbs = NurbsSurface::from_homogeneous([3, 1], [knots_u, knots_v], points).unwrap();
+        let b = surface_body(vec![crate::spline_conv::tensor_face(&nurbs).unwrap()]);
+        let edges = |body: &Body| -> usize {
+            let mut ids = std::collections::HashSet::new();
+            for f in body.solid.face_iter() {
+                for e in f.edge_iter() {
+                    ids.insert(e.id());
+                }
+            }
+            ids.len()
+        };
+        let (ea, eb) = (edges(&a), edges(&b));
+        let sewn = stitch(&[&a, &b], 0.0).unwrap();
+        assert_eq!(edges(&sewn), ea + eb, "the S is not the straight edge: nothing is sewn");
+        // A straight neighbour along the same edge is sewn (the control: one edge fewer).
+        let right = Region2 {
+            outer: Loop2::polygon(&[Vec2::new(10.0, 0.0), Vec2::new(20.0, 0.0), Vec2::new(20.0, 10.0), Vec2::new(10.0, 10.0)]),
+            holes: vec![],
+        };
+        let c = patch_region(&Plane::XY, &right).unwrap();
+        let sewn = stitch(&[&a, &c], 0.0).unwrap();
+        assert_eq!(edges(&sewn), ea + edges(&c) - 1);
     }
 
     #[test]
