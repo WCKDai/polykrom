@@ -4512,6 +4512,12 @@ pub fn for_feature(app: &SolveApp, id: u64, marker: Option<usize>) -> Option<Dia
             {
                 d.extra.insert("corner".into(), json!("g2"));
             }
+            // A radius per edge, in the order of the edges.
+            if let FeatureKind::Fillet { edge_radii, .. } = &f.kind
+                && !edge_radii.is_empty()
+            {
+                d.extra.insert("edge_radii".into(), json!(edge_radii));
+            }
             // A fillet that reduces or tapers a radius too large for its edges.
             if let FeatureKind::Fillet { fit, .. } = &f.kind {
                 use solidcraft_engine::doc::FilletFit;

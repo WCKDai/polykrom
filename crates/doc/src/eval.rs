@@ -5807,14 +5807,20 @@ fn replay(
                 let nb = match &src.kind {
                     FeatureKind::Chamfer { distance2, angle, flip, .. } => chamfer_with(vals, &mb.body, &moved, r, distance2, angle, *flip)?,
                     // A radius per edge: each copied edge with its own, if every edge was found.
+                    // A radius per edge: each copied edge with the radius its edge took in the
+                    // source (the edges it found, in order), else from the feature's own list.
                     FeatureKind::Fillet { edge_radii, .. } if !edge_radii.is_empty() => {
-                        if edge_radii.len() != moved.len() {
-                            return Err(DocError::Invalid("a copied fillet with a radius per edge needs each of its edges".into()));
-                        }
-                        let mut radii = Vec::with_capacity(edge_radii.len());
-                        for e in edge_radii {
-                            radii.push(val(vals, e, Kind::Length)?);
-                        }
+                        let radii = match st.fitted.get(&src.id) {
+                            Some(used) if used.len() == moved.len() => used.clone(),
+                            _ if edge_radii.len() == moved.len() => {
+                                let mut radii = Vec::with_capacity(edge_radii.len());
+                                for e in edge_radii {
+                                    radii.push(val(vals, e, Kind::Length)?);
+                                }
+                                radii
+                            }
+                            _ => return Err(DocError::Invalid("a copied fillet with a radius per edge needs each of its edges".into())),
+                        };
                         kernel::fillet_each(&mb.body, &moved, &radii)?
                     }
                     // A copy is congruent to the original: the radius it was reduced to first.
@@ -6808,13 +6814,25 @@ fn eval_feature(doc: &Document, vals: &BTreeMap<String, Value>, f: &Feature, st:
                 }
                 out
             } else if per_edge {
-                // One edge at a time, to keep each with its radius.
+                // One edge at a time, to keep each with its radius; one no longer found is skipped
+                // (as the whole list would skip it), and none found is an error.
                 let mut out = Vec::new();
+                let mut lost = 0;
                 for (i, p) in edges.iter().enumerate() {
                     let refs: Vec<EdgeRef> = f.edge_refs.get(i).cloned().into_iter().collect();
-                    let q = resolve_edges(&mb.body, &[p.0], &refs, warning)?;
-                    came_from.extend(std::iter::repeat_n(i, q.len()));
-                    out.extend(q);
+                    match resolve_edges(&mb.body, &[p.0], &refs, warning) {
+                        Ok(q) => {
+                            came_from.extend(std::iter::repeat_n(i, q.len()));
+                            out.extend(q);
+                        }
+                        Err(_) => lost += 1,
+                    }
+                }
+                if out.is_empty() {
+                    return Err(DocError::Invalid("none of the selected edges exist any more".into()));
+                }
+                if lost > 0 {
+                    append_warning(warning, format!("{lost} of the selected edges no longer exist and were skipped"));
                 }
                 out
             } else {
@@ -6867,7 +6885,11 @@ fn eval_feature(doc: &Document, vals: &BTreeMap<String, Value>, f: &Feature, st:
                         let e = edge_radii.get(*i).ok_or_else(|| DocError::Invalid("edge radius".into()))?;
                         radii.push(val(vals, e, Kind::Length)?);
                     }
-                    (kernel::fillet_each(&mb.body, &edges, &radii)?, input)
+                    let b = kernel::fillet_each(&mb.body, &edges, &radii)?;
+                    // The radius each found edge took, for copies of the fillet (as a fit keeps the
+                    // radii it reduced to).
+                    st.fitted.insert(f.id, radii);
+                    (b, input)
                 }
                 FeatureKind::Fillet { fit, .. } => {
                     let (b, used) = fillet_fitted(&mb.body, &edges, r, *fit)?;
