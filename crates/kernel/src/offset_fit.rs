@@ -539,4 +539,33 @@ mod tests {
         let (u, v) = base.foot(Vec3::new(13.0, 4.0, 3.0), (0.5, 0.5), [-1.0, 2.0, -1.0, 2.0]).unwrap();
         assert!((u - 1.3).abs() < 1e-9 && (v - 0.4).abs() < 1e-9, "{u} {v}");
     }
+
+    /// A plane whose u runs over 1e-4 and v over 1e8 (derivatives 1e5 and 1e-7 long): its
+    /// normal is regular whatever the scaling, and its offset fits.
+    #[test]
+    fn a_normal_does_not_depend_on_parameter_scaling() {
+        let pts = vec![vec![p3(Vec3::ZERO), p3(Vec3::new(0.0, 10.0, 0.0))], vec![p3(Vec3::new(10.0, 0.0, 0.0)), p3(Vec3::new(10.0, 10.0, 0.0))]];
+        let (ku, kv) = (mt::KnotVec::from(vec![0.0, 0.0, 1e-4, 1e-4]), mt::KnotVec::from(vec![0.0, 0.0, 1e8, 1e8]));
+        let base = Extended::new(mt::Surface::BSplineSurface(mt::BSplineSurface::new((ku, kv), pts)));
+        let n = base.jet(0.5e-4, 0.5e8).normal().unwrap();
+        assert!((n.z.abs() - 1.0).abs() < 1e-12, "{n:?}");
+        let f = fit_offset(&base, [0.0, 1e-4, 0.0, 1e8], 2.0, 0.01).unwrap();
+        assert!((from_p3(mt::ParametricSurface::subs(&f, 0.3e-4, 0.7e8)).z.abs() - 2.0).abs() < 1e-9);
+    }
+
+    /// A surface with more knots than an offset fit takes sample lines (400 spans each way) is
+    /// refused before anything is sampled.
+    #[test]
+    fn a_surface_with_too_many_knots_is_refused_up_front() {
+        let n = 400;
+        let mut knots = vec![0.0, 0.0];
+        knots.extend((1..n).map(|i| i as f64 / n as f64));
+        knots.extend([1.0, 1.0]);
+        let kv = mt::KnotVec::from(knots);
+        let pts: Vec<Vec<mt::Point3>> =
+            (0..=n).map(|i| (0..=n).map(|j| p3(Vec3::new(i as f64, j as f64, ((i + j) % 2) as f64 * 0.01))).collect()).collect();
+        let base = Extended::new(mt::Surface::BSplineSurface(mt::BSplineSurface::new((kv.clone(), kv), pts)));
+        let e = fit_offset(&base, [0.0, 1.0, 0.0, 1.0], 0.1, 0.01).unwrap_err();
+        assert!(matches!(e, KernelError::TooLarge(_)), "{e}");
+    }
 }
