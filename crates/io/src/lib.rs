@@ -381,10 +381,12 @@ pub struct SolidMesh {
 /// ([`export_mesh`]) meshes each face on its own, so a seam or a trimmed edge can leave a crack
 /// between two faces' points. Tried in turn, the first closed one kept: the body's display mesh
 /// (its faces share each edge's points), the reference tessellation, and each of them welded
-/// within a tenth of the chord tolerance (closing cracks narrower than that). A mesh counts only
-/// if it also has triangles on every face of the body: one that left out a whole shell (a
-/// cavity's faces) can be closed and still not the solid. When none closes, the display mesh (or
-/// the reference one, where the body has no display mesh), marked open.
+/// within a tenth of the chord tolerance (closing cracks narrower than that). A closed mesh counts
+/// only if it is the whole solid: one that left out a whole shell (a cavity's faces) can be closed
+/// and still not the solid. It is when every face of the body keeps triangles after the weld,
+/// or, where some lost theirs (a sliver face collapsed by the weld, a fin cancelled against its
+/// twin), when its volume is within 1 % of the B-rep's. When none counts, the display mesh (or the
+/// reference one, where the body has no display mesh), marked open.
 pub fn solid_mesh(b: &solidcraft_kernel::Body) -> Result<SolidMesh> {
     let tol = (b.size() * 2e-4).max(1e-3);
     let eps = weld_eps(b);
@@ -400,11 +402,19 @@ pub fn solid_mesh(b: &solidcraft_kernel::Body) -> Result<SolidMesh> {
         tries.push(m);
     }
     tries.push(export_mesh(b)?);
+    let brep_volume = std::cell::OnceCell::new();
+    let whole = |m: &Mesh, w: &Mesh| {
+        if b.is_mesh() || (m.tri_face.len() == m.triangles.len() && covers_every_face(&w.tri_face, b.face_count())) {
+            return true;
+        }
+        let v = *brep_volume.get_or_init(|| solidcraft_kernel::measure_mass(b).ok().map(|x| x.volume).filter(|v| *v > 0.0));
+        matches!((v, w.mass_properties()), (Some(v), Some(mp)) if (mp.volume - v).abs() <= 0.01 * v)
+    };
     let mut first: Option<Mesh> = None;
     for wide in [eps, (tol * 0.1).max(eps)] {
         for m in &tries {
             let w = welded(m, wide);
-            if w.is_closed() && (b.is_mesh() || (m.tri_face.len() == m.triangles.len() && covers_every_face(&w.tri_face, b.face_count()))) {
+            if w.is_closed() && whole(m, &w) {
                 return Ok(SolidMesh { mesh: w, closed: true });
             }
             first.get_or_insert(w);

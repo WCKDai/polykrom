@@ -53,7 +53,8 @@ defaults are written and a warning says so. A value that is not a positive numbe
   same link combine with the parallel-axis theorem.
 - **Meshes of solids are closed**: each solid's mesh is its display mesh (whose faces share
   their edges' points, so seams and trimmed edges leave no cracks) or else its finer reference
-  mesh, welded, with any fins a weld leaves taken out; the first of these that closes is
+  mesh, welded, with any fins a weld leaves taken out; the first of these that closes and is
+  the whole solid (every face keeps triangles, or its volume is the B-rep's to 1 %) is
   written, so the mass, the inertia and the collision come from a watertight mesh. (A solid
   touching itself along an edge is closed too: that edge has four triangles, two each way.)
 - **A solid whose mesh still has gaps** keeps its mass: the volume and centre come from the
