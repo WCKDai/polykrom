@@ -13,7 +13,7 @@
 use std::collections::{HashMap, HashSet};
 
 use mt::{BoundedCurve, ParametricCurve};
-use solidcraft_geom::Vec3;
+use solidcraft_geom::{Aabb3, Vec3};
 use truck_modeling as mt;
 
 use crate::body::{Body, Solid, from_p3};
@@ -126,20 +126,30 @@ fn holes(b: &Body) -> Vec<Hole> {
     found
 }
 
-/// Whether a hole of `b` opens within three walls of another loop of the face it opens in, where
-/// the ring of face between them may vanish when the shell moves both by the wall.
-pub(crate) fn hole_near_rim(b: &Body, thickness: f64) -> bool {
+/// Whether a hole of `b` opens within `walls` walls of another loop of the face it opens in,
+/// where the ring of face between them may vanish when the shell moves both by the wall (within
+/// two, it does wherever the neighbour across that loop stands square to the face).
+pub(crate) fn hole_near_rim(b: &Body, thickness: f64, walls: f64) -> bool {
     let faces: Vec<mt::Face> = b.solid.face_iter().cloned().collect();
     holes(b).iter().flat_map(|h| h.rims.iter()).any(|(p, rim)| {
         let Some(face) = faces.get(*p) else { return false };
         let ids: HashSet<mt::EdgeID> = rim.edge_iter().map(|e| e.id()).collect();
         let mine = wire_points(rim);
-        face.absolute_boundaries()
-            .iter()
-            .filter(|w| !w.edge_iter().any(|e| ids.contains(&e.id())))
-            .flat_map(wire_points)
-            .any(|q| mine.iter().any(|m| m.dist(q) < thickness * 3.0))
+        // The other loops as polylines (their points closed round), each rim point measured to
+        // their segments.
+        face.absolute_boundaries().iter().filter(|w| !w.edge_iter().any(|e| ids.contains(&e.id()))).any(|w| {
+            let pts = wire_points(w);
+            let segs: Vec<(Vec3, Vec3)> = pts.iter().zip(pts.iter().skip(1).chain(pts.first())).map(|(a, c)| (*a, *c)).collect();
+            mine.iter().any(|m| segs.iter().any(|(a, c)| segment_dist(*m, *a, *c) < thickness * walls))
+        })
     })
+}
+
+/// The distance from `p` to the segment from `a` to `c`.
+fn segment_dist(p: Vec3, a: Vec3, c: Vec3) -> f64 {
+    let d = c - a;
+    let t = if d.len2() > 0.0 { ((p - a).dot(d) / d.len2()).clamp(0.0, 1.0) } else { 0.0 };
+    p.dist(a + d * t)
 }
 
 /// The solid a hole removed: its faces turned inside out, capped by its rims on their planes.
@@ -173,24 +183,20 @@ pub(crate) fn refused_at(e: &KernelError) -> Option<Vec3> {
     }
 }
 
-/// Rounds of filling the holes near where the filled body's shell is refused.
-const MAX_ROUNDS: usize = 6;
-
-/// Shell of `b` (`opened`: its open faces) through some of its holes filled (see the module
-/// comment): the holes near `at`, where the direct shell was refused, then those near where
-/// the filled body's cavity is refused, and so on; every hole where `at` is unknown. `None`
-/// where no hole is near (or `b` has none). Open faces move out past the body (by a margin),
-/// so the cavity passes through them and the body less the cavity is open there.
-pub(crate) fn shell_round_holes(b: &Body, opened: &[usize], thickness: f64, tolerance: f64, at: Option<Vec3>) -> Result<Option<Body>> {
+/// Shell of `b` (`opened`: its open faces) through its holes filled (see the module comment);
+/// `None` where it has none. Open faces move out past the body (by a margin), so the cavity
+/// passes through them and the body less the cavity is open there.
+pub(crate) fn shell_round_holes(b: &Body, opened: &[usize], thickness: f64, tolerance: f64) -> Result<Option<Body>> {
     let found = holes(b);
     if found.is_empty() || found.len() > MAX_HOLES {
         return Ok(None);
     }
-    if opened.iter().any(|i| found.iter().any(|h| h.faces.contains(i))) {
+    let lining: Vec<usize> = found.iter().flat_map(|h| h.faces.iter().copied()).collect();
+    if opened.iter().any(|i| lining.contains(i)) {
         return Ok(None);
     }
-    let mesh = b.tessellate((b.size() * 2e-3).max(1e-3))?;
     // A point inside each open face, found again on the filled body.
+    let mesh = b.tessellate((b.size() * 2e-3).max(1e-3))?;
     let mut inside: Vec<Vec3> = Vec::new();
     for o in opened {
         let best = mesh
@@ -203,67 +209,48 @@ pub(crate) fn shell_round_holes(b: &Body, opened: &[usize], thickness: f64, tole
         let [x, y, z] = best.ok_or_else(|| KernelError::Failed("shell: an open face with no mesh".into()))?;
         inside.push((x + y + z) / 3.0);
     }
-    // Each hole's mesh points: a hole is near a point within three walls of one.
-    let points: Vec<Vec<Vec3>> = found
-        .iter()
-        .map(|h| {
-            let mut pts: Vec<Vec3> = Vec::new();
-            for (t, f) in mesh.triangles.iter().zip(&mesh.tri_face) {
-                if h.faces.contains(&(*f as usize))
-                    && let Some(tri) = mesh.tri(t)
-                {
-                    pts.extend(tri);
-                }
-            }
-            pts
-        })
-        .collect();
-    let reach = thickness * 3.0 + b.size() * 1e-3;
-    let mut chosen: Vec<usize> = Vec::new();
-    let mut at = at;
-    let mut made = None;
-    for _ in 0..MAX_ROUNDS {
-        let before = chosen.len();
-        for (k, pts) in points.iter().enumerate() {
-            let near = at.is_none_or(|p| pts.iter().any(|q| q.dist(p) <= reach));
-            if near && !chosen.contains(&k) {
-                chosen.push(k);
-            }
+    let filled = crate::delete_face::delete_faces(b, &lining)?;
+    let mut open_filled: Vec<usize> = Vec::new();
+    for p in &inside {
+        let f = crate::surfaces::nearest_face(&filled, *p)?;
+        if !open_filled.contains(&f) {
+            open_filled.push(f);
         }
-        if chosen.len() == before {
-            return Ok(None);
-        }
-        let lining: Vec<usize> = chosen.iter().filter_map(|k| found.get(*k)).flat_map(|h| h.faces.iter().copied()).collect();
-        let filled = crate::delete_face::delete_faces(b, &lining)?;
-        let mut open_filled: Vec<usize> = Vec::new();
-        for p in &inside {
-            let f = crate::surfaces::nearest_face(&filled, *p)?;
-            if !open_filled.contains(&f) {
-                open_filled.push(f);
-            }
-        }
-        let margin = thickness + b.size() * 0.05;
-        let cavity = match crate::offset_free::offset_free(&filled, |i| if open_filled.contains(&i) { margin } else { -thickness }, tolerance) {
-            Ok(c) => c,
-            Err(e @ (KernelError::Failed(_) | KernelError::Invalid(_))) => {
-                at = Some(refused_at(&e).ok_or(e)?);
-                continue;
-            }
-            Err(e) => return Err(e),
-        };
-        if let Some(p) = crate::offset_free::too_thin(&filled, &cavity, &open_filled, thickness, tolerance)? {
-            at = Some(p);
-            continue;
-        }
-        made = Some(cavity);
-        break;
     }
-    let Some(mut cavity) = made else { return Ok(None) };
-    for hole in chosen.iter().filter_map(|k| found.get(*k)) {
-        let solid = hole_solid(b, hole)?;
-        let grown = crate::offset_free::offset_free(&solid, |_| thickness, tolerance)?;
-        cavity = crate::ops::boolean(&cavity, &grown, crate::BoolOp::Cut)?
-            .ok_or_else(|| KernelError::Failed("shell: the holes fill the cavity".into()))?;
+    let margin = thickness + b.size() * 0.05;
+    let cavity = crate::offset_free::offset_free(&filled, |i| if open_filled.contains(&i) { margin } else { -thickness }, tolerance)?;
+    if let Some(p) = crate::offset_free::too_thin(&filled, &cavity, &open_filled, thickness, tolerance)? {
+        return Err(KernelError::Failed(format!(
+            "not supported yet: the shell's walls would meet near [{:.2}, {:.2}, {:.2}] (the body is thinner there than twice the wall)",
+            p.x, p.y, p.z
+        )));
+    }
+    // The holes grown by the wall, cut from the cavity at once where they lie apart (one
+    // Boolean, not one per hole), else one by one.
+    let mut grown: Vec<(Body, Aabb3)> = Vec::new();
+    for hole in &found {
+        let g = crate::offset_free::offset_free(&hole_solid(b, hole)?, |_| thickness, tolerance)?;
+        let mut bb = Aabb3::EMPTY;
+        for p in g.tessellate((g.size() * 1e-2).max(1e-3))?.positions {
+            bb.add(p);
+        }
+        grown.push((g, bb.inflated(thickness)));
+    }
+    let overlap = |a: &Aabb3, c: &Aabb3| {
+        a.min.x <= c.max.x && c.min.x <= a.max.x && a.min.y <= c.max.y && c.min.y <= a.max.y && a.min.z <= c.max.z && c.min.z <= a.max.z
+    };
+    let apart = grown.iter().enumerate().all(|(i, (_, a))| grown.iter().skip(i + 1).all(|(_, c)| !overlap(a, c)));
+    let mut cavity = cavity;
+    if apart && grown.len() > 1 {
+        let shells: Vec<mt::Shell> = grown.iter().flat_map(|(g, _)| g.solid.boundaries().iter().cloned()).collect();
+        let tool = guard("shell", || Body::new(Solid::new_unchecked(shells)))?;
+        cavity =
+            crate::ops::boolean(&cavity, &tool, crate::BoolOp::Cut)?.ok_or_else(|| KernelError::Failed("shell: the holes fill the cavity".into()))?;
+    } else {
+        for (g, _) in &grown {
+            cavity =
+                crate::ops::boolean(&cavity, g, crate::BoolOp::Cut)?.ok_or_else(|| KernelError::Failed("shell: the holes fill the cavity".into()))?;
+        }
     }
     crate::ops::boolean(b, &cavity, crate::BoolOp::Cut)?.ok_or_else(|| KernelError::Failed("the shell removed everything".into())).map(Some)
 }
