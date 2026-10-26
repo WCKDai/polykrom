@@ -366,3 +366,27 @@ fn a_bought_part_envelope_is_left_out_of_polish() {
     assert!(r["bodies"].as_array().unwrap().iter().all(|b| b["body"] != "Cube"), "{r}");
     assert!(r["skipped"].as_array().unwrap().iter().any(|k| k["body"] == "Cube" && k["why"].as_str().unwrap().contains("envelope")), "{r}");
 }
+
+#[test]
+fn polish_apply_chamfers_an_edge_the_kernel_cannot_round() {
+    // The kernel refuses some fillets (a spline outline, #184; walls too narrow for the ball):
+    // the fix is applied as a chamfer as wide as the radius, and says why.
+    let mut s = Session::default();
+    run(&mut s, "solid.box", json!({"length": 40, "width": 20, "height": 10, "body_name": "Block"}));
+    super::super::polish_apply::REFUSE_FILLETS.with(|r| r.set(true));
+    let r = s.execute("polish.apply", &json!({}));
+    super::super::polish_apply::REFUSE_FILLETS.with(|r| r.set(false));
+    let r = r.unwrap();
+    let applied = r["applied"].as_array().unwrap();
+    assert_eq!(applied.len(), 1, "{r}");
+    assert_eq!(applied[0]["command"], "solid.chamfer", "{r}");
+    assert!(applied[0]["fallback"].as_str().unwrap().contains("refused"), "{r}");
+    assert_eq!(applied[0]["params"]["distance"], 1.0, "{r}");
+    let after = run(&mut s, "inspect.polish", json!({}));
+    assert_eq!(polish_body(&after, "Block")["sharp_edges"], 0, "the chamfer's faces aren't sharp edges: {after}");
+    // The refusal is remembered for the body as it was: run again from there, the fillet isn't
+    // tried a second time.
+    run(&mut s, "edit.undo", json!({}));
+    let again = run(&mut s, "polish.apply", json!({}));
+    assert!(again["applied"][0]["fallback"].as_str().unwrap().contains("refused before"), "{again}");
+}

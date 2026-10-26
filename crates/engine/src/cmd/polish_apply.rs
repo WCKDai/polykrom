@@ -24,7 +24,9 @@ pub static COMMANDS: &[CommandSpec] = &[CommandSpec::new("polish.apply", "Apply 
      skip?, sharp_deg? (as inspect.polish); max_fixes?: how many of inspect.polish's fixes to try, 1…100 (default 20); mass_tol?: the \
      share of a body's volume a fix may change, 0…1 (default 0.05); batch?: bool (default true: every fix at once, checked once, and \
      split by the bodies a failed check points at, then in halves; false: one fix at a time, each checked) → before: {score, scores}, after: {score, scores}, \
-     applied: [{id, body, command, params, score_before, score_after}], skipped: [{id, body, command, reason}] (refused by the kernel, \
+     applied: [{id, body, command, params, score_before, score_after, ms (in the command), fallback? (a fillet the kernel refused, applied as a chamfer \
+     as wide as its radius, and why)}], skipped: [{id, body, command, reason, ms?}] (refused by the kernel (remembered for the body as it is, so a later run \
+     skips it at once), \
      every edge on a face a joint origin names, invalid body, new interference, joints no longer resolve, mass changed, score fell, or already fixed \
      by an earlier fix), held_edges: [{id, edges}] (edges left out of a fix because they lie on a face a joint origin names), fixes (what \
      inspect.polish still suggests), fixes_left (how many of them are safe: run again), recommendations: [findings, most severe first; \
@@ -40,6 +42,8 @@ const SCORE_SLACK: f64 = 0.5;
 const DEPTH_SLACK: f64 = 0.05;
 /// How near (mm) another body's box must come to a touched body's to be checked for clashes.
 const NEIGHBOUR_GAP: f64 = 1.0;
+/// Refusals remembered; the memory starts over when full.
+const MAX_REMEMBERED: usize = 10_000;
 
 /// One of inspect.polish's fixes.
 struct Fix {
@@ -207,15 +211,33 @@ fn run_fixes(s: &mut Session, fixes: &[Fix], which: &[usize], run: &mut Run, cha
         } else {
             fix.params.clone()
         };
-        // Run inside this command, the fix doesn't get the mapping of world picks into the body's
-        // own frame that a command run on its own gets: map them here.
-        let params = crate::frames::to_local(s, &fix.command, &params).unwrap_or(params);
-        // A refused fix leaves the design as it was: nothing to check or roll back.
-        match s.execute(&fix.command, &params) {
-            Err(e) => skip(run, format!("refused: {e}")),
-            Ok(_) => {
+        // A refused fix leaves the design as it was: nothing to check or roll back. A refused
+        // fillet is tried again as a chamfer as wide as its radius (a spline or curved edge the
+        // kernel can't round yet, #184, walls too narrow for the ball). A refusal is remembered
+        // for the body as it is, so a later pass doesn't spend the kernel's time on it again.
+        let started = web_time::Instant::now();
+        let mut chamfer = json!({"edges": params["edges"], "distance": params["radius"]});
+        if let Some(b) = params.get("body") {
+            chamfer["body"] = b.clone();
+        }
+        let ran = match attempt(s, &fix.body, &fix.command, &params) {
+            Ok(local) => Ok(json!({"command": fix.command, "params": local})),
+            Err(e) if fix.command == "solid.fillet" => match attempt(s, &fix.body, "solid.chamfer", &chamfer) {
+                Ok(local) => Ok(json!({"command": "solid.chamfer", "params": local, "fallback": format!("chamfer: the fillet was refused ({e})")})),
+                Err(c) => Err(format!("refused: {e}; as a chamfer: {c}")),
+            },
+            Err(e) => Err(format!("refused: {e}")),
+        };
+        let ms = (started.elapsed().as_secs_f64() * 10000.0).round() / 10.0;
+        match ran {
+            Ok(mut v) => {
+                v["ms"] = json!(ms);
                 changed.insert(fix.body.clone());
-                done.push((i, params));
+                done.push((i, v));
+            }
+            Err(why) => {
+                run.skipped.push(json!({"id": fix.id, "body": fix.body, "command": fix.command, "reason": why, "ms": ms}));
+                run.out.insert(i);
             }
         }
     }
@@ -223,13 +245,62 @@ fn run_fixes(s: &mut Session, fixes: &[Fix], which: &[usize], run: &mut Run, cha
     done
 }
 
-/// Records fixes that ran and passed their check as applied.
+/// [`exec`], unless the kernel refused the same command on the same body as it is before (in
+/// this session): then the refusal again, at once. A refusal is remembered.
+fn attempt(s: &mut Session, body: &str, command: &str, params: &Value) -> std::result::Result<Value, String> {
+    use std::hash::{Hash, Hasher};
+    let geometry = s.world_state().body(body).and_then(|b| b.geometry_key());
+    let key = geometry.map(|g| {
+        let mut h = std::collections::hash_map::DefaultHasher::new();
+        (g, command, params.to_string()).hash(&mut h);
+        h.finish()
+    });
+    if let Some(why) = key.and_then(|k| s.polish_refused.lock().ok()?.get(&k).cloned()) {
+        return Err(format!("{why} (refused before)"));
+    }
+    exec(s, command, params).map_err(|e| {
+        let why = e.to_string();
+        if let (Some(k), Ok(mut seen)) = (key, s.polish_refused.lock()) {
+            if seen.len() >= MAX_REMEMBERED {
+                seen.clear();
+            }
+            seen.insert(k, why.clone());
+        }
+        why
+    })
+}
+
+/// Runs `command` inside polish.apply. Run inside this command, it doesn't get the mapping of
+/// world picks into the body's own frame that a command run on its own gets: they are mapped
+/// here. Returns the parameters it ran with.
+fn exec(s: &mut Session, command: &str, params: &Value) -> Result<Value> {
+    #[cfg(test)]
+    if command == "solid.fillet" && REFUSE_FILLETS.with(std::cell::Cell::get) {
+        return Err(crate::EngineError::Other("not supported yet: refused for the test".into()));
+    }
+    let local = crate::frames::to_local(s, command, params).unwrap_or_else(|| params.clone());
+    s.execute(command, &local).map(|_| local)
+}
+
+#[cfg(test)]
+thread_local! {
+    /// Tests: polish.apply's fillets are refused, as the kernel refuses some (#184).
+    pub(super) static REFUSE_FILLETS: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+/// Records fixes that ran and passed their check as applied (`ran`: the command, its
+/// parameters, and why it fell back to a chamfer when it did).
 fn accept(run: &mut Run, fixes: &[Fix], done: Vec<(usize, Value)>, was: &State, now: &State) {
-    for (i, params) in done {
+    for (i, ran) in done {
         let Some(fix) = fixes.get(i) else { continue };
         let score = |st: &State| st.bodies.get(&fix.body).and_then(|b| b.score);
-        run.applied.push(json!({"id": fix.id, "body": fix.body, "command": fix.command, "params": params,
-            "score_before": score(was), "score_after": score(now)}));
+        let mut v = json!({"id": fix.id, "body": fix.body, "command": ran["command"], "params": ran["params"],
+            "score_before": score(was), "score_after": score(now)});
+        if let Some(why) = ran.get("fallback") {
+            v["fallback"] = why.clone();
+        }
+        v["ms"] = ran["ms"].clone();
+        run.applied.push(v);
         run.changed.insert(fix.body.clone());
     }
 }
