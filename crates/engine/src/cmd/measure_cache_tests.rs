@@ -58,6 +58,8 @@ fn an_open_sheet_reports_its_area_and_no_volume() {
     for key in ["volume_mm3", "center_of_mass", "mass_g"] {
         assert!(sheet.get(key).is_none(), "{key} in {sheet}");
     }
+    // Its material's density stays: it doesn't need a volume.
+    assert!(sheet["density_g_cm3"].as_f64().is_some_and(|d| d > 0.0), "{sheet}");
     // The closed box keeps its volume; the totals count only it.
     assert!(body(&m, "Box").get("open").is_none());
     assert!((m["total"]["volume_mm3"].as_f64().unwrap_or(0.0) - 8.0).abs() < 1e-9, "{m}");

@@ -134,10 +134,14 @@ fn measure(s: &mut Session, p: &Value) -> Result<Value> {
         let source = body.definition_name();
         // Every body's material, measured or not: naming it takes no measuring.
         b["material"] = json!(s.doc.body_material(source));
-        if let Some(v) = b["volume_mm3"].as_f64() {
+        // A measured body's density, an open sheet's too (the Properties window shows it); a
+        // mass only where there is a volume.
+        if b.get("area_mm2").is_some() {
             let rho = s.doc.density(source);
             b["density_g_cm3"] = json!(rho);
-            b["mass_g"] = json!(v * rho / 1000.0);
+            if let Some(v) = b["volume_mm3"].as_f64() {
+                b["mass_g"] = json!(v * rho / 1000.0);
+            }
         }
     }
     if !want.is_empty() && bodies.len() != want.len() {
