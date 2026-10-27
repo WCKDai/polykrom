@@ -18,9 +18,9 @@ repository = "https://github.com/wckdboy/polykrom"
 # internal
 # The kernel and its geometry foundation are maintained in PolyCore and pinned by revision.
 # Bump both entries together; they must resolve to the same commit so their types are the same.
-solidcraft-geom = { git = "https://github.com/WCKDai/polycore", rev = "5530dab29b76056e3572cf8be3558066a7291b97" }
+solidcraft-geom = { git = "https://github.com/WCKDai/polycore", rev = "6331b8cac8c336f8aea96fd6686e59e40b2263c5" }
 solidcraft-sketch = { path = "crates/sketch" }
-solidcraft-kernel = { git = "https://github.com/WCKDai/polycore", rev = "5530dab29b76056e3572cf8be3558066a7291b97" }
+solidcraft-kernel = { git = "https://github.com/WCKDai/polycore", rev = "6331b8cac8c336f8aea96fd6686e59e40b2263c5" }
 solidcraft-render = { path = "crates/render" }
 solidcraft-gpu = { path = "crates/gpu" }
 solidcraft-doc = { path = "crates/doc" }
