@@ -59,7 +59,9 @@ pub static COMMANDS: &[CommandSpec] = &[
         .params("→ pairs in contact sets that pass through each other now"),
     CommandSpec::new("motion.study", "Motion Study", study).at("SOLID", "ASSEMBLE").icon("play").params(
         "name?; study? (edit an existing one); steps? (timeline length, default 100); keys: [{joint, index?, points: [[step, value], …]}] \
-         (values: degrees for angles, mm for distances, or expressions)",
+         (values: degrees for angles, mm for distances, or expressions; editing a study, each key passed replaces only that joint value's \
+         key, the others kept); replace_keys?: bool (editing: the keys passed become the whole set) → study, name, steps, keys (the \
+         count), and editing: keys_changed {replaced, added, kept, removed}",
     ),
     CommandSpec::new("motion.play", "Play Motion Study", play).icon("play").params(
         "study: id|name; step (0…steps) — sets the joints to the study's values there (contact sets stop them); quiet?: bool \
@@ -660,6 +662,7 @@ fn study(s: &mut Session, p: &Value) -> Result<Value> {
         None => doc.allocate_id()?,
     };
     let count = doc.assembly.studies.len();
+    let mut changed: Option<Value> = None;
     let a = &mut doc.assembly;
     let out = match existing.and_then(|i| a.studies.get_mut(i)) {
         Some(m) => {
@@ -667,7 +670,34 @@ fn study(s: &mut Session, p: &Value) -> Result<Value> {
                 m.steps = n;
             }
             if p.get("keys").is_some() {
-                m.keys = keys;
+                // Each key passed takes the place of the study's key for that joint value; the
+                // others stay, unless the whole set is to be replaced.
+                let replace_all = p.get("replace_keys").and_then(Value::as_bool).unwrap_or(false);
+                let before = m.keys.len();
+                if replace_all {
+                    let added = keys.len();
+                    m.keys = keys;
+                    changed = Some(json!({"replaced": 0, "added": added, "kept": 0, "removed": before}));
+                } else {
+                    // The study's slots replaced, each counted once: a joint value passed twice
+                    // keeps the last key passed for it.
+                    let mut replaced = std::collections::BTreeSet::new();
+                    for k in keys {
+                        match m.keys.iter().position(|x| x.joint == k.joint && x.index == k.index) {
+                            Some(at) => {
+                                if at < before {
+                                    replaced.insert(at);
+                                }
+                                if let Some(slot) = m.keys.get_mut(at) {
+                                    *slot = k;
+                                }
+                            }
+                            None => m.keys.push(k),
+                        }
+                    }
+                    let (replaced, added) = (replaced.len(), m.keys.len() - before);
+                    changed = Some(json!({"replaced": replaced, "added": added, "kept": before - replaced, "removed": 0}));
+                }
             }
             if let Some(n) = str_(p, "name").filter(|n| !n.trim().is_empty()) {
                 m.name = n.to_string();
@@ -688,7 +718,11 @@ fn study(s: &mut Session, p: &Value) -> Result<Value> {
             m
         }
     };
-    Ok(json!({"study": out.id, "name": out.name, "steps": out.steps, "keys": out.keys.len()}))
+    let mut reply = json!({"study": out.id, "name": out.name, "steps": out.steps, "keys": out.keys.len()});
+    if let Some(c) = changed {
+        reply["keys_changed"] = c;
+    }
+    Ok(reply)
 }
 
 /// Joint values of a study at a step: (joint, full value vector).
