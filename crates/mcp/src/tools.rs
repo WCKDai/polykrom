@@ -384,6 +384,9 @@ fn type_matches(t: &str, v: &Value) -> bool {
 
 /// Validates `args` against the tool's schema (top level): unknown tool, missing required
 /// arguments, unknown arguments, type and enum mismatches.
+/// Tools whose list arguments must hold only items of the listed type.
+const STRICT_ITEMS: [&str; 1] = ["polish"];
+
 pub(crate) fn check_arguments(name: &str, args: &Value) -> Result<(), String> {
     let defs = tool_definitions();
     let def = defs.iter().find(|d| d["name"] == name).ok_or_else(|| format!("unknown tool `{name}`"))?;
@@ -418,6 +421,19 @@ pub(crate) fn check_arguments(name: &str, args: &Value) -> Result<(), String> {
         {
             return Err(format!("{name}: `{k}` must be one of {}", Value::Array(allowed.clone())));
         }
+        // A list's items, for the tools whose lists select what they change: `[null]` for a
+        // list of names must not read as an empty list (every body). Other tools' lists stay
+        // lenient (`select: [1]` is answered with what it missed).
+        if let (true, Some(items), Some(t)) = (STRICT_ITEMS.contains(&name), v.as_array(), p["items"]["type"].as_str()) {
+            if items.iter().any(|x| !type_matches(t, x)) {
+                return Err(format!("{name}: every item of `{k}` must be of type {t}"));
+            }
+            if let Some(allowed) = p["items"]["enum"].as_array()
+                && let Some(x) = items.iter().find(|x| !allowed.contains(x))
+            {
+                return Err(format!("{name}: `{k}` may not hold {x}; its items are one of {}", Value::Array(allowed.clone())));
+            }
+        }
     }
     Ok(())
 }
@@ -442,6 +458,7 @@ pub fn call_tool(b: &mut dyn Backend, name: &str, args: &Value) -> Value {
     let a = args.as_object().unwrap_or(&empty);
     let r = match name {
         "screenshot" => return screenshot(b, a),
+        "polish" => return polish_result(b, a),
         "batch" => return batch(b, a),
         _ => dispatch(b, name, a),
     };
@@ -656,7 +673,7 @@ fn dispatch(b: &mut dyn Backend, name: &str, a: &Map<String, Value>) -> Result<V
             None => exec(b, "diagnostics.crash_reports", pick(a, &["limit"])),
         },
         "skill_reference" => crate::skill_reference::read(a),
-        "polish" => polish(b, a),
+        "polish" => polish(b, a).map(|(v, _)| v),
         "running" => b.call("control.running", json!({})),
         "undo" => exec(b, "edit.undo", json!({})),
         "redo" => exec(b, "edit.redo", json!({})),
@@ -1166,12 +1183,28 @@ static SHOT: AtomicU64 = AtomicU64::new(0);
 
 /// `polish`: inspect.polish, then (apply "safe") polish.apply, and with `views` four renders to
 /// critique: front three-quarter, side, top and back three-quarter.
-fn polish(b: &mut dyn Backend, a: &Map<String, Value>) -> Result<Value, String> {
+/// The `polish` tool's result: its report as text and, with `views`, the four renders as
+/// images, so an agent without file access can look at them.
+fn polish_result(b: &mut dyn Backend, a: &Map<String, Value>) -> Value {
+    match polish(b, a) {
+        Ok((v, pngs)) => {
+            let mut r = text_result(&v, false);
+            if let Some(content) = r["content"].as_array_mut() {
+                content.extend(pngs.iter().map(|png| json!({"type": "image", "data": base64(png), "mimeType": "image/png"})));
+            }
+            r
+        }
+        Err(e) => text_result(&Value::String(e), true),
+    }
+}
+
+fn polish(b: &mut dyn Backend, a: &Map<String, Value>) -> Result<(Value, Vec<Vec<u8>>), String> {
     let categories: Vec<&str> =
         a.get("categories").and_then(Value::as_array).map(|v| v.iter().filter_map(Value::as_str).collect()).unwrap_or_default();
     let wanted = |v: &Value| categories.is_empty() || categories.iter().any(|c| v["category"] == *c);
     let mut out = match str_arg(a, "apply").unwrap_or("none") {
         "safe" => exec(b, "polish.apply", pick(a, &["bodies", "categories", "printed", "skip", "max_fixes"]))?,
+        // Recommendations are capped at 50: the ones asked for, before the cap.
         "none" => {
             let r = exec(b, "inspect.polish", pick(a, &["bodies", "printed", "skip", "max_fixes"]))?;
             let findings: Vec<Value> = r["bodies"]
@@ -1180,6 +1213,7 @@ fn polish(b: &mut dyn Backend, a: &Map<String, Value>) -> Result<Value, String> 
                 .flatten()
                 .flat_map(|body| body["findings"].as_array().into_iter().flatten().map(move |f| json!({"body": body["body"], "category": f["category"], "severity": f["severity"], "kind": f["kind"], "message": f["message"]})))
                 .chain(r["assembly"].as_array().into_iter().flatten().cloned())
+                .filter(|v| wanted(v))
                 .take(50)
                 .collect();
             let score = json!({"score": r["score"], "scores": r["scores"]});
@@ -1193,6 +1227,7 @@ fn polish(b: &mut dyn Backend, a: &Map<String, Value>) -> Result<Value, String> 
             list.retain(|v| v.get("category").is_none() || wanted(v));
         }
     }
+    let mut pngs = Vec::new();
     if a.get("views").and_then(Value::as_bool).unwrap_or(false) {
         let dir = crate::scratch_dir().unwrap_or_else(vfs::temp_dir);
         let n = SHOT.fetch_add(1, Ordering::Relaxed);
@@ -1218,15 +1253,18 @@ fn polish(b: &mut dyn Backend, a: &Map<String, Value>) -> Result<Value, String> 
                 args.insert("view".into(), json!(how));
             }
             // The fixes are in: a render that fails is reported, not the whole pass.
-            if let Err(e) = capture(b, &args) {
-                out["views_error"] = json!(e);
-                break;
+            match capture(b, &args) {
+                Ok((png, _)) => pngs.push(png),
+                Err(e) => {
+                    out["views_error"] = json!(e);
+                    break;
+                }
             }
             views.push(json!({"view": name, "path": path}));
         }
         out["views"] = json!(views);
     }
-    Ok(out)
+    Ok((out, pngs))
 }
 
 /// `screenshot`: render or capture to a file, return it as an MCP image content block.

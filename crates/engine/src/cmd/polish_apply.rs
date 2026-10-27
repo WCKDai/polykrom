@@ -19,8 +19,8 @@ pub static COMMANDS: &[CommandSpec] = &[CommandSpec::new("polish.apply", "Apply 
      share of a body's volume a fix may change, 0…1 (default 0.05) → before: {score, scores}, after: {score, scores}, applied: [{id, \
      body, command, params, score_before, score_after}], skipped: [{id, body, command, reason}] (refused by the kernel, invalid body, \
      new interference, joints no longer resolve, mass changed, score fell, or already fixed by an earlier fix), fixes (what inspect.polish \
-     still suggests), fixes_left (how many of them are safe: run again), recommendations: [findings, most severe \
-     first; fix: [ids] on one a listed safe fix still covers]. Each fix runs in a checkpoint and is rolled back \
+     still suggests), fixes_left (how many of them are safe: run again), recommendations: [findings (of `categories` \
+     when given), most severe first; fix: [ids] on one a listed safe fix still covers]. Each fix runs in a checkpoint and is rolled back \
      when it fails a check; a fix on a body an earlier fix changed is worked out again from the body as it is now. One undo step",
 )];
 
@@ -162,6 +162,8 @@ fn apply(s: &mut Session, p: &Value) -> Result<Value> {
             r["fix"] = json!(ids);
         }
     }
+    // With categories, the recommendations are theirs: chosen before the cap of 50.
+    recommendations.retain(|r| categories.is_empty() || categories.iter().any(|c| r["category"] == c.as_str()));
     recommendations.sort_by_key(rank);
     recommendations.truncate(50);
     Ok(json!({

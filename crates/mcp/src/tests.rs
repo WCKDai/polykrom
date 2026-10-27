@@ -2228,6 +2228,10 @@ fn polish_measures_applies_and_renders_four_views() {
     assert!(after > before, "{done}");
     assert!(!done["applied"].as_array().unwrap().is_empty(), "{done}");
     let views = done["views"].as_array().unwrap();
+    // The renders come back as images too, for an agent that can't read files.
+    let shown = raw_tool(&mut s, "polish", json!({"views": true}));
+    let images = shown["result"]["content"].as_array().unwrap().iter().filter(|c| c["type"] == "image").count();
+    assert_eq!(images, if gpu { 4 } else { 0 }, "{shown}");
     if gpu {
         assert_eq!(views.len(), 4, "{done}");
         for v in views {
@@ -2238,6 +2242,9 @@ fn polish_measures_applies_and_renders_four_views() {
     }
     let r = raw_tool(&mut s, "polish", json!({"apply": "all"}));
     assert_eq!(r["error"]["code"], -32602, "the schema refuses it: {r}");
+    // A list of names holding something else is refused, not read as every body.
+    let r = raw_tool(&mut s, "polish", json!({"apply": "safe", "bodies": [null]}));
+    assert_eq!(r["error"]["code"], -32602, "{r}");
 }
 
 /// `polish` keeps to the categories asked for, applying or not, and measuring alone lists the
@@ -2254,6 +2261,9 @@ fn polish_keeps_to_its_categories_and_lists_assembly_findings() {
     tool(&mut s, "execute", json!({"command": "component.activate", "params": {"component": "root"}}));
     let look = tool(&mut s, "polish", json!({}));
     assert!(look["recommendations"].as_array().unwrap().iter().any(|r| r["kind"] == "not_held"), "{look}");
+    let held = tool(&mut s, "polish", json!({"categories": ["assembly"]}));
+    let kinds: Vec<&Value> = held["recommendations"].as_array().unwrap().iter().map(|r| &r["kind"]).collect();
+    assert!(!kinds.is_empty() && kinds.iter().all(|k| *k == "not_held"), "{held}");
     let print = tool(&mut s, "polish", json!({"apply": "safe", "categories": ["print"]}));
     assert_eq!(print["applied"], json!([]), "{print}");
     for k in ["fixes", "recommendations"] {
