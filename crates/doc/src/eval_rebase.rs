@@ -124,13 +124,13 @@ fn names_its_own(f: &Feature) -> bool {
     }
 }
 
-/// The same body, as far as any feature can tell: shared geometry and names, the same identity
-/// and owner.
-fn same_body(a: &ModelBody, b: &ModelBody) -> bool {
+/// The same body, as far as any feature can tell: shared geometry and names, the same owner and
+/// (when `keyed`) evaluation key.
+fn same_body(a: &ModelBody, b: &ModelBody, keyed: bool) -> bool {
     a.name == b.name
         && a.body.same(&b.body)
         && a.names.id() == b.names.id()
-        && a.key == b.key
+        && (!keyed || a.key == b.key)
         && a.feature == b.feature
         && a.component == b.component
         && a.transferred == b.transferred
@@ -151,7 +151,7 @@ fn same_sketch(a: &ModelState, b: &ModelState, id: u64) -> bool {
 
 /// How deep the chain of features naming the model's bodies is (see `ModelState::stamp`).
 fn depth(st: &ModelState) -> usize {
-    st.bodies.iter().filter_map(|b| b.names.depth()).max().unwrap_or(0)
+    st.bodies.iter().filter_map(|b| b.names.depth()).max().unwrap_or(0).max(st.naming_floor)
 }
 
 /// The bodies of `st` that `reads` takes, in their order.
@@ -179,7 +179,9 @@ fn operands_read(lineage: &crate::lineage::Lineage, read: &dyn Fn(&str) -> bool)
 
 /// `f`'s result `after`, evaluated from `was`, as `f` would leave `now` instead: `None` when that
 /// cannot be shown (see the module notes).
-fn rebase(f: &Feature, was: &ModelState, after: &ModelState, now: &ModelState) -> Option<ModelState> {
+/// `keyed`: the bodies it reads must have the same evaluation keys too (a lane's do not: they are
+/// keyed as serial evaluation keys them when they are taken, see [`take_lane`]).
+fn rebase(f: &Feature, was: &ModelState, after: &ModelState, now: &ModelState, keyed: bool) -> Option<ModelState> {
     let (reads, sketch) = reads(f)?;
     // Nothing either model holds that the change does not carry: sheets, construction geometry,
     // blends, the body counter; and names worked out as deep in both.
@@ -200,7 +202,7 @@ fn rebase(f: &Feature, was: &ModelState, after: &ModelState, now: &ModelState) -
     // A scoped cut with no body to change shapes its tool around a name no body is given (see
     // `shaping_targets`): it is evaluated.
     let scoped_none = f.scoped_surroundings && matches!(reads, Reads::Component) && old.is_empty();
-    if scoped_none || old.len() != new.len() || !old.iter().zip(&new).all(|(a, b)| same_body(a, b)) {
+    if scoped_none || old.len() != new.len() || !old.iter().zip(&new).all(|(a, b)| same_body(a, b, keyed)) {
         return None;
     }
     let read = |n: &str| matches!(reads, Reads::All) || old.iter().any(|b| b.name == n);
@@ -215,7 +217,7 @@ fn rebase(f: &Feature, was: &ModelState, after: &ModelState, now: &ModelState) -
         match position.get(b.name.as_str()) {
             Some(i) if made.is_empty() && last.is_none_or(|l| *i > l) => {
                 last = Some(*i);
-                if !was.bodies.get(*i).is_some_and(|w| same_body(w, b)) {
+                if !was.bodies.get(*i).is_some_and(|w| same_body(w, b, true)) {
                     changed.insert(b.name.as_str(), b);
                 }
             }
@@ -292,12 +294,52 @@ impl<'a> Previous<'a> {
 
     /// Feature `f` (`local`: its own inputs, as the cache keys them) rebased onto `now`: the state
     /// and its last result (for its warnings and time).
-    pub(super) fn rebase(&self, f: &Feature, local: u64, now: &ModelState) -> Option<(ModelState, &'a FeatureResult)> {
+    pub(super) fn rebase(&self, f: &Feature, local: u64, now: &ModelState) -> Option<Rebased> {
         let i = *self.at.get(&f.id)?;
         let old = self.results.get(i).filter(|r| r.local == local && r.local != 0 && !r.skipped && !r.stale && !r.unkept && r.error.is_none())?;
         let was = self.results.get(..i)?.iter().rev().find(|r| !r.skipped).filter(|r| !r.unkept && !r.stale)?;
-        Some((rebase(f, &was.state, &old.state, now)?, old))
+        let state = rebase(f, &was.state, &old.state, now, true)?;
+        Some(Rebased { state, warning: old.warning.clone(), boolean_diagnostics: old.boolean_diagnostics.clone(), ms: old.ms, keyed: false })
     }
+}
+
+/// A feature's result rebased onto the model before it now, with the warning, diagnostics and
+/// time of the evaluation it came from.
+pub(super) struct Rebased {
+    pub state: ModelState,
+    pub warning: Option<String>,
+    pub boolean_diagnostics: kernel::BooleanDiagnostics,
+    pub ms: f64,
+    /// Its bodies are keyed as evaluating the feature keys them (a lane's result, #234); a result
+    /// rebased from the last evaluation keeps the keys of the evaluation that made it.
+    pub keyed: bool,
+}
+
+/// Whether feature `f` is of a kind whose result can be rebased at all.
+pub(super) fn rebasable(f: &Feature) -> bool {
+    reads(f).is_some()
+}
+
+/// `f`'s result as its component's lane evaluated it ahead (#234), taken into the model before it
+/// now, its bodies keyed with `key` as evaluating it here keys them; `None` when that cannot be
+/// shown.
+pub(super) fn take_lane(f: &Feature, ahead: &super::lanes::Ahead, now: &ModelState, key: u64) -> Option<Rebased> {
+    let mut state = rebase(f, &ahead.before, ahead.after.as_deref()?, now, false)?;
+    // As `ModelState::stamp` keys them: a body the feature leaves as it was keeps its key, one it
+    // made or changed takes the feature's.
+    let kept: std::collections::HashMap<&str, &ModelBody> = now.bodies.iter().map(|b| (b.name.as_str(), b)).collect();
+    for b in &mut state.bodies {
+        match kept.get(b.name.as_str()) {
+            Some(old) if old.body.same(&b.body) => b.key = old.key,
+            _ => {
+                let mut h = std::collections::hash_map::DefaultHasher::new();
+                (key, &b.name).hash(&mut h);
+                b.key = h.finish();
+            }
+        }
+    }
+    let (warning, boolean_diagnostics, ms) = (ahead.warning.clone(), ahead.boolean_diagnostics.clone(), ahead.ms);
+    Some(Rebased { state, warning, boolean_diagnostics, ms, keyed: true })
 }
 
 /// `POLYKROM_REBASE_SHADOW`: evaluate rebased features as well, and compare.
@@ -320,17 +362,16 @@ pub fn shadow_mismatches() -> usize {
 /// ([`shadow_mismatches`]); the evaluated result is then kept. The crate's own tests fail on it.
 pub(super) fn shadow_check(
     f: &Feature,
-    rebased: &ModelState,
-    old: &FeatureResult,
+    rebased: &Rebased,
     evaluated: &ModelState,
     error: Option<&str>,
     warning: Option<&str>,
     diagnostics: &kernel::BooleanDiagnostics,
 ) -> bool {
-    let difference = differs(rebased, evaluated).or_else(|| match () {
+    let difference = differs(&rebased.state, evaluated, rebased.keyed).or_else(|| match () {
         _ if error.is_some() => Some(format!("evaluating it failed: {error:?}")),
-        _ if old.warning.as_deref() != warning => Some(format!("warning {:?} vs {warning:?}", old.warning)),
-        _ if &old.boolean_diagnostics != diagnostics => Some("boolean diagnostics".into()),
+        _ if rebased.warning.as_deref() != warning => Some(format!("warning {:?} vs {warning:?}", rebased.warning)),
+        _ if &rebased.boolean_diagnostics != diagnostics => Some("boolean diagnostics".into()),
         _ => None,
     });
     let note = match &difference {
@@ -355,9 +396,10 @@ pub(super) fn shadow_check(
 }
 
 /// What tells two models apart (`None`: nothing): bodies by name, owner, exact geometry, volume
-/// and face names; sketches, threads, sheets, construction geometry and the rest. Body keys are
-/// not compared: a rebased body keeps the identity of the evaluation that made it.
-pub(super) fn differs(a: &ModelState, b: &ModelState) -> Option<String> {
+/// and face names; sketches, threads, sheets, construction geometry and the rest. Body keys only
+/// when `keyed`: a result rebased from the last evaluation keeps the keys of the evaluation that
+/// made it.
+pub(super) fn differs(a: &ModelState, b: &ModelState, keyed: bool) -> Option<String> {
     if a.bodies.len() != b.bodies.len() {
         return Some(format!("{} bodies vs {}", a.bodies.len(), b.bodies.len()));
     }
@@ -370,6 +412,9 @@ pub(super) fn differs(a: &ModelState, b: &ModelState) -> Option<String> {
         }
         if x.names.depth() != y.names.depth() {
             return what(&format!("naming depth {:?} vs {:?}", x.names.depth(), y.names.depth()));
+        }
+        if keyed && x.key != y.key {
+            return what("evaluation key");
         }
         if x.body.same(&y.body) && x.names.id() == y.names.id() {
             continue;

@@ -57,7 +57,7 @@ struct Command {
 }
 
 /// `run`'s lines in the usage.
-const USAGE_RUN: &str = "  polykrom-cli run <script.json|design.polykrom|part.step> [--in design.polykrom|part.step] [--out FILE]... [--save FILE] [--quiet] [--results] [--timings] [--profile] [--json-out FILE] [--allow-errors]\n  polykrom-cli run --in <design.polykrom|part.step> [--out FILE]...\n      (a timeline feature that fails fails the run and nothing is written; --allow-errors writes anyway)\n      (--timings prints {timings: [{index, command, ms}], total_ms} for a script, with --results its results too\n       and with --in open: {ms, recomputed}, what opening the design took (a saved model is adopted);\n       --profile adds each command's profile: {boolean_ms, tessellate_ms, other_ms}, the kernel's share)\n";
+const USAGE_RUN: &str = "  polykrom-cli run <script.json|design.polykrom|part.step> [--in design.polykrom|part.step] [--out FILE]... [--save FILE] [--quiet] [--results] [--timings] [--profile] [--json-out FILE] [--allow-errors]\n  polykrom-cli run --in <design.polykrom|part.step> [--out FILE]...\n      (a timeline feature that fails fails the run and nothing is written; --allow-errors writes anyway)\n      (--timings prints {timings: [{index, command, ms}], total_ms} for a script, with --results its results too\n       and with --in open: {ms, recomputed, ahead}, what opening the design took (a saved model is adopted;\n       ahead: the features evaluated in their part's lane, side by side);\n       --profile adds each command's profile: {boolean_ms, tessellate_ms, other_ms}, the kernel's share)\n";
 /// `eval`'s lines in the usage.
 const USAGE_EVAL: &str = "  polykrom-cli eval <script.json|design.polykrom|part.step> [--json-out FILE]     (alias: inspect; or --in FILE)\n      (--json-out FILE writes the JSON that run (with --results, else the measurement) and eval print to FILE instead of stdout,\n       as plain UTF-8: a shell's > can re-encode it, e.g. Windows PowerShell adds a byte-order mark)\n";
 /// `script`'s lines in the usage.
@@ -367,7 +367,8 @@ fn cmd_run(args: &[String]) -> Result<(), String> {
             None => Session::default(),
         };
         // What opening `--in` took: a saved design adopts the model its file keeps (#174).
-        let opened = base.map(|_| json!({"ms": t0.elapsed().as_secs_f64() * 1000.0, "recomputed": s.model.last_recomputed}));
+        let opened =
+            base.map(|_| json!({"ms": t0.elapsed().as_secs_f64() * 1000.0, "recomputed": s.model.last_recomputed, "ahead": s.model.last_ahead}));
         let needs = if want_results { "--results needs a script" } else { "--timings needs a script" };
         let v = read_json(path.ok_or(needs)?)?;
         let out = if timings {
