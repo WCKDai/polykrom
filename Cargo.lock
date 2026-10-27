@@ -3248,7 +3248,7 @@ dependencies = [
 [[package]]
 name = "polycore-matext4cgmath"
 version = "0.1.0"
-source = "git+https://github.com/WCKDai/polycore?rev=6331b8cac8c336f8aea96fd6686e59e40b2263c5#6331b8cac8c336f8aea96fd6686e59e40b2263c5"
+source = "git+https://github.com/WCKDai/polycore?rev=f62771f2b89fd1845bd377480870bf9b6f5a9425#f62771f2b89fd1845bd377480870bf9b6f5a9425"
 dependencies = [
  "cgmath",
  "katexit",
@@ -3258,7 +3258,7 @@ dependencies = [
 [[package]]
 name = "polycore-truck-base"
 version = "0.5.0"
-source = "git+https://github.com/WCKDai/polycore?rev=6331b8cac8c336f8aea96fd6686e59e40b2263c5#6331b8cac8c336f8aea96fd6686e59e40b2263c5"
+source = "git+https://github.com/WCKDai/polycore?rev=f62771f2b89fd1845bd377480870bf9b6f5a9425#f62771f2b89fd1845bd377480870bf9b6f5a9425"
 dependencies = [
  "cgmath",
  "polycore-matext4cgmath",
@@ -3269,7 +3269,7 @@ dependencies = [
 [[package]]
 name = "polycore-truck-derivers"
 version = "0.1.0"
-source = "git+https://github.com/WCKDai/polycore?rev=6331b8cac8c336f8aea96fd6686e59e40b2263c5#6331b8cac8c336f8aea96fd6686e59e40b2263c5"
+source = "git+https://github.com/WCKDai/polycore?rev=f62771f2b89fd1845bd377480870bf9b6f5a9425#f62771f2b89fd1845bd377480870bf9b6f5a9425"
 dependencies = [
  "proc-macro-error",
  "proc-macro2",
@@ -3280,7 +3280,7 @@ dependencies = [
 [[package]]
 name = "polycore-truck-geometry"
 version = "0.5.0"
-source = "git+https://github.com/WCKDai/polycore?rev=6331b8cac8c336f8aea96fd6686e59e40b2263c5#6331b8cac8c336f8aea96fd6686e59e40b2263c5"
+source = "git+https://github.com/WCKDai/polycore?rev=f62771f2b89fd1845bd377480870bf9b6f5a9425#f62771f2b89fd1845bd377480870bf9b6f5a9425"
 dependencies = [
  "polycore-truck-base",
  "polycore-truck-geotrait",
@@ -3291,7 +3291,7 @@ dependencies = [
 [[package]]
 name = "polycore-truck-geotrait"
 version = "0.4.0"
-source = "git+https://github.com/WCKDai/polycore?rev=6331b8cac8c336f8aea96fd6686e59e40b2263c5#6331b8cac8c336f8aea96fd6686e59e40b2263c5"
+source = "git+https://github.com/WCKDai/polycore?rev=f62771f2b89fd1845bd377480870bf9b6f5a9425#f62771f2b89fd1845bd377480870bf9b6f5a9425"
 dependencies = [
  "getrandom 0.2.17",
  "polycore-truck-base",
@@ -3303,7 +3303,7 @@ dependencies = [
 [[package]]
 name = "polycore-truck-meshalgo"
 version = "0.4.0"
-source = "git+https://github.com/WCKDai/polycore?rev=6331b8cac8c336f8aea96fd6686e59e40b2263c5#6331b8cac8c336f8aea96fd6686e59e40b2263c5"
+source = "git+https://github.com/WCKDai/polycore?rev=f62771f2b89fd1845bd377480870bf9b6f5a9425#f62771f2b89fd1845bd377480870bf9b6f5a9425"
 dependencies = [
  "array-macro",
  "derive_more",
@@ -3321,7 +3321,7 @@ dependencies = [
 [[package]]
 name = "polycore-truck-modeling"
 version = "0.6.0"
-source = "git+https://github.com/WCKDai/polycore?rev=6331b8cac8c336f8aea96fd6686e59e40b2263c5#6331b8cac8c336f8aea96fd6686e59e40b2263c5"
+source = "git+https://github.com/WCKDai/polycore?rev=f62771f2b89fd1845bd377480870bf9b6f5a9425#f62771f2b89fd1845bd377480870bf9b6f5a9425"
 dependencies = [
  "derive_more",
  "polycore-truck-base",
@@ -3337,7 +3337,7 @@ dependencies = [
 [[package]]
 name = "polycore-truck-polymesh"
 version = "0.6.0"
-source = "git+https://github.com/WCKDai/polycore?rev=6331b8cac8c336f8aea96fd6686e59e40b2263c5#6331b8cac8c336f8aea96fd6686e59e40b2263c5"
+source = "git+https://github.com/WCKDai/polycore?rev=f62771f2b89fd1845bd377480870bf9b6f5a9425#f62771f2b89fd1845bd377480870bf9b6f5a9425"
 dependencies = [
  "array-macro",
  "bytemuck",
@@ -3352,7 +3352,7 @@ dependencies = [
 [[package]]
 name = "polycore-truck-shapeops"
 version = "0.4.0"
-source = "git+https://github.com/WCKDai/polycore?rev=6331b8cac8c336f8aea96fd6686e59e40b2263c5#6331b8cac8c336f8aea96fd6686e59e40b2263c5"
+source = "git+https://github.com/WCKDai/polycore?rev=f62771f2b89fd1845bd377480870bf9b6f5a9425#f62771f2b89fd1845bd377480870bf9b6f5a9425"
 dependencies = [
  "derive_more",
  "itertools 0.13.0",
@@ -3368,7 +3368,7 @@ dependencies = [
 [[package]]
 name = "polycore-truck-stepio"
 version = "0.3.0"
-source = "git+https://github.com/WCKDai/polycore?rev=6331b8cac8c336f8aea96fd6686e59e40b2263c5#6331b8cac8c336f8aea96fd6686e59e40b2263c5"
+source = "git+https://github.com/WCKDai/polycore?rev=f62771f2b89fd1845bd377480870bf9b6f5a9425#f62771f2b89fd1845bd377480870bf9b6f5a9425"
 dependencies = [
  "chrono",
  "polycore-truck-geometry",
@@ -3380,7 +3380,7 @@ dependencies = [
 [[package]]
 name = "polycore-truck-topology"
 version = "0.6.0"
-source = "git+https://github.com/WCKDai/polycore?rev=6331b8cac8c336f8aea96fd6686e59e40b2263c5#6331b8cac8c336f8aea96fd6686e59e40b2263c5"
+source = "git+https://github.com/WCKDai/polycore?rev=f62771f2b89fd1845bd377480870bf9b6f5a9425#f62771f2b89fd1845bd377480870bf9b6f5a9425"
 dependencies = [
  "parking_lot",
  "polycore-truck-base",
@@ -4381,7 +4381,7 @@ dependencies = [
 [[package]]
 name = "solidcraft-geom"
 version = "0.1.0"
-source = "git+https://github.com/WCKDai/polycore?rev=6331b8cac8c336f8aea96fd6686e59e40b2263c5#6331b8cac8c336f8aea96fd6686e59e40b2263c5"
+source = "git+https://github.com/WCKDai/polycore?rev=f62771f2b89fd1845bd377480870bf9b6f5a9425#f62771f2b89fd1845bd377480870bf9b6f5a9425"
 dependencies = [
  "serde",
  "thiserror 2.0.21",
@@ -4430,7 +4430,7 @@ dependencies = [
 [[package]]
 name = "solidcraft-kernel"
 version = "0.1.0"
-source = "git+https://github.com/WCKDai/polycore?rev=6331b8cac8c336f8aea96fd6686e59e40b2263c5#6331b8cac8c336f8aea96fd6686e59e40b2263c5"
+source = "git+https://github.com/WCKDai/polycore?rev=f62771f2b89fd1845bd377480870bf9b6f5a9425#f62771f2b89fd1845bd377480870bf9b6f5a9425"
 dependencies = [
  "log",
  "polycore-truck-meshalgo",
