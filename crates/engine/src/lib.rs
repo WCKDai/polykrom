@@ -1051,11 +1051,14 @@ impl Session {
         }
     }
 
-    /// Go back to `mark` (from [`Session::mark`]), keeping the undo history as it is.
+    /// Go back to `mark` (from [`Session::mark`]), keeping the undo history and the selection as
+    /// they are: a change taken back inside a command isn't the user's step back.
     pub(crate) fn go_back(&mut self, mut mark: Checkpoint) {
         mark.undo = std::mem::take(&mut self.undo);
         mark.redo = std::mem::take(&mut self.redo);
+        let selection = std::mem::take(&mut self.selection);
         self.go_to(mark);
+        self.selection = selection;
     }
 
     fn go_to(&mut self, c: Checkpoint) {

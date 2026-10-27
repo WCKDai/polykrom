@@ -316,3 +316,15 @@ fn polish_apply_refuses_a_malformed_selection_and_keeps_the_sessions_checkpoints
     assert_eq!(r["skipped"].as_array().map(Vec::len), Some(1), "{r}");
     assert_eq!(run(&mut s, "edit.restore_checkpoint", json!({"checkpoint": marks[0]}))["restored"], true);
 }
+
+#[test]
+fn polish_apply_keeps_the_selection_when_it_rolls_a_fix_back() {
+    let mut s = Session::default();
+    run(&mut s, "solid.box", json!({"length": 40, "width": 20, "height": 10, "body_name": "Block"}));
+    run(&mut s, "select.set", json!({"items": [{"type": "body", "name": "Block"}]}));
+    let before = s.selection.clone();
+    assert!(!before.is_empty());
+    let r = run(&mut s, "polish.apply", json!({"mass_tol": 0}));
+    assert_eq!(r["skipped"].as_array().map(Vec::len), Some(1), "{r}");
+    assert_eq!(s.selection, before);
+}
