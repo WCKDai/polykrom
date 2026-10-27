@@ -81,6 +81,17 @@ impl NameCell {
     pub(crate) fn depth(&self) -> Option<usize> {
         self.origin.as_ref().map(|o| o.depth).or(self.saved_depth)
     }
+    /// [`NameCell::depth`], a moved copy's taken from its source (at the end of a chain of
+    /// copies): how deep naming the body goes, for features that count their own chain (#143).
+    pub(crate) fn chain_depth(&self) -> Option<usize> {
+        let mut cell = self;
+        loop {
+            match (cell.depth(), &cell.copy_of) {
+                (None, Some(source)) => cell = &source.names,
+                (depth, _) => return depth,
+            }
+        }
+    }
     /// Identity of the names: clones of a cell share them.
     pub(crate) fn id(&self) -> usize {
         Arc::as_ptr(&self.names) as usize
@@ -127,7 +138,7 @@ pub(crate) fn body_depth(f: &Feature, before: &ModelState, all: usize, b: &Model
     if !f.own_chain_depth {
         return all;
     }
-    b.lineage().and_then(|l| operand_depth(&l, before)).map_or(all, |d| (d + 1).min(all))
+    b.lineage().and_then(|l| operand_depth(&l, before)).map_or(all, |d| d + 1)
 }
 
 /// The naming origins of the bodies a feature makes: [`body_depth`] deep, one origin shared by
@@ -164,7 +175,7 @@ fn operand_depth(lineage: &Lineage, before: &ModelState) -> Option<usize> {
     use crate::lineage::Operand;
     lineage.operands.iter().try_fold(0, |deepest, op| {
         let depth = match op.as_ref() {
-            Operand::Body(n) | Operand::Copy { body: n, .. } | Operand::Inner(n) => before.body(n)?.names.depth().unwrap_or(0),
+            Operand::Body(n) | Operand::Copy { body: n, .. } | Operand::Inner(n) => before.body(n)?.names.chain_depth().unwrap_or(0),
             Operand::Stage(stage) => operand_depth(&stage.lineage, before)?,
             Operand::Made(_) | Operand::CopiedTool { .. } => 0,
         };
@@ -382,9 +393,9 @@ pub(crate) fn geometric_names(b: &ModelBody, o: &NamingOrigin, nf: usize) -> Vec
 fn geometric_from(b: &ModelBody, o: &NamingOrigin, nf: usize, names_of: fn(&ModelBody) -> Arc<Vec<String>>) -> Vec<String> {
     // A rigid Move changes coordinates, not topology or face ownership. Geometric
     // overlap with the unmoved input cannot recover the names at the new position.
-    // Only bodies shallower than this one are read, so naming through them ends within
-    // `MAX_DEPTH` hops (#143). Counting every body, that is all of them.
-    let shallower = |x: &ModelBody| x.names.depth().unwrap_or(0) < o.depth;
+    // Counting its own chain, only bodies shallower than this one are read, so naming through
+    // them ends within `MAX_DEPTH` hops (#143).
+    let shallower = |x: &ModelBody| !o.feature.own_chain_depth || x.names.chain_depth().unwrap_or(0) < o.depth;
     if matches!(o.feature.kind, FeatureKind::Move { .. })
         && let Some(input) = o.before.body(&b.name).filter(|x| shallower(x))
     {
@@ -1198,5 +1209,49 @@ mod tests {
         };
         let names = std::thread::Builder::new().stack_size(256 * 1024).spawn(run).unwrap().join().unwrap();
         assert_eq!(names.len(), 6);
+    }
+
+    /// A body moved into a component is a copy named after its source: a feature that changes
+    /// the copy counts the source's chain (#143). Moving and changing a body 2000 times goes past
+    /// `MAX_DEPTH`, where faces are named by position, rather than through 2000 copies.
+    #[test]
+    fn a_long_run_of_moves_and_edits_names_on_a_small_stack() {
+        let run = || {
+            let block = solidcraft_kernel::box_solid(Vec3::ZERO, Vec3::new(4., 2., 1.)).unwrap();
+            let mut doc = crate::Document::default();
+            let kind = FeatureKind::Combine { target: "B".into(), tools: Vec::new(), operation: crate::Operation::Join, keep_tools: false };
+            let id = doc.add_feature(kind, None).unwrap();
+            let mut f = doc.feature(id).cloned().unwrap();
+            let mut first = ModelBody::new("B".into(), block.clone(), 1);
+            let origin = NamingOrigin { feature: f.clone(), before: Arc::new(ModelState::default()), depth: 1, mats: Vec::new(), sheets: Vec::new() };
+            first.names = NameCell::new(Some(Arc::new(origin)));
+            let mut chain = vec![first];
+            for k in 0..2000 {
+                // Moved: a copy named after the body it was.
+                let mut moved = ModelBody::new("B".into(), block.clone(), 2 * k + 2);
+                moved.names = NameCell::same(chain.last().unwrap());
+                // Then changed, its faces kept: named after the copy's.
+                f.id = 2 * k + 3;
+                let mut before = ModelState::default();
+                before.bodies = vec![moved.clone()];
+                let before = Arc::new(before);
+                let mut b = ModelBody::new("B".into(), block.clone(), f.id)
+                    .with_lineage(Some(Lineage::of(&block, crate::lineage::Operand::Body("B".into()))));
+                let all = before.bodies.iter().filter_map(|x| x.names.depth()).max().unwrap_or(0) + 1;
+                let depth = body_depth(&f, &before, all, &b);
+                assert_eq!(depth, k as usize + 2, "one deeper than the body it was moved from");
+                b.names = NameCell::traced(
+                    Some(Arc::new(NamingOrigin { feature: f.clone(), before, depth, mats: Vec::new(), sheets: Vec::new() })),
+                    b.lineage(),
+                );
+                chain.push(moved);
+                chain.push(b);
+            }
+            let names = face_names(chain.last().unwrap()).as_ref().clone();
+            while chain.pop().is_some() {}
+            names
+        };
+        let names = std::thread::Builder::new().stack_size(256 * 1024).spawn(run).unwrap().join().unwrap();
+        assert!(names.iter().all(|n| n.starts_with("B:face:")), "past the limit, by position: {names:?}");
     }
 }
