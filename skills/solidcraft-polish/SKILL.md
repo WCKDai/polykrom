@@ -1,12 +1,21 @@
 ---
 name: solidcraft-polish
-description: Use when a Polykrom design works but should look finished, print well and feel like a real product - a polish pass after the function is verified. Typical requests: make it look less boxy, round the edges, make it prettier, get it ready to print, give it a consistent style, or "polish" a robot, enclosure or gadget.
+description: Use when a Polykrom design works but should look finished, print well and feel like a real product - a polish pass after the function is verified. Typical requests: make it look less boxy, round the edges, make it prettier, get it ready to print, give it a consistent style, restyle it to match concept art (faceted, hard-surface, organic), or "polish" a robot, enclosure or gadget.
 ---
 
 # Polykrom polish
 
 ## Overview
 Function first, then finish. Once sizes, fits and motion check out, polish in passes: measure the finish with `inspect.polish`, apply the safe fixes, look at the result, make the judgement changes, measure again. Stop when the score stops rising. Each pass is cheap; one long pass that tries everything at once breaks more than it fixes.
+
+## Pick the style first
+The finish follows a style, and `inspect.polish`, `polish.apply` and the `polish` tool take it as `style`:
+- **`organic`**: soft product forms. The edge family is fillets in two or three radii, flat faces meeting square read as boxy, and the fixes are fillets.
+- **`faceted`**: hard-surface or low-poly forms, such as a mech, a faceted robot shell or a gem-cut enclosure. Flat facets are the point and are never "boxy". The edge family is crisp chamfers in two or three sizes (1.5 to 3 mm on a hand-sized part), and the fixes are chamfers. Fillets mixed in among the chamfers cost points.
+- **`technical`**: machined or functional parts. Edges are just broken, with small fillets or chamfers, and flat faces are fine.
+- **`auto`** (the default): the design's own leaning. It counts the chamfer faces against the fillet faces on its parts, and treats a design with neither as organic. The report says what it used, in `style.used`.
+
+When the brief or the concept art shows a style, ask for it explicitly. If a faceted concept is judged as organic, the pass rounds every crisp edge it should keep. For a raw blockout of a faceted design, ask for `faceted`, because `auto` sees no chamfers yet.
 
 ## The loop
 1. **Measure and fix the safe things:** `polish {"apply": "safe", "views": true}` runs `inspect.polish`, applies its fillets and chamfers one group at a time inside a checkpoint (a group that fails, clashes, breaks a joint or moves the mass is rolled back and listed as skipped), measures again and renders four views. Without the `polish` tool: `execute inspect.polish`, then `execute polish.apply`, then `screenshot` from four views.
@@ -25,7 +34,12 @@ Read the report from the top: `score` and `scores` per category (`look`, `print`
 - **Printed parts:** chamfer the first-layer edges (0.3 to 0.5 mm, never a fillet there: it overhangs), keep overhangs under 45° from vertical, walls at 1.2 mm or more, screw clearance holes at nominal + 0.3 mm (M3: 3.3 mm).
 - **Part lines.** Where shells meet, leave a deliberate gap or a small groove (0.5 mm) rather than a flush seam that never lines up. Split a large shell along a line that follows the form.
 - **Visual hierarchy.** One dominant form, a few secondary ones, small details last. Line up edges and centres across parts; repeat the same radius and the same gap.
-- **Colour blocking.** Pick a palette of two or three colours plus one accent (`appearance.assign`). Colour by function (shell, mechanism, accent on what moves or what you touch), not body by body. Give every visible body an appearance and a material.
+- **Faceted style.** Build the form from flat facets: cut corners off with angled planes or chamfer big, then add small chamfers to catch the light. Keep to two or three chamfer sizes (`chamfer_family` flags more) and don't mix in fillets on the same part (`mixed_edges`). Screw heads and other black details are deliberate accents, not clutter.
+- **Colour blocking.** Pick a palette of two or three colours plus one accent, for example cream, lime and black (`appearance.assign`). Give each part one colour; don't paint faces of one part different colours. Colour by function (shell, mechanism, accent on what moves or what you touch), not body by body. Give every visible body an appearance and a material. `inspect.polish` reports the palette in `colours` and flags these as `tidy` findings:
+  - a part left in the default colour (`default_colour`);
+  - two parts in colours almost but not quite the same (`near_duplicate_colour`): use one colour;
+  - a printed part alone in its colour (`off_palette`);
+  - faces of one part in other colours (`several_colours`).
 - **Names.** Rename default names (`Body12`, `Component3`) for what the part is.
 
 ## Traps

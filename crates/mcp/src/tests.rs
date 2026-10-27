@@ -2240,6 +2240,17 @@ fn polish_measures_applies_and_renders_four_views() {
     } else {
         assert!(done["views_error"].is_string(), "{done}");
     }
+    // The style asked for is the one judged by: a faceted pass on a fresh box suggests chamfers.
+    tool(
+        &mut s,
+        "execute",
+        json!({"command": "solid.box", "params": {"length": 30, "width": 20, "height": 10, "corner": [0, 60, 0], "operation": "new_body", "body_name": "Facet"}}),
+    );
+    let faceted = tool(&mut s, "polish", json!({"style": "faceted", "bodies": ["Facet"]}));
+    assert_eq!(faceted["style"]["used"], "faceted", "{faceted}");
+    assert!(faceted["fixes"].as_array().unwrap().iter().all(|f| f["command"] == "solid.chamfer"), "{faceted}");
+    let r = raw_tool(&mut s, "polish", json!({"style": "baroque"}));
+    assert_eq!(r["error"]["code"], -32602, "{r}");
     let r = raw_tool(&mut s, "polish", json!({"apply": "all"}));
     assert_eq!(r["error"]["code"], -32602, "the schema refuses it: {r}");
     // A list of names holding something else is refused, not read as every body.
