@@ -422,3 +422,21 @@ fn polish_apply_refuses_a_malformed_selection_and_keeps_the_sessions_checkpoints
     assert_eq!(r["skipped"].as_array().map(Vec::len), Some(1), "{r}");
     assert_eq!(run(&mut s, "edit.restore_checkpoint", json!({"checkpoint": marks[0]}))["restored"], true);
 }
+
+#[test]
+fn polish_apply_checks_each_fix_on_one_body_on_its_own() {
+    // A printed tee: outside rounds, inside fillets and a bed chamfer on one body. In a batch,
+    // only one fix per body is checked with the others; the rest go one at a time, so an
+    // inside fillet's added mass can't hide an outside round's removed mass.
+    let outcome = |batch: bool| {
+        let mut s = Session::default();
+        tee(&mut s);
+        run(&mut s, "material.assign", json!({"bodies": ["Tee"], "material": "PLA"}));
+        let r = run(&mut s, "polish.apply", json!({"batch": batch}));
+        let ids = |k: &str| r[k].as_array().unwrap().iter().map(|f| f["id"].clone()).collect::<Vec<_>>();
+        (ids("applied"), ids("skipped"), r["after"]["score"].clone())
+    };
+    let (batched, single) = (outcome(true), outcome(false));
+    assert!(batched.0.len() > 1, "{batched:?}");
+    assert_eq!(batched, single);
+}

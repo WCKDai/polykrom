@@ -223,8 +223,13 @@ fn run_fixes(s: &mut Session, fixes: &[Fix], which: &[usize], run: &mut Run, cha
         };
         // A body an earlier fix changed: the same fix worked out again on it as it is now.
         let params = if changed.contains(&fix.body) {
-            match fresh(s, &run.ask, fix) {
-                Some(params) => params,
+            // Worked out again, its edges on faces a joint origin names are left out again.
+            match fresh(s, &run.ask, fix).map(|p| hold_edges(s, &fix.body, p)) {
+                Some((params, _)) if params["edges"].as_array().is_some_and(|e| !e.is_empty()) => params,
+                Some(_) => {
+                    skip(run, "every edge is on a face a joint origin is attached to".into());
+                    continue;
+                }
                 None => {
                     skip(run, "already fixed by an earlier fix".into());
                     continue;
@@ -342,14 +347,29 @@ fn batch(s: &mut Session, fixes: &[Fix], which: &[usize], run: &mut Run) -> Resu
     for &i in which {
         let Some(fix) = fixes.get(i).filter(|_| !run.out.contains(&i)) else { continue };
         if held.contains(&fix.body) {
-            batch_groups(s, fixes, &by_body(fixes, &run_of), run)?;
-            run_of.clear();
+            flush(s, fixes, &mut run_of, run)?;
             settle(s, fixes, &[i], run)?;
         } else {
             run_of.push(i);
         }
     }
-    batch_groups(s, fixes, &by_body(fixes, &run_of), run)
+    flush(s, fixes, &mut run_of, run)
+}
+
+/// Settles a run of fixes: the first fix of each body in one batch, then each body's others one
+/// at a time. Two fixes on one body are never checked together, so one can't hide the other's
+/// change of mass or score (an inside fillet adds what an outside one takes away).
+fn flush(s: &mut Session, fixes: &[Fix], run_of: &mut Vec<usize>, run: &mut Run) -> Result<()> {
+    let groups = by_body(fixes, run_of);
+    let firsts: Vec<(String, Vec<usize>)> = groups.iter().map(|(b, g)| (b.clone(), g.iter().take(1).copied().collect())).collect();
+    let mut rest: Vec<usize> = groups.iter().flat_map(|(_, g)| g.iter().skip(1).copied()).collect();
+    rest.sort_unstable();
+    run_of.clear();
+    batch_groups(s, fixes, &firsts, run)?;
+    for i in rest {
+        settle(s, fixes, &[i], run)?;
+    }
+    Ok(())
 }
 
 /// Fixes `which` by body, bodies in the order their first fix comes.
@@ -401,8 +421,8 @@ fn batch_groups(s: &mut Session, fixes: &[Fix], groups: &[(String, Vec<usize>)],
     for d in done.drain(..from) {
         accept(run, fixes, d, &was, &now);
     }
-    for (_, g) in groups.iter().skip(from) {
-        settle(s, fixes, g, run)?;
+    for i in groups.iter().skip(from).flat_map(|(_, g)| g.iter().copied()) {
+        settle(s, fixes, &[i], run)?;
     }
     Ok(())
 }
