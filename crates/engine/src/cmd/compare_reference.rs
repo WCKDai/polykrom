@@ -43,9 +43,11 @@ pub static COMMANDS: &[CommandSpec] = &[
         "reference: body name | [names] (as inspect.compare_reference); bodies?: [names] (the design to fit it to, default every \
          visible body but the reference); method?: bbox|principal (default bbox: the bounding boxes' diagonals and centres; \
          principal: the spread about the area-weighted centroids, and the principal axes, reported to turn by hand); apply?: \
-         bool (default false: only report) → scale, translate, origin (what the scale is about), residual: per-axis extent ratios \
-         left after the uniform scale (1 = matches), axes? (principal: each design axis with the reference's nearest and the angle \
-         between them), steps: [{command, params}] (solid.scale about origin, then solid.move), applied",
+         bool (default false: only report) → turn? ({axis, angle_deg: 90, residual_unturned}: a quarter turn first, when the \
+         reference was modelled with another axis up and turning it matches the proportions better), scale, translate, origin \
+         (what the scale is about, after any turn), residual: per-axis extent ratios left after the uniform scale (1 = matches), axes? (principal: each design axis with the reference's nearest and the angle \
+         between them), steps: [{command, params}] (any turn about the world origin, solid.scale about origin, then solid.move), \
+         applied",
     ),
 ];
 
@@ -560,19 +562,43 @@ fn fit(s: &mut Session, p: &Value) -> Result<Value> {
     if !(scale.is_finite() && scale > 0.0) {
         return Err(bad(FIT, "no scale fits"));
     }
-    let translate = target - origin;
+    // A concept modelled with another axis up: try a quarter turn about each axis and keep the
+    // one whose proportions match best (the bounding boxes' per-axis ratios nearest 1).
     let (ds, rs) = (db.size(), rb.size());
-    let ratio = |d: f64, r: f64| if r > 0.0 { round(d / (r * scale)) } else { 0.0 };
+    let turned = |axis: usize, v: Vec3| match axis {
+        1 => Vec3::new(v.x, -v.z, v.y),
+        2 => Vec3::new(v.z, v.y, -v.x),
+        3 => Vec3::new(-v.y, v.x, v.z),
+        _ => v,
+    };
+    let extents = |axis: usize| {
+        let t = turned(axis, rs);
+        Vec3::new(t.x.abs(), t.y.abs(), t.z.abs())
+    };
+    let ratios = |e: Vec3| [(ds.x, e.x), (ds.y, e.y), (ds.z, e.z)].map(|(d, r)| if r > 0.0 { d / (r * scale) } else { 0.0 });
+    let badness = |axis: usize| ratios(extents(axis)).iter().filter(|r| **r > 0.0).map(|r| r.ln().abs()).sum::<f64>();
+    let best = (0..4).min_by(|a, b| badness(*a).total_cmp(&badness(*b))).unwrap_or(0);
+    let turn = (best != 0 && badness(best) + 0.2 < badness(0)).then_some(best);
+    let origin = turn.map_or(origin, |t| turned(t, origin));
+    let translate = target - origin;
     let r3 = |v: Vec3| [round(v.x), round(v.y), round(v.z)];
     let names: Vec<String> = reference.iter().map(|b| b.name.clone()).collect();
-    let steps = json!([
-        {"command": "solid.scale", "params": {"bodies": names, "factor": round(scale * 10000.0) / 100.0 / 100.0, "origin": r3(origin)}},
-        {"command": "solid.move", "params": {"bodies": names, "translate": r3(translate)}},
-    ]);
+    let mut steps = Vec::new();
+    if let Some(t) = turn {
+        let axis = [[1, 0, 0], [0, 1, 0], [0, 0, 1]].get(t - 1).copied().unwrap_or([0, 0, 1]);
+        steps.push(json!({"command": "solid.move", "params": {"bodies": names, "axis": axis, "angle": 90}}));
+        let axis_name = ["x", "y", "z"].get(t - 1).copied();
+        out["turn"] = json!({"axis": axis_name, "angle_deg": 90, "residual_unturned": ratios(rs).map(round)});
+    }
+    steps
+        .push(json!({"command": "solid.scale", "params": {"bodies": names, "factor": round(scale * 10000.0) / 100.0 / 100.0, "origin": r3(origin)}}));
+    steps.push(json!({"command": "solid.move", "params": {"bodies": names, "translate": r3(translate)}}));
+    let steps = Value::Array(steps);
+    let residual = ratios(extents(turn.unwrap_or(0))).map(round);
     out["scale"] = json!(round(scale * 10000.0) / 10000.0);
     out["translate"] = json!(r3(translate));
     out["origin"] = json!(r3(origin));
-    out["residual"] = json!({"x": ratio(ds.x, rs.x), "y": ratio(ds.y, rs.y), "z": ratio(ds.z, rs.z)});
+    out["residual"] = json!({"x": residual[0], "y": residual[1], "z": residual[2]});
     let mut applied = false;
     if bool_(p, "apply").unwrap_or(false) {
         for step in steps.as_array().into_iter().flatten() {
