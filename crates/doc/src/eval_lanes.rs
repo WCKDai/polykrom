@@ -82,11 +82,20 @@ impl Lanes {
                 None => lanes.push((f.component, vec![i])),
             }
         }
+        // A feature is waited for by its id: ids must be unique (a design's are; a document built
+        // in code may not hold to it).
+        let ids: Vec<u64> = lanes.iter().flat_map(|(_, lane)| lane).filter_map(|i| doc.features.get(*i)).map(|f| f.id).collect();
+        if ids.iter().collect::<std::collections::HashSet<_>>().len() != ids.len() {
+            return None;
+        }
         let shared = Arc::new(Shared { done: Mutex::new(std::collections::HashMap::new()), ready: Condvar::new(), stop: AtomicBool::new(false) });
         let inputs =
             Inputs { doc: doc.clone(), vals: vals.clone(), param_errors: param_errors.clone(), feature_component: feature_component.clone() };
         let worker = Arc::clone(&shared);
         let started = std::thread::Builder::new().name("polykrom-lanes".into()).spawn(move || {
+            // Whatever happens to the lanes (a worker that cannot start, a panic), every feature
+            // gets an entry once they are done, so no one waits for one in vain.
+            let _all = Fill { shared: &worker, rest: ids };
             let run = |lane: &(u64, Vec<usize>)| -> kernel::Result<()> {
                 run_lane(&inputs, &worker, &lane.1);
                 Ok(())
@@ -119,20 +128,6 @@ impl Drop for Lanes {
 /// in the lane left. Every one of them gets an entry, `None` from the first one not evaluated
 /// (stopped, or a panic past the kernel's guard), so no one waits for it in vain.
 fn run_lane(inputs: &Inputs, shared: &Shared, lane: &[usize]) {
-    struct Fill<'a> {
-        shared: &'a Shared,
-        rest: Vec<u64>,
-    }
-    impl Drop for Fill<'_> {
-        fn drop(&mut self) {
-            if let Ok(mut done) = self.shared.done.lock() {
-                for id in self.rest.drain(..) {
-                    done.entry(id).or_insert(None);
-                }
-            }
-            self.shared.ready.notify_all();
-        }
-    }
     let doc = &inputs.doc;
     let features: Vec<&Feature> = lane.iter().filter_map(|i| doc.features.get(*i)).collect();
     let mut fill = Fill { shared, rest: features.iter().rev().map(|f| f.id).collect() };
@@ -167,6 +162,23 @@ fn run_lane(inputs: &Inputs, shared: &Shared, lane: &[usize]) {
             done.insert(f.id, Some(Ahead { before, after, warning, boolean_diagnostics, ms }));
         }
         shared.ready.notify_all();
+    }
+}
+
+/// Features (by id) given no entry yet: on drop, each gets `None` unless it has one.
+struct Fill<'a> {
+    shared: &'a Shared,
+    rest: Vec<u64>,
+}
+
+impl Drop for Fill<'_> {
+    fn drop(&mut self) {
+        if let Ok(mut done) = self.shared.done.lock() {
+            for id in self.rest.drain(..) {
+                done.entry(id).or_insert(None);
+            }
+        }
+        self.shared.ready.notify_all();
     }
 }
 

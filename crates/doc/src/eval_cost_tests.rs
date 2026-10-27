@@ -616,3 +616,21 @@ fn opening_a_design_evaluates_its_parts_side_by_side() {
         assert_eq!(a.state.digest(), b.state.digest(), "after {}", a.name);
     }
 }
+
+#[test]
+fn a_timeline_with_repeated_feature_ids_opens_serially() {
+    // Features are waited for by id: a document built in code with an id twice (no design file
+    // holds one) is evaluated in order, as before, without waiting on a lane (#251 review).
+    let (mut doc, _, first, _) = library_parts(8, true);
+    let twin = doc.feature(first).unwrap().clone();
+    doc.features.push(twin);
+    let mut model = Model::new();
+    model.evaluate(&doc);
+    assert_eq!(model.last_ahead, 0);
+    let mut serial = Model { no_cache: true, ..Model::new() };
+    serial.evaluate(&doc);
+    for (a, b) in model.results.iter().zip(&serial.results) {
+        assert_eq!((a.id, &a.error, &a.warning), (b.id, &b.error, &b.warning));
+        assert_eq!(super::rebase::differs(&a.state, &b.state, true), None, "after {}", a.name);
+    }
+}
