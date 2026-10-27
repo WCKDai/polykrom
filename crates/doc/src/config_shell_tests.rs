@@ -254,8 +254,9 @@ fn saved_former_strip_projection_reports_lost_without_expanding_healthy_material
     let mut old_body = ModelBody::new("Case".into(), raw, shell);
     old_body.names = crate::naming::NameCell::new(Some(std::sync::Arc::new(crate::naming::NamingOrigin {
         feature: doc.feature(shell).unwrap().clone(),
+        // As deep as evaluation makes it: one deeper than every body before it.
+        depth: before.bodies.iter().filter_map(|b| b.names.depth()).max().unwrap_or(0) + 1,
         before,
-        depth: 1,
         mats: vec![],
         sheets: vec![],
     })));
@@ -379,8 +380,9 @@ fn saved_curved_strip_projection_is_lost_after_exact_wall_coalescence() {
     let mut old_body = ModelBody::new("Case".into(), raw, shell);
     old_body.names = crate::naming::NameCell::new(Some(std::sync::Arc::new(crate::naming::NamingOrigin {
         feature: doc.feature(shell).unwrap().clone(),
+        // As deep as evaluation makes it: one deeper than every body before it.
+        depth: before.bodies.iter().filter_map(|b| b.names.depth()).max().unwrap_or(0) + 1,
         before,
-        depth: 1,
         mats: vec![],
         sheets: vec![],
     })));
@@ -520,8 +522,9 @@ fn saved_stepped_tab_cut_piece_projection_is_lost_without_expanding_material() {
     let mut old_body = ModelBody::new("Case".into(), old_cut, cut);
     old_body.names = crate::naming::NameCell::new(Some(std::sync::Arc::new(crate::naming::NamingOrigin {
         feature: doc.feature(cut).unwrap().clone(),
+        // As deep as evaluation makes it: one deeper than every body before it.
+        depth: before.bodies.iter().filter_map(|b| b.names.depth()).max().unwrap_or(0) + 1,
         before,
-        depth: 1,
         mats: vec![],
         sheets: vec![],
     })));

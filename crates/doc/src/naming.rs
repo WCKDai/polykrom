@@ -130,6 +130,35 @@ pub(crate) fn body_depth(f: &Feature, before: &ModelState, all: usize, b: &Model
     b.lineage().and_then(|l| operand_depth(&l, before)).map_or(all, |d| (d + 1).min(all))
 }
 
+/// The naming origins of the bodies a feature makes: [`body_depth`] deep, one origin shared by
+/// all at each depth (a pattern's copies share their transforms).
+pub(crate) struct Origins {
+    all: Arc<NamingOrigin>,
+    shallower: std::cell::RefCell<Vec<Arc<NamingOrigin>>>,
+}
+
+impl Origins {
+    /// For the bodies made by `all`'s feature, `all.depth` deep when counting every body.
+    pub(crate) fn new(all: Arc<NamingOrigin>) -> Self {
+        Origins { all, shallower: std::cell::RefCell::new(Vec::new()) }
+    }
+
+    /// Body `b`'s origin.
+    pub(crate) fn of(&self, b: &ModelBody) -> Arc<NamingOrigin> {
+        let depth = body_depth(&self.all.feature, &self.all.before, self.all.depth, b);
+        if depth == self.all.depth {
+            return self.all.clone();
+        }
+        let mut shallower = self.shallower.borrow_mut();
+        if let Some(o) = shallower.iter().find(|o| o.depth == depth) {
+            return o.clone();
+        }
+        let o = Arc::new(NamingOrigin { depth, ..NamingOrigin::clone(&self.all) });
+        shallower.push(o.clone());
+        o
+    }
+}
+
 /// The deepest of the bodies `lineage` names faces after (`None`: one is not in `before`).
 fn operand_depth(lineage: &Lineage, before: &ModelState) -> Option<usize> {
     use crate::lineage::Operand;
@@ -353,8 +382,11 @@ pub(crate) fn geometric_names(b: &ModelBody, o: &NamingOrigin, nf: usize) -> Vec
 fn geometric_from(b: &ModelBody, o: &NamingOrigin, nf: usize, names_of: fn(&ModelBody) -> Arc<Vec<String>>) -> Vec<String> {
     // A rigid Move changes coordinates, not topology or face ownership. Geometric
     // overlap with the unmoved input cannot recover the names at the new position.
+    // Only bodies shallower than this one are read, so naming through them ends within
+    // `MAX_DEPTH` hops (#143). Counting every body, that is all of them.
+    let shallower = |x: &ModelBody| x.names.depth().unwrap_or(0) < o.depth;
     if matches!(o.feature.kind, FeatureKind::Move { .. })
-        && let Some(input) = o.before.body(&b.name)
+        && let Some(input) = o.before.body(&b.name).filter(|x| shallower(x))
     {
         return names_of(input).as_ref().clone();
     }
@@ -388,7 +420,7 @@ fn geometric_from(b: &ModelBody, o: &NamingOrigin, nf: usize, names_of: fn(&Mode
         .before
         .bodies
         .iter()
-        .filter(|x| !independent_solid && !x.body.is_mesh() && overlaps(x))
+        .filter(|x| !independent_solid && !x.body.is_mesh() && shallower(x) && overlaps(x))
         .take(64)
         .map(|x| {
             let n = face_count(x);
@@ -405,7 +437,7 @@ fn geometric_from(b: &ModelBody, o: &NamingOrigin, nf: usize, names_of: fn(&Mode
             .before
             .bodies
             .iter()
-            .filter(|x| !x.body.is_mesh())
+            .filter(|x| !x.body.is_mesh() && shallower(x))
             .take(64)
             .map(|x| (x, FaceIndex::new(&x.mesh(), face_count(x)), names_of(x)))
             .collect();
@@ -1122,5 +1154,49 @@ mod tests {
         let inputs = [(&body, FaceIndex::new(&mesh, 3), distinct)];
         assert_eq!(vote(&points, &inputs, 1e-8, None), None);
         assert_eq!(vote(&points[..2], &inputs, 1e-8, None), None, "equal different-source votes must not pick a lexicographic winner");
+    }
+
+    /// A body is named from geometry where its history does not describe it, from the bodies
+    /// overlapping it. Counting only its own chain of features (#143), a long run of such bodies
+    /// one over another never names one through the next: names are read only from shallower
+    /// bodies, so 2000 of them name on a small stack.
+    #[test]
+    fn a_long_run_of_overlapping_bodies_names_on_a_small_stack() {
+        let run = || {
+            let block = solidcraft_kernel::box_solid(Vec3::ZERO, Vec3::new(4., 2., 1.)).unwrap();
+            // A lineage its body does not match (another face count): named from geometry.
+            let other = solidcraft_kernel::cylinder(Vec3::ZERO, Vec3::Z, 1.0, 1.0).unwrap();
+            let mut doc = crate::Document::default();
+            let kind = FeatureKind::Combine { target: "Anchor".into(), tools: Vec::new(), operation: crate::Operation::Join, keep_tools: false };
+            let id = doc.add_feature(kind, None).unwrap();
+            let mut f = doc.feature(id).cloned().unwrap();
+            assert!(f.own_chain_depth);
+            let mut anchor = ModelBody::new("Anchor".into(), block.clone(), 1);
+            let first = NamingOrigin { feature: f.clone(), before: Arc::new(ModelState::default()), depth: 1, mats: Vec::new(), sheets: Vec::new() };
+            anchor.names = NameCell::new(Some(Arc::new(first)));
+            let mut chain = vec![anchor.clone()];
+            for k in 0..2000 {
+                f.id = 100 + k;
+                let mut before = ModelState::default();
+                before.bodies = vec![anchor.clone(), chain.last().unwrap().clone()];
+                let before = Arc::new(before);
+                let mut b = ModelBody::new(format!("B{k}"), block.clone(), f.id)
+                    .with_lineage(Some(Lineage::of(&other, crate::lineage::Operand::Body("Anchor".into()))));
+                let all = before.bodies.iter().filter_map(|x| x.names.depth()).max().unwrap_or(0) + 1;
+                let depth = body_depth(&f, &before, all, &b);
+                assert_eq!(depth, 2, "one deeper than the anchor its faces come from");
+                let origin = NamingOrigin { feature: f.clone(), before, depth, mats: Vec::new(), sheets: Vec::new() };
+                b.names = NameCell::traced(Some(Arc::new(origin)), b.lineage());
+                chain.push(b);
+            }
+            let names = face_names(chain.last().unwrap()).as_ref().clone();
+            assert_eq!(names, face_names(&anchor).as_ref().clone(), "named after the anchor it lies on");
+            // Last first: each body holds the model before it, so freeing the first would free
+            // the whole chain at once, one frame per body.
+            while chain.pop().is_some() {}
+            names
+        };
+        let names = std::thread::Builder::new().stack_size(256 * 1024).spawn(run).unwrap().join().unwrap();
+        assert_eq!(names.len(), 6);
     }
 }

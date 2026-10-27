@@ -436,3 +436,33 @@ fn a_cut_late_in_a_long_design_keeps_a_seated_joint() {
     let old = Session::opened(solidcraft_doc::Document::from_json(&json.to_string()).unwrap(), None);
     assert!(names(&old).iter().all(|n| n.starts_with(&format!("{body}:face:"))), "{:?}", names(&old));
 }
+
+/// The pieces a cut leaves take the body names in the order of their faces' names (#143): late
+/// in a long design as early on, not by position.
+#[test]
+fn pieces_of_a_cut_late_in_a_long_design_are_named_as_early_on() {
+    let pieces = |moves: usize| {
+        let mut s = Session::default();
+        run(&mut s, "solid.box", json!({"length": 40, "width": 20, "height": 5, "corner": [0, 0, 0], "body_name": "Plate"}));
+        run(&mut s, "solid.box", json!({"length": 10, "width": 10, "height": 2, "corner": [0, 300, 0], "body_name": "Shell"}));
+        for k in 0..moves {
+            let dx = if k % 2 == 0 { 1 } else { -1 };
+            run(&mut s, "solid.move", json!({"bodies": ["Shell"], "translate": [dx, 0, 0]}));
+        }
+        // A slot across the plate, off its middle: a short piece and a long one.
+        run(&mut s, "solid.box", json!({"length": 2, "width": 30, "height": 20, "corner": [12, -5, -5], "operation": "cut", "targets": ["Plate"]}));
+        let mut named: Vec<(String, bool)> = s
+            .model
+            .state()
+            .bodies
+            .iter()
+            .filter(|b| b.name != "Shell")
+            .map(|b| (b.name.clone(), b.body.tessellate_with(1e-3, true).unwrap().measure().volume < 2000.0))
+            .collect();
+        named.sort();
+        named
+    };
+    let early = pieces(0);
+    assert_eq!(early.len(), 2, "{early:?}");
+    assert_eq!(pieces(420), early);
+}
