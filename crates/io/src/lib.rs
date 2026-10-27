@@ -383,10 +383,11 @@ pub struct SolidMesh {
 /// (its faces share each edge's points), the reference tessellation, and each of them welded
 /// within a tenth of the chord tolerance (closing cracks narrower than that). A closed mesh counts
 /// only if it is the whole solid: one that left out a whole shell (a cavity's faces) can be closed
-/// and still not the solid. It is when every face of the body keeps triangles after the weld,
-/// or, where some lost theirs (a sliver face collapsed by the weld, a fin cancelled against its
-/// twin), when its volume is within 1 % of the B-rep's. When none counts, the display mesh (or the
-/// reference one, where the body has no display mesh), marked open.
+/// and still not the solid. So every face of the body must have triangles before the weld, and
+/// the faces the weld empties (a sliver collapsed, a fin cancelled against its twin: in either
+/// case two sides closer than the weld width) may hold no more than their area times twice that
+/// width, which must be negligible (1e-4 of the mesh's volume). When none counts, the display
+/// mesh (or the reference one, where the body has no display mesh), marked open.
 pub fn solid_mesh(b: &solidcraft_kernel::Body) -> Result<SolidMesh> {
     let tol = (b.size() * 2e-4).max(1e-3);
     let eps = weld_eps(b);
@@ -402,25 +403,49 @@ pub fn solid_mesh(b: &solidcraft_kernel::Body) -> Result<SolidMesh> {
         tries.push(m);
     }
     tries.push(export_mesh(b)?);
-    let brep_volume = std::cell::OnceCell::new();
-    let whole = |m: &Mesh, w: &Mesh| {
-        if b.is_mesh() || (m.tri_face.len() == m.triangles.len() && covers_every_face(&w.tri_face, b.face_count())) {
+    let whole = |m: &Mesh, w: &Mesh, wide: f64| {
+        if b.is_mesh() {
             return true;
         }
-        let v = *brep_volume.get_or_init(|| solidcraft_kernel::measure_mass(b).ok().map(|x| x.volume).filter(|v| *v > 0.0));
-        matches!((v, w.mass_properties()), (Some(v), Some(mp)) if (mp.volume - v).abs() <= 0.01 * v)
+        if m.tri_face.len() != m.triangles.len() || !covers_every_face(&m.tri_face, b.face_count()) {
+            return false;
+        }
+        let volume = w.mass_properties().map_or(0.0, |p| p.volume.abs());
+        emptied_area(m, &w.tri_face, b.face_count()) * 2.0 * wide <= 1e-4 * volume
     };
     let mut first: Option<Mesh> = None;
     for wide in [eps, (tol * 0.1).max(eps)] {
         for m in &tries {
             let w = welded(m, wide);
-            if w.is_closed() && whole(m, &w) {
+            if w.is_closed() && whole(m, &w, wide) {
                 return Ok(SolidMesh { mesh: w, closed: true });
             }
             first.get_or_insert(w);
         }
     }
     Ok(SolidMesh { mesh: first.unwrap_or_default(), closed: false })
+}
+
+/// The area `original`'s triangles had on the faces that no longer have any in `kept` (the face
+/// of each triangle left after a weld).
+fn emptied_area(original: &Mesh, kept: &[u32], faces: usize) -> f64 {
+    let mut has = vec![false; faces];
+    for f in kept {
+        if let Some(h) = has.get_mut(*f as usize) {
+            *h = true;
+        }
+    }
+    let corner = |i: u32| original.positions.get(i as usize).copied();
+    original
+        .triangles
+        .iter()
+        .zip(&original.tri_face)
+        .filter(|(_, f)| !has.get(**f as usize).copied().unwrap_or(true))
+        .filter_map(|(t, _)| {
+            let (a, b, c) = (corner(t[0])?, corner(t[1])?, corner(t[2])?);
+            Some((b - a).cross(c - a).len() * 0.5)
+        })
+        .sum()
 }
 
 /// Whether the triangles' faces (`tri_face`) include every one of a body's `faces`.
@@ -1209,6 +1234,17 @@ mod tests {
         let b = solidcraft_kernel::box_solid(Vec3::ZERO, Vec3::new(10.0, 20.0, 30.0)).unwrap();
         let m = solid_mesh(&b).unwrap();
         assert!(m.closed && (m.mesh.mass_properties().map_or(0.0, |p| p.volume) - 6000.0).abs() < 1e-6);
+    }
+
+    /// The faces a weld empties are measured by the area they had: what they can hold is at most
+    /// that times the weld width (#216).
+    #[test]
+    fn the_area_of_faces_a_weld_empties() {
+        let positions = vec![Vec3::ZERO, Vec3::new(4.0, 0.0, 0.0), Vec3::new(0.0, 3.0, 0.0), Vec3::new(0.0, 0.0, 2.0)];
+        let m = Mesh { positions, triangles: vec![[0, 1, 2], [0, 1, 3], [0, 2, 3]], tri_face: vec![0, 1, 1], ..Mesh::default() };
+        assert!(emptied_area(&m, &[0, 1], 2).abs() < 1e-12, "both faces kept");
+        assert!((emptied_area(&m, &[0], 2) - (4.0 + 3.0)).abs() < 1e-12, "face 1: 4 + 3");
+        assert!((emptied_area(&m, &[1], 2) - 6.0).abs() < 1e-12, "face 0: 6");
     }
 
     #[test]
