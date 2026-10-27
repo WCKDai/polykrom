@@ -51,6 +51,15 @@ defaults are written and a warning says so. A value that is not a positive numbe
 - **Mass and inertia** come from each body's mesh and material density: the mass in kg, the
   centre of mass and the inertia tensor about it in the link frame, in kg m². Bodies of the
   same link combine with the parallel-axis theorem.
+- **Meshes of solids are closed**: each solid's mesh is its display mesh (whose faces share
+  their edges' points, so seams and trimmed edges leave no cracks) or else its finer reference
+  mesh, welded, with any fins a weld leaves taken out; the first of these that closes and is
+  the whole solid (every face meshed, and any faces the weld empties too thin to hold
+  anything) is written, so the mass, the inertia and the collision come from a watertight mesh. (A solid
+  touching itself along an edge is closed too: that edge has four triangles, two each way.)
+- **A solid whose mesh still has gaps** keeps its mass: the volume and centre come from the
+  B-rep and the inertia from the mesh, scaled to that volume. It gets no collision, and a
+  warning names it ("the mesh of body … has gaps that could not be closed").
 - **Open surfaces** are drawn but add no mass or collision, with a warning naming them.
 - **A link with no mass** (only surfaces, no bodies, or a chain's in-between link) gets a token
   mass of 1e-6 kg and inertia of 1e-12 kg m², because Gazebo drops massless links and breaks

@@ -15,7 +15,7 @@ use solidcraft_doc::joints::{self, Joint, JointKind};
 use solidcraft_doc::{Document, IDENTITY, MAX_PLACEMENT_DEPTH, MAX_PLACEMENTS, Mat, ModelState, Occurrence, apply_point, mat_inverse, mat_mul};
 use solidcraft_geom::{Mesh, Vec3};
 
-use crate::{IoError, Result, export_mesh, stl_binary, weld, weld_eps};
+use crate::{IoError, Result, SolidMesh, solid_mesh, stl_binary};
 
 /// Mass (kg) and inertia (kg m²) of a link with no massive body: Gazebo drops massless links.
 const TOKEN_MASS: f64 = 1e-6;
@@ -235,28 +235,42 @@ fn parts(doc: &Document, st: &ModelState, stem: &str, names: &mut Names, out: &m
         let (mut visual, mut collision) = (Mesh::default(), Mesh::default());
         let (mut masses, mut color, mut open) = (Vec::new(), None, false);
         for b in st.bodies.iter().filter(|b| doc.model_body_component(b) == c) {
-            let mut m = export_mesh(&b.body)?;
+            let SolidMesh { mesh: mut welded, closed } = solid_mesh(&b.body)?;
             if let Some(o) = doc.model_body_offset(b) {
-                for p in &mut m.positions {
+                for p in &mut welded.positions {
                     *p = apply_point(o, *p);
                 }
             }
-            let (positions, triangles) = weld(&m.positions, &m.triangles, weld_eps(&b.body));
-            let welded = Mesh { positions, triangles, ..Mesh::default() };
             let opacity = b.body.paint().map(|p| p.opacity).filter(|o| o.is_finite()).map_or(1.0, |o| o.clamp(0.0, 1.0));
             color = color.or(b.body.color().map(|[r, g, b]| [r, g, b, opacity]));
             append(&mut visual, &welded);
-            match welded.mass_properties() {
-                Some(mp) => {
-                    // g/cm³ to kg/mm³.
-                    let rho = doc.density(&b.name) * 1e-6;
-                    masses.push((rho * mp.volume, mp.centroid, mp.inertia.map(|r| r.map(|x| x * rho))));
-                    append(&mut collision, &welded);
+            // g/cm³ to kg/mm³.
+            let rho = doc.density(&b.name) * 1e-6;
+            if closed && let Some(mp) = welded.mass_properties() {
+                masses.push((rho * mp.volume, mp.centroid, mp.inertia.map(|r| r.map(|x| x * rho))));
+                append(&mut collision, &welded);
+                continue;
+            }
+            open = true;
+            // A solid whose mesh keeps a crack still has its mass: the B-rep's volume and centre
+            // (placed as the mesh is), and the inertia of the cracked mesh about its own centre,
+            // scaled to that volume. An open sheet has none.
+            let solid = !b.body.is_surface();
+            let brep = if solid { solidcraft_kernel::measure_mass(&b.body).ok().filter(|m| m.volume > 0.0) } else { None };
+            match (brep, welded.mass_properties_open().filter(|m| m.volume > 0.0)) {
+                (Some(m), Some(mp)) => {
+                    let centroid = doc.model_body_offset(b).map_or(m.centroid, |o| apply_point(o, m.centroid));
+                    // The mesh's tensor is about its own centre: moved to the B-rep's (the
+                    // parallel-axis theorem), then scaled to the B-rep's volume.
+                    let inertia = parallel_axis(mp.inertia, mp.volume, centroid - mp.centroid);
+                    let scale = m.volume / mp.volume;
+                    masses.push((rho * m.volume, centroid, inertia.map(|r| r.map(|x| x * rho * scale))));
+                    out.warnings.push(format!(
+                        "the mesh of body `{}` has gaps that could not be closed: its mass and inertia come from the B-rep, and it gets no collision",
+                        b.name
+                    ));
                 }
-                None => {
-                    open = true;
-                    out.warnings.push(format!("body `{}` is not a closed solid: it is drawn but adds no mass or collision", b.name));
-                }
+                _ => out.warnings.push(format!("body `{}` is not a closed solid: it is drawn but adds no mass or collision", b.name)),
             }
         }
         let mut part = Part { visual: None, collision: None, color, masses };
@@ -659,6 +673,20 @@ pub(crate) fn token() -> Inertial {
     Inertial { mass: TOKEN_MASS, com: Vec3::ZERO, inertia: [[TOKEN_INERTIA, 0.0, 0.0], [0.0, TOKEN_INERTIA, 0.0], [0.0, 0.0, TOKEN_INERTIA]] }
 }
 
+/// `inertia` of a `mass` about its centre, moved to a point `d` from it (the parallel-axis
+/// theorem): I + m (|d|² 1 - d dᵀ).
+fn parallel_axis(inertia: [[f64; 3]; 3], mass: f64, d: Vec3) -> [[f64; 3]; 3] {
+    let dv = [d.x, d.y, d.z];
+    let d2 = d.dot(d);
+    let mut out = inertia;
+    for (i, (row, di)) in out.iter_mut().zip(dv).enumerate() {
+        for (j, (x, dj)) in row.iter_mut().zip(dv).enumerate() {
+            *x += mass * (if i == j { d2 } else { 0.0 } - di * dj);
+        }
+    }
+    out
+}
+
 /// Bodies' masses (component frame) combined in the link frame (`to_link`: component to link).
 fn inertial(masses: &[BodyMass], to_link: &Mat) -> Option<Inertial> {
     let mass: f64 = masses.iter().map(|m| m.0).sum();
@@ -834,6 +862,19 @@ mod tests {
     use std::f64::consts::FRAC_PI_2;
 
     use quick_xml::events::Event;
+
+    /// A unit cube's tensor about its centre (1/6 on the diagonal) moved to points off it: the
+    /// fallback mass of a cracked mesh is moved this way to the B-rep's centre (#216).
+    #[test]
+    fn parallel_axis_moves_a_tensor_off_the_centre() {
+        let cube = [[1.0 / 6.0, 0.0, 0.0], [0.0, 1.0 / 6.0, 0.0], [0.0, 0.0, 1.0 / 6.0]];
+        let near = |a: [[f64; 3]; 3], b: [[f64; 3]; 3]| a.iter().flatten().zip(b.iter().flatten()).all(|(x, y)| (x - y).abs() < 1e-12);
+        let up = parallel_axis(cube, 1.0, Vec3::new(0.0, 0.5, 0.0));
+        assert!(near(up, [[1.0 / 6.0 + 0.25, 0.0, 0.0], [0.0, 1.0 / 6.0, 0.0], [0.0, 0.0, 1.0 / 6.0 + 0.25]]), "{up:?}");
+        let diagonal = parallel_axis(cube, 2.0, Vec3::new(1.0, 1.0, 0.0));
+        assert!(near(diagonal, [[1.0 / 6.0 + 2.0, -2.0, 0.0], [-2.0, 1.0 / 6.0 + 2.0, 0.0], [0.0, 0.0, 1.0 / 6.0 + 4.0]]), "{diagonal:?}");
+        assert!(near(parallel_axis(cube, 3.0, Vec3::ZERO), cube));
+    }
 
     /// Rotations that stress the decomposition: general ones, gimbal lock (pitch ±90°, which a
     /// hinge whose axis lies along x gives) and next to it.

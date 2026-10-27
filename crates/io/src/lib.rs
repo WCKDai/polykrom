@@ -367,6 +367,128 @@ pub fn export_mesh(b: &solidcraft_kernel::Body) -> Result<Mesh> {
     Ok(b.tessellate((b.size() * 2e-4).max(1e-3))?)
 }
 
+/// A solid's export mesh, welded, and whether it is closed (see [`solid_mesh`]).
+#[derive(Clone, Debug, Default)]
+pub struct SolidMesh {
+    pub mesh: Mesh,
+    /// Every edge shared by two triangles crossing it opposite ways: a mass and a collision can
+    /// be worked out from it.
+    pub closed: bool,
+}
+
+/// The welded export mesh of a body meant as a closed solid (the parts of a URDF or MJCF model,
+/// whose masses and collisions need closed meshes). The reference tessellation
+/// ([`export_mesh`]) meshes each face on its own, so a seam or a trimmed edge can leave a crack
+/// between two faces' points. Tried in turn, the first closed one kept: the body's display mesh
+/// (its faces share each edge's points), the reference tessellation, and each of them welded
+/// within a tenth of the chord tolerance (closing cracks narrower than that). A closed mesh counts
+/// only if it is the whole solid: one that left out a whole shell (a cavity's faces) can be closed
+/// and still not the solid. So every face of the body must have triangles before the weld, and
+/// what the weld takes out (slivers collapsed, fins cancelled against their twins: in either case
+/// two sides closer than the weld width, on a whole face or part of one) may hold no more than
+/// the area it took out times twice that width, which must be negligible (1e-4 of the mesh's
+/// volume). When none counts, the first mesh that has triangles on every face (else the display
+/// mesh, or the reference one where the body has no display mesh), welded and marked open: what
+/// an open solid's inertia is read from.
+pub fn solid_mesh(b: &solidcraft_kernel::Body) -> Result<SolidMesh> {
+    let tol = (b.size() * 2e-4).max(1e-3);
+    let eps = weld_eps(b);
+    // Each triangle keeps its face through the weld and the fin removal, so coverage is read
+    // off the triangles that are left.
+    let welded = |m: &Mesh, eps: f64| {
+        let (positions, triangles, faces) = threemf::weld_tagged(&m.positions, &m.triangles, &m.tri_face, eps);
+        let (triangles, tri_face) = without_fins(triangles, faces);
+        Mesh { positions, triangles, tri_face, ..Mesh::default() }
+    };
+    let mut tries: Vec<Mesh> = Vec::new();
+    if let Ok(m) = b.display_mesh(tol) {
+        tries.push(m);
+    }
+    tries.push(export_mesh(b)?);
+    let whole = |m: &Mesh, w: &Mesh, wide: f64| {
+        if b.is_mesh() {
+            return true;
+        }
+        if !(m.tri_face.len() == m.triangles.len() && covers_every_face(&m.tri_face, b.face_count())) {
+            return false;
+        }
+        let volume = w.mass_properties().map_or(0.0, |p| p.volume.abs());
+        // Splitting at T-junctions keeps the area; what the weld takes out is the rest (with the
+        // little its vertex moves add or take, at most the width along each edge).
+        (mesh_area(m) - mesh_area(w)).max(0.0) * 2.0 * wide <= 1e-4 * volume
+    };
+    let complete = |m: &Mesh| b.is_mesh() || (m.tri_face.len() == m.triangles.len() && covers_every_face(&m.tri_face, b.face_count()));
+    // The open fallback: the first welded mesh of a tessellation with every face, else the first.
+    let mut fallback: Option<(Mesh, bool)> = None;
+    for wide in [eps, (tol * 0.1).max(eps)] {
+        for m in &tries {
+            let w = welded(m, wide);
+            if w.is_closed() && whole(m, &w, wide) {
+                return Ok(SolidMesh { mesh: w, closed: true });
+            }
+            let full = complete(m);
+            if fallback.as_ref().is_none_or(|(_, had)| full && !had) {
+                fallback = Some((w, full));
+            }
+        }
+    }
+    Ok(SolidMesh { mesh: fallback.map(|(m, _)| m).unwrap_or_default(), closed: false })
+}
+
+/// The area of a mesh's triangles.
+fn mesh_area(m: &Mesh) -> f64 {
+    let corner = |i: u32| m.positions.get(i as usize).copied();
+    m.triangles
+        .iter()
+        .filter_map(|t| {
+            let (a, b, c) = (corner(t[0])?, corner(t[1])?, corner(t[2])?);
+            Some((b - a).cross(c - a).len() * 0.5)
+        })
+        .sum()
+}
+
+/// Whether the triangles' faces (`tri_face`) include every one of a body's `faces`.
+fn covers_every_face(tri_face: &[u32], faces: usize) -> bool {
+    let mut has = vec![false; faces];
+    for f in tri_face {
+        if let Some(h) = has.get_mut(*f as usize) {
+            *h = true;
+        }
+    }
+    has.iter().all(|h| *h)
+}
+
+/// `triangles` without the fins a weld can leave: a triangle and its twin with the other
+/// orientation (two faces' slivers welded onto each other) bound no volume and leave their edges
+/// used three or four times, so both go; a triangle repeated with the same orientation is kept
+/// once. `tags` (one per triangle) are kept with the triangles that stay.
+fn without_fins(triangles: Vec<[u32; 3]>, tags: Vec<u32>) -> (Vec<[u32; 3]>, Vec<u32>) {
+    // A triangle's corners rotated to start at the smallest, so its orientation is kept.
+    let key = |t: &[u32; 3]| {
+        let k = (0..3).min_by_key(|&i| t[i]).unwrap_or(0);
+        [t[k], t[(k + 1) % 3], t[(k + 2) % 3]]
+    };
+    let mut count: std::collections::HashMap<[u32; 3], i64> = std::collections::HashMap::new();
+    for t in &triangles {
+        *count.entry(key(t)).or_insert(0) += 1;
+    }
+    let mut out = Vec::with_capacity(triangles.len());
+    let mut out_tags = Vec::with_capacity(triangles.len());
+    let mut kept: std::collections::HashSet<[u32; 3]> = std::collections::HashSet::new();
+    for (i, t) in triangles.into_iter().enumerate() {
+        let k = key(&t);
+        let flipped = key(&[t[0], t[2], t[1]]);
+        let (same, other) = (count.get(&k).copied().unwrap_or(0), count.get(&flipped).copied().unwrap_or(0));
+        // Opposite twins cancel pair by pair; what is left of the more common orientation stays,
+        // once.
+        if same > other && kept.insert(k) {
+            out.push(t);
+            out_tags.push(tags.get(i).copied().unwrap_or(0));
+        }
+    }
+    (out, out_tags)
+}
+
 /// Distance within which an exported mesh's vertices are welded (STL and 3MF alike).
 fn weld_eps(b: &solidcraft_kernel::Body) -> f64 {
     (b.size() * 1e-6).max(1e-7)
@@ -1097,5 +1219,49 @@ mod tests {
         let mut xml = String::new();
         zip.by_name("3D/3dmodel.model").unwrap().read_to_string(&mut xml).unwrap();
         assert!(!xml.contains("ft:"));
+    }
+
+    /// A weld that lands two faces' slivers on each other leaves a triangle and its flipped twin
+    /// (a fin, its edges used three and four times) and repeats: both twins go, a repeat is kept
+    /// once, and a tetrahedron with them is closed again (#216).
+    /// A mesh closes without being the solid when a whole shell's faces have no triangles (#216):
+    /// every face must have some.
+    #[test]
+    fn a_solid_mesh_has_triangles_on_every_face() {
+        assert!(covers_every_face(&[0, 2, 1, 1], 3));
+        assert!(!covers_every_face(&[0, 0, 1], 3), "face 2 has none");
+        assert!(!covers_every_face(&[], 1));
+        // Every face of a box is meshed, and its solid mesh is closed.
+        let b = solidcraft_kernel::box_solid(Vec3::ZERO, Vec3::new(10.0, 20.0, 30.0)).unwrap();
+        let m = solid_mesh(&b).unwrap();
+        assert!(m.closed && (m.mesh.mass_properties().map_or(0.0, |p| p.volume) - 6000.0).abs() < 1e-6);
+    }
+
+    /// What a weld takes out is measured by area, all of a face or part of one: what it can hold
+    /// is at most that times the weld width (#216).
+    #[test]
+    fn the_area_a_weld_takes_out() {
+        let positions = vec![Vec3::ZERO, Vec3::new(4.0, 0.0, 0.0), Vec3::new(0.0, 3.0, 0.0), Vec3::new(0.0, 0.0, 2.0)];
+        let m = Mesh { positions, triangles: vec![[0, 1, 2], [0, 1, 3], [0, 2, 3]], tri_face: vec![0, 1, 1], ..Mesh::default() };
+        assert!((mesh_area(&m) - (6.0 + 4.0 + 3.0)).abs() < 1e-12);
+        // Part of face 1 gone (its 3 mm² triangle), face 1 still has a triangle: 3 mm² taken out.
+        let part = Mesh { triangles: vec![[0, 1, 2], [0, 1, 3]], tri_face: vec![0, 1], ..m.clone() };
+        assert!((mesh_area(&m) - mesh_area(&part) - 3.0).abs() < 1e-12);
+    }
+
+    #[test]
+    fn welded_fins_are_taken_out() {
+        let tetra = vec![[0, 2, 1], [0, 1, 3], [1, 2, 3], [0, 3, 2]];
+        let mut with = tetra.clone();
+        with.extend([[1, 3, 4], [1, 4, 3], [0, 1, 3]]);
+        // Each triangle's face goes with it: the fin's faces (5, 6) go with the fin.
+        let (cleaned, faces) = without_fins(with, vec![0, 1, 2, 3, 5, 6, 1]);
+        assert_eq!(cleaned, tetra);
+        assert_eq!(faces, vec![0, 1, 2, 3]);
+        assert!(!covers_every_face(&faces, 7), "faces 4 to 6 have no triangles left");
+        let positions = vec![Vec3::ZERO, Vec3::X, Vec3::Y, Vec3::Z, Vec3::new(1.0, 1.0, 1.0)];
+        let m = Mesh { positions, triangles: cleaned, ..Mesh::default() };
+        assert!(m.is_closed());
+        assert!((m.mass_properties().map_or(0.0, |p| p.volume) - 1.0 / 6.0).abs() < 1e-12);
     }
 }

@@ -58,7 +58,9 @@ A number that is not positive, or a flag that is not `true` or `false`, is refus
 - **Bodies:** one per URDF link, nested as the tree is. A body with no moving joint is welded
   to its parent. Each has `<inertial pos mass fullinertia>`: the link's centre of mass in
   metres, its mass in kg and its inertia tensor about the centre in kg m², from the bodies'
-  meshes and material densities. A body with no mass gets URDF's token mass (1e-6 kg).
+  closed meshes and material densities (see [URDF](urdf.md): a solid whose mesh still has a gap
+  takes its mass from the B-rep, gets no collision and is named in the reply's `warnings`).
+  MuJoCo works out no mass from the meshes. A body with no mass gets URDF's token mass (1e-6 kg).
 - **Geoms:** each body's mesh as a `type="mesh"` geom in its colour (`rgba`, opacity kept). A
   component mixing closed solids with open surfaces gets a drawn geom that doesn't collide and
   an unseen collision geom (group 3) of the closed solids.
