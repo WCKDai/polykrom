@@ -13,3 +13,5 @@ allow-wildcard-paths = true
 unknown-registry = "deny"
 unknown-git = "deny"
 allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+# The kernel and geometry foundation are pinned to this repository and revision (see Cargo.toml).
+allow-git = ["https://github.com/WCKDai/polycore"]

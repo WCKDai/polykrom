@@ -803,17 +803,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "chacha20"
-version = "0.10.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "65c35e4b699c7e15ccbe7ee35c005e4fc0a278d22238a2857e6ce2dadeda1b06"
-dependencies = [
- "cfg-if",
- "cpufeatures 0.3.1",
- "rand_core 0.10.1",
-]
-
-[[package]]
 name = "chardetng"
 version = "0.1.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1694,7 +1683,6 @@ dependencies = [
  "cfg-if",
  "libc",
  "r-efi 6.0.0",
- "rand_core 0.10.1",
 ]
 
 [[package]]
@@ -2429,15 +2417,6 @@ name = "log"
 version = "0.4.34"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f9f8bd3e56ce4dfc153cf470fffbfa98c7620958b312ca5c3a4b8d5181fd13c6"
-
-[[package]]
-name = "matext4cgmath"
-version = "0.1.0"
-dependencies = [
- "cgmath",
- "katexit",
- "num-complex",
-]
 
 [[package]]
 name = "memchr"
@@ -3267,6 +3246,153 @@ dependencies = [
 ]
 
 [[package]]
+name = "polycore-matext4cgmath"
+version = "0.1.0"
+source = "git+https://github.com/WCKDai/polycore?rev=5530dab29b76056e3572cf8be3558066a7291b97#5530dab29b76056e3572cf8be3558066a7291b97"
+dependencies = [
+ "cgmath",
+ "katexit",
+ "num-complex",
+]
+
+[[package]]
+name = "polycore-truck-base"
+version = "0.5.0"
+source = "git+https://github.com/WCKDai/polycore?rev=5530dab29b76056e3572cf8be3558066a7291b97#5530dab29b76056e3572cf8be3558066a7291b97"
+dependencies = [
+ "cgmath",
+ "polycore-matext4cgmath",
+ "rustc-hash 2.1.3",
+ "serde",
+]
+
+[[package]]
+name = "polycore-truck-derivers"
+version = "0.1.0"
+source = "git+https://github.com/WCKDai/polycore?rev=5530dab29b76056e3572cf8be3558066a7291b97#5530dab29b76056e3572cf8be3558066a7291b97"
+dependencies = [
+ "proc-macro-error",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.119",
+]
+
+[[package]]
+name = "polycore-truck-geometry"
+version = "0.5.0"
+source = "git+https://github.com/WCKDai/polycore?rev=5530dab29b76056e3572cf8be3558066a7291b97#5530dab29b76056e3572cf8be3558066a7291b97"
+dependencies = [
+ "polycore-truck-base",
+ "polycore-truck-geotrait",
+ "serde",
+ "thiserror 1.0.69",
+]
+
+[[package]]
+name = "polycore-truck-geotrait"
+version = "0.4.0"
+source = "git+https://github.com/WCKDai/polycore?rev=5530dab29b76056e3572cf8be3558066a7291b97#5530dab29b76056e3572cf8be3558066a7291b97"
+dependencies = [
+ "getrandom 0.2.17",
+ "polycore-truck-base",
+ "polycore-truck-derivers",
+ "rand",
+ "thiserror 1.0.69",
+]
+
+[[package]]
+name = "polycore-truck-meshalgo"
+version = "0.4.0"
+source = "git+https://github.com/WCKDai/polycore?rev=5530dab29b76056e3572cf8be3558066a7291b97#5530dab29b76056e3572cf8be3558066a7291b97"
+dependencies = [
+ "array-macro",
+ "derive_more",
+ "itertools 0.13.0",
+ "polycore-truck-base",
+ "polycore-truck-geometry",
+ "polycore-truck-modeling",
+ "polycore-truck-polymesh",
+ "polycore-truck-topology",
+ "rayon",
+ "rustc-hash 2.1.3",
+ "spade",
+]
+
+[[package]]
+name = "polycore-truck-modeling"
+version = "0.6.0"
+source = "git+https://github.com/WCKDai/polycore?rev=5530dab29b76056e3572cf8be3558066a7291b97#5530dab29b76056e3572cf8be3558066a7291b97"
+dependencies = [
+ "derive_more",
+ "polycore-truck-base",
+ "polycore-truck-geometry",
+ "polycore-truck-geotrait",
+ "polycore-truck-polymesh",
+ "polycore-truck-topology",
+ "rustc-hash 2.1.3",
+ "serde",
+ "thiserror 1.0.69",
+]
+
+[[package]]
+name = "polycore-truck-polymesh"
+version = "0.6.0"
+source = "git+https://github.com/WCKDai/polycore?rev=5530dab29b76056e3572cf8be3558066a7291b97#5530dab29b76056e3572cf8be3558066a7291b97"
+dependencies = [
+ "array-macro",
+ "bytemuck",
+ "itertools 0.13.0",
+ "polycore-truck-base",
+ "polycore-truck-geotrait",
+ "rustc-hash 2.1.3",
+ "serde",
+ "thiserror 1.0.69",
+]
+
+[[package]]
+name = "polycore-truck-shapeops"
+version = "0.4.0"
+source = "git+https://github.com/WCKDai/polycore?rev=5530dab29b76056e3572cf8be3558066a7291b97#5530dab29b76056e3572cf8be3558066a7291b97"
+dependencies = [
+ "derive_more",
+ "itertools 0.13.0",
+ "polycore-truck-base",
+ "polycore-truck-geometry",
+ "polycore-truck-geotrait",
+ "polycore-truck-meshalgo",
+ "polycore-truck-modeling",
+ "polycore-truck-topology",
+ "rustc-hash 2.1.3",
+]
+
+[[package]]
+name = "polycore-truck-stepio"
+version = "0.3.0"
+source = "git+https://github.com/WCKDai/polycore?rev=5530dab29b76056e3572cf8be3558066a7291b97#5530dab29b76056e3572cf8be3558066a7291b97"
+dependencies = [
+ "chrono",
+ "polycore-truck-geometry",
+ "polycore-truck-modeling",
+ "polycore-truck-polymesh",
+ "polycore-truck-topology",
+]
+
+[[package]]
+name = "polycore-truck-topology"
+version = "0.6.0"
+source = "git+https://github.com/WCKDai/polycore?rev=5530dab29b76056e3572cf8be3558066a7291b97#5530dab29b76056e3572cf8be3558066a7291b97"
+dependencies = [
+ "parking_lot",
+ "polycore-truck-base",
+ "polycore-truck-geotrait",
+ "rayon",
+ "rclite",
+ "rustc-hash 2.1.3",
+ "serde",
+ "thiserror 1.0.69",
+]
+
+[[package]]
 name = "portable-atomic"
 version = "1.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3354,22 +3480,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3d595e54a326bc53c1c197b32d295e14b169e3cfeaa8dc82b529f947fba6bcf5"
 
 [[package]]
-name = "proptest"
-version = "1.12.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b8530004ccb15eae51c7e40009fbe317f341f804db54dc033eec1c50be28cfa0"
-dependencies = [
- "bitflags 2.13.2",
- "chacha20",
- "core_detect",
- "num-traits",
- "rand 0.10.3",
- "rand_xorshift",
- "regex-syntax",
- "unarray",
-]
-
-[[package]]
 name = "pxfm"
 version = "0.1.30"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3419,17 +3529,7 @@ checksum = "e058c7de0b26af77780c769414d6257830bb240f3c38477dbc2c16e5f54d6d4c"
 dependencies = [
  "libc",
  "rand_chacha",
- "rand_core 0.6.4",
-]
-
-[[package]]
-name = "rand"
-version = "0.10.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "65c9fb96cbc91e3478eaae79a69fcd3f1ae4ad052e471fe6732fff548984b4af"
-dependencies = [
- "getrandom 0.4.3",
- "rand_core 0.10.1",
+ "rand_core",
 ]
 
 [[package]]
@@ -3439,7 +3539,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e6c10a63a0fa32252be49d21e7709d4d4baf8d231c2dbce1eaa8141b9b127d88"
 dependencies = [
  "ppv-lite86",
- "rand_core 0.6.4",
+ "rand_core",
 ]
 
 [[package]]
@@ -3449,21 +3549,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ec0be4795e2f6a28069bec0b5ff3e2ac9bafc99e6a9a7dc3547996c5c816922c"
 dependencies = [
  "getrandom 0.2.17",
-]
-
-[[package]]
-name = "rand_core"
-version = "0.10.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "63b8176103e19a2643978565ca18b50549f6101881c443590420e4dc998a3c69"
-
-[[package]]
-name = "rand_xorshift"
-version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "60aa6af80be32871323012e02e6e65f8a7cc7890931ae421d217ad8fe0df2ccf"
-dependencies = [
- "rand_core 0.10.1",
 ]
 
 [[package]]
@@ -3576,12 +3661,6 @@ dependencies = [
  "quote",
  "syn 3.0.6",
 ]
-
-[[package]]
-name = "regex-syntax"
-version = "0.8.11"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d6f6ff9a378485b298a5286656da665ba74413d36db0979633275d2e708145d4"
 
 [[package]]
 name = "renderdoc-sys"
@@ -3863,7 +3942,7 @@ dependencies = [
  "hkdf",
  "num",
  "once_cell",
- "rand 0.8.8",
+ "rand",
  "serde",
  "sha2 0.10.9",
  "zbus 4.4.0",
@@ -4301,10 +4380,10 @@ dependencies = [
 
 [[package]]
 name = "solidcraft-geom"
-version = "0.21.0"
+version = "0.1.0"
+source = "git+https://github.com/WCKDai/polycore?rev=5530dab29b76056e3572cf8be3558066a7291b97#5530dab29b76056e3572cf8be3558066a7291b97"
 dependencies = [
  "serde",
- "serde_json",
  "thiserror 2.0.21",
 ]
 
@@ -4350,21 +4429,21 @@ dependencies = [
 
 [[package]]
 name = "solidcraft-kernel"
-version = "0.21.0"
+version = "0.1.0"
+source = "git+https://github.com/WCKDai/polycore?rev=5530dab29b76056e3572cf8be3558066a7291b97#5530dab29b76056e3572cf8be3558066a7291b97"
 dependencies = [
  "log",
- "proptest",
+ "polycore-truck-meshalgo",
+ "polycore-truck-modeling",
+ "polycore-truck-shapeops",
+ "polycore-truck-stepio",
+ "polycore-truck-topology",
  "rayon",
  "serde",
  "serde_json",
  "solidcraft-geom",
  "spade",
  "thiserror 2.0.21",
- "truck-meshalgo",
- "truck-modeling",
- "truck-shapeops",
- "truck-stepio",
- "truck-topology",
  "web-time",
 ]
 
@@ -4746,145 +4825,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "truck-base"
-version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4c279de9e92e5dc20a188deb0bb9a4bd421a6a185e57e03e19025e84a36c5a05"
-dependencies = [
- "cgmath",
- "matext4cgmath",
- "rustc-hash 2.1.3",
- "serde",
-]
-
-[[package]]
-name = "truck-derivers"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "421ff1c5a303aed64e295d9b30e8424ee7a2fa251617a59ae4acfd078496009f"
-dependencies = [
- "proc-macro-error",
- "proc-macro2",
- "quote",
- "syn 2.0.119",
-]
-
-[[package]]
-name = "truck-geometry"
-version = "0.5.0"
-dependencies = [
- "serde",
- "thiserror 1.0.69",
- "truck-base",
- "truck-geotrait",
-]
-
-[[package]]
-name = "truck-geotrait"
-version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "97a31fe98d5a0589ad20576260e214af23dea21a8d125da81ad3bbcb666f411f"
-dependencies = [
- "getrandom 0.2.17",
- "rand 0.8.8",
- "thiserror 1.0.69",
- "truck-base",
- "truck-derivers",
-]
-
-[[package]]
-name = "truck-meshalgo"
-version = "0.4.0"
-dependencies = [
- "array-macro",
- "derive_more",
- "itertools 0.13.0",
- "rayon",
- "rustc-hash 2.1.3",
- "spade",
- "truck-base",
- "truck-geometry",
- "truck-modeling",
- "truck-polymesh",
- "truck-topology",
-]
-
-[[package]]
-name = "truck-modeling"
-version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8082c2dfac8c2732a014d81807fb5d24dbac0d72ee4de2a705b7fbc05fa05b18"
-dependencies = [
- "derive_more",
- "rustc-hash 2.1.3",
- "serde",
- "thiserror 1.0.69",
- "truck-base",
- "truck-geometry",
- "truck-geotrait",
- "truck-polymesh",
- "truck-topology",
-]
-
-[[package]]
-name = "truck-polymesh"
-version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b8f22def310af4a89c37beb4839bbf702b302d2c112ea29553759f0e16622fbf"
-dependencies = [
- "array-macro",
- "bytemuck",
- "itertools 0.13.0",
- "rustc-hash 2.1.3",
- "serde",
- "thiserror 1.0.69",
- "truck-base",
- "truck-geotrait",
-]
-
-[[package]]
-name = "truck-shapeops"
-version = "0.4.0"
-dependencies = [
- "derive_more",
- "itertools 0.13.0",
- "rustc-hash 2.1.3",
- "truck-base",
- "truck-geometry",
- "truck-geotrait",
- "truck-meshalgo",
- "truck-modeling",
- "truck-topology",
-]
-
-[[package]]
-name = "truck-stepio"
-version = "0.3.0"
-dependencies = [
- "chrono",
- "truck-geometry",
- "truck-modeling",
- "truck-polymesh",
- "truck-topology",
-]
-
-[[package]]
-name = "truck-topology"
-version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bf62a1610405c5e39ab5eb6948f326fc1641689734a6b8207a80792133fe0e78"
-dependencies = [
- "parking_lot",
- "rayon",
- "rclite",
- "rustc-hash 2.1.3",
- "serde",
- "thiserror 1.0.69",
- "truck-base",
- "truck-geotrait",
-]
-
-[[package]]
 name = "ttf-parser"
 version = "0.25.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4933,12 +4873,6 @@ dependencies = [
  "tempfile",
  "windows-sys 0.61.2",
 ]
-
-[[package]]
-name = "unarray"
-version = "0.1.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "eaea85b334db583fe3274d12b4cd1880032beab409c0d774be044d4480ab9a94"
 
 [[package]]
 name = "unicode-general-category"
@@ -6032,7 +5966,7 @@ dependencies = [
  "hex",
  "nix 0.29.0",
  "ordered-stream",
- "rand 0.8.8",
+ "rand",
  "serde",
  "serde_repr",
  "sha1 0.10.7",

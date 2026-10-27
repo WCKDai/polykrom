@@ -2,7 +2,9 @@
 resolver = "3"
 members = ["crates/*", "apps/*", "xtask"]
 # Third-party code kept with local fixes (see vendor/README.md); not linted as ours.
-exclude = ["vendor"]
+# The in-tree kernel and geometry crates are the pre-PolyCore copies. They stay on disk until
+# their remaining work has moved, but the workspace builds PolyCore's copies instead.
+exclude = ["vendor", "crates/kernel", "crates/geom"]
 
 [workspace.package]
 version = "0.21.0"
@@ -14,9 +16,11 @@ repository = "https://github.com/wckdboy/polykrom"
 
 [workspace.dependencies]
 # internal
-solidcraft-geom = { path = "crates/geom" }
+# The kernel and its geometry foundation are maintained in PolyCore and pinned by revision.
+# Bump both entries together; they must resolve to the same commit so their types are the same.
+solidcraft-geom = { git = "https://github.com/WCKDai/polycore", rev = "5530dab29b76056e3572cf8be3558066a7291b97" }
 solidcraft-sketch = { path = "crates/sketch" }
-solidcraft-kernel = { path = "crates/kernel" }
+solidcraft-kernel = { git = "https://github.com/WCKDai/polycore", rev = "5530dab29b76056e3572cf8be3558066a7291b97" }
 solidcraft-render = { path = "crates/render" }
 solidcraft-gpu = { path = "crates/gpu" }
 solidcraft-doc = { path = "crates/doc" }
@@ -44,16 +48,7 @@ sha2 = "0.10"
 moxcms = { version = "0.8.1", default-features = false, features = ["extended_range"] }
 semver = "1"
 
-# geometry kernel (Apache-2.0; see plan/adr/0001-geometry-kernel.md). Only crates/kernel uses it.
-truck-modeling = "0.6"
-truck-shapeops = { version = "0.4", default-features = false }
-truck-meshalgo = { version = "0.4", default-features = false, features = ["tessellation", "analyzers"] }
-truck-stepio = { version = "0.3", default-features = false }
-truck-topology = "0.6"
-# constrained Delaunay + Ruppert refinement for trimmed faces (MIT OR Apache-2.0); already in the
-# tree through truck-meshalgo.
-spade = { version = "2.15", default-features = false, features = ["std"] }
-rayon = "1.12"
+# geometry kernel dependencies now come with PolyCore's crates; see the git entries above.
 
 # packages (3MF)
 zip = { version = "9", default-features = false, features = ["deflate"] }
@@ -146,14 +141,9 @@ codegen-units = 16
 # binary). See docs/crash-reports.md.
 debug = "line-tables-only"
 
-# truck-shapeops with Polykrom fixes (Apache-2.0, see vendor/truck-shapeops and ATTRIBUTION.md).
+# PolyCore carries the patched Truck closure (renamed `polycore-truck-*`). Polykrom no longer
+# patches registry Truck crates directly, so only the UI vendor remains here.
 [patch.crates-io]
-truck-geometry = { path = "vendor/truck-geometry" }
-truck-shapeops = { path = "vendor/truck-shapeops" }
-truck-stepio = { path = "vendor/truck-stepio" }
-truck-meshalgo = { path = "vendor/truck-meshalgo" }
-matext4cgmath = { path = "vendor/matext4cgmath" }
-
 # Keep OpenGL pipelines, resolve textures and CAD callbacks at the same safe sample count.
 egui-wgpu = { path = "vendor/egui-wgpu" }
 

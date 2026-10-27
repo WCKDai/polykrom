@@ -60,14 +60,13 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # The kernel lives in PolyCore and is tested there at the revision pinned in Cargo.toml.
           - part: engine
             args: -p solidcraft-engine --lib
-          - part: kernel
-            args: -p solidcraft-kernel
           - part: ui
             args: -p solidcraft-ui-egui
           - part: rest
-            args: --workspace --exclude solidcraft-engine --exclude solidcraft-kernel --exclude solidcraft-ui-egui
+            args: --workspace --exclude solidcraft-engine --exclude solidcraft-ui-egui
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: dtolnay/rust-toolchain@stable
