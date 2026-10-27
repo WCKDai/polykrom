@@ -302,6 +302,112 @@ fn polish_apply_says_which_findings_another_run_would_fix() {
     assert_eq!(cube.map(|f| f["fix"].clone()), Some(json!(["F1"])), "{r}");
 }
 
+/// A 40 x 20 x 10 block whose round stays inside a 1% change of mass, and a 4 mm cube whose
+/// round (0.3 mm on 12 edges, about 1.5% of it) doesn't.
+fn block_and_cube(s: &mut Session) {
+    run(s, "solid.box", json!({"length": 40, "width": 20, "height": 10, "body_name": "Block"}));
+    run(s, "solid.box", json!({"length": 4, "width": 4, "height": 4, "corner": [60, 0, 0], "operation": "new_body", "body_name": "Cube"}));
+}
+
+#[test]
+fn polish_apply_in_a_batch_settles_as_one_at_a_time_does() {
+    let outcome = |batch: bool| {
+        let mut s = Session::default();
+        block_and_cube(&mut s);
+        let r = run(&mut s, "polish.apply", json!({"mass_tol": 0.01, "batch": batch}));
+        let ids = |k: &str| r[k].as_array().unwrap().iter().map(|f| (f["id"].clone(), f["body"].clone())).collect::<Vec<_>>();
+        let reasons: Vec<bool> = r["skipped"].as_array().unwrap().iter().map(|f| f["reason"].as_str().unwrap().contains("mass of Cube")).collect();
+        (ids("applied"), ids("skipped"), reasons, r["after"]["score"].clone(), r["checks"].as_u64().unwrap())
+    };
+    let (batched, single) = (outcome(true), outcome(false));
+    assert_eq!(batched.0, vec![(json!("F1"), json!("Block"))], "{batched:?}");
+    assert_eq!(batched.1, vec![(json!("F2"), json!("Cube"))], "{batched:?}");
+    assert_eq!(batched.2, vec![true]);
+    assert_eq!((&batched.0, &batched.1, &batched.3), (&single.0, &single.1, &single.3), "batched {batched:?}\none at a time {single:?}");
+}
+
+#[test]
+fn polish_apply_checks_a_clean_batch_once() {
+    let mut s = Session::default();
+    block_and_cube(&mut s);
+    let r = run(&mut s, "polish.apply", json!({}));
+    assert_eq!(r["applied"].as_array().map(Vec::len), Some(2), "{r}");
+    assert_eq!(r["checks"], 2, "one check before and one after the batch: {r}");
+}
+
+#[test]
+fn polish_apply_leaves_out_an_edge_a_joint_is_attached_to() {
+    let mut s = Session::default();
+    run(&mut s, "component.create", json!({"name": "Panel"}));
+    run(&mut s, "solid.box", json!({"length": 40, "width": 20, "height": 10, "corner": [0, 0, 0]}));
+    run(&mut s, "component.activate", json!({"component": "root"}));
+    run(&mut s, "component.create", json!({"name": "Bracket"}));
+    run(&mut s, "solid.box", json!({"length": 20, "width": 10, "height": 6, "corner": [0, 500, 0]}));
+    run(&mut s, "component.activate", json!({"component": "root"}));
+    run(
+        &mut s,
+        "joint.create",
+        json!({"type": "rigid", "a": {"occurrence": "Panel", "edge": [20, 0, 10]}, "b": {"occurrence": "Bracket", "face": [10, 505, 0]}}),
+    );
+    let r = run(&mut s, "polish.apply", json!({}));
+    assert!(r["held_edges"].as_array().is_some_and(|h| h.iter().any(|x| x["edges"].as_u64() >= Some(1))), "{r}");
+    assert!(r["skipped"].as_array().unwrap().iter().all(|k| !k["reason"].as_str().unwrap().contains("joints")), "{r}");
+    assert!(!r["applied"].as_array().unwrap().is_empty(), "{r}");
+    assert_eq!(run(&mut s, "joint.solve", json!({}))["errors"], json!([]));
+}
+
+#[test]
+fn a_bought_part_envelope_is_left_out_of_polish() {
+    let mut s = Session::default();
+    block_and_cube(&mut s);
+    run(&mut s, "material.create", json!({"name": "Servo envelope", "density_g_cm3": 1.4}));
+    run(&mut s, "material.assign", json!({"bodies": ["Cube"], "material": "Servo envelope"}));
+    let r = run(&mut s, "inspect.polish", json!({}));
+    assert!(r["bodies"].as_array().unwrap().iter().all(|b| b["body"] != "Cube"), "{r}");
+    assert!(r["skipped"].as_array().unwrap().iter().any(|k| k["body"] == "Cube" && k["why"].as_str().unwrap().contains("envelope")), "{r}");
+}
+
+#[test]
+fn polish_apply_chamfers_an_edge_the_kernel_cannot_round() {
+    // The kernel refuses some fillets (a spline outline, #184; walls too narrow for the ball):
+    // the fix is applied as a chamfer as wide as the radius, and says why.
+    let mut s = Session::default();
+    run(&mut s, "solid.box", json!({"length": 40, "width": 20, "height": 10, "body_name": "Block"}));
+    super::super::polish_apply::REFUSE_FILLETS.with(|r| r.set(true));
+    let r = s.execute("polish.apply", &json!({}));
+    super::super::polish_apply::REFUSE_FILLETS.with(|r| r.set(false));
+    let r = r.unwrap();
+    let applied = r["applied"].as_array().unwrap();
+    assert_eq!(applied.len(), 1, "{r}");
+    assert_eq!(applied[0]["command"], "solid.chamfer", "{r}");
+    assert!(applied[0]["fallback"].as_str().unwrap().contains("refused"), "{r}");
+    assert_eq!(applied[0]["params"]["distance"], 1.0, "{r}");
+    let after = run(&mut s, "inspect.polish", json!({}));
+    assert_eq!(polish_body(&after, "Block")["sharp_edges"], 0, "the chamfer's faces aren't sharp edges: {after}");
+    // The refusal is remembered: run again, the fillet isn't tried a second time.
+    run(&mut s, "edit.undo", json!({}));
+    let again = run(&mut s, "polish.apply", json!({}));
+    assert!(again["applied"][0]["fallback"].as_str().unwrap().contains("refused before"), "{again}");
+}
+
+#[test]
+fn polish_apply_batches_many_bodies_without_using_up_checkpoints() {
+    // 17 blocks and a cube whose round the 1% mass limit rolls back: the batch's eighteen
+    // groups go back past the session's sixteen checkpoints, and a checkpoint taken before is
+    // still there.
+    let mut s = Session::default();
+    for k in 0..17 {
+        let p = json!({"length": 40, "width": 20, "height": 10, "corner": [k * 50, 0, 0], "operation": "new_body", "body_name": format!("Block{k}")});
+        run(&mut s, "solid.box", p);
+    }
+    run(&mut s, "solid.box", json!({"length": 4, "width": 4, "height": 4, "corner": [0, 100, 0], "operation": "new_body", "body_name": "Cube"}));
+    let mark = run(&mut s, "edit.checkpoint", json!({}))["checkpoint"].clone();
+    let r = run(&mut s, "polish.apply", json!({"mass_tol": 0.01, "max_fixes": 20}));
+    assert_eq!(r["applied"].as_array().map(Vec::len), Some(17), "{r}");
+    assert_eq!(r["skipped"].as_array().map(Vec::len), Some(1), "{r}");
+    assert_eq!(run(&mut s, "edit.restore_checkpoint", json!({"checkpoint": mark}))["restored"], true);
+}
+
 #[test]
 fn polish_apply_refuses_a_malformed_selection_and_keeps_the_sessions_checkpoints() {
     let mut s = Session::default();
@@ -315,6 +421,24 @@ fn polish_apply_refuses_a_malformed_selection_and_keeps_the_sessions_checkpoints
     let r = run(&mut s, "polish.apply", json!({"mass_tol": 0}));
     assert_eq!(r["skipped"].as_array().map(Vec::len), Some(1), "{r}");
     assert_eq!(run(&mut s, "edit.restore_checkpoint", json!({"checkpoint": marks[0]}))["restored"], true);
+}
+
+#[test]
+fn polish_apply_checks_each_fix_on_one_body_on_its_own() {
+    // A printed tee: outside rounds, inside fillets and a bed chamfer on one body. In a batch,
+    // only one fix per body is checked with the others; the rest go one at a time, so an
+    // inside fillet's added mass can't hide an outside round's removed mass.
+    let outcome = |batch: bool| {
+        let mut s = Session::default();
+        tee(&mut s);
+        run(&mut s, "material.assign", json!({"bodies": ["Tee"], "material": "PLA"}));
+        let r = run(&mut s, "polish.apply", json!({"batch": batch}));
+        let ids = |k: &str| r[k].as_array().unwrap().iter().map(|f| f["id"].clone()).collect::<Vec<_>>();
+        (ids("applied"), ids("skipped"), r["after"]["score"].clone())
+    };
+    let (batched, single) = (outcome(true), outcome(false));
+    assert!(batched.0.len() > 1, "{batched:?}");
+    assert_eq!(batched, single);
 }
 
 #[test]

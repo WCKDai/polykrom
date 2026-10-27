@@ -21,7 +21,7 @@ use crate::params::{bad, num, string_list};
 use crate::{Result, Session};
 
 pub static COMMANDS: &[CommandSpec] = &[CommandSpec::new("inspect.polish", "Polish", polish).icon("inspect").noundo().params(
-    "bodies?: [names] (default every visible solid body; fasteners, bodies with an outside thread, are left out); max_fixes?: 1…100 \
+    "bodies?: [names] (default every visible solid body; fasteners, bodies with an outside thread, and bought-part envelopes, bodies whose material name says envelope, are left out); max_fixes?: 1…100 \
      (default 10); sharp_deg?: the bend between two faces above which an edge is sharp (default 20); printed?: [names] (printed \
      whatever their material; PLA, PETG and TPU bodies are printed); skip?: [names] → score (0–100, the design: the categories' \
      weighted mean, look 4, print 2, strength 1.5, tidy 1, assembly 1, mass 0.5), scores: {look, print, strength, mass, tidy, \
@@ -143,6 +143,8 @@ fn polish(s: &mut Session, p: &Value) -> Result<Value> {
             Some("mesh body")
         } else if threaded.contains(b.name.as_str()) || threaded.contains(b.definition_name()) {
             Some("fastener (outside thread)")
+        } else if s.doc.body_material(b.definition_name()).to_ascii_lowercase().contains("envelope") {
+            Some("bought-part envelope (its material says so)")
         } else if skip.contains(&b.name) {
             Some("skipped")
         } else {
