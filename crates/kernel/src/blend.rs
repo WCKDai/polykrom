@@ -1995,18 +1995,11 @@ pub fn fillet_max(body: &Body, edges: &[Vec3], radius: f64) -> Option<(f64, Body
 /// reduced for a tight edge elsewhere. The radius per edge (in `edges`' order) and the result;
 /// one radius for all (as [`fillet_max`]) when a group is refused for another reason than its
 /// size, the groups don't build together, or there are too many to search (each search is up
-/// to 16 fillets, and this runs in the live preview). `None` at once where the edges together
-/// don't take even a hundredth of the radius, and where a group takes no radius.
+/// to 16 fillets, and this runs in the live preview). `None` where a group takes no radius.
 pub fn fillet_max_each(body: &Body, edges: &[Vec3], radius: f64) -> Option<(Vec<f64>, Body)> {
     const MAX_GROUPS: usize = 8;
     const MAX_SEARCHES: usize = 2;
     let one = || fillet_max(body, edges, radius).map(|(r, b)| (vec![r; edges.len()], b));
-    // Edges that take not even a hundredth of the radius together take no radius: no group is
-    // searched (on a large body each search took minutes, #243). Where they do, the search runs
-    // as before.
-    if crate::work::nested(|| fillet(body, edges, floor_radius(radius))).is_err() {
-        return None;
-    }
     let Some(groups) = interacting_groups(body, edges).filter(|g| g.len() > 1 && g.len() <= MAX_GROUPS) else { return one() };
     let mut radii = vec![radius; edges.len()];
     let mut searches = 0;
