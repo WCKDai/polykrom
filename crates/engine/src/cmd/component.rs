@@ -273,6 +273,7 @@ fn delete(s: &mut Session, p: &Value) -> Result<Value> {
     if id == 0 {
         return Err(bad(cmd, "the design itself can't be deleted"));
     }
+    let worked = super::edit::working_features(s);
     let removed = s.doc_mut().remove_component_tree(id).map_err(|e| match e {
         solidcraft_doc::DocError::Invalid(msg) => bad(cmd, msg),
         e => e.into(),
@@ -281,7 +282,18 @@ fn delete(s: &mut Session, p: &Value) -> Result<Value> {
     if gone.contains(&s.active_component) {
         s.active_component = 0;
     }
-    Ok(json!({"deleted": gone, "features": removed.features}))
+    // Features elsewhere that used its bodies as tools (#241), and any left failing.
+    s.refresh();
+    let tools = super::edit::settle_tool_features(s, &worked);
+    let failing = super::edit::newly_failing(s, &worked);
+    let mut out = json!({"deleted": gone, "features": removed.features});
+    if !tools.is_empty() {
+        out["tool_features"] = json!(tools);
+    }
+    if !failing.is_empty() {
+        out["failing"] = json!(failing);
+    }
+    Ok(out)
 }
 
 fn unlock(s: &mut Session, p: &Value) -> Result<Value> {

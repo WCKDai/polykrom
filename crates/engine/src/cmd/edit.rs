@@ -154,7 +154,7 @@ fn delete(s: &mut Session, p: &Value) -> Result<Value> {
     }
     // Features that work now; any of them failing after the delete is reported (a later
     // feature that names a deleted body, #267).
-    let worked: std::collections::BTreeSet<u64> = s.model.results.iter().filter(|r| r.error.is_none() && !r.skipped).map(|r| r.id).collect();
+    let worked = working_features(s);
     let mut gone = Vec::new();
     for k in keys {
         let Some(id) = s.doc.find_feature(&k).map(|f| f.id) else {
@@ -174,17 +174,90 @@ fn delete(s: &mut Session, p: &Value) -> Result<Value> {
     }
     s.selection.clear();
     s.refresh();
-    let failing: Vec<Value> = s
-        .model
+    let tools = settle_tool_features(s, &worked);
+    let failing = newly_failing(s, &worked);
+    let mut out = json!({"deleted": gone});
+    if !tools.is_empty() {
+        out["tool_features"] = json!(tools);
+    }
+    if !failing.is_empty() {
+        out["failing"] = json!(failing);
+    }
+    Ok(out)
+}
+
+/// The features that worked (`worked`) and fail now: `[{feature, error}]`.
+pub(super) fn newly_failing(s: &Session, worked: &std::collections::BTreeSet<u64>) -> Vec<Value> {
+    whole_history(s)
         .results
         .iter()
         .filter(|r| worked.contains(&r.id))
         .filter_map(|r| r.error.as_ref().map(|e| json!({"feature": r.name, "error": e})))
-        .collect();
-    if failing.is_empty() {
-        return Ok(json!({"deleted": gone}));
+        .collect()
+}
+
+/// The features that work now (before a delete), for [`settle_tool_features`] and
+/// [`newly_failing`] after it.
+pub(super) fn working_features(s: &Session) -> std::collections::BTreeSet<u64> {
+    whole_history(s).results.iter().filter(|r| r.error.is_none() && !r.skipped).map(|r| r.id).collect()
+}
+
+/// The session's model with the whole history evaluated: with the history rolled back, a copy
+/// evaluated past the marker (sharing the cache), so a feature after it counts too (#3471).
+fn whole_history(s: &Session) -> std::borrow::Cow<'_, solidcraft_doc::Model> {
+    if s.doc.marker.is_none() {
+        return std::borrow::Cow::Borrowed(&s.model);
     }
-    Ok(json!({"deleted": gone, "failing": failing}))
+    let mut doc = (*s.doc).clone();
+    doc.marker = None;
+    let mut model = s.model.clone();
+    model.evaluate(&doc);
+    std::borrow::Cow::Owned(model)
+}
+
+/// After a delete (#241): a join, cut or intersect that worked (`worked`) and now fails because a
+/// body it used as a tool is gone loses that tool, or, with no tool left, is suppressed (it would
+/// change nothing). What was done: `[{feature, tools_removed} | {feature, suppressed: true,
+/// tools_removed}]`. A feature failing for any other reason is left to be reported.
+pub(super) fn settle_tool_features(s: &mut Session, worked: &std::collections::BTreeSet<u64>) -> Vec<Value> {
+    let mut done = Vec::new();
+    for _ in 0..16 {
+        // A feature after a rolled-back marker is settled too.
+        let model = whole_history(s).into_owned();
+        let broken: Vec<u64> = model.results.iter().filter(|r| worked.contains(&r.id) && r.error.is_some()).map(|r| r.id).collect();
+        let mut changed = false;
+        for id in broken {
+            let Some(FeatureKind::Combine { target, tools, .. }) = s.doc.feature(id).map(|f| f.kind.clone()) else { continue };
+            let before = model.state_before(id);
+            if before.body(&target).is_none() {
+                continue;
+            }
+            let (kept, gone): (Vec<_>, Vec<_>) = tools.into_iter().partition(|t| before.body(t).is_some());
+            if gone.is_empty() {
+                continue;
+            }
+            let name = s.doc.feature(id).map(|f| f.name.clone()).unwrap_or_default();
+            let suppress = kept.is_empty();
+            if let Some(f) = s.doc_mut().feature_mut(id) {
+                if suppress {
+                    f.suppressed = true;
+                } else if let FeatureKind::Combine { tools, .. } = &mut f.kind {
+                    *tools = kept;
+                }
+            }
+            done.push(if suppress {
+                json!({"feature": name, "suppressed": true, "tools_removed": gone})
+            } else {
+                json!({"feature": name, "tools_removed": gone})
+            });
+            changed = true;
+        }
+        if !changed {
+            break;
+        }
+        s.refresh();
+    }
+    done
 }
 
 fn rename(s: &mut Session, p: &Value) -> Result<Value> {
