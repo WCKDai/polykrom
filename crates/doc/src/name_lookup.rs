@@ -394,23 +394,32 @@ fn renumbered_piece_at(bodies: &[(usize, &ModelBody)], name: &str, found: (usize
     if key == name {
         return None;
     }
-    let mut best: Option<(f64, usize, usize, Vec3)> = None;
+    let mut best: Option<(f64, usize, usize, Vec3, bool)> = None;
     for &(bi, b) in bodies {
         let names = naming::names(b);
         let tol = (b.body.size() * 1e-3).max(1e-3);
         for (face, n) in names.faces.iter().enumerate() {
-            if (bi, face) == found || crate::piece_names::without_numbers(n) != key {
+            if (bi, face) == found {
                 continue;
             }
+            // Its own name, else one of a face merged into it.
+            let alike = |x: &String| crate::piece_names::without_numbers(x) == key;
+            let merged = if alike(n) {
+                false
+            } else if names.info.get(face).is_some_and(|i| i.aliases.iter().any(alike)) {
+                true
+            } else {
+                continue;
+            };
             if let Some((d, q)) = nearest_on_face(&b.mesh(), face, p).filter(|(d, _)| *d <= tol)
-                && best.is_none_or(|x| d < x.0)
+                && best.as_ref().is_none_or(|x| d < x.0)
             {
-                best = Some((d, bi, face, q));
+                best = Some((d, bi, face, q, merged));
             }
         }
     }
-    let (_, body, face, point) = best?;
-    Some(FaceHit { body, face, point, split: true, merged: false, verified: false, on_point: true, legacy: false })
+    let (_, body, face, point, merged) = best?;
+    Some(FaceHit { body, face, point, split: true, merged, verified: false, on_point: true, legacy: false })
 }
 
 /// [`locate_face`] for a name saved before format 14 (without its mark), as those builds found
