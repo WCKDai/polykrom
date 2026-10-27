@@ -239,7 +239,7 @@ fn rebase(f: &Feature, was: &ModelState, after: &ModelState, now: &ModelState) -
     let transfer = matches!(f.kind, FeatureKind::BodyTransfer { .. });
     let names_read = changed.values().chain(&made).all(|b| {
         transfer
-            || (b.names.depth() == Some(was_depth)
+            || (b.names.depth() == Some(crate::naming::body_depth(f, was, was_depth, b))
                 && b.lineage().is_none_or(|l| operands_read(&l, &read))
                 && (names_its_own(f) || !crate::naming::names(b).geometric))
     });
@@ -254,9 +254,10 @@ fn rebase(f: &Feature, was: &ModelState, after: &ModelState, now: &ModelState) -
     if !others.iter().zip(&after.sketches).all(|(a, b)| Arc::ptr_eq(a, b)) || solved.iter().any(|s| s.feature != f.id) {
         return None;
     }
-    let deepened = |b: &ModelBody| match transfer || now_depth == was_depth {
-        true => b.clone(),
-        false => ModelBody { names: b.names.at_depth(now_depth), ..b.clone() },
+    // As deep as the model now makes it, or as its own chain is where the feature counts that.
+    let deepened = |b: &ModelBody| match crate::naming::body_depth(f, now, now_depth, b) {
+        depth if transfer || b.names.depth() == Some(depth) => b.clone(),
+        depth => ModelBody { names: b.names.at_depth(depth), ..b.clone() },
     };
     let mut st = now.clone();
     st.bodies = now

@@ -877,7 +877,13 @@ impl ModelState {
                     (key, &b.name).hash(&mut h);
                     b.key = h.finish();
                     if !matches!(f.kind, FeatureKind::BodyTransfer { .. }) {
-                        b.names = crate::naming::NameCell::traced(Some(origin.clone()), b.lineage());
+                        // As deep as its own chain of features, where the feature counts that (#143).
+                        let own = crate::naming::body_depth(f, before, depth, b);
+                        let origin = match own == depth {
+                            true => origin.clone(),
+                            false => Arc::new(crate::naming::NamingOrigin { depth: own, ..(*origin).clone() }),
+                        };
+                        b.names = crate::naming::NameCell::traced(Some(origin), b.lineage());
                     }
                     // Faces split on purpose stay split through later features (for export).
                     if b.body.split_lines().is_none()

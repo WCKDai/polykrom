@@ -2426,6 +2426,13 @@ pub struct Feature {
     /// did.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub scoped_surroundings: bool,
+    /// The bodies it makes or changes are named from history as long as their own chain of
+    /// features (the bodies their faces come from, back to the first) is shorter than
+    /// `naming::MAX_DEPTH`, not the whole design's: a cut late in a long design keeps the names of
+    /// its target's faces (#143). Set on the features made since; those of older designs count
+    /// every body, so the faces of the bodies they make keep the names they were saved with.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub own_chain_depth: bool,
     #[serde(flatten)]
     pub kind: FeatureKind,
 }
@@ -3200,6 +3207,7 @@ impl Document {
             link_faces: Vec::new(),
             tool_frames: Vec::new(),
             scoped_surroundings,
+            own_chain_depth: true,
             kind,
         };
         self.place_feature(f);

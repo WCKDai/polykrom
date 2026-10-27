@@ -24,7 +24,7 @@ use crate::lineage::Lineage;
 use crate::{Feature, FeatureKind, ModelBody, ModelState};
 
 /// How a body came to be: the feature and the model just before it.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct NamingOrigin {
     pub feature: Feature,
     pub before: Arc<ModelState>,
@@ -118,6 +118,30 @@ pub use crate::piece_names::parent_piece;
 
 /// Deeper chains than this are named by position only (bounded work and stack).
 pub(crate) const MAX_DEPTH: usize = 400;
+
+/// How deep in the chain of features naming it body `b` is, made by `f` from `before`: one
+/// deeper than the bodies its faces come from (its lineage's operands) when `f` counts its own
+/// chain ([`Feature::own_chain_depth`], #143), else (or without lineage) `all`, one deeper than
+/// every body before it.
+pub(crate) fn body_depth(f: &Feature, before: &ModelState, all: usize, b: &ModelBody) -> usize {
+    if !f.own_chain_depth {
+        return all;
+    }
+    b.lineage().and_then(|l| operand_depth(&l, before)).map_or(all, |d| (d + 1).min(all))
+}
+
+/// The deepest of the bodies `lineage` names faces after (`None`: one is not in `before`).
+fn operand_depth(lineage: &Lineage, before: &ModelState) -> Option<usize> {
+    use crate::lineage::Operand;
+    lineage.operands.iter().try_fold(0, |deepest, op| {
+        let depth = match op.as_ref() {
+            Operand::Body(n) | Operand::Copy { body: n, .. } | Operand::Inner(n) => before.body(n)?.names.depth().unwrap_or(0),
+            Operand::Stage(stage) => operand_depth(&stage.lineage, before)?,
+            Operand::Made(_) | Operand::CopiedTool { .. } => 0,
+        };
+        Some(deepest.max(depth))
+    })
+}
 
 /// Up to this many sample points per face.
 const SAMPLES: usize = 9;
