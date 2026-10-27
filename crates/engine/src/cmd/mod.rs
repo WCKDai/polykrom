@@ -40,6 +40,7 @@ mod polish;
 mod polish_apply;
 mod printability;
 mod statics;
+pub(crate) use edit::{newly_failing, working_features};
 pub(crate) use face::{FaceRefForm, face_ref_form};
 pub(crate) use features::profiles as feature_profiles;
 pub(crate) use features::{EdgeRefForm, edge_ref_form, sketch_key};

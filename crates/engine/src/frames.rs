@@ -329,6 +329,11 @@ impl Drop for LocalGeometry {
 /// A command running inside another (its parameters are already in component frames).
 pub struct Nested;
 
+/// A command is running on this thread (one starting now runs inside it).
+pub(crate) fn running() -> bool {
+    DEPTH.with(|d| d.get() > 0)
+}
+
 impl Nested {
     /// Enter command `id`; true when it is the outermost one.
     pub fn enter(id: &str) -> (Nested, bool) {

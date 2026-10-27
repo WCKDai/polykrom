@@ -492,6 +492,12 @@ impl Backend for Headless {
                 s.execute(id, &params).map_err(|e| e.to_string())
             }
             "engine.script" => s.run_script(&p).map(Value::from).map_err(|e| e.to_string()),
+            // The steps in one call, so the design is evaluated once (#253).
+            "engine.batch" => {
+                let steps = p.get("commands").and_then(Value::as_array).ok_or("`commands` must be an array of {command, params}")?;
+                let opts = solidcraft_engine::batch::Options::of(&p);
+                Ok(solidcraft_engine::batch::run(s, steps, opts, |s| s, |s, id, params| s.execute(id, &params).map_err(|e| e.to_string())))
+            }
             "engine.commands" => s.execute("engine.commands", &json!({})).map_err(|e| e.to_string()),
             "document.inspect" => s.execute("document.inspect", &p).map_err(|e| e.to_string()),
             "ui.view" => {

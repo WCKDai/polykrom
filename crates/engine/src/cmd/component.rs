@@ -273,7 +273,9 @@ fn delete(s: &mut Session, p: &Value) -> Result<Value> {
     if id == 0 {
         return Err(bad(cmd, "the design itself can't be deleted"));
     }
-    let worked = super::edit::working_features(s);
+    // In a batch, the evaluation and what it settles wait for the batch's end (#253).
+    let deferred = s.defers_delete();
+    let worked = if deferred { Default::default() } else { super::edit::working_features(s) };
     let removed = s.doc_mut().remove_component_tree(id).map_err(|e| match e {
         solidcraft_doc::DocError::Invalid(msg) => bad(cmd, msg),
         e => e.into(),
@@ -281,6 +283,9 @@ fn delete(s: &mut Session, p: &Value) -> Result<Value> {
     let gone = removed.components;
     if gone.contains(&s.active_component) {
         s.active_component = 0;
+    }
+    if deferred {
+        return Ok(json!({"deleted": gone, "features": removed.features}));
     }
     // Features elsewhere that used its bodies as tools (#241), and any left failing.
     s.refresh();
