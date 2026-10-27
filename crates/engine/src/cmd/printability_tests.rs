@@ -452,3 +452,77 @@ fn polish_apply_keeps_the_selection_when_it_rolls_a_fix_back() {
     assert_eq!(r["skipped"].as_array().map(Vec::len), Some(1), "{r}");
     assert_eq!(s.selection, before);
 }
+
+// Style-aware polish (#193): faceted, organic and technical finishes, and colour blocking.
+
+/// A 40 x 20 x 10 block with all twelve edges finished: chamfered 1.5 mm, or filleted 2 mm.
+fn finished_block(s: &mut Session, chamfer: bool) {
+    run(s, "solid.box", json!({"length": 40, "width": 20, "height": 10, "body_name": "Block"}));
+    let edges = json!([
+        [20, 0, 0],
+        [20, 20, 0],
+        [20, 0, 10],
+        [20, 20, 10],
+        [0, 10, 0],
+        [40, 10, 0],
+        [0, 10, 10],
+        [40, 10, 10],
+        [0, 0, 5],
+        [40, 0, 5],
+        [0, 20, 5],
+        [40, 20, 5]
+    ]);
+    if chamfer {
+        run(s, "solid.chamfer", json!({"edges": edges, "distance": 1.5}));
+    } else {
+        run(s, "solid.fillet", json!({"edges": edges, "radius": 2}));
+    }
+}
+
+#[test]
+fn a_faceted_part_scores_higher_as_faceted_than_as_organic() {
+    let mut s = Session::default();
+    finished_block(&mut s, true);
+    let look = |s: &mut Session, style: &str| run(s, "inspect.polish", json!({"style": style}))["bodies"][0]["scores"]["look"].as_f64().unwrap();
+    let (faceted, organic) = (look(&mut s, "faceted"), look(&mut s, "organic"));
+    assert!(faceted > organic + 10.0, "faceted {faceted}, organic {organic}");
+    // A raw box under the faceted style gets chamfers, not fillets.
+    let mut raw = Session::default();
+    run(&mut raw, "solid.box", json!({"length": 40, "width": 20, "height": 10, "body_name": "Block"}));
+    let r = run(&mut raw, "inspect.polish", json!({"style": "faceted"}));
+    assert_eq!(r["fixes"][0]["command"], "solid.chamfer", "{r}");
+    assert_eq!(r["fixes"][0]["category"], "look", "{r}");
+    assert!(s.execute("inspect.polish", &json!({"style": "baroque"})).is_err());
+}
+
+#[test]
+fn auto_style_follows_the_edges_a_design_has() {
+    for (chamfer, want) in [(true, "faceted"), (false, "organic")] {
+        let mut s = Session::default();
+        finished_block(&mut s, chamfer);
+        let r = run(&mut s, "inspect.polish", json!({}));
+        assert_eq!(r["style"]["used"], want, "{}", r["style"]);
+        assert_eq!(r["style"]["asked"], "auto");
+        assert!(r["bodies"][0]["scores"]["look"].as_f64().unwrap() > 90.0, "{r}");
+    }
+}
+
+#[test]
+fn colour_blocking_flags_default_and_near_duplicate_colours() {
+    let mut s = Session::default();
+    for (k, name) in ["Shell", "Lid", "Base"].iter().enumerate() {
+        run(
+            &mut s,
+            "solid.box",
+            json!({"length": 20, "width": 20, "height": 10, "corner": [k * 40, 0, 0], "operation": "new_body", "body_name": name}),
+        );
+    }
+    run(&mut s, "appearance.assign", json!({"bodies": ["Shell"], "color": "#c8e632"}));
+    run(&mut s, "appearance.assign", json!({"bodies": ["Lid"], "color": "#cde836"}));
+    let r = run(&mut s, "inspect.polish", json!({}));
+    assert_eq!(r["colours"]["near_duplicates"], json!([["#c8e632", "#cde836"]]), "{}", r["colours"]);
+    let kinds =
+        |b: &str| polish_body(&r, b)["findings"].as_array().unwrap().iter().map(|f| f["kind"].as_str().unwrap().to_string()).collect::<Vec<_>>();
+    assert!(kinds("Base").contains(&"default_colour".to_string()), "{:?}", kinds("Base"));
+    assert!(kinds("Lid").contains(&"near_duplicate_colour".to_string()), "{:?}", kinds("Lid"));
+}
