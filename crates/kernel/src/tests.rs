@@ -3836,3 +3836,65 @@ fn presearch_grids_once_per_polyline_change_nothing() {
         }
     }
 }
+
+/// Set in the processes [`native_bits_are_the_same_in_every_process`] starts: they print their
+/// hash instead of starting processes of their own.
+const DETERMINISM_CHILD: &str = "POLYKROM_DETERMINISM_CHILD";
+
+/// FNV-1a over the native encodings of operations that came out differently from one run to the
+/// next (#250): a box with all twelve edges rounded, and a corner of three edges rounded at
+/// different radii at once.
+fn determinism_hash() -> u64 {
+    let block = box_solid(Vec3::ZERO, Vec3::new(40.0, 30.0, 20.0)).unwrap();
+    let edges = [
+        (20.0, 0.0, 0.0),
+        (20.0, 0.0, 20.0),
+        (20.0, 30.0, 0.0),
+        (20.0, 30.0, 20.0),
+        (0.0, 15.0, 0.0),
+        (0.0, 15.0, 20.0),
+        (40.0, 15.0, 0.0),
+        (40.0, 15.0, 20.0),
+        (0.0, 0.0, 10.0),
+        (0.0, 30.0, 10.0),
+        (40.0, 0.0, 10.0),
+        (40.0, 30.0, 10.0),
+    ]
+    .map(|(x, y, z)| Vec3::new(x, y, z));
+    let rounded = fillet(&block, &edges, 2.0).unwrap();
+    let corner =
+        fillet_radii(&block, &[(Vec3::new(20.0, 0.0, 20.0), 1.0), (Vec3::new(0.0, 15.0, 20.0), 2.0), (Vec3::new(0.0, 0.0, 10.0), 3.0)]).unwrap();
+    let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
+    for b in [&rounded, &corner] {
+        for byte in encode_native_body(b).unwrap() {
+            hash = (hash ^ u64::from(byte)).wrapping_mul(0x0100_0000_01b3);
+        }
+    }
+    hash
+}
+
+/// The same operations give the same B-rep bits in every process, on one thread or many: an
+/// order taken from addresses or from a per-process hash seed changes between runs, which a
+/// comparison inside one process would not see (#250).
+#[test]
+fn native_bits_are_the_same_in_every_process() {
+    let here = determinism_hash();
+    if std::env::var_os(DETERMINISM_CHILD).is_some() {
+        println!("determinism-hash {here:016x}");
+        return;
+    }
+    let exe = std::env::current_exe().unwrap();
+    for threads in ["1", "4"] {
+        let out = std::process::Command::new(&exe)
+            .args(["tests::native_bits_are_the_same_in_every_process", "--exact", "--nocapture", "--test-threads=1"])
+            .env(DETERMINISM_CHILD, "1")
+            .env("RAYON_NUM_THREADS", threads)
+            .output()
+            .unwrap();
+        let text = String::from_utf8_lossy(&out.stdout);
+        // libtest prints the test's name on the line the child's output starts.
+        let theirs =
+            text.split("determinism-hash ").nth(1).and_then(|rest| rest.get(..16)).unwrap_or_else(|| panic!("no hash from the child: {text}"));
+        assert_eq!(theirs, format!("{here:016x}"), "on {threads} threads");
+    }
+}
