@@ -35,6 +35,36 @@ pub struct NamingOrigin {
     pub sheets: Vec<crate::sheet::SheetBody>,
 }
 
+/// An empty model, put in place of the one a naming origin held while it is freed.
+static NO_MODEL: std::sync::LazyLock<Arc<ModelState>> = std::sync::LazyLock::new(Arc::default);
+
+impl Drop for NamingOrigin {
+    /// A body's names hold the model before the feature that made it, whose bodies' names hold
+    /// the models before theirs: freed one inside another, a long design took a stack frame per
+    /// body and could overflow a small stack. The chain is unlinked into lists and freed in a
+    /// loop instead; what something else still holds stays.
+    fn drop(&mut self) {
+        let mut models = vec![std::mem::replace(&mut self.before, NO_MODEL.clone())];
+        let mut bodies: Vec<ModelBody> = Vec::new();
+        loop {
+            if let Some(model) = models.pop() {
+                if let Ok(mut model) = Arc::try_unwrap(model) {
+                    bodies.append(&mut model.bodies);
+                }
+            } else if let Some(mut body) = bodies.pop() {
+                if let Some(mut origin) = body.names.origin.take().and_then(|o| Arc::try_unwrap(o).ok()) {
+                    models.push(std::mem::replace(&mut origin.before, NO_MODEL.clone()));
+                }
+                if let Some(source) = body.names.copy_of.take().and_then(|b| Arc::try_unwrap(b).ok()) {
+                    bodies.push(source);
+                }
+            } else {
+                break;
+            }
+        }
+    }
+}
+
 /// The lazily computed names of a body, shared by its clones.
 #[derive(Clone, Debug, Default)]
 pub struct NameCell {
@@ -164,7 +194,9 @@ impl Origins {
         if let Some(o) = shallower.iter().find(|o| o.depth == depth) {
             return o.clone();
         }
-        let o = Arc::new(NamingOrigin { depth, ..NamingOrigin::clone(&self.all) });
+        let mut o = NamingOrigin::clone(&self.all);
+        o.depth = depth;
+        let o = Arc::new(o);
         shallower.push(o.clone());
         o
     }
@@ -1202,13 +1234,42 @@ mod tests {
             }
             let names = face_names(chain.last().unwrap()).as_ref().clone();
             assert_eq!(names, face_names(&anchor).as_ref().clone(), "named after the anchor it lies on");
-            // Last first: each body holds the model before it, so freeing the first would free
-            // the whole chain at once, one frame per body.
-            while chain.pop().is_some() {}
             names
         };
         let names = std::thread::Builder::new().stack_size(256 * 1024).spawn(run).unwrap().join().unwrap();
         assert_eq!(names.len(), 6);
+    }
+
+    /// Each body's names hold the model before the feature that made it, so a long design is a
+    /// chain of models, some through moved copies. Freeing it takes no stack frame per body: a
+    /// chain 2000 deep frees on a 256 KiB stack.
+    #[test]
+    fn a_long_chain_of_models_frees_on_a_small_stack() {
+        let run = || {
+            let block = solidcraft_kernel::box_solid(Vec3::ZERO, Vec3::new(4., 2., 1.)).unwrap();
+            let mut doc = crate::Document::default();
+            let kind = FeatureKind::Combine { target: "B".into(), tools: Vec::new(), operation: crate::Operation::Join, keep_tools: false };
+            let id = doc.add_feature(kind, None).unwrap();
+            let f = doc.feature(id).cloned().unwrap();
+            let mut last: Option<ModelBody> = None;
+            for k in 0..2000 {
+                let mut before = ModelState::default();
+                before.bodies.extend(last.take());
+                let mut b = ModelBody::new("B".into(), block.clone(), k + 1);
+                let origin =
+                    NamingOrigin { feature: f.clone(), before: Arc::new(before), depth: k as usize + 1, mats: Vec::new(), sheets: Vec::new() };
+                b.names = NameCell::new(Some(Arc::new(origin)));
+                // Every third one moved: a copy named after it.
+                if k % 3 == 2 {
+                    let mut moved = ModelBody::new("B".into(), block.clone(), k + 1);
+                    moved.names = NameCell::same(&b);
+                    b = moved;
+                }
+                last = Some(b);
+            }
+            drop(last);
+        };
+        std::thread::Builder::new().stack_size(256 * 1024).spawn(run).unwrap().join().unwrap();
     }
 
     /// A body moved into a component is a copy named after its source: a feature that changes
@@ -1247,9 +1308,7 @@ mod tests {
                 chain.push(moved);
                 chain.push(b);
             }
-            let names = face_names(chain.last().unwrap()).as_ref().clone();
-            while chain.pop().is_some() {}
-            names
+            face_names(chain.last().unwrap()).as_ref().clone()
         };
         let names = std::thread::Builder::new().stack_size(256 * 1024).spawn(run).unwrap().join().unwrap();
         assert!(names.iter().all(|n| n.starts_with("B:face:")), "past the limit, by position: {names:?}");
