@@ -55,16 +55,10 @@ TEST_DATA = {
     "tests/action_matrix/": ("apps/solidcraft-cli/", "crates/engine/", "xtask/"),
 }
 # Vendored crates (vendor/<crate>/, a [patch] of a crates.io dependency) and the dependency names
-# through which workspace packages reach them: the truck crates and their maths crate only through
-# truck itself (crates/kernel), egui-wgpu directly or through eframe. Another vendored crate
-# selects the full workspace.
-TRUCK = lambda dep: dep.startswith("truck-")  # noqa: E731
+# through which workspace packages reach them. egui-wgpu comes directly or through eframe. The
+# Truck crates now live in PolyCore and are no longer workspace dependencies; a change to the
+# remaining in-tree copies selects the full workspace conservatively (see the fallback below).
 VENDOR_USES = {
-    "truck-geometry": TRUCK,
-    "truck-shapeops": TRUCK,
-    "truck-stepio": TRUCK,
-    "truck-meshalgo": TRUCK,
-    "matext4cgmath": TRUCK,
     "egui-wgpu": lambda dep: dep in ("egui-wgpu", "eframe"),
 }
 
