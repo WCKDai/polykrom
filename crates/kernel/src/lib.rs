@@ -13,7 +13,6 @@
 #![forbid(unsafe_code)]
 
 mod blend;
-mod blend_budget;
 mod blend_corner;
 mod blend_fit;
 mod blend_variable;
@@ -158,9 +157,9 @@ mod tspline;
 mod untouched_faces_tests;
 pub mod watch;
 mod whole_face;
+mod work;
 
 pub use blend::{ChamferSide, chamfer, chamfer_sides, fillet, fillet_each, fillet_g2, fillet_g2_corners, fillet_max, fillet_max_each};
-pub use blend_budget::{BLEND_SEARCH_WORK, BLEND_WORK, blend_work_left, with_blend_budget};
 pub use blend_corner::fillet_radii;
 pub use blend_variable::{RadiusSpline, Taper, fillet_chord, fillet_tapered, fillet_variable, fillet_variable_points, fillet_variable_spline, taper};
 pub use body::{Body, CapSignature, DISPLAY_ANGLE, DisplayShare, EdgeInfo, FaceInfo, FacePaint, FaceSource, Paint};
@@ -227,6 +226,7 @@ pub use topo::{CylinderFace, cylinder_end_at, cylinder_face, cylinder_face_at};
 pub use topo::{TopoCounts, merged_topology, seam_flags};
 pub use tspline::tspline_sheet;
 pub use whole_face::{WholeFace, cut_takes_only_the_face, cut_tool, face_prism, matching_face};
+pub use work::{BLEND_SEARCH_WORK, BLEND_WORK, Stage as WorkStage, with_blend_budget, with_work_budget, work_left};
 
 #[derive(Debug, Clone, PartialEq, thiserror::Error)]
 pub enum KernelError {

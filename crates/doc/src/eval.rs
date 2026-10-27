@@ -666,9 +666,9 @@ fn fillet_fitted(
     // #243); a size search on edges that refuse quickly is what Reduce is for.
     let mut used = 0;
     let first = kernel::with_blend_budget(kernel::BLEND_WORK, edges, || {
-        let before = kernel::blend_work_left().unwrap_or(0);
+        let before = kernel::work_left().unwrap_or(0);
         let r = kernel::fillet(body, edges, r);
-        used = before.saturating_sub(kernel::blend_work_left().unwrap_or(0));
+        used = before.saturating_sub(kernel::work_left().unwrap_or(0));
         r
     });
     match first {
