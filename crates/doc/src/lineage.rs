@@ -540,7 +540,7 @@ impl crate::ModelBody {
 /// takes the first of their body names, and so on. The kernel's shell order, which named them
 /// before, can swap when an upstream edit moves the cut; their faces' names follow history.
 /// `origin` is the feature that made them, for naming their faces.
-pub(crate) fn order_lumps(bodies: &mut [crate::ModelBody], origin: &Arc<crate::naming::NamingOrigin>) {
+pub(crate) fn order_lumps(bodies: &mut [crate::ModelBody], origins: &crate::naming::Origins) {
     let mut families: Vec<(*const Operand, Vec<usize>)> = Vec::new();
     for (i, b) in bodies.iter().enumerate() {
         let Made::Traced(l) = &b.made else { continue };
@@ -561,7 +561,7 @@ pub(crate) fn order_lumps(bodies: &mut [crate::ModelBody], origin: &Arc<crate::n
         }
         let least = |b: &crate::ModelBody| {
             let mut named = b.clone();
-            named.names = crate::naming::NameCell::traced(Some(origin.clone()), b.lineage());
+            named.names = crate::naming::NameCell::traced(Some(origins.of(b)), b.lineage());
             crate::naming::face_names(&named).iter().min().cloned()
         };
         let keys: Option<Vec<(String, usize)>> = members.iter().map(|i| bodies.get(*i).and_then(least).map(|k| (k, *i))).collect();

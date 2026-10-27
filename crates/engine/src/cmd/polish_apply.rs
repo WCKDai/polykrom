@@ -21,7 +21,7 @@ use crate::{Result, Session};
 
 pub static COMMANDS: &[CommandSpec] = &[CommandSpec::new("polish.apply", "Apply Polish", apply).icon("polish").params(
     "fixes?: [ids from inspect.polish, such as \"F1\"] | categories?: [look|print|strength] (default every safe fix); bodies?, printed?, \
-     skip?, sharp_deg? (as inspect.polish); max_fixes?: how many of inspect.polish's fixes to try, 1…100 (default 20); mass_tol?: the \
+     skip?, sharp_deg?, style? (as inspect.polish: faceted applies chamfers where organic applies fillets); max_fixes?: how many of inspect.polish's fixes to try, 1…100 (default 20); mass_tol?: the \
      share of a body's volume a fix may change, 0…1 (default 0.05); batch?: bool (default true: every fix at once, checked once, and \
      split by the bodies a failed check points at, then in halves; false: one fix at a time, each checked) → before: {score, scores}, after: {score, scores}, \
      applied: [{id, body, command, params, score_before, score_after, ms (in the command), fallback? (a fillet the kernel refused, applied as a chamfer \
@@ -29,14 +29,14 @@ pub static COMMANDS: &[CommandSpec] = &[CommandSpec::new("polish.apply", "Apply 
      later run skips it at once), \
      every edge on a face a joint origin names, invalid body, new interference, joints no longer resolve, mass changed, score fell, or already fixed \
      by an earlier fix), held_edges: [{id, edges}] (edges left out of a fix because they lie on a face a joint origin names), fixes (what \
-     inspect.polish still suggests), fixes_left (how many of them are safe: run again), recommendations: [findings (of `categories` when given), most \
+     inspect.polish still suggests), style, colours (as inspect.polish reports them after the run), fixes_left (how many of them are safe: run again), recommendations: [findings (of `categories` when given), most \
      severe first; fix: [ids] on one a listed safe fix still covers], checks (how many times touched \
      bodies were checked), ms: {inspect, fixes, checks}. A fix on a body an earlier fix changed is worked out again from the body as it \
      is now. One undo step",
 )];
 
 /// The inspect.polish parameters a run passes on.
-const PASSED: [&str; 4] = ["bodies", "printed", "skip", "sharp_deg"];
+const PASSED: [&str; 5] = ["bodies", "printed", "skip", "sharp_deg", "style"];
 /// The categories inspect.polish reports.
 const CATEGORIES: [&str; 6] = ["look", "print", "strength", "mass", "tidy", "assembly"];
 
@@ -201,7 +201,7 @@ fn apply(s: &mut Session, p: &Value) -> Result<Value> {
         "after": {"score": after["score"], "scores": after["scores"]},
         "applied": run.applied, "skipped": run.skipped, "held_edges": held, "fixes": after["fixes"], "fixes_left": left.len(),
         "recommendations": recommendations,
-        "checks": run.checks, "ms": {"inspect": ms(run.ms[0]), "fixes": ms(run.ms[1]), "checks": ms(run.ms[2])},
+        "style": after["style"], "colours": after["colours"], "checks": run.checks, "ms": {"inspect": ms(run.ms[0]), "fixes": ms(run.ms[1]), "checks": ms(run.ms[2])},
     }))
 }
 

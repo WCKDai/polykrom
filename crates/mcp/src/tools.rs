@@ -334,8 +334,9 @@ pub fn tool_definitions() -> Vec<Value> {
              category: look, print, strength, mass, tidy, assembly), and with `apply: \"safe\"` apply its fillets and chamfers through \
              polish.apply (each group checked for a valid body, unchanged mass, no new interference and working joints, and rolled back \
              if it fails) and measure again. Returns before and after scores, what was applied and skipped, the fixes still suggested \
-             and the findings to act on by hand. With `views`, also four model renders (front three-quarter, side, top, back \
-             three-quarter) as PNG paths to critique. Repeat, making the judgement changes in between, until the score stops rising \
+             and the findings to act on by hand, the `style` judged by (organic, faceted or technical, asked or inferred) and the \
+             design's `colours` (palette, near-duplicate colours). With `views`, also four model renders (front three-quarter, side, \
+             top, back three-quarter) as images and PNG paths to critique. Repeat, making the judgement changes in between, until the score stops rising \
              (skill_reference solidcraft-polish).",
             obj(
                 json!({
@@ -346,6 +347,7 @@ pub fn tool_definitions() -> Vec<Value> {
                     "printed": {"type": "array", "items": {"type": "string"}, "description": "Bodies to judge as printed whatever their material"},
                     "skip": {"type": "array", "items": {"type": "string"}, "description": "Bodies to leave out, such as bought parts modelled as blocks"},
                     "max_fixes": {"type": "integer", "description": "How many fixes to list or try (1–100)"},
+                    "style": {"type": "string", "enum": ["auto", "organic", "faceted", "technical"], "description": "The finish aimed at. auto (default): faceted when the parts carry more chamfers than fillets, else organic; organic: fillets in a radius family, raw flat faces read as boxy; faceted: hard-surface facets with crisp chamfers in two or three sizes, flat facets are good and fixes are chamfers; technical: edges just broken, flat faces fine. Match it to the concept: faceted for a hard-surface or low-poly look"},
                 }),
                 &[],
             ),
@@ -1203,10 +1205,10 @@ fn polish(b: &mut dyn Backend, a: &Map<String, Value>) -> Result<(Value, Vec<Vec
         a.get("categories").and_then(Value::as_array).map(|v| v.iter().filter_map(Value::as_str).collect()).unwrap_or_default();
     let wanted = |v: &Value| categories.is_empty() || categories.iter().any(|c| v["category"] == *c);
     let mut out = match str_arg(a, "apply").unwrap_or("none") {
-        "safe" => exec(b, "polish.apply", pick(a, &["bodies", "categories", "printed", "skip", "max_fixes"]))?,
+        "safe" => exec(b, "polish.apply", pick(a, &["bodies", "categories", "printed", "skip", "max_fixes", "style"]))?,
         // Recommendations are capped at 50: the ones asked for, before the cap.
         "none" => {
-            let r = exec(b, "inspect.polish", pick(a, &["bodies", "printed", "skip", "max_fixes"]))?;
+            let r = exec(b, "inspect.polish", pick(a, &["bodies", "printed", "skip", "max_fixes", "style"]))?;
             let findings: Vec<Value> = r["bodies"]
                 .as_array()
                 .into_iter()
@@ -1217,7 +1219,8 @@ fn polish(b: &mut dyn Backend, a: &Map<String, Value>) -> Result<(Value, Vec<Vec
                 .take(50)
                 .collect();
             let score = json!({"score": r["score"], "scores": r["scores"]});
-            json!({"before": score, "after": score, "applied": [], "skipped": [], "fixes": r["fixes"], "recommendations": findings, "bodies": r["bodies"]})
+            json!({"before": score, "after": score, "applied": [], "skipped": [], "fixes": r["fixes"], "recommendations": findings, "bodies": r["bodies"],
+                "style": r["style"], "colours": r["colours"]})
         }
         other => return Err(format!("`apply` is safe or none, not `{other}`")),
     };
