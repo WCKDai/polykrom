@@ -461,3 +461,43 @@ fn a_design_saved_before_pieces_were_numbered_by_place_keeps_their_numbers() {
     saved_with.refresh();
     assert_eq!(listed(&mut saved_with, "Block"), kept);
 }
+
+/// Pieces of a face that nothing around them tells apart are numbered along the face (`#1`,
+/// `#2`, …). An upstream edit that takes one away renumbers the rest, so a stored number can
+/// name another piece now: a reference with that number, picked on its piece, still finds the
+/// piece at its point, not the piece that took its number (#143).
+#[test]
+fn a_numbered_piece_is_found_at_its_point_when_the_numbers_move() {
+    let mut s = Session::default();
+    run(&mut s, "parameters.add", json!({"name": "notch", "expression": "5 mm"}));
+    run(&mut s, "solid.box", json!({"length": 100, "width": 20, "height": 10, "corner": [0, 0, 0], "body_name": "Plate"}));
+    // A notch in the front at the left end; widened, it takes the first piece the wave leaves.
+    run(
+        &mut s,
+        "solid.box",
+        json!({"length": "notch", "width": 3, "height": 20, "corner": [0, -1, -5], "operation": "cut", "targets": ["Plate"], "name": "Notch"}),
+    );
+    // A wave cut along the front: one spline, so the front's pieces between its crests touch the
+    // same faces and are numbered.
+    run(&mut s, "sketch.create", json!({"plane": "XY", "name": "Wave"}));
+    let crests = json!([[10, -5], [20, 5], [30, -5], [40, 5], [50, -5], [60, 5], [70, -5], [80, 5], [90, -5], [95, -15], [5, -15]]);
+    run(&mut s, "sketch.spline.fit_point", json!({"points": crests, "periodic": true}));
+    run(&mut s, "sketch.finish", json!({}));
+    run(&mut s, "solid.extrude", json!({"sketch": "Wave", "distance": 10, "operation": "cut", "targets": ["Plate"]}));
+    let pick = Vec3::new(50.0, 0.0, 5.0);
+    let name = solidcraft_doc::naming::face_name_at_body(s.model.state().body("Plate").unwrap(), pick).unwrap();
+    assert!(name.ends_with("#2"), "the second numbered piece of the front: {name}");
+    // Its top edge, named after it.
+    let on_edge = Vec3::new(50.0, 0.0, 10.0);
+    let edge = solidcraft_doc::naming::edge_names_at(s.model.state().body("Plate").unwrap(), &[on_edge]).remove(0);
+    assert!(edge.contains(&name), "{edge}");
+    change(&mut s, "notch", "40 mm");
+    let st = s.model.state();
+    let hit = solidcraft_doc::naming::locate_face(&st, &name, pick).unwrap();
+    let b = st.bodies.get(hit.body).unwrap();
+    let centre = b.body.faces(0.01).unwrap()[hit.face].centroid;
+    assert!((centre.x - 50.0).abs() < 3.0, "{name} now names the piece at x = {}; the one picked is at x = 50", centre.x);
+    assert!(!hit.verified, "found by its point, not by its number");
+    let hit = solidcraft_doc::naming::locate_edge(b, &edge, on_edge).unwrap();
+    assert!(hit.on_point && !hit.verified, "{edge} found at its point: {hit:?}");
+}

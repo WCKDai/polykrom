@@ -68,6 +68,19 @@ pub fn locate_edge(b: &ModelBody, name: &str, near: Vec3) -> Result<EdgeHit, Str
             .ok_or_else(|| "edge".into())
     };
     if let Some(i) = names.iter().position(|n| n == name) {
+        // Away from its point, a numbered name can have moved on to another piece (#143): the
+        // edge alike but for its numbers at the point.
+        if !edge_near(b, &m, i, near) {
+            let key = crate::piece_names::without_numbers(name);
+            let at = (key != name)
+                .then(|| {
+                    names.iter().enumerate().find(|(j, n)| *j != i && crate::piece_names::without_numbers(n) == key && edge_near(b, &m, *j, near))
+                })
+                .flatten();
+            if let Some((j, _)) = at {
+                return Ok(EdgeHit { edge: j, point: near, split: true, verified: false, on_point: true, legacy: false });
+            }
+        }
         return exact(i);
     }
     // By the faces it separates: the best way any edge matches.
@@ -331,8 +344,9 @@ fn locate_in<'a>(bodies: impl Iterator<Item = (usize, &'a ModelBody)>, name: &st
     if let Some(old) = legacy_name(name) {
         return legacy_locate(bodies, old, p);
     }
+    let bodies: Vec<(usize, &ModelBody)> = bodies.collect();
     let mut best: Option<(Match, Vec<(usize, &ModelBody, usize)>)> = None;
-    for (bi, b) in bodies {
+    for &(bi, b) in &bodies {
         let names = naming::names(b);
         for face in 0..names.faces.len() {
             if let Some(level) = crate::history_names::matches(&names, face, name) {
@@ -352,6 +366,12 @@ fn locate_in<'a>(bodies: impl Iterator<Item = (usize, &'a ModelBody)>, name: &st
     }
     let (distance, body, b, face, point) = nearest?;
     let on_point = distance <= (b.body.size() * 1e-3).max(1e-3);
+    if level == Match::Exact
+        && !on_point
+        && let Some(hit) = renumbered_piece_at(&bodies, name, (body, face), p)
+    {
+        return Some(hit);
+    }
     Some(FaceHit {
         body,
         face,
@@ -362,6 +382,35 @@ fn locate_in<'a>(bodies: impl Iterator<Item = (usize, &'a ModelBody)>, name: &st
         on_point,
         legacy: false,
     })
+}
+
+/// A numbered piece (`#k`) that the name, found away from the reference's point, numbered
+/// before: another piece of the same face, alike but for its number, at `p`. An upstream edit
+/// that adds or takes away such a piece renumbers the others along their spread, so the number
+/// can now name a piece elsewhere (#143). `None` when the name has no number or no such piece is
+/// at `p`.
+fn renumbered_piece_at(bodies: &[(usize, &ModelBody)], name: &str, found: (usize, usize), p: Vec3) -> Option<FaceHit> {
+    let key = crate::piece_names::without_numbers(name);
+    if key == name {
+        return None;
+    }
+    let mut best: Option<(f64, usize, usize, Vec3)> = None;
+    for &(bi, b) in bodies {
+        let names = naming::names(b);
+        let tol = (b.body.size() * 1e-3).max(1e-3);
+        for (face, n) in names.faces.iter().enumerate() {
+            if (bi, face) == found || crate::piece_names::without_numbers(n) != key {
+                continue;
+            }
+            if let Some((d, q)) = nearest_on_face(&b.mesh(), face, p).filter(|(d, _)| *d <= tol)
+                && best.is_none_or(|x| d < x.0)
+            {
+                best = Some((d, bi, face, q));
+            }
+        }
+    }
+    let (_, body, face, point) = best?;
+    Some(FaceHit { body, face, point, split: true, merged: false, verified: false, on_point: true, legacy: false })
 }
 
 /// [`locate_face`] for a name saved before format 14 (without its mark), as those builds found
