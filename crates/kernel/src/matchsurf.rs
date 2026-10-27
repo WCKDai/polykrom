@@ -371,7 +371,21 @@ fn chain_mid(chain: &[mt::Edge]) -> Result<Vec3> {
         && ea == eb
         && let Some(e) = chain.get(ea)
     {
-        let p = from_p3(e.oriented_curve().subs(ta + (tb - ta) * t));
+        // The parameter whose point is the remaining length on from `a`, by bisection: a curve's
+        // parameter need not run evenly with its length (a NURBS), though within one sample
+        // interval the chord stands for the arc.
+        let c = e.oriented_curve();
+        let want = (half - lo).max(0.0);
+        let (mut l, mut r) = (ta, tb);
+        for _ in 0..40 {
+            let m = 0.5 * (l + r);
+            if from_p3(c.subs(m)).dist(*a) < want {
+                l = m;
+            } else {
+                r = m;
+            }
+        }
+        let p = from_p3(c.subs(0.5 * (l + r)));
         if p.is_finite() {
             return Ok(p);
         }
