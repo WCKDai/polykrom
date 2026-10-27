@@ -526,3 +526,34 @@ fn colour_blocking_flags_default_and_near_duplicate_colours() {
     assert!(kinds("Base").contains(&"default_colour".to_string()), "{:?}", kinds("Base"));
     assert!(kinds("Lid").contains(&"near_duplicate_colour".to_string()), "{:?}", kinds("Lid"));
 }
+
+#[test]
+fn chamfers_on_rims_and_upright_edges_count_toward_the_style() {
+    // A cylinder's chamfered rim is a cone: still a chamfer, and the design leans faceted.
+    let mut s = Session::default();
+    run(&mut s, "solid.cylinder", json!({"radius": 10, "height": 20, "base": [0, 0, 0]}));
+    run(&mut s, "solid.chamfer", json!({"edges": [[10, 0, 20]], "distance": 1.5}));
+    let r = run(&mut s, "inspect.polish", json!({}));
+    // (The kernel keeps a round face in two halves.)
+    assert!(r["style"]["chamfer_faces"].as_u64() >= Some(1), "{}", r["style"]);
+    assert_eq!(r["style"]["used"], "faceted");
+    // A printed box's upright chamfers stand on the bed by a square edge: they are its edge
+    // treatment, not bed chamfers.
+    let mut s = Session::default();
+    run(&mut s, "solid.box", json!({"length": 40, "width": 20, "height": 10, "body_name": "Block"}));
+    run(&mut s, "material.assign", json!({"bodies": ["Block"], "material": "PLA"}));
+    run(&mut s, "solid.chamfer", json!({"edges": [[0, 0, 5], [40, 0, 5], [0, 20, 5], [40, 20, 5]], "distance": 2}));
+    let r = run(&mut s, "inspect.polish", json!({}));
+    assert_eq!(r["style"]["chamfer_faces"], 4, "{}", r["style"]);
+}
+
+#[test]
+fn technical_style_wants_edges_just_broken_and_every_part_coloured() {
+    let mut s = Session::default();
+    finished_block(&mut s, false);
+    let r = run(&mut s, "inspect.polish", json!({"style": "technical"}));
+    let kinds: Vec<&str> = polish_body(&r, "Block")["findings"].as_array().unwrap().iter().filter_map(|f| f["kind"].as_str()).collect();
+    assert!(kinds.contains(&"heavy_edges"), "2 mm rounds on a 40 mm part: {kinds:?}");
+    // A lone uncoloured part is still asked for a colour.
+    assert!(kinds.contains(&"default_colour"), "{kinds:?}");
+}

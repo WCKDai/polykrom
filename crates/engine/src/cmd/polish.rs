@@ -46,10 +46,10 @@ pub static COMMANDS: &[CommandSpec] = &[CommandSpec::new("inspect.polish", "Poli
      length − 25 × boxiness − 5 per radius past three (≤ 10) − 25 × the chamfers' share of its rounds and chamfers − 10 for both on one part − 5 per \
      sliver (≤ 15); (faceted) 100 − 50 × sharp share − 5 per chamfer size past two (≤ 15) − 25 × the fillets' share − 15 for both \
      on one part − slivers; \
-     (technical) 100 − 40 × sharp share − 10 × boxiness − slivers; bed chamfers don't count as a part's edge treatment; print 100 − 20 × sharp share of the bed's edges \
+     (technical) 100 − 40 × sharp share − 10 × boxiness − 20 × the share of rounds and chamfers past max(1 mm, 1% of the part) − slivers; bed chamfers don't count as a part's edge treatment; print 100 − 20 × sharp share of the bed's edges \
      − 200 × overhang share (≤ 40) − 100 × thin share (≤ 25) − 5 per tight hole (≤ 15); strength 100 − 8 per inside corner (≤ 60); \
      mass 70 for a printed body over 20 cm³ whose mean wall is over 6 mm (shell or pocket it), else 100; tidy 100 − 10 for a default \
-     name, − 10 without a material when others have one, − 5 for the default colour in a design with a palette, − 5 for a colour \
+     name, − 10 without a material when others have one, − 5 for the default colour, − 5 for a colour \
      within 30 (RGB) of another part's, − 5 for a printed part alone in its colour, − 5 for faces in other colours; assembly 100 − 10 per \
      occurrence neither grounded nor jointed (≤ 60)",
 )];
@@ -473,7 +473,12 @@ fn body_report(b: &ModelBody, m: &Mesh, others: &[&Near], printed: bool, sharp: 
         let bevel_edges: Vec<&Edge> =
             all.iter().filter(|e| e.convex && e.faces.contains(&f) && (CHAMFER_DEG.0..=CHAMFER_DEG.1).contains(&e.angle)).collect();
         let across = bevel_edges.iter().filter_map(|e| e.faces.iter().find(|g| **g != f)).map(|g| strip(*g)).fold(0.0, f64::max);
-        if planar.get(f).copied().flatten().is_some() && bevel_edges.len() >= 2 && w(f) < 0.2 * size && strip(f) < 0.5 * across {
+        // Flat, or a cone: the chamfer round a hole's or a cylinder's rim.
+        let flat_or_cone = || {
+            planar.get(f).copied().flatten().is_some()
+                || matches!(solidcraft_kernel::face_surface(&b.body, f), Some(solidcraft_kernel::FaceSurface::Cone { .. }))
+        };
+        if bevel_edges.len() >= 2 && w(f) < 0.2 * size && strip(f) < 0.5 * across && flat_or_cone() {
             blend.get_mut(f).into_iter().for_each(|x| *x = true);
             chamfers.push(round(strip(f)));
             chamfer_faces.push(f);
@@ -579,7 +584,13 @@ fn body_report(b: &ModelBody, m: &Mesh, others: &[&Near], printed: bool, sharp: 
     let styled_bevels: Vec<usize> = chamfer_faces
         .iter()
         .copied()
-        .filter(|f| !all.iter().any(|e| e.faces.contains(f) && e.faces.iter().any(|g| bed.get(*g).copied().unwrap_or(false))))
+        .filter(|f| {
+            !all.iter().any(|e| {
+                e.faces.contains(f)
+                    && (CHAMFER_DEG.0..=CHAMFER_DEG.1).contains(&e.angle)
+                    && e.faces.iter().any(|g| bed.get(*g).copied().unwrap_or(false))
+            })
+        })
         .collect();
     // A 45° chamfer's face is √2 times as wide as the chamfer's distance.
     let bevel_family = self::family(&styled_bevels.iter().map(|f| strip(*f) / std::f64::consts::SQRT_2).collect::<Vec<_>>());
@@ -589,6 +600,10 @@ fn body_report(b: &ModelBody, m: &Mesh, others: &[&Near], printed: bool, sharp: 
     // The share of the part's rounds and chamfers that are the other style's.
     let blends = (radii.len() + styled_bevels.len()).max(1) as f64;
     let (bevel_share, round_share) = (styled_bevels.len() as f64 / blends, radii.len() as f64 / blends);
+    // Technical parts have their edges broken lightly: rounds and chamfers past this are heavy.
+    let light = (0.01 * size).max(1.0);
+    let heavy: Vec<f64> =
+        radii.iter().copied().chain(styled_bevels.iter().map(|f| strip(*f) / std::f64::consts::SQRT_2)).filter(|x| *x > light + 1e-6).collect();
     let look = match style {
         Style::Organic => {
             100.0
@@ -607,7 +622,7 @@ fn body_report(b: &ModelBody, m: &Mesh, others: &[&Near], printed: bool, sharp: 
                 - if mixed { 15.0 } else { 0.0 }
                 - slivers
         }
-        Style::Technical => 100.0 - 40.0 * share - 10.0 * boxiness - slivers,
+        Style::Technical => 100.0 - 40.0 * share - 10.0 * boxiness - 20.0 * heavy.len() as f64 / blends - slivers,
     };
     if !exposed.is_empty() {
         let what = match style {
@@ -627,6 +642,14 @@ fn body_report(b: &ModelBody, m: &Mesh, others: &[&Near], printed: bool, sharp: 
     }
     if style == Style::Organic && extra_radii > 0 {
         find("look", "low", "radius_family", format!("{} distinct fillet radii: keep to three (small, medium, large)", family.len()));
+    }
+    if style == Style::Technical && !heavy.is_empty() {
+        find(
+            "look",
+            "low",
+            "heavy_edges",
+            format!("{} rounds or chamfers larger than {light:.1} mm: a technical part's edges are just broken", heavy.len()),
+        );
     }
     if style == Style::Faceted && bevel_family.len() > 2 {
         find("look", "low", "chamfer_family", format!("{} distinct chamfer sizes: keep to two", bevel_family.len()));
@@ -860,12 +883,10 @@ fn tidy(s: &Session, r: &mut Report, looks: &BTreeMap<String, (Option<[u8; 3]>, 
     let (colour, several) = looks.get(&name).copied().unwrap_or((None, false));
     let printed = r.json["printed"] == true;
     match colour {
-        None if !palette.used.is_empty() => {
+        None => {
             score -= 5.0;
-            notes.push((
-                "default_colour",
-                format!("`{def}` shows the default colour in a design with a palette: give it a palette colour (appearance.assign)"),
-            ));
+            let why = if palette.used.is_empty() { "give each part a deliberate colour" } else { "give it a palette colour" };
+            notes.push(("default_colour", format!("`{def}` shows the default colour: {why} (appearance.assign)")));
         }
         Some(c) => {
             if let Some(other) = palette.near.iter().find_map(|(a, b)| {
@@ -884,7 +905,6 @@ fn tidy(s: &Session, r: &mut Report, looks: &BTreeMap<String, (Option<[u8; 3]>, 
                 notes.push(("off_palette", format!("`{def}` is the only part in {}: print it in a palette colour", hex(c))));
             }
         }
-        None => {}
     }
     if several {
         score -= 5.0;
