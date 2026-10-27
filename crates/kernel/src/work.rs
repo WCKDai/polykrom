@@ -118,6 +118,12 @@ pub(crate) fn spend(stage: Stage, step: &str, units: u64) -> Result<()> {
     })
 }
 
+/// Whether a work budget has run out on this thread (an operation that can't count its own
+/// steps, such as a boolean's retries, stops trying).
+pub(crate) fn exhausted_now() -> bool {
+    OUT_IN.with(|c| c.borrow().is_some())
+}
+
 /// One step of a blend: one unit.
 pub(crate) fn blend_step(step: &str) -> Result<()> {
     spend(Stage::Blend, step, 1)

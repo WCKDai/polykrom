@@ -209,6 +209,7 @@ pub fn fillet_variable_points(body: &Body, edge_at: Vec3, start: Vec3, points: &
 /// rolled by a ball of the law's radius instead ([`curved_variable`]).
 pub fn fillet_variable_spline(body: &Body, edge_at: Vec3, start: Vec3, spline: &RadiusSpline) -> Result<Body> {
     body.require_brep("fillet")?;
+    crate::work::blend_step("rounding an edge with a varying radius")?;
     spline.check()?;
     let edge = crate::surfaces::edge_near(body, edge_at).ok_or_else(|| KernelError::Invalid(format!("no edge at {edge_at:?}")))?;
     guard("variable fillet", || {
@@ -651,6 +652,7 @@ pub fn fillet_chord(body: &Body, edges: &[Vec3], chord: f64) -> Result<Body> {
         let Some(first) = edges.first() else { continue };
         let keep = |x: &mt::Edge| edges.iter().any(|e| e.id() == x.id());
         let chain = crate::blend::smooth_chain_within(&cur.solid, first, &keep).unwrap_or_else(|| vec![first.id()]);
+        crate::work::blend_step("rolling a ball of a given chord along a chain of edges")?;
         let (made, rec) = crate::guard("chord fillet", || crate::curveblend::curve_blend_chord(&cur.solid, &chain, cur.size(), chord, true))?;
         let step = crate::record::rebuilt(made, &[&cur.solid], &rec)?;
         cur = crate::record::after(step, &cur, &counts);

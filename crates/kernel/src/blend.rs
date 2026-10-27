@@ -1121,6 +1121,7 @@ pub fn fillet_g2(body: &Body, edges: &[Vec3], radius: f64) -> Result<Body> {
     let counts = record::counts(&[body]);
     let mut cur = crate::boolean_record::healed(body)?;
     for p in edges {
+        crate::work::blend_step("rounding an edge with a curvature-continuous blend")?;
         let size = cur.size();
         let Some((idx, dist)) = cur.nearest_edge(*p, (size * 2e-3).max(1e-3))? else {
             return Err(KernelError::Invalid("the body has no edges".into()));

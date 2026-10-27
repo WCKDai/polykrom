@@ -395,6 +395,16 @@ fn a_blend_out_of_its_work_budget_is_refused_naming_the_step() {
     let (m0, m1) = (measure(&free).unwrap(), measure(&within).unwrap());
     assert_eq!((m0.volume.to_bits(), m0.area.to_bits(), m0.faces, m0.edges), (m1.volume.to_bits(), m1.area.to_bits(), m1.faces, m1.edges));
     assert_eq!(work_left(), None, "the budget ends with its scope");
+    // Curvature-continuous and varying-radius fillets take their steps too.
+    let one = [Vec3::new(10.0, 20.0, 20.0)];
+    for e in [
+        with_blend_budget(0, &one, || fillet_g2(&b, &one, 2.0)).unwrap_err().to_string(),
+        with_blend_budget(0, &one, || fillet_variable_points(&b, one[0], Vec3::new(0.0, 20.0, 20.0), &[(0.0, 1.0), (1.0, 2.0)], false))
+            .unwrap_err()
+            .to_string(),
+    ] {
+        assert!(e.contains("the blend ran out of its work budget (0 units)"), "{e}");
+    }
 }
 
 /// The largest-radius search on an edge no radius takes (the tangent edge between a round and the
