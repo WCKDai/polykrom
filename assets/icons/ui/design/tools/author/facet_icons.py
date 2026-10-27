@@ -92,6 +92,31 @@ def fillet():
     return ic
 
 
+@icon('model', 'Apply Polish')
+def polish():
+    ic = new('polish', 'Apply Polish')
+    # The fillet's rounded block, smaller, with a sparkle: rounds and chamfers applied for the look.
+    d = frame(0.82, dx=-5, dy=6, height=18)
+    r, x0, y0, x1, y1, z1 = 9, -12, -12, 12, 12, 18
+    ts = [i * math.pi / 2 / 10 for i in range(11)]
+    a = [d.p(x1, y1 - r + r * math.sin(t), z1 - r + r * math.cos(t)) for t in ts]
+    b = [d.p(x0, y1 - r + r * math.sin(t), z1 - r + r * math.cos(t)) for t in ts]
+    ic.fill(poly(a + b[::-1]), A2)
+    ic.stroke(d.poly((x0, y0, z1), (x1, y0, z1), (x1, y1 - r, z1), (x0, y1 - r, z1)), LINE, W)
+    ic.stroke(poly([d.p(x0, y1, z1 - r), d.p(x0, y1, 0), d.p(x1, y1, 0), d.p(x1, y0, 0), d.p(x1, y0, z1)], False), LINE, W)
+    ic.stroke(poly([d.p(x1, y1, z1 - r), d.p(x1, y1, 0)], False), LINE, W)
+    ic.stroke(poly(a, False), LINE, W)
+    ic.stroke(poly(b, False), LINE, W)
+    cx, cy = 49, 14
+    spark = []
+    for k in range(8):
+        rr = 10 if k % 2 == 0 else 2.8
+        an = math.radians(-90 + 45 * k)
+        spark.append((cx + rr * math.cos(an), cy + rr * math.sin(an)))
+    ic.fill(poly(spark), A3)
+    return ic
+
+
 @icon('model')
 def chamfer():
     ic = new('chamfer', 'Chamfer')

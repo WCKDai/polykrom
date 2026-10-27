@@ -216,3 +216,115 @@ fn a_printed_box_gets_a_bed_chamfer_and_print_scores() {
     assert!(s.execute("inspect.polish", &json!({"bodies": ["Nope"]})).is_err());
     assert!(s.execute("inspect.polish", &json!({"max_fixes": 0})).is_err());
 }
+
+// polish.apply (#193): the safe fixes, each checked and rolled back when it makes things worse.
+
+#[test]
+fn polish_apply_rounds_a_raw_box_in_one_undo_step() {
+    let mut s = Session::default();
+    run(&mut s, "solid.box", json!({"length": 40, "width": 20, "height": 10, "body_name": "Block"}));
+    let features = s.doc.features.len();
+    let r = run(&mut s, "polish.apply", json!({}));
+    let (before, after) = (r["before"]["score"].as_f64().unwrap(), r["after"]["score"].as_f64().unwrap());
+    assert!(after > before + 20.0, "{r}");
+    assert!(!r["applied"].as_array().unwrap().is_empty(), "{r}");
+    let report = run(&mut s, "inspect.polish", json!({}));
+    assert_eq!(polish_body(&report, "Block")["sharp_edges"], 0, "{report}");
+    run(&mut s, "edit.undo", json!({}));
+    assert_eq!(s.doc.features.len(), features, "one undo takes every fix back");
+}
+
+#[test]
+fn polish_apply_rolls_back_a_fix_that_fails_its_checks() {
+    let mut s = Session::default();
+    run(&mut s, "solid.box", json!({"length": 40, "width": 20, "height": 10, "body_name": "Block"}));
+    let features = s.doc.features.len();
+    // No change of mass allowed: every fillet removes some, so each is rolled back.
+    let r = run(&mut s, "polish.apply", json!({"mass_tol": 0}));
+    assert_eq!(r["applied"].as_array().map(Vec::len), Some(0), "{r}");
+    let skipped = r["skipped"].as_array().unwrap();
+    assert!(!skipped.is_empty() && skipped.iter().all(|k| k["reason"].as_str().unwrap().contains("mass")), "{r}");
+    assert_eq!(s.doc.features.len(), features, "{r}");
+    assert_eq!(r["after"]["score"], r["before"]["score"]);
+    // Only the fixes asked for.
+    let r = run(&mut s, "polish.apply", json!({"fixes": ["F1"]}));
+    assert_eq!(r["applied"].as_array().map(Vec::len), Some(1), "{r}");
+    assert!(s.execute("polish.apply", &json!({"fixes": ["F99"]})).is_err());
+    assert!(s.execute("polish.apply", &json!({"mass_tol": 2})).is_err());
+}
+
+#[test]
+fn polish_apply_rounds_a_part_placed_twice_where_it_is_placed() {
+    let mut s = Session::default();
+    run(&mut s, "component.create", json!({"name": "Leg"}));
+    run(&mut s, "solid.box", json!({"length": 10, "width": 10, "height": 30, "corner": [0, 0, 0]}));
+    run(&mut s, "component.activate", json!({"component": "root"}));
+    run(&mut s, "occurrence.copy", json!({"component": "Leg", "translate": [50, 0, 0]}));
+    run(&mut s, "occurrence.copy", json!({"component": "Leg", "translate": [0, 40, 0]}));
+    let r = run(&mut s, "polish.apply", json!({}));
+    assert_eq!(r["skipped"], json!([]), "{r}");
+    let after = run(&mut s, "inspect.polish", json!({}));
+    assert_eq!(after["bodies"].as_array().map(Vec::len), Some(3), "{after}");
+    for b in after["bodies"].as_array().unwrap() {
+        assert_eq!(b["sharp_edges"], 0, "{after}");
+    }
+}
+
+#[test]
+fn polish_apply_keeps_a_full_undo_history_but_its_oldest_step() {
+    let mut s = Session::default();
+    run(&mut s, "solid.box", json!({"length": 40, "width": 20, "height": 10, "body_name": "Block"}));
+    run(&mut s, "solid.box", json!({"length": 4, "width": 4, "height": 4, "corner": [60, 0, 0], "operation": "new_body", "body_name": "Cube"}));
+    for i in 0..200 {
+        run(&mut s, "parameters.add", json!({"name": format!("p{i}"), "expression": "1 mm"}));
+    }
+    let before: Vec<std::sync::Arc<solidcraft_doc::Document>> = s.undo.iter().map(|u| u.doc.clone()).collect();
+    let r = run(&mut s, "polish.apply", json!({}));
+    assert!(r["applied"].as_array().is_some_and(|a| a.len() >= 2), "{r}");
+    assert_eq!(s.undo.len(), before.len());
+    // One step in (the run), one out (the oldest): the rest are the same steps.
+    for (now, was) in s.undo.iter().zip(before.iter().skip(1)) {
+        assert!(std::sync::Arc::ptr_eq(&now.doc, was), "an older undo step was lost");
+    }
+    let last = s.undo.last().map(|u| u.label.clone());
+    assert_eq!(last.as_deref(), Some("Apply Polish"));
+}
+
+#[test]
+fn polish_apply_says_which_findings_another_run_would_fix() {
+    let mut s = Session::default();
+    run(&mut s, "solid.box", json!({"length": 40, "width": 20, "height": 10, "body_name": "Block"}));
+    run(&mut s, "solid.box", json!({"length": 4, "width": 4, "height": 4, "corner": [60, 0, 0], "operation": "new_body", "body_name": "Cube"}));
+    let r = run(&mut s, "polish.apply", json!({"max_fixes": 1}));
+    assert_eq!(r["applied"].as_array().map(Vec::len), Some(1), "{r}");
+    assert_eq!(r["fixes_left"], 1, "{r}");
+    let cube = r["recommendations"].as_array().unwrap().iter().find(|f| f["body"] == "Cube" && f["kind"] == "sharp_edges").cloned();
+    assert_eq!(cube.map(|f| f["fix"].clone()), Some(json!(["F1"])), "{r}");
+}
+
+#[test]
+fn polish_apply_refuses_a_malformed_selection_and_keeps_the_sessions_checkpoints() {
+    let mut s = Session::default();
+    run(&mut s, "solid.box", json!({"length": 40, "width": 20, "height": 10, "body_name": "Block"}));
+    // A selection that isn't strings is refused rather than read as "every fix".
+    assert!(s.execute("polish.apply", &json!({"fixes": [42]})).is_err());
+    assert!(s.execute("polish.apply", &json!({"categories": [42]})).is_err());
+    assert!(s.execute("polish.apply", &json!({"categories": ["shiny"]})).is_err());
+    // Sixteen checkpoints, the most a session keeps: a run (one fix rolled back) leaves them all.
+    let marks: Vec<Value> = (0..16).map(|_| run(&mut s, "edit.checkpoint", json!({}))["checkpoint"].clone()).collect();
+    let r = run(&mut s, "polish.apply", json!({"mass_tol": 0}));
+    assert_eq!(r["skipped"].as_array().map(Vec::len), Some(1), "{r}");
+    assert_eq!(run(&mut s, "edit.restore_checkpoint", json!({"checkpoint": marks[0]}))["restored"], true);
+}
+
+#[test]
+fn polish_apply_keeps_the_selection_when_it_rolls_a_fix_back() {
+    let mut s = Session::default();
+    run(&mut s, "solid.box", json!({"length": 40, "width": 20, "height": 10, "body_name": "Block"}));
+    run(&mut s, "select.set", json!({"items": [{"type": "body", "name": "Block"}]}));
+    let before = s.selection.clone();
+    assert!(!before.is_empty());
+    let r = run(&mut s, "polish.apply", json!({"mass_tol": 0}));
+    assert_eq!(r["skipped"].as_array().map(Vec::len), Some(1), "{r}");
+    assert_eq!(s.selection, before);
+}

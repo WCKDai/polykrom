@@ -829,6 +829,7 @@
   "cmd.plastic_rest": "垫块",
   "cmd.plastic_rules": "列出塑料规则",
   "cmd.plastic_snap_fit": "卡扣",
+  "cmd.polish_apply": "应用精修",
   "cmd.render_backends": "渲染后端",
   "cmd.render_cancel": "取消渲染",
   "cmd.render_export": "导出 PNG",
