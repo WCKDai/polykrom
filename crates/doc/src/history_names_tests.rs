@@ -15,9 +15,16 @@ fn piece_names_parse_into_stem_and_bounding_faces() {
     assert_eq!(piece_parts("F2:top#[]"), Some(("F2:top", vec![])));
     assert_eq!(strip_edge_piece("F2:side:l2|F2:top#[F4:side:l2]~2"), "F2:side:l2|F2:top");
     assert_eq!(strip_edge_piece("F2:side:l2#1|F2:top#2"), "F2:side:l2|F2:top");
+    // Only the numbers that tell pieces apart by place go; what tells them apart by their
+    // neighbours stays (#143).
+    use crate::piece_names::without_numbers;
+    assert_eq!(without_numbers("F1:-y#[F1:-x]#2"), "F1:-y#[F1:-x]");
+    assert_eq!(without_numbers("F1:+z|F1:-y#2~3"), "F1:+z|F1:-y");
+    assert_eq!(without_numbers("F3:side:s1#12"), "F3:side:s1");
+    assert_eq!(without_numbers("Plate:face:12"), "Plate:face:12");
     // Hostile names never panic and are their own stems.
-    for n in ["", "#", "#[", "]", "a#[", "a]", "#[]", "a#[b", "x#[[]]]", "é#[ü]", "#1", "a#[b]#", "~", "a~"] {
-        let _ = (strip_piece(n), parent_piece(n), piece_parts(n), strip_edge_piece(n));
+    for n in ["", "#", "#[", "]", "a#[", "a]", "#[]", "a#[b", "x#[[]]]", "é#[ü]", "#1", "a#[b]#", "~", "a~", "é#1ü"] {
+        let _ = (strip_piece(n), parent_piece(n), piece_parts(n), strip_edge_piece(n), without_numbers(n));
     }
     assert_eq!(strip_piece("#[]"), "#[]");
 }
