@@ -325,3 +325,144 @@ fn a_round_origin_keeps_its_end_when_the_face_it_opens_onto_gets_other_neighbour
     let (z, dz) = top(&s).unwrap_or_default();
     assert!((z - 4.0).abs() < 1e-9 && (dz - 1.0).abs() < 1e-9, "{z} {dz}");
 }
+
+/// #143: a cut made from another, moved component into the tray (as a fairing's tap holes were
+/// cut into TinyRex's thigh) leaves the tray's faces named as before, so the bracket seated on
+/// the tray's hole stays seated: the same as a cut made inside the tray's own component.
+#[test]
+fn a_cut_from_another_component_keeps_a_seated_joint() {
+    for (from_inside, how) in [(true, "cylinder"), (false, "cylinder"), (true, "hole"), (false, "hole"), (true, "extrude"), (false, "extrude")] {
+        let mut s = tray();
+        let r = run(
+            &mut s,
+            "joint.create",
+            json!({"type": "rigid", "name": "Mount",
+                   "a": {"occurrence": "Tray", "circle": [280, 50, 1], "x": [1, 0, 0]},
+                   "b": {"occurrence": "Bracket", "circle": [110, 210, 0], "x": [1, 0, 0]}}),
+        );
+        assert_eq!(r["errors"].as_array().map(Vec::len), Some(0), "{r}");
+        let tray_comp = s.doc.find_component("Tray").unwrap_or(0);
+        let body = s.model.state().bodies.iter().find(|b| b.component == tray_comp).map(|b| b.name.clone()).unwrap();
+        let names = |s: &Session| {
+            let st = s.model.state();
+            let mut n: Vec<String> = solidcraft_doc::naming::face_names(st.body(&body).unwrap()).iter().cloned().collect();
+            n.sort();
+            n
+        };
+        let before = names(&s);
+        run(&mut s, "component.activate", json!({"component": "root"}));
+        // Drawn in the fairing's frame, 50 mm above where it lands on the tray.
+        let dz = if from_inside {
+            run(&mut s, "component.activate", json!({"component": "Tray"}));
+            0.0
+        } else {
+            run(&mut s, "component.create", json!({"name": "Fairing"}));
+            run(&mut s, "solid.box", json!({"length": 10, "width": 10, "height": 2, "corner": [0, 300, 0]}));
+            let fairing = occ(&s, "Fairing");
+            run(&mut s, "occurrence.move", json!({"occurrence": fairing, "translate": [0, 0, 50], "capture": false}));
+            -50.0
+        };
+        match how {
+            "cylinder" => {
+                run(&mut s, "solid.cylinder", json!({"base": [50, 50, -1.0 + dz], "radius": 1, "height": 3, "operation": "cut", "targets": [body]}));
+            }
+            "hole" => {
+                // A face pick: where the face is shown.
+                run(&mut s, "solid.hole", json!({"position": [50, 50, 1], "diameter": 2, "participants": [body]}));
+            }
+            _ => {
+                run(&mut s, "sketch.create", json!({"plane": {"origin": [0, 0, 1.0 + dz], "x_dir": [1, 0, 0], "y_dir": [0, 1, 0]}, "name": "Taps"}));
+                run(&mut s, "sketch.circle.center", json!({"center": [50, 50], "radius": 1}));
+                run(&mut s, "sketch.finish", json!({}));
+                run(
+                    &mut s,
+                    "solid.extrude",
+                    json!({"sketch": "Taps", "distance": 3, "direction": "negative", "operation": "cut", "targets": [body]}),
+                );
+            }
+        }
+        let after = names(&s);
+        let kept: Vec<&String> = before.iter().filter(|n| after.contains(n)).collect();
+        assert_eq!(kept.len(), before.len(), "{how} from inside {from_inside}: names before {before:?}, after {after:?}");
+        let r = run(&mut s, "joint.solve", json!({}));
+        assert_eq!(r["errors"].as_array().map(Vec::len), Some(0), "{how} from inside {from_inside}: {r}");
+        on_the_hole(&s, 300.0);
+    }
+}
+
+/// A cut late in a long design keeps the names of the faces it leaves alone (#143): TinyRex's tap
+/// holes, cut into a thigh after some 1600 features, renamed every face of the thigh by position
+/// (`Thigh_L:face:k`) and its seated screws' joints no longer found the holes' walls.
+#[test]
+fn a_cut_late_in_a_long_design_keeps_a_seated_joint() {
+    let mut s = tray();
+    let r = run(
+        &mut s,
+        "joint.create",
+        json!({"type": "rigid", "name": "Mount",
+               "a": {"occurrence": "Tray", "circle": [280, 50, 1], "x": [1, 0, 0]},
+               "b": {"occurrence": "Bracket", "circle": [110, 210, 0], "x": [1, 0, 0]}}),
+    );
+    assert_eq!(r["errors"].as_array().map(Vec::len), Some(0), "{r}");
+    let tray_comp = s.doc.find_component("Tray").unwrap_or(0);
+    let body = s.model.state().bodies.iter().find(|b| b.component == tray_comp).map(|b| b.name.clone()).unwrap();
+    let names = |s: &Session| {
+        let mut n: Vec<String> = solidcraft_doc::naming::face_names(s.model.state().body(&body).unwrap()).iter().cloned().collect();
+        n.sort();
+        n
+    };
+    let before = names(&s);
+    // Many features on another part: more than the 400 the names of a body's own chain of
+    // features are worked out through.
+    run(&mut s, "component.activate", json!({"component": "root"}));
+    run(&mut s, "component.create", json!({"name": "Fairing"}));
+    run(&mut s, "solid.box", json!({"length": 10, "width": 10, "height": 2, "corner": [0, 300, 0], "body_name": "Shell"}));
+    for k in 0..420 {
+        let dx = if k % 2 == 0 { 1 } else { -1 };
+        run(&mut s, "solid.move", json!({"bodies": ["Shell"], "translate": [dx, 0, 0]}));
+    }
+    run(&mut s, "solid.cylinder", json!({"base": [50, 50, -1], "radius": 1, "height": 3, "operation": "cut", "targets": [body]}));
+    let after = names(&s);
+    let lost: Vec<&String> = before.iter().filter(|n| !after.contains(n)).collect();
+    assert!(lost.is_empty(), "names lost {lost:?}, now {after:?}");
+    let r = run(&mut s, "joint.solve", json!({}));
+    assert_eq!(r["errors"].as_array().map(Vec::len), Some(0), "{r}");
+    on_the_hole(&s, 300.0);
+    // A design saved before features counted their own chain names the faces as it did then.
+    let mut json: serde_json::Value = serde_json::from_str(&s.doc.to_json()).unwrap();
+    for f in json["features"].as_array_mut().unwrap() {
+        f.as_object_mut().unwrap().remove("own_chain_depth");
+    }
+    let old = Session::opened(solidcraft_doc::Document::from_json(&json.to_string()).unwrap(), None);
+    assert!(names(&old).iter().all(|n| n.starts_with(&format!("{body}:face:"))), "{:?}", names(&old));
+}
+
+/// The pieces a cut leaves take the body names in the order of their faces' names (#143): late
+/// in a long design as early on, not by position.
+#[test]
+fn pieces_of_a_cut_late_in_a_long_design_are_named_as_early_on() {
+    let pieces = |moves: usize| {
+        let mut s = Session::default();
+        run(&mut s, "solid.box", json!({"length": 40, "width": 20, "height": 5, "corner": [0, 0, 0], "body_name": "Plate"}));
+        run(&mut s, "solid.box", json!({"length": 10, "width": 10, "height": 2, "corner": [0, 300, 0], "body_name": "Shell"}));
+        for k in 0..moves {
+            let dx = if k % 2 == 0 { 1 } else { -1 };
+            run(&mut s, "solid.move", json!({"bodies": ["Shell"], "translate": [dx, 0, 0]}));
+        }
+        // A slot across the plate, off its middle: a short piece and a long one.
+        run(&mut s, "solid.box", json!({"length": 2, "width": 30, "height": 20, "corner": [12, -5, -5], "operation": "cut", "targets": ["Plate"]}));
+        let mut named: Vec<(String, bool)> = s
+            .model
+            .state()
+            .bodies
+            .iter()
+            .filter(|b| b.name != "Shell")
+            .map(|b| (b.name.clone(), b.body.tessellate_with(1e-3, true).unwrap().measure().volume < 2000.0))
+            .collect();
+        named.sort();
+        named
+    };
+    let early = pieces(0);
+    assert_eq!(early.len(), 2, "{early:?}");
+    assert_eq!(pieces(420), early);
+}

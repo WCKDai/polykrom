@@ -847,10 +847,12 @@ impl ModelState {
         let depth = before.bodies.iter().filter_map(|b| b.names.depth()).max().unwrap_or(0).max(before.naming_floor) + 1;
         let sheets = if f.kind.is_sheet() { self.sheets.clone() } else { Vec::new() };
         let origin = Arc::new(crate::naming::NamingOrigin { feature: f.clone(), before: before.clone(), depth, mats, sheets });
+        // Each body as deep as its own chain of features, where the feature counts that (#143).
+        let origins = crate::naming::Origins::new(origin);
         // Pieces a cut left are named after their faces, not the kernel's shell order (unless
         // the feature was saved when they were named in that order).
         if !f.shell_piece_order {
-            crate::lineage::order_lumps(&mut self.bodies, &origin);
+            crate::lineage::order_lumps(&mut self.bodies, &origins);
         }
         // The bodies before the feature by name, in their order (names repeat only in damaged
         // states): every lookup below is the first match of a linear search, without walking
@@ -880,7 +882,7 @@ impl ModelState {
                     (key, &b.name).hash(&mut h);
                     b.key = h.finish();
                     if !matches!(f.kind, FeatureKind::BodyTransfer { .. }) {
-                        b.names = crate::naming::NameCell::traced(Some(origin.clone()), b.lineage());
+                        b.names = crate::naming::NameCell::traced(Some(origins.of(b)), b.lineage());
                     }
                     // Faces split on purpose stay split through later features (for export).
                     if b.body.split_lines().is_none()
