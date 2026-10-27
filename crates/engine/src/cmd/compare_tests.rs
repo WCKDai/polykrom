@@ -293,3 +293,20 @@ fn colour_blocks_are_compared_where_the_reference_has_colours() {
     assert!(s.execute("inspect.compare_reference", &json!({"reference": "Nope"})).is_err());
     assert!(s.execute("inspect.compare_reference", &json!({"reference": "Concept", "views": ["sideways"]})).is_err());
 }
+
+#[test]
+fn a_reference_modelled_with_another_axis_up_is_turned_first() {
+    let mut s = Session::default();
+    run(&mut s, "solid.box", json!({"length": 40, "width": 20, "height": 10, "body_name": "Block"}));
+    // The same block lying the other way (40 along Y, 20 along X), larger and elsewhere.
+    run(
+        &mut s,
+        "solid.box",
+        json!({"length": 30, "width": 60, "height": 15, "corner": [200, 100, 50], "operation": "new_body", "body_name": "Concept"}),
+    );
+    let fit = run(&mut s, "inspect.fit_reference", json!({"reference": "Concept", "bodies": ["Block"], "apply": true}));
+    assert_eq!(fit["turn"]["axis"], "z", "{fit}");
+    assert_eq!(fit["residual"], json!({"x": 1.0, "y": 1.0, "z": 1.0}), "{fit}");
+    let r = run(&mut s, "inspect.compare_reference", json!({"reference": "Concept", "bodies": ["Block"]}));
+    assert!(r["score"].as_f64().unwrap() > 99.0, "{r}");
+}
