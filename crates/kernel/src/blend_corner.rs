@@ -27,6 +27,7 @@ use crate::{KernelError, Result, guard};
 /// Fillet each edge nearest a point with its own radius.
 pub fn fillet_radii(body: &Body, edges: &[(Vec3, f64)]) -> Result<Body> {
     body.require_brep("fillet")?;
+    crate::blend_budget::spend("building the blends and their corners together")?;
     if edges.is_empty() || edges.len() > 1000 {
         return Err(KernelError::Invalid("select 1…1000 edges".into()));
     }
@@ -60,6 +61,7 @@ pub fn fillet_radii(body: &Body, edges: &[(Vec3, f64)]) -> Result<Body> {
 /// Local equal-distance chamfers, including pocket rims where adjacent walls have
 /// different slopes. The planar strips trim each other at each selected corner.
 pub(crate) fn chamfer(body: &Body, edges: &[Vec3], distance: f64) -> Result<Body> {
+    crate::blend_budget::spend("building the chamfers and their corners together")?;
     let cur = crate::boolean_record::healed(body)?;
     let selected: Vec<_> = edges.iter().map(|p| (*p, distance)).collect();
     Ok(crate::record::after(build(&cur, &selected, false)?, &cur, &crate::record::counts(&[body])))

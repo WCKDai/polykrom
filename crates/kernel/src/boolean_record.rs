@@ -200,10 +200,73 @@ pub(crate) fn heal_prism_result(body: &Body, size: f64, keep: &[Vec<Vec3>], coun
 }
 
 /// `body` healed as the local modifiers take it (coplanar neighbours as one face, as after a
-/// join; faces split on purpose kept apart), with its history over `[body]`.
+/// join; faces split on purpose kept apart), with its history over `[body]`. Under
+/// [`with_heal_memo`], a body healed before is not healed again.
 pub(crate) fn healed(body: &Body) -> Result<Body> {
+    if let Some(done) = HEALED.with(|m| m.borrow().as_ref().and_then(|v| v.iter().find(|(k, _)| same_body(k, body)).map(|(_, h)| h.clone()))) {
+        return Ok(done);
+    }
     let counts = record::counts(&[body]);
-    heal_body(&operand(body, 0, &counts), body.deep_copy(), body.size(), body.split_keep(), &counts)
+    let made = heal_body(&operand(body, 0, &counts), body.deep_copy(), body.size(), body.split_keep(), &counts)?;
+    HEALED.with(|m| {
+        if let Some(v) = m.borrow_mut().as_mut() {
+            if v.len() >= HEAL_MEMO {
+                v.remove(0);
+            }
+            v.push((body.clone(), made.clone()));
+        }
+    });
+    Ok(made)
+}
+
+/// Bodies healed under [`with_heal_memo`] kept for reuse.
+const HEAL_MEMO: usize = 8;
+
+thread_local! {
+    /// The bodies healed under [`with_heal_memo`] (each with what it healed to), if one runs.
+    static HEALED: std::cell::RefCell<Option<Vec<(Body, Body)>>> = const { std::cell::RefCell::new(None) };
+}
+
+/// `f`, with each body [`healed`] kept and given again when the same body is healed again: a
+/// blend tries one construction after another on the same body, and each healed it again
+/// (most of each try's time on a large body, #243). The bodies kept are held until `f` ends,
+/// so none is mistaken for a later one.
+pub(crate) fn with_heal_memo<T>(f: impl FnOnce() -> T) -> T {
+    struct Clear(bool);
+    impl Drop for Clear {
+        fn drop(&mut self) {
+            if self.0 {
+                HEALED.with(|m| *m.borrow_mut() = None);
+            }
+        }
+    }
+    let outermost = HEALED.with(|m| {
+        let mut m = m.borrow_mut();
+        let none = m.is_none();
+        if none {
+            *m = Some(Vec::new());
+        }
+        none
+    });
+    let _clear = Clear(outermost);
+    f()
+}
+
+/// The same body: the same solid, history, split lines, face sources and size.
+fn same_body(a: &Body, b: &Body) -> bool {
+    fn same<T>(x: &Option<std::sync::Arc<T>>, y: &Option<std::sync::Arc<T>>) -> bool {
+        match (x, y) {
+            (None, None) => true,
+            (Some(x), Some(y)) => std::sync::Arc::ptr_eq(x, y),
+            _ => false,
+        }
+    }
+    std::sync::Arc::ptr_eq(&a.solid, &b.solid)
+        && same(&a.history, &b.history)
+        && same(&a.splits, &b.splits)
+        && same(&a.face_sources, &b.face_sources)
+        && a.size.to_bits() == b.size.to_bits()
+        && a.regularization_protected == b.regularization_protected
 }
 
 /// `body` copied as it is, unhealed (`Body::deep_copy`, which keeps its face and edge order),

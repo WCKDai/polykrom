@@ -1200,6 +1200,7 @@ fn blend_with(body: &Body, edges: &[Vec3], r: f64, shape: Shape, what: &str, cur
 }
 
 fn blend_in_order(body: &Body, edges: &[Vec3], r: f64, shape: Shape, what: &str, curved_ends: bool) -> Result<Body> {
+    crate::blend_budget::spend("rolling a ball along the edges")?;
     if !(r.is_finite() && r > 1e-6 && r < 1e6) {
         return Err(KernelError::Invalid(format!("{what} size must be positive")));
     }
@@ -1846,13 +1847,18 @@ fn closed(input: &Body, b: Body) -> Result<Body> {
 /// largest that works).
 pub fn fillet(body: &Body, edges: &[Vec3], radius: f64) -> Result<Body> {
     body.require_brep("fillet")?;
-    // A round that would run past its faces into other geometry or another round (#1080).
-    // Checked once built, so a refusal of the build itself stands as it is.
-    let size = crate::blend_fit::Size::Round(radius);
-    match fillet_built(body, edges, radius) {
-        Ok(b) => crate::blend_fit::accept(body, b, edges, size),
-        Err(e) => Err(crate::blend_fit::explain(body, edges, size, e)),
-    }
+    crate::blend_budget::spend("starting a fillet")?;
+    crate::blend_budget::nested(|| {
+        // A round that would run past its faces into other geometry or another round (#1080).
+        // Checked once built, so a refusal of the build itself stands as it is.
+        let size = crate::blend_fit::Size::Round(radius);
+        match fillet_built(body, edges, radius) {
+            Ok(b) => crate::blend_fit::accept(body, b, edges, size),
+            // Inside another blend (a corner rounded first): that blend's refusal is the one read.
+            Err(e) if crate::blend_budget::inside_another() => Err(e),
+            Err(e) => Err(crate::blend_fit::explain(body, edges, size, e)),
+        }
+    })
 }
 
 /// [`fillet`], once the radius is known to fit.
@@ -1895,6 +1901,7 @@ fn keep_size(e: KernelError, e2: KernelError) -> KernelError {
 /// (see [`crate::curveblend::corner_blend`]); with `g2`, the corners where three blends meet are
 /// G2 patches ([`crate::corner_g2`]) instead of pieces of the ball's sphere.
 fn corners(body: &Body, edges: &[Vec3], r: f64, shape: Shape, what: &str, g2: bool) -> Result<Body> {
+    crate::blend_budget::spend("building the corners where the blends meet on curved faces")?;
     let counts = record::counts(&[body]);
     let cur = crate::boolean_record::healed(body)?;
     let size = cur.size();
@@ -1930,9 +1937,10 @@ fn radius_step(radius: f64) -> f64 {
 }
 
 /// The largest radius below `radius` (to three significant digits) at which the fillet of
-/// these edges works, with its result; `None` when none does. Each candidate is a real fillet
-/// of the edges, so the radius returned is one that was built; the search runs up to 16 of
-/// them, so it is for an explicit request, not every refusal.
+/// these edges works, with its result; `None` when none does, or when half the radius and a
+/// hundredth of it are both refused (the edges take no round worth the name). Each candidate is
+/// a real fillet of the edges, so the radius returned is one that was built; the search runs up
+/// to 17 of them, so it is for an explicit request, not every refusal.
 pub fn fillet_max(body: &Body, edges: &[Vec3], radius: f64) -> Option<(f64, Body)> {
     if !(radius.is_finite() && radius > 1e-6) {
         return None;
@@ -1942,18 +1950,34 @@ pub fn fillet_max(body: &Body, edges: &[Vec3], radius: f64) -> Option<(f64, Body
     let mut hi = (radius / q).ceil() as u64;
     let mut lo = 0u64;
     let mut best: Option<Body> = None;
+    let mut floor_checked = false;
     // log2(10⁴) steps reach the step size; the cap keeps a slow body from stalling.
     for _ in 0..16 {
         if hi - lo <= 1 {
             break;
         }
         let mid = lo + (hi - lo) / 2;
-        match fillet(body, edges, mid as f64 * q) {
+        // Each candidate's refusal is unread: no reason is looked for (a step on a large body).
+        match crate::blend_budget::nested(|| fillet(body, edges, mid as f64 * q)) {
             Ok(b) => {
                 lo = mid;
                 best = Some(b);
             }
-            Err(_) => hi = mid,
+            Err(_) => {
+                hi = mid;
+                // Refused at half the size with nothing built yet: whether a hundredth of it
+                // works at all before halving on (#243). A radius that small is no round, and
+                // where even it is refused the edges take no size (on a large body each try
+                // took a minute, and the search tried a dozen). Where it works, the search
+                // goes on as before.
+                let floor = ((radius / 100.0) / q).ceil().max(1.0) as u64;
+                if best.is_none() && !floor_checked && hi > floor {
+                    floor_checked = true;
+                    if crate::blend_budget::nested(|| fillet(body, edges, floor as f64 * q)).is_err() {
+                        return None;
+                    }
+                }
+            }
         }
     }
     best.map(|b| (lo as f64 * q, b))
@@ -1974,13 +1998,16 @@ pub fn fillet_max_each(body: &Body, edges: &[Vec3], radius: f64) -> Option<(Vec<
     let mut searches = 0;
     for g in &groups {
         let pts: Vec<Vec3> = g.iter().filter_map(|i| edges.get(*i).copied()).collect();
-        let r = match fillet(body, &pts, radius) {
+        // Each group's own tries are steps of this search, their refusals unread.
+        let r = match crate::blend_budget::nested(|| fillet(body, &pts, radius)) {
             Ok(_) => continue,
             Err(KernelError::TooLarge(_)) if searches < MAX_SEARCHES => {
                 searches += 1;
                 match fillet_max(body, &pts, radius) {
                     Some((r, _)) => r,
-                    None => return one(),
+                    // A group no radius takes, alone: nor with the other groups, which don't
+                    // meet it (searching all the edges again took as long once more, #243).
+                    None => return None,
                 }
             }
             Err(_) => return one(),
@@ -2082,6 +2109,7 @@ fn interacting_groups(body: &Body, pts: &[Vec3]) -> Option<Vec<Vec<usize>>> {
 /// a mitre); the local operation is the fallback.
 pub fn chamfer(body: &Body, edges: &[Vec3], distance: f64) -> Result<Body> {
     body.require_brep("chamfer")?;
+    crate::blend_budget::spend("starting a chamfer")?;
     if !(distance.is_finite() && distance > 1e-6 && distance < 1e6) {
         return Err(KernelError::Invalid("chamfer size must be positive".into()));
     }
@@ -2091,10 +2119,11 @@ pub fn chamfer(body: &Body, edges: &[Vec3], distance: f64) -> Result<Body> {
     // A chamfer that would run past its faces into other geometry or another chamfer, or whose
     // result changes more than the chamfers can (#1080).
     let size = crate::blend_fit::Size::Chamfer(distance);
-    match chamfer_built(body, edges, distance) {
+    crate::blend_budget::nested(|| match chamfer_built(body, edges, distance) {
         Ok(b) => crate::blend_fit::accept(body, b, edges, size),
+        Err(e) if crate::blend_budget::inside_another() => Err(e),
         Err(e) => Err(crate::blend_fit::explain(body, edges, size, e)),
-    }
+    })
 }
 
 /// [`chamfer`], once the size is known to fit.
@@ -2121,6 +2150,7 @@ fn chamfer_built(body: &Body, edges: &[Vec3], distance: f64) -> Result<Body> {
             acc = next;
         }
         let (tool, h) = acc?;
+        crate::blend_budget::spend("cutting the chamfers").ok()?;
         let r = crate::ops::boolean(body, &tool, crate::BoolOp::Cut).ok().flatten()?;
         let h = cut_history(crate::boolean_record::through(&r, 1, h.as_ref()), body, tools);
         Some(r.with_checked_history(h, &counts))
@@ -2149,6 +2179,7 @@ fn chamfer_built(body: &Body, edges: &[Vec3], distance: f64) -> Result<Body> {
                 let size = lc.size();
                 let solid = lc.deep_copy();
                 let ids = edge_ids(&lc, &solid, &g)?;
+                crate::blend_budget::spend("chamfering a whole loop")?;
                 match crate::loopblend::loop_blend(&solid, &ids, size, distance, false) {
                     Some(res) => {
                         let (made, rec) = guard("chamfer", || res)?;
@@ -2239,6 +2270,7 @@ fn chamfer_built(body: &Body, edges: &[Vec3], distance: f64) -> Result<Body> {
 
 /// `cur` cut by one cutter, with its history over `[cur]` (`None`: nothing left).
 fn cut_one(cur: &Body, t: &Cutter) -> Result<Option<Body>> {
+    crate::blend_budget::spend("cutting a chamfer")?;
     let counts = record::counts(&[cur]);
     Ok(crate::ops::boolean(cur, &t.body, crate::BoolOp::Cut)?.map(|r| {
         let h = cut_history(r.history().cloned(), cur, std::slice::from_ref(t));

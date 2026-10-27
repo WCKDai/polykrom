@@ -382,6 +382,43 @@ fn fillet_max_finds_the_largest_radius_that_works() {
     assert!(fillet_max(&b, &[Vec3::new(500.0, 0.0, 5.0)], 1.0).is_none());
 }
 
+/// A fillet under a work budget too small for it is refused at once, naming the step it ran out
+/// in and the edges; under one it fits in, it is the same body as with none (#243).
+#[test]
+fn a_blend_out_of_its_work_budget_is_refused_naming_the_step() {
+    let b = box_solid(Vec3::ZERO, Vec3::new(20.0, 20.0, 20.0)).unwrap();
+    let corner = [Vec3::new(10.0, 20.0, 20.0), Vec3::new(20.0, 10.0, 20.0), Vec3::new(20.0, 20.0, 10.0)];
+    let free = fillet(&b, &corner, 2.0).unwrap();
+    let e = with_blend_budget(1, &corner, || fillet(&b, &corner, 2.0)).unwrap_err().to_string();
+    assert!(e.contains("ran out of its work budget (1 steps) while") && e.contains("[10.00, 20.00, 20.00]"), "{e}");
+    let within = with_blend_budget(BLEND_WORK, &corner, || fillet(&b, &corner, 2.0)).unwrap();
+    let (m0, m1) = (measure(&free).unwrap(), measure(&within).unwrap());
+    assert_eq!((m0.volume.to_bits(), m0.area.to_bits(), m0.faces, m0.edges), (m1.volume.to_bits(), m1.area.to_bits(), m1.faces, m1.edges));
+    assert_eq!(blend_work_left(), None, "the budget ends with its scope");
+}
+
+/// The largest-radius search on an edge no radius takes (the tangent edge between a round and the
+/// face it runs into) stops after half the radius and a hundredth of it are refused, rather than
+/// halving a dozen times (#243): a few fillets' steps, not a dozen fillets'.
+#[test]
+fn fillet_max_stops_where_a_hundredth_of_the_radius_is_refused() {
+    let b = box_solid(Vec3::ZERO, Vec3::new(20.0, 20.0, 10.0)).unwrap();
+    let rounded = fillet(&b, &[Vec3::new(20.0, 10.0, 10.0)], 3.0).unwrap();
+    // Where the round meets the top face: tangent, no edge to blend.
+    let seam = [Vec3::new(17.0, 10.0, 10.0)];
+    assert!(fillet(&rounded, &seam, 1.0).is_err());
+    let one = with_blend_budget(10_000, &seam, || {
+        let _ = fillet(&rounded, &seam, 1.0);
+        Ok::<_, KernelError>(10_000 - blend_work_left().unwrap_or(0))
+    })
+    .unwrap();
+    let search =
+        with_blend_budget(10_000, &seam, || Ok::<_, KernelError>((fillet_max(&rounded, &seam, 1.0), 10_000 - blend_work_left().unwrap_or(0))))
+            .unwrap();
+    assert!(search.0.is_none());
+    assert!(search.1 <= 2 * one, "the search took {} steps, one fillet {one}", search.1);
+}
+
 /// Edges that share no face get their own largest radius: a 2 mm fin's top edge takes at most
 /// its thickness, while a corner of the block it stands on, far from it, keeps the 4 asked for.
 /// Edges that limit each other (the post's four, sharing faces) still share one.
