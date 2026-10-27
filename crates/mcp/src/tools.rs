@@ -328,10 +328,34 @@ pub fn tool_definitions() -> Vec<Value> {
             Effect::Files,
         ),
         tool(
+            "polish",
+            "Polish the design",
+            "A finishing pass: measure how finished the design is with inspect.polish (scores 0–100 per body and for the design, by \
+             category: look, print, strength, mass, tidy, assembly), and with `apply: \"safe\"` apply its fillets and chamfers through \
+             polish.apply (each group checked for a valid body, unchanged mass, no new interference and working joints, and rolled back \
+             if it fails) and measure again. Returns before and after scores, what was applied and skipped, the fixes still suggested \
+             and the findings to act on by hand. With `views`, also four model renders (front three-quarter, side, top, back \
+             three-quarter) as PNG paths to critique. Repeat, making the judgement changes in between, until the score stops rising \
+             (skill_reference solidcraft-polish).",
+            obj(
+                json!({
+                    "bodies": {"type": "array", "items": {"type": "string"}, "description": "Bodies to judge (default every visible solid body)"},
+                    "categories": {"type": "array", "items": {"type": "string", "enum": ["look", "print", "strength", "mass", "tidy", "assembly"]}, "description": "Only these categories' fixes and findings"},
+                    "apply": {"type": "string", "enum": ["safe", "none"], "description": "safe: apply the fillets and chamfers; none (default): only measure"},
+                    "views": {"type": "boolean", "description": "Also render four views (default false)"},
+                    "printed": {"type": "array", "items": {"type": "string"}, "description": "Bodies to judge as printed whatever their material"},
+                    "skip": {"type": "array", "items": {"type": "string"}, "description": "Bodies to leave out, such as bought parts modelled as blocks"},
+                    "max_fixes": {"type": "integer", "description": "How many fixes to list or try (1–100)"},
+                }),
+                &[],
+            ),
+            Effect::Files,
+        ),
+        tool(
             "skill_reference",
             "Skill reference",
             "Read a document of SolidCraft's bundled agent skills (solidcraft-modeling, solidcraft-mechanisms, \
-             solidcraft-editing, solidcraft-checking) from the copy built into SolidCraft. `file` defaults to reference.md; \
+             solidcraft-editing, solidcraft-checking, solidcraft-polish) from the copy built into SolidCraft. `file` defaults to reference.md; \
              each skill also has SKILL.md. Unknown skills or files are refused with the available ones.",
             obj(
                 json!({
@@ -360,6 +384,9 @@ fn type_matches(t: &str, v: &Value) -> bool {
 
 /// Validates `args` against the tool's schema (top level): unknown tool, missing required
 /// arguments, unknown arguments, type and enum mismatches.
+/// Tools whose list arguments must hold only items of the listed type.
+const STRICT_ITEMS: [&str; 1] = ["polish"];
+
 pub(crate) fn check_arguments(name: &str, args: &Value) -> Result<(), String> {
     let defs = tool_definitions();
     let def = defs.iter().find(|d| d["name"] == name).ok_or_else(|| format!("unknown tool `{name}`"))?;
@@ -394,6 +421,19 @@ pub(crate) fn check_arguments(name: &str, args: &Value) -> Result<(), String> {
         {
             return Err(format!("{name}: `{k}` must be one of {}", Value::Array(allowed.clone())));
         }
+        // A list's items, for the tools whose lists select what they change: `[null]` for a
+        // list of names must not read as an empty list (every body). Other tools' lists stay
+        // lenient (`select: [1]` is answered with what it missed).
+        if let (true, Some(items), Some(t)) = (STRICT_ITEMS.contains(&name), v.as_array(), p["items"]["type"].as_str()) {
+            if items.iter().any(|x| !type_matches(t, x)) {
+                return Err(format!("{name}: every item of `{k}` must be of type {t}"));
+            }
+            if let Some(allowed) = p["items"]["enum"].as_array()
+                && let Some(x) = items.iter().find(|x| !allowed.contains(x))
+            {
+                return Err(format!("{name}: `{k}` may not hold {x}; its items are one of {}", Value::Array(allowed.clone())));
+            }
+        }
     }
     Ok(())
 }
@@ -418,6 +458,7 @@ pub fn call_tool(b: &mut dyn Backend, name: &str, args: &Value) -> Value {
     let a = args.as_object().unwrap_or(&empty);
     let r = match name {
         "screenshot" => return screenshot(b, a),
+        "polish" => return polish_result(b, a),
         "batch" => return batch(b, a),
         _ => dispatch(b, name, a),
     };
@@ -632,6 +673,7 @@ fn dispatch(b: &mut dyn Backend, name: &str, a: &Map<String, Value>) -> Result<V
             None => exec(b, "diagnostics.crash_reports", pick(a, &["limit"])),
         },
         "skill_reference" => crate::skill_reference::read(a),
+        "polish" => polish(b, a).map(|(v, _)| v),
         "running" => b.call("control.running", json!({})),
         "undo" => exec(b, "edit.undo", json!({})),
         "redo" => exec(b, "edit.redo", json!({})),
@@ -722,6 +764,7 @@ fn batch_step(step: &Value) -> Result<(String, Value, Option<String>), String> {
         "pending" => Err("`pending` is a tool, not a command: call it on its own".into()),
         "running" => Err("`running` is a tool, not a command: call it on its own".into()),
         "skill_reference" => Err("`skill_reference` is a tool, not a command: call it on its own".into()),
+        "polish" => Err("`polish` is a tool, not a command: call it on its own (in a batch: inspect.polish or polish.apply)".into()),
         // An engine command: the step goes as it is.
         _ => Ok((String::new(), Value::Null, None)),
     }
@@ -741,6 +784,7 @@ const TOOL_STEPS: &[&str] = &[
     "new_design",
     "open",
     "pending",
+    "polish",
     "redo",
     "running",
     "save",
@@ -1136,6 +1180,92 @@ fn compact(mut v: Value) -> Value {
 }
 
 static SHOT: AtomicU64 = AtomicU64::new(0);
+
+/// `polish`: inspect.polish, then (apply "safe") polish.apply, and with `views` four renders to
+/// critique: front three-quarter, side, top and back three-quarter.
+/// The `polish` tool's result: its report as text and, with `views`, the four renders as
+/// images, so an agent without file access can look at them.
+fn polish_result(b: &mut dyn Backend, a: &Map<String, Value>) -> Value {
+    match polish(b, a) {
+        Ok((v, pngs)) => {
+            let mut r = text_result(&v, false);
+            if let Some(content) = r["content"].as_array_mut() {
+                content.extend(pngs.iter().map(|png| json!({"type": "image", "data": base64(png), "mimeType": "image/png"})));
+            }
+            r
+        }
+        Err(e) => text_result(&Value::String(e), true),
+    }
+}
+
+fn polish(b: &mut dyn Backend, a: &Map<String, Value>) -> Result<(Value, Vec<Vec<u8>>), String> {
+    let categories: Vec<&str> =
+        a.get("categories").and_then(Value::as_array).map(|v| v.iter().filter_map(Value::as_str).collect()).unwrap_or_default();
+    let wanted = |v: &Value| categories.is_empty() || categories.iter().any(|c| v["category"] == *c);
+    let mut out = match str_arg(a, "apply").unwrap_or("none") {
+        "safe" => exec(b, "polish.apply", pick(a, &["bodies", "categories", "printed", "skip", "max_fixes"]))?,
+        // Recommendations are capped at 50: the ones asked for, before the cap.
+        "none" => {
+            let r = exec(b, "inspect.polish", pick(a, &["bodies", "printed", "skip", "max_fixes"]))?;
+            let findings: Vec<Value> = r["bodies"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .flat_map(|body| body["findings"].as_array().into_iter().flatten().map(move |f| json!({"body": body["body"], "category": f["category"], "severity": f["severity"], "kind": f["kind"], "message": f["message"]})))
+                .chain(r["assembly"].as_array().into_iter().flatten().cloned())
+                .filter(|v| wanted(v))
+                .take(50)
+                .collect();
+            let score = json!({"score": r["score"], "scores": r["scores"]});
+            json!({"before": score, "after": score, "applied": [], "skipped": [], "fixes": r["fixes"], "recommendations": findings, "bodies": r["bodies"]})
+        }
+        other => return Err(format!("`apply` is safe or none, not `{other}`")),
+    };
+    // Only the categories asked for, whichever way the pass ran.
+    for k in ["fixes", "recommendations", "applied", "skipped"] {
+        if let Some(list) = out.get_mut(k).and_then(Value::as_array_mut) {
+            list.retain(|v| v.get("category").is_none() || wanted(v));
+        }
+    }
+    let mut pngs = Vec::new();
+    if a.get("views").and_then(Value::as_bool).unwrap_or(false) {
+        let dir = crate::scratch_dir().unwrap_or_else(vfs::temp_dir);
+        let n = SHOT.fetch_add(1, Ordering::Relaxed);
+        let mut views = Vec::new();
+        for (name, how) in [("front_three_quarter", "iso"), ("side", "right"), ("top", "top"), ("back_three_quarter", "back_iso")] {
+            let path = dir.join(format!("polish-{n}-{name}.png")).to_string_lossy().to_string();
+            let mut args = Map::new();
+            args.insert("path".into(), json!(path));
+            args.insert("source".into(), json!("model"));
+            if how == "back_iso" {
+                // The iso camera turned half way round the model.
+                let Ok(cam) = b.call("engine.execute", json!({"command": "view.apply", "params": {"view": "iso"}})) else { break };
+                let cam = cam.get("camera").cloned().unwrap_or(cam);
+                let mut c = json!({});
+                for k in ["target", "yaw", "pitch", "distance", "fov"] {
+                    if let Some(v) = cam.get(k).filter(|v| !v.is_null()) {
+                        c[k] = v.clone();
+                    }
+                }
+                c["yaw"] = json!(c["yaw"].as_f64().unwrap_or(0.0) + std::f64::consts::PI);
+                args.insert("camera".into(), c);
+            } else {
+                args.insert("view".into(), json!(how));
+            }
+            // The fixes are in: a render that fails is reported, not the whole pass.
+            match capture(b, &args) {
+                Ok((png, _)) => pngs.push(png),
+                Err(e) => {
+                    out["views_error"] = json!(e);
+                    break;
+                }
+            }
+            views.push(json!({"view": name, "path": path}));
+        }
+        out["views"] = json!(views);
+    }
+    Ok((out, pngs))
+}
 
 /// `screenshot`: render or capture to a file, return it as an MCP image content block.
 fn screenshot(b: &mut dyn Backend, a: &Map<String, Value>) -> Value {

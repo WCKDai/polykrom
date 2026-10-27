@@ -13,6 +13,7 @@ agent without file access (such as the one in SolidCraft's own chat) can still r
 | [`solidcraft-editing`](solidcraft-editing/SKILL.md) | changes, fixes or extends an existing design |
 | [`solidcraft-checking`](solidcraft-checking/SKILL.md) | builds, changes or ports a design, next to the two above: parameter ranges, every allowed value, exact STEP comparison, regression tests, designs kept in git |
 | [`solidcraft-mechanisms`](solidcraft-mechanisms/SKILL.md) | builds, drives or animates an assembly: components, joints, motion links, closed loops such as actuators, contact sets, motion studies |
+| [`solidcraft-polish`](solidcraft-polish/SKILL.md) | makes a working design look finished and print well, in measured passes: radius families, no raw boxes, lofted shells, chamfered first layers, colour blocking |
 
 They teach the agent to:
 - plan the part as numbers
