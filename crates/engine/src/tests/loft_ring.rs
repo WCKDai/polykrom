@@ -57,7 +57,7 @@ fn a_ring_section_keeps_its_hole_and_rejects_a_disc() {
 #[test]
 fn a_ring_lofted_to_a_point_is_refused() {
     let mut s = Session::default();
-    // Square, since lofting curved sections to a point is not supported at all yet.
+    // Square, so only the hole can be what is refused.
     run(&mut s, "sketch.create", json!({"plane": "XY", "name": "A"}));
     run(&mut s, "sketch.rectangle.two_point", json!({"p0": [-20, -20], "p1": [20, 20]}));
     run(&mut s, "sketch.rectangle.two_point", json!({"p0": [-12, -12], "p1": [12, 12]}));
@@ -100,4 +100,21 @@ fn tapered_ring_loft_reproduction() {
     s.run_script(&serde_json::from_str(include_str!("../../../../examples/regressions/loft_rings.json")).unwrap()).unwrap();
     let want = PI * 30.0 / 3.0 * ((400.0 + 280.0 + 196.0) - (144.0 + 96.0 + 64.0));
     assert!(rel(volume(&mut s), want) < 1e-3);
+}
+
+#[test]
+fn a_circle_lofts_to_a_point_as_a_spike() {
+    // TinyRex's dorsal spike (WCKDai/polycore#11): a circle on a plate, raked to a point above it.
+    let mut s = Session::default();
+    run(&mut s, "sketch.create", json!({"plane": "XY", "offset": 0, "name": "Base"}));
+    run(&mut s, "sketch.circle.center", json!({"center": [0, 0], "radius": 4.5}));
+    run(&mut s, "sketch.finish", json!({}));
+    run(&mut s, "sketch.create", json!({"plane": "XY", "offset": 9, "name": "Tip"}));
+    run(&mut s, "sketch.point", json!({"point": [-4, 0]}));
+    run(&mut s, "sketch.finish", json!({}));
+    run(&mut s, "solid.loft", json!({"sections": [{"sketch": "Base"}, {"sketch": "Tip", "point": "p1"}], "operation": "new"}));
+    let want = PI * 4.5 * 4.5 * 9.0 / 3.0;
+    let got = volume(&mut s);
+    assert!(rel(got, want) < 2e-3, "{got} vs {want}");
+    assert!(s.model.state().bodies[0].body.validity().is_empty());
 }
