@@ -1057,6 +1057,30 @@ mod tests {
         assert!(hit.merged && hit.split && !hit.verified && hit.on_point, "{hit:?}");
     }
 
+    /// A command working on one body's faces keeps to that body: another body with a piece of
+    /// that number at the point does not take a renumbered piece's reference (#143).
+    #[test]
+    fn a_renumbered_piece_stays_on_the_body_asked_for() {
+        let block = solidcraft_kernel::box_solid(Vec3::ZERO, Vec3::new(4., 2., 1.)).unwrap();
+        let faces = block.faces(0.01).unwrap();
+        let facing = |z: f64| faces.iter().find(|f| f.plane_normal.is_some_and(|n| n.z * z > 0.99)).unwrap().index;
+        let (top, bottom) = (facing(1.0), facing(-1.0));
+        let named = |body: &str, at: &[(usize, &str)]| {
+            let mut names: Vec<String> = (0..faces.len()).map(|i| format!("{body}:face:{i}")).collect();
+            for (i, n) in at {
+                names[*i] = n.to_string();
+            }
+            let mut b = ModelBody::new(body.into(), block.clone(), 1);
+            b.names = NameCell::saved(Arc::new(crate::history_names::Names::given(Arc::new(names))), Some(1));
+            b
+        };
+        let mut st = ModelState::default();
+        // On A the piece picked was #2 and is #1 now; B, in the same place, has a #2 there.
+        st.bodies = vec![named("A", &[(top, "X#1"), (bottom, "X#2")]), named("B", &[(top, "X#2")])];
+        let hit = crate::name_lookup::locate_face_on_body(&st, Some("A"), "X#2", Vec3::new(2., 1., 1.)).unwrap();
+        assert_eq!((hit.body, hit.face), (0, top), "{hit:?}");
+    }
+
     fn same_hit(a: &FaceHit, b: &FaceHit) {
         assert_eq!((a.body, a.face, a.point), (b.body, b.face, b.point));
         assert_eq!((a.split, a.merged, a.verified, a.on_point, a.legacy), (b.split, b.merged, b.verified, b.on_point, b.legacy));

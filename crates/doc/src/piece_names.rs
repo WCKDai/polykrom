@@ -130,12 +130,11 @@ pub(crate) fn strip_edge_piece(n: &str) -> String {
     out
 }
 
-/// `n` without the numbers that tell pieces apart only by where they lie: a piece's `#k` and an
-/// edge's own `~k`. Names alike but for those name pieces that nothing around them tells apart,
-/// numbered along their spread: an upstream edit that adds or takes away such a piece renumbers
-/// the others (#143).
-pub(crate) fn without_numbers(n: &str) -> String {
-    let n = strip_edge_number(n);
+/// A face name without the numbers that tell pieces apart only by where they lie (`#k`). Names
+/// alike but for those name pieces that nothing around them tells apart, numbered along their
+/// spread: an upstream edit that adds or takes away such a piece renumbers the others (#143). An
+/// edge number a face's name carries (a blend's `~k`) stays: it names another edge.
+pub(crate) fn without_piece_numbers(n: &str) -> String {
     let mut out = String::with_capacity(n.len());
     let mut chars = n.char_indices().peekable();
     while let Some((i, c)) = chars.next() {
@@ -148,6 +147,12 @@ pub(crate) fn without_numbers(n: &str) -> String {
         out.push(c);
     }
     out
+}
+
+/// An edge name without the numbers that tell pieces apart only by where they lie: its faces'
+/// (`#k`) and its own (`~k`).
+pub(crate) fn without_numbers(n: &str) -> String {
+    without_piece_numbers(strip_edge_number(n))
 }
 
 /// An edge name without its own number (`~k`).
