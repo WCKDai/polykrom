@@ -16,7 +16,7 @@ use serde_json::{Map, Value, json};
 use solidcraft_doc::joints::Snap;
 
 use super::CommandSpec;
-use crate::params::{bad, bool_, num, string_list};
+use crate::params::{bad, bool_, num};
 use crate::{Result, Session};
 
 pub static COMMANDS: &[CommandSpec] = &[CommandSpec::new("polish.apply", "Apply Polish", apply).icon("polish").params(
@@ -29,14 +29,29 @@ pub static COMMANDS: &[CommandSpec] = &[CommandSpec::new("polish.apply", "Apply 
      later run skips it at once), \
      every edge on a face a joint origin names, invalid body, new interference, joints no longer resolve, mass changed, score fell, or already fixed \
      by an earlier fix), held_edges: [{id, edges}] (edges left out of a fix because they lie on a face a joint origin names), fixes (what \
-     inspect.polish still suggests), fixes_left (how many of them are safe: run again), recommendations: [findings, most severe first; \
-     fix: [ids] on one a listed safe fix still covers], checks (how many times touched \
+     inspect.polish still suggests), fixes_left (how many of them are safe: run again), recommendations: [findings (of `categories` when given), most \
+     severe first; fix: [ids] on one a listed safe fix still covers], checks (how many times touched \
      bodies were checked), ms: {inspect, fixes, checks}. A fix on a body an earlier fix changed is worked out again from the body as it \
      is now. One undo step",
 )];
 
 /// The inspect.polish parameters a run passes on.
 const PASSED: [&str; 4] = ["bodies", "printed", "skip", "sharp_deg"];
+/// The categories inspect.polish reports.
+const CATEGORIES: [&str; 6] = ["look", "print", "strength", "mass", "tidy", "assembly"];
+
+/// A list of strings parameter (`None`: not given); anything else in it is refused, so a
+/// malformed selection never widens to every fix.
+fn strings(p: &Value, k: &str, cmd: &str) -> Result<Vec<String>> {
+    match p.get(k).filter(|v| !v.is_null()) {
+        None => Ok(Vec::new()),
+        Some(Value::Array(a)) => {
+            a.iter().map(|v| v.as_str().map(str::to_string).ok_or_else(|| bad(cmd, format!("`{k}` must list strings")))).collect()
+        }
+        Some(_) => Err(bad(cmd, format!("`{k}` must be a list of strings"))),
+    }
+}
+
 /// How far a fix may lower a body's score (rounding) or deepen a clash (mm) and still stay.
 const SCORE_SLACK: f64 = 0.5;
 const DEPTH_SLACK: f64 = 0.05;
@@ -69,6 +84,8 @@ struct State {
     joint_errors: BTreeSet<u64>,
     /// The touched bodies each checked joint holds.
     joint_bodies: BTreeMap<u64, BTreeSet<String>>,
+    /// Every placement of a touched body's part, with the touched body it is.
+    owner: BTreeMap<String, String>,
     clashes: BTreeMap<(String, String), f64>,
 }
 
@@ -103,7 +120,10 @@ fn apply(s: &mut Session, p: &Value) -> Result<Value> {
     ask.insert("max_fixes".into(), json!(max));
     let ask = Value::Object(ask);
     let before = s.execute("inspect.polish", &ask)?;
-    let (ids, categories) = (string_list(p, "fixes"), string_list(p, "categories"));
+    let (ids, categories) = (strings(p, "fixes", cmd)?, strings(p, "categories", cmd)?);
+    if let Some(c) = categories.iter().find(|c| !CATEGORIES.contains(&c.as_str())) {
+        return Err(bad(cmd, format!("unknown category `{c}` ({})", CATEGORIES.join(", "))));
+    }
     let all = before["fixes"].as_array().cloned().unwrap_or_default();
     if let Some(missing) = ids.iter().find(|id| !all.iter().any(|f| f["id"] == id.as_str())) {
         return Err(bad(cmd, format!("no fix `{missing}` (inspect.polish lists them)")));
@@ -167,6 +187,8 @@ fn apply(s: &mut Session, p: &Value) -> Result<Value> {
             r["fix"] = json!(ids);
         }
     }
+    // With categories, the recommendations are theirs: chosen before the cap of 50.
+    recommendations.retain(|r| categories.is_empty() || categories.iter().any(|c| r["category"] == c.as_str()));
     recommendations.sort_by_key(rank);
     recommendations.truncate(50);
     // Applied and skipped in the order inspect.polish listed the fixes, whatever order they settled in.
@@ -471,44 +493,56 @@ fn fresh(s: &mut Session, ask: &Value, fix: &Fix) -> Option<Value> {
 /// that lists the face's neighbours with it), so the origin is still found. A fix left with none
 /// is skipped. Returns the edges left out, by fix.
 fn hold_joint_edges(s: &Session, fixes: &mut [Fix], run: &mut Run) -> Vec<Value> {
-    let origins: Vec<&solidcraft_doc::joints::JointOrigin> =
-        s.doc.assembly.joints.iter().flat_map(|j| [&j.a, &j.b]).chain(s.doc.assembly.origins.iter().map(|o| &o.origin)).collect();
-    if origins.is_empty() {
-        return Vec::new();
-    }
-    let component = |occ: u64| s.doc.occurrences.iter().find(|o| o.id == occ).map_or(0, |o| o.component);
-    let st = s.world_state();
     let mut held = Vec::new();
     for (i, fix) in fixes.iter_mut().enumerate() {
-        let Some(b) = st.body(&fix.body) else { continue };
-        let snaps: Vec<&Snap> = origins.iter().filter(|o| component(o.occurrence) == b.component).map(|o| &o.snap).collect();
-        if snaps.is_empty() {
-            continue;
-        }
-        let points: Vec<Value> = fix.params["edges"].as_array().cloned().unwrap_or_default();
-        let at: Vec<solidcraft_geom::Vec3> = points.iter().filter_map(crate::params::vec3).collect();
-        let names = solidcraft_doc::naming::edge_names_at(b, &at);
-        // The faces and edges the origins name; an edge on such a face changes the face (and its
-        // name, which can list its neighbours), so the origin may no longer be found.
-        let named: BTreeSet<&str> =
-            snaps.iter().flat_map(|snap| snap.face_names()).flat_map(|n| std::iter::once(n.as_str()).chain(n.split('|'))).collect();
-        let holds = |name: &str| named.contains(name) || name.split('|').any(|f| named.contains(f));
-        let keep: Vec<Value> = points.iter().zip(&names).filter(|(_, n)| n.is_empty() || !holds(n)).map(|(p, _)| p.clone()).collect();
-        let left_out = points.len().saturating_sub(keep.len());
+        let (params, left_out) = hold_edges(s, &fix.body, fix.params.clone());
         if left_out == 0 {
             continue;
         }
         held.push(json!({"id": fix.id, "edges": left_out}));
-        if keep.is_empty() {
+        if params["edges"].as_array().is_none_or(|e| e.is_empty()) {
             run.skipped.push(
                 json!({"id": fix.id, "body": fix.body, "command": fix.command, "reason": "every edge is on a face a joint origin is attached to"}),
             );
             run.out.insert(i);
         } else {
-            fix.params["edges"] = json!(keep);
+            fix.params = params;
         }
     }
     held
+}
+
+/// A fix's parameters on `body` without the edges a joint origin is attached to (see
+/// [`hold_joint_edges`]), and how many were left out.
+fn hold_edges(s: &Session, body: &str, mut params: Value) -> (Value, usize) {
+    let st = s.world_state();
+    let Some(b) = st.body(body) else { return (params, 0) };
+    let component = |occ: u64| s.doc.occurrences.iter().find(|o| o.id == occ).map_or(0, |o| o.component);
+    let snaps: Vec<&Snap> = s
+        .doc
+        .assembly
+        .joints
+        .iter()
+        .flat_map(|j| [&j.a, &j.b])
+        .chain(s.doc.assembly.origins.iter().map(|o| &o.origin))
+        .filter(|o| component(o.occurrence) == b.component)
+        .map(|o| &o.snap)
+        .collect();
+    if snaps.is_empty() {
+        return (params, 0);
+    }
+    let points: Vec<Value> = params["edges"].as_array().cloned().unwrap_or_default();
+    let at: Vec<solidcraft_geom::Vec3> = points.iter().filter_map(crate::params::vec3).collect();
+    let names = solidcraft_doc::naming::edge_names_at(b, &at);
+    // The faces and edges the origins name; an edge on such a face changes the face (and its
+    // name, which can list its neighbours), so the origin may no longer be found.
+    let named: BTreeSet<&str> =
+        snaps.iter().flat_map(|snap| snap.face_names()).flat_map(|n| std::iter::once(n.as_str()).chain(n.split('|'))).collect();
+    let holds = |name: &str| named.contains(name) || name.split('|').any(|f| named.contains(f));
+    let keep: Vec<Value> = points.iter().zip(&names).filter(|(_, n)| n.is_empty() || !holds(n)).map(|(p, _)| p.clone()).collect();
+    let left_out = points.len().saturating_sub(keep.len());
+    params["edges"] = json!(keep);
+    (params, left_out)
 }
 
 /// The touched bodies' volume (from their display meshes), validity and polish score, the joints
@@ -520,6 +554,8 @@ fn state(s: &mut Session, run: &mut Run, touched: &BTreeSet<String>) -> State {
     let mut bodies = BTreeMap::new();
     let mut around: BTreeSet<String> = touched.clone();
     let mut components = BTreeSet::new();
+    // A fix changes every placement of a part: each placement's clashes count as its body's.
+    let mut owner: BTreeMap<String, String> = BTreeMap::new();
     for name in touched {
         let Some(b) = st.body(name) else {
             bodies.insert(name.clone(), BodyState { volume: None, invalid: usize::MAX, score: None });
@@ -529,8 +565,11 @@ fn state(s: &mut Session, run: &mut Run, touched: &BTreeSet<String>) -> State {
         let volume = m.triangles.iter().filter_map(|t| m.tri(t)).map(|[a, b, c]| a.dot(b.cross(c)) / 6.0).sum::<f64>().abs();
         bodies.insert(name.clone(), BodyState { volume: Some(volume), invalid: b.body.validity().len(), score: None });
         components.insert(b.component);
-        let bx = m.bounds().inflated(NEIGHBOUR_GAP);
-        around.extend(st.bodies.iter().filter(|o| !touched.contains(&o.name) && o.mesh().bounds().meets(&bx)).map(|o| o.name.clone()));
+        for placed in st.bodies.iter().filter(|o| o.definition_name() == b.definition_name()) {
+            owner.insert(placed.name.clone(), name.clone());
+            let bx = placed.mesh().bounds().inflated(NEIGHBOUR_GAP);
+            around.extend(st.bodies.iter().filter(|o| o.mesh().bounds().meets(&bx)).map(|o| o.name.clone()));
+        }
     }
     // Scores, every touched body in one call.
     let mut ask = run.ask.clone();
@@ -566,10 +605,10 @@ fn state(s: &mut Session, run: &mut Run, touched: &BTreeSet<String>) -> State {
         .unwrap_or_default()
         .iter()
         .filter_map(|h| Some(((h["a"].as_str()?.to_string(), h["b"].as_str()?.to_string()), h["depth_mm"].as_f64().unwrap_or(0.0))))
-        .filter(|((a, b), _)| touched.contains(a) || touched.contains(b))
+        .filter(|((a, b), _)| owner.contains_key(a) || owner.contains_key(b))
         .collect();
     run.ms[2] += t.elapsed().as_secs_f64() * 1000.0;
-    State { bodies, joint_errors, joint_bodies, clashes }
+    State { bodies, joint_errors, joint_bodies, clashes, owner }
 }
 
 /// Why the state after a batch is worse than before it (`None`: it isn't), and the touched bodies
@@ -586,6 +625,9 @@ fn worse(was: &State, now: &State, mass_tol: f64) -> Option<(String, BTreeSet<St
         let Some(a) = was.bodies.get(name) else { continue };
         let reason = if b.invalid > a.invalid {
             Some(format!("{name} is no longer valid"))
+        } else if b.volume.is_none() || b.score.is_none() {
+            // What can't be measured after the fix isn't known to be fine.
+            Some(format!("{name} could not be measured after the fix"))
         } else if let (Some(x), Some(y)) = (a.volume, b.volume)
             && x > 0.0
             && ((y - x) / x).abs() > mass_tol
@@ -606,7 +648,7 @@ fn worse(was: &State, now: &State, mass_tol: f64) -> Option<(String, BTreeSet<St
         fault("joints no longer resolve".into(), &mut now.joint_bodies.get(j).into_iter().flatten().cloned());
     }
     for ((a, b), _) in now.clashes.iter().filter(|(k, d)| was.clashes.get(*k).is_none_or(|w| **d > w + DEPTH_SLACK)) {
-        fault(format!("{a} and {b} interfere"), &mut [a, b].into_iter().filter(|n| now.bodies.contains_key(*n)).cloned());
+        fault(format!("{a} and {b} interfere"), &mut [a, b].into_iter().filter_map(|n| now.owner.get(n)).cloned());
     }
     why.map(|w| (w, at_fault))
 }

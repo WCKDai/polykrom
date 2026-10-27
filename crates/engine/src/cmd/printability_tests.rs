@@ -407,3 +407,18 @@ fn polish_apply_batches_many_bodies_without_using_up_checkpoints() {
     assert_eq!(r["skipped"].as_array().map(Vec::len), Some(1), "{r}");
     assert_eq!(run(&mut s, "edit.restore_checkpoint", json!({"checkpoint": mark}))["restored"], true);
 }
+
+#[test]
+fn polish_apply_refuses_a_malformed_selection_and_keeps_the_sessions_checkpoints() {
+    let mut s = Session::default();
+    run(&mut s, "solid.box", json!({"length": 40, "width": 20, "height": 10, "body_name": "Block"}));
+    // A selection that isn't strings is refused rather than read as "every fix".
+    assert!(s.execute("polish.apply", &json!({"fixes": [42]})).is_err());
+    assert!(s.execute("polish.apply", &json!({"categories": [42]})).is_err());
+    assert!(s.execute("polish.apply", &json!({"categories": ["shiny"]})).is_err());
+    // Sixteen checkpoints, the most a session keeps: a run (one fix rolled back) leaves them all.
+    let marks: Vec<Value> = (0..16).map(|_| run(&mut s, "edit.checkpoint", json!({}))["checkpoint"].clone()).collect();
+    let r = run(&mut s, "polish.apply", json!({"mass_tol": 0}));
+    assert_eq!(r["skipped"].as_array().map(Vec::len), Some(1), "{r}");
+    assert_eq!(run(&mut s, "edit.restore_checkpoint", json!({"checkpoint": marks[0]}))["restored"], true);
+}
