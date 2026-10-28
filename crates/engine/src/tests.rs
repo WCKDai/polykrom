@@ -906,6 +906,11 @@ fn unknown_commands_suggest_the_closest_ids() {
     assert!(msg("solid.extrud").starts_with("unknown command `solid.extrud` (did you mean `solid.extrude`"), "{}", msg("solid.extrud"));
     assert!(msg("Extrude").contains("`solid.extrude`"), "{}", msg("Extrude"));
     assert_eq!(msg("FusionFilletEdgesCommand"), "unknown command `FusionFilletEdgesCommand`");
+    // A family's name leads to its members (TinyRex's agent asked for `sketch.spline` and was
+    // offered `sketch.line`).
+    let spline = msg("sketch.spline");
+    assert!(spline.starts_with("unknown command `sketch.spline` (did you mean `sketch.spline."), "{spline}");
+    assert!(spline.contains("`sketch.spline.fit_point`"), "{spline}");
     let long = "x".repeat(10_000);
     assert_eq!(msg(&long), format!("unknown command `{long}`"));
 }
