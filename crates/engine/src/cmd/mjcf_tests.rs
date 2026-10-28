@@ -370,3 +370,40 @@ fn mjcf_hollow_shell_has_its_mass_and_inertia_and_a_closed_mesh() {
     assert!(stl_closed(&stl), "the shell's mesh is closed");
     let _ = std::fs::remove_dir_all(&d);
 }
+
+/// Each rated servo's gain is scaled to its rating against the strongest one's, so a micro servo
+/// (TinyRex's SG90 jaw among STS3215s) reaches its force limit at the same error as the big ones
+/// instead of a hundredth of a degree off its target; a gain asked for stays one for all.
+#[test]
+fn mjcf_gains_follow_the_ratings() {
+    let mut s = arm();
+    run(&mut s, "component.activate", json!({"component": "root"}));
+    run(&mut s, "component.create", json!({"name": "Jaw"}));
+    run(&mut s, "solid.box", json!({"length": 20, "width": 10, "height": 3, "corner": [42, 30, 0]}));
+    run(&mut s, "solid.cylinder", json!({"base": [42, 33, 4], "axis": [1, 0, 0], "radius": 4, "height": 10, "operation": "new"}));
+    run(
+        &mut s,
+        "joint.create",
+        json!({"type": "revolute", "a": {"occurrence": "Jaw", "circle": [43, 37, 4]}, "b": {"occurrence": "Arm", "circle": [1, 37, 4]},
+               "flip": true, "name": "Hinge", "limits": [[-30, 30]]}),
+    );
+    // A joint's rating is its `a` side's (the servo's), then its `b` side's.
+    for (component, nm) in [("Arm", 1.912), ("Jaw", 0.177)] {
+        let ratings = json!({"kind": "servo", "stall_torque_nm": nm, "speed_rpm": 50});
+        let values = serde_json::Map::from_iter([(crate::cmd::parts::RATINGS_KEY.to_string(), ratings)]);
+        run(&mut s, "component.metadata.set", json!({"component": component, "values": values}));
+    }
+    let d = temp("gains");
+    let (_, xml) = export(&mut s, &d, "a.xml", json!({}));
+    let kp = |joint: &str| -> f64 {
+        let at = xml.find(&format!(r#"<position name="{joint}""#)).unwrap_or_else(|| panic!("{joint}: {xml}"));
+        let rest = &xml[at..];
+        let k = rest.find("kp=\"").unwrap() + 4;
+        rest[k..k + rest[k..].find('"').unwrap()].parse().unwrap()
+    };
+    assert_eq!(kp("Elbow"), 1000.0);
+    assert!((kp("Hinge") - 1000.0 * 0.177 / 1.912).abs() < 0.01, "{}", kp("Hinge"));
+    let (_, xml) = export(&mut s, &d, "b.xml", json!({"kp": 7}));
+    assert_eq!(xml.matches(r#"kp="7""#).count(), 2, "{xml}");
+    let _ = std::fs::remove_dir_all(&d);
+}
