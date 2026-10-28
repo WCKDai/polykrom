@@ -263,20 +263,30 @@ pub fn mjcf(doc: &Document, st: &ModelState, stem: &str, options: &MjcfOptions) 
         }
         s += "  </equality>\n";
     }
-    let kp = positive(options.kp).unwrap_or(DEFAULT_KP);
     let mut ctrl = Vec::new();
     let mut unrated = Vec::new();
     let mut actuators = Vec::new();
     let driven: Vec<&UrdfJoint> = moving.iter().copied().filter(|j| j.mimic.is_none()).collect();
+    let rating = |j: &UrdfJoint| j.source.filter(|_| j.step == Step::Revolute).and_then(|(id, _)| positive(options.torques.get(&id).copied()));
+    // Without a gain asked for, each rated servo's is scaled to its rating against the strongest
+    // one's, which keeps [`DEFAULT_KP`]: every servo then reaches its force limit at the same error.
+    // One gain for all made a micro servo saturate a hundredth of a degree off its target
+    // (TinyRex's SG90 jaw among STS3215s).
+    let strongest = driven.iter().filter_map(|j| rating(j)).fold(0.0_f64, f64::max);
+    let gain = |rated: Option<f64>| match (positive(options.kp), rated) {
+        (Some(kp), _) => kp,
+        (None, Some(r)) if strongest > 0.0 => DEFAULT_KP * r / strongest,
+        (None, _) => DEFAULT_KP,
+    };
     if !driven.is_empty() {
         s += "  <actuator>\n";
         for j in driven {
-            let rated = j.source.filter(|_| j.step == Step::Revolute).and_then(|(id, _)| positive(options.torques.get(&id).copied()));
+            let rated = rating(j);
             let force = rated.or(effort).unwrap_or_else(|| {
                 unrated.push(j.name.clone());
                 urdf::DEFAULT_EFFORT
             });
-            s += &format!("    <position name=\"{}\" joint=\"{}\" kp=\"{}\" dampratio=\"1\"", attr(&j.name), attr(&j.name), num(kp));
+            s += &format!("    <position name=\"{}\" joint=\"{}\" kp=\"{}\" dampratio=\"1\"", attr(&j.name), attr(&j.name), num(gain(rated)));
             let scale = if j.step == Step::Prismatic { 1e-3 } else { 1.0 };
             let range = j.limit.map(|(lo, hi)| (lo * scale, hi * scale));
             if let Some((lo, hi)) = range {
