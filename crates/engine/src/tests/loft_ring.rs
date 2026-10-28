@@ -118,3 +118,16 @@ fn a_circle_lofts_to_a_point_as_a_spike() {
     assert!(rel(got, want) < 2e-3, "{got} vs {want}");
     assert!(s.model.state().bodies[0].body.validity().is_empty());
 }
+
+#[test]
+fn a_ball_rounds_the_end_of_a_rod() {
+    // TinyRex's toe (WCKDai/polycore#17): a ball of the rod's radius joined to its end.
+    let mut s = Session::default();
+    let base = json!([32, 35, -121.655]);
+    run(&mut s, "solid.cylinder", json!({"radius": 3.5, "height": 28, "base": base, "axis": [1, 0, 0], "operation": "new", "body_name": "Toe"}));
+    run(&mut s, "solid.sphere", json!({"radius": 3.5, "center": [60, 35, -121.655], "operation": "join", "targets": ["Toe"]}));
+    let want = PI * 3.5 * 3.5 * 28.0 + 2.0 / 3.0 * PI * 3.5 * 3.5 * 3.5;
+    let got = volume(&mut s);
+    assert!(rel(got, want) < 2e-3, "{got} vs {want}");
+    assert_eq!(s.model.state().bodies.len(), 1);
+}
