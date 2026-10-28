@@ -117,6 +117,9 @@ fn a_circle_lofts_to_a_point_as_a_spike() {
     let got = volume(&mut s);
     assert!(rel(got, want) < 2e-3, "{got} vs {want}");
     assert!(s.model.state().bodies[0].body.validity().is_empty());
+    // Its apex has no surface normal; the render workspace refuses a mesh with a NaN one.
+    let mesh = s.model.state().bodies[0].body.tessellate(0.01).unwrap();
+    assert!(mesh.normals.iter().all(|n| n.is_finite()), "a non-finite normal at the spike's tip");
 }
 
 #[test]
