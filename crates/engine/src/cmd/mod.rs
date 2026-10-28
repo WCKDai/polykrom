@@ -328,9 +328,10 @@ pub fn find_command(id: &str) -> Option<&'static CommandSpec> {
     all.iter().find(|c| c.id == id).or_else(|| all.iter().find(|c| c.id.eq_ignore_ascii_case(id))).copied()
 }
 
-/// The end of an unknown command's error: up to three ids like `id`, nearest first. Ids a few
-/// letters away (`solid.extrud` → `solid.extrude`) come before ids that end in the same word
-/// (`file.open` → `doc.open`). Empty when nothing is close.
+/// The end of an unknown command's error: up to three ids like `id`, nearest first. A family the
+/// id names (`sketch.spline` → `sketch.spline.fit_point`) comes first, then ids a few letters
+/// away (`solid.extrud` → `solid.extrude`), then ids that end in the same word (`file.open` →
+/// `doc.open`). Empty when nothing is close.
 pub(crate) fn did_you_mean(id: &str) -> String {
     let id = id.to_ascii_lowercase();
     if id.len() > 64 {
@@ -338,11 +339,21 @@ pub(crate) fn did_you_mean(id: &str) -> String {
     }
     let last = |s: &str| s.rsplit('.').next().unwrap_or(s).to_string();
     let near = (id.chars().count() / 4).max(2);
-    let mut found: Vec<(bool, usize, &str)> = command_specs()
+    let family = format!("{}.", id.trim_end_matches('.'));
+    let mut found: Vec<(u8, usize, &str)> = command_specs()
         .iter()
         .filter_map(|c| {
             let d = edit_distance(&id, c.id);
-            (d <= near || last(&id) == last(c.id)).then_some((d > near, d, c.id))
+            let rank = if c.id.starts_with(&family) {
+                0
+            } else if d <= near {
+                1
+            } else if last(&id) == last(c.id) {
+                2
+            } else {
+                return None;
+            };
+            Some((rank, d, c.id))
         })
         .collect();
     found.sort();
