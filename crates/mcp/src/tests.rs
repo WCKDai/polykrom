@@ -847,6 +847,7 @@ fn tool_calls_stay_inside_the_agents_folders() {
 #[cfg(windows)]
 fn short_spelling(path: &std::path::Path) -> Option<std::path::PathBuf> {
     use std::os::windows::process::CommandExt;
+    // nosemgrep: agents.config.eng-rust-command-shell -- test-only duplicate of the Windows short-name lookup.
     let out = std::process::Command::new("cmd").raw_arg(format!("/d /c for %I in (\"{}\") do @echo %~sI", path.display())).output().ok()?;
     Some(String::from_utf8_lossy(&out.stdout).trim().to_string())
         .filter(|s| solidcraft_engine::io::vfs::windows_refusal(s).is_some_and(|why| why.contains("8.3")))

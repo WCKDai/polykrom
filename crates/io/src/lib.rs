@@ -988,6 +988,19 @@ mod tests {
         assert!(read_stl(&fake).is_err());
     }
 
+    /// The checked-in contract fixture keeps the pre-rename `solvecraft/N` tag readable and
+    /// re-tags it when saved (docs/compatibility.md §2). It is a fixed byte fixture, not a
+    /// generated document, so a change to the reader or writer fails here.
+    #[test]
+    fn legacy_contract_fixture_loads_and_retags() {
+        let bytes = include_bytes!("../tests/fixtures/legacy-solvecraft-v1.solidcraft");
+        let doc = read_design(bytes).expect("legacy fixture must open");
+        assert_eq!(doc.name, "Untitled");
+        let saved = String::from_utf8(write_design(&doc)).expect("design JSON is UTF-8");
+        assert!(saved.contains("\"solidcraft/"), "saved design keeps the current tag");
+        assert!(!saved.contains("solvecraft/"), "saved design is re-tagged");
+    }
+
     /// A frame holding a plate and two posts, whose solids carry the names of the last feature
     /// that made them, as some CAD systems write them; as STEP text.
     fn frame_step() -> String {

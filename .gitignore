@@ -14,3 +14,5 @@ mutants.out*/
 
 # Wrangler cache (account details); never commit it.
 .wrangler/
+.agents/evidence/
+.worktrees/

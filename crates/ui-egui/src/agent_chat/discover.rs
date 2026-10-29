@@ -303,7 +303,9 @@ pub(super) fn command_for(program: &Path) -> Command {
     let shim = if cfg!(windows) { runnable_sibling(program) } else { None };
     let program = shim.as_deref().unwrap_or(program);
     let mut cmd = if cfg!(windows) && program.extension().is_some_and(|e| e.eq_ignore_ascii_case("cmd") || e.eq_ignore_ascii_case("bat")) {
-        let mut c = Command::new("cmd");
+        // nosemgrep: agents.config.eng-rust-command-shell -- a .cmd/.bat shim needs cmd.exe; the program path is
+        // user-selected and passed as one argument after /C, not built from shell text.
+        let mut c = Command::new("cmd"); // nosemgrep: agents.config.eng-rust-command-shell
         c.arg("/C").arg(program);
         c
     } else {
