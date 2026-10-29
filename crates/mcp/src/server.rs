@@ -43,7 +43,9 @@ threaded, not as a clash: put a cosmetic thread on it with `solid.thread`, libra
 run mechanisms with `motion.study {name, steps, keys}`, check them with `motion.interference` and record them with \
 `motion.export_animation {study, path}`; check strength with `analysis.static_stress`, and that a robot stands and walks with `sim.mujoco {study?}`. Once it works, polish \
 the finish in passes with `polish {apply: safe, views: true}` (`inspect.polish` measures sharp edges, radius family, boxiness, \
-printability and tidiness; `polish.apply` applies its safe fillets and chamfers) until the score stops rising. Before modelling, state the numbers the result \
+printability and tidiness; `polish.apply` applies its safe fillets and chamfers) until the score stops rising. To match a concept, insert it \
+(`file.insert_mesh`), fit it with `inspect.fit_reference {reference, apply: true}` and compare with \
+`inspect.compare_reference {reference}` after each change. Before modelling, state the numbers the result \
 must meet (sizes, volume, mass, clearances, travel); before saying it is done, check each with `measure` or the inspect commands. \
 On large designs keep replies small with a select list on `execute` and on each `batch` step (dotted paths, * for list items: \
 [\"total.mass_g\", \"bodies.*.name\"]), check whole assemblies with `inspect.interference {method: mesh}` (seconds) before exact \

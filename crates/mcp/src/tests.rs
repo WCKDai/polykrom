@@ -2249,6 +2249,14 @@ fn polish_measures_applies_and_renders_four_views() {
     let faceted = tool(&mut s, "polish", json!({"style": "faceted", "bodies": ["Facet"]}));
     assert_eq!(faceted["style"]["used"], "faceted", "{faceted}");
     assert!(faceted["fixes"].as_array().unwrap().iter().all(|f| f["command"] == "solid.chamfer"), "{faceted}");
+    // A concept to match: the reply carries the comparison.
+    tool(
+        &mut s,
+        "execute",
+        json!({"command": "solid.box", "params": {"length": 30, "width": 20, "height": 10, "corner": [0, 60, 0], "operation": "new_body", "body_name": "Concept"}}),
+    );
+    let matched = tool(&mut s, "polish", json!({"bodies": ["Facet"], "reference": ["Concept"]}));
+    assert!(matched["reference_match"]["score"].as_f64().unwrap() > 99.0, "{matched}");
     let r = raw_tool(&mut s, "polish", json!({"style": "baroque"}));
     assert_eq!(r["error"]["code"], -32602, "{r}");
     let r = raw_tool(&mut s, "polish", json!({"apply": "all"}));

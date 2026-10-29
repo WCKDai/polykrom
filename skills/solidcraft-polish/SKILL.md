@@ -17,6 +17,16 @@ The finish follows a style, and `inspect.polish`, `polish.apply` and the `polish
 
 When the brief or the concept art shows a style, ask for it explicitly. If a faceted concept is judged as organic, the pass rounds every crisp edge it should keep. For a raw blockout of a faceted design, ask for `faceted`, because `auto` sees no chamfers yet.
 
+## Matching a concept
+When the design is restyled to concept art or a concept model, measure the match instead of eyeballing it:
+1. **Insert the concept** as a mesh: `execute file.insert_mesh {"path": "concept.3mf"}`. A 3MF's objects come in as mesh bodies with their colours.
+2. **Fit it:** `execute inspect.fit_reference {"reference": ["<mesh body>"], "apply": true}` scales it uniformly and moves it onto the design, by bounding box (`method: "principal"` uses the surface spread and reports the axes' angles to turn by hand). Check `residual`: per-axis ratios far from 1 mean the proportions differ, not the scale.
+3. **Compare:** `execute inspect.compare_reference {"reference": ["<mesh body>"]}`, or `polish {"reference": ["<mesh body>"]}`. It reports, from the left, front, top and three-quarter views:
+   - the silhouette IoU per view and a `score` (their mean × 100);
+   - the regions where the design sticks out past the concept or falls short of it by more than `tolerance_mm`, each named by the nearest part (for example "Head is 18 mm short of the reference toward +x (left view)");
+   - with a coloured reference, how much of the overlap is the same colour.
+4. **Change the largest region first**, compare again, and repeat until the score stops rising. Hide the reference (`browser.visibility`) for screenshots.
+
 ## The loop
 1. **Measure and fix the safe things:** `polish {"apply": "safe", "views": true}` runs `inspect.polish`, applies its fillets and chamfers one group at a time inside a checkpoint (a group that fails, clashes, breaks a joint or moves the mass is rolled back and listed as skipped), measures again and renders four views. Without the `polish` tool: `execute inspect.polish`, then `execute polish.apply`, then `screenshot` from four views.
 2. **Look:** read the four views (front three-quarter, side, top, back three-quarter). Critique them against the rules below, as a product designer would: silhouette, proportions, hierarchy, where the eye goes, what looks unfinished.
