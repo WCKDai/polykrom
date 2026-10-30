@@ -5,7 +5,7 @@
 use serde_json::{Value, json};
 use solidcraft_geom::Vec3;
 
-use super::{four_bar, meet, occ, part, pin, run};
+use super::{five_bar, four_bar, joint_angle, meet, occ, part, pin, run};
 use crate::Session;
 
 /// A part made of one box (`size` from `corner`) in a new component.
@@ -350,4 +350,20 @@ fn sweeping_a_follower_names_the_joints_that_drive_it() {
     // The joint that drives it sweeps as before.
     let r = run(&mut s, "joint.sweep", json!({"joint": "Hinge", "from": 0, "to": 10}));
     assert!(r["samples"].is_array(), "{r}");
+}
+
+#[test]
+fn sweep_holds_the_other_input_of_a_five_bar() {
+    let mut s = five_bar();
+    let before_b = joint_angle(&s, "InputB");
+    let r = run(
+        &mut s,
+        "joint.sweep",
+        json!({"joint": "InputA", "hold": ["InputB"], "from": 0, "to": 5, "step": 1,
+               "occurrences": ["L1"], "against": ["L3"], "apply": true}),
+    );
+    assert_eq!(r["held"], json!(["InputB"]), "{r}");
+    assert!(r["stopped_by"].is_null(), "the sweep reaches 5 deg: {r}");
+    assert!((joint_angle(&s, "InputA").to_degrees() - 5.0).abs() < 1e-6, "the sweep did not apply: {r}");
+    assert!((joint_angle(&s, "InputB") - before_b).abs() < 1e-9, "the held input moved: {r}");
 }

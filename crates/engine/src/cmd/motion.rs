@@ -423,11 +423,22 @@ fn closest(p: Vec3, a: Vec3, b: Vec3, c: Vec3) -> Vec3 {
 /// `given` values (joint, index) are driven; in a closed loop the others follow. Returns the
 /// answer and the last solve.
 fn drive_with_contact(s: &mut Session, want: &[(u64, Vec<f64>)], given: &BTreeSet<(u64, usize)>) -> Result<(Value, joints::Solution)> {
+    drive_with_contact_holding(s, want, given, &joints::Held::new())
+}
+
+/// As [`drive_with_contact`], with `extra` values held at their current values (a loop input
+/// the caller asked to keep): the solver leaves them fixed while it closes the loops.
+fn drive_with_contact_holding(
+    s: &mut Session,
+    want: &[(u64, Vec<f64>)],
+    given: &BTreeSet<(u64, usize)>,
+    extra: &joints::Held,
+) -> Result<(Value, joints::Solution)> {
     let baseline = s.doc.clone();
     let start: Vec<(u64, Vec<f64>)> =
         want.iter().map(|(id, _)| (*id, s.doc.assembly.joints.iter().find(|j| j.id == *id).map(|j| j.values.clone()).unwrap_or_default())).collect();
     // Closed loops follow the driven values from where they start.
-    let held: joints::Held = given
+    let mut held: joints::Held = given
         .iter()
         .filter(|&&(id, i)| want.iter().any(|(w, q)| *w == id && i < q.len()))
         .map(|&(id, i)| {
@@ -436,6 +447,7 @@ fn drive_with_contact(s: &mut Session, want: &[(u64, Vec<f64>)], given: &BTreeSe
             ((id, i), from.unwrap_or(0.0))
         })
         .collect();
+    held.extend(extra.iter().map(|(v, at)| (*v, *at)));
     let set = |s: &mut Session, t: f64| {
         // Trial order must not affect free anchors or linked joint placements.
         s.doc = baseline.clone();
@@ -513,10 +525,11 @@ fn drive_with_contact(s: &mut Session, want: &[(u64, Vec<f64>)], given: &BTreeSe
     Ok((out, sol))
 }
 
-/// Drive one joint (joint.drive), honouring contact sets.
-pub fn drive_joint(s: &mut Session, id: u64, q: Vec<f64>, given: usize) -> Result<Value> {
+/// Drive one joint (joint.drive), honouring contact sets, keeping `held` values fixed while
+/// closed loops follow.
+pub fn drive_joint(s: &mut Session, id: u64, q: Vec<f64>, given: usize, held: &joints::Held) -> Result<Value> {
     let given = (0..given.min(q.len())).map(|i| (id, i)).collect();
-    Ok(drive_with_contact(s, &[(id, q)], &given)?.0)
+    Ok(drive_with_contact_holding(s, &[(id, q)], &given, held)?.0)
 }
 
 fn enable_sets(s: &mut Session, p: &Value) -> Result<Value> {

@@ -42,9 +42,9 @@ pub static COMMANDS: &[CommandSpec] = &[
     CommandSpec::new("joint.rigid_group", "Rigid Group", rigid_group).at("SOLID", "ASSEMBLE").icon("rigid_group").params("occurrences: [ids or names] (move together, as they are)"),
     CommandSpec::new("joint.drive", "Drive Joints", drive).at("SOLID", "ASSEMBLE").icon("drive").params(
         "joint: id|name; value | values: [angles in deg or expressions, distances] (values not given keep theirs; a value driven drops the expression joint.create gave it; clamped to the limits; the other joints of a \
-         closed loop follow, and the motion stops where the loop can no longer close → stopped_by_loop); quiet?: bool (leave out dof \
+         closed loop follow, and the motion stops where the loop can no longer close → stopped_by_loop); hold?: [ids or names] (keep these joints at their current values while the loop solves; a drive that can no longer close stops and names the loop); quiet?: bool (leave out dof \
          and fixed) → values: [{name, value, unit: deg|mm, limits}] as joint.list gives them; moved: whether any occurrence moved; \
-         reason: why the joint can move nothing (suppressed, its origins lost, or its chain joined to nothing grounded → unconnected: \
+         held: [names] when hold was given; reason: why the joint can move nothing (suppressed, its origins lost, or its chain joined to nothing grounded → unconnected: \
          the occurrence named)",
     ),
     CommandSpec::new("joint.reach", "Reach Point", reach).icon("reach").params(
@@ -795,9 +795,53 @@ fn rigid_group(s: &mut Session, p: &Value) -> Result<Value> {
     Ok(json!({"joints": made}))
 }
 
+/// The joints `joint` names in `hold`: ids or names, each at most once, none the driven one and
+/// none rigid (a rigid joint has no value to hold).
+pub(crate) fn hold_ids(s: &Session, p: &Value, cmd: &str, driven: Option<u64>) -> Result<Vec<u64>> {
+    let items = match p.get("hold") {
+        None | Some(Value::Null) => return Ok(Vec::new()),
+        Some(Value::Array(items)) => items,
+        Some(_) => return Err(bad(cmd, "`hold` must be a list of joint ids or names")),
+    };
+    if items.len() > 1000 {
+        return Err(bad(cmd, "`hold` lists at most 1000 joints"));
+    }
+    let mut out = Vec::new();
+    for item in items {
+        let id = joint_id(s, Some(item), cmd)?;
+        if Some(id) == driven {
+            return Err(bad(cmd, "`hold` cannot name the joint being driven"));
+        }
+        if out.contains(&id) {
+            return Err(bad(cmd, "`hold` names a joint twice"));
+        }
+        let j = s.doc.assembly.joints.iter().find(|j| j.id == id).ok_or_else(|| bad(cmd, "joint"))?;
+        if j.kind == JointKind::Rigid {
+            return Err(bad(cmd, "a rigid joint has no value to hold"));
+        }
+        out.push(id);
+    }
+    Ok(out)
+}
+
+/// The current values of `ids`, as the solver's fixed values (`Held`): every degree of freedom,
+/// with a value the file leaves out read as 0.
+pub(crate) fn hold_values(s: &Session, ids: &[u64]) -> joints::Held {
+    let mut held = joints::Held::new();
+    for id in ids {
+        let Some(j) = s.doc.assembly.joints.iter().find(|j| j.id == *id) else { continue };
+        for i in 0..j.kind.dofs().len() {
+            held.insert((*id, i), j.values.get(i).copied().unwrap_or(0.0));
+        }
+    }
+    held
+}
+
 fn drive(s: &mut Session, p: &Value) -> Result<Value> {
     let cmd = "joint.drive";
     let id = joint_id(s, p.get("joint"), cmd)?;
+    let held_ids = hold_ids(s, p, cmd, Some(id))?;
+    let held = hold_values(s, &held_ids);
     let kind = s.doc.assembly.joints.iter().find(|j| j.id == id).map(|j| j.kind).ok_or_else(|| bad(cmd, "joint"))?;
     if kind == JointKind::Rigid {
         return Err(bad(cmd, "a rigid joint does not move"));
@@ -825,14 +869,26 @@ fn drive(s: &mut Session, p: &Value) -> Result<Value> {
         j.exprs.set_value(i, None);
     }
     let before = super::motion::positions(s);
-    let r = super::motion::drive_joint(s, id, q, given)?;
-    let sol = solution(s, &BTreeMap::new(), response_analysis(p));
+    let r = super::motion::drive_joint(s, id, q, given, &held)?;
+    // The final solve must not undo the drive: keep the values it was given (and the held
+    // inputs) where they ended up, while the other joints of the loop follow.
+    let mut final_held = held.clone();
+    if let Some(j) = s.doc.assembly.joints.iter().find(|j| j.id == id) {
+        for i in 0..given.min(kind.dofs().len()) {
+            final_held.insert((id, i), j.values.get(i).copied().unwrap_or(0.0));
+        }
+    }
+    let sol = solution(s, &final_held, response_analysis(p));
     let mut out = sol_json(&sol, p);
     out["joint"] = json!(id);
     out["values"] = json!(effective_values(s, id));
     out["stopped_by_contact"] = r["stopped_by_contact"].clone();
     out["stopped_by_loop"] = r["stopped_by_loop"].clone();
     out["moved"] = json!(super::motion::moved(&before, &super::motion::positions(s)).next().is_some());
+    if p.get("hold").is_some() {
+        out["held"] =
+            json!(held_ids.iter().filter_map(|id| s.doc.assembly.joints.iter().find(|j| j.id == *id).map(|j| j.name.clone())).collect::<Vec<_>>());
+    }
     if let Some((why, unconnected)) = cannot_move(s, &sol, id) {
         out["reason"] = json!(why);
         if let Some(o) = unconnected {
