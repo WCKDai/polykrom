@@ -64,7 +64,7 @@ settings), then run `flatpak uninstall --user ai.storyteller.solvecraft` (see th
 [compatibility notes](https://github.com/wckdboy/polykrom/blob/main/docs/compatibility.md#linux-app-id)).
 
 Alternatively, download the release's `.flatpak` file for your architecture and run
-`flatpak install --user ./solidcraft-VERSION-linux-ARCH.flatpak`. The bundle supplies the
+`flatpak install --user ./polykrom-VERSION-linux-ARCH.flatpak`. The bundle supplies the
 Flathub runtime repository address; installation still needs internet access to fetch any
 missing runtime. Launch with `flatpak run ai.storyteller.solidcraft`, rather than looking for
 a host `solidcraft` binary. Files chosen through Open/Save use the desktop file-chooser portal;
@@ -83,7 +83,7 @@ solidcraft.cli --version  # the CLI, for scripts and `solidcraft.cli mcp`
 The snap can open designs in your home folder (not hidden folders) and, through the file
 chooser, anywhere else. For USB drives and other mounted disks, run
 `sudo snap connect solidcraft:removable-media` once. A release's `.snap` file installs without
-the store with `sudo snap install --dangerous ./solidcraft-VERSION-linux-ARCH.snap`; it then
+the store with `sudo snap install --dangerous ./polykrom-VERSION-linux-ARCH.snap`; it then
 doesn't update automatically.
 
 ## Web

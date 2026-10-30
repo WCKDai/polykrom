@@ -94,17 +94,17 @@ and Polykrom picks the one matching how it was installed:
 
 | Installed as | Detected by | Download | How to update |
 |---|---|---|---|
-| AppImage | `APPIMAGE` is set | `solidcraft-linux-<arch>.AppImage` | Replace the old AppImage with the new one |
+| AppImage | `APPIMAGE` is set | `polykrom-linux-<arch>.AppImage` | Replace the old AppImage with the new one |
 | Flatpak | `FLATPAK_ID` is set | doesn't check (see below) | `flatpak update ai.storyteller.solidcraft` |
 | Snap from the Snap Store | `SNAP` is set | release page | `sudo snap refresh solidcraft` (snapd also refreshes by itself) |
-| Snap from a downloaded file | `SNAP_REVISION` starts with `x` | `solidcraft-linux-<arch>.snap` | `sudo snap install --dangerous ./solidcraft-linux-<arch>.snap` |
-| `.deb` | under `/usr`, dpkg knows `solidcraft` | `solidcraft-linux-<arch>.deb` | `sudo apt install ./solidcraft-linux-<arch>.deb` |
-| `.rpm` | under `/usr`, an rpm database exists | `solidcraft-linux-<arch>.rpm` | `sudo dnf install ./solidcraft-linux-<arch>.rpm` |
-| `.tar.gz` | anywhere else on Linux | `solidcraft-<version>-linux-<arch>.tar.gz` | Unpack over the old copy |
-| Windows installer | under Program Files, or in the folder the installer recorded | `solidcraft-windows-<arch>.msi` | Run the installer |
-| Windows portable | `polykrom-cli.exe` beside it | `solidcraft-windows-<arch>-portable.zip` | Unzip over the old copy |
-| Windows `.exe` | anywhere else on Windows | `SolidCraft-<version>-windows-x64.exe` | Replace the old `.exe` |
-| macOS | inside `SolidCraft.app` | `solidcraft-macos-universal.dmg` | Drag the new app to Applications |
+| Snap from a downloaded file | `SNAP_REVISION` starts with `x` | `polykrom-linux-<arch>.snap` | `sudo snap install --dangerous ./polykrom-linux-<arch>.snap` |
+| `.deb` | under `/usr`, dpkg knows `solidcraft` | `polykrom-linux-<arch>.deb` | `sudo apt install ./polykrom-linux-<arch>.deb` |
+| `.rpm` | under `/usr`, an rpm database exists | `polykrom-linux-<arch>.rpm` | `sudo dnf install ./polykrom-linux-<arch>.rpm` |
+| `.tar.gz` | anywhere else on Linux | `polykrom-<version>-linux-<arch>.tar.gz` | Unpack over the old copy |
+| Windows installer | under Program Files, or in the folder the installer recorded | `polykrom-windows-<arch>.msi` | Run the installer |
+| Windows portable | `polykrom-cli.exe` beside it | `polykrom-windows-<arch>-portable.zip` | Unzip over the old copy |
+| Windows `.exe` | anywhere else on Windows | `Polykrom-<version>-windows-x64.exe` | Replace the old `.exe` |
+| macOS | inside `SolidCraft.app` | `polykrom-macos-universal.dmg` | Drag the new app to Applications |
 
 The window shows the command for Snap, `.deb` and `.rpm` installations, with a Copy button. The
 Flatpak has no network permission and Flatpak itself (or your software center) offers its

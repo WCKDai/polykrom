@@ -1,8 +1,8 @@
 # Flatpak manifest for the single-file bundle attached to every GitHub release
-# (solidcraft-<version>-linux-<arch>.flatpak). Build it with packaging/linux/flatpak-bundle.sh.
+# (polykrom-<version>-linux-<arch>.flatpak). Build it with packaging/linux/flatpak-bundle.sh.
 # Adapted from PhotoCraft's (storytold/photocraft, Apache-2.0; see ATTRIBUTION.md).
 #
-# It repackages the release's own Linux tarball (solidcraft-<version>-linux-<arch>.tar.gz, built
+# It repackages the release's own Linux tarball (polykrom-<version>-linux-<arch>.tar.gz, built
 # on Ubuntu 22.04 by package.sh) instead of compiling Rust inside flatpak-builder: no network
 # during the build, and the same binaries as the AppImage/deb/rpm. The binaries need glibc >= 2.35
 # and load X11, Wayland, xkbcommon and Vulkan at runtime; the freedesktop runtime has all of

@@ -11,15 +11,16 @@ version bump and no patch release for every merge.
 Release titles, installer product names and everything a person reads use the Polykrom name.
 Asset, binary and package file names keep SolidCraft's stable names until the second rename
 stage, because the updater picks assets by them
-(`solidcraft-<version>-linux-<arch>.AppImage`, `SolidCraft-<version>-windows-x64.exe`,
+(`polykrom-<version>-linux-<arch>.AppImage`, `Polykrom-<version>-windows-x64.exe`,
 `polykrom-cli` archives, …). The old name survives only in the shims listed in
 [compatibility.md](compatibility.md) (the end-of-life Flatpak refs of the old Linux app ID, the legacy `.zsync` and `.flatpakrepo`
 copies, the deprecated old-name CLI alias); keep them until that document says they can go. Do not
 rewrite published assets, checksums, tags or historical release notes of earlier versions.
 
 The main installers (`.msi`, portable `.zip`, `.dmg`, `.AppImage`, `.deb`, `.rpm`, `.flatpak`, `.snap`) are
-also attached without the version in their names, for example `solidcraft-windows-x64.msi` and
-`solidcraft-linux-x86_64.AppImage`, and listed in `SHA256SUMS.txt`. The README's Download section
+also attached without the version in their names, for example `polykrom-windows-x64.msi` and
+`polykrom-linux-x86_64.AppImage`, and again under SolidCraft's names (`solidcraft-windows-x64.msi`, …)
+for links and installs from before the rename (docs/compatibility.md), all listed in `SHA256SUMS.txt`. The README's Download section
 links to `https://github.com/bherbruck/solidcraft/releases/latest/download/<name>`, which follows
 the release marked latest; nightlies never are. Keep these names stable: renaming one breaks the
 README links and the in-app update check, which picks them by name (`crates/ui-egui/src/update.rs`;
@@ -166,7 +167,7 @@ erase the package repository.
 
 ## Snap package and Snap Store
 
-Every release and nightly attaches `solidcraft-<version>-linux-<arch>.snap` for x86_64 and
+Every release and nightly attaches `polykrom-<version>-linux-<arch>.snap` for x86_64 and
 aarch64 (`packaging/linux/snap-pack.sh`, manifest `packaging/linux/snap/snapcraft.yaml`). Like the
 Flatpak, it repackages the Linux job's tarball. The `snap` job installs it with `--dangerous`,
 starts the confined app on headless X11 and Wayland (`packaging/linux/snap-smoke.py`), models a
@@ -220,7 +221,7 @@ Polykrom is in [winget-pkgs](https://github.com/microsoft/winget-pkgs) as
 GitHub release runs `winget.yml`, which uses [Komac](https://github.com/russellbanks/Komac)
 (a pinned, checksum-verified binary) to open a pull request at microsoft/winget-pkgs from the
 owner's fork `bherbruck/winget-pkgs`. It submits the three versioned MSIs
-(`solidcraft-<version>-windows-{x64,x86,arm64}.msi`, never the fixed-name copies), reads their
+(`polykrom-<version>-windows-{x64,x86,arm64}.msi`, never the fixed-name copies), reads their
 product codes, links the release notes and keeps the other fields from the previous version's
 manifest. The winget-pkgs bots validate it and a moderator merges it, usually within a day or two.
 

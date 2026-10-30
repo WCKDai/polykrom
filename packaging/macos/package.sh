@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Build and package Polykrom for macOS:
 #
-#   $DIST/solidcraft-<version>-macos-<arch>.dmg        SolidCraft.app (with polykrom-cli inside) on a
+#   $DIST/polykrom-<version>-macos-<arch>.dmg        SolidCraft.app (with polykrom-cli inside) on a
 #                                                      drag-to-Applications DMG
-#   $DIST/solidcraft-cli-<version>-macos-<arch>.zip    the headless CLI, polykrom-cli (and its
+#   $DIST/polykrom-cli-<version>-macos-<arch>.zip    the headless CLI, polykrom-cli (and its
 #                                                      solidcraft-cli and solvecraft-cli aliases) with the licence files
 #
 # Usage: packaging/macos/package.sh [--arch universal|aarch64|x86_64] [--skip-build]
@@ -38,8 +38,8 @@ export MACOSX_DEPLOYMENT_TARGET=11.0
 SHORT_VERSION="${VERSION%%-*}"
 WORK="$CARGO_TARGET_DIR/macos-package"
 APP="$WORK/SolidCraft.app"
-DMG="$DIST/solidcraft-$VERSION-macos-$ARCH.dmg"
-CLI_ZIP="$DIST/solidcraft-cli-$VERSION-macos-$ARCH.zip"
+DMG="$DIST/polykrom-$VERSION-macos-$ARCH.dmg"
+CLI_ZIP="$DIST/polykrom-cli-$VERSION-macos-$ARCH.zip"
 
 echo "==> Polykrom $VERSION for macOS ($ARCH)"
 if [ "$SKIP_BUILD" = 0 ]; then
@@ -127,7 +127,7 @@ hdiutil detach "$MNT"
 
 # ---- CLI ---------------------------------------------------------------------------------------
 echo "==> building $CLI_ZIP"
-CLI_DIR="$WORK/solidcraft-cli-$VERSION-macos-$ARCH"
+CLI_DIR="$WORK/polykrom-cli-$VERSION-macos-$ARCH"
 mkdir -p "$CLI_DIR"
 cp "$WORK/bin/polykrom-cli" "$CLI_DIR/"
 codesign --force --sign - --timestamp=none --identifier "$MACOS_BUNDLE_ID-cli" "$CLI_DIR/polykrom-cli"

@@ -4,10 +4,10 @@
 
 .DESCRIPTION
   Produces, in $env:DIST (default: dist/release):
-    solidcraft-<version>-windows-<arch>.msi            per-machine installer (WiX v5)
-    solidcraft-<version>-windows-<arch>-portable.zip   polykrom.exe + polykrom-cli.exe (and the aliases) + licences
+    polykrom-<version>-windows-<arch>.msi              per-machine installer (WiX v5)
+    polykrom-<version>-windows-<arch>-portable.zip     polykrom.exe + polykrom-cli.exe (and the aliases) + licences
                                                        (+ the solvecraft-cli.exe compatibility alias)
-    SolidCraft-<version>-windows-<arch>.exe            the app alone (x64 only: a plain download)
+    Polykrom-<version>-windows-<arch>.exe              the app alone (x64 only: a plain download)
 
   The binaries link the C runtime statically (+crt-static), so nothing else needs installing.
   The icon comes from $env:SOLIDCRAFT_ICONS (solidcraft.ico, made by `solidcraft-cli icon`), or
@@ -93,7 +93,7 @@ $Icon = if ($env:SOLIDCRAFT_ICONS) { Join-Path $env:SOLIDCRAFT_ICONS 'solidcraft
 if (-not (Test-Path $Icon)) { throw "Missing package icon: $Icon" }
 
 # ---- MSI ---------------------------------------------------------------------------------------
-$Msi = Join-Path $Dist "solidcraft-$Version-windows-$Arch.msi"
+$Msi = Join-Path $Dist "polykrom-$Version-windows-$Arch.msi"
 Invoke-Native 'wix build' {
   wix build (Join-Path $Root 'assets/platforms/windows/solidcraft.wxs') -arch $Arch `
     -ext WixToolset.UI.wixext -ext WixToolset.Util.wixext `
@@ -108,19 +108,19 @@ Invoke-Native 'MSI shortcut icon validation (ICE50)' {
 Remove-Item -Force -ErrorAction SilentlyContinue ([IO.Path]::ChangeExtension($Msi, '.wixpdb'))
 
 # ---- portable zip ------------------------------------------------------------------------------
-$Portable = Join-Path $TargetDir "windows-package\solidcraft-$Version-windows-$Arch-portable"
+$Portable = Join-Path $TargetDir "windows-package\polykrom-$Version-windows-$Arch-portable"
 Remove-Item -Recurse -Force $Portable -ErrorAction SilentlyContinue
 New-Item -ItemType Directory -Force -Path $Portable | Out-Null
 Copy-Item (Join-Path $Stage '*.exe') $Portable
 foreach ($f in 'README.md', 'LICENSE-MIT', 'LICENSE-APACHE', 'NOTICE', 'THIRD-PARTY-LICENSES.txt') { Copy-Item (Join-Path $Root $f) $Portable }
-$Zip = Join-Path $Dist "solidcraft-$Version-windows-$Arch-portable.zip"
+$Zip = Join-Path $Dist "polykrom-$Version-windows-$Arch-portable.zip"
 Remove-Item -Force $Zip -ErrorAction SilentlyContinue
 Compress-Archive -Path $Portable -DestinationPath $Zip
 
 # ---- the app as a plain download (x64) ---------------------------------------------------------
 $Outputs = @($Msi, $Zip)
 if ($Arch -eq 'x64') {
-  $Exe = Join-Path $Dist "SolidCraft-$Version-windows-$Arch.exe"
+  $Exe = Join-Path $Dist "Polykrom-$Version-windows-$Arch.exe"
   Copy-Item (Join-Path $Stage 'polykrom.exe') $Exe
   $Outputs += $Exe
 }

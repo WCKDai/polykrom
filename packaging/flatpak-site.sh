@@ -42,7 +42,7 @@ if curl --fail --silent --location --output /dev/null "$previous_url/summary"; t
   ostree --repo="$repo_dir" remote delete previous
 fi
 for arch in x86_64 aarch64; do
-  asset="solidcraft-$version-linux-$arch.flatpak"
+  asset="polykrom-$version-linux-$arch.flatpak"
   gh release download "$tag" --repo "$GITHUB_REPOSITORY" --pattern "$asset" --dir "$bundles"
   (
     cd "$bundles"
