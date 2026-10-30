@@ -2,9 +2,9 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use solidcraft_doc::Document;
-use solidcraft_doc::joints::cam::CamProfile;
-use solidcraft_doc::joints::{Assembly, Coupling, JointOrigin, Size};
+use polykrom_doc::Document;
+use polykrom_doc::joints::cam::CamProfile;
+use polykrom_doc::joints::{Assembly, Coupling, JointOrigin, Size};
 
 use crate::{EngineError, Result};
 

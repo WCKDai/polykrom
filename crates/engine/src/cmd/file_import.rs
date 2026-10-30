@@ -9,10 +9,10 @@
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 
+use polykrom_doc::joints::{Joint, JointKind, JointOrigin, Snap};
+use polykrom_doc::kernel::{StepImport, StepNode};
+use polykrom_doc::{FeatureKind, IDENTITY, Mat};
 use serde_json::{Value, json};
-use solidcraft_doc::joints::{Joint, JointKind, JointOrigin, Snap};
-use solidcraft_doc::kernel::{StepImport, StepNode};
-use solidcraft_doc::{FeatureKind, IDENTITY, Mat};
 use solidcraft_geom::Vec3;
 
 use crate::{EngineError, Result, Session};
@@ -60,18 +60,18 @@ pub(crate) enum Tree<'a> {
     Step(&'a StepImport),
     /// A mesh file's components (glTF nodes), bodies already in their component's frame
     /// (checked with [`mesh_plan_fits`] first).
-    Mesh(&'a solidcraft_io::MeshPlan),
+    Mesh(&'a polykrom_io::MeshPlan),
 }
 
 /// Can the components of `plan` be made as it says? (Otherwise its bodies are built in place.)
-pub(crate) fn mesh_plan_fits(plan: &solidcraft_io::MeshPlan) -> bool {
+pub(crate) fn mesh_plan_fits(plan: &polykrom_io::MeshPlan) -> bool {
     Plan::of_mesh(plan).is_some()
 }
 
 impl Plan {
     /// A glTF file's node plan, as it is; `None` when an occurrence can't hold it (a placement
     /// that isn't rigid, or components out of order), so the caller builds the bodies in place.
-    fn of_mesh(plan: &solidcraft_io::MeshPlan) -> Option<Plan> {
+    fn of_mesh(plan: &polykrom_io::MeshPlan) -> Option<Plan> {
         let mut made = 0usize;
         let mut places = Vec::with_capacity(plan.places.len());
         for p in &plan.places {
@@ -112,8 +112,8 @@ impl Plan {
         if !has_bodies(node, 0) {
             return;
         }
-        let world = solidcraft_doc::mat_mul(parent_world, &node.transform);
-        let inverse = solidcraft_doc::mat_inverse(&world);
+        let world = polykrom_doc::mat_mul(parent_world, &node.transform);
+        let inverse = polykrom_doc::mat_inverse(&world);
         // Too deep, too many, or placed in a way an occurrence can't be: the bodies stay where
         // the parent is (they are built in place, so nothing moves).
         let (Some(inverse), true, true, true) = (inverse, depth < MAX_DEPTH, self.slots.len() < MAX_COMPONENTS, subtree_rigid(node, depth)) else {
@@ -143,7 +143,7 @@ impl Plan {
     /// Every body below `node` goes to `parent`.
     fn flatten(&mut self, node: &StepNode, parent: Option<usize>, parent_world: &Mat) {
         let Some(parent) = parent else { return };
-        let Some(inverse) = solidcraft_doc::mat_inverse(parent_world) else { return };
+        let Some(inverse) = polykrom_doc::mat_inverse(parent_world) else { return };
         let mut all = Vec::new();
         collect_bodies(node, &mut all, 0);
         self.bodies.extend(all.into_iter().map(|b| (b as usize, parent, inverse)));
@@ -281,7 +281,7 @@ pub(crate) fn add_in_component(
     }
     // The bodies' names, as the feature will give them (checked once it is built).
     let names = match (&kind, imp) {
-        (FeatureKind::Import { skip, .. }, Some(imp)) => solidcraft_doc::import_body_names(&s.model.state(), &body_names, imp, skip),
+        (FeatureKind::Import { skip, .. }, Some(imp)) => polykrom_doc::import_body_names(&s.model.state(), &body_names, imp, skip),
         // Mesh bodies keep their names unless taken (then they are put right once built).
         (FeatureKind::MeshImport { .. }, _) => body_names.iter().cloned().map(Some).collect(),
         _ => Vec::new(),
@@ -329,7 +329,7 @@ fn put_bodies(s: &mut Session, names: &[Option<String>], moves: &[(usize, u64, M
     for (b, comp, offset) in moves {
         let Some(Some(name)) = names.get(*b) else { continue };
         d.body_components.insert(name.clone(), *comp);
-        if !solidcraft_doc::is_identity(offset) {
+        if !polykrom_doc::is_identity(offset) {
             d.body_offsets.insert(name.clone(), *offset);
         }
     }
@@ -341,13 +341,13 @@ fn add_rigid_joints(s: &mut Session, pairs: &[(u64, u64, Mat)]) -> Result<Vec<u6
     if pairs.is_empty() {
         return Ok(Vec::new());
     }
-    if s.doc.assembly.joints.len() + pairs.len() > solidcraft_doc::joints::MAX_JOINTS {
+    if s.doc.assembly.joints.len() + pairs.len() > polykrom_doc::joints::MAX_JOINTS {
         // Too many to hold together: the parts are placed, not locked.
         return Ok(Vec::new());
     }
     let mut ids = Vec::with_capacity(pairs.len());
-    let point = |m: &Mat, p: Vec3| solidcraft_doc::apply_point(m, p);
-    let vector = |m: &Mat, v: Vec3| solidcraft_doc::apply_vector(m, v);
+    let point = |m: &Mat, p: Vec3| polykrom_doc::apply_point(m, p);
+    let vector = |m: &Mat, v: Vec3| polykrom_doc::apply_vector(m, v);
     let made: Vec<Joint> = pairs
         .iter()
         .map(|(a, b, m)| {

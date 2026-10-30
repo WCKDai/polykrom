@@ -78,7 +78,7 @@ write it with `python3 -B facet_icons.py write ID`, so the code and the SVG neve
 2. Add a function to `facet_icons.py` (or start one with `new_icon.py NAME --base part|plate|empty`),
    wire `.icon("name")` in the command registry and the timeline/browser selectors.
 3. Preview at 64, 24 and 16 px in **both themes**. At 16 px the operation must stay distinct.
-4. Run `cargo xtask icons` and `cargo test --profile ci -p solidcraft-ui-egui --lib icon_svg::tests`.
+4. Run `cargo xtask icons` and `cargo test --profile ci -p polykrom-ui-egui --lib icon_svg::tests`.
 5. Leave the icon Open. The owner accepts artwork on the review page; never add acceptance
    hashes yourself or copy another icon's hash.
 
@@ -87,5 +87,5 @@ assets are forbidden even as hidden references.
 
 Runtime discovery is also checked by `crates/ui-egui/tests/icon_audit.rs`. New menu surfaces
 must extend that Harness traversal. Regenerate the committed `design/requested_icons.txt` with
-`UPDATE_ICON_MANIFEST=1 cargo test -p solidcraft-ui-egui --test icon_audit`; review the sorted
+`UPDATE_ICON_MANIFEST=1 cargo test -p polykrom-ui-egui --test icon_audit`; review the sorted
 id/placeholder diff.

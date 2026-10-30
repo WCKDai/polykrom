@@ -74,7 +74,7 @@ commands:
   wasm            cargo check every library crate and the web app for wasm32-unknown-unknown
   web-offline [DIR]
                   write the web build's service worker (sw.js: offline use, updates); run by
-                  Trunk after release builds of apps/solidcraft-web, or on a built site in DIR
+                  Trunk after release builds of apps/polykrom-web, or on a built site in DIR
   web-api-test [--site DIR]  Test the command API in a real browser build (default: dist/web)
   web-offline-test [--site DIR]
                   check in headless Chrome that the web app works offline and updates to a new
@@ -160,7 +160,7 @@ pub fn metadata() -> Result<serde_json::Value, String> {
     serde_json::from_slice(&out.stdout).map_err(|e| format!("cargo metadata: bad JSON: {e}"))
 }
 
-/// The full action matrix (apps/solidcraft-cli/tests/action_matrix.rs), with the ci profile.
+/// The full action matrix (apps/polykrom-cli/tests/action_matrix.rs), with the ci profile.
 fn cmd_action_matrix(bless: bool, results: Option<&str>, from: Option<&str>) -> Result<(), String> {
     let mut c = cargo();
     c.args([
@@ -188,7 +188,7 @@ fn cmd_action_matrix(bless: bool, results: Option<&str>, from: Option<&str>) -> 
         let p = std::path::absolute(d).map_err(|e| format!("{d}: {e}"))?;
         c.env("ACTION_MATRIX_MERGE", p);
     }
-    run(c, "cargo test --profile ci -p solidcraft-cli --test action_matrix action_matrix_all")
+    run(c, "cargo test --profile ci -p polykrom-cli --test action_matrix action_matrix_all")
 }
 
 fn cmd_layers() -> Result<(), String> {
@@ -371,7 +371,7 @@ fn wasm_check() -> Result<(Command, usize), String> {
     let crates = layers::from_metadata(&metadata()?)?;
     let mut set: Vec<String> =
         crates.iter().filter(|c| matches!(layers::classify(&c.name), Some(layers::Class::Layer(_)))).map(|c| c.name.clone()).collect();
-    set.push("solidcraft-web".into());
+    set.push("polykrom-web".into());
     let mut c = cargo();
     c.args(["check", "--target", "wasm32-unknown-unknown", "--profile", "ci"]);
     for p in &set {

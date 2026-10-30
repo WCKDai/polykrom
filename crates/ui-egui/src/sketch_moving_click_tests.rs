@@ -3,8 +3,8 @@
 //! nothing.
 
 use crate::scenario::Harness;
+use polykrom_engine::sketch::CurveKind;
 use serde_json::json;
-use solidcraft_engine::sketch::CurveKind;
 
 fn harness(command: &str) -> Harness {
     let mut h = Harness::new();
@@ -55,7 +55,7 @@ fn clicks_that_move_place_their_points() {
         // The points went where the button was let go: the first one is at its spot.
         let sid = h.app.session.active_sketch.unwrap();
         let sk = h.app.session.model.state().sketch(sid).unwrap().sketch.clone();
-        let first = solidcraft_engine::geom::Vec2::new(points[0][0], points[0][1]);
+        let first = polykrom_engine::geom::Vec2::new(points[0][0], points[0][1]);
         // (A three-point circle keeps only its centre: through all three, its radius is 20.)
         let through = sk.curves.iter().any(|c| matches!(c.kind, CurveKind::Circle { r, .. } if (r - 20.0).abs() < 0.5));
         assert!(sk.points.iter().any(|p| (p.pos - first).len() < 0.5) || through, "{command}: no point at {first:?}");
@@ -82,8 +82,8 @@ fn a_short_drag_starts_a_rectangle_circle_or_polygon_by_clicks() {
         assert_eq!(curves(&h), count, "{command}: {:?}", h.app.status);
         let sid = h.app.session.active_sketch.unwrap();
         let sk = h.app.session.model.state().sketch(sid).unwrap().sketch.clone();
-        let far = solidcraft_engine::geom::Vec2::new(second[0], second[1]);
-        let circle = |c: &solidcraft_engine::sketch::Curve| matches!(c.kind, CurveKind::Circle { r, .. } if (r - far.len()).abs() < 0.5);
+        let far = polykrom_engine::geom::Vec2::new(second[0], second[1]);
+        let circle = |c: &polykrom_engine::sketch::Curve| matches!(c.kind, CurveKind::Circle { r, .. } if (r - far.len()).abs() < 0.5);
         let on_shape = sk.points.iter().any(|p| (p.pos - far).len() < 0.5) || sk.curves.iter().any(circle);
         assert!(on_shape, "{command}: the second click wasn't where it was let go");
     }

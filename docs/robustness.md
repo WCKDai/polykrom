@@ -79,7 +79,7 @@ do not leak into GNU validation (#4104).
 To record an intended change, give the reason:
 
 ```
-ROBUSTNESS_GOLDENS_BLESS="why it changed" cargo test --profile ci -p solidcraft-engine --lib robustness_goldens::seed_
+ROBUSTNESS_GOLDENS_BLESS="why it changed" cargo test --profile ci -p polykrom-engine --lib robustness_goldens::seed_
 ```
 
 The changed seeds and the reason are added to the file's `notes`; say why in the pull request too.

@@ -40,8 +40,8 @@ fn body_at(s: &Session, p: [f64; 3]) -> Option<String> {
 fn names(s: &Session, body: &str) -> Vec<(String, bool)> {
     let state = s.model.state();
     let b = state.body(body).unwrap_or_else(|| panic!("body {body}"));
-    let names = solidcraft_doc::naming::face_names(b);
-    names.iter().enumerate().map(|(i, n)| (n.clone(), solidcraft_doc::naming::face_name_exact(b, i))).collect()
+    let names = polykrom_doc::naming::face_names(b);
+    names.iter().enumerate().map(|(i, n)| (n.clone(), polykrom_doc::naming::face_name_exact(b, i))).collect()
 }
 
 /// A 40 x 30 x 10 block ("Block": sketch lines l1 bottom, l2 right, l3 top, l4 left).
@@ -231,7 +231,7 @@ fn a_name_of_a_body_without_history_is_found_by_geometry_and_says_so_once_it_mov
     run(&mut s, "solid.align", json!({"bodies": ["Body1"], "from": [0, 0, 0], "to": [0, 0, 2], "name": "Lift"}));
     let state = s.model.state();
     let body = state.bodies.first().unwrap();
-    assert!((0..solidcraft_doc::naming::face_names(body).len()).all(|i| !solidcraft_doc::naming::face_name_exact(body, i)));
+    assert!((0..polykrom_doc::naming::face_names(body).len()).all(|i| !polykrom_doc::naming::face_name_exact(body, i)));
     run(&mut s, "solid.fillet", json!({"edges": [[40, 15, 12]], "radius": 2, "name": "Round"}));
     // Where it was picked, the pick and the name agree: nothing to say.
     assert_eq!(warning(&s, "Round"), None);
@@ -294,7 +294,7 @@ fn a_sketch_on_a_certified_face_survives_a_fillet_and_a_cut_upstream_of_it() {
     assert!((top(&s) - 14.0).abs() < 1e-6);
     let state = s.model.state();
     let body = state.bodies.first().unwrap();
-    assert!((0..solidcraft_doc::naming::face_names(body).len()).all(|i| solidcraft_doc::naming::face_name_exact(body, i)));
+    assert!((0..polykrom_doc::naming::face_names(body).len()).all(|i| polykrom_doc::naming::face_name_exact(body, i)));
     change(&mut s, "h", "16 mm");
     for f in ["Corner", "Hole", "Top", "Peg"] {
         assert_eq!(error(&s, f), None, "{f}");
@@ -419,7 +419,7 @@ fn split_pieces_keep_their_numbers_across_evaluations() {
     let first = named(&mut s);
     assert!(first.iter().any(|(n, _)| n.contains('#')), "no split pieces: {first:?}");
     for run in 0..10 {
-        let mut fresh = Session::new(solidcraft_doc::Document::clone(&s.doc));
+        let mut fresh = Session::new(polykrom_doc::Document::clone(&s.doc));
         fresh.refresh();
         assert_eq!(named(&mut fresh), first, "evaluation {run}");
     }
@@ -445,8 +445,8 @@ fn a_design_saved_before_pieces_were_numbered_by_place_keeps_their_numbers() {
         pending.retain(|c| c != "face-pieces-by-place");
     }
     // 0.18.3 folded the change into format 29, so a build before it wrote 28.
-    file["format"] = Value::String(solidcraft_doc::format::format_string(28));
-    let old = solidcraft_doc::Document::from_json(&file.to_string()).unwrap();
+    file["format"] = Value::String(polykrom_doc::format::format_string(28));
+    let old = polykrom_doc::Document::from_json(&file.to_string()).unwrap();
     assert!(old.features.iter().all(|f| f.kernel_piece_order), "the features of an older design keep the old numbering");
     let mut reopened = Session::new(old);
     reopened.refresh();
@@ -455,7 +455,7 @@ fn a_design_saved_before_pieces_were_numbered_by_place_keeps_their_numbers() {
     // The pieces are numbered differently by place, and the older design keeps its own numbers.
     let (old1, new1) = (at(&kept, "F2:side#1").unwrap(), at(&by_place, "F2:side#1").unwrap());
     assert!((0..3).any(|k| (old1[k] - new1[k]).abs() > 1.0), "{kept:?} {by_place:?}");
-    let mut legacy = solidcraft_doc::Document::clone(&s.doc);
+    let mut legacy = polykrom_doc::Document::clone(&s.doc);
     legacy.features.iter_mut().for_each(|f| f.kernel_piece_order = true);
     let mut saved_with = Session::new(legacy);
     saved_with.refresh();

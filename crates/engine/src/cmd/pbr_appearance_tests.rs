@@ -89,7 +89,7 @@ fn invalid_optical_requests_refuse_atomically_and_scalar_export_cannot_lose_them
         "pbr":{"metallic":0,"roughness":0.5,"dielectric_ior":1.5}}),
     )
     .unwrap();
-    assert!(solidcraft_io::catalog::Catalog::from_document(&s.doc, "user.fixture", "Original", Default::default()).is_err());
+    assert!(polykrom_io::catalog::Catalog::from_document(&s.doc, "user.fixture", "Original", Default::default()).is_err());
     let mut invalid: serde_json::Value = serde_json::from_str(&s.doc.to_json()).unwrap();
     invalid["appearances"]["bodies"]["Specimen"]["opacity"] = json!(0.5);
     assert!(crate::doc::Document::from_json(&invalid.to_string()).is_err());
@@ -115,7 +115,7 @@ fn physical_default_look_and_face_override_keep_independent_optical_meaning() {
     assert!(scene.meshes[0].surface.is_some());
     assert!(scene.meshes[0].faces.iter().any(|f| f.color == [0, 128, 160] && f.surface.is_none()));
     assert_eq!(s.doc.user_materials[0].density, 0.7);
-    assert!(solidcraft_io::catalog::Catalog::from_document(&s.doc, "user.fixture", "Original", Default::default()).is_err());
+    assert!(polykrom_io::catalog::Catalog::from_document(&s.doc, "user.fixture", "Original", Default::default()).is_err());
 }
 
 #[test]

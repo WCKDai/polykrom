@@ -7,9 +7,9 @@
 use std::cell::Cell;
 use std::sync::Arc;
 
+use polykrom_sketch::Sketch;
 use solidcraft_geom::{Plane, Vec2, Vec3};
 use solidcraft_kernel as kernel;
-use solidcraft_sketch::Sketch;
 
 use crate::*;
 

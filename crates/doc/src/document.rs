@@ -1,7 +1,7 @@
+use polykrom_sketch::Sketch;
 use serde::{Deserialize, Serialize};
 use solidcraft_geom::{Plane, Vec2, Vec3};
 use solidcraft_kernel::Continuity;
-use solidcraft_sketch::Sketch;
 
 use crate::construct::{AxisDef, GeoRef, PointDef};
 use crate::expr::{self, Expr, Kind};
@@ -225,7 +225,7 @@ impl ExtrudeConvention {
 }
 
 /// Extent of an extrude.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, solidcraft_derive::Walk)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, polykrom_derive::Walk)]
 pub struct Extent {
     #[walk(length = "Distance")]
     pub distance: Expr,
@@ -265,7 +265,7 @@ pub struct Extent {
 }
 
 /// Thin Extrude: a wall of constant thickness along sketch curves instead of the profiles.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, solidcraft_derive::Walk)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, polykrom_derive::Walk)]
 pub struct ThinWall {
     /// The sketch curves the wall follows: open chains and closed loops, joined where they
     /// meet end to end.
@@ -282,7 +282,7 @@ pub struct ThinWall {
 }
 
 /// How a swept profile turns as it follows its path.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize, solidcraft_derive::Walk)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize, polykrom_derive::Walk)]
 #[serde(rename_all = "snake_case")]
 pub enum SweepOrientation {
     /// Square to the path, turning with it (a rotation-minimising frame).
@@ -303,7 +303,7 @@ impl SweepOrientation {
 
 /// A sweep's or a loft's guide rail: a chain of curves of a sketch, followed from the end nearest
 /// the path's start (the loft's first section).
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, solidcraft_derive::Walk)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, polykrom_derive::Walk)]
 pub struct SweepRail {
     pub sketch: SketchId,
     pub curves: Vec<String>,
@@ -357,7 +357,7 @@ impl ThinSide {
 }
 
 /// Revolve axis.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, solidcraft_derive::Walk)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, polykrom_derive::Walk)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum AxisRef {
     /// A line of the profile's sketch.
@@ -373,7 +373,7 @@ pub enum AxisRef {
 }
 
 /// Persistent cylindrical Emboss selection, authored in the feature component frame.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, solidcraft_derive::Walk)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, polykrom_derive::Walk)]
 pub struct EmbossFace {
     pub body: BodyName,
     #[walk(pinned)]
@@ -456,7 +456,7 @@ impl EmbossFace {
 /// edge's own angle and height (expressions) in place of the feature's. In a design file an
 /// edge with neither is the point `[x, y, z]`, as every edge was before; one with its own
 /// values is `{"point": [x, y, z], "angle": "…", "height": "…"}`.
-#[derive(Clone, Debug, Default, PartialEq, solidcraft_derive::Walk)]
+#[derive(Clone, Debug, Default, PartialEq, polykrom_derive::Walk)]
 pub struct FlangeEdge {
     pub point: Position,
     #[walk(angle = "Edge angle")]
@@ -522,7 +522,7 @@ impl<'de> Deserialize<'de> for FlangeEdge {
 }
 
 /// Feature definitions.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, solidcraft_derive::Walk)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, polykrom_derive::Walk)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum FeatureKind {
     /// A recorded timeline ownership boundary. Geometry is converted from its
@@ -1701,7 +1701,7 @@ impl ExtendMode {
 }
 
 /// What Extend extends up to instead of a distance.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, solidcraft_derive::Walk)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, polykrom_derive::Walk)]
 #[serde(rename_all = "snake_case")]
 pub enum ExtendTo {
     /// A plane.
@@ -1713,7 +1713,7 @@ pub enum ExtendTo {
 }
 
 /// How a fillet's size is given.
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, solidcraft_derive::Walk)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, polykrom_derive::Walk)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum FilletStyle {
     #[default]
@@ -1791,7 +1791,7 @@ impl FilletStyle {
 /// Sketch curves a trim cuts with: chains of the curves `curves` (every curve of the sketch
 /// that is not construction geometry when empty) swept along `direction` (the sketch's normal
 /// when none) onto the surface.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, solidcraft_derive::Walk)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, polykrom_derive::Walk)]
 pub struct TrimCurves {
     pub sketch: SketchId,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -1801,7 +1801,7 @@ pub struct TrimCurves {
 }
 
 /// A face picked by a point on it, on a named body.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, solidcraft_derive::Walk)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, polykrom_derive::Walk)]
 pub struct FaceAt {
     pub body: BodyName,
     pub point: Position,
@@ -1810,7 +1810,7 @@ pub struct FaceAt {
 /// One end of a blend: a body and the points that pick the edges of its boundary chain. With two
 /// picks on the same edge the chain is that one edge; more pick a chain that runs on from pick to
 /// pick (the order of the picks does not matter).
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, solidcraft_derive::Walk)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, polykrom_derive::Walk)]
 pub struct BlendSide {
     pub body: BodyName,
     pub edges: Vec<Position>,
@@ -1821,7 +1821,7 @@ pub struct BlendSide {
 /// on them (`edges`), or a side collapsed to the point `point` (the apex of a three-sided patch).
 /// A chain of a surface's open edges may carry `continuity` with the face beside it (G0, the
 /// default, G1 or G2).
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, solidcraft_derive::Walk)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, polykrom_derive::Walk)]
 pub struct NetworkCurve {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sketch: Option<SketchId>,
@@ -1839,7 +1839,7 @@ pub struct NetworkCurve {
 
 /// How a patch on a loop of edges meets the faces beside the loop: every edge with `all`, but the
 /// edges picked in `edges` with their own.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, solidcraft_derive::Walk)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, polykrom_derive::Walk)]
 pub struct PatchContinuity {
     #[serde(default = "patch_g0", skip_serializing_if = "is_g0")]
     pub all: Continuity,
@@ -1848,7 +1848,7 @@ pub struct PatchContinuity {
 }
 
 /// One edge of a patch's loop (a point on it) and how the patch meets the face beside it.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, solidcraft_derive::Walk)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, polykrom_derive::Walk)]
 pub struct EdgeContinuity {
     pub edge: Position,
     pub g: Continuity,
@@ -1921,7 +1921,7 @@ pub struct MeshData {
 }
 
 /// Points of a sketch, by id.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, solidcraft_derive::Walk)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, polykrom_derive::Walk)]
 pub struct SketchPoints {
     pub sketch: SketchId,
     pub ids: Vec<String>,
@@ -1954,7 +1954,7 @@ pub struct Component {
 }
 
 /// One loft section: profiles of a sketch.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, solidcraft_derive::Walk)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, polykrom_derive::Walk)]
 pub struct LoftSection {
     pub sketch: SketchId,
     #[walk(profiles_of = sketch, when = point.is_none())]
@@ -1966,7 +1966,7 @@ pub struct LoftSection {
 
 /// A section of a surface loft: one chain from a sketch (one profile's boundary, or curves
 /// meeting end to end).
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, solidcraft_derive::Walk)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, polykrom_derive::Walk)]
 pub struct SheetSection {
     pub sketch: SketchId,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -2017,7 +2017,7 @@ fn is_zero(v: &f64) -> bool {
 }
 
 /// Hole shapes.
-#[derive(Clone, Debug, PartialEq, Default, Serialize, Deserialize, solidcraft_derive::Walk)]
+#[derive(Clone, Debug, PartialEq, Default, Serialize, Deserialize, polykrom_derive::Walk)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum HoleKind {
     /// Plain hole; blind holes get a drill point when `tip_angle` is set.
@@ -2043,7 +2043,7 @@ pub enum HoleKind {
 
 /// A Single hole's reference edge (#37): a point on a straight edge of the hole's face, and the
 /// distance of the hole's centre from that edge's line, in the face's plane.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, solidcraft_derive::Walk)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, polykrom_derive::Walk)]
 pub struct HoleReference {
     pub edge: Position,
     #[walk(length = "Reference distance")]
@@ -2051,7 +2051,7 @@ pub struct HoleReference {
 }
 
 /// Pattern layouts.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, solidcraft_derive::Walk)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, polykrom_derive::Walk)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum PatternKind {
     Rectangular {
@@ -2069,9 +2069,9 @@ pub enum PatternKind {
         #[walk(length = "Spacing 2")]
         spacing2: Option<Expr>,
         #[serde(default, skip_serializing_if = "default_pattern_alignment")]
-        alignment: solidcraft_sketch::PatternAlignment,
+        alignment: polykrom_sketch::PatternAlignment,
         #[serde(default, skip_serializing_if = "default_pattern_alignment")]
-        alignment2: solidcraft_sketch::PatternAlignment,
+        alignment2: polykrom_sketch::PatternAlignment,
         #[serde(default, skip_serializing_if = "std::ops::Not::not")]
         reversed: bool,
         #[serde(default, skip_serializing_if = "std::ops::Not::not")]
@@ -2086,7 +2086,7 @@ pub enum PatternKind {
         #[walk(angle = "Total angle")]
         angle: Expr,
         #[serde(default, skip_serializing_if = "default_pattern_alignment")]
-        alignment: solidcraft_sketch::PatternAlignment,
+        alignment: polykrom_sketch::PatternAlignment,
         #[serde(default, skip_serializing_if = "std::ops::Not::not")]
         reversed: bool,
         /// A construction axis the copies turn about, by name, followed when it moves;
@@ -2116,8 +2116,8 @@ pub enum PatternKind {
     },
 }
 
-fn default_pattern_alignment(alignment: &solidcraft_sketch::PatternAlignment) -> bool {
-    *alignment == solidcraft_sketch::PatternAlignment::Right
+fn default_pattern_alignment(alignment: &polykrom_sketch::PatternAlignment) -> bool {
+    *alignment == polykrom_sketch::PatternAlignment::Right
 }
 
 fn z_axis() -> Dir {
@@ -3626,7 +3626,7 @@ impl Document {
             .filter_map(|p| p.count_expression.as_ref().map(|e| (p.id.clone(), e)))
             .map(|(id, e)| {
                 let n = crate::eval::val(vals, e, Kind::Unitless)?;
-                Ok((id, solidcraft_sketch::SketchPattern::circular_quantity(n)?))
+                Ok((id, polykrom_sketch::SketchPattern::circular_quantity(n)?))
             })
             .collect::<Result<_>>()?;
         for (id, count) in counts {
@@ -3647,7 +3647,7 @@ impl Document {
                     *slot = val(vals, e, Kind::Length).map_err(|error| DocError::Expr(format!("point {} {what}: {error}", p.id)))?;
                 }
             }
-            if !(at.is_finite() && at.x.abs() < solidcraft_sketch::MAX_COORD && at.y.abs() < solidcraft_sketch::MAX_COORD) {
+            if !(at.is_finite() && at.x.abs() < polykrom_sketch::MAX_COORD && at.y.abs() < polykrom_sketch::MAX_COORD) {
                 return Err(DocError::Invalid(format!("point {} is placed out of range", p.id)));
             }
             p.pos = at;
@@ -3663,7 +3663,7 @@ impl Document {
     pub fn apply_text_values(&self, vals: &std::collections::BTreeMap<String, expr::Value>, sk: &mut Sketch) -> Result<()> {
         use crate::eval::val;
         for link in &mut sk.links {
-            let solidcraft_sketch::LinkSource::Text { at, height, angle, exprs, .. } = &mut link.source else { continue };
+            let polykrom_sketch::LinkSource::Text { at, height, angle, exprs, .. } = &mut link.source else { continue };
             let number = |e: &Option<String>, kind: Kind, what: &str| -> Result<Option<f64>> {
                 match e {
                     None => Ok(None),
@@ -3704,10 +3704,10 @@ impl Document {
         &self,
         vals: &std::collections::BTreeMap<String, expr::Value>,
         sk: &mut Sketch,
-        stored: &solidcraft_sketch::DrivingValues,
+        stored: &polykrom_sketch::DrivingValues,
         moved_from: Option<&Sketch>,
-    ) -> Result<solidcraft_sketch::SolveReport> {
-        self.solve_sketch_with_analysis(vals, sk, stored, moved_from, solidcraft_sketch::Analysis::Full)
+    ) -> Result<polykrom_sketch::SolveReport> {
+        self.solve_sketch_with_analysis(vals, sk, stored, moved_from, polykrom_sketch::Analysis::Full)
     }
 
     /// [`Self::solve_sketch`] with the diagnostics needed by an internal edit. Parameter
@@ -3717,25 +3717,25 @@ impl Document {
         &self,
         vals: &std::collections::BTreeMap<String, expr::Value>,
         sk: &mut Sketch,
-        stored: &solidcraft_sketch::DrivingValues,
+        stored: &polykrom_sketch::DrivingValues,
         moved_from: Option<&Sketch>,
-        analysis: solidcraft_sketch::Analysis,
-    ) -> Result<solidcraft_sketch::SolveReport> {
+        analysis: polykrom_sketch::Analysis,
+    ) -> Result<polykrom_sketch::SolveReport> {
         self.apply_pattern_quantities(vals, sk)?;
         self.apply_dimension_values(vals, sk)?;
         let was = |sk: &Sketch| moved_from.and_then(|from| sk.positions_in(from));
         let offsets = !sk.offsets.is_empty() || !sk.freeform_offsets.is_empty();
         // Offsets always require another solve after refresh. Only that last report is
         // published; the first report only decides which state the second solve starts from.
-        let first_analysis = if offsets { solidcraft_sketch::Analysis::StatusOnly } else { analysis };
-        let mut report = solidcraft_sketch::solve_after_edit_with_analysis(sk, stored, was(sk).as_deref(), first_analysis);
+        let first_analysis = if offsets { polykrom_sketch::Analysis::StatusOnly } else { analysis };
+        let mut report = polykrom_sketch::solve_after_edit_with_analysis(sk, stored, was(sk).as_deref(), first_analysis);
         if offsets {
             // Source dimensions may have moved curves during the solve.
             sk.refresh_offsets()?;
             report = if report.ok() {
-                solidcraft_sketch::solve_with(sk, &solidcraft_sketch::Hold::default(), None, analysis, None)
+                polykrom_sketch::solve_with(sk, &polykrom_sketch::Hold::default(), None, analysis, None)
             } else {
-                solidcraft_sketch::solve_after_edit_with_analysis(sk, stored, was(sk).as_deref(), analysis)
+                polykrom_sketch::solve_after_edit_with_analysis(sk, stored, was(sk).as_deref(), analysis)
             };
         }
         Ok(report)

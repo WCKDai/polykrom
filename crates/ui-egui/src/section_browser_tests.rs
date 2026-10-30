@@ -87,7 +87,7 @@ fn edit_opens_the_section_dialog() {
     assert!(h.app.dialog.is_some(), "the Section Analysis dialog opens");
 }
 
-fn section_dialog(h: &Harness) -> (String, bool, Vec<solidcraft_engine::Sel>) {
+fn section_dialog(h: &Harness) -> (String, bool, Vec<polykrom_engine::Sel>) {
     let d = h.app.dialog.as_ref().expect("the Section Analysis dialog");
     let crate::dialogs::Kind::Section { offset, flip, .. } = &d.kind else { panic!("not the section dialog: {:?}", d.kind) };
     (offset.clone(), *flip, d.inputs.first().map(|i| i.items.clone()).unwrap_or_default())
@@ -106,7 +106,7 @@ fn ok(h: &mut Harness) {
 fn edit_starts_from_the_section_as_it_was_left() {
     let mut h = harness();
     h.app.run("solid.box", json!({"length":40,"width":30,"height":20})).unwrap();
-    h.app.session.selection = vec![solidcraft_engine::Sel::Plane { name: "XY".into() }];
+    h.app.session.selection = vec![polykrom_engine::Sel::Plane { name: "XY".into() }];
     h.app.start("inspect.section");
     if let Some(crate::dialogs::Kind::Section { offset, .. }) = h.app.dialog.as_mut().map(|d| &mut d.kind) {
         *offset = "12 mm".into();
@@ -128,7 +128,7 @@ fn edit_starts_from_the_section_as_it_was_left() {
     menu(&mut h, "Edit Section Analysis");
     let (offset, flip, plane) = section_dialog(&h);
     assert_eq!((offset.as_str(), flip), ("12 mm", false));
-    assert_eq!(plane, vec![solidcraft_engine::Sel::Plane { name: "XY".into() }]);
+    assert_eq!(plane, vec![polykrom_engine::Sel::Plane { name: "XY".into() }]);
     crate::dialogs::cancel(&mut h.app);
     h.frames(2);
 
@@ -155,7 +155,7 @@ fn edit_starts_from_the_section_as_it_was_left() {
 fn the_hatch_option_carries_through_the_section() {
     let mut h = harness();
     h.app.run("solid.box", json!({"length":40,"width":30,"height":20})).unwrap();
-    h.app.session.selection = vec![solidcraft_engine::Sel::Plane { name: "XY".into() }];
+    h.app.session.selection = vec![polykrom_engine::Sel::Plane { name: "XY".into() }];
     h.app.start("inspect.section");
     assert!(crate::viewport::section_hatch(&h.app), "a new section is hatched");
     if let Some(crate::dialogs::Kind::Section { hatch, .. }) = h.app.dialog.as_mut().map(|d| &mut d.kind) {

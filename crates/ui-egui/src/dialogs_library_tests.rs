@@ -1,6 +1,6 @@
 use super::*;
 use crate::{dialogs::Kind, scenario::Harness};
-use solidcraft_engine::{Sel, Session};
+use polykrom_engine::{Sel, Session};
 
 #[test]
 fn catalog_clicked_load_apply_export_and_ok_keep_one_design_undo_step() {

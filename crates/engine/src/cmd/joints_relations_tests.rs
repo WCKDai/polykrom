@@ -162,7 +162,7 @@ fn relations_that_disagree_are_reported_not_forced() {
     assert!(p.is_finite(), "{p:?}");
     // Saved and read back, the relations are the same.
     let saved = serde_json::to_string(&s.doc.assembly.joints).unwrap_or_default();
-    let back: Vec<solidcraft_doc::joints::Joint> = serde_json::from_str(&saved).unwrap_or_default();
+    let back: Vec<polykrom_doc::joints::Joint> = serde_json::from_str(&saved).unwrap_or_default();
     assert_eq!(back, s.doc.assembly.joints);
     assert!(saved.contains("\"point_on_plane\"") && saved.contains("\"point_on_line\""), "{saved}");
 }
@@ -204,8 +204,8 @@ fn a_panel_full_of_parts_placed_by_relations_stays_solved() {
             let origin = |n: &str| s.doc.assembly.origins.iter().find(|o| o.name == n).map(|o| o.origin.clone());
             let (Some(a), Some(b)) = (origin(a), origin(&format!("{c}{b}"))) else { panic!("origins") };
             let id = s.doc.assembly.joints.iter().map(|j| j.id).max().unwrap_or(0) + 1;
-            let kind = solidcraft_doc::joints::JointKind::parse(kind).unwrap_or(solidcraft_doc::joints::JointKind::Rigid);
-            let mut j = solidcraft_doc::joints::Joint {
+            let kind = polykrom_doc::joints::JointKind::parse(kind).unwrap_or(polykrom_doc::joints::JointKind::Rigid);
+            let mut j = polykrom_doc::joints::Joint {
                 id,
                 name: format!("R{id}"),
                 kind,
@@ -219,7 +219,7 @@ fn a_panel_full_of_parts_placed_by_relations_stays_solved() {
                 suppressed: false,
                 exprs: Default::default(),
             };
-            if let Some(q) = solidcraft_doc::joints::relation_values(&s.doc, &s.model.state(), &j) {
+            if let Some(q) = polykrom_doc::joints::relation_values(&s.doc, &s.model.state(), &j) {
                 j.values = q;
             }
             s.doc_mut().assembly.joints.push(j);

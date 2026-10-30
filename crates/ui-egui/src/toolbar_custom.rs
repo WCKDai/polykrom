@@ -10,8 +10,8 @@
 
 use std::collections::BTreeMap;
 
+use polykrom_engine::{CommandSpec, command_specs};
 use serde_json::{Value, json};
-use solidcraft_engine::{CommandSpec, command_specs};
 
 use crate::context_menu::Item;
 use crate::{SolveApp, ui_kit};
@@ -137,7 +137,7 @@ fn key(tab: &str, panel: &str) -> String {
 /// The buttons a panel shows: the user's list, or the first `promoted` commands of the panel.
 pub fn buttons(app: &SolveApp, tab: &str, panel: &str, cmds: &[&'static CommandSpec], promoted: usize) -> Vec<&'static CommandSpec> {
     match app.toolbar_custom.panels.get(&key(tab, panel)) {
-        Some(ids) => ids.iter().filter_map(|id| solidcraft_engine::find_command(id)).collect(),
+        Some(ids) => ids.iter().filter_map(|id| polykrom_engine::find_command(id)).collect(),
         None => cmds.iter().take(promoted).copied().collect(),
     }
 }
@@ -192,7 +192,7 @@ fn home_panel(tab: &str, id: &str) -> Option<&'static str> {
 
 /// Pin a command to the toolbar of a tab (as a button of its panel, at the end).
 pub fn pin(app: &mut SolveApp, tab: &str, id: &str) -> Result<(), String> {
-    if solidcraft_engine::find_command(id).is_none() {
+    if polykrom_engine::find_command(id).is_none() {
         return Err(format!("no command `{id}`"));
     }
     if pinned_on(app, tab, id).is_some() {

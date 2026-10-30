@@ -2,11 +2,11 @@
 
 use crate::ui_kit::{Container, Edge, Surface};
 use egui::{Rect, Sense, UiBuilder, pos2, vec2};
-use serde_json::{Value, json};
-use solidcraft_engine::doc::{
+use polykrom_engine::doc::{
     FeatureKind, PlaneRef, SketchId,
     construct::{AxisDef, PointDef},
 };
+use serde_json::{Value, json};
 
 use crate::SolveApp;
 use crate::theme::Tokens;
@@ -77,8 +77,8 @@ pub(crate) fn icon_of(k: &FeatureKind) -> &'static str {
         FeatureKind::Sphere { .. } => "sphere",
         FeatureKind::Torus { .. } => "torus",
         FeatureKind::Combine { .. } => "combine",
-        FeatureKind::Pattern { pattern: solidcraft_engine::doc::PatternKind::Rectangular { .. }, .. } => "pattern_rect",
-        FeatureKind::Pattern { pattern: solidcraft_engine::doc::PatternKind::Path { .. }, .. } => "pattern_path",
+        FeatureKind::Pattern { pattern: polykrom_engine::doc::PatternKind::Rectangular { .. }, .. } => "pattern_rect",
+        FeatureKind::Pattern { pattern: polykrom_engine::doc::PatternKind::Path { .. }, .. } => "pattern_path",
         FeatureKind::Pattern { .. } => "pattern_circ",
         FeatureKind::Mirror { .. } => "mirror",
         FeatureKind::ConstructionPlane { plane } => construction_plane_icon(plane),
@@ -207,7 +207,7 @@ pub(crate) fn selected_feature_ids(app: &SolveApp) -> Vec<u64> {
         .features
         .iter()
         .filter(|feature| {
-            app.session.selection.iter().any(|selection| matches!(selection, solidcraft_engine::Sel::Feature { id } if *id == feature.id))
+            app.session.selection.iter().any(|selection| matches!(selection, polykrom_engine::Sel::Feature { id } if *id == feature.id))
         })
         .map(|feature| feature.id)
         .collect()
@@ -324,7 +324,7 @@ fn toggle_feature(app: &mut SolveApp, id: u64) {
     let selected = selected_feature_ids(app);
     if selected.contains(&id) {
         let rest: Vec<_> =
-            app.session.selection.iter().filter(|s| !matches!(s, solidcraft_engine::Sel::Feature { id: f } if *f == id)).cloned().collect();
+            app.session.selection.iter().filter(|s| !matches!(s, polykrom_engine::Sel::Feature { id: f } if *f == id)).cloned().collect();
         let _ = app.run("select.set", json!({ "items": rest }));
     } else {
         let _ = app.run("select.set", json!({ "items": [{"type": "feature", "id": id}], "add": true }));
@@ -447,7 +447,7 @@ fn timeline_contents(app: &mut SolveApp, ui: &mut egui::Ui, floating: bool) {
                 let err = res.and_then(|r| r.error.clone());
                 let warn = res.and_then(|r| r.warning.clone());
                 let rolled = i >= marker;
-                let is_it = |s: &solidcraft_engine::Sel| matches!(s, solidcraft_engine::Sel::Feature { id: f } if f == id);
+                let is_it = |s: &polykrom_engine::Sel| matches!(s, polykrom_engine::Sel::Feature { id: f } if f == id);
                 let sel = app.session.selection.iter().any(is_it) || app.dialog.as_ref().is_some_and(|d| d.items().iter().any(is_it));
                 if resp.hovered() {
                     hovered = Some(*id);
@@ -480,7 +480,7 @@ fn timeline_contents(app: &mut SolveApp, ui: &mut egui::Ui, floating: bool) {
                     let takes = app.dialog.as_ref().and_then(|d| d.active_input()).is_some_and(|i| i.accept & crate::selection::FEATURES != 0);
                     if takes {
                         if let Some(mut d) = app.dialog.take() {
-                            d.pick(&app.session, solidcraft_engine::Sel::Feature { id: *id });
+                            d.pick(&app.session, polykrom_engine::Sel::Feature { id: *id });
                             app.dialog = Some(d);
                         }
                     } else {
@@ -648,11 +648,11 @@ mod tests {
 
     #[test]
     fn construction_history_matches_the_tool_that_created_it() {
-        use solidcraft_engine::doc::{
+        use polykrom_engine::doc::{
             FeatureKind, PlaneRef,
             construct::{AxisDef, GeoRef, PointDef},
         };
-        use solidcraft_engine::geom::Vec3;
+        use polykrom_engine::geom::Vec3;
         let point = || GeoRef::Point { p: Vec3::ZERO };
         let reference = || Box::new(point());
         let mut cases = Vec::new();
@@ -686,7 +686,7 @@ mod tests {
             cases.push((format!("construct.plane.{id}"), FeatureKind::ConstructionPlane { plane }));
         }
         for (id, feature) in cases {
-            let command = solidcraft_engine::find_command(&id).unwrap();
+            let command = polykrom_engine::find_command(&id).unwrap();
             let icon = super::icon_of(&feature);
             assert_eq!(icon, command.icon, "{id}: history and toolbar disagree");
             assert!(!crate::icon_svg::resolve(icon).placeholder, "{id}");
@@ -709,20 +709,20 @@ mod tests {
             ("solid.web", json!({"type":"rib", "sketch":0, "curves":[], "thickness":"2", "web":true})),
         ];
         for (id, definition) in cases {
-            let feature: solidcraft_engine::doc::FeatureKind = serde_json::from_value(definition).unwrap();
-            let command = solidcraft_engine::find_command(id).unwrap();
+            let feature: polykrom_engine::doc::FeatureKind = serde_json::from_value(definition).unwrap();
+            let command = polykrom_engine::find_command(id).unwrap();
             assert_eq!(super::icon_of(&feature), command.icon, "{id}: history and toolbar disagree");
         }
     }
 
     #[test]
     fn a_path_pattern_keeps_its_path_icon_in_history() {
-        use solidcraft_engine::doc::{FeatureKind, PatternKind};
+        use polykrom_engine::doc::{FeatureKind, PatternKind};
         let feature = FeatureKind::Pattern {
             features: Vec::new(),
             bodies: Vec::new(),
             pattern: PatternKind::Path {
-                path_sketch: solidcraft_engine::doc::SketchId(0),
+                path_sketch: polykrom_engine::doc::SketchId(0),
                 path: Vec::new(),
                 count: "2".into(),
                 spacing: "10".into(),
@@ -731,7 +731,7 @@ mod tests {
                 orient: false,
             },
         };
-        assert_eq!(super::icon_of(&feature), solidcraft_engine::find_command("solid.pattern.path").unwrap().icon);
+        assert_eq!(super::icon_of(&feature), polykrom_engine::find_command("solid.pattern.path").unwrap().icon);
     }
 
     fn two_boxes(left: bool) -> Harness {

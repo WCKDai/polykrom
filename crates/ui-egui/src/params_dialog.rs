@@ -106,7 +106,7 @@ fn rows(app: &mut SolveApp) -> Vec<Row> {
     // Sketch dimension parameters: the sketch that owns each.
     let mut owner: std::collections::BTreeMap<String, String> = Default::default();
     for f in &app.session.doc.features {
-        if let solidcraft_engine::doc::FeatureKind::Sketch { sketch, .. } = &f.kind {
+        if let polykrom_engine::doc::FeatureKind::Sketch { sketch, .. } = &f.kind {
             for c in &sketch.constraints {
                 if let Some(p) = &c.param {
                     owner.insert(p.clone(), f.name.clone());
@@ -223,7 +223,7 @@ pub fn show(app: &mut SolveApp, ctx: &egui::Context) {
         let (closed, action) = panel.feature(
             ui,
             ui_kit::FeatureOptions {
-                icon: solidcraft_engine::find_command("parameters.change").map_or("", |c| c.icon),
+                icon: polykrom_engine::find_command("parameters.change").map_or("", |c| c.icon),
                 title,
                 drag_key: "PARAMETERS",
                 moved,
@@ -799,7 +799,7 @@ mod tests {
     }
 
     fn escape_state(h: &crate::scenario::Harness) -> Value {
-        let history = |steps: &[solidcraft_engine::Snapshot]| {
+        let history = |steps: &[polykrom_engine::Snapshot]| {
             steps
                 .iter()
                 .map(|s| json!({"label":s.label,"document":s.doc.to_json(),"sketch":s.active_sketch,"moves":s.pending_moves}))
@@ -851,7 +851,7 @@ mod tests {
         let mut h = escape_dialog();
         h.app.run("parameters.change", json!({"name":"width","expression":"12 mm"})).unwrap();
         h.app.run("edit.undo", json!({})).unwrap();
-        h.app.session.selection = vec![solidcraft_engine::Sel::Plane { name: "XY".into() }];
+        h.app.session.selection = vec![polykrom_engine::Sel::Plane { name: "XY".into() }];
         h.step(&json!({"click":{"handle":"params:title"}})).unwrap();
         assert!(!h.app.session.undo.is_empty() && !h.app.session.redo.is_empty());
         let before = escape_state(&h);
@@ -989,7 +989,7 @@ mod tests {
         assert_eq!(word_before("1 + ", 4), (4, String::new()));
         assert_eq!(word_before("ü", 9), (0, "ü".to_string()));
         let ctx = crate::fonts::test_context();
-        let mut app = SolveApp::new(solidcraft_engine::Session::default(), Default::default());
+        let mut app = SolveApp::new(polykrom_engine::Session::default(), Default::default());
         let _ = app.run("parameters.add", json!({"name": "width", "expression": "40 mm"}));
         let _ = app.run("parameters.add", json!({"name": "radius", "expression": "10 mm"}));
         let _ = app.run("parameters.add", json!({"name": "rounding", "expression": "3 mm"}));
@@ -1025,7 +1025,7 @@ mod tests {
     #[test]
     fn a_parameter_is_offered_for_any_part_of_its_name() {
         let ctx = egui::Context::default();
-        let mut app = SolveApp::new(solidcraft_engine::Session::default(), Default::default());
+        let mut app = SolveApp::new(polykrom_engine::Session::default(), Default::default());
         for (name, e) in [("cab_side_thickness", "18 mm"), ("sides", "4")] {
             let _ = app.run("parameters.add", json!({"name": name, "expression": e}));
         }
@@ -1079,7 +1079,7 @@ mod tests {
         start.elapsed().as_secs_f64() * 1000.0 / n as f64
     }
 
-    /// Frame times with the window closed and open (`cargo test -p solidcraft-ui-egui params_frame_time -- --nocapture`).
+    /// Frame times with the window closed and open (`cargo test -p polykrom-ui-egui params_frame_time -- --nocapture`).
     #[test]
     fn params_frame_time() {
         let mut h = big_design();
@@ -1094,7 +1094,7 @@ mod tests {
 
     /// #2733: many feature groups, rather than only many user parameters.
     fn many_feature_groups() -> crate::scenario::Harness {
-        use solidcraft_engine::doc::{Document, FeatureKind, PlaneRef};
+        use polykrom_engine::doc::{Document, FeatureKind, PlaneRef};
         let mut doc = Document::default();
         for i in 0..51 {
             doc.add_user_param(&format!("p{i}"), "10 mm", None, None).unwrap();
@@ -1110,7 +1110,7 @@ mod tests {
         }
         let mut h = crate::scenario::Harness::new();
         h.app.home.open = false;
-        h.app.session = solidcraft_engine::Session::new(doc);
+        h.app.session = polykrom_engine::Session::new(doc);
         h.app.ui.show_origin = false;
         h
     }

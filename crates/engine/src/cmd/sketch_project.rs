@@ -3,11 +3,11 @@
 //! (fixed, drawn purple, updated when the upstream geometry changes). Break Link turns them into
 //! normal geometry.
 
+use polykrom_doc::project::resolve;
+use polykrom_doc::{Document, FeatureKind};
+use polykrom_sketch::{ConstraintKind, LinkKind, LinkSource, Sketch};
 use serde_json::{Value, json};
-use solidcraft_doc::project::resolve;
-use solidcraft_doc::{Document, FeatureKind};
 use solidcraft_geom::{Plane, Vec3};
-use solidcraft_sketch::{ConstraintKind, LinkKind, LinkSource, Sketch};
 
 use super::{CommandSpec, in_sketch};
 use crate::params::{bad, bool_, str_, vec3};
@@ -121,7 +121,7 @@ fn source(s: &Session, v: &Value, cmd: &str) -> Result<LinkSource> {
 /// The plane of a sketch feature, resolved against `st`: the model before the sketch as its
 /// component sees it, which is what evaluation resolves it against. A construction plane built
 /// from the model (through a sketch line, three points, between two faces…) exists only there.
-fn sketch_plane(doc: &Document, id: u64, st: &solidcraft_doc::ModelState) -> Result<Plane> {
+fn sketch_plane(doc: &Document, id: u64, st: &polykrom_doc::ModelState) -> Result<Plane> {
     let (vals, _) = doc.param_values();
     match doc.feature(id).map(|f| &f.kind) {
         Some(FeatureKind::Sketch { plane, .. }) => Ok(doc.resolve_plane_in(&vals, plane, 0, Some(st))?),
@@ -135,16 +135,16 @@ fn state_for_sketch<'a>(
     s: &Session,
     doc: &Document,
     id: u64,
-    st: &'a solidcraft_doc::ModelState,
-) -> std::result::Result<std::borrow::Cow<'a, solidcraft_doc::ModelState>, solidcraft_doc::DocError> {
+    st: &'a polykrom_doc::ModelState,
+) -> std::result::Result<std::borrow::Cow<'a, polykrom_doc::ModelState>, polykrom_doc::DocError> {
     let comp = doc.feature(id).map(|f| f.component).unwrap_or(0);
     let attachment = doc.feature(id).and_then(|feature| match &feature.kind {
-        solidcraft_doc::FeatureKind::Sketch { plane, .. } => super::sketch::face::anchor(plane),
+        polykrom_doc::FeatureKind::Sketch { plane, .. } => super::sketch::face::anchor(plane),
         _ => None,
     });
     match attachment {
-        Some(anchor) => solidcraft_doc::state_in_face_anchor_frame(doc, st, anchor, comp),
-        None => Ok(solidcraft_doc::state_in_frame_at(doc, st, comp, owner_frame(s, doc, comp))),
+        Some(anchor) => polykrom_doc::state_in_face_anchor_frame(doc, st, anchor, comp),
+        None => Ok(polykrom_doc::state_in_frame_at(doc, st, comp, owner_frame(s, doc, comp))),
     }
 }
 
@@ -162,7 +162,7 @@ fn placed_candidate<'a>(s: &Session, doc: &'a Document) -> std::borrow::Cow<'a, 
     std::borrow::Cow::Owned(placed)
 }
 
-fn owner_frame(s: &Session, doc: &Document, comp: u64) -> solidcraft_doc::Mat {
+fn owner_frame(s: &Session, doc: &Document, comp: u64) -> polykrom_doc::Mat {
     if comp == s.active_component { s.active_component_frame() } else { doc.component_transform(comp) }
 }
 
@@ -185,7 +185,7 @@ pub(super) fn refresh(s: &Session, doc: &Document, id: u64, sk: &mut Sketch) -> 
     let _ = doc.apply_text_values(&vals, sk);
     let st = s.model.state_before(id);
     let attachment = doc.feature(id).and_then(|feature| match &feature.kind {
-        solidcraft_doc::FeatureKind::Sketch { plane, .. } => super::sketch::face::anchor(plane),
+        polykrom_doc::FeatureKind::Sketch { plane, .. } => super::sketch::face::anchor(plane),
         _ => None,
     });
     let Ok(st) = state_for_sketch(s, &doc, id, &st) else {
@@ -193,8 +193,8 @@ pub(super) fn refresh(s: &Session, doc: &Document, id: u64, sk: &mut Sketch) -> 
     };
     let Ok(plane) = sketch_plane(&doc, id, &st) else { return Vec::new() };
     let warnings = match attachment {
-        Some(anchor) => solidcraft_doc::project::refresh_face_anchor_links(&doc, &vals, &st, &plane, sk, anchor),
-        None => solidcraft_doc::project::refresh_links(&doc, &vals, &st, &plane, sk),
+        Some(anchor) => polykrom_doc::project::refresh_face_anchor_links(&doc, &vals, &st, &plane, sk, anchor),
+        None => polykrom_doc::project::refresh_links(&doc, &vals, &st, &plane, sk),
     };
     if let Ok(stored) = doc.sketch(id)
         && sk.positions_in(stored).is_some()
@@ -221,16 +221,16 @@ pub(super) fn add_link(s: &Session, doc: &Document, id: u64, sk: &mut Sketch, ki
     let name = if let LinkSource::Face { body, at } = &r.source {
         st.body(body).and_then(|body| {
             if let Some(index) = r.face_index {
-                solidcraft_doc::naming::face_names(body).get(index).filter(|name| !name.is_empty()).cloned()
+                polykrom_doc::naming::face_names(body).get(index).filter(|name| !name.is_empty()).cloned()
             } else {
-                solidcraft_doc::naming::face_name_at_body(body, *at)
+                polykrom_doc::naming::face_name_at_body(body, *at)
             }
         })
     } else {
         None
     };
     // The link is the edge that was picked, not whichever is nearest the picked point later.
-    let edge_name = solidcraft_doc::project::resolved_edge_name(&st, &r);
+    let edge_name = polykrom_doc::project::resolved_edge_name(&st, &r);
     let link = sk.add_link_with_wires(kind, r.source, &r.geom, &r.wires)?;
     if let Some(l) = sk.links.iter_mut().find(|l| l.id == link) {
         l.face_name = name;
@@ -342,7 +342,7 @@ fn spun_profile(s: &mut Session, p: &Value) -> Result<Value> {
             let st = s.model.state();
             let ss = st.sketch(id).ok_or_else(|| EngineError::Other("the sketch is not evaluated".into()))?;
             let ci = ss.sketch.curve_index(axis).ok_or_else(|| bad(cmd, format!("unknown curve `{axis}`")))?;
-            let Some(solidcraft_sketch::Shape::Line { a, b }) = ss.sketch.shape(ci) else { return Err(bad(cmd, "the axis must be a line")) };
+            let Some(polykrom_sketch::Shape::Line { a, b }) = ss.sketch.shape(ci) else { return Err(bad(cmd, "the axis must be a line")) };
             let (wa, wb) = (ss.plane.to_world(a), ss.plane.to_world(b));
             (wa, wb - wa)
         }
@@ -474,7 +474,7 @@ pub(super) fn snap_points(s: &mut Session, p: &Value, cmd: &str) -> Result<Value
         } else if let Some(line) = mid {
             // "mid:<line>": a new point at the line's midpoint, kept there.
             let l = sk.curve_index(&line).ok_or_else(|| bad(cmd, format!("unknown curve `{line}`")))?;
-            let Some(solidcraft_sketch::Shape::Line { a, b }) = sk.shape(l) else { return Err(bad(cmd, format!("`{line}` is not a line"))) };
+            let Some(polykrom_sketch::Shape::Line { a, b }) = sk.shape(l) else { return Err(bad(cmd, format!("`{line}` is not a line"))) };
             let pi = sk.add_point((a + b) * 0.5, None)?;
             sk.add_constraint(ConstraintKind::Midpoint { p: pi, l }, None)?;
             sk.points.get(pi).map(|q| q.id.clone()).unwrap_or_default()
@@ -531,14 +531,14 @@ pub(super) fn project_internal_faces(s: &mut Session, id: u64, body: &str, indic
     let mut doc = (*s.doc).clone();
     let raw = s.model.state_before(id);
     let component = doc.feature(id).map(|feature| feature.component).unwrap_or(0);
-    let state = solidcraft_doc::state_in_frame_at(&doc, &raw, component, owner_frame(s, &doc, component));
+    let state = polykrom_doc::state_in_frame_at(&doc, &raw, component, owner_frame(s, &doc, component));
     let plane = sketch_plane(&doc, id, &state)?;
-    let names = state.body(body).map(solidcraft_doc::naming::face_names).unwrap_or_default();
+    let names = state.body(body).map(polykrom_doc::naming::face_names).unwrap_or_default();
 
     let mut sk = doc.sketch(id)?.clone();
     let mut links = Vec::with_capacity(indices.len());
     for &index in indices {
-        let resolved = solidcraft_doc::project::resolve_face_indices(&state, &plane, LinkKind::Project, body, &[index])?;
+        let resolved = polykrom_doc::project::resolve_face_indices(&state, &plane, LinkKind::Project, body, &[index])?;
         let link = sk.add_link_with_wires(LinkKind::Project, resolved.source, &resolved.geom, &resolved.wires)?;
         if let Some(entry) = sk.links.iter_mut().find(|entry| entry.id == link) {
             entry.face_name = names.get(index).cloned();
@@ -556,7 +556,7 @@ pub(super) fn auto_project_face(s: &mut Session, id: u64, _at: Vec3) -> Result<O
     let Some(anchor) = doc
         .feature(id)
         .and_then(|feature| match &feature.kind {
-            solidcraft_doc::FeatureKind::Sketch { plane, .. } => super::sketch::face::anchor(plane),
+            polykrom_doc::FeatureKind::Sketch { plane, .. } => super::sketch::face::anchor(plane),
             _ => None,
         })
         .cloned()
@@ -565,9 +565,9 @@ pub(super) fn auto_project_face(s: &mut Session, id: u64, _at: Vec3) -> Result<O
     };
     let raw = s.model.state_before(id);
     let author = doc.feature(id).map(|feature| feature.component).unwrap_or(0);
-    let state = solidcraft_doc::state_in_face_anchor_frame(&doc, &raw, &anchor, author)?;
+    let state = polykrom_doc::state_in_face_anchor_frame(&doc, &raw, &anchor, author)?;
     let plane = doc.resolve_face_anchor(&anchor, author, &raw)?;
-    let resolved = solidcraft_doc::project::resolve_anchored_face(&doc, &state, &plane, LinkKind::Project, &anchor)?;
+    let resolved = polykrom_doc::project::resolve_anchored_face(&doc, &state, &plane, LinkKind::Project, &anchor)?;
     let mut sk = doc.sketch(id)?.clone();
     let link = sk.add_link_with_wires(LinkKind::Project, resolved.source, &resolved.geom, &resolved.wires)?;
     if let Some(link) = sk.links.iter_mut().find(|entry| entry.id == link) {

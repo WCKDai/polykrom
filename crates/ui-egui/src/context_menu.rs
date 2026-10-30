@@ -13,9 +13,9 @@
 
 use crate::ui_kit::{Container, Surface};
 use egui::{Color32, Pos2, Rect, Sense, Vec2, pos2, vec2};
+use polykrom_engine::Sel;
 use serde::Serialize;
 use serde_json::{Value, json};
-use solidcraft_engine::Sel;
 
 use crate::SolveApp;
 
@@ -162,7 +162,7 @@ impl Item {
 
 /// A command entry: label, icon, shortcut and enablement come from the registry.
 pub(crate) fn cmd(app: &SolveApp, id: &str, label: &str) -> Item {
-    let info = solidcraft_engine::find_command(id).map(|c| c.info(&app.session));
+    let info = polykrom_engine::find_command(id).map(|c| c.info(&app.session));
     let shortcut = match id {
         "edit.undo" => "Ctrl+Z".to_string(),
         "edit.redo" => "Ctrl+Y".to_string(),
@@ -445,13 +445,12 @@ fn picked_face_feature(app: &SolveApp) -> Option<u64> {
     })?;
     let state = app.session.world_state();
     let body = state.body(body)?;
-    let names = solidcraft_engine::doc::naming::face_names(body);
+    let names = polykrom_engine::doc::naming::face_names(body);
     let name = names.get(index)?;
     let (creator, _) = name.strip_prefix('F')?.split_once(':')?;
     let id = creator.parse::<u64>().ok()?;
     let owner = app.session.doc.feature(body.feature)?;
-    if matches!(owner.kind, solidcraft_engine::doc::FeatureKind::Import { .. } | solidcraft_engine::doc::FeatureKind::MeshImport { .. })
-        && id != owner.id
+    if matches!(owner.kind, polykrom_engine::doc::FeatureKind::Import { .. } | polykrom_engine::doc::FeatureKind::MeshImport { .. }) && id != owner.id
     {
         return None;
     }
@@ -687,7 +686,7 @@ fn origin_plane_items(app: &SolveApp, name: &str) -> Vec<Item> {
 /// An assembly joint: edit, drive, suppress, delete.
 fn joint_items(app: &SolveApp, id: u64) -> Vec<Item> {
     let Some(j) = app.session.doc.assembly.joints.iter().find(|j| j.id == id) else { return Vec::new() };
-    let rigid = j.kind == solidcraft_engine::doc::joints::JointKind::Rigid;
+    let rigid = j.kind == polykrom_engine::doc::joints::JointKind::Rigid;
     // Show/Hide acts on every joint picked in the browser (this one among them).
     let mut joints = app.tree.picked_joints.clone();
     if !joints.contains(&id) {
@@ -862,7 +861,7 @@ fn explode_text(app: &SolveApp) -> Option<Item> {
 /// Sketch entity items: construction, fix, delete, dimension and the constraints the selection
 /// can take.
 fn sketch_entity_items(app: &SolveApp) -> Vec<Item> {
-    use solidcraft_engine::sketch::CurveKind;
+    use polykrom_engine::sketch::CurveKind;
     let Some(sid) = app.session.active_sketch else { return Vec::new() };
     let st = app.session.world_state();
     let Some(ss) = st.sketch(sid) else { return Vec::new() };
@@ -930,7 +929,7 @@ fn sketch_entity_items(app: &SolveApp) -> Vec<Item> {
             ss.sketch
                 .curve_index(id)
                 .and_then(|i| ss.sketch.curves.get(i))
-                .is_some_and(|c| matches!(c.kind, solidcraft_engine::sketch::CurveKind::Line { .. }))
+                .is_some_and(|c| matches!(c.kind, polykrom_engine::sketch::CurveKind::Line { .. }))
         })
         .cloned()
         .collect();
@@ -1361,7 +1360,7 @@ pub fn delete(app: &mut SolveApp) {
 /// visibility (bodies, faces' and edges' bodies, sketches, construction and origin planes and
 /// axes, components' bodies, canvases, joints' glyphs). When some are shown and some hidden, all are hidden.
 pub fn toggle_visibility(app: &mut SolveApp) {
-    use solidcraft_engine::doc::FeatureKind;
+    use polykrom_engine::doc::FeatureKind;
     let paths: Vec<Vec<u64>> =
         app.session.selection.iter().filter_map(|s| if let Sel::Occurrence { path } = s { Some(path.clone()) } else { None }).collect();
     if !paths.is_empty() {
@@ -1965,7 +1964,7 @@ mod tests {
 
     #[test]
     fn line_offset_context_menu_breaks_association_and_allows_trim() {
-        use solidcraft_engine::{geom::Vec2, sketch::Shape};
+        use polykrom_engine::{geom::Vec2, sketch::Shape};
 
         let mut h = crate::scenario::Harness::new();
         h.app.home.open = false;
@@ -2065,7 +2064,7 @@ mod tests {
 
     #[test]
     fn disabled_radial_menu_does_not_capture_right_button_hold() {
-        let mut app = SolveApp::new(solidcraft_engine::Session::default(), Default::default());
+        let mut app = SolveApp::new(polykrom_engine::Session::default(), Default::default());
         let ctx = crate::fonts::test_context();
         let point = pos2(600.0, 400.0);
         app.viewport.mouse = Some(point);

@@ -12,7 +12,7 @@ pub(super) fn eval(doc: &Document, vals: &BTreeMap<String, Value>, f: &Feature, 
             let mut made = Vec::new();
             if let Some(sk) = sketch {
                 let ss = st.sketch(sk.0).ok_or_else(|| DocError::Unknown(format!("sketch {sk} (it must come earlier in the timeline)")))?;
-                let regions = solidcraft_sketch::merge_regions(&select_profiles(ss, profiles)?);
+                let regions = polykrom_sketch::merge_regions(&select_profiles(ss, profiles)?);
                 for r in &regions {
                     made.push(kernel::patch_region(&ss.plane, r)?);
                 }
@@ -763,7 +763,7 @@ fn section_chains(ss: &SolvedSketch, sec: &SheetSection) -> Result<Vec<Vec<Seg2>
 fn sheet_chains(ss: &SolvedSketch, profiles: Option<&ProfileSel>, curves: &[String]) -> Result<Vec<Vec<Seg2>>> {
     let mut chains: Vec<Vec<Seg2>> = Vec::new();
     if let Some(sel) = profiles {
-        for r in solidcraft_sketch::merge_regions(&select_profiles(ss, sel)?) {
+        for r in polykrom_sketch::merge_regions(&select_profiles(ss, sel)?) {
             chains.extend(std::iter::once(r.outer).chain(r.holes).map(|lp| lp.segs));
         }
     }

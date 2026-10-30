@@ -112,8 +112,8 @@ const MAX_PATTERN_INSTANCES: i64 = 1000;
 
 /// A solid pattern's quantity row, with step arrows from 1 to `MAX_PATTERN_INSTANCES`. The
 /// count goes to the command as typed, so it is evaluated as the document evaluates it.
-fn quantity_row(ui: &mut egui::Ui, doc: &solidcraft_engine::doc::Document, label: &str, value: &mut String) -> bool {
-    let eval = |text: &str| doc.eval(text.trim(), solidcraft_engine::doc::expr::Kind::Unitless).ok();
+fn quantity_row(ui: &mut egui::Ui, doc: &polykrom_engine::doc::Document, label: &str, value: &mut String) -> bool {
+    let eval = |text: &str| doc.eval(text.trim(), polykrom_engine::doc::expr::Kind::Unitless).ok();
     ui_kit::count_row(ui, label, value, &ui_kit::Count { min: 1, max: MAX_PATTERN_INSTANCES, eval: &eval })
 }
 
@@ -255,7 +255,7 @@ pub(super) fn rows(app: &mut SolveApp, ctx: &egui::Context, d: &mut Dialog, ui: 
                         (d, _) => d,
                     };
                     // Selecting Symmetric applies the current total-distance semantics.
-                    d.extra.insert("convention".into(), json!(solidcraft_engine::doc::ExtrudeConvention::TotalDistance));
+                    d.extra.insert("convention".into(), json!(polykrom_engine::doc::ExtrudeConvention::TotalDistance));
                     // An explicit direction ends the automatic choices (#1257).
                     smart.manual_dir = true;
                     *auto_op = false;

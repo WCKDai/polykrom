@@ -3,10 +3,10 @@
 //! persistent name refers to), whether each origin is found today and why not, its kind, offset,
 //! angle, flip, limits, values, expressions and the motion links it takes part in. Reads only.
 
+use polykrom_doc::joints::{self, Joint, JointOrigin, Snap, XRef};
+use polykrom_doc::naming::{legacy_name, strip_piece};
+use polykrom_doc::{Document, MAX_PLACEMENT_DEPTH, ModelState};
 use serde_json::{Value, json};
-use solidcraft_doc::joints::{self, Joint, JointOrigin, Snap, XRef};
-use solidcraft_doc::naming::{legacy_name, strip_piece};
-use solidcraft_doc::{Document, MAX_PLACEMENT_DEPTH, ModelState};
 
 use super::{component_of, joint_id, link_json, named_values, occurrence_name};
 use crate::{Result, Session};

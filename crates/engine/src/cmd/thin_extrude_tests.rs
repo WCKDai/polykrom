@@ -66,7 +66,7 @@ fn the_thickness_is_a_parameter_and_the_wall_survives_reopening() {
     let t = f.param_names.iter().zip(f.kind.inputs()).find(|(_, (label, _, _))| *label == "Thickness").map(|(n, _)| n.clone()).unwrap();
     run(&mut s, "parameters.change", json!({"name": t, "expression": "4"}));
     close(volume(&mut s), (44.0 * 24.0 - 36.0 * 16.0) * 10.0);
-    let mut reopened = Session { doc: solidcraft_doc::Document::from_json(&s.doc.to_json()).unwrap().into(), ..Session::default() };
+    let mut reopened = Session { doc: polykrom_doc::Document::from_json(&s.doc.to_json()).unwrap().into(), ..Session::default() };
     reopened.refresh();
     close(volume(&mut reopened), (44.0 * 24.0 - 36.0 * 16.0) * 10.0);
     // A plain extrude of the same sketch fills the rectangle.
@@ -177,14 +177,14 @@ fn hostile_thin_params_never_panic() {
 // sketch doesn't have, so they are certified by the curves the wall follows: the signature the
 // solid caps had when the wall follows the whole profile.
 
-fn attachment(s: &Session, sketch: &str) -> solidcraft_doc::FaceAttachmentStatus {
+fn attachment(s: &Session, sketch: &str) -> polykrom_doc::FaceAttachmentStatus {
     let id = s.doc.find_feature(sketch).map(|f| f.id).unwrap_or_default();
     s.placed_document().sketch_face_attachment(id, &s.model)
 }
 
-fn attached(s: &Session, sketch: &str) -> (solidcraft_geom::Plane, Option<solidcraft_doc::config::FaceCertificate>) {
+fn attached(s: &Session, sketch: &str) -> (solidcraft_geom::Plane, Option<polykrom_doc::config::FaceCertificate>) {
     match attachment(s, sketch) {
-        solidcraft_doc::FaceAttachmentStatus::Healthy { plane, target, .. } => (plane, target.certificate),
+        polykrom_doc::FaceAttachmentStatus::Healthy { plane, target, .. } => (plane, target.certificate),
         other => panic!("{sketch}: {other:?}"),
     }
 }
@@ -199,8 +199,8 @@ fn sketch_on(s: &mut Session, at: [f64; 3], name: &str) {
     run(s, "sketch.finish", json!({}));
 }
 
-fn is_extrude_cap(certificate: &Option<solidcraft_doc::config::FaceCertificate>) -> bool {
-    matches!(certificate, Some(solidcraft_doc::config::FaceCertificate::ExtrudeCap { .. }))
+fn is_extrude_cap(certificate: &Option<polykrom_doc::config::FaceCertificate>) -> bool {
+    matches!(certificate, Some(polykrom_doc::config::FaceCertificate::ExtrudeCap { .. }))
 }
 
 #[test]
@@ -223,7 +223,7 @@ fn sketches_on_a_solid_extrudes_caps_keep_their_faces_when_it_is_made_thin_and_s
         // The sketch follows the thin wall's height, and keeps its face through a save.
         run(&mut s, "timeline.edit", json!({"feature": "Wall", "set": {"extent": {"distance": "25"}}}));
         assert!((attached(&s, "Top").0.origin.z - 25.0).abs() < 1e-9, "{side}");
-        let mut reopened = Session { doc: solidcraft_doc::Document::from_json(&s.doc.to_json()).unwrap().into(), ..Session::default() };
+        let mut reopened = Session { doc: polykrom_doc::Document::from_json(&s.doc.to_json()).unwrap().into(), ..Session::default() };
         reopened.refresh();
         no_errors(&reopened, side);
         assert!((attached(&reopened, "Top").0.origin.z - 25.0).abs() < 1e-9, "{side}");
@@ -257,7 +257,7 @@ fn a_thin_wall_along_part_of_the_profile_does_not_take_over_its_cap() {
     run(&mut s, "solid.extrude", json!({"sketch": "Outline", "distance": 10, "name": "Wall"}));
     sketch_on(&mut s, [6.0, 6.0, 10.0], "Top");
     let _ = s.execute("timeline.edit", &json!({"feature": "Wall", "set": {"thin": {"curves": [&sides[0], &sides[1]], "thickness": "2"}}}));
-    assert!(matches!(attachment(&s, "Top"), solidcraft_doc::FaceAttachmentStatus::Lost { .. }), "{:?}", attachment(&s, "Top"));
+    assert!(matches!(attachment(&s, "Top"), polykrom_doc::FaceAttachmentStatus::Lost { .. }), "{:?}", attachment(&s, "Top"));
 }
 
 #[test]
@@ -272,7 +272,7 @@ fn the_caps_of_walls_apart_attach_by_their_history_names() {
     run(&mut s, "solid.extrude", json!({"sketch": "Outline", "thin": true, "thickness": 1, "side": "inside", "distance": 5}));
     sketch_on(&mut s, [0.5, 0.5, 5.0], "Top");
     let (_, certificate) = attached(&s, "Top");
-    assert!(matches!(certificate, Some(solidcraft_doc::config::FaceCertificate::Lineage)), "{certificate:?}");
+    assert!(matches!(certificate, Some(polykrom_doc::config::FaceCertificate::Lineage)), "{certificate:?}");
 }
 
 fn no_errors(s: &Session, context: &str) {

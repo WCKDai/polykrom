@@ -1,10 +1,10 @@
 //! Horizontal/Vertical accepts either one line or two distinct sketch points.
 
+use polykrom_engine::sketch::ConstraintKind;
+use polykrom_ui_egui::scenario::Harness;
 use serde_json::json;
-use solidcraft_engine::sketch::ConstraintKind;
-use solidcraft_ui_egui::scenario::Harness;
 
-fn line_midpoint(sk: &solidcraft_engine::sketch::Sketch, id: &str) -> solidcraft_engine::geom::Vec2 {
+fn line_midpoint(sk: &polykrom_engine::sketch::Sketch, id: &str) -> polykrom_engine::geom::Vec2 {
     let a = sk.point(sk.resolve_point(&format!("{id}.start")).unwrap()).unwrap();
     let b = sk.point(sk.resolve_point(&format!("{id}.end")).unwrap()).unwrap();
     (a + b) * 0.5
@@ -48,7 +48,7 @@ fn horizontal_vertical_uses_preselected_line_and_preserves_rejection() {
 
 #[test]
 fn horizontal_vertical_leaves_ambiguous_preselection_to_pick_tool() {
-    use solidcraft_engine::Sel;
+    use polykrom_engine::Sel;
     for selection in [
         vec![Sel::SketchPoint { id: "origin".into() }],
         vec![Sel::SketchPoint { id: "origin".into() }, Sel::SketchCurve { id: "c1".into() }],
@@ -236,7 +236,7 @@ fn shift_picks_midpoint_in_either_order_and_persists_ordinary_constraints() {
             assert_eq!(h.app.session.doc.to_json(), after);
             // The ordinary constraint glyph remains selectable and deletable.
             h.step(&json!({"key":"Escape"})).unwrap();
-            let glyph = solidcraft_ui_egui::sketch_tools::glyph_positions().into_iter().find(|(id, _)| id == &constraint).unwrap().1;
+            let glyph = polykrom_ui_egui::sketch_tools::glyph_positions().into_iter().find(|(id, _)| id == &constraint).unwrap().1;
             h.step(&json!({"click":[glyph.x,glyph.y]})).unwrap();
             h.step(&json!({"key":"Delete"})).unwrap();
             let sk = &h.app.session.model.state().sketches[0].sketch;
@@ -244,7 +244,7 @@ fn shift_picks_midpoint_in_either_order_and_persists_ordinary_constraints() {
             assert_eq!(sk.points.len(), 5);
             let midpoint_constraint = sk.constraints.iter().find(|c| matches!(c.kind, ConstraintKind::Midpoint { .. })).unwrap().id.clone();
             // The defining Midpoint relationship is editable through the same glyph UI.
-            let glyph = solidcraft_ui_egui::sketch_tools::glyph_positions().into_iter().find(|(id, _)| id == &midpoint_constraint).unwrap().1;
+            let glyph = polykrom_ui_egui::sketch_tools::glyph_positions().into_iter().find(|(id, _)| id == &midpoint_constraint).unwrap().1;
             h.step(&json!({"click":[glyph.x,glyph.y]})).unwrap();
             h.step(&json!({"key":"Delete"})).unwrap();
             let sk = &h.app.session.model.state().sketches[0].sketch;
@@ -318,7 +318,7 @@ fn midpoint_aligns_to_the_fixed_origin_without_straightening_the_line() {
         let b = sk.point(sk.resolve_point("l1.end").unwrap()).unwrap();
         assert!(((a + b) * 0.5).x.abs() < 1e-6);
         assert!((b.x - a.x).abs() > 1. && (b.y - a.y).abs() > 1., "only the midpoint is aligned");
-        assert_eq!(sk.point(0).unwrap(), solidcraft_engine::geom::Vec2::ZERO);
+        assert_eq!(sk.point(0).unwrap(), polykrom_engine::geom::Vec2::ZERO);
     }
 }
 

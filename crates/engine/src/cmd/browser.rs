@@ -8,7 +8,7 @@ use std::collections::BTreeMap;
 
 use serde_json::{Value, json};
 
-use solidcraft_doc::FeatureKind;
+use polykrom_doc::FeatureKind;
 
 use super::CommandSpec;
 use crate::params::{bad, bool_, str_};
@@ -100,7 +100,7 @@ fn group(s: &mut Session, p: &Value) -> Result<Value> {
     for g in d.browser_groups.iter_mut().filter(|g| g.component == component && g.folder == folder) {
         g.items.retain(|k| !items.contains(k));
     }
-    d.browser_groups.push(solidcraft_doc::BrowserGroup { id, name: name.clone(), component, folder, items });
+    d.browser_groups.push(polykrom_doc::BrowserGroup { id, name: name.clone(), component, folder, items });
     Ok(json!({ "group": id, "name": name }))
 }
 
@@ -400,7 +400,7 @@ fn document_units(s: &mut Session, p: &Value) -> Result<Value> {
             .doc
             .params
             .iter()
-            .filter(|p| !p.model && p.unit.is_empty() && solidcraft_doc::expr::is_literal(&p.expr) && p.expr.trim().parse::<f64>().is_ok())
+            .filter(|p| !p.model && p.unit.is_empty() && polykrom_doc::expr::is_literal(&p.expr) && p.expr.trim().parse::<f64>().is_ok())
             .map(|p| (p.name.clone(), p.expr.trim().to_string()))
             .collect();
         for (name, e) in bare {
@@ -428,7 +428,7 @@ fn document_units(s: &mut Session, p: &Value) -> Result<Value> {
 fn view_save(s: &mut Session, p: &Value) -> Result<Value> {
     let cmd = "view.save";
     let c = p.get("camera").ok_or_else(|| bad(cmd, "`camera` is required"))?;
-    let mut v: solidcraft_doc::NamedView = serde_json::from_value(c.clone()).map_err(|e| bad(cmd, format!("bad camera: {e}")))?;
+    let mut v: polykrom_doc::NamedView = serde_json::from_value(c.clone()).map_err(|e| bad(cmd, format!("bad camera: {e}")))?;
     let ok = [v.target.x, v.target.y, v.target.z, v.yaw, v.pitch, v.distance, v.fov].iter().all(|x| x.is_finite()) && v.distance > 0.0;
     if !ok {
         return Err(bad(cmd, "the camera must be finite with a positive distance"));
@@ -464,7 +464,7 @@ fn view_apply(s: &mut Session, p: &Value) -> Result<Value> {
                 }
                 None => 0.0,
             };
-            let v: solidcraft_doc::NamedView = serde_json::from_value(c.clone()).map_err(|e| bad(cmd, format!("bad camera: {e}")))?;
+            let v: polykrom_doc::NamedView = serde_json::from_value(c.clone()).map_err(|e| bad(cmd, format!("bad camera: {e}")))?;
             crate::render::Camera { roll: roll.clamp(-std::f64::consts::PI, std::f64::consts::PI), ..camera_of(&v) }
         }
         // Standard view names come first, as in the browser's Named Views folder.
@@ -486,7 +486,7 @@ fn view_apply(s: &mut Session, p: &Value) -> Result<Value> {
 }
 
 /// The orbit camera of a named view (Z up, no roll).
-fn camera_of(v: &solidcraft_doc::NamedView) -> crate::render::Camera {
+fn camera_of(v: &polykrom_doc::NamedView) -> crate::render::Camera {
     crate::render::Camera { target: v.target, yaw: v.yaw, pitch: v.pitch, distance: v.distance, fov: v.fov, ..Default::default() }
 }
 
@@ -546,14 +546,14 @@ fn replace_body_name(v: &mut Value, old: &str, new: &str, names_body: bool, dept
 fn member_pins(s: &Session, fid: u64) -> Option<BTreeMap<String, String>> {
     let f = s.doc.feature(fid)?;
     let result = s.model.result(fid)?;
-    let lines = solidcraft_doc::frame::member_line_ids(&result.state, &f.kind).ok()?;
+    let lines = polykrom_doc::frame::member_line_ids(&result.state, &f.kind).ok()?;
     let made: Vec<String> = result.state.bodies.iter().filter(|b| b.feature == fid).map(|b| b.name.clone()).collect();
     (lines.len() == made.len()).then(|| lines.into_iter().zip(made).collect())
 }
 
 /// Whether the `i`-th new body of `f` is numbered by the body counter (`BodyN`): it has no stored
 /// name of its own and is not numbered after the feature's first name (`Ribs (4)`).
-pub(crate) fn counted(f: &solidcraft_doc::Feature, i: usize) -> bool {
+pub(crate) fn counted(f: &polykrom_doc::Feature, i: usize) -> bool {
     let first = f.body_names.first().is_some_and(|n| !n.trim().is_empty());
     f.body_names.get(i).is_none_or(|n| n.trim().is_empty()) && (f.shell_piece_order || i < f.body_names.len() || !first)
 }
@@ -561,7 +561,7 @@ pub(crate) fn counted(f: &solidcraft_doc::Feature, i: usize) -> bool {
 /// Point every feature but `fid` (the one that made body `old`) at `name` where it names `old`,
 /// and the design's own keys (materials, appearances...): what renaming the body changes besides
 /// the features' stored body names. The rename fast path proves a change is only this (#169).
-pub(crate) fn rename_body_refs(d: &mut solidcraft_doc::Document, fid: u64, old: &str, name: &str) -> std::result::Result<(), String> {
+pub(crate) fn rename_body_refs(d: &mut polykrom_doc::Document, fid: u64, old: &str, name: &str) -> std::result::Result<(), String> {
     let mut failed = None;
     for f in d.features.iter_mut().filter(|f| f.id != fid) {
         // The bodies a join/cut/intersect may change (a primitive's `targets`) are kept beside
@@ -573,7 +573,7 @@ pub(crate) fn rename_body_refs(d: &mut solidcraft_doc::Document, fid: u64, old: 
             *b = name.to_string();
         }
         if let FeatureKind::Sketch { plane, .. } = &mut f.kind {
-            solidcraft_doc::sheet::rename_plane_sheet_body(plane, old, name);
+            polykrom_doc::sheet::rename_plane_sheet_body(plane, old, name);
         }
         if let FeatureKind::Sketch { plane, sketch } = &mut f.kind
             && let Some(anchor) = super::sketch::face::anchor_mut(plane)
@@ -583,7 +583,7 @@ pub(crate) fn rename_body_refs(d: &mut solidcraft_doc::Document, fid: u64, old: 
             let bodies = std::collections::BTreeMap::from([(old.to_string(), name.to_string())]);
             anchor.remap_target(&ids, &bodies).map_err(|e| e.to_string())?;
             for link in &mut sketch.links {
-                if link.auto_face && matches!(&link.source,solidcraft_sketch::LinkSource::Face {body,..} if *body==old) {
+                if link.auto_face && matches!(&link.source,polykrom_sketch::LinkSource::Face {body,..} if *body==old) {
                     link.face_name = Some(anchor.target.name.clone());
                 }
             }
@@ -762,7 +762,7 @@ fn redefine_sketch(s: &mut Session, p: &Value) -> Result<Value> {
             .filter(|link| {
                 link.auto_face
                     && link.face_name.as_ref() == Some(&anchor.target.name)
-                    && matches!(&link.source,solidcraft_sketch::LinkSource::Face {body,..} if *body==anchor.target.body)
+                    && matches!(&link.source,polykrom_sketch::LinkSource::Face {body,..} if *body==anchor.target.body)
             })
             .map(|link| link.id.clone())
             .collect();
@@ -786,7 +786,7 @@ fn redefine_sketch(s: &mut Session, p: &Value) -> Result<Value> {
     let attachment = s.doc.feature(id).and_then(|feature| match &feature.kind {
         FeatureKind::Sketch { plane, .. } => Some(if super::sketch::face::anchor(plane).is_some() {
             "exact_face"
-        } else if solidcraft_doc::sheet::plane_sheet_face(plane).is_some() {
+        } else if polykrom_doc::sheet::plane_sheet_face(plane).is_some() {
             "sheet_face"
         } else {
             "fixed"
@@ -1007,10 +1007,10 @@ mod tests {
         let label = kind("Label").to_string();
         assert!(label.contains(&format!("\"{body}\"")) && !label.contains("\"Lid\""), "{label}");
         let moved = s.doc.features.iter().find_map(|f| match &f.kind {
-            solidcraft_doc::FeatureKind::Move { bodies, .. } => Some(bodies.clone()),
+            polykrom_doc::FeatureKind::Move { bodies, .. } => Some(bodies.clone()),
             _ => None,
         });
-        assert_eq!(moved, Some(vec![solidcraft_doc::BodyName::from("Lid")]), "the move follows the rename");
+        assert_eq!(moved, Some(vec![polykrom_doc::BodyName::from("Lid")]), "the move follows the rename");
         assert!(s.model.results.iter().all(|r| r.error.is_none()));
     }
 
@@ -1142,7 +1142,7 @@ mod tests {
         run(&mut s, "view.save", json!({"camera": cam, "name": "Detail"}));
         run(&mut s, "view.rename", json!({"view": "Named View1", "name": "Overview"}));
         assert!(s.execute("view.rename", &json!({"view": "Overview", "name": "Detail"})).is_err());
-        let back: solidcraft_doc::Document = serde_json::from_str(&serde_json::to_string(&*s.doc).unwrap()).unwrap();
+        let back: polykrom_doc::Document = serde_json::from_str(&serde_json::to_string(&*s.doc).unwrap()).unwrap();
         assert_eq!(back.named_views.len(), 2);
         assert_eq!(back.named_views[0].target.z, 3.0);
         run(&mut s, "view.delete", json!({"view": "Detail"}));
@@ -1167,7 +1167,7 @@ mod tests {
         run(&mut s, "construct.plane.offset", json!({"base": "XY", "offset": 5, "name": "Floor"}));
         let body = s.model.state().bodies[0].name.clone();
         let drain_name = s.doc.feature(drain).unwrap().name.clone();
-        let cam = solidcraft_render::Camera::default();
+        let cam = polykrom_render::Camera::default();
         let lines = |s: &Session| crate::view::scene(s, &cam).lines.len();
         let shown = |s: &mut Session| {
             let d = run(s, "document.inspect", json!({}));
@@ -1247,7 +1247,7 @@ mod tests {
         let params = json!({"folder": "bodies"});
         let first = run(&mut s, "browser.group", params.clone())["group"].as_u64().unwrap();
         run(&mut s, "browser.ungroup", json!({"group": first}));
-        let doc = solidcraft_doc::Document::from_json(&s.doc.to_json()).unwrap();
+        let doc = polykrom_doc::Document::from_json(&s.doc.to_json()).unwrap();
         *s.doc_mut() = doc;
         let second = run(&mut s, "browser.group", params)["group"].as_u64().unwrap();
         assert!(second > first, "deleted group {first} was reused as {second}");
@@ -1271,7 +1271,7 @@ mod tests {
         run(&mut s, "browser.move", json!({"folder": "bodies", "items": [b.clone()]}));
         assert_eq!(s.doc.browser_groups[0].items, vec!["Bolt".to_string()]);
         run(&mut s, "browser.order", json!({"folder": "bodies", "order": [b.clone(), "Bolt"]}));
-        let saved: solidcraft_doc::Document = serde_json::from_str(&serde_json::to_string(&*s.doc).unwrap()).unwrap();
+        let saved: polykrom_doc::Document = serde_json::from_str(&serde_json::to_string(&*s.doc).unwrap()).unwrap();
         assert_eq!(saved.browser_groups, s.doc.browser_groups);
         assert_eq!(saved.browser_order["0/bodies"], vec![b, "Bolt".to_string()]);
         run(&mut s, "browser.ungroup", json!({"group": g}));
@@ -1329,7 +1329,7 @@ mod tests {
 
         // Saved with the design.
         run(&mut s, "browser.visibility", json!({"tree_folders": [key, "o:4/sketches"], "visible": false}));
-        let v: solidcraft_doc::Visibility = serde_json::from_value(serde_json::to_value(&s.visibility).unwrap()).unwrap();
+        let v: polykrom_doc::Visibility = serde_json::from_value(serde_json::to_value(&s.visibility).unwrap()).unwrap();
         assert_eq!(v.hidden_folders, vec![key.clone(), "o:4/sketches".to_string()]);
         // Showing every body also shows the folders and groups that hold bodies.
         run(&mut s, "browser.visibility", json!({"folder": "bodies", "visible": true}));

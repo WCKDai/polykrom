@@ -1,6 +1,6 @@
 //! Stateless camera commands shared by the navigation cube and programmatic callers.
+use polykrom_render::{Camera, StandardView};
 use serde_json::{Value, json};
-use solidcraft_render::{Camera, StandardView};
 
 use super::CommandSpec;
 use crate::params::{bad, num, req_vec2, req_vec3, vec3};
@@ -227,8 +227,8 @@ pub(crate) fn square_heading(yaw: f64) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use polykrom_render::UpAxis;
     use solidcraft_geom::Vec3;
-    use solidcraft_render::UpAxis;
 
     #[test]
     fn look_at_planes_uses_the_first_supported_selection_and_flips_on_repeat() {

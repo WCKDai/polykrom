@@ -1,7 +1,7 @@
 # Opaque surface numerical contract
 
 First numerical slice of [#1004](https://github.com/bherbruck/solidcraft/issues/1004),
-under #813/#620. `solidcraft_render::surface` is an original, device-independent
+under #813/#620. `polykrom_render::surface` is an original, device-independent
 reference for the upcoming integrated consumer. It does not change existing looks,
 commands, document formats, snapshots or viewport rendering. No backend advertises
 PBR because this module exists. No external code, dataset or file asset is added.

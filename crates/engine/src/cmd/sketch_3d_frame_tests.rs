@@ -1,7 +1,7 @@
 use crate::Session;
+use polykrom_sketch::WireSpace;
 use serde_json::{Value, json};
 use solidcraft_geom::Vec3;
-use solidcraft_sketch::WireSpace;
 
 fn run(s: &mut Session, cmd: &str, params: Value) -> Value {
     s.execute(cmd, &params).unwrap_or_else(|e| panic!("{cmd}: {e}"))
@@ -57,7 +57,7 @@ fn wire_frame_second_occurrence_world_inputs_move_and_reopen() {
     run(&mut s, "edit.redo", json!({}));
     run(&mut s, "sketch.move3d", json!({"wire":point,"to":[18,33,46]}));
     near(s.doc.sketch(sketch).unwrap().wires.iter().find(|w| w.id == point).unwrap().fit[0], Vec3::new(3.0, 2.0, 6.0));
-    let restored = solidcraft_doc::format::read(&s.doc.to_json()).unwrap();
+    let restored = polykrom_doc::format::read(&s.doc.to_json()).unwrap();
     assert_eq!(restored.sketch(sketch).unwrap().wires, s.doc.sketch(sketch).unwrap().wires);
     // Same definition at the first placement has the local geometry; selected second is exact.
     run(&mut s, "component.activate", json!({"component":component,"occurrence":first,"path":[first]}));
@@ -144,21 +144,21 @@ fn wire_frame_include_other_component_refresh_break_lost_and_reopen() {
     run(&mut s, "sketch.break_link", json!({"link":link}));
     assert_eq!(s.doc.sketch(sketch).unwrap().wires[0].space, WireSpace::Component);
     assert!(s.doc.sketch(sketch).unwrap().wires[0].link.is_none());
-    let restored = solidcraft_doc::format::read(&s.doc.to_json()).unwrap();
+    let restored = polykrom_doc::format::read(&s.doc.to_json()).unwrap();
     assert_eq!(restored.sketch(sketch).unwrap().wires[0], s.doc.sketch(sketch).unwrap().wires[0]);
     run(&mut s, "edit.undo", json!({}));
     assert_eq!(s.doc.to_json(), before);
     // Lost references retain the last coordinates and explicit marker, with no guessing.
     let sk = s.doc_mut().sketch_mut(sketch).unwrap();
     let entry = sk.links.iter_mut().find(|l| l.id == link).unwrap();
-    entry.source = solidcraft_sketch::LinkSource::Edge { body: "Missing".into(), at: Vec3::ZERO };
+    entry.source = polykrom_sketch::LinkSource::Edge { body: "Missing".into(), at: Vec3::ZERO };
     // The link is the edge it names; without the name it is the edge nearest its point.
     entry.edge_name = None;
     run(&mut s, "sketch.line", json!({"points":[[2,0],[3,0]]}));
     let sk = s.doc.sketch(sketch).unwrap();
     assert!(sk.link(&link).unwrap().lost);
     assert_eq!(sk.wires[0], initial);
-    let restored = solidcraft_doc::format::read(&s.doc.to_json()).unwrap();
+    let restored = polykrom_doc::format::read(&s.doc.to_json()).unwrap();
     assert_eq!(restored.sketch(sketch).unwrap().wires[0], initial);
 }
 
@@ -215,17 +215,17 @@ fn wire_frame_wide_owner_graph_has_bounded_indexed_traversal() {
     // A legal wide assembly used to force one whole occurrence scan for each leaf.
     let doc = s.doc_mut();
     for i in 0..9998u64 {
-        doc.components.push(solidcraft_doc::Component { id: 10_000 + i, name: format!("Sibling{i}"), parent: 0, ..Default::default() });
-        doc.occurrences.push(solidcraft_doc::Occurrence {
+        doc.components.push(polykrom_doc::Component { id: 10_000 + i, name: format!("Sibling{i}"), parent: 0, ..Default::default() });
+        doc.occurrences.push(polykrom_doc::Occurrence {
             id: 100_000 + i,
             component: 10_000 + i,
             parent: 0,
             name: format!("Sibling{i}"),
-            transform: solidcraft_doc::IDENTITY,
+            transform: polykrom_doc::IDENTITY,
             grounded: false,
         });
     }
-    assert_eq!(super::inverse_owner_frame(&s, &json!({"sketch":target}), "sketch.point3d").unwrap(), solidcraft_doc::IDENTITY);
+    assert_eq!(super::inverse_owner_frame(&s, &json!({"sketch":target}), "sketch.point3d").unwrap(), polykrom_doc::IDENTITY);
 }
 
 #[test]
@@ -256,7 +256,7 @@ fn wire_frame_cross_owner_sweep_follows_world_path_edit_undo_and_reopen() {
     run(&mut s, "edit.undo", json!({}));
     assert_eq!(s.doc.to_json(), saved);
     check(&s, 10.0);
-    let mut reopened = Session { doc: solidcraft_doc::format::read(&saved).unwrap().into(), ..Default::default() };
+    let mut reopened = Session { doc: polykrom_doc::format::read(&saved).unwrap().into(), ..Default::default() };
     reopened.refresh();
     check(&reopened, 10.0);
 }
@@ -304,7 +304,7 @@ fn wire_frame_three_owner_sweep_profile_move_invalidates_warm_cache() {
     assert_eq!(s.doc.component_transform(path_owner["component"].as_u64().unwrap()), fixed_path);
     assert_eq!(s.doc.component_transform(consumer["component"].as_u64().unwrap()), fixed_consumer);
     let warm = measure(&s, 7.0);
-    let mut cold = Session { doc: solidcraft_doc::format::read(&s.doc.to_json()).unwrap().into(), ..Default::default() };
+    let mut cold = Session { doc: polykrom_doc::format::read(&s.doc.to_json()).unwrap().into(), ..Default::default() };
     cold.refresh();
     let reopened = measure(&cold, 7.0);
     near(warm.centroid, reopened.centroid);

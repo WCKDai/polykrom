@@ -163,7 +163,7 @@ mod delete {
             let feature = h.app.session.doc.features.last().unwrap();
             let (id, name) = (feature.id, feature.name.clone());
             click(&mut h, &format!("timeline:{name}"));
-            assert!(h.app.session.selection.iter().any(|s| matches!(s, solidcraft_engine::Sel::Feature { id: f } if *f == id)));
+            assert!(h.app.session.selection.iter().any(|s| matches!(s, polykrom_engine::Sel::Feature { id: f } if *f == id)));
             click(&mut h, "timeline-joint:Hinge");
             assert_eq!(h.app.tree.picked_joints, [hinge], "the clicked joint is the selection; left={left}");
             assert!(h.app.session.selection.is_empty(), "the old feature must not remain a Delete target");

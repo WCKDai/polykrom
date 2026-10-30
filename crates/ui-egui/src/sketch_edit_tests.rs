@@ -2,7 +2,7 @@
 
 use crate::SolveApp;
 use crate::test_support::sample_app;
-use solidcraft_engine::doc::FeatureKind;
+use polykrom_engine::doc::FeatureKind;
 
 fn first_sketch(app: &SolveApp) -> u64 {
     app.session.doc.features.iter().find(|f| matches!(f.kind, FeatureKind::Sketch { .. })).map(|f| f.id).unwrap()
@@ -86,8 +86,8 @@ fn toolbar_finish_and_other_feature_edit_leave_the_sketch() {
 /// Leaving a sketch any way leaves the camera exactly where it is; entering still faces the plane.
 mod exit_keeps_view {
     use crate::scenario::Harness;
+    use polykrom_engine::render::Camera;
     use serde_json::json;
-    use solidcraft_engine::render::Camera;
 
     /// Start a sketch on XY from the iso view, then orbit and pan into a 3D view of the user's own.
     fn sketching_in_3d() -> (Harness, Camera) {

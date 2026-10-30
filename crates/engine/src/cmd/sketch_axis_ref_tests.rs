@@ -2,9 +2,9 @@
 //! axis becomes one linked construction line on it, shared by every constraint on that axis,
 //! reported in `created`, and left out of profiles. A real curve with that id wins.
 
+use polykrom_sketch::{CurveKind, LinkSource, Sketch};
 use serde_json::{Value, json};
 use solidcraft_geom::{Vec2, Vec3};
-use solidcraft_sketch::{CurveKind, LinkSource, Sketch};
 
 use crate::Session;
 
@@ -200,7 +200,7 @@ fn the_axis_survives_save_and_load() {
     run(&mut s, "sketch.line", json!({"points": [[-4, 0], [10, 0]], "ids": ["a"]}));
     run(&mut s, "sketch.constraint.symmetry", json!({"a": "a.start", "b": "a.end", "line": "y"}));
     run(&mut s, "sketch.finish", json!({}));
-    let doc = solidcraft_doc::Document::from_json(&s.doc.to_json()).unwrap();
+    let doc = polykrom_doc::Document::from_json(&s.doc.to_json()).unwrap();
     let id = doc.find_feature("Sketch1").map(|f| f.id).unwrap();
     let sk = doc.sketch(id).unwrap();
     assert_eq!(axis_lines(sk).len(), 1);

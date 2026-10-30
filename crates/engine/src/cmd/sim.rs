@@ -4,8 +4,8 @@
 //! holds the design's pose; mode `study` drives the actuators along a motion study with the base
 //! free. Desktop only: `POLYKROM_MUJOCO_PYTHON` names a Python that has MuJoCo (default `python3`).
 
+use polykrom_io::urdf::{Step, UrdfModel};
 use serde_json::{Value, json};
-use solidcraft_io::urdf::{Step, UrdfModel};
 
 use super::CommandSpec;
 use crate::params::{bad, num, str_};
@@ -146,7 +146,7 @@ mod native {
     const MAX_OUTPUT: u64 = 16 << 20;
 
     pub(super) fn run(s: &mut Session, p: &Value) -> Result<Value> {
-        let checked = |path: &str| solidcraft_io::vfs::check(path).map_err(|e| EngineError::Other(e.to_string()));
+        let checked = |path: &str| polykrom_io::vfs::check(path).map_err(|e| EngineError::Other(e.to_string()));
         // The video written where it was asked for, not in the runner's folder.
         let mut p = p.clone();
         if let Some(v) = str_(&p, "video").map(str::to_string) {

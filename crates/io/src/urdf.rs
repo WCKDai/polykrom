@@ -11,8 +11,8 @@
 
 use std::collections::{BTreeMap, BTreeSet, HashSet, VecDeque};
 
-use solidcraft_doc::joints::{self, Joint, JointKind};
-use solidcraft_doc::{Document, IDENTITY, MAX_PLACEMENT_DEPTH, MAX_PLACEMENTS, Mat, ModelState, Occurrence, apply_point, mat_inverse, mat_mul};
+use polykrom_doc::joints::{self, Joint, JointKind};
+use polykrom_doc::{Document, IDENTITY, MAX_PLACEMENT_DEPTH, MAX_PLACEMENTS, Mat, ModelState, Occurrence, apply_point, mat_inverse, mat_mul};
 use solidcraft_geom::{Mesh, Vec3};
 
 use crate::{IoError, Result, SolidMesh, solid_mesh, stl_binary};

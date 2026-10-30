@@ -4,7 +4,7 @@
 //! runs: what it does is fixed.
 //!
 //! ```text
-//! cargo build --release -p solidcraft-ui-egui --example acp_test_agent
+//! cargo build --release -p polykrom-ui-egui --example acp_test_agent
 //! # Preferences → General → Agent chat → Add custom command: target/release/examples/acp_test_agent
 //! ```
 //!

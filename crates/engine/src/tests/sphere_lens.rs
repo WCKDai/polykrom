@@ -32,6 +32,6 @@ fn negative_lens_extrude_cuts_a_partial_sphere_and_reopens() {
         assert!(!body.contains(Vec3::new(0., -10., 15.)));
     };
     check(&mut s);
-    let mut reopened = Session::new(solidcraft_doc::Document::from_json(&s.doc.to_json()).unwrap());
+    let mut reopened = Session::new(polykrom_doc::Document::from_json(&s.doc.to_json()).unwrap());
     check(&mut reopened);
 }

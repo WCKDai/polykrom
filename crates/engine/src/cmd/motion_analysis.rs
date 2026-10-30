@@ -6,10 +6,10 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 
+use polykrom_doc::joints;
+use polykrom_doc::motion::MotionStudy;
+use polykrom_doc::{Document, Mat, apply_point, mat_mul};
 use serde_json::{Value, json};
-use solidcraft_doc::joints;
-use solidcraft_doc::motion::MotionStudy;
-use solidcraft_doc::{Document, Mat, apply_point, mat_mul};
 use solidcraft_geom::{Aabb3, Vec3};
 
 use super::contact_sweep::{ContactGeometry, Member};
@@ -276,7 +276,7 @@ struct Collision {
 fn shared_volume(s: &Session, doc: &Document, a: u64, b: u64, booleans: &mut usize) -> Option<f64> {
     let st = s.model.state();
     // The bodies under each (and not under the other), with their world frames and boxes.
-    let mut sides: [Vec<(Mat, Aabb3, &solidcraft_doc::ModelBody)>; 2] = Default::default();
+    let mut sides: [Vec<(Mat, Aabb3, &polykrom_doc::ModelBody)>; 2] = Default::default();
     for (comp, path, m) in doc.placements() {
         // A body belongs to the innermost of the two on its path, as contact sets pair them.
         let side = match path.iter().rev().find(|o| **o == a || **o == b) {

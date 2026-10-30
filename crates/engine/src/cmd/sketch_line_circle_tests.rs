@@ -14,7 +14,7 @@ fn run(s: &mut Session, id: &str, p: Value) -> Value {
     }
 }
 
-fn sketch(s: &Session) -> solidcraft_sketch::Sketch {
+fn sketch(s: &Session) -> polykrom_sketch::Sketch {
     s.model.state().sketch(s.active_sketch.unwrap()).unwrap().sketch.clone()
 }
 
@@ -83,7 +83,7 @@ fn the_dimension_undoes_and_reopens() {
     run(&mut s, "sketch.dimension", json!({"entities": ["l1", "c1"], "value": 6}));
     let saved = s.doc.to_json();
     assert!(saved.contains("\"line_circle_distance\""), "not saved");
-    let mut reopened = Session::new(solidcraft_doc::Document::from_json(&saved).unwrap());
+    let mut reopened = Session::new(polykrom_doc::Document::from_json(&saved).unwrap());
     run(&mut reopened, "sketch.edit", json!({"sketch": "Sketch1"}));
     assert!(point(&reopened, "c1.center").dist(Vec2::new(20.0, 11.0)) < 1e-7, "{:?}", point(&reopened, "c1.center"));
     let kinds = |s: &Session| sketch(s).constraints.iter().map(|c| c.kind.clone()).collect::<Vec<_>>();

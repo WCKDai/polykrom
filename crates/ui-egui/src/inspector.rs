@@ -13,7 +13,7 @@ use serde_json::{Value, json};
 use crate::SolveApp;
 use crate::theme::Tokens;
 use crate::ui_kit::{self, Container, Edge, Surface};
-use solidcraft_engine::Sel;
+use polykrom_engine::Sel;
 
 /// The card's width (logical points).
 const WIDTH: f32 = 268.0;
@@ -34,7 +34,7 @@ pub struct Inspector {
 
 impl Inspector {
     /// Remember a command's result if it is a check the inspector shows.
-    pub fn record(&mut self, id: &str, reply: &Value, session: &mut solidcraft_engine::Session) {
+    pub fn record(&mut self, id: &str, reply: &Value, session: &mut polykrom_engine::Session) {
         if id == "analysis.static_stress"
             && let Some(body) = reply.get("body").and_then(Value::as_str)
         {
@@ -254,7 +254,7 @@ mod tests {
         h.frames(2);
         assert!(crate::scenario::rect_of("inspector:card").is_none(), "nothing selected, no inspector");
         let body = h.app.session.world_state().bodies[0].name.clone();
-        h.app.session.selection = vec![solidcraft_engine::Sel::Body { name: body.clone() }];
+        h.app.session.selection = vec![polykrom_engine::Sel::Body { name: body.clone() }];
         h.frames(2);
         assert!(crate::scenario::rect_of("inspector:card").is_some());
         assert!(h.widget(&body).is_some(), "the body's name heads the card");
@@ -267,7 +267,7 @@ mod tests {
         assert!(crate::scenario::rect_of("inspector:card").is_none(), "hidden");
         h.app.session.selection.clear();
         h.frames(1);
-        h.app.session.selection = vec![solidcraft_engine::Sel::Body { name: body }];
+        h.app.session.selection = vec![polykrom_engine::Sel::Body { name: body }];
         h.frames(2);
         assert!(crate::scenario::rect_of("inspector:card").is_some(), "a new selection shows it again");
     }
@@ -279,7 +279,7 @@ mod tests {
         // What `analysis.static_stress` replies; recorded as `SolveApp::run` records it.
         let reply = json!({"body": body, "max_von_mises_mpa": 114.8, "max_displacement_mm": 0.165, "safety_factor": 2.17});
         h.app.inspector.record("analysis.static_stress", &reply, &mut h.app.session);
-        h.app.session.selection = vec![solidcraft_engine::Sel::Body { name: body.clone() }];
+        h.app.session.selection = vec![polykrom_engine::Sel::Body { name: body.clone() }];
         h.frames(2);
         assert!(h.widget("114.8 MPa").is_some());
         assert!(h.widget("0.165 mm").is_some());
@@ -289,11 +289,11 @@ mod tests {
         h.frames(2);
         assert!(h.widget(crate::i18n::tr("inspector.stale")).is_none(), "selecting is not an edit");
         h.app.run("solid.box", json!({"length": 5, "width": 5, "height": 5, "corner": [100, 0, 0]})).unwrap();
-        h.app.session.selection = vec![solidcraft_engine::Sel::Body { name: body.clone() }];
+        h.app.session.selection = vec![polykrom_engine::Sel::Body { name: body.clone() }];
         h.frames(2);
         assert!(h.widget(crate::i18n::tr("inspector.stale")).is_none(), "another body changed, not this one");
         h.app.run("material.assign", json!({"bodies": [body.clone()], "material": "Steel"})).unwrap();
-        h.app.session.selection = vec![solidcraft_engine::Sel::Body { name: body }];
+        h.app.session.selection = vec![polykrom_engine::Sel::Body { name: body }];
         h.frames(2);
         assert!(h.widget(crate::i18n::tr("inspector.stale")).is_some(), "its material changed after the check");
     }

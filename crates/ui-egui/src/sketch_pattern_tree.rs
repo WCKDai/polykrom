@@ -1,7 +1,7 @@
 //! Sketch patterns are children of their sketch, rather than separate timeline features.
 
+use polykrom_engine::{Sel, sketch::SketchPatternKind};
 use serde_json::json;
-use solidcraft_engine::{Sel, sketch::SketchPatternKind};
 
 use crate::{
     SolveApp,

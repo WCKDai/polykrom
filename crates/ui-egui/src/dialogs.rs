@@ -6,12 +6,12 @@ use crate::ui_kit::choice_row;
 use std::hash::{Hash, Hasher};
 
 use egui::{RichText, vec2};
+use polykrom_engine::Sel;
+use polykrom_engine::Session;
+use polykrom_engine::doc::expr::Kind as ValueKind;
+use polykrom_engine::doc::{AxisRef, Direction, FeatureKind, FilletStyle, HoleKind, Operation, PatternKind, PlaneRef, ProfileSel, ThinSide};
+use polykrom_engine::geom::{Aabb3, Vec3};
 use serde_json::{Value, json};
-use solidcraft_engine::Sel;
-use solidcraft_engine::Session;
-use solidcraft_engine::doc::expr::Kind as ValueKind;
-use solidcraft_engine::doc::{AxisRef, Direction, FeatureKind, FilletStyle, HoleKind, Operation, PatternKind, PlaneRef, ProfileSel, ThinSide};
-use solidcraft_engine::geom::{Aabb3, Vec3};
 
 use crate::SolveApp;
 use crate::selection::{
@@ -461,12 +461,12 @@ struct ShellChain {
 
 /// OK computing off the window thread: the dialog's commands evaluated on a copy of the
 /// session. Once that is in, OK runs them for real, taking what the copy evaluated
-/// ([`solidcraft_engine::Session::prime`]) rather than computing it again; meanwhile the window
+/// ([`polykrom_engine::Session::prime`]) rather than computing it again; meanwhile the window
 /// stays live and the dialog says it is computing.
 pub struct Applying {
-    pub(crate) done: std::sync::mpsc::Receiver<Option<solidcraft_engine::Evaluated>>,
+    pub(crate) done: std::sync::mpsc::Receiver<Option<polykrom_engine::Evaluated>>,
     /// What it evaluated, once in (`Some(None)`: it failed, or its worker is gone).
-    evaluated: Option<Option<solidcraft_engine::Evaluated>>,
+    evaluated: Option<Option<polykrom_engine::Evaluated>>,
     /// When OK was pressed (ms).
     pub(crate) started: f64,
     /// The commands being computed.
@@ -479,7 +479,7 @@ pub struct Applying {
 impl Applying {
     /// OK computing `cmds`, in once `done` says what was evaluated (tests stand in for the worker).
     #[cfg(test)]
-    pub(crate) fn computing(done: std::sync::mpsc::Receiver<Option<solidcraft_engine::Evaluated>>, cmds: Vec<(String, Value)>) -> Self {
+    pub(crate) fn computing(done: std::sync::mpsc::Receiver<Option<polykrom_engine::Evaluated>>, cmds: Vec<(String, Value)>) -> Self {
         Applying { done, evaluated: None, started: crate::now_ms(), cmds, seen: true }
     }
 
@@ -508,11 +508,11 @@ enum Begun {
     /// It computes off the window thread.
     Later(Applying),
     /// It runs now, with what was evaluated for it (if anything).
-    Now(Option<solidcraft_engine::Evaluated>),
+    Now(Option<polykrom_engine::Evaluated>),
 }
 
 /// Run the dialog's commands, taking the features `evaluated` computed for them ahead.
-fn run_evaluated(app: &mut SolveApp, d: &Dialog, evaluated: Option<&solidcraft_engine::Evaluated>) -> Result<(), String> {
+fn run_evaluated(app: &mut SolveApp, d: &Dialog, evaluated: Option<&polykrom_engine::Evaluated>) -> Result<(), String> {
     if let Some(evaluated) = evaluated {
         app.session.prime(evaluated);
     }
@@ -914,8 +914,8 @@ impl Dialog {
         }
         *of = picks.to_vec();
         *suggested = picks.first().and_then(|sel| match sel {
-            Sel::Face { point, .. } => solidcraft_engine::doc::suggested_thread(&s.world_state(), *point).ok().map(|value| {
-                solidcraft_engine::doc::parse_metric_thread(&value).map(|(d, p)| crate::dialogs_thread::designation(d, p)).unwrap_or(value)
+            Sel::Face { point, .. } => polykrom_engine::doc::suggested_thread(&s.world_state(), *point).ok().map(|value| {
+                polykrom_engine::doc::parse_metric_thread(&value).map(|(d, p)| crate::dialogs_thread::designation(d, p)).unwrap_or(value)
             }),
             _ => None,
         });
@@ -1095,7 +1095,7 @@ impl Dialog {
         let mut faces = Vec::new();
         for (name, points) in by_body {
             if let Some(body) = state.body(name) {
-                faces.extend(solidcraft_engine::doc::tangent_face_chain(body, &points).into_iter().map(|(index, point)| Sel::Face {
+                faces.extend(polykrom_engine::doc::tangent_face_chain(body, &points).into_iter().map(|(index, point)| Sel::Face {
                     body: name.to_string(),
                     index,
                     point,
@@ -1418,16 +1418,16 @@ pub(crate) fn snaps_to_points(accept: Accept) -> bool {
 pub(crate) struct SnapPoints<'a> {
     /// Show Projected is off: no linked point is taken.
     hide_linked: bool,
-    shown: solidcraft_engine::view::SketchPointVisibility<'a>,
+    shown: polykrom_engine::view::SketchPointVisibility<'a>,
 }
 
 impl<'a> SnapPoints<'a> {
-    pub(crate) fn of(sk: &'a solidcraft_engine::sketch::Sketch) -> Self {
-        Self { hide_linked: sk.view.hide_projected, shown: solidcraft_engine::view::SketchPointVisibility::new(sk) }
+    pub(crate) fn of(sk: &'a polykrom_engine::sketch::Sketch) -> Self {
+        Self { hide_linked: sk.view.hide_projected, shown: polykrom_engine::view::SketchPointVisibility::new(sk) }
     }
 
     /// Does a face place snap to point `p` of the sketch?
-    pub(crate) fn takes(&self, p: &solidcraft_engine::sketch::SPoint) -> bool {
+    pub(crate) fn takes(&self, p: &polykrom_engine::sketch::SPoint) -> bool {
         self.shown.takes(p) && !(self.hide_linked && p.link.is_some())
     }
 }
@@ -1701,7 +1701,7 @@ thread_local! {
     /// imported part of a few million triangles, and an open Section Analysis on a face asks
     /// for its plane several times a frame.
     #[allow(clippy::type_complexity)]
-    static FACE_PLANES: std::cell::RefCell<(Option<std::sync::Arc<solidcraft_engine::doc::ModelState>>, Vec<(String, usize, Option<(Vec3, Vec3)>)>)> =
+    static FACE_PLANES: std::cell::RefCell<(Option<std::sync::Arc<polykrom_engine::doc::ModelState>>, Vec<(String, usize, Option<(Vec3, Vec3)>)>)> =
         const { std::cell::RefCell::new((None, Vec::new())) };
 }
 
@@ -1843,7 +1843,7 @@ fn feature_of_face(s: &Session, body: &str, index: usize, p: Vec3) -> Option<u64
     }) {
         return hit;
     }
-    let on_model = |st: &solidcraft_engine::doc::ModelState| {
+    let on_model = |st: &polykrom_engine::doc::ModelState| {
         st.bodies.iter().any(|b| {
             let m = b.mesh();
             let bb = m.bounds();
@@ -2129,7 +2129,7 @@ pub(crate) fn input_rows_range(d: &mut Dialog, ui: &mut egui::Ui, s: &Session, r
 
 /// Feature patterns use the same source-fixed slot ordering and controls as sketch patterns.
 fn feature_pattern_alignment_row(ui: &mut egui::Ui, extra: &mut serde_json::Map<String, Value>, index: usize) {
-    use solidcraft_engine::sketch::PatternAlignment;
+    use polykrom_engine::sketch::PatternAlignment;
     let (label, alignment_key, reversed_key) =
         if index == 0 { ("Alignment", "alignment", "reversed") } else { ("Alignment 2", "alignment2", "reversed2") };
     let alignment = extra.get(alignment_key).cloned().and_then(|v| serde_json::from_value::<PatternAlignment>(v).ok()).unwrap_or_default();
@@ -2218,13 +2218,13 @@ fn update_fill_cells(app: &SolveApp, d: &mut Dialog) {
 
 /// The cells a set of tool bodies makes: each region inside some of them and outside the rest,
 /// as a point inside it and which tools hold it. Found by sampling a grid over the tools.
-pub(crate) fn fill_cells(st: &solidcraft_engine::doc::ModelState, tools: &[String]) -> Vec<(Vec3, String)> {
+pub(crate) fn fill_cells(st: &polykrom_engine::doc::ModelState, tools: &[String]) -> Vec<(Vec3, String)> {
     let bodies: Vec<_> = tools.iter().filter_map(|n| st.body(n).map(|b| (n.clone(), b.mesh()))).take(16).collect();
     if bodies.is_empty() {
         return Vec::new();
     }
     let indexes: Vec<_> = bodies.iter().map(|(_, m)| m.inside_index()).collect();
-    let bb = bodies.iter().fold(solidcraft_engine::geom::Aabb3::EMPTY, |b, (_, m)| b.union(&m.bounds()));
+    let bb = bodies.iter().fold(polykrom_engine::geom::Aabb3::EMPTY, |b, (_, m)| b.union(&m.bounds()));
     let n = 20;
     let at = |i: usize, lo: f64, hi: f64| lo + (hi - lo) * (i as f64 + 0.5) / n as f64;
     // Signature (which tools hold the point) → the points with it.
@@ -2350,7 +2350,7 @@ fn auto_operation(app: &SolveApp, d: &mut Dialog) {
         }
     }
     let Kind::Extrude { direction, distance, .. } = &d.kind else { return };
-    let Ok(dist) = app.session.doc.eval(distance, solidcraft_engine::doc::expr::Kind::Length) else { return };
+    let Ok(dist) = app.session.doc.eval(distance, polykrom_engine::doc::expr::Kind::Length) else { return };
     let mut side = crate::smart_extrude::side(dist, *direction);
     if !matches!(d.kind, Kind::Extrude { auto_op: true, .. }) {
         return;
@@ -2358,11 +2358,11 @@ fn auto_operation(app: &SolveApp, d: &mut Dialog) {
     let Some(params) = dialog_commands(app, d).ok().and_then(|c| c.into_iter().next()).map(|(_, p)| p) else { return };
     // To an object, the extrude goes to it on whichever side it is: that is the side (#1633).
     if params.get("to").is_some()
-        && let Some(reach) = solidcraft_engine::extrude_reach(&app.session, &params)
+        && let Some(reach) = polykrom_engine::extrude_reach(&app.session, &params)
     {
         side = crate::smart_extrude::side(reach, 0);
     }
-    let Some(fresh) = solidcraft_engine::auto_operation(&app.session, &params).and_then(|op| OPS.iter().position(|o| *o == op)) else {
+    let Some(fresh) = polykrom_engine::auto_operation(&app.session, &params).and_then(|op| OPS.iter().position(|o| *o == op)) else {
         return;
     };
     if let Kind::Extrude { operation, smart, .. } = &mut d.kind {
@@ -2522,7 +2522,7 @@ pub fn show(app: &mut SolveApp, ctx: &egui::Context) {
         app.viewport.dialog_rect = crate::scenario::rect_of("dialog:window");
     } else {
         let response = window.open(&mut keep).show(ctx, |ui| {
-            let spec = dense::command(&d.kind).and_then(solidcraft_engine::find_command);
+            let spec = dense::command(&d.kind).and_then(polykrom_engine::find_command);
             let icon = spec.as_ref().map_or("", |s| s.icon);
             let label = spec.as_ref().map_or(heading.as_str(), |s| tr(s.label));
             let label = if d.editing.is_some() { heading.as_str() } else { label };
@@ -2785,7 +2785,7 @@ fn set_object(inputs: &mut Vec<SelInput>, active: &mut usize, label: &'static st
 }
 
 /// The plane an extrude's picked profiles lie in: the first pick's sketch plane, or its planar face.
-fn profile_plane(s: &Session, first: &Sel) -> Option<solidcraft_engine::geom::Plane> {
+fn profile_plane(s: &Session, first: &Sel) -> Option<polykrom_engine::geom::Plane> {
     let st = s.world_state();
     match first {
         Sel::Profile { sketch, .. } => st.sketch(*sketch).map(|ss| ss.plane),
@@ -2796,7 +2796,7 @@ fn profile_plane(s: &Session, first: &Sel) -> Option<solidcraft_engine::geom::Pl
 
 /// Is a pick an object to extrude to from profiles in `reference` (not one more profile)? A face
 /// is unless it is planar and in that plane; a vertex or a place is unless it lies in it.
-fn object_target(s: &Session, reference: &solidcraft_engine::geom::Plane, sel: &Sel) -> bool {
+fn object_target(s: &Session, reference: &polykrom_engine::geom::Plane, sel: &Sel) -> bool {
     const TOLERANCE: f64 = 1e-6;
     match sel {
         Sel::Face { body, index, .. } => {
@@ -2953,7 +2953,7 @@ pub(crate) fn shown_expr(e: &str, kind: ValueKind) -> String {
         ValueKind::Angle => "deg",
         _ => return e.to_string(),
     };
-    if solidcraft_engine::doc::expr::is_bare_number(e) { format!("{} {unit}", e.trim()) } else { e.to_string() }
+    if polykrom_engine::doc::expr::is_bare_number(e) { format!("{} {unit}", e.trim()) } else { e.to_string() }
 }
 
 fn hole_defaults() -> Kind {
@@ -3016,16 +3016,16 @@ fn flip_toward_viewer(app: &SolveApp, name: &str) -> Option<&'static str> {
 /// the sketch, the view turning to it and the extrude all went the wrong way. `None` while the
 /// active component sits at the origin (the name says the same) or for a construction plane.
 fn shown_origin_plane(app: &SolveApp, name: &str) -> Option<Value> {
-    let p = solidcraft_engine::geom::Plane::named(name)?;
-    if app.session.doc.find_feature(name).is_some() || solidcraft_engine::doc::is_identity(&app.session.active_component_frame()) {
+    let p = polykrom_engine::geom::Plane::named(name)?;
+    if app.session.doc.find_feature(name).is_some() || polykrom_engine::doc::is_identity(&app.session.active_component_frame()) {
         return None;
     }
     Some(json!({"origin": [0.0, 0.0, 0.0], "x_dir": pt(p.x), "y_dir": pt(p.y)}))
 }
 
 /// The world plane of an origin plane or a construction plane by name, where it is shown.
-fn plane_by_name(s: &Session, name: &str) -> Option<solidcraft_engine::geom::Plane> {
-    if let Some(p) = solidcraft_engine::geom::Plane::named(name) {
+fn plane_by_name(s: &Session, name: &str) -> Option<polykrom_engine::geom::Plane> {
+    if let Some(p) = polykrom_engine::geom::Plane::named(name) {
         return Some(p);
     }
     let st = s.world_state();
@@ -3033,12 +3033,12 @@ fn plane_by_name(s: &Session, name: &str) -> Option<solidcraft_engine::geom::Pla
         .iter()
         .find(|c| c.name == name)
         .and_then(|c| match &c.geom {
-            solidcraft_engine::doc::construct::ConstructGeom::Plane(pl) => Some(*pl),
+            polykrom_engine::doc::construct::ConstructGeom::Plane(pl) => Some(*pl),
             _ => None,
         })
         // With occurrences the world state leaves construction geometry out; the viewport's
         // planes are evaluated in place.
-        .or_else(|| solidcraft_engine::view::construction_planes(s).into_iter().find(|(_, n, _)| n == name).map(|(_, _, pl)| pl))
+        .or_else(|| polykrom_engine::view::construction_planes(s).into_iter().find(|(_, n, _)| n == name).map(|(_, _, pl)| pl))
 }
 
 /// Animate the camera to look straight at the active sketch plane.
@@ -3070,13 +3070,13 @@ fn look_at_sketch_from(app: &mut SolveApp, again: bool) {
 /// zoomed out when that would not fit in the view; it never zooms in, so a zoom the user chose
 /// stays. A sketch without geometry keeps its plane's origin. Centring on the origin alone left a
 /// sketch drawn away from it (a part placed far from the origin, as imports often are) out of view.
-pub(crate) fn onto_sketch(mut to: solidcraft_engine::render::Camera, ss: &solidcraft_engine::doc::SolvedSketch) -> solidcraft_engine::render::Camera {
+pub(crate) fn onto_sketch(mut to: polykrom_engine::render::Camera, ss: &polykrom_engine::doc::SolvedSketch) -> polykrom_engine::render::Camera {
     let Some((lo, hi)) = ss.sketch.bounds() else {
         to.target = ss.plane.origin;
         return to;
     };
     let mut b = Aabb3::default();
-    for p in [lo, hi, solidcraft_engine::geom::Vec2::new(lo.x, hi.y), solidcraft_engine::geom::Vec2::new(hi.x, lo.y)] {
+    for p in [lo, hi, polykrom_engine::geom::Vec2::new(lo.x, hi.y), polykrom_engine::geom::Vec2::new(hi.x, lo.y)] {
         b.add(ss.plane.to_world(p));
     }
     let keep = to.distance;
@@ -3175,7 +3175,7 @@ fn same_cut(a: (Vec3, Vec3), b: (Vec3, Vec3)) -> bool {
 }
 
 /// Placement used to edit a definition in the selected authoring occurrence.
-pub(crate) fn feature_frame(s: &Session, component: u64) -> solidcraft_engine::doc::Mat {
+pub(crate) fn feature_frame(s: &Session, component: u64) -> polykrom_engine::doc::Mat {
     if component == s.active_component { s.active_component_frame() } else { s.placed_document().component_transform(component) }
 }
 
@@ -3230,7 +3230,7 @@ pub fn preview_commands(app: &SolveApp, d: &Dialog) -> Result<Vec<(String, Value
 
 /// A wrapped Emboss edit keeps its profile guide in the saved author occurrence.
 /// An invalid saved context must not draw the guide at a different occurrence.
-pub(crate) fn emboss_profile_plane(app: &SolveApp, sketch: u64) -> Result<Option<solidcraft_engine::geom::Plane>, String> {
+pub(crate) fn emboss_profile_plane(app: &SolveApp, sketch: u64) -> Result<Option<polykrom_engine::geom::Plane>, String> {
     let Some(dialog) = app.dialog.as_ref().filter(|d| matches!(d.kind, Kind::Emboss { .. })) else { return Ok(None) };
     let Some((feature, _)) = dialog.editing else { return Ok(None) };
     let Some(feature) = app.session.doc.feature(feature) else { return Err("the edited feature is missing".into()) };
@@ -3244,10 +3244,10 @@ pub(crate) fn emboss_profile_plane(app: &SolveApp, sketch: u64) -> Result<Option
     let owner = app.session.doc.feature(sketch.feature).map(|feature| feature.component).unwrap_or(0);
     let plane = sketch.plane;
     let frame = face.sketch_frame(&app.session.doc, feature.component, owner, body).map_err(|error| error.to_string())?;
-    solidcraft_engine::geom::Plane::new(
-        solidcraft_engine::doc::apply_point(&frame, plane.origin),
-        solidcraft_engine::doc::apply_vector(&frame, plane.x),
-        solidcraft_engine::doc::apply_vector(&frame, plane.y),
+    polykrom_engine::geom::Plane::new(
+        polykrom_engine::doc::apply_point(&frame, plane.origin),
+        polykrom_engine::doc::apply_vector(&frame, plane.x),
+        polykrom_engine::doc::apply_vector(&frame, plane.y),
     )
     .map(Some)
     .ok_or_else(|| "the Emboss author frame is degenerate".into())
@@ -3347,7 +3347,7 @@ fn dialog_commands(app: &SolveApp, d: &Dialog) -> Result<Vec<(String, Value)>, S
             // Coplanar faces of one body share one sketch and Boolean. Mixed selections
             // retain their original order and explicit face-body scope.
             let state = s.world_state();
-            let mut group: Option<(String, solidcraft_engine::geom::Plane, Vec<Value>)> = None;
+            let mut group: Option<(String, polykrom_engine::geom::Plane, Vec<Value>)> = None;
             let mut coplanar = true;
             for pick in sels(d, 0) {
                 let Sel::Face { body, index, point } = pick else { continue };
@@ -3750,7 +3750,7 @@ fn dialog_commands(app: &SolveApp, d: &Dialog) -> Result<Vec<(String, Value)>, S
         }
         Kind::Material { index } => {
             need(0, "bodies")?;
-            let name = s.doc.material_names().get(*index).cloned().unwrap_or_else(|| solidcraft_engine::doc::DEFAULT_MATERIAL.into());
+            let name = s.doc.material_names().get(*index).cloned().unwrap_or_else(|| polykrom_engine::doc::DEFAULT_MATERIAL.into());
             ("material.assign", json!({"bodies": sels(d, 0).body_names(), "material": name}))
         }
         Kind::Section { offset, flip, hatch } => {
@@ -3765,7 +3765,7 @@ fn dialog_commands(app: &SolveApp, d: &Dialog) -> Result<Vec<(String, Value)>, S
                     json!({"origin": pt(*point), "normal": pt(n)})
                 }
                 Some(Sel::Plane { name }) => {
-                    let pl = solidcraft_engine::view::construction_planes(s)
+                    let pl = polykrom_engine::view::construction_planes(s)
                         .into_iter()
                         .find(|(_, n, _)| n == name)
                         .map(|(_, _, pl)| pl)
@@ -3858,7 +3858,7 @@ fn dialog_commands(app: &SolveApp, d: &Dialog) -> Result<Vec<(String, Value)>, S
                     if let Some(error) = opts.custom_thread.as_ref().and_then(|draft| draft.error.as_ref()) {
                         return Err(error.clone());
                     }
-                    solidcraft_engine::doc::parse_tapped_thread(&opts.thread)
+                    polykrom_engine::doc::parse_tapped_thread(&opts.thread)
                         .ok_or("select a valid metric or catalogued UNC/UNF, G or Rp thread size")?;
                     params["thread"] = json!(opts.thread.trim());
                 }
@@ -3966,8 +3966,8 @@ fn box_corner(s: &Session, fields: &[(&'static str, String)], p: Vec3, normal: O
         };
         // A plain length ("20 mm", "2 in"; a bare number has the design's unit by now) gives a
         // plain number (mm).
-        let plain = solidcraft_engine::doc::expr::is_literal(&size)
-            .then(|| solidcraft_engine::doc::Document::eval_in(&Default::default(), &size, ValueKind::Length).ok())
+        let plain = polykrom_engine::doc::expr::is_literal(&size)
+            .then(|| polykrom_engine::doc::Document::eval_in(&Default::default(), &size, ValueKind::Length).ok())
             .flatten();
         match plain.filter(|v| v.is_finite()) {
             Some(v) => json!(c - back * v),
@@ -4061,14 +4061,14 @@ pub fn axis_of(app: &SolveApp, sel: &Sel) -> Option<(Vec3, Vec3)> {
             "Y" => Some((Vec3::ZERO, Vec3::Y)),
             "Z" => Some((Vec3::ZERO, Vec3::Z)),
             // A construction axis.
-            n => solidcraft_engine::view::construction_axes(&app.session).into_iter().find(|(_, an, _, _)| an == n).map(|(_, _, o, d)| (o, d)),
+            n => polykrom_engine::view::construction_axes(&app.session).into_iter().find(|(_, an, _, _)| an == n).map(|(_, _, o, d)| (o, d)),
         },
         Sel::SketchCurve { id } => {
             let st = app.session.world_state();
             let sid = curves_sketch(app, std::slice::from_ref(id), None)?;
             let ss = st.sketch(sid)?;
             let c = ss.sketch.curves.get(ss.sketch.curve_index(id)?)?;
-            let solidcraft_engine::sketch::CurveKind::Line { a, b } = c.kind else { return None };
+            let polykrom_engine::sketch::CurveKind::Line { a, b } = c.kind else { return None };
             let (pa, pb) = (ss.plane.to_world(ss.sketch.point(a)?), ss.plane.to_world(ss.sketch.point(b)?));
             Some((pa, (pb - pa).normalized()?))
         }
@@ -4092,21 +4092,21 @@ pub fn axis_of(app: &SolveApp, sel: &Sel) -> Option<(Vec3, Vec3)> {
 }
 
 /// Which profiles of a sketch a profile selection means.
-pub(crate) fn profile_indices(ss: &solidcraft_engine::doc::SolvedSketch, sel: &ProfileSel) -> Vec<usize> {
+pub(crate) fn profile_indices(ss: &polykrom_engine::doc::SolvedSketch, sel: &ProfileSel) -> Vec<usize> {
     let ps = &ss.profiles;
     match sel {
         ProfileSel::All => (0..ps.len()).collect(),
         ProfileSel::Indices { indices } => indices.iter().copied().filter(|i| *i < ps.len()).collect(),
         ProfileSel::OffsetBoundaries { .. } | ProfileSel::WholeBoundaries { .. } => {
-            solidcraft_engine::doc::profile_selection_indices(ss, sel).unwrap_or_default()
+            polykrom_engine::doc::profile_selection_indices(ss, sel).unwrap_or_default()
         }
         ProfileSel::Curves { loops } => loops
             .iter()
             .filter_map(|l| {
-                solidcraft_engine::doc::profile_selection_indices(ss, &ProfileSel::Curves { loops: vec![l.clone()] }).ok()?.first().copied()
+                polykrom_engine::doc::profile_selection_indices(ss, &ProfileSel::Curves { loops: vec![l.clone()] }).ok()?.first().copied()
             })
             .collect(),
-        ProfileSel::Points { points } => points.iter().filter_map(|q| solidcraft_engine::doc::sketch::profile_at_point(ps, *q)).collect(),
+        ProfileSel::Points { points } => points.iter().filter_map(|q| polykrom_engine::doc::sketch::profile_at_point(ps, *q)).collect(),
     }
 }
 
@@ -4134,13 +4134,13 @@ impl Drop for Refill {
 /// A point stored in a feature, as it shows on world body `body`: features keep their picks in
 /// the frame of the body they were on, so each body's placement takes the point to the world
 /// (a moved component, a pasted instance). Other points are the world already.
-fn stored_on(frames: &Option<Vec<(String, solidcraft_engine::doc::Mat)>>, body: &str, p: Vec3) -> Vec3 {
-    frames.as_ref().and_then(|f| f.iter().find(|(n, _)| n == body)).map(|(_, m)| solidcraft_engine::doc::apply_point(m, p)).unwrap_or(p)
+fn stored_on(frames: &Option<Vec<(String, polykrom_engine::doc::Mat)>>, body: &str, p: Vec3) -> Vec3 {
+    frames.as_ref().and_then(|f| f.iter().find(|(n, _)| n == body)).map(|(_, m)| polykrom_engine::doc::apply_point(m, p)).unwrap_or(p)
 }
 
 /// Body placements while filling a dialog from a feature (when anything is placed).
-fn stored_frames(s: &Session) -> Option<Vec<(String, solidcraft_engine::doc::Mat)>> {
-    if !REFILL.with(std::cell::Cell::get) || !solidcraft_engine::frames::placed(s) {
+fn stored_frames(s: &Session) -> Option<Vec<(String, polykrom_engine::doc::Mat)>> {
+    if !REFILL.with(std::cell::Cell::get) || !polykrom_engine::frames::placed(s) {
         return None;
     }
     let st = s.model.state();
@@ -4167,14 +4167,14 @@ pub(crate) fn edge_sel(s: &Session, p0: Vec3) -> Option<Sel> {
 
 /// The body face containing a point (nearest triangle).
 pub(crate) fn face_sel(s: &Session, p0: Vec3) -> Option<Sel> {
-    use solidcraft_engine::kernel::{self, FaceSurface};
+    use polykrom_engine::kernel::{self, FaceSurface};
 
     if !p0.is_finite() {
         return None;
     }
     let st = s.world_state();
     let frames = stored_frames(s);
-    let mut best: Option<(f64, &solidcraft_engine::doc::ModelBody, usize, Vec3)> = None;
+    let mut best: Option<(f64, &polykrom_engine::doc::ModelBody, usize, Vec3)> = None;
     for b in &st.bodies {
         let p = stored_on(&frames, &b.name, p0);
         let m = b.mesh();
@@ -4201,7 +4201,7 @@ pub(crate) fn face_sel(s: &Session, p0: Vec3) -> Option<Sel> {
 /// Resolve a stored name on the current input body before placing its pick in the viewport.
 /// Keep the resolved index: a face point can lie on a boundary shared with another face.
 fn named_refill(s: &Session, body: Option<&str>, name: &str, point: Vec3, edge: bool) -> Option<Sel> {
-    use solidcraft_engine::doc::naming;
+    use polykrom_engine::doc::naming;
 
     if name.is_empty() {
         return None;
@@ -4227,20 +4227,20 @@ fn named_refill(s: &Session, body: Option<&str>, name: &str, point: Vec3, edge: 
         .body_frames_with_source(&st)
         .into_iter()
         .find(|(_, definition, _, _, _)| definition == source.definition_name())
-        .map(|(world, _, _, _, frame)| (world, solidcraft_engine::doc::apply_point(&frame, point)))
+        .map(|(world, _, _, _, frame)| (world, polykrom_engine::doc::apply_point(&frame, point)))
         .unwrap_or_else(|| (source.name.clone(), point));
     s.world_state().body(&body)?;
     Some(if edge { Sel::Edge { body, index, point } } else { Sel::Face { body, index, point } })
 }
 
-fn emboss_face_sel(s: &Session, component: u64, face: &solidcraft_engine::doc::EmbossFace, persistent: &str) -> Option<Sel> {
+fn emboss_face_sel(s: &Session, component: u64, face: &polykrom_engine::doc::EmbossFace, persistent: &str) -> Option<Sel> {
     let source = s.model.state();
     let body = source.body(&face.body)?;
-    let index = solidcraft_engine::doc::naming::face_names(body).iter().position(|name| name == persistent)?;
+    let index = polykrom_engine::doc::naming::face_names(body).iter().position(|name| name == persistent)?;
     let owner = s.doc.model_body_component(body);
     let world_name = s.doc.world_body_name(&source, &face.body, owner, &face.path);
-    let author = solidcraft_engine::doc::EmbossFace::component_frame(&s.doc, component, &face.author_path).ok()?;
-    let point = solidcraft_engine::doc::apply_point(&author, face.at.0);
+    let author = polykrom_engine::doc::EmbossFace::component_frame(&s.doc, component, &face.author_path).ok()?;
+    let point = polykrom_engine::doc::apply_point(&author, face.at.0);
     s.world_state().body(&world_name)?;
     Some(Sel::Face { body: world_name, index, point })
 }
@@ -4336,10 +4336,10 @@ fn plane_arg(app: &SolveApp, sel: Option<&Sel>) -> Result<Value, String> {
 }
 
 /// A stored construction reference back into a dialog pick.
-fn geo_sel(s: &Session, g: &solidcraft_engine::doc::construct::GeoRef) -> Option<Sel> {
+fn geo_sel(s: &Session, g: &polykrom_engine::doc::construct::GeoRef) -> Option<Sel> {
     match g {
-        solidcraft_engine::doc::construct::GeoRef::Plane { plane } => plane_sel(s, plane),
-        solidcraft_engine::doc::construct::GeoRef::Face { at, .. } => face_sel(s, *at),
+        polykrom_engine::doc::construct::GeoRef::Plane { plane } => plane_sel(s, plane),
+        polykrom_engine::doc::construct::GeoRef::Face { at, .. } => face_sel(s, *at),
         _ => None,
     }
 }
@@ -4378,7 +4378,7 @@ fn pt3(v: Vec3) -> Value {
 }
 
 /// A point of expressions: numbers as numbers, expressions as strings.
-fn pt_expr(p: &solidcraft_engine::doc::PointExpr) -> Value {
+fn pt_expr(p: &polykrom_engine::doc::PointExpr) -> Value {
     Value::Array(p.iter().map(|e| e.parse::<f64>().ok().filter(|x| x.is_finite()).map_or_else(|| json!(e), |x| json!(x))).collect())
 }
 
@@ -4424,7 +4424,7 @@ pub fn for_feature(app: &SolveApp, id: u64, marker: Option<usize>) -> Option<Dia
                 if let Some(point) = point {
                     set_object(&mut d.inputs, &mut d.active, label, true);
                     if let Some(input) = d.inputs.iter_mut().find(|i| i.label == label) {
-                        input.items = vec![Sel::Vertex { body: String::new(), point: solidcraft_engine::doc::apply_point(&frame, point.0) }];
+                        input.items = vec![Sel::Vertex { body: String::new(), point: polykrom_engine::doc::apply_point(&frame, point.0) }];
                     }
                 }
             }
@@ -4449,8 +4449,8 @@ pub fn for_feature(app: &SolveApp, id: u64, marker: Option<usize>) -> Option<Dia
             let frame = feature_frame(s, f.component);
             let stored_axis = match axis {
                 AxisRef::Line { origin, dir } => Some(json!({
-                    "origin": pt(solidcraft_engine::doc::apply_point(&frame, origin.0)),
-                    "dir": pt(solidcraft_engine::doc::apply_vector(&frame, dir.0))
+                    "origin": pt(polykrom_engine::doc::apply_point(&frame, origin.0)),
+                    "dir": pt(polykrom_engine::doc::apply_vector(&frame, dir.0))
                 })),
                 _ => None,
             };
@@ -4465,7 +4465,7 @@ pub fn for_feature(app: &SolveApp, id: u64, marker: Option<usize>) -> Option<Dia
             if let Some(point) = to {
                 set_to_object(&mut d.inputs, &mut d.active, true);
                 if let Some(input) = d.inputs.iter_mut().find(|i| i.label == TO_OBJECT) {
-                    input.items = vec![Sel::Vertex { body: String::new(), point: solidcraft_engine::doc::apply_point(&frame, point.0) }];
+                    input.items = vec![Sel::Vertex { body: String::new(), point: polykrom_engine::doc::apply_point(&frame, point.0) }];
                 }
             }
             let items = st.sketch(sketch.0).map(|ss| profile_indices(ss, profiles)).unwrap_or_default();
@@ -4514,7 +4514,7 @@ pub fn for_feature(app: &SolveApp, id: u64, marker: Option<usize>) -> Option<Dia
             }
             // A fillet that reduces or tapers a radius too large for its edges.
             if let FeatureKind::Fillet { fit, .. } = &f.kind {
-                use solidcraft_engine::doc::FilletFit;
+                use polykrom_engine::doc::FilletFit;
                 let mode = match fit {
                     FilletFit::Exact => None,
                     FilletFit::Reduce => Some("reduce"),
@@ -4740,7 +4740,7 @@ pub fn for_feature(app: &SolveApp, id: u64, marker: Option<usize>) -> Option<Dia
             let mut d = start("solid.boundary_fill")?;
             // The cells again, ticked where a stored cell point lies in the same cell.
             let before = s.model.state_before(f.id);
-            let found = fill_cells(&before, &solidcraft_engine::doc::plain(tools));
+            let found = fill_cells(&before, &polykrom_engine::doc::plain(tools));
             let filled: Vec<String> =
                 cells.iter().filter_map(|c| found.iter().min_by(|a, b| a.0.dist(c.0).total_cmp(&b.0.dist(c.0))).map(|x| x.1.clone())).collect();
             let items: Vec<Sel> = tools.iter().map(|n| Sel::Body { name: n.to_string() }).collect();
@@ -4919,8 +4919,8 @@ pub fn for_feature(app: &SolveApp, id: u64, marker: Option<usize>) -> Option<Dia
         FeatureKind::ConstructionPlane { plane: PlaneRef::AlongPath { path, t } } => {
             let mut d = start("construct.plane.along_path")?;
             let (item, sketch) = match path.as_ref() {
-                solidcraft_engine::doc::construct::GeoRef::SketchCurve { sketch, curve } => (Sel::SketchCurve { id: curve.clone() }, Some(*sketch)),
-                solidcraft_engine::doc::construct::GeoRef::Edge { at, name } => {
+                polykrom_engine::doc::construct::GeoRef::SketchCurve { sketch, curve } => (Sel::SketchCurve { id: curve.clone() }, Some(*sketch)),
+                polykrom_engine::doc::construct::GeoRef::Edge { at, name } => {
                     // Preserve the saved named reference until a replacement is picked.
                     d.extra.insert("path".into(), json!({"type":"edge","at":pt3(*at),"name":name}));
                     (Sel::Edge { body: String::new(), index: 0, point: *at }, None)
@@ -5105,7 +5105,7 @@ pub fn for_feature(app: &SolveApp, id: u64, marker: Option<usize>) -> Option<Dia
             let mut d = start("solid.move")?;
             crate::dialogs_move::for_feature(
                 &mut d,
-                &solidcraft_engine::doc::plain(bodies),
+                &polykrom_engine::doc::plain(bodies),
                 translate,
                 rotate_axis.map(Vec3::from),
                 angle.as_ref(),
@@ -5132,7 +5132,7 @@ pub fn for_feature(app: &SolveApp, id: u64, marker: Option<usize>) -> Option<Dia
 #[cfg(test)]
 mod param_refusal_tests {
     use super::*;
-    use solidcraft_engine::Session;
+    use polykrom_engine::Session;
 
     #[test]
     fn a_refused_parameter_change_shows_why() {

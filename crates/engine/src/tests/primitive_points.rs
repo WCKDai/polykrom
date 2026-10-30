@@ -31,7 +31,7 @@ fn cylinder_base_expressions_follow_parameters() {
     // And it survives a save and reopen.
     let text = s.doc.to_json();
     assert!(text.contains("basin_width/2"), "{text}");
-    let s2 = Session::new(solidcraft_doc::Document::from_json(&text).unwrap());
+    let s2 = Session::new(polykrom_doc::Document::from_json(&text).unwrap());
     let (lo, _) = bbox(&s2, "Pin");
     assert!(near(lo, [25.0, 5.0, -2.0]), "{lo:?}");
 }

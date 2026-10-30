@@ -11,9 +11,9 @@
 //! `hand_rolled_camera_input_is_rejected` fails when they do.
 
 use egui::{Pos2, Rect, pos2, vec2};
+use polykrom_engine::geom::Vec3;
+use polykrom_engine::render::Camera;
 use serde_json::json;
-use solidcraft_engine::geom::Vec3;
-use solidcraft_engine::render::Camera;
 
 use crate::SolveApp;
 use crate::prefs::{OrbitAround, pivot_under};
@@ -997,7 +997,7 @@ mod tests {
     fn touchpad_free_orbit_setting_reaches_the_shared_command() {
         use super::*;
         for caps in [NavCaps::MODEL, NavCaps::RENDER, NavCaps { orbit: false, pick: false }] {
-            for up in [solidcraft_engine::render::UpAxis::Y, solidcraft_engine::render::UpAxis::Z] {
+            for up in [polykrom_engine::render::UpAxis::Y, polykrom_engine::render::UpAxis::Z] {
                 for free in [false, true] {
                     let ctx = egui::Context::default();
                     let mut app = crate::SolveApp::new(Default::default(), crate::Services::default());
@@ -1032,7 +1032,7 @@ mod tests {
     #[test]
     fn touchpad_free_orbit_keeps_the_rigid_pivot_in_both_projections() {
         use super::*;
-        for up in [solidcraft_engine::render::UpAxis::Y, solidcraft_engine::render::UpAxis::Z] {
+        for up in [polykrom_engine::render::UpAxis::Y, polykrom_engine::render::UpAxis::Z] {
             for fov in [0.0, 0.6] {
                 for around in [OrbitAround::Origin, OrbitAround::Cursor] {
                     let ctx = egui::Context::default();
@@ -1129,14 +1129,14 @@ mod tests {
     #[test]
     fn solidworks_mouse_orbit_passes_the_pole_without_snapping() {
         use serde_json::json;
-        for up in [solidcraft_engine::render::UpAxis::Z, solidcraft_engine::render::UpAxis::Y] {
+        for up in [polykrom_engine::render::UpAxis::Z, polykrom_engine::render::UpAxis::Y] {
             for button in ["middle", "right"] {
                 let mut h = crate::scenario::Harness::new();
                 h.app.home.open = false;
                 h.app.preferences.nav = "solidworks".into();
                 h.app.preferences.free_orbit = true;
                 h.app.ui.up_axis = up;
-                h.app.cam = solidcraft_engine::render::Camera { yaw: 0.0, pitch: 1.4, up, ..Default::default() };
+                h.app.cam = polykrom_engine::render::Camera { yaw: 0.0, pitch: 1.4, up, ..Default::default() };
                 let before = h.app.cam;
                 h.call("ui.drag", json!({"x0":800,"y0":400,"x1":800,"y1":480,"button":button,"steps":40}));
                 assert!((h.app.cam.back().dot(before.back()) - 0.64_f64.cos()).abs() < 1e-6, "{up:?} {button}: {:?}", h.app.cam);
@@ -1220,7 +1220,7 @@ mod tests {
             "cam.rotate_in_view(",
         ];
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
-        let dirs = [root.join("src"), root.join("../../apps/solidcraft/src"), root.join("../../apps/solidcraft-web/src")];
+        let dirs = [root.join("src"), root.join("../../apps/polykrom/src"), root.join("../../apps/polykrom-web/src")];
         let allowed = ["navigation.rs"];
         let mut offenders = Vec::new();
         let mut scanned = 0;
@@ -1258,7 +1258,7 @@ mod tests {
         use egui::{Event, Modifiers, PointerButton, pos2, vec2};
         let flat = super::NavCaps { orbit: false, pick: false };
         for preset in crate::prefs::NAV_PRESETS.iter().map(|p| p.id) {
-            let mut s = solidcraft_engine::Session::default();
+            let mut s = polykrom_engine::Session::default();
             s.execute("solid.box", &serde_json::json!({"length":40,"width":30,"height":20})).unwrap();
             let mut app = crate::SolveApp::new(s, crate::Services::default());
             app.preferences.nav = preset.into();
@@ -1340,7 +1340,7 @@ mod tests {
         let every_axis = DeviceMotion { motion: Motion { translation: [1.0, 1.0, 1.0], rotation: [1.0, 1.0, 1.0] }, seconds: 0.05 };
         let flat = super::NavCaps { orbit: false, pick: false };
         for (caps, turns) in [(flat, false), (super::NavCaps::MODEL, true), (super::NavCaps::RENDER, true)] {
-            let mut s = solidcraft_engine::Session::default();
+            let mut s = polykrom_engine::Session::default();
             s.execute("solid.box", &serde_json::json!({"length":40,"width":30,"height":20})).unwrap();
             let mut app = crate::SolveApp::new(s, crate::Services::default());
             let ctx = crate::fonts::test_context();
@@ -1371,7 +1371,7 @@ mod tests {
     #[test]
     fn the_3d_mouse_never_turns_a_sketch_being_edited() {
         use crate::space_mouse::{DeviceMotion, Motion};
-        let mut s = solidcraft_engine::Session::default();
+        let mut s = polykrom_engine::Session::default();
         s.execute("sketch.create", &serde_json::json!({"plane": "XY"})).unwrap();
         let mut app = crate::SolveApp::new(s, crate::Services::default());
         assert!(app.session.active_sketch.is_some());

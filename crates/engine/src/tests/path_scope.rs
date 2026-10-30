@@ -1,14 +1,14 @@
 //! Commands run for an agent (#205): with a `vfs::PathScope` active, every command that reads,
 //! writes or deletes a file it was given a path for stays inside the scope's folders.
 
+use polykrom_io::vfs::{PathScope, scoped};
 use serde_json::json;
-use solidcraft_io::vfs::{PathScope, scoped};
 
 use crate::*;
 
 #[test]
 fn file_commands_stay_inside_the_agents_folders() {
-    let base = solidcraft_io::vfs::temp_dir().join(format!("solidcraft-path-scope-{}", std::process::id()));
+    let base = polykrom_io::vfs::temp_dir().join(format!("solidcraft-path-scope-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&base);
     let (root, out) = (base.join("root"), base.join("out"));
     std::fs::create_dir_all(&root).unwrap();
@@ -16,7 +16,7 @@ fn file_commands_stay_inside_the_agents_folders() {
     let at = |d: &std::path::Path, f: &str| d.join(f).to_string_lossy().to_string();
     let mut s = Session::default();
     s.execute("solid.box", &json!({"length": 10, "width": 10, "height": 10})).unwrap();
-    std::fs::write(out.join("part.solidcraft"), solidcraft_io::write_design(&s.doc)).unwrap();
+    std::fs::write(out.join("part.solidcraft"), polykrom_io::write_design(&s.doc)).unwrap();
     std::fs::write(out.join("p.csv"), "name,expression\nw,5 mm\n").unwrap();
 
     scoped(Some(PathScope::new([root.clone()])), || {
@@ -74,19 +74,19 @@ fn file_commands_stay_inside_the_agents_folders() {
 /// font outside its folders stays unread, even one already read (and cached) for the user.
 #[test]
 fn a_designs_font_file_stays_inside_the_agents_folders() {
-    let base = solidcraft_io::vfs::temp_dir().join(format!("solidcraft-font-scope-{}", std::process::id()));
+    let base = polykrom_io::vfs::temp_dir().join(format!("solidcraft-font-scope-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&base);
     let (root, out) = (base.join("root"), base.join("out"));
     std::fs::create_dir_all(&root).unwrap();
     std::fs::create_dir_all(&out).unwrap();
     let font = out.join("f.ttf");
-    std::fs::write(&font, solidcraft_sketch::font_data(None).unwrap().bytes()).unwrap();
+    std::fs::write(&font, polykrom_sketch::font_data(None).unwrap().bytes()).unwrap();
     let mut s = Session::default();
     s.execute("sketch.create", &json!({"plane": "XY"})).unwrap();
     s.execute("sketch.text", &json!({"text": "A", "at": [0, 0], "font": font.to_string_lossy()})).unwrap();
     s.execute("sketch.finish", &json!({})).unwrap();
     let design = root.join("text.solidcraft");
-    std::fs::write(&design, solidcraft_io::write_design(&s.doc)).unwrap();
+    std::fs::write(&design, polykrom_io::write_design(&s.doc)).unwrap();
     let open = json!({"path": design.to_string_lossy()});
     // The sketch's warning says what its text couldn't read.
     let warnings = |s: &Session| s.model.results.iter().filter_map(|r| r.warning.clone()).collect::<Vec<_>>().join("; ");

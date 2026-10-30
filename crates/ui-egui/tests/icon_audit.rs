@@ -2,8 +2,8 @@
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
+use polykrom_ui_egui::{icon_svg, scenario::Harness, workspace};
 use serde_json::{Value, json};
-use solidcraft_ui_egui::{icon_svg, scenario::Harness, workspace};
 
 fn click(h: &mut Harness, handle: &str) {
     h.step(&json!({"click":{"handle":handle}})).unwrap_or_else(|e| panic!("{handle}: {e}"));
@@ -71,7 +71,7 @@ fn menu(h: &mut Harness, target: Value, surface: &str, requested: &mut BTreeMap<
                 }
                 let icon = child["icon"].as_str().unwrap();
                 assert!(!icon.is_empty(), "{surface}: submenu row has no icon: {child}");
-                assert!(!solidcraft_ui_egui::icon_svg::resolve(icon).placeholder, "{surface}: submenu placeholder {icon}");
+                assert!(!polykrom_ui_egui::icon_svg::resolve(icon).placeholder, "{surface}: submenu placeholder {icon}");
             }
         }
     }
@@ -82,12 +82,12 @@ fn menu(h: &mut Harness, target: Value, surface: &str, requested: &mut BTreeMap<
 fn ribbon(h: &mut Harness, requested: &mut BTreeMap<String, bool>) {
     for tab in workspace::visible_tabs(&h.app) {
         click(h, &format!("tab:{tab}"));
-        let panels = solidcraft_ui_egui::scenario::handles(&format!("panel:{tab}:"));
+        let panels = polykrom_ui_egui::scenario::handles(&format!("panel:{tab}:"));
         assert!(!panels.is_empty(), "no panels on {tab}");
         for (handle, _) in panels {
             click(h, &handle);
             collect(h, &handle, requested);
-            for (family, at) in solidcraft_ui_egui::scenario::handles("create_family:") {
+            for (family, at) in polykrom_ui_egui::scenario::handles("create_family:") {
                 h.call("ui.move", json!({"x":at.x,"y":at.y}));
                 h.frames(20);
                 collect(h, &family, requested);
@@ -98,7 +98,7 @@ fn ribbon(h: &mut Harness, requested: &mut BTreeMap<String, bool>) {
 }
 
 fn assistant(h: &mut Harness, requested: &mut BTreeMap<String, bool>) {
-    use solidcraft_ui_egui::agent_chat::{Item, backend::ToolStatus};
+    use polykrom_ui_egui::agent_chat::{Item, backend::ToolStatus};
     h.call("ui.agent_chat", json!({"features":true,"open":true,"picker":false,"width":440}));
     h.app.agent_chat.items = vec![
         Item::User { text: "Round the plate edges".into(), image: false, pictures: vec![], files: vec![] },
@@ -119,9 +119,9 @@ fn assistant(h: &mut Harness, requested: &mut BTreeMap<String, bool>) {
 }
 
 fn panels(h: &mut Harness, requested: &mut BTreeMap<String, bool>) {
-    for command in solidcraft_engine::command_specs() {
-        let panel = solidcraft_ui_egui::dialogs::Dialog::for_command(&h.app, command.id).is_some()
-            || solidcraft_ui_egui::tools::Tool::for_command(command.id).is_some()
+    for command in polykrom_engine::command_specs() {
+        let panel = polykrom_ui_egui::dialogs::Dialog::for_command(&h.app, command.id).is_some()
+            || polykrom_ui_egui::tools::Tool::for_command(command.id).is_some()
             || matches!(command.id, "parameters.change" | "document.metadata" | "material.properties.validate");
         if !panel {
             continue;
@@ -140,7 +140,7 @@ fn panels(h: &mut Harness, requested: &mut BTreeMap<String, bool>) {
 }
 
 fn context_rows(h: &mut Harness, prefix: &str, requested: &mut BTreeMap<String, bool>) {
-    for (handle, _) in solidcraft_ui_egui::scenario::handles(prefix) {
+    for (handle, _) in polykrom_ui_egui::scenario::handles(prefix) {
         if handle == "timeline:rollback" {
             continue;
         }
@@ -158,13 +158,11 @@ fn requested_menu_icons_have_artwork_and_match_manifest() {
     }
     let mut h = Harness::new();
     h.app.home.open = false;
-    h.app.services.install_app = Some(solidcraft_ui_egui::install::InstallApp {
-        offer: Box::new(|| Some(solidcraft_ui_egui::install::Offer::Prompt)),
-        prompt: Box::new(|| {}),
-    });
+    h.app.services.install_app =
+        Some(polykrom_ui_egui::install::InstallApp { offer: Box::new(|| Some(polykrom_ui_egui::install::Offer::Prompt)), prompt: Box::new(|| {}) });
     h.app.preferences.radial_context_menu = true;
     assert_eq!(h.call("ui.icon_audit", json!({"reset":true}))["ok"], true);
-    h.app.session.run_script(&solidcraft_engine::sample::script()).unwrap();
+    h.app.session.run_script(&polykrom_engine::sample::script()).unwrap();
     h.frames(3);
     let mut requested = BTreeMap::new();
     collect(&mut h, "initial browser and timeline", &mut requested);
@@ -179,10 +177,10 @@ fn requested_menu_icons_have_artwork_and_match_manifest() {
     collect(&mut h, "Help", &mut requested);
     escape(&mut h);
     menu(&mut h, json!({"type":"workspace"}), "workspace", &mut requested);
-    solidcraft_ui_egui::render_workspace::enter(&mut h.app, true).unwrap();
+    polykrom_ui_egui::render_workspace::enter(&mut h.app, true).unwrap();
     h.frames(3);
     ribbon(&mut h, &mut requested);
-    solidcraft_ui_egui::render_workspace::enter(&mut h.app, false).unwrap();
+    polykrom_ui_egui::render_workspace::enter(&mut h.app, false).unwrap();
     h.frames(3);
 
     let body = h.app.session.model.state().bodies.first().unwrap().name.clone();
@@ -266,7 +264,7 @@ fn requested_menu_icons_have_artwork_and_match_manifest() {
         // The tabs were clicked above at full width; narrow layouts can clip their hit regions.
         h.app.ui.tab = tab.into();
         h.frames(3);
-        if solidcraft_ui_egui::scenario::handle_at("toolbar:overflow").is_some() {
+        if polykrom_ui_egui::scenario::handle_at("toolbar:overflow").is_some() {
             overflow_count += 1;
             click(&mut h, "toolbar:overflow");
             collect(&mut h, "overflow", &mut requested);
@@ -274,7 +272,7 @@ fn requested_menu_icons_have_artwork_and_match_manifest() {
                 if let Some([x, y]) = h.widget(panel) {
                     h.call("ui.move", json!({"x":x,"y":y}));
                     h.frames(20);
-                    overflow_rows += solidcraft_ui_egui::scenario::handles("toolbar:").iter().filter(|(name, _)| name != "toolbar:overflow").count();
+                    overflow_rows += polykrom_ui_egui::scenario::handles("toolbar:").iter().filter(|(name, _)| name != "toolbar:overflow").count();
                     collect(&mut h, &format!("overflow:{tab}:{panel}"), &mut requested);
                 }
             }
@@ -301,8 +299,8 @@ fn requested_menu_icons_have_artwork_and_match_manifest() {
     }
 
     // Search every command by its full label so results beyond the first page are painted.
-    for command in solidcraft_engine::command_specs() {
-        solidcraft_ui_egui::shortcut_box::open(&mut h.app, None);
+    for command in polykrom_engine::command_specs() {
+        polykrom_ui_egui::shortcut_box::open(&mut h.app, None);
         h.app.sbox.text = command.label.to_owned();
         h.frames(2);
         collect(&mut h, command.id, &mut requested);
@@ -325,7 +323,7 @@ fn requested_menu_icons_have_artwork_and_match_manifest() {
     }
     // Sheet and assembly contexts expose contextual tabs and browser row kinds that
     // a single solid part cannot offer. Use repository-owned public sample recipes.
-    for sample in solidcraft_engine::sample::samples().into_iter().filter(|s| matches!(s.name, "Sheet Metal Bracket" | "Hinge Assembly")) {
+    for sample in polykrom_engine::sample::samples().into_iter().filter(|s| matches!(s.name, "Sheet Metal Bracket" | "Hinge Assembly")) {
         let mut sample_h = Harness::new();
         sample_h.app.home.open = false;
         sample_h.app.session.run_script(&(sample.script)()).unwrap();
@@ -370,7 +368,7 @@ fn requested_menu_icons_have_artwork_and_match_manifest() {
     let path = geometry.dir.join("audit.solidcraft");
     geometry.app.run("file.save", json!({"path":path})).unwrap();
     geometry.app.home.recent = vec![path.to_string_lossy().into_owned()];
-    geometry.app.recoverable.push(solidcraft_engine::recovery::Entry {
+    geometry.app.recoverable.push(polykrom_engine::recovery::Entry {
         id: "icon-audit".into(),
         path: Some("audit.solidcraft".into()),
         name: "Audit design".into(),
@@ -389,7 +387,7 @@ fn requested_menu_icons_have_artwork_and_match_manifest() {
     // Populate actual document slots, then click the same overflow launcher as a person.
     let mut documents = Harness::new();
     for _ in 0..12 {
-        solidcraft_ui_egui::documents::open_tab(&mut documents.app, solidcraft_engine::Session::default()).unwrap();
+        polykrom_ui_egui::documents::open_tab(&mut documents.app, polykrom_engine::Session::default()).unwrap();
     }
     documents.app.home.open = false;
     documents.call("ui.resize", json!({"width":640,"height":1000}));
@@ -402,7 +400,7 @@ fn requested_menu_icons_have_artwork_and_match_manifest() {
         let mut diagnostics = Harness::new();
         diagnostics.app.home.open = false;
         if failing {
-            diagnostics.app.session.run_script(&solidcraft_engine::sample::script()).unwrap();
+            diagnostics.app.session.run_script(&polykrom_engine::sample::script()).unwrap();
             diagnostics.app.run("parameters.change", json!({"name":"width","expression":"5 mm"})).unwrap();
         } else {
             diagnostics.app.run("solid.box", json!({"length":10,"width":10,"height":10,"body_name":"One"})).unwrap();
@@ -438,7 +436,7 @@ fn requested_menu_icons_have_artwork_and_match_manifest() {
         let expected = std::fs::read_to_string(&path).unwrap_or_default().replace("\r\n", "\n");
         assert_eq!(
             expected, manifest,
-            "Runtime icon discovery changed. Regenerate with UPDATE_ICON_MANIFEST=1 cargo test -p solidcraft-ui-egui --test icon_audit"
+            "Runtime icon discovery changed. Regenerate with UPDATE_ICON_MANIFEST=1 cargo test -p polykrom-ui-egui --test icon_audit"
         );
     }
     let missing = requested.iter().filter(|(_, placeholder)| **placeholder).map(|(name, _)| name).collect::<Vec<_>>();
@@ -465,7 +463,7 @@ fn audit_is_opt_in_drains_and_records_resolved_aliases() {
 /// Review evidence uses the application's actual SVG renderer, without a window or screenshot.
 #[test]
 fn offset_mode_artwork_review() {
-    use solidcraft_ui_egui::theme::{ColorVision, Tokens};
+    use polykrom_ui_egui::theme::{ColorVision, Tokens};
     let names = ["offset", "offset_two_sides", "offset_symmetric", "sketch_chamfer", "sketch_chamfer_two_distances", "split_body"];
     let mut sheet = tiny_skia::Pixmap::new(400, names.len() as u32 * 88).unwrap();
     for (row, name) in names.iter().enumerate() {

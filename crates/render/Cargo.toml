@@ -1,5 +1,5 @@
 [package]
-name = "solidcraft-render"
+name = "polykrom-render"
 description = "Polykrom view math (orbit camera, projection, picking rays), the description of headless pictures, and product render jobs"
 version.workspace = true
 edition.workspace = true

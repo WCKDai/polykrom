@@ -1,7 +1,7 @@
 //! Select Other: press and hold, the viewport menu's entry, click cycling and dialog inputs.
 
+use polykrom_engine::Sel;
 use serde_json::{Value, json};
-use solidcraft_engine::Sel;
 
 use crate::scenario::Harness;
 

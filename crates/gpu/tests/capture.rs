@@ -4,13 +4,13 @@
 //! compare bytes. Skipped, with the reason printed, on a machine without a GPU adapter
 //! (`SOLIDCRAFT_REQUIRE_GPU=1` makes that a failure).
 
+use polykrom_engine::Session;
+use polykrom_engine::geom::Vec3;
+use polykrom_engine::render::{Camera, Rgb, SceneLine};
+use polykrom_engine::view::{self, Guides, colors};
+use polykrom_gpu::GpuError;
+use polykrom_gpu::capture::{self, Capturer};
 use serde_json::json;
-use solidcraft_engine::Session;
-use solidcraft_engine::geom::Vec3;
-use solidcraft_engine::render::{Camera, Rgb, SceneLine};
-use solidcraft_engine::view::{self, Guides, colors};
-use solidcraft_gpu::GpuError;
-use solidcraft_gpu::capture::{self, Capturer};
 
 fn capturer() -> Option<&'static Capturer> {
     match capture::shared() {
@@ -63,7 +63,7 @@ fn opengl_viewport_pipelines_render_a_model() {
     assert_eq!(adapter.get_info().backend, wgpu::Backend::Gl);
     eprintln!("OpenGL regression: {:?}", adapter.get_info());
     let (device, queue) = pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor {
-        required_features: solidcraft_gpu::depth_features(&adapter),
+        required_features: polykrom_gpu::depth_features(&adapter),
         required_limits: wgpu::Limits::downlevel_defaults().using_resolution(adapter.limits()),
         ..Default::default()
     }))
@@ -191,7 +191,7 @@ fn pictures_show_the_surface_analysis() {
     assert!(black > 500 && white > 500, "zebra: {black} black, {white} white pixels");
     s.execute("inspect.accessibility", &json!({})).unwrap();
     let access = picture(&s);
-    let [ok, blocked] = colors_of(solidcraft_engine::render::AnalysisColors::DEFAULT.access);
+    let [ok, blocked] = colors_of(polykrom_engine::render::AnalysisColors::DEFAULT.access);
     let near = |p: [u8; 4], c: [u8; 3]| (0..3).all(|k| (i32::from(p[k]) - i32::from(c[k])).abs() < 60);
     let (reachable, under) = (pixels(&access).filter(|p| near(*p, ok)).count(), pixels(&access).filter(|p| near(*p, blocked)).count());
     assert!(reachable > 1000 && under > 1000, "accessibility: {reachable} reachable, {under} blocked pixels");
@@ -206,7 +206,7 @@ fn colors_of(c: [[f32; 3]; 2]) -> [[u8; 3]; 2] {
 #[test]
 fn an_empty_picture_is_the_background() {
     let Some(c) = capturer() else { return };
-    let sc = solidcraft_engine::render::Scene { background: Some((colors::BG_TOP, colors::BG_BOTTOM)), ..Default::default() };
+    let sc = polykrom_engine::render::Scene { background: Some((colors::BG_TOP, colors::BG_BOTTOM)), ..Default::default() };
     let img = c.rgba(&sc, &Camera::default(), 64, 64).unwrap();
     let at = |row: usize| pixels(&img).nth(row * 64 + 32).unwrap_or_default();
     let near = |p: [u8; 4], c: Rgb| [p[0], p[1], p[2]].iter().zip([c.0, c.1, c.2]).all(|(a, b)| a.abs_diff(b) <= 3);
@@ -217,7 +217,7 @@ fn an_empty_picture_is_the_background() {
 #[test]
 fn bad_picture_sizes_are_errors() {
     let Some(c) = capturer() else { return };
-    let sc = solidcraft_engine::render::Scene::default();
+    let sc = polykrom_engine::render::Scene::default();
     for (w, h) in [(0, 10), (10, 0), (capture::MAX_SIDE + 1, 10), (u32::MAX, u32::MAX)] {
         assert!(c.rgba(&sc, &Camera::default(), w, h).is_err(), "{w} x {h}");
     }

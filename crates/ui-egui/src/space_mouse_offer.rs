@@ -316,8 +316,8 @@ mod tests {
     #[test]
     fn it_stays_away_from_a_calibrated_device_and_navigation_off() {
         let axes =
-            std::array::from_fn(|source| solidcraft_space_mouse::AxisCalibration { source, reversed: false, rest: 0, dead_zone: 0, full: [350; 2] });
-        let calibration = solidcraft_space_mouse::Calibration { dead_zone_share: 0.0, kind: solidcraft_space_mouse::Kind::ReturnToCenter, axes };
+            std::array::from_fn(|source| polykrom_space_mouse::AxisCalibration { source, reversed: false, rest: 0, dead_zone: 0, full: [350; 2] });
+        let calibration = polykrom_space_mouse::Calibration { dead_zone_share: 0.0, kind: polykrom_space_mouse::Kind::ReturnToCenter, axes };
         for (enabled, calibrated) in [(false, false), (true, true)] {
             let mut h = crate::scenario::Harness::new();
             h.app.home.open = false;
@@ -810,8 +810,8 @@ mod preferences_tests {
     #[test]
     fn an_unplugged_and_replugged_device_keeps_its_calibration_and_is_not_offered_again() {
         let axes =
-            std::array::from_fn(|source| solidcraft_space_mouse::AxisCalibration { source, reversed: false, rest: 0, dead_zone: 0, full: [350; 2] });
-        let calibration = solidcraft_space_mouse::Calibration { dead_zone_share: 0.0, kind: solidcraft_space_mouse::Kind::ReturnToCenter, axes };
+            std::array::from_fn(|source| polykrom_space_mouse::AxisCalibration { source, reversed: false, rest: 0, dead_zone: 0, full: [350; 2] });
+        let calibration = polykrom_space_mouse::Calibration { dead_zone_share: 0.0, kind: polykrom_space_mouse::Kind::ReturnToCenter, axes };
         for prefs_open in [false, true] {
             let mut h = crate::scenario::Harness::new();
             h.app.home.open = false;
@@ -881,8 +881,8 @@ mod preferences_tests {
     #[test]
     fn a_driver_fallback_round_trip_keeps_the_calibration_and_the_driver_choice() {
         let axes =
-            std::array::from_fn(|source| solidcraft_space_mouse::AxisCalibration { source, reversed: false, rest: 0, dead_zone: 0, full: [350; 2] });
-        let calibration = solidcraft_space_mouse::Calibration { dead_zone_share: 0.0, kind: solidcraft_space_mouse::Kind::ReturnToCenter, axes };
+            std::array::from_fn(|source| polykrom_space_mouse::AxisCalibration { source, reversed: false, rest: 0, dead_zone: 0, full: [350; 2] });
+        let calibration = polykrom_space_mouse::Calibration { dead_zone_share: 0.0, kind: polykrom_space_mouse::Kind::ReturnToCenter, axes };
         let mut h = crate::scenario::Harness::new();
         h.app.home.open = false;
         h.app.preferences.space_mouse_driver = crate::prefs::SpaceMouseDriver::Direct;

@@ -8,9 +8,9 @@ use crate::ui_kit::choice_row;
 use std::hash::{Hash, Hasher};
 
 use egui::{Align2, FontId, Rect, RichText, Sense, Stroke, pos2, vec2};
+use polykrom_engine::Session;
+use polykrom_engine::doc::joints::JointKind;
 use serde_json::{Value, json};
-use solidcraft_engine::Session;
-use solidcraft_engine::doc::joints::JointKind;
 
 use crate::SolveApp;
 use crate::dialogs::{combo, form_row};

@@ -433,7 +433,7 @@ pub fn srgb(c: [f32; 3]) -> Color32 {
 
 /// Surface analysis colours, straight sRGB 0..1 as the shader takes them (exact, so they read
 /// the same as when they were literals in the WGSL). The light theme's are the headless default.
-pub use solidcraft_engine::render::AnalysisColors;
+pub use polykrom_engine::render::AnalysisColors;
 
 /// Colours for native viewport markers and the agent pointer. Command artwork uses the SVG palette.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -807,7 +807,7 @@ impl Tokens {
 
 /// How a physical material looks (the default appearance follows the material).
 pub fn material_color(name: &str) -> Option<Color32> {
-    solidcraft_engine::doc::material_color(name).map(|[r, g, b]| Color32::from_rgb(r, g, b))
+    polykrom_engine::doc::material_color(name).map(|[r, g, b]| Color32::from_rgb(r, g, b))
 }
 
 /// Switch themes (the visuals follow on the next [`apply`]).

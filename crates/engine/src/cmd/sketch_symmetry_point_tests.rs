@@ -1,9 +1,9 @@
 //! Symmetry about a point (#1075): the origin (or any sketch point) picked as the third entity,
 //! or given as `point`. Each pair is joined by a construction line the point is the midpoint of.
 
+use polykrom_sketch::{ConstraintKind, Sketch};
 use serde_json::{Value, json};
 use solidcraft_geom::Vec2;
-use solidcraft_sketch::{ConstraintKind, Sketch};
 
 use crate::Session;
 

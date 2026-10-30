@@ -1,9 +1,9 @@
 //! Scalar local libraries: inspect/export files and copy exact revisions into a design.
 use super::CommandSpec;
 use crate::{Result, Session, params::bad};
+use polykrom_io::catalog::{Catalog, Definition, Provenance};
 use serde::Deserialize;
 use serde_json::{Value, json};
-use solidcraft_io::catalog::{Catalog, Definition, Provenance};
 
 pub static COMMANDS: &[CommandSpec] = &[
     CommandSpec::new("library.inspect", "Inspect Local Library", inspect).icon("inspect").noundo().doc_only()
@@ -88,7 +88,7 @@ fn path(cmd: &str, value: &str) -> Result<()> {
     if value.is_empty() || value.len() > 4096 || value.chars().any(char::is_control) {
         return Err(bad(cmd, "invalid library path"));
     }
-    solidcraft_io::vfs::check(value).map_err(|e| bad(cmd, e.to_string()))
+    polykrom_io::vfs::check(value).map_err(|e| bad(cmd, e.to_string()))
 }
 fn nested(s: &mut Session, id: &str, p: &Value) -> Result<Value> {
     crate::find_command(id).ok_or_else(|| bad("library.apply", "required assignment command is unavailable"))?.run_nested(s, p)
@@ -111,15 +111,15 @@ fn export(s: &mut Session, p: &Value) -> Result<Value> {
     let bytes = catalog.encode().map_err(|e| bad(cmd, e.to_string()))?;
     #[cfg(not(target_arch = "wasm32"))]
     let result = if request.overwrite {
-        solidcraft_io::write_atomic(std::path::Path::new(&request.path), &bytes, false)
+        polykrom_io::write_atomic(std::path::Path::new(&request.path), &bytes, false)
     } else {
-        solidcraft_io::safe_write::create_atomic(std::path::Path::new(&request.path), &bytes)
+        polykrom_io::safe_write::create_atomic(std::path::Path::new(&request.path), &bytes)
     };
     #[cfg(target_arch = "wasm32")]
-    let result = if !request.overwrite && solidcraft_io::vfs::exists(&request.path) {
+    let result = if !request.overwrite && polykrom_io::vfs::exists(&request.path) {
         Err(std::io::Error::new(std::io::ErrorKind::AlreadyExists, "library file already exists"))
     } else {
-        solidcraft_io::vfs::write(&request.path, &bytes)
+        polykrom_io::vfs::write(&request.path, &bytes)
     };
     result.map_err(|e| bad(cmd, format!("could not export library: {e}")))?;
     Ok(json!({"path":request.path,"entries":catalog.entries.len(),"bytes":bytes.len(),"catalog":catalog}))

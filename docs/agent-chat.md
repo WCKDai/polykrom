@@ -327,7 +327,7 @@ A scripted test agent is in the source tree. It makes a block, rounds it and mea
 no model behind it:
 
 ```sh
-cargo build --release -p solidcraft-ui-egui --example acp_test_agent
+cargo build --release -p polykrom-ui-egui --example acp_test_agent
 ```
 
 Then add it under Preferences → AI → **Add agent… → Custom command** with the path of

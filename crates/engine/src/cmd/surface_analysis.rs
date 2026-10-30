@@ -135,7 +135,7 @@ fn continuity(s: &mut Session, p: &Value) -> Result<Value> {
     let picks = edge_picks(p)?;
     let st = s.world_state();
     let named = str_(p, "body");
-    let candidates: Vec<&solidcraft_doc::ModelBody> = match named {
+    let candidates: Vec<&polykrom_doc::ModelBody> = match named {
         Some(name) => vec![st.body(name).ok_or_else(|| bad(cmd, format!("no body `{name}`")))?],
         None => st.bodies.iter().filter(|b| s.body_visible(&b.name)).collect(),
     };
@@ -145,7 +145,7 @@ fn continuity(s: &mut Session, p: &Value) -> Result<Value> {
     if candidates.len() > MAX_BODIES {
         return Err(bad(cmd, format!("more than {MAX_BODIES} bodies are shown: name the `body` to analyse")));
     }
-    let mut targets: Vec<(&solidcraft_doc::ModelBody, Vec<usize>)> = Vec::new();
+    let mut targets: Vec<(&polykrom_doc::ModelBody, Vec<usize>)> = Vec::new();
     if picks.is_empty() {
         targets.extend(candidates.into_iter().map(|b| (b, Vec::new())));
     } else {

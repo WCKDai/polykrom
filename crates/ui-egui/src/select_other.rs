@@ -19,9 +19,9 @@
 
 use crate::ui_kit::{Container, Surface};
 use egui::{Align2, FontId, Pos2, Rect, Sense, pos2, vec2};
+use polykrom_engine::Sel;
+use polykrom_engine::sketch::CurveKind;
 use serde_json::{Value, json};
-use solidcraft_engine::Sel;
-use solidcraft_engine::sketch::CurveKind;
 use std::hash::{Hash, Hasher};
 
 use crate::SolveApp;
@@ -186,7 +186,7 @@ fn sketch_name(app: &SolveApp, sketch: u64) -> String {
 }
 
 /// "Line 3" (its kind and number), with what kind of geometry it is when that matters.
-fn curve_label(sk: &solidcraft_engine::sketch::Sketch, id: &str) -> String {
+fn curve_label(sk: &polykrom_engine::sketch::Sketch, id: &str) -> String {
     if let Some((i, c)) = sk.curves.iter().enumerate().find(|(_, c)| c.id == id) {
         let kind = curve_kind_name(&c.kind);
         let n = id_number(id).unwrap_or_else(|| sk.curves.iter().take(i + 1).filter(|x| curve_kind_name(&x.kind) == kind).count() as u64);
@@ -205,7 +205,7 @@ fn curve_label(sk: &solidcraft_engine::sketch::Sketch, id: &str) -> String {
 }
 
 /// "Point (arc 2 centre)": the role it plays in the first curve that uses it.
-fn point_label(sk: &solidcraft_engine::sketch::Sketch, id: &str) -> String {
+fn point_label(sk: &polykrom_engine::sketch::Sketch, id: &str) -> String {
     let Some(pi) = sk.points.iter().position(|p| p.id == id) else { return id.to_string() };
     let role = sk.curves.iter().find_map(|c| {
         let name = format!("{} {}", curve_kind_name(&c.kind).to_lowercase(), id_number(&c.id).unwrap_or(0));
@@ -233,7 +233,7 @@ fn point_label(sk: &solidcraft_engine::sketch::Sketch, id: &str) -> String {
 pub fn label(app: &SolveApp, sel: &Sel) -> String {
     let st = app.session.world_state();
     let in_sketch =
-        |sketch: u64, f: &dyn Fn(&solidcraft_engine::sketch::Sketch) -> String| st.sketch(sketch).map(|ss| f(&ss.sketch)).unwrap_or_default();
+        |sketch: u64, f: &dyn Fn(&polykrom_engine::sketch::Sketch) -> String| st.sketch(sketch).map(|ss| f(&ss.sketch)).unwrap_or_default();
     match sel {
         Sel::SketchPoint { id } => app.session.active_sketch.map(|s| in_sketch(s, &|sk| point_label(sk, id))).unwrap_or_else(|| id.clone()),
         Sel::SketchCurve { id } => app.session.active_sketch.map(|s| in_sketch(s, &|sk| curve_label(sk, id))).unwrap_or_else(|| id.clone()),

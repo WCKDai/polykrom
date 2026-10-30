@@ -1,8 +1,8 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use crate::Session;
+use polykrom_doc::{Document, FeatureKind, RevolveConvention};
 use serde_json::{Value, json};
-use solidcraft_doc::{Document, FeatureKind, RevolveConvention};
 use solidcraft_geom::Vec3;
 use std::f64::consts::{FRAC_PI_2, PI, SQRT_2};
 
@@ -149,7 +149,7 @@ fn extent_handle_angles_match_new_and_legacy_material() {
     let ss = &state.sketches[0];
     let regions = vec![ss.profiles[0].region.clone()];
     for convention in [RevolveConvention::SketchNormal, RevolveConvention::LegacyAxisStart] {
-        let extent = solidcraft_doc::revolve_extent_with_convention(
+        let extent = polykrom_doc::revolve_extent_with_convention(
             &state,
             &ss.plane,
             &regions,
@@ -327,7 +327,7 @@ fn construction_axis_revolve_follows_the_axis() {
     profile(&mut s, false);
     run(&mut s, "solid.revolve", json!({"sketch":"Profile","axis":"Axis1","angle":"180 deg","operation":"new","profiles":[0],"name":"Turn"}));
     let turn = s.doc.find_feature("Turn").unwrap();
-    assert!(matches!(&turn.kind, FeatureKind::Revolve { axis: solidcraft_doc::AxisRef::Construction { name }, .. } if name == "Axis1"));
+    assert!(matches!(&turn.kind, FeatureKind::Revolve { axis: polykrom_doc::AxisRef::Construction { name }, .. } if name == "Axis1"));
     let reopened = Document::from_json(&s.doc.to_json()).unwrap();
     assert_eq!(reopened.find_feature("Turn").unwrap().kind, turn.kind);
     let volume = |s: &Session| solidcraft_kernel::measure(&s.model.state().bodies[0].body).unwrap().volume;

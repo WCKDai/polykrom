@@ -26,7 +26,7 @@ fn text_move_updates_the_source_once_preserves_ids_and_roundtrips() {
     assert_eq!((text.as_str(), *height, font), ("II", 10.0, &None));
     assert_eq!(s.undo.len(), undo + 1);
     let moved = s.doc.to_json();
-    let reopened = solidcraft_doc::Document::from_json(&moved).unwrap();
+    let reopened = polykrom_doc::Document::from_json(&moved).unwrap();
     assert_eq!(reopened.to_json(), moved);
     run(&mut s, "edit.undo", json!({}));
     assert_eq!(s.doc.to_json(), before);
@@ -120,17 +120,17 @@ fn text_move_in_a_rotated_component_preserves_font_and_local_coordinates() {
     run(&mut s, "occurrence.move", json!({"occurrence":component["occurrence"],"translate":[30,20,10],"axis":[0,0,1],"angle":90}));
     let created = run(&mut s, "sketch.create", json!({"plane":"XY"}));
     let sid = created["sketch"].as_u64().unwrap();
-    let result = run(&mut s, "sketch.text", json!({"text":"I","at":[0,0],"height":10,"font":solidcraft_sketch::DEFAULT_FONT_FAMILY}));
+    let result = run(&mut s, "sketch.text", json!({"text":"I","at":[0,0],"height":10,"font":polykrom_sketch::DEFAULT_FONT_FAMILY}));
     let link = result["link"].as_str().unwrap();
     let before = s.world_state().sketch(sid).unwrap().plane;
     run(&mut s, "sketch.move", json!({"entities":[result["curves"][0]],"translate":[5,2]}));
     let sk = s.doc.sketch(sid).unwrap();
     let LinkSource::Text { at, font, .. } = &sk.link(link).unwrap().source else { panic!() };
     assert!(at.dist(Vec2::new(5.0, 2.0)) < 1e-9);
-    assert_eq!(font.as_deref(), Some(solidcraft_sketch::DEFAULT_FONT_FAMILY));
+    assert_eq!(font.as_deref(), Some(polykrom_sketch::DEFAULT_FONT_FAMILY));
     let state = s.world_state();
     assert!(state.sketch(sid).unwrap().plane.to_world(*at).dist(before.to_world(Vec2::new(5.0, 2.0))) < 1e-9);
-    let reopened = Session::new(solidcraft_doc::Document::from_json(&s.doc.to_json()).unwrap());
+    let reopened = Session::new(polykrom_doc::Document::from_json(&s.doc.to_json()).unwrap());
     assert_eq!(reopened.doc.sketch(sid).unwrap().link(link).unwrap().source, sk.link(link).unwrap().source);
 }
 
@@ -186,7 +186,7 @@ fn text_on_a_path_follows_its_curve_when_the_curve_moves() {
     assert!(lo.x > 0.0 && lo.y > 4.0 && lo.y < 6.0, "{lo:?}");
     // A design with styled text reads back the same.
     let saved = s.doc.to_json();
-    assert_eq!(solidcraft_doc::Document::from_json(&saved).unwrap().to_json(), saved);
+    assert_eq!(polykrom_doc::Document::from_json(&saved).unwrap().to_json(), saved);
 }
 
 #[test]
@@ -208,7 +208,7 @@ fn text_style_parameters_are_checked() {
     run(&mut s, "sketch.edit_text", json!({"link":link,"italic":true,"align":"right","letter_spacing":1.5,"line_spacing":1.2}));
     let LinkSource::Text { style, text, .. } = &s.doc.sketch(1).unwrap().link(&link).unwrap().source else { panic!() };
     assert_eq!(text, "II");
-    assert!(style.italic && style.align == solidcraft_sketch::TextAlign::Right && style.letter_spacing == 1.5 && style.line_spacing == 1.2);
+    assert!(style.italic && style.align == polykrom_sketch::TextAlign::Right && style.letter_spacing == 1.5 && style.line_spacing == 1.2);
     // Left out, a style stays.
     run(&mut s, "sketch.edit_text", json!({"link":link,"text":"I"}));
     let LinkSource::Text { style, .. } = &s.doc.sketch(1).unwrap().link(&link).unwrap().source else { panic!() };

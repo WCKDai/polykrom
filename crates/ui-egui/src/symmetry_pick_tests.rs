@@ -1,7 +1,7 @@
 //! The Symmetry tool's third pick may be the origin point or an origin axis (#1075).
 
+use polykrom_engine::geom::Vec2;
 use serde_json::json;
-use solidcraft_engine::geom::Vec2;
 
 use crate::scenario::Harness;
 

@@ -7,11 +7,11 @@
 
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
+use polykrom_doc::joints::{self, JointKind};
+use polykrom_doc::{Document, IDENTITY, Mat, apply_point, apply_vector, mat_mul};
+use polykrom_sketch::linalg;
 use serde_json::{Value, json};
-use solidcraft_doc::joints::{self, JointKind};
-use solidcraft_doc::{Document, IDENTITY, Mat, apply_point, apply_vector, mat_mul};
 use solidcraft_geom::{Vec2, Vec3};
-use solidcraft_sketch::linalg;
 
 use super::CommandSpec;
 use super::joints::occurrence_id;

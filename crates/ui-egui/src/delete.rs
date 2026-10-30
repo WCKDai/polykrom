@@ -20,7 +20,7 @@ pub struct Pending {
 /// What Delete acts on now: the selection (bodies not locked), plus the components picked in
 /// the browser (their occurrences).
 pub fn selection_params(app: &SolveApp) -> Value {
-    use solidcraft_engine::Sel;
+    use polykrom_engine::Sel;
     let mut items: Vec<Sel> = Vec::new();
     for s in app.session.selection.iter().filter(|s| !matches!(s, Sel::Body { name } if app.ui.locked_bodies.contains(name))) {
         // A MidPoint glyph shared by lines whose midpoints meet removes every constraint it

@@ -147,14 +147,14 @@ mod tests {
             .doc
             .features
             .iter()
-            .find(|feature| feature.name == "Boss" && matches!(feature.kind, solidcraft_doc::FeatureKind::Sketch { .. }))
+            .find(|feature| feature.name == "Boss" && matches!(feature.kind, polykrom_doc::FeatureKind::Sketch { .. }))
             .unwrap()
             .id;
         let bore = session
             .doc
             .features
             .iter()
-            .find(|feature| feature.name == "Bore" && matches!(feature.kind, solidcraft_doc::FeatureKind::Sketch { .. }))
+            .find(|feature| feature.name == "Bore" && matches!(feature.kind, polykrom_doc::FeatureKind::Sketch { .. }))
             .unwrap()
             .id;
         session.execute("parameters.change", &serde_json::json!({"name":"thickness","expression":"12 mm"})).unwrap();
@@ -169,7 +169,7 @@ mod tests {
         assert!(!plate.contains(solidcraft_geom::Vec3::new(40., 25., 24.)));
         assert!(!plate.contains(solidcraft_geom::Vec3::new(40., 25., 2.)));
         assert!(plate.contains(solidcraft_geom::Vec3::new(40., 35., 2.)));
-        let reopened = crate::Session::new(solidcraft_doc::Document::from_json(&session.doc.to_json()).unwrap());
+        let reopened = crate::Session::new(polykrom_doc::Document::from_json(&session.doc.to_json()).unwrap());
         assert!((reopened.model.state().sketch(bore).unwrap().plane.origin.z - 26.).abs() < 1e-6);
         let reopened_world = reopened.world_state();
         let reopened_plate = reopened_world.body("Plate").unwrap().mesh();

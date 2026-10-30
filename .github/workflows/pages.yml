@@ -57,7 +57,7 @@ jobs:
           SOLIDCRAFT_GPU: software
         run: cargo xtask book
       - name: Build the web app
-        working-directory: apps/solidcraft-web
+        working-directory: apps/polykrom-web
         run: trunk build --release --public-url ./
       - name: Test the web app offline and across an update (headless Chrome)
         run: cargo xtask web-offline-test --site dist/web

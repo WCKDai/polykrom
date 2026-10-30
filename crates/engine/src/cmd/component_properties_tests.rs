@@ -108,7 +108,7 @@ fn compact_exponentially_instanced_assembly_refuses_partial_totals() {
     for _ in 0..17 {
         let parent = s.active_component;
         let component = s.doc_mut().add_component(None, parent).unwrap();
-        last_occurrence = s.doc_mut().add_occurrence(component, parent, solidcraft_doc::IDENTITY).unwrap();
+        last_occurrence = s.doc_mut().add_occurrence(component, parent, polykrom_doc::IDENTITY).unwrap();
         s.active_component = component;
     }
     for command in ["component.properties", "occurrence.properties"] {
@@ -167,7 +167,7 @@ fn user_defined_material_is_edited_renamed_and_deleted() {
     assert_eq!(created["appearance"]["color"], "#1c1c1c", "{created}");
     let list = run(&mut s, "material.list", json!({}));
     let materials = list["materials"].as_array().unwrap();
-    assert_eq!(materials.len(), solidcraft_doc::MATERIALS.len() + 1);
+    assert_eq!(materials.len(), polykrom_doc::MATERIALS.len() + 1);
     let rubber = materials.last().unwrap();
     assert_eq!((rubber["name"].as_str(), rubber["user"].as_bool()), (Some("Rubber"), Some(true)));
 
@@ -241,7 +241,7 @@ fn user_defined_material_survives_save_and_reopen() {
     run(&mut s, "material.create", json!({"name": "Leather", "density_g_cm3": 0.86, "appearance": "Rubber - Black"}));
     run(&mut s, "material.assign", json!({"bodies": ["Tab"], "material": "Leather"}));
     run(&mut s, "file.save", json!({"path": path}));
-    assert!(s.doc.to_json().contains(&format!("\"{}\"", solidcraft_doc::format::format_string(solidcraft_doc::format::FORMAT))));
+    assert!(s.doc.to_json().contains(&format!("\"{}\"", polykrom_doc::format::format_string(polykrom_doc::format::FORMAT))));
 
     run(&mut s, "file.new", json!({}));
     run(&mut s, "doc.open", json!({"path": path}));
@@ -278,13 +278,13 @@ fn designs_without_user_materials_open_unchanged() {
     legacy["materials"] = json!({"Plate": "Broken"});
     std::fs::write(&path, serde_json::to_vec(&legacy).unwrap()).unwrap();
     run(&mut s, "doc.open", json!({"path": path}));
-    close(&mass(&mut s), solidcraft_doc::DEFAULT_DENSITY);
+    close(&mass(&mut s), polykrom_doc::DEFAULT_DENSITY);
     // #4783: it reads as the material it weighs; the file's assignment is kept as it is.
     let props = run(&mut s, "component.properties", json!({"component": "root"}));
     assert_eq!(props["bodies"][0]["material"], "Default", "{props}");
     let measured = run(&mut s, "inspect.measure", json!({}));
     assert_eq!(measured["bodies"][0]["material"], "Default", "{measured}");
-    close(&measured["bodies"][0]["density_g_cm3"], solidcraft_doc::DEFAULT_DENSITY);
+    close(&measured["bodies"][0]["density_g_cm3"], polykrom_doc::DEFAULT_DENSITY);
     assert_eq!(s.doc.materials.get("Plate").map(String::as_str), Some("Broken"));
     assert_eq!(s.doc.material_look("Broken").map(|l| l.opacity), Some(1.0));
     // Assigning the default material, in any case, clears the damaged assignment.

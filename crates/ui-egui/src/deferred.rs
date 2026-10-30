@@ -4,11 +4,11 @@
 //! after the marker (a line of text cut into a block), each of these ran that feature's boolean
 //! on the window thread, and the window froze until it was done.
 //!
-//! The command is evaluated on a copy of the session ([`solidcraft_engine::Session::ahead`]),
+//! The command is evaluated on a copy of the session ([`polykrom_engine::Session::ahead`]),
 //! which leaves what it computes in the evaluation cache the session shares. Done within the
 //! app's wait ([`crate::dialogs::APPLY_AT_ONCE`]), the command just runs; otherwise the window
 //! goes on, saying it computes, and the command runs for real once the evaluation is in, taking
-//! the features it evaluated ([`solidcraft_engine::Session::prime`]) rather than computing them
+//! the features it evaluated ([`polykrom_engine::Session::prime`]) rather than computing them
 //! again. Commands asked for meanwhile wait their turn; a marker moved again
 //! replaces the move still waiting, so a drag computes where it ends rather than every slot it
 //! crossed.
@@ -25,9 +25,9 @@ use crate::SolveApp;
 
 /// A command computing off the window thread.
 pub struct Deferred {
-    done: std::sync::mpsc::Receiver<Option<solidcraft_engine::Evaluated>>,
+    done: std::sync::mpsc::Receiver<Option<polykrom_engine::Evaluated>>,
     /// What it evaluated, once in (`Some(None)`: it failed, or its thread is gone).
-    evaluated: Option<Option<solidcraft_engine::Evaluated>>,
+    evaluated: Option<Option<polykrom_engine::Evaluated>>,
     /// When it started (ms).
     pub(crate) started: f64,
     command: (String, Value),
@@ -53,7 +53,7 @@ enum Start {
     /// It computes off the window thread.
     Later(Deferred),
     /// It runs now, with what was evaluated for it ahead (if anything).
-    Now(Option<solidcraft_engine::Evaluated>),
+    Now(Option<polykrom_engine::Evaluated>),
 }
 
 /// A delete's check computing off the window thread: each check command's reply, in order.
@@ -132,7 +132,7 @@ impl SolveApp {
     }
 
     /// Run a command for real, taking the features `evaluated` computed for it ahead.
-    fn run_evaluated(&mut self, id: &str, params: Value, evaluated: Option<&solidcraft_engine::Evaluated>) -> Result<Value, String> {
+    fn run_evaluated(&mut self, id: &str, params: Value, evaluated: Option<&polykrom_engine::Evaluated>) -> Result<Value, String> {
         if let Some(evaluated) = evaluated {
             self.session.prime(evaluated);
         }

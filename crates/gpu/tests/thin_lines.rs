@@ -3,15 +3,15 @@
 //! falls between two rows, so such lines came and went as the view zoomed. Skipped, with the
 //! reason printed, without a GPU adapter (`SOLIDCRAFT_REQUIRE_GPU=1` makes that a failure).
 
-use solidcraft_engine::geom::Vec3;
-use solidcraft_engine::render::{Camera, Rgb, Scene, SceneLine, StandardView};
-use solidcraft_gpu::GpuError;
-use solidcraft_gpu::capture::Capturer;
+use polykrom_engine::geom::Vec3;
+use polykrom_engine::render::{Camera, Rgb, Scene, SceneLine, StandardView};
+use polykrom_gpu::GpuError;
+use polykrom_gpu::capture::Capturer;
 
 /// Pictures drawn with one sample per pixel: with 4× multisampling a thin line covers some
 /// samples wherever it falls, which hides the fault.
 fn capturer() -> Option<&'static Capturer> {
-    static SINGLE: std::sync::OnceLock<solidcraft_gpu::Result<Capturer>> = std::sync::OnceLock::new();
+    static SINGLE: std::sync::OnceLock<polykrom_gpu::Result<Capturer>> = std::sync::OnceLock::new();
     match SINGLE.get_or_init(Capturer::headless_single_sample).as_ref() {
         Ok(c) => {
             assert_eq!(c.samples(), 1);

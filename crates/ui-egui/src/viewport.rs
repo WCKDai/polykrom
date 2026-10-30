@@ -4,12 +4,12 @@
 use crate::fonts::RichTextExt as _;
 use crate::ui_kit::{Container, Surface};
 use egui::{Align2, Color32, FontId, Pos2, Rect, Sense, Shape, Stroke, pos2, vec2};
+use polykrom_engine::Sel;
+use polykrom_engine::geom::{Vec2, Vec3};
+use polykrom_engine::render::{Camera, Mat4, Rgb};
+use polykrom_engine::sketch::CurveKind;
+use polykrom_engine::view::{GridPlane, colors, grid_plane, grid_step, sketch_lines_with_sampler};
 use serde_json::json;
-use solidcraft_engine::Sel;
-use solidcraft_engine::geom::{Vec2, Vec3};
-use solidcraft_engine::render::{Camera, Mat4, Rgb};
-use solidcraft_engine::sketch::CurveKind;
-use solidcraft_engine::view::{GridPlane, colors, grid_plane, grid_step, sketch_lines_with_sampler};
 use std::hash::{Hash, Hasher};
 
 use crate::gpu::{Frame, GpuScene, GpuTarget, SceneSlot, ViewportCallback};
@@ -77,7 +77,7 @@ pub struct ViewportState {
     mesh_bounds: std::sync::Mutex<MeshBounds>,
     /// Each shown body mesh's section index for the cut's normal (the mesh held, so its address
     /// stays its own): a Section Analysis dragged along its normal cuts through it.
-    section_index: std::sync::Mutex<Vec<(std::sync::Arc<solidcraft_engine::geom::Mesh>, std::sync::Arc<solidcraft_engine::view::SectionIndex>)>>,
+    section_index: std::sync::Mutex<Vec<(std::sync::Arc<polykrom_engine::geom::Mesh>, std::sync::Arc<polykrom_engine::view::SectionIndex>)>>,
     /// Each body mesh's picking index (made the first time a pick reaches the body), kept while
     /// the mesh is part of the world state.
     pub(crate) pick_index: crate::pick_index::PickIndexes,
@@ -304,17 +304,17 @@ pub fn projection(app: &SolveApp, rect: Rect) -> Proj {
 /// Sketches drawn in the viewport: the active one, and finished ones not yet used by a feature.
 pub(crate) fn visible_sketches(app: &SolveApp) -> Vec<u64> {
     let st = crate::open_meshing::shown_world(app);
-    st.sketches.iter().filter(|s| solidcraft_engine::view::sketch_drawn(&app.session, s.feature, app.ui.show_sketches)).map(|s| s.feature).collect()
+    st.sketches.iter().filter(|s| polykrom_engine::view::sketch_drawn(&app.session, s.feature, app.ui.show_sketches)).map(|s| s.feature).collect()
 }
 
 /// What Home, Fit and the orbit pivot frame: the bodies and sketches shown now, where they are
-/// now (see [`solidcraft_engine::view::visible_bounds`]).
-pub fn view_bounds(app: &SolveApp) -> solidcraft_engine::geom::Aabb3 {
+/// now (see [`polykrom_engine::view::visible_bounds`]).
+pub fn view_bounds(app: &SolveApp) -> polykrom_engine::geom::Aabb3 {
     // Bodies still being meshed after an open frame the view by their outlines.
     if crate::open_meshing::framing(app) {
-        return solidcraft_engine::view::unmeshed_bounds(&app.session, app.ui.show_sketches);
+        return polykrom_engine::view::unmeshed_bounds(&app.session, app.ui.show_sketches);
     }
-    solidcraft_engine::view::visible_bounds(&app.session, app.ui.show_sketches)
+    polykrom_engine::view::visible_bounds(&app.session, app.ui.show_sketches)
 }
 
 fn scene_key(app: &SolveApp) -> u64 {
@@ -324,7 +324,7 @@ fn scene_key(app: &SolveApp) -> u64 {
     app.ui.show_grid.hash(&mut h);
     app.ui.visual_style.hash(&mut h);
     app.ui.ground_shadow.hash(&mut h);
-    solidcraft_engine::doc::display_quality::current().hash(&mut h);
+    polykrom_engine::doc::display_quality::current().hash(&mut h);
     lod_generation(app).hash(&mut h);
     app.viewport.mesh_lods.generation().hash(&mut h);
     // The section plane (its cut outlines are part of the model scene).
@@ -391,7 +391,7 @@ fn sketch_color(t: &Tokens, c: Rgb) -> [u8; 4] {
 }
 
 /// With a component active, bodies outside it are drawn faded.
-fn body_faded(app: &SolveApp, b: &solidcraft_engine::doc::ModelBody, active_bodies: &Option<Vec<String>>) -> bool {
+fn body_faded(app: &SolveApp, b: &polykrom_engine::doc::ModelBody, active_bodies: &Option<Vec<String>>) -> bool {
     let s = &app.session;
     if let Some(names) = active_bodies {
         !names.contains(&b.name)
@@ -440,22 +440,18 @@ const DRAW_DRAG_MIN: f32 = 24.0;
 /// body or face) are drawn from their plans where the device evaluates them; faded and
 /// see-through ones (sorted and blended per triangle) are built here. A body seen up close is
 /// drawn from its refined plan ([`crate::display_lod`]).
-fn drawn_plan(
-    app: &SolveApp,
-    b: &solidcraft_engine::doc::ModelBody,
-    opaque: bool,
-) -> Option<std::sync::Arc<solidcraft_engine::geom::tess::TessPlan>> {
+fn drawn_plan(app: &SolveApp, b: &polykrom_engine::doc::ModelBody, opaque: bool) -> Option<std::sync::Arc<polykrom_engine::geom::tess::TessPlan>> {
     let shaded = app.ui.visual_style != 2;
     (shaded && opaque && app.viewport.gpu.is_some_and(|g| g.tess))
         .then(|| refined(app, b).map(|(plan, _)| plan).or_else(|| b.display_plan()))
         .flatten()
-        .filter(|plan| plan.vertex_count() <= solidcraft_gpu::MAX_BATCH)
+        .filter(|plan| plan.vertex_count() <= polykrom_gpu::MAX_BATCH)
 }
 
 /// The refined plan and mesh `b` is drawn from, when the view has it drawn finer than the chosen
 /// display quality (#1320).
-fn refined(app: &SolveApp, b: &solidcraft_engine::doc::ModelBody) -> crate::display_lod::Refined {
-    app.viewport.lod.lock().ok()?.refined(b, solidcraft_engine::doc::display_quality::current())
+fn refined(app: &SolveApp, b: &polykrom_engine::doc::ModelBody) -> crate::display_lod::Refined {
+    app.viewport.lod.lock().ok()?.refined(b, polykrom_engine::doc::display_quality::current())
 }
 
 /// Changes whenever a body's refinement changes (the scene and highlight keys).
@@ -469,9 +465,9 @@ fn lod_generation(app: &SolveApp) -> u64 {
 /// and shimmers.
 fn shown_mesh(
     app: &SolveApp,
-    b: &solidcraft_engine::doc::ModelBody,
+    b: &polykrom_engine::doc::ModelBody,
     active_bodies: &Option<Vec<String>>,
-) -> std::sync::Arc<solidcraft_engine::geom::Mesh> {
+) -> std::sync::Arc<polykrom_engine::geom::Mesh> {
     if let Some((_, mesh)) = refined(app, b) {
         // Refined: faces drawn from the refined plan on the GPU or built from its mesh here.
         return mesh;
@@ -493,8 +489,8 @@ fn shown_mesh(
 /// (#1320), the reference mesh at Normal display quality, else the plan's mesh at the chosen
 /// quality (finer or coarser faces and edges alike), falling back to the reference mesh when the
 /// body has no plan.
-fn drawn_mesh(app: &SolveApp, b: &solidcraft_engine::doc::ModelBody) -> std::sync::Arc<solidcraft_engine::geom::Mesh> {
-    use solidcraft_engine::doc::display_quality::{DisplayQuality, current};
+fn drawn_mesh(app: &SolveApp, b: &polykrom_engine::doc::ModelBody) -> std::sync::Arc<polykrom_engine::geom::Mesh> {
+    use polykrom_engine::doc::display_quality::{DisplayQuality, current};
     if let Some((_, mesh)) = refined(app, b) {
         return mesh;
     }
@@ -508,7 +504,7 @@ fn update_refinement(app: &mut SolveApp, ctx: &egui::Context, proj: &Proj) {
     if app.viewport.gpu.is_none() || !crate::display_lod::enabled() {
         return; // The CPU picture draws the reference mesh.
     }
-    let q = solidcraft_engine::doc::display_quality::current();
+    let q = polykrom_engine::doc::display_quality::current();
     // Nothing to choose again while the view, the model and the planning stand still.
     let mut h = std::collections::hash_map::DefaultHasher::new();
     scene_key(app).hash(&mut h);
@@ -567,7 +563,7 @@ fn update_refinement(app: &mut SolveApp, ctx: &egui::Context, proj: &Proj) {
 /// (held, so no other mesh can take their addresses while the block is kept).
 pub(crate) struct CachedBlock {
     bytes: std::sync::Arc<crate::gpu::BlockBytes>,
-    meshes: Vec<std::sync::Arc<solidcraft_engine::geom::Mesh>>,
+    meshes: Vec<std::sync::Arc<polykrom_engine::geom::Mesh>>,
     /// Each body's triangles in `bytes.tris`, by body name: whole-body highlights draw those
     /// vertices again instead of building a copy of them on the CPU.
     ranges: Vec<(String, std::ops::Range<u32>)>,
@@ -576,11 +572,11 @@ pub(crate) struct CachedBlock {
 /// [`ViewportState::mesh_bounds`]: each box by the shared mesh it was measured on (held, so its
 /// address stays its own) and the placement that moved it ([`ModelBody::mesh_in_place`]).
 ///
-/// [`ModelBody::mesh_in_place`]: solidcraft_engine::doc::ModelBody::mesh_in_place
-type MeshBounds = std::collections::HashMap<(usize, [u64; 16]), (std::sync::Arc<solidcraft_engine::geom::Mesh>, solidcraft_engine::geom::Aabb3)>;
+/// [`ModelBody::mesh_in_place`]: polykrom_engine::doc::ModelBody::mesh_in_place
+type MeshBounds = std::collections::HashMap<(usize, [u64; 16]), (std::sync::Arc<polykrom_engine::geom::Mesh>, polykrom_engine::geom::Aabb3)>;
 
 /// [`ViewportState::instanced_tris`].
-type InstancedTris = std::collections::HashMap<usize, (std::sync::Arc<solidcraft_engine::geom::Mesh>, std::sync::Arc<crate::gpu::SharedTris>)>;
+type InstancedTris = std::collections::HashMap<usize, (std::sync::Arc<polykrom_engine::geom::Mesh>, std::sync::Arc<crate::gpu::SharedTris>)>;
 
 /// A body alone is drawn as an instance of its triangles (shared vertices, indexed) from this many
 /// triangles: a large imported mesh. Smaller ones are drawn so only when placed more than once.
@@ -588,7 +584,7 @@ pub(crate) const INSTANCE_ALONE: usize = 50_000;
 
 /// Shared vertices made ahead, off the window thread ([`warm_shared_tris`]), by mesh address
 /// (the mesh held, so its address stays its own), until a scene takes them.
-static WARMED: std::sync::Mutex<Vec<(std::sync::Arc<solidcraft_engine::geom::Mesh>, std::sync::Arc<crate::gpu::SharedTris>)>> =
+static WARMED: std::sync::Mutex<Vec<(std::sync::Arc<polykrom_engine::geom::Mesh>, std::sync::Arc<crate::gpu::SharedTris>)>> =
     std::sync::Mutex::new(Vec::new());
 /// Most meshes kept warmed and not taken yet (a design opened and closed before it was drawn).
 const MAX_WARMED: usize = 8;
@@ -597,7 +593,7 @@ const MAX_WARMED: usize = 8;
 /// background mesher, after a file is opened or inserted): welding a scanned part takes a
 /// noticeable part of a second, which the window thread would otherwise spend on the first frame
 /// that shows it.
-pub(crate) fn warm_shared_tris(mesh: &std::sync::Arc<solidcraft_engine::geom::Mesh>) {
+pub(crate) fn warm_shared_tris(mesh: &std::sync::Arc<polykrom_engine::geom::Mesh>) {
     if mesh.triangles.len() < INSTANCE_ALONE || WARMED.lock().map_or(true, |w| w.iter().any(|(m, _)| std::sync::Arc::ptr_eq(m, mesh))) {
         return;
     }
@@ -611,7 +607,7 @@ pub(crate) fn warm_shared_tris(mesh: &std::sync::Arc<solidcraft_engine::geom::Me
 }
 
 /// The shared vertices made ahead for `mesh`, taken from the warmed ones.
-fn taken_shared_tris(mesh: &std::sync::Arc<solidcraft_engine::geom::Mesh>) -> Option<std::sync::Arc<crate::gpu::SharedTris>> {
+fn taken_shared_tris(mesh: &std::sync::Arc<polykrom_engine::geom::Mesh>) -> Option<std::sync::Arc<crate::gpu::SharedTris>> {
     let mut warmed = WARMED.lock().ok()?;
     let at = warmed.iter().position(|(m, _)| std::sync::Arc::ptr_eq(m, mesh))?;
     Some(warmed.remove(at).1)
@@ -622,13 +618,13 @@ struct BodyDraw {
     /// The body's name in the world state, for the highlight's lookup of its triangles.
     name: String,
     /// Its mesh where it stands, or (with `place`) the shared mesh `place` moves there.
-    mesh: std::sync::Arc<solidcraft_engine::geom::Mesh>,
+    mesh: std::sync::Arc<polykrom_engine::geom::Mesh>,
     /// The move from `mesh` to where the body stands, for a body drawn as an instance.
-    place: Option<solidcraft_engine::doc::Mat>,
+    place: Option<polykrom_engine::doc::Mat>,
     col: [u8; 4],
     faded: bool,
     opacity: f64,
-    face_looks: std::collections::HashMap<usize, solidcraft_engine::doc::appearance::Look>,
+    face_looks: std::collections::HashMap<usize, polykrom_engine::doc::appearance::Look>,
     /// Its faces are drawn elsewhere, from its plan on the GPU or as an instance of shared
     /// triangles (only its edges are built here).
     on_gpu: bool,
@@ -675,7 +671,7 @@ impl BodyDraw {
                 }
             }
         }
-        let at = |p: Vec3| self.place.as_ref().map_or(p, |m| solidcraft_engine::doc::apply_point(m, p)).to_f32();
+        let at = |p: Vec3| self.place.as_ref().map_or(p, |m| polykrom_engine::doc::apply_point(m, p)).to_f32();
         for (ei, e) in m.edges.iter().enumerate().filter(|_| edges) {
             if !m.edge_pickable(ei) || (shaded && !m.shaded_edge_visible(ei)) {
                 continue;
@@ -740,9 +736,9 @@ fn push_block(
 /// bodies (or large: [`INSTANCE_ALONE`]), and each body placed from them.
 struct Instances {
     /// Each candidate body's shared mesh and placement, by body name.
-    candidates: std::collections::HashMap<String, (std::sync::Arc<solidcraft_engine::geom::Mesh>, solidcraft_engine::doc::Mat)>,
+    candidates: std::collections::HashMap<String, (std::sync::Arc<polykrom_engine::geom::Mesh>, polykrom_engine::doc::Mat)>,
     /// The meshes drawn as instances, in the order their first placement came, by address.
-    meshes: Vec<(std::sync::Arc<solidcraft_engine::geom::Mesh>, crate::gpu::InstancedMesh)>,
+    meshes: Vec<(std::sync::Arc<polykrom_engine::geom::Mesh>, crate::gpu::InstancedMesh)>,
     kept: InstancedTris,
     lods: crate::mesh_lod::MeshLods,
 }
@@ -750,7 +746,7 @@ struct Instances {
 impl Instances {
     /// The shown bodies' shared meshes, keeping those more than one body is drawn from and large
     /// ones.
-    fn new(app: &SolveApp, shown: &[&solidcraft_engine::doc::ModelBody], shaded: bool) -> Instances {
+    fn new(app: &SolveApp, shown: &[&polykrom_engine::doc::ModelBody], shaded: bool) -> Instances {
         let kept = app.viewport.instanced_tris.lock().map(|mut k| std::mem::take(&mut *k)).unwrap_or_default();
         let mut candidates = std::collections::HashMap::new();
         if shaded {
@@ -771,10 +767,10 @@ impl Instances {
     /// `look`): its shared mesh and placement.
     fn place(
         &mut self,
-        b: &solidcraft_engine::doc::ModelBody,
+        b: &polykrom_engine::doc::ModelBody,
         col: [u8; 4],
         look: crate::gpu::InstanceLook,
-    ) -> Option<(std::sync::Arc<solidcraft_engine::geom::Mesh>, solidcraft_engine::doc::Mat)> {
+    ) -> Option<(std::sync::Arc<polykrom_engine::geom::Mesh>, polykrom_engine::doc::Mat)> {
         let (mesh, m) = self.candidates.get(&b.name)?.clone();
         let rows = [0, 1, 2].map(|r| [m[0][r] as f32, m[1][r] as f32, m[2][r] as f32, m[3][r] as f32]);
         let key = std::sync::Arc::as_ptr(&mesh) as usize;
@@ -819,9 +815,9 @@ impl Instances {
 /// without making the moved copy); `None` for a body drawn finer than its display quality.
 fn shared_mesh(
     app: &SolveApp,
-    b: &solidcraft_engine::doc::ModelBody,
-) -> Option<(std::sync::Arc<solidcraft_engine::geom::Mesh>, solidcraft_engine::doc::Mat)> {
-    use solidcraft_engine::doc::display_quality::{DisplayQuality, current};
+    b: &polykrom_engine::doc::ModelBody,
+) -> Option<(std::sync::Arc<polykrom_engine::geom::Mesh>, polykrom_engine::doc::Mat)> {
+    use polykrom_engine::doc::display_quality::{DisplayQuality, current};
     if refined(app, b).is_some() {
         return None;
     }
@@ -850,7 +846,7 @@ pub(crate) fn build_scene(app: &SolveApp) -> GpuScene {
     let mut made: std::collections::HashMap<u64, CachedBlock> = std::collections::HashMap::new();
     let mut run: Vec<BodyDraw> = Vec::new();
     let mut run_key = std::collections::hash_map::DefaultHasher::new();
-    let shown: Vec<&solidcraft_engine::doc::ModelBody> =
+    let shown: Vec<&polykrom_engine::doc::ModelBody> =
         st.bodies.iter().filter(|b| app.session.body_visible(&b.name) && !app.preview.effective_replaced().contains(&b.name)).collect();
     // Bodies drawn from the same triangles more than once (a part placed by many occurrences)
     // are drawn as instances of them: one copy of the triangles on the GPU, and none moved on
@@ -862,7 +858,7 @@ pub(crate) fn build_scene(app: &SolveApp) -> GpuScene {
         let col = if faded { c4(base.gamma_multiply(0.35)) } else { c4(base) };
         // Appearances: the body's opacity, and faces with looks of their own.
         let opacity = s.doc.model_body_opacity(b);
-        let face_looks: std::collections::HashMap<usize, solidcraft_engine::doc::appearance::Look> =
+        let face_looks: std::collections::HashMap<usize, polykrom_engine::doc::appearance::Look> =
             if shaded { s.doc.face_colors(b).into_iter().collect() } else { Default::default() };
         let opaque = !faded && opacity >= 0.999 && face_looks.values().all(|l| l.opacity >= 0.999);
         let planned = drawn_plan(app, b, opaque);
@@ -939,7 +935,7 @@ pub(crate) fn build_scene(app: &SolveApp) -> GpuScene {
             let mesh = b.mesh();
             let index = match kept.iter().position(|(m, i)| std::sync::Arc::ptr_eq(m, &mesh) && i.normal() == n) {
                 Some(k) => kept.swap_remove(k).1,
-                None => std::sync::Arc::new(solidcraft_engine::view::SectionIndex::new(&mesh, n)),
+                None => std::sync::Arc::new(polykrom_engine::view::SectionIndex::new(&mesh, n)),
             };
             for (a, c) in index.segments(&mesh, o) {
                 sc.line(a.to_f32(), c.to_f32(), col, 1.8, false);
@@ -967,8 +963,8 @@ pub(crate) fn build_scene(app: &SolveApp) -> GpuScene {
 /// The colour of a measured seam, one per verdict from the theme's `continuity` tokens: within
 /// every tolerance (G2), tangent with a curvature jump (G1), a crease (G0), and faces that do
 /// not meet.
-fn continuity_color(t: &Tokens, verdict: solidcraft_engine::kernel::SeamVerdict) -> Color32 {
-    use solidcraft_engine::kernel::SeamVerdict as V;
+fn continuity_color(t: &Tokens, verdict: polykrom_engine::kernel::SeamVerdict) -> Color32 {
+    use polykrom_engine::kernel::SeamVerdict as V;
     let [smooth, jump, sharp, gap] = t.continuity;
     match verdict {
         V::Smooth => smooth,
@@ -985,7 +981,7 @@ fn build_sketch_scene(app: &SolveApp, proj: &Proj) -> GpuScene {
     let s = &app.session;
     let st = crate::open_meshing::shown_world(app);
     let mut fill_budget = 131_072;
-    let sketch_plane = solidcraft_engine::view::open_sketch_plane(s);
+    let sketch_plane = polykrom_engine::view::open_sketch_plane(s);
     if sketch_plane.is_some() || (app.ui.show_grid && !active_view(app).hide_grid) {
         let (minor, major) = grid_step(app.cam.half_height());
         let mut ext = (app.cam.half_height() * 3.0 / major).ceil() * major;
@@ -993,7 +989,7 @@ fn build_sketch_scene(app: &SolveApp, proj: &Proj) -> GpuScene {
         // Z up, XZ with Y up (laid out in the camera's Z-up frame), or the upright origin plane
         // facing the view when the ground is seen edge-on.
         let (c, u, v, w3): (Vec3, Vec3, Vec3, Box<dyn Fn(Vec3) -> [f32; 3]>) = if let Some(pl) = &sketch_plane {
-            let (c, u, v) = solidcraft_engine::view::sketch_grid_frame(pl, app.cam.target, major);
+            let (c, u, v) = polykrom_engine::view::sketch_grid_frame(pl, app.cam.target, major);
             (c, u, v, Box::new(|p| p.to_f32()))
         } else {
             let tf = app.cam.to_frame(app.cam.target);
@@ -1077,9 +1073,9 @@ fn build_sketch_scene(app: &SolveApp, proj: &Proj) -> GpuScene {
     sc
 }
 
-fn ground_shadow(sc: &mut GpuScene, app: &SolveApp, st: &std::sync::Arc<solidcraft_engine::doc::ModelState>) {
+fn ground_shadow(sc: &mut GpuScene, app: &SolveApp, st: &std::sync::Arc<polykrom_engine::doc::ModelState>) {
     // The bodies' box in the camera's Z-up frame (the ground is its XY plane).
-    let mut b = solidcraft_engine::geom::Aabb3::EMPTY;
+    let mut b = polykrom_engine::geom::Aabb3::EMPTY;
     let boxes = body_bounds(app, st);
     for (x, (_, bb)) in st.bodies.iter().zip(boxes.iter()) {
         if bb.is_empty() || !app.session.body_visible(&x.name) {
@@ -1214,7 +1210,7 @@ pub fn origin_axes(app: &SolveApp) -> Vec<(&'static str, Vec3)> {
 /// from, to).
 pub fn construction_axis_segments(app: &SolveApp) -> Vec<(String, Vec3, Vec3)> {
     let axes: Vec<_> =
-        solidcraft_engine::view::construction_axes(&app.session).into_iter().filter(|(_, n, _, _)| app.session.construction_visible(n)).collect();
+        polykrom_engine::view::construction_axes(&app.session).into_iter().filter(|(_, n, _, _)| app.session.construction_visible(n)).collect();
     if axes.is_empty() {
         return Vec::new();
     }
@@ -1242,7 +1238,7 @@ pub fn construction_axis_segments(app: &SolveApp) -> Vec<(String, Vec3, Vec3)> {
 
 /// Construction points shown: (name, position).
 pub fn construction_points(app: &SolveApp) -> Vec<(String, Vec3)> {
-    solidcraft_engine::view::construction_points(&app.session)
+    polykrom_engine::view::construction_points(&app.session)
         .into_iter()
         .filter(|(_, n, _)| app.session.construction_visible(n))
         .map(|(_, n, p)| (n, p))
@@ -1252,7 +1248,7 @@ pub fn construction_points(app: &SolveApp) -> Vec<(String, Vec3)> {
 /// Construction planes drawn as squares around their origin: (name, normal, quad).
 pub fn construction_quads(app: &SolveApp) -> Vec<(String, Vec3, [Vec3; 4])> {
     let h = origin_size(app.cam.half_height()) * 1.2;
-    solidcraft_engine::view::construction_planes(&app.session)
+    polykrom_engine::view::construction_planes(&app.session)
         .into_iter()
         .filter(|(_, n, _)| app.session.construction_visible(n))
         .map(|(_, name, pl)| {
@@ -1265,10 +1261,7 @@ pub fn construction_quads(app: &SolveApp) -> Vec<(String, Vec3, [Vec3; 4])> {
 /// Pick what is under `pos`: sketch points, sketch curves, vertices, edges and axes first, then
 /// the surfaces along the ray (profiles, faces, planes) nearest first.
 /// Bounding boxes of the shown model's bodies (cached until the model changes).
-fn body_bounds(
-    app: &SolveApp,
-    st: &std::sync::Arc<solidcraft_engine::doc::ModelState>,
-) -> std::sync::Arc<Vec<(String, solidcraft_engine::geom::Aabb3)>> {
+fn body_bounds(app: &SolveApp, st: &std::sync::Arc<polykrom_engine::doc::ModelState>) -> std::sync::Arc<Vec<(String, polykrom_engine::geom::Aabb3)>> {
     if let Ok(mut g) = app.viewport.pick_bounds.lock() {
         if let Some((k, b)) = g.as_ref()
             && std::sync::Arc::ptr_eq(k, st)
@@ -1307,12 +1300,12 @@ fn body_bounds(
     std::sync::Arc::new(Vec::new())
 }
 
-type BodyBounds = (std::sync::Arc<solidcraft_engine::doc::ModelState>, std::sync::Arc<Vec<(String, solidcraft_engine::geom::Aabb3)>>);
+type BodyBounds = (std::sync::Arc<polykrom_engine::doc::ModelState>, std::sync::Arc<Vec<(String, polykrom_engine::geom::Aabb3)>>);
 
 /// The model's extent: bodies (from the cached boxes) and sketches.
-pub fn model_bounds(app: &SolveApp) -> solidcraft_engine::geom::Aabb3 {
+pub fn model_bounds(app: &SolveApp) -> polykrom_engine::geom::Aabb3 {
     let st = crate::open_meshing::shown_world(app);
-    let mut b = body_bounds(app, &st).iter().fold(solidcraft_engine::geom::Aabb3::EMPTY, |a, (_, x)| a.union(x));
+    let mut b = body_bounds(app, &st).iter().fold(polykrom_engine::geom::Aabb3::EMPTY, |a, (_, x)| a.union(x));
     for ss in &st.sketches {
         if let Some((lo, hi)) = ss.sketch.bounds() {
             for p in [lo, hi] {
@@ -1327,7 +1320,7 @@ pub fn model_bounds(app: &SolveApp) -> solidcraft_engine::geom::Aabb3 {
 }
 
 /// Where a ray enters a box (None: it misses).
-fn ray_box(o: Vec3, d: Vec3, b: &solidcraft_engine::geom::Aabb3, pad: f64) -> Option<f64> {
+fn ray_box(o: Vec3, d: Vec3, b: &polykrom_engine::geom::Aabb3, pad: f64) -> Option<f64> {
     let (mut t0, mut t1) = (f64::NEG_INFINITY, f64::INFINITY);
     for (oo, dd, lo, hi) in [(o.x, d.x, b.min.x, b.max.x), (o.y, d.y, b.min.y, b.max.y), (o.z, d.z, b.min.z, b.max.z)] {
         let (lo, hi) = (lo - pad, hi + pad);
@@ -1362,7 +1355,7 @@ fn ray_segment_closest(o: Vec3, d: Vec3, a: Vec3, b: Vec3) -> Vec3 {
 }
 
 /// A box's outline on screen, grown by `px` (None: behind the eye).
-fn screen_box(proj: &Proj, b: &solidcraft_engine::geom::Aabb3, px: f32) -> Option<Rect> {
+fn screen_box(proj: &Proj, b: &polykrom_engine::geom::Aabb3, px: f32) -> Option<Rect> {
     let mut r = Rect::NOTHING;
     for i in 0..8 {
         let p = Vec3::new(
@@ -1505,7 +1498,7 @@ fn pick_hits(app: &SolveApp, proj: &Proj, pos: Pos2, other_sketch_points: bool, 
     for ss in point_sketches.iter().filter_map(|sid| st.sketch(*sid)) {
         let sid = ss.feature;
         let shown = snapping.then(|| crate::dialogs::SnapPoints::of(&ss.sketch));
-        let visible = solidcraft_engine::view::SketchPointVisibility::new(&ss.sketch);
+        let visible = polykrom_engine::view::SketchPointVisibility::new(&ss.sketch);
         for p in &ss.sketch.points {
             if !visible.takes(p) || shown.as_ref().is_some_and(|f| !f.takes(p)) {
                 continue;
@@ -1525,7 +1518,7 @@ fn pick_hits(app: &SolveApp, proj: &Proj, pos: Pos2, other_sketch_points: bool, 
         let Some(ss) = st.sketch(sid) else { continue };
         let bonus = if s.active_sketch == Some(sid) { 2.0 } else { 0.0 };
         for (i, c) in ss.sketch.curves.iter().enumerate() {
-            if !solidcraft_engine::view::sketch_curve_visible(&ss.sketch, i) {
+            if !polykrom_engine::view::sketch_curve_visible(&ss.sketch, i) {
                 continue;
             }
             let straight = matches!(c.kind, CurveKind::Line { .. });
@@ -1605,8 +1598,8 @@ fn pick_hits(app: &SolveApp, proj: &Proj, pos: Pos2, other_sketch_points: bool, 
         // In the part's own frame, as for faces; its points are moved back to where it stands.
         let (m, place) = b.mesh_in_place();
         let Some((lo, ld)) = local_ray(&place, o, d) else { continue };
-        let moved = !solidcraft_engine::doc::is_identity(&place);
-        let at = |p: Vec3| if moved { solidcraft_engine::doc::apply_point(&place, p) } else { p };
+        let moved = !polykrom_engine::doc::is_identity(&place);
+        let at = |p: Vec3| if moved { polykrom_engine::doc::apply_point(&place, p) } else { p };
         // Only the segments that can come near the cursor, from the index, in the order a scan
         // of every edge would meet them, so ties go the same way.
         let near = crate::pick_index::segments_near(app.viewport.pick_index.of(&m).as_deref(), &m, lo, ld, reach);
@@ -1727,7 +1720,7 @@ fn pick_hits(app: &SolveApp, proj: &Proj, pos: Pos2, other_sketch_points: bool, 
 
 /// The section cut shown now: the open Section Analysis dialog's plane, else the session's.
 /// The active sketch's display options (defaults when not sketching).
-pub fn active_view(app: &SolveApp) -> solidcraft_engine::sketch::SketchView {
+pub fn active_view(app: &SolveApp) -> polykrom_engine::sketch::SketchView {
     let st = crate::open_meshing::shown_world(app);
     app.session.active_sketch.and_then(|s| st.sketch(s)).map(|ss| ss.sketch.view.clone()).unwrap_or_default()
 }
@@ -1778,7 +1771,7 @@ fn feature_geometry(app: &SolveApp, id: u64) -> Vec<Sel> {
             out.push(Sel::Body { name: b.name.clone() });
             continue;
         }
-        let names = solidcraft_engine::doc::naming::face_names(b);
+        let names = polykrom_engine::doc::naming::face_names(b);
         let m = b.mesh();
         for (index, _) in names.iter().enumerate().filter(|(_, n)| n.starts_with(&prefix)) {
             if let Some(point) = m.triangles.iter().zip(&m.tri_face).find_map(|(t, f)| {
@@ -1811,9 +1804,9 @@ fn displayed_selection(app: &SolveApp, item: &Sel) -> Vec<Sel> {
 
 /// The box around what is selected (bodies, faces, edges, vertices, sketch curves and the
 /// bodies of selected features), where it is shown.
-pub fn selection_bounds(app: &SolveApp) -> Option<solidcraft_engine::geom::Aabb3> {
+pub fn selection_bounds(app: &SolveApp) -> Option<polykrom_engine::geom::Aabb3> {
     let st = crate::open_meshing::shown_world(app);
-    let mut b = solidcraft_engine::geom::Aabb3::EMPTY;
+    let mut b = polykrom_engine::geom::Aabb3::EMPTY;
     for s in app.session.selection.iter().flat_map(|item| displayed_selection(app, item)) {
         match &s {
             Sel::Body { name } => {
@@ -1875,14 +1868,14 @@ pub fn selection_bounds(app: &SolveApp) -> Option<solidcraft_engine::geom::Aabb3
 /// The section as the shader's clip plane (normal, d), zero when there is none.
 /// The surface analysis for the shader (see `gpu::Frame::analysis`).
 fn analysis_uniform(app: &SolveApp) -> [f32; 8] {
-    solidcraft_gpu::view::analysis_uniform(app.session.analysis.map(|a| a.mode()), crate::access::map(app).as_ref())
+    polykrom_gpu::view::analysis_uniform(app.session.analysis.map(|a| a.mode()), crate::access::map(app).as_ref())
 }
 
 /// While Draft, Accessibility or Curvature Map analysis is on, what each of its colours means and
 /// the values it stands for, at the bottom left of the viewport (#973). The colours alone don't
 /// say, and with colour vision loss they can be hard to tell apart.
 fn analysis_legend(app: &SolveApp, painter: &egui::Painter, rect: Rect) {
-    use solidcraft_engine::SurfaceAnalysis as A;
+    use polykrom_engine::SurfaceAnalysis as A;
     let t = Tokens::get();
     let tr = crate::i18n::tr_label;
     let col = |c: [f32; 3]| {
@@ -2070,7 +2063,7 @@ pub(crate) fn dialog_pick(app: &mut SolveApp, hit: &Hit, sel: Sel) {
 
 /// The edge a selection refers to now: by index if it still passes through the stored point,
 /// otherwise the edge nearest the point.
-fn edge_of(m: &solidcraft_engine::geom::Mesh, index: usize, point: Vec3) -> Option<&Vec<Vec3>> {
+fn edge_of(m: &polykrom_engine::geom::Mesh, index: usize, point: Vec3) -> Option<&Vec<Vec3>> {
     let tol = m.bounds().diagonal().max(1.0) * 1e-6;
     let near = |e: &Vec<Vec3>| e.windows(2).map(|w| point.dist_to_segment(w[0], w[1])).fold(f64::INFINITY, f64::min);
     if let Some(e) = m.edges.get(index)
@@ -2081,13 +2074,13 @@ fn edge_of(m: &solidcraft_engine::geom::Mesh, index: usize, point: Vec3) -> Opti
     m.edges.iter().min_by(|a, b| near(a).total_cmp(&near(b))).filter(|e| near(e) < tol * 1e3)
 }
 
-fn face_tris(sc: &mut GpuScene, m: &solidcraft_engine::geom::Mesh, face: usize, col: [u8; 4], lit: bool) {
+fn face_tris(sc: &mut GpuScene, m: &polykrom_engine::geom::Mesh, face: usize, col: [u8; 4], lit: bool) {
     mesh_tris(sc, m, col, lit, |f| f as usize == face);
 }
 
 /// Emit a set of faces in one mesh pass. Whole-body feedback must not scan every triangle
 /// again for each face of a detailed imported part.
-fn mesh_tris(sc: &mut GpuScene, m: &solidcraft_engine::geom::Mesh, col: [u8; 4], lit: bool, takes: impl Fn(u32) -> bool) {
+fn mesh_tris(sc: &mut GpuScene, m: &polykrom_engine::geom::Mesh, col: [u8; 4], lit: bool, takes: impl Fn(u32) -> bool) {
     for (t, f) in m.triangles.iter().zip(&m.tri_face) {
         if !takes(*f) {
             continue;
@@ -2115,7 +2108,7 @@ fn edge_lines(sc: &mut GpuScene, e: &[Vec3], core: Color32, halo: Color32, w: f3
 }
 
 /// The outline of a highlighted face where the model hides it (dimmed).
-fn hidden_face_outline(sc: &mut GpuScene, m: &solidcraft_engine::geom::Mesh, face: usize, col: Color32) {
+fn hidden_face_outline(sc: &mut GpuScene, m: &polykrom_engine::geom::Mesh, face: usize, col: Color32) {
     for (ei, e) in m.edges.iter().enumerate() {
         let on = m.edge_faces.get(ei).is_some_and(|f| f.iter().any(|x| *x as usize == face));
         if on && m.edge_pickable(ei) {
@@ -2137,7 +2130,7 @@ pub(crate) fn profile_fill(sc: &mut GpuScene, app: &SolveApp, sketch: u64, index
     };
     // Lift toward the eye so a profile on a face shows over it.
     let lift = app.cam.back() * (app.cam.half_height() * 0.002);
-    let w = |q: solidcraft_engine::geom::Vec2| (plane.to_world(q) + lift).to_f32();
+    let w = |q: polykrom_engine::geom::Vec2| (plane.to_world(q) + lift).to_f32();
     let col = c4(fill);
     // In the translucent pass (after the grid and edges) so it covers them.
     let proj = display_proj(app);
@@ -2209,7 +2202,7 @@ fn highlight_geometry_key(app: &SolveApp) -> u64 {
     app.viewport.hover_bodies.hash(&mut h);
     // Which mesh lights a face follows how the model draws its body (see `shown_mesh`), and at
     // which display quality its plan and edges are made.
-    solidcraft_engine::doc::display_quality::current().hash(&mut h);
+    polykrom_engine::doc::display_quality::current().hash(&mut h);
     lod_generation(app).hash(&mut h);
     // Whole-body highlights redraw the model scene's own blocks: they must be the scene's
     // current ones (their keys and the bodies' ranges in them).
@@ -2256,13 +2249,13 @@ fn highlight_key(app: &SolveApp) -> u64 {
 #[derive(Clone)]
 struct HoverBlock {
     key: u64,
-    state: std::sync::Arc<solidcraft_engine::doc::ModelState>,
-    doc: std::sync::Arc<solidcraft_engine::doc::Document>,
+    state: std::sync::Arc<polykrom_engine::doc::ModelState>,
+    doc: std::sync::Arc<polykrom_engine::doc::Document>,
     block: crate::gpu::SceneBlock,
     /// Whole bodies the model draws from their plans: reused like the block when the camera
     /// moves (they are the model's own evaluated triangles, not a copy of them).
-    hover_planned: Vec<std::sync::Arc<solidcraft_engine::geom::tess::TessPlan>>,
-    selected_planned: Vec<std::sync::Arc<solidcraft_engine::geom::tess::TessPlan>>,
+    hover_planned: Vec<std::sync::Arc<polykrom_engine::geom::tess::TessPlan>>,
+    selected_planned: Vec<std::sync::Arc<polykrom_engine::geom::tess::TessPlan>>,
     /// CPU-built bodies: their triangles in the model scene's blocks, reused the same way.
     hover_blocks: Vec<crate::gpu::BlockTris>,
     selected_blocks: Vec<crate::gpu::BlockTris>,
@@ -2278,16 +2271,16 @@ struct HoverBlock {
 /// (every triangle of every body, again), while the model already had them all on the GPU.
 fn highlight_plan(
     app: &SolveApp,
-    b: &solidcraft_engine::doc::ModelBody,
+    b: &polykrom_engine::doc::ModelBody,
     active_bodies: &Option<Vec<String>>,
-) -> Option<std::sync::Arc<solidcraft_engine::geom::tess::TessPlan>> {
+) -> Option<std::sync::Arc<polykrom_engine::geom::tess::TessPlan>> {
     drawn_plan(app, b, highlight_opaque(app, b, active_bodies))
 }
 
 /// Whether the model draws a whole body opaque on the GPU, rather than building it on the CPU:
 /// a live preview stands in for none, faded and see-through bodies stay on the CPU, and face
 /// opacities matter only where faces are shaded.
-fn highlight_opaque(app: &SolveApp, b: &solidcraft_engine::doc::ModelBody, active_bodies: &Option<Vec<String>>) -> bool {
+fn highlight_opaque(app: &SolveApp, b: &polykrom_engine::doc::ModelBody, active_bodies: &Option<Vec<String>>) -> bool {
     if app.preview.effective_replaced().contains(&b.name) {
         return false;
     }
@@ -2309,7 +2302,7 @@ struct HighlightInstances {
 impl HighlightInstances {
     /// Add the body at `color`, when the model draws it as an instanced placement of an opaque
     /// shared mesh; `false` when it does not (the caller builds its feedback on the CPU).
-    fn add(&mut self, app: &SolveApp, b: &solidcraft_engine::doc::ModelBody, active_bodies: &Option<Vec<String>>, color: [u8; 4]) -> bool {
+    fn add(&mut self, app: &SolveApp, b: &polykrom_engine::doc::ModelBody, active_bodies: &Option<Vec<String>>, color: [u8; 4]) -> bool {
         // A body with face appearances of its own is built on the CPU, never as an instance.
         if !highlight_opaque(app, b, active_bodies) || !app.session.doc.face_colors(b).is_empty() {
             return false;
@@ -2360,7 +2353,7 @@ impl HighlightInstances {
 /// costs no CPU work, where copying every triangle did (a whole assembly hovered at once stalled
 /// the window). See-through and faded bodies have no range here: they are not in the block's
 /// opaque triangles, and the CPU feedback colours them.
-fn highlight_block_tris(app: &SolveApp, b: &solidcraft_engine::doc::ModelBody) -> Option<crate::gpu::BlockTris> {
+fn highlight_block_tris(app: &SolveApp, b: &polykrom_engine::doc::ModelBody) -> Option<crate::gpu::BlockTris> {
     if app.preview.effective_replaced().contains(&b.name) {
         return None;
     }
@@ -2378,7 +2371,7 @@ pub(crate) fn build_highlight(app: &SolveApp) -> GpuScene {
     let s = &app.session;
     let active_bodies = s.active_occurrence_path.as_ref().and_then(|p| s.occurrence_bodies(p, true).ok());
     // Faces lit over the model use the triangles the model shows them with.
-    let shown = |b: &solidcraft_engine::doc::ModelBody| shown_mesh(app, b, &active_bodies);
+    let shown = |b: &polykrom_engine::doc::ModelBody| shown_mesh(app, b, &active_bodies);
     let mut sel = Vec::new();
     for item in app.highlighted() {
         for piece in displayed_selection(app, &item) {
@@ -2713,7 +2706,7 @@ pub(crate) fn build_highlight(app: &SolveApp) -> GpuScene {
         sc.selected_instanced = selected_instanced;
     }
 
-    if solidcraft_engine::geom::env::var_os("PROFILE_FRAMES").is_some() {
+    if polykrom_engine::geom::env::var_os("PROFILE_FRAMES").is_some() {
         let in_blocks = |f: fn(&crate::gpu::SceneBlock) -> usize| sc.blocks.iter().map(f).sum::<usize>();
         let tris = sc.tris.len() + in_blocks(|b| b.bytes.tris.len());
         let lines = sc.lines.len() + in_blocks(|b| b.bytes.lines.len());
@@ -2734,7 +2727,7 @@ pub(crate) fn build_highlight(app: &SolveApp) -> GpuScene {
 }
 
 /// A body's display colour (appearance, material or imported colour), if it has one.
-fn body_color(doc: &solidcraft_engine::doc::Document, b: &solidcraft_engine::doc::ModelBody) -> Option<Color32> {
+fn body_color(doc: &polykrom_engine::doc::Document, b: &polykrom_engine::doc::ModelBody) -> Option<Color32> {
     let to8 = |x: f32| (x.clamp(0.0, 1.0) * 255.0).round() as u8;
     doc.body_color(b).map(|[r, g, b]| Color32::from_rgb(to8(r), to8(g), to8(b)))
 }
@@ -2748,12 +2741,12 @@ fn body_rgb(app: &SolveApp, name: &str) -> (u8, u8, u8) {
 
 /// The ray `o` + t `d` in the frame of a mesh that `place` (a rigid move) puts in the world, with
 /// the same t along it; `None` for a move with no inverse.
-fn local_ray(place: &solidcraft_engine::doc::Mat, o: Vec3, d: Vec3) -> Option<(Vec3, Vec3)> {
-    if solidcraft_engine::doc::is_identity(place) {
+fn local_ray(place: &polykrom_engine::doc::Mat, o: Vec3, d: Vec3) -> Option<(Vec3, Vec3)> {
+    if polykrom_engine::doc::is_identity(place) {
         return Some((o, d));
     }
-    let back = solidcraft_engine::doc::mat_inverse(place)?;
-    Some((solidcraft_engine::doc::apply_point(&back, o), solidcraft_engine::doc::apply_vector(&back, d)))
+    let back = polykrom_engine::doc::mat_inverse(place)?;
+    Some((polykrom_engine::doc::apply_point(&back, o), polykrom_engine::doc::apply_vector(&back, d)))
 }
 
 pub(crate) fn polyline_mid(pts: &[Vec3]) -> Vec3 {
@@ -3288,7 +3281,7 @@ pub fn show(app: &mut SolveApp, ui: &mut egui::Ui) {
                         .and_then(|i| sk.curves.get(i))
                         .and_then(|c| c.link.as_deref())
                         .or_else(|| sk.resolve_point(id).and_then(|i| sk.points.get(i)).and_then(|p| p.link.as_deref()))?;
-                    sk.link(link).filter(|l| l.kind == solidcraft_engine::sketch::LinkKind::Text).map(|l| l.id.clone())
+                    sk.link(link).filter(|l| l.kind == polykrom_engine::sketch::LinkKind::Text).map(|l| l.id.clone())
                 });
                 if let Some(link) = link
                     && let Some(q) = on_plane(app, a)
@@ -3347,7 +3340,7 @@ pub fn show(app: &mut SolveApp, ui: &mut egui::Ui) {
                     if r.get("retry").and_then(serde_json::Value::as_bool) == Some(true) && !resp.drag_stopped() {
                         ui.ctx().request_repaint();
                     }
-                    r.get("at").and_then(solidcraft_engine::params::vec2).unwrap_or(q)
+                    r.get("at").and_then(polykrom_engine::params::vec2).unwrap_or(q)
                 }
                 Err(_) => from,
             };
@@ -3467,7 +3460,7 @@ pub fn show(app: &mut SolveApp, ui: &mut egui::Ui) {
     points_2d(app, &painter, &proj);
     if let Some((plane, sketch)) = crate::sketch_attachment_ui::lost_guide(app)
         && let Some((low, high)) = sketch.bounds()
-        && let Some(at) = proj.to_screen(plane.to_world(solidcraft_engine::geom::Vec2::new((low.x + high.x) * 0.5, high.y)))
+        && let Some(at) = proj.to_screen(plane.to_world(polykrom_engine::geom::Vec2::new((low.x + high.x) * 0.5, high.y)))
     {
         painter.text(
             at - vec2(0.0, 12.0),
@@ -3835,7 +3828,7 @@ fn dragged_with(app: &SolveApp, id: &str) -> Vec<String> {
 
 /// What a click on `sel` picks: its pieces ([`grouped_selection`]), and for a letter of a sketch
 /// text the whole text, unless Shift is held (Shift picks the one letter).
-pub(crate) fn picked_selection(s: &solidcraft_engine::Session, sel: &Sel) -> Vec<Sel> {
+pub(crate) fn picked_selection(s: &polykrom_engine::Session, sel: &Sel) -> Vec<Sel> {
     if let Sel::Profile { sketch, index } = sel
         && !crate::sketch_text::one_letter()
         && let Some(letters) = crate::sketch_text::text_profiles(s, *sketch, *index)
@@ -3847,7 +3840,7 @@ pub(crate) fn picked_selection(s: &solidcraft_engine::Session, sel: &Sel) -> Vec
 
 /// Expand a visible rim or surface into the kernel pieces a command needs. The original
 /// face pick keeps its point (used by tools such as Hole and construction geometry).
-pub(crate) fn grouped_selection(s: &solidcraft_engine::Session, sel: &Sel) -> Vec<Sel> {
+pub(crate) fn grouped_selection(s: &polykrom_engine::Session, sel: &Sel) -> Vec<Sel> {
     let st = s.world_state();
     match sel {
         Sel::Edge { body, index, .. } => {
@@ -3888,7 +3881,7 @@ pub(crate) fn grouped_selection(s: &solidcraft_engine::Session, sel: &Sel) -> Ve
 }
 
 /// Measure keeps one entry per visible item, rather than using its two slots for kernel halves.
-pub(crate) fn measurement_selection(s: &solidcraft_engine::Session, sel: &Sel) -> Sel {
+pub(crate) fn measurement_selection(s: &polykrom_engine::Session, sel: &Sel) -> Sel {
     let pieces = grouped_selection(s, sel);
     let mut representative = sel.clone();
     match &mut representative {
@@ -3938,7 +3931,7 @@ fn box_select(app: &mut SolveApp, proj: &Proj, bx: BoxSel, add: bool) {
             {
                 continue;
             }
-            if !solidcraft_engine::view::sketch_curve_visible(&ss.sketch, i) {
+            if !polykrom_engine::view::sketch_curve_visible(&ss.sketch, i) {
                 continue;
             }
             let sampled = if bx.crossing {
@@ -3950,15 +3943,13 @@ fn box_select(app: &mut SolveApp, proj: &Proj, bx: BoxSel, add: bool) {
             let takes = if bx.crossing {
                 parts.iter().any(|part| bx.takes(part))
             } else {
-                sampled.quality == solidcraft_engine::render::SamplingQuality::Complete
-                    && !parts.is_empty()
-                    && parts.iter().all(|part| bx.takes(part))
+                sampled.quality == polykrom_engine::render::SamplingQuality::Complete && !parts.is_empty() && parts.iter().all(|part| bx.takes(part))
             };
             if takes {
                 out.push(Sel::SketchCurve { id: c.id.clone() });
             }
         }
-        let visible = solidcraft_engine::view::SketchPointVisibility::new(&ss.sketch);
+        let visible = polykrom_engine::view::SketchPointVisibility::new(&ss.sketch);
         for (i, p) in ss.sketch.points.iter().enumerate().filter(|_| !off("sketch") && !off("sketch_points")) {
             if accepts.is_none_or(|a| a & crate::selection::SKETCH_POINTS != 0)
                 && i != 0
@@ -4161,7 +4152,7 @@ pub(crate) fn standalone_points(app: &SolveApp) -> Vec<Vec3> {
             continue;
         }
         let used: std::collections::HashSet<usize> = sk.curves.iter().flat_map(|c| c.kind.point_ids()).collect();
-        let visible = solidcraft_engine::view::SketchPointVisibility::new(sk);
+        let visible = polykrom_engine::view::SketchPointVisibility::new(sk);
         for (i, p) in sk.points.iter().enumerate().skip(1) {
             if !used.contains(&i) && p.link.is_none() && visible.takes(p) {
                 out.push(ss.plane.to_world(p.pos));
@@ -4194,7 +4185,7 @@ fn overlays(app: &SolveApp, painter: &egui::Painter, proj: &Proj) {
     let sk = &ss.sketch;
     let locked = sk.locked_points();
     let virtual_corners: Vec<usize> = sk.virtual_corners().into_iter().map(|(i, _)| i).collect();
-    let visible = solidcraft_engine::view::SketchPointVisibility::new(sk);
+    let visible = polykrom_engine::view::SketchPointVisibility::new(sk);
     for (i, p) in sk.points.iter().enumerate() {
         if !visible.takes(p) {
             continue;
@@ -4237,9 +4228,9 @@ fn overlays(app: &SolveApp, painter: &egui::Painter, proj: &Proj) {
 /// diamond round each untied one (it touches another curve only by position), told apart by
 /// shape. Both are warnings, not errors: an open sketch (a sweep path, an axis) is valid.
 fn loose_end_markers(
-    sk: &solidcraft_engine::sketch::Sketch,
-    ends: &solidcraft_engine::sketch::EndReport,
-    plane: &solidcraft_engine::geom::Plane,
+    sk: &polykrom_engine::sketch::Sketch,
+    ends: &polykrom_engine::sketch::EndReport,
+    plane: &polykrom_engine::geom::Plane,
     painter: &egui::Painter,
     proj: &Proj,
     t: &Tokens,
@@ -4259,10 +4250,10 @@ fn loose_end_markers(
 /// dark or the light theme and a colour vision mode, from the tokens the window draws with, so the
 /// picture matches the window. The light theme's tokens (Off) are the engine's own colours, so a light
 /// render is unchanged.
-pub(crate) fn scene_palette(dark: bool, mode: crate::theme::ColorVision) -> solidcraft_engine::view::Palette {
+pub(crate) fn scene_palette(dark: bool, mode: crate::theme::ColorVision) -> polykrom_engine::view::Palette {
     let t = Tokens::themed(dark, mode);
     let rgb = |c: Color32| Rgb(c.r(), c.g(), c.b());
-    solidcraft_engine::view::Palette {
+    polykrom_engine::view::Palette {
         background: (rgb(t.viewport_top), rgb(t.viewport_bottom)),
         grid: rgb(t.grid),
         grid_major: rgb(t.grid_major),
@@ -4481,7 +4472,7 @@ pub(crate) fn nearest_quarter_turn(yaw: f64) -> f64 {
 /// Turn the view to face the selected planar face or plane, else the active sketch; asked again
 /// while it already faces it, from the other side (#1886).
 pub fn look_at_selection(app: &mut SolveApp) {
-    if solidcraft_engine::find_command("view.normal_to").is_some_and(|command| command.info(&app.session).disabled_reason.is_none()) {
+    if polykrom_engine::find_command("view.normal_to").is_some_and(|command| command.info(&app.session).disabled_reason.is_none()) {
         app.start("view.normal_to");
     } else {
         crate::dialogs::look_at_sketch_again(app);
@@ -4641,7 +4632,7 @@ mod tests {
 
     #[test]
     fn ground_shadow_does_not_enter_see_through_geometry() -> Result<(), Box<dyn std::error::Error>> {
-        let mut session = solidcraft_engine::Session::default();
+        let mut session = polykrom_engine::Session::default();
         session.execute("solid.box", &json!({"length": 30, "width": 30, "height": 10}))?;
         let app = SolveApp::new(session, crate::Services::default());
         let mut scene = GpuScene::default();
@@ -4662,8 +4653,8 @@ mod tests {
     #[cfg(not(target_arch = "wasm32"))]
     #[test]
     fn continuity_colours_stay_on_the_edges_of_the_face_under_the_pointer() {
-        use solidcraft_engine::kernel::SeamVerdict;
-        let mut s = solidcraft_engine::Session::default();
+        use polykrom_engine::kernel::SeamVerdict;
+        let mut s = polykrom_engine::Session::default();
         s.execute("solid.box", &json!({"length": 60, "width": 40, "height": 20, "body_name": "B"})).unwrap();
         s.execute("solid.fillet", &json!({"edges": [[30, 0, 20], [30, 40, 20], [0, 20, 20], [60, 20, 20]], "radius": 6})).unwrap();
         let mut app = SolveApp::new(s, crate::Services::default());
@@ -4710,7 +4701,7 @@ mod tests {
                 proj.cam.back().to_f32(),
                 eye,
                 SIZE,
-                tess.then_some(solidcraft_gpu::SHADER),
+                tess.then_some(polykrom_gpu::SHADER),
                 [0.0; 8],
                 crate::gpu::analysis_colors(&t.analysis),
             ) else {
@@ -4758,7 +4749,7 @@ mod tests {
     /// nothing in the smooth or gap colours.
     #[test]
     fn continuity_seams_take_their_colours_from_the_theme() {
-        let mut s = solidcraft_engine::Session::default();
+        let mut s = polykrom_engine::Session::default();
         s.execute("solid.box", &json!({"length": 20, "width": 20, "height": 20})).unwrap();
         s.execute("solid.fillet", &json!({"edges": [[20, 20, 10]], "radius": 4})).unwrap();
         s.execute("inspect.continuity", &json!({})).unwrap();
@@ -4779,8 +4770,8 @@ mod tests {
     #[cfg(not(target_arch = "wasm32"))]
     #[test]
     fn bodies_evaluated_on_the_gpu_look_like_bodies_built_on_the_cpu() {
-        let mut s = solidcraft_engine::Session::default();
-        s.run_script(&solidcraft_engine::sample::script()).unwrap();
+        let mut s = polykrom_engine::Session::default();
+        s.run_script(&polykrom_engine::sample::script()).unwrap();
         let mut app = SolveApp::new(s, crate::Services::default());
         app.fit_view();
         const SIZE: u32 = 256;
@@ -4791,7 +4782,7 @@ mod tests {
             let proj = projection(&app, rect);
             let e = proj.cam.eye().to_f32();
             let eye = [e[0], e[1], e[2], if proj.cam.fov > 0.0 { 1.0 } else { 0.0 }];
-            let (planned, shader) = (scene.planned.len(), tess.then_some(solidcraft_gpu::SHADER));
+            let (planned, shader) = (scene.planned.len(), tess.then_some(polykrom_gpu::SHADER));
             (
                 planned,
                 scene.tris.len(),
@@ -4841,8 +4832,8 @@ mod tests {
             return;
         };
         assert!(!tess, "the rejected shader built a pipeline");
-        let mut s = solidcraft_engine::Session::default();
-        s.run_script(&solidcraft_engine::sample::script()).unwrap();
+        let mut s = polykrom_engine::Session::default();
+        s.run_script(&polykrom_engine::sample::script()).unwrap();
         let mut app = SolveApp::new(s, crate::Services::default());
         app.fit_view();
         app.viewport.gpu = Some(GpuTarget { format: egui_wgpu::wgpu::TextureFormat::Rgba8Unorm, depth: None, samples: 1, tess });
@@ -4879,8 +4870,8 @@ mod tests {
     #[cfg(not(target_arch = "wasm32"))]
     #[test]
     fn supersampling_draws_the_same_model_with_smooth_edges() {
-        let mut s = solidcraft_engine::Session::default();
-        s.run_script(&solidcraft_engine::sample::script()).unwrap();
+        let mut s = polykrom_engine::Session::default();
+        s.run_script(&polykrom_engine::sample::script()).unwrap();
         let mut app = SolveApp::new(s, crate::Services::default());
         app.fit_view();
         app.viewport.gpu = Some(GpuTarget { format: egui_wgpu::wgpu::TextureFormat::Rgba8Unorm, depth: None, samples: 1, tess: false });
@@ -4935,7 +4926,7 @@ mod tests {
     #[cfg(not(target_arch = "wasm32"))]
     #[test]
     fn a_hovered_face_lights_whole_over_a_body_drawn_from_its_plan() {
-        let mut s = solidcraft_engine::Session::default();
+        let mut s = polykrom_engine::Session::default();
         s.execute("solid.box", &json!({"length": 40, "width": 40, "height": 40, "corner": [0, 0, 0], "operation": "new"})).unwrap();
         s.execute("solid.box", &json!({"length": 16, "width": 16, "height": 20, "corner": [12, 12, 20], "operation": "cut"})).unwrap();
         s.execute("solid.cylinder", &json!({"base": [33, 33, 40], "diameter": 10, "height": 10, "operation": "join"})).unwrap();
@@ -4953,7 +4944,7 @@ mod tests {
             let proj = projection(&app, rect);
             let e = proj.cam.eye().to_f32();
             let eye = [e[0], e[1], e[2], if proj.cam.fov > 0.0 { 1.0 } else { 0.0 }];
-            let shader = tess.then_some(solidcraft_gpu::SHADER);
+            let shader = tess.then_some(polykrom_gpu::SHADER);
             crate::gpu::render_offscreen(
                 scene,
                 Some(highlight),
@@ -5000,7 +4991,7 @@ mod tests {
     #[cfg(not(target_arch = "wasm32"))]
     #[test]
     fn an_origin_plane_on_a_face_is_tinted_evenly() {
-        let mut s = solidcraft_engine::Session::default();
+        let mut s = polykrom_engine::Session::default();
         s.execute("solid.box", &json!({"length": 40, "width": 30, "height": 10, "corner": [0, 0, 0]})).unwrap();
         let mut app = SolveApp::new(s, crate::Services::default());
         app.cam = Camera {
@@ -5125,7 +5116,7 @@ mod tests {
     #[test]
     fn pictures_are_drawn_in_the_windows_theme() {
         use crate::theme::ColorVision;
-        use solidcraft_engine::view::Palette;
+        use polykrom_engine::view::Palette;
         assert_eq!(scene_palette(false, ColorVision::Off), Palette::DEFAULT, "the light theme is the engine's colours");
         let rgb = |c: Color32| Rgb(c.r(), c.g(), c.b());
         let (p, t) = (scene_palette(true, ColorVision::Off), Tokens::dark());
@@ -5164,7 +5155,7 @@ mod tests {
         }
         let mut h = crate::scenario::Harness::new();
         h.app.run("solid.box", json!({"length": 40, "width": 30, "height": 20})).unwrap();
-        h.app.cam = solidcraft_engine::view::home_camera(&h.app.session);
+        h.app.cam = polykrom_engine::view::home_camera(&h.app.session);
         for dark in [false, true, false] {
             h.app.ui.dark = dark;
             let img = crate::control::view_rgba(&h.app, 160, 120).unwrap();
@@ -5195,7 +5186,7 @@ mod tests {
         }
         let mut h = crate::scenario::Harness::new();
         h.app.run("solid.box", json!({"length":40,"width":30,"height":20})).unwrap();
-        let cam = solidcraft_engine::view::home_camera(&h.app.session);
+        let cam = polykrom_engine::view::home_camera(&h.app.session);
         let whole = pixels(&mut h, cam);
         let before = h.app.session.doc.clone();
         let undo = h.app.session.undo.len();
@@ -5263,7 +5254,7 @@ mod tests {
 
     #[test]
     fn timeline_modifier_highlight_follows_edits_and_rollback() {
-        let mut app = SolveApp::new(solidcraft_engine::Session::default(), crate::Services::default());
+        let mut app = SolveApp::new(polykrom_engine::Session::default(), crate::Services::default());
         app.run("solid.box", json!({"length":20,"width":20,"height":20})).unwrap();
         let id = app.run("solid.fillet", json!({"edges":[[0,0,10]],"radius":2})).unwrap()["feature"].as_u64().unwrap();
         // A later chamfer changes the same body without consuming the fillet.
@@ -5284,7 +5275,7 @@ mod tests {
 
     #[test]
     fn timeline_modifier_highlight_follows_component_instances() {
-        let mut app = SolveApp::new(solidcraft_engine::Session::default(), crate::Services::default());
+        let mut app = SolveApp::new(polykrom_engine::Session::default(), crate::Services::default());
         app.run("component.create", json!({"name":"Part","grounded":false})).unwrap();
         app.run("solid.box", json!({"length":20,"width":20,"height":20})).unwrap();
         let id = app.run("solid.fillet", json!({"edges":[[0,0,10]],"radius":2})).unwrap()["feature"].as_u64().unwrap();
@@ -5305,7 +5296,7 @@ mod tests {
     /// A design with a part (`command` with `params`, see [`PARTS`]) placed three times (one
     /// placement turned), drawn on a device that builds bodies on the CPU.
     fn three_placed_parts((command, params): (&str, &str)) -> SolveApp {
-        let mut app = SolveApp::new(solidcraft_engine::Session::default(), crate::Services::default());
+        let mut app = SolveApp::new(polykrom_engine::Session::default(), crate::Services::default());
         app.ui.ground_shadow = false;
         app.ui.show_origin = false;
         app.viewport.gpu = Some(GpuTarget { format: egui_wgpu::wgpu::TextureFormat::Rgba8Unorm, depth: None, samples: 1, tess: false });
@@ -5382,11 +5373,11 @@ mod tests {
     /// before instancing) and as instances. Prints the median frame time of each.
     #[cfg(not(target_arch = "wasm32"))]
     #[test]
-    #[ignore = "manual: SOLIDCRAFT_BENCH_MESH=part.stl cargo test --release -p solidcraft-ui-egui --lib -- --ignored instanced_scene_gpu_benchmark --nocapture"]
+    #[ignore = "manual: SOLIDCRAFT_BENCH_MESH=part.stl cargo test --release -p polykrom-ui-egui --lib -- --ignored instanced_scene_gpu_benchmark --nocapture"]
     fn instanced_scene_gpu_benchmark() {
         use egui_wgpu::wgpu;
         let Some(path) = std::env::var_os("SOLIDCRAFT_BENCH_MESH") else { return };
-        let mut app = SolveApp::new(solidcraft_engine::Session::default(), crate::Services::default());
+        let mut app = SolveApp::new(polykrom_engine::Session::default(), crate::Services::default());
         app.ui.ground_shadow = false;
         app.ui.show_origin = false;
         let component = app.run("file.insert_mesh", json!({"path": path.to_string_lossy()})).unwrap()["component"].clone();
@@ -5406,7 +5397,7 @@ mod tests {
         };
         let scale: u32 = std::env::var("SOLIDCRAFT_BENCH_DIV").ok().and_then(|v| v.parse().ok()).unwrap_or(1).max(1);
         let (w, h, samples) = (3600u32 / scale, 2190u32 / scale, 4u32);
-        let depth = solidcraft_gpu::depth_format(&device, true);
+        let depth = polykrom_gpu::depth_format(&device, true);
         let format = wgpu::TextureFormat::Rgba8Unorm;
         app.viewport.gpu = Some(GpuTarget { format, depth: Some(depth), samples, tess: false });
         app.fit_view();
@@ -5475,7 +5466,7 @@ mod tests {
                     None,
                     [0.0; 8],
                     crate::gpu::analysis_colors(&Tokens::get().analysis),
-                ) && let Some(png) = solidcraft_engine::render::png(SIDE as usize, SIDE as usize, rgba)
+                ) && let Some(png) = polykrom_engine::render::png(SIDE as usize, SIDE as usize, rgba)
                 {
                     let _ = std::fs::write(std::path::Path::new(&dir).join(format!("{name}.png")), png);
                 }
@@ -5539,7 +5530,7 @@ mod tests {
                             depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
                                 view: &depth_view,
                                 depth_ops: Some(wgpu::Operations {
-                                    load: wgpu::LoadOp::Clear(solidcraft_gpu::view::far_depth(solidcraft_gpu::view::reversed_depth(Some(depth)))),
+                                    load: wgpu::LoadOp::Clear(polykrom_gpu::view::far_depth(polykrom_gpu::view::reversed_depth(Some(depth)))),
                                     store: wgpu::StoreOp::Discard,
                                 }),
                                 stencil_ops: Some(wgpu::Operations { load: wgpu::LoadOp::Clear(0), store: wgpu::StoreOp::Discard }),
@@ -5573,7 +5564,7 @@ mod tests {
     /// opened or inserted) are the ones its first scene draws: that frame welds nothing.
     #[test]
     fn a_large_meshs_shared_vertices_are_made_ahead_of_its_first_scene() {
-        use solidcraft_engine::doc::{Document, FeatureKind, MeshData};
+        use polykrom_engine::doc::{Document, FeatureKind, MeshData};
         // A flat grid of 160 × 160 squares: 51 200 triangles, each corner its own vertex.
         let n = 160u32;
         let corners: Vec<[u32; 2]> =
@@ -5586,7 +5577,7 @@ mod tests {
             color: None,
         }];
         doc.add_feature(FeatureKind::MeshImport { file: "grid.stl".into(), meshes }, Some("Grid")).unwrap();
-        let mut app = SolveApp::new(solidcraft_engine::Session::new(doc), crate::Services::default());
+        let mut app = SolveApp::new(polykrom_engine::Session::new(doc), crate::Services::default());
         app.viewport.gpu = Some(GpuTarget { format: egui_wgpu::wgpu::TextureFormat::Rgba8Unorm, depth: None, samples: 1, tess: false });
         let (mesh, _) = app.session.world_state().bodies[0].mesh_in_place();
         assert!(mesh.triangles.len() >= INSTANCE_ALONE);
@@ -5602,7 +5593,7 @@ mod tests {
     /// A design with one imported mesh of about 100 000 triangles (a sphere of radius 50, each
     /// corner its own point, as an STL is read), drawn on a device that builds bodies on the CPU.
     fn large_scan() -> SolveApp {
-        use solidcraft_engine::doc::{Document, FeatureKind, MeshData};
+        use polykrom_engine::doc::{Document, FeatureKind, MeshData};
         let n = 160u32;
         let at = |i: u32, j: u32| {
             let (t, p) = (std::f64::consts::PI * f64::from(i) / f64::from(n), std::f64::consts::TAU * f64::from(j) / f64::from(2 * n));
@@ -5621,7 +5612,7 @@ mod tests {
             color: None,
         }];
         doc.add_feature(FeatureKind::MeshImport { file: "scan.stl".into(), meshes }, Some("Scan")).unwrap();
-        let mut app = SolveApp::new(solidcraft_engine::Session::new(doc), crate::Services::default());
+        let mut app = SolveApp::new(polykrom_engine::Session::new(doc), crate::Services::default());
         app.ui.ground_shadow = false;
         app.ui.show_origin = false;
         app.viewport.gpu = Some(GpuTarget { format: egui_wgpu::wgpu::TextureFormat::Rgba8Unorm, depth: None, samples: 1, tess: false });
@@ -5702,7 +5693,7 @@ mod tests {
         assert!(glass.glass.is_empty(), "no triangle sorted one by one");
         assert!(!glass.clone().merged().glass.is_empty());
         // One placement active (as right after the part is made): the others faded.
-        let mut context = SolveApp::new(solidcraft_engine::Session::default(), crate::Services::default());
+        let mut context = SolveApp::new(polykrom_engine::Session::default(), crate::Services::default());
         context.viewport.gpu = app.viewport.gpu;
         context.ui.ground_shadow = false;
         context.ui.show_origin = false;
@@ -5766,7 +5757,7 @@ mod tests {
                 let local = mesh.bounds();
                 (
                     b.name.clone(),
-                    solidcraft_engine::doc::apply_point(
+                    polykrom_engine::doc::apply_point(
                         &m,
                         Vec3::new((local.min.x + local.max.x) / 2.0, (local.min.y + local.max.y) / 2.0, local.max.z),
                     ),
@@ -5785,7 +5776,7 @@ mod tests {
             assert!(point.dist(*top) < 0.05, "{point:?} vs {top:?}");
         }
         assert!(
-            st.bodies.iter().all(|b| b.cached_mesh().is_none() || b.mesh_in_place().1 == solidcraft_engine::doc::IDENTITY),
+            st.bodies.iter().all(|b| b.cached_mesh().is_none() || b.mesh_in_place().1 == polykrom_engine::doc::IDENTITY),
             "a moved copy was made to pick"
         );
     }
@@ -5883,7 +5874,7 @@ mod tests {
     fn edge_between_two_faces_picks_along_its_whole_length() {
         for style in [0u8, 2] {
             let ctx = crate::fonts::test_context();
-            let mut app = SolveApp::new(solidcraft_engine::Session::default(), crate::Services::default());
+            let mut app = SolveApp::new(polykrom_engine::Session::default(), crate::Services::default());
             app.run("solid.box", json!({"length":200,"width":120,"height":160})).unwrap();
             app.ui.show_origin = false;
             app.ui.visual_style = style;
@@ -5934,7 +5925,7 @@ mod tests {
     }
 
     fn hover_app(gpu: bool) -> SolveApp {
-        let mut s = solidcraft_engine::Session::default();
+        let mut s = polykrom_engine::Session::default();
         s.execute("sketch.create", &json!({"plane": "XY"})).unwrap();
         s.execute("sketch.point", &json!({"point": [0, 0]})).unwrap();
         let mut app = SolveApp::new(s, crate::Services::default());
@@ -6198,7 +6189,7 @@ mod tests {
     #[test]
     fn touchpad_motion_does_not_move_the_camera_under_a_canvas_triad() {
         let ctx = crate::fonts::test_context();
-        let mut s = solidcraft_engine::Session::default();
+        let mut s = polykrom_engine::Session::default();
         s.execute("solid.box", &json!({"length":20,"width":20,"height":20})).unwrap();
         s.selection = vec![Sel::Body { name: "Body1".into() }];
         let mut app = SolveApp::new(s, crate::Services::default());
@@ -6385,7 +6376,7 @@ mod tests {
 
     fn device_face_app(gpu: bool) -> SolveApp {
         let mut app = hover_app(gpu);
-        app.session = solidcraft_engine::Session::default();
+        app.session = polykrom_engine::Session::default();
         app.session.execute("solid.box", &json!({"length":40,"width":40,"height":40,"corner":[-20,-20,-20]})).unwrap();
         app.ui.show_origin = false;
         app.cam.target = Vec3::ZERO;
@@ -6475,7 +6466,7 @@ mod tests {
         use crate::space_mouse::{DeviceMotion, Motion};
         for gpu in [false, true] {
             let ctx = crate::fonts::test_context();
-            let mut s = solidcraft_engine::Session::default();
+            let mut s = polykrom_engine::Session::default();
             s.execute("solid.box", &json!({"length": 40, "width": 30, "height": 20})).unwrap();
             let mut app = SolveApp::new(s, crate::Services::default());
             app.ui.show_origin = false;
@@ -6527,7 +6518,7 @@ mod tests {
         app.viewport.spin = false;
         hover_frame(&mut app, &ctx, vec![]);
         assert!(app.viewport.hover.is_some());
-        app.cam_anim = Some(solidcraft_engine::render::CameraAnim::new(app.cam, app.cam, 0.0));
+        app.cam_anim = Some(polykrom_engine::render::CameraAnim::new(app.cam, app.cam, 0.0));
         for _ in 0..3 {
             hover_frame(&mut app, &ctx, vec![]);
             assert!(app.viewport.hover.is_none());
@@ -6542,7 +6533,7 @@ mod tests {
     /// exactly triangles the model draws, never another triangulation (#1064).
     #[test]
     fn a_refined_body_highlights_on_its_drawn_triangles() {
-        use solidcraft_engine::doc::display_quality::current;
+        use polykrom_engine::doc::display_quality::current;
         let tris_of = |bytes: &[u8]| -> Vec<[u32; 9]> {
             bytes
                 .chunks(3 * crate::gpu::TRI_SIZE)
@@ -6556,7 +6547,7 @@ mod tests {
                 })
                 .collect()
         };
-        let mesh_tris = |m: &solidcraft_engine::geom::Mesh| -> std::collections::HashSet<[u32; 9]> {
+        let mesh_tris = |m: &polykrom_engine::geom::Mesh| -> std::collections::HashSet<[u32; 9]> {
             let mut sc = GpuScene::default();
             for f in 0..m.tri_face.iter().map(|f| *f as usize + 1).max().unwrap_or(0) {
                 face_tris(&mut sc, m, f, [0; 4], true);
@@ -6596,7 +6587,7 @@ mod tests {
     }
 
     fn cylinder_app() -> SolveApp {
-        let mut s = solidcraft_engine::Session::default();
+        let mut s = polykrom_engine::Session::default();
         s.execute("solid.cylinder", &json!({"radius": 10, "height": 20})).unwrap();
         let mut app = SolveApp::new(s, crate::Services::default());
         app.ui.show_origin = false;
@@ -6729,7 +6720,7 @@ mod tests {
         assert!(built.blocks.iter().all(|b| b.bytes.tris.is_empty()), "no copy of the body's triangles");
         // Two occurrences of one component are drawn as placements of its shared triangles: the
         // highlight draws those placements again, in its colour.
-        let mut s = solidcraft_engine::Session::default();
+        let mut s = polykrom_engine::Session::default();
         s.execute("solid.cylinder", &json!({"radius": 10, "height": 20, "body_name": "Sleeve"})).unwrap();
         let made = s.execute("component.from_bodies", &json!({"bodies": ["Sleeve"]})).unwrap();
         let part = made["components"][0]["component"].as_u64().unwrap();
@@ -6757,7 +6748,7 @@ mod tests {
 
     #[test]
     fn smooth_wall_display_preserves_wireframe_and_edge_selection() {
-        let mut s = solidcraft_engine::Session::default();
+        let mut s = polykrom_engine::Session::default();
         let sketch = s.execute("sketch.create", &json!({"plane":"XY"})).unwrap()["sketch"].as_u64().unwrap();
         s.execute("sketch.ellipse", &json!({"center":[0,0],"major":[25,0],"minor_radius":5})).unwrap();
         let inner =
@@ -6794,22 +6785,22 @@ mod tests {
         let mut without_display_mask = (*mesh).clone();
         without_display_mask.smooth_edges.clear();
         assert_eq!(mesh.surface_patch(mesh.edge_faces[smooth][0] as usize), without_display_mask.surface_patch(mesh.edge_faces[smooth][0] as usize));
-        let cam = solidcraft_engine::view::home_camera(&app.session);
-        let cpu = solidcraft_engine::view::scene(&app.session, &cam);
-        let actual_edges = cpu.lines.iter().filter(|line| line.color == solidcraft_engine::view::colors::EDGE).count();
+        let cam = polykrom_engine::view::home_camera(&app.session);
+        let cpu = polykrom_engine::view::scene(&app.session, &cam);
+        let actual_edges = cpu.lines.iter().filter(|line| line.color == polykrom_engine::view::colors::EDGE).count();
         assert_eq!(actual_edges, mesh.edges.iter().enumerate().filter(|(i, _)| mesh.shaded_edge_visible(*i)).count());
-        if let Ok(directory) = solidcraft_engine::geom::env::var("SMOOTH_SCREENSHOTS").ok_or(()) {
+        if let Ok(directory) = polykrom_engine::geom::env::var("SMOOTH_SCREENSHOTS").ok_or(()) {
             std::fs::create_dir_all(&directory).unwrap();
             for (name, old_edges, wireframe) in [("after", false, false), ("before", true, false), ("wireframe", true, true)] {
-                let mut scene = solidcraft_engine::view::scene(&app.session, &cam);
-                scene.lines.retain(|line| line.color == solidcraft_engine::view::colors::EDGE);
+                let mut scene = polykrom_engine::view::scene(&app.session, &cam);
+                scene.lines.retain(|line| line.color == polykrom_engine::view::colors::EDGE);
                 if old_edges {
                     scene.lines.clear();
                     for (i, edge) in mesh.edges.iter().enumerate() {
                         if mesh.edge_pickable(i) {
-                            scene.lines.push(solidcraft_engine::render::SceneLine {
+                            scene.lines.push(polykrom_engine::render::SceneLine {
                                 points: edge.clone(),
-                                color: solidcraft_engine::view::colors::EDGE,
+                                color: polykrom_engine::view::colors::EDGE,
                                 width: 1.2,
                                 on_top: false,
                             });
@@ -6820,7 +6811,7 @@ mod tests {
                     scene.meshes.clear();
                 }
                 assert!(crate::gpu::test_picture_renderer(), "SMOOTH_SCREENSHOTS needs a GPU");
-                let png = solidcraft_engine::capture::png(&scene, &cam, 1200, 800).unwrap();
+                let png = polykrom_engine::capture::png(&scene, &cam, 1200, 800).unwrap();
                 std::fs::write(std::path::Path::new(&directory).join(format!("smooth-ring-{name}.png")), png.bytes).unwrap();
             }
         }
@@ -6828,7 +6819,7 @@ mod tests {
 
     #[test]
     fn certified_small_crease_overrides_old_seam_fit_for_picking_and_patches() {
-        let mut s = solidcraft_engine::Session::default();
+        let mut s = polykrom_engine::Session::default();
         let sketch = s.execute("sketch.create", &json!({"plane":"XY"})).unwrap()["sketch"].as_u64().unwrap();
         let step = std::f64::consts::TAU / 8.;
         let k = 4. / 3. * (step / 4.).tan() * 10.;
@@ -7373,7 +7364,7 @@ mod tests {
     #[test]
     fn trackpad_gestures_over_dialogs_do_not_move_the_view() {
         let ctx = crate::fonts::test_context();
-        let mut app = SolveApp::new(solidcraft_engine::Session::default(), crate::Services::default());
+        let mut app = SolveApp::new(polykrom_engine::Session::default(), crate::Services::default());
         assert!(app.preferences.trackpad_pan);
         crate::help::run(&mut app, &ctx, "shortcuts");
         let mut time = 0.0;
@@ -7435,7 +7426,7 @@ mod tests {
     fn shortcuts_window_wheel_does_not_zoom_the_viewport() {
         for smooth in [true, false] {
             let ctx = crate::fonts::test_context();
-            let mut app = SolveApp::new(solidcraft_engine::Session::default(), crate::Services::default());
+            let mut app = SolveApp::new(polykrom_engine::Session::default(), crate::Services::default());
             app.preferences.smooth_wheel_zoom = smooth;
             app.preferences.trackpad_pan = false;
             crate::help::run(&mut app, &ctx, "shortcuts");
@@ -7689,12 +7680,12 @@ mod tests {
 
     #[test]
     fn section_outlines_follow_the_cut() {
-        let mut s = solidcraft_engine::Session::default();
+        let mut s = polykrom_engine::Session::default();
         s.execute("solid.box", &json!({"length": 40, "width": 30, "height": 20})).unwrap();
         let st = s.model.state();
         let m = st.bodies[0].mesh();
         let (o, n) = (Vec3::new(0.0, 15.0, 0.0), Vec3::new(0.0, -1.0, 0.0));
-        let segs = solidcraft_engine::view::section_segments(&m, o, n);
+        let segs = polykrom_engine::view::section_segments(&m, o, n);
         assert!(segs.len() >= 4, "{segs:?}");
         // On the plane (a hair to the kept side) and around the 40 x 20 cut.
         let mut len = 0.0;
@@ -7704,12 +7695,12 @@ mod tests {
         }
         assert!((len - 120.0).abs() < 0.5, "outline length {len}");
         // A plane that misses the body cuts nothing.
-        assert!(solidcraft_engine::view::section_segments(&m, Vec3::new(0.0, 99.0, 0.0), n).is_empty());
+        assert!(polykrom_engine::view::section_segments(&m, Vec3::new(0.0, 99.0, 0.0), n).is_empty());
     }
 
     #[test]
     fn selection_shows_where_the_model_hides_it() {
-        let mut s = solidcraft_engine::Session::default();
+        let mut s = polykrom_engine::Session::default();
         s.execute("solid.box", &json!({"length": 40, "width": 30, "height": 20})).unwrap();
         let mut app = SolveApp::new(s, crate::Services::default());
         assert!(build_highlight(&app).merged().hidden.is_empty());
@@ -7765,7 +7756,7 @@ mod tests {
     #[test]
     fn axis_snap_selects_all_directions_in_both_up_frames() {
         assert_eq!(snap_directions().count(), 26);
-        for up in [solidcraft_engine::render::UpAxis::Z, solidcraft_engine::render::UpAxis::Y] {
+        for up in [polykrom_engine::render::UpAxis::Z, polykrom_engine::render::UpAxis::Y] {
             for d in snap_directions() {
                 let mut cam = Camera { up, ..Camera::default() };
                 cam = cam.looking_from(cam.from_frame(d + Vec3::new(0.05, 0.03, 0.02)));
@@ -7788,7 +7779,7 @@ mod tests {
             assert!(h.app.viewport.orbit_free.is_some());
             match reset {
                 0 => h.app.fit_view(),
-                1 => h.app.set_up_axis(solidcraft_engine::render::UpAxis::Y),
+                1 => h.app.set_up_axis(polykrom_engine::render::UpAxis::Y),
                 _ => crate::documents::new_design(&mut h.app),
             }
             assert!(h.app.viewport.orbit_free.is_none());
@@ -7974,7 +7965,7 @@ mod tests {
 
     #[test]
     fn construction_axes_span_the_model_and_points_show() {
-        let mut s = solidcraft_engine::Session::default();
+        let mut s = polykrom_engine::Session::default();
         s.execute("solid.box", &json!({"length": 40, "width": 30, "height": 20})).unwrap();
         s.execute("construct.axis.two_points", &json!({"a": {"vertex": [0, 0, 20]}, "b": {"vertex": [40, 30, 20]}})).unwrap();
         s.execute("construct.point.vertex", &json!({"point": {"vertex": [40, 0, 20]}})).unwrap();
@@ -8003,8 +7994,8 @@ mod tests {
     #[test]
     fn draft_analysis_on_the_gpu_draws_the_modes_colours_and_stripes() {
         use crate::theme::ColorVision;
-        let mut s = solidcraft_engine::Session::default();
-        s.run_script(&solidcraft_engine::sample::script()).unwrap();
+        let mut s = polykrom_engine::Session::default();
+        s.run_script(&polykrom_engine::sample::script()).unwrap();
         let mut app = SolveApp::new(s, crate::Services::default());
         app.fit_view();
         app.run("inspect.draft", json!({"pull": [-1, -1, 0]})).unwrap();
@@ -8071,8 +8062,8 @@ mod tests {
         h.app.run("sketch.create", json!({"plane": "XY"})).unwrap();
         let made = h.app.run("sketch.line", json!({"points": [[-30, -20], [30, 20]]})).unwrap();
         h.app.run("sketch.constraint.fix", json!({"entity": made["created"]["curves"][0]})).unwrap();
-        let mut cam = solidcraft_engine::view::home_camera(&h.app.session);
-        cam.set_view(solidcraft_engine::render::StandardView::Top);
+        let mut cam = polykrom_engine::view::home_camera(&h.app.session);
+        cam.set_view(polykrom_engine::render::StandardView::Top);
         h.app.cam = cam;
         let count = |h: &crate::scenario::Harness, c: Color32| {
             let img = crate::control::view_rgba(&h.app, 320, 240).unwrap();
@@ -8166,7 +8157,7 @@ mod view_home_tests;
 #[cfg(test)]
 mod grid_plane_tests {
     use super::*;
-    use solidcraft_engine::render::{StandardView, UpAxis};
+    use polykrom_engine::render::{StandardView, UpAxis};
 
     fn plane(view: StandardView, up: UpAxis) -> (Vec3, Vec3) {
         let (yaw, pitch) = view.angles();
@@ -8246,7 +8237,7 @@ mod grid_plane_tests {
     #[test]
     fn the_viewport_keeps_the_grid_plane_between_frames() {
         let rect = Rect::from_min_size(Pos2::ZERO, egui::vec2(800.0, 600.0));
-        let mut app = SolveApp::new(solidcraft_engine::Session::default(), crate::Services::default());
+        let mut app = SolveApp::new(polykrom_engine::Session::default(), crate::Services::default());
         app.preferences.grid_follows_view = true;
         app.cam.yaw = 0.0;
         app.cam.pitch = 0.0;
@@ -8289,7 +8280,7 @@ mod grid_plane_tests {
     #[test]
     fn the_grid_covers_the_middle_of_the_view_when_the_target_is_off_the_ground() {
         let rect = Rect::from_min_size(Pos2::ZERO, egui::vec2(1280.0, 720.0));
-        let mut app = SolveApp::new(solidcraft_engine::Session::default(), crate::Services::default());
+        let mut app = SolveApp::new(polykrom_engine::Session::default(), crate::Services::default());
         app.ui.show_grid = true;
         app.ui.perspective = false;
         // The camera of the report.
@@ -8320,7 +8311,7 @@ mod grid_plane_tests {
     #[test]
     fn an_open_sketch_always_shows_a_grid_on_its_plane() {
         let rect = Rect::from_min_size(Pos2::ZERO, egui::vec2(800.0, 600.0));
-        let mut app = SolveApp::new(solidcraft_engine::Session::default(), crate::Services::default());
+        let mut app = SolveApp::new(polykrom_engine::Session::default(), crate::Services::default());
         app.ui.show_grid = false;
         let grid = |app: &SolveApp| build_sketch_scene(app, &projection(app, rect)).under;
         assert!(grid(&app).is_empty(), "no grid outside a sketch with the switch off");
@@ -8343,7 +8334,7 @@ mod grid_plane_tests {
     #[test]
     fn an_open_sketch_is_drawn_orthographic() {
         let rect = Rect::from_min_size(Pos2::ZERO, egui::vec2(800.0, 600.0));
-        let mut app = SolveApp::new(solidcraft_engine::Session::default(), crate::Services::default());
+        let mut app = SolveApp::new(polykrom_engine::Session::default(), crate::Services::default());
         app.ui.perspective = true;
         assert!(projection(&app, rect).cam.fov > 0.0);
         app.run("sketch.create", json!({"plane": "XZ"})).unwrap();
@@ -8358,7 +8349,7 @@ mod grid_plane_tests {
     /// tool while remaining off by default.
     #[test]
     fn create_sketch_shows_the_origin_planes_through_the_model() {
-        let mut app = SolveApp::new(solidcraft_engine::Session::default(), crate::Services::default());
+        let mut app = SolveApp::new(polykrom_engine::Session::default(), crate::Services::default());
         app.run("solid.box", json!({"length":40,"width":40,"height":40})).unwrap();
         app.ui.show_origin = false;
         assert!(origin_planes(&app).is_empty());
@@ -8386,7 +8377,7 @@ mod grid_plane_tests {
     #[test]
     fn the_preference_draws_finished_sketches_through_bodies() {
         let rect = Rect::from_min_size(Pos2::ZERO, egui::vec2(800.0, 600.0));
-        let mut app = SolveApp::new(solidcraft_engine::Session::default(), crate::Services::default());
+        let mut app = SolveApp::new(polykrom_engine::Session::default(), crate::Services::default());
         app.run("sketch.create", json!({"plane": "XY"})).unwrap();
         app.run("sketch.rectangle.two_point", json!({"p0": [-10, -10], "p1": [10, 10]})).unwrap();
         app.run("sketch.finish", json!({})).unwrap();
@@ -8405,7 +8396,7 @@ mod grid_plane_tests {
     /// objects it doesn't.
     #[test]
     fn a_dialog_picking_a_plane_shows_the_origin_planes() {
-        let mut app = SolveApp::new(solidcraft_engine::Session::default(), crate::Services::default());
+        let mut app = SolveApp::new(polykrom_engine::Session::default(), crate::Services::default());
         app.run("solid.box", json!({"length":40,"width":40,"height":40})).unwrap();
         app.ui.show_origin = false;
         app.start("solid.mirror");
@@ -8424,7 +8415,7 @@ mod grid_plane_tests {
     /// (same gate [`show`] uses via [`preview_should_roll_back`]).
     #[test]
     fn preview_rollback_stays_off_while_manipulator_dragging() {
-        let mut s = solidcraft_engine::Session::default();
+        let mut s = polykrom_engine::Session::default();
         s.execute("sketch.create", &json!({"plane": "xy"})).unwrap();
         s.execute("sketch.line", &json!({"points": [[0, 0], [20, 0]]})).unwrap();
         s.execute("sketch.finish", &json!({})).unwrap();
@@ -8447,7 +8438,7 @@ mod standalone_point_tests {
     /// sketch draws none.
     #[test]
     fn a_finished_sketch_shows_its_standalone_points() {
-        let mut app = SolveApp::new(solidcraft_engine::Session::default(), crate::Services::default());
+        let mut app = SolveApp::new(polykrom_engine::Session::default(), crate::Services::default());
         app.run("sketch.create", json!({"plane": "XY"})).unwrap();
         app.run("sketch.rectangle.two_point", json!({"p0": [0, 0], "p1": [20, 10]})).unwrap();
         app.run("sketch.point", json!({"point": [5, 4]})).unwrap();

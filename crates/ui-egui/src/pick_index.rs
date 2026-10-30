@@ -10,7 +10,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 use egui::{Pos2, vec2};
-use solidcraft_engine::geom::{Mesh, MeshIndex, Vec3};
+use polykrom_engine::geom::{Mesh, MeshIndex, Vec3};
 
 use crate::viewport::Proj;
 

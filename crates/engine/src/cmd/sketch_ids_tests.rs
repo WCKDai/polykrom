@@ -2,8 +2,8 @@
 //! dimensions}` with the real ids of what it added, so a script can dimension and constrain the
 //! new geometry right away; ids are never reused after a delete.
 
+use polykrom_sketch::{CurveKind, Sketch};
 use serde_json::{Value, json};
-use solidcraft_sketch::{CurveKind, Sketch};
 
 use crate::Session;
 

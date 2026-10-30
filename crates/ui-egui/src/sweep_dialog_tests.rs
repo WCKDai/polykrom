@@ -3,10 +3,10 @@
 use crate::dialogs::Kind;
 use crate::dialogs_surface::Surf;
 use crate::scenario::Harness;
+use polykrom_engine::Sel;
+use polykrom_engine::doc::{FeatureKind, SweepOrientation};
+use polykrom_engine::geom::Vec3;
 use serde_json::json;
-use solidcraft_engine::Sel;
-use solidcraft_engine::doc::{FeatureKind, SweepOrientation};
-use solidcraft_engine::geom::Vec3;
 
 /// A square `Q` on XY and a path `P` 40 up the Z axis; the square's sketch id.
 fn setup(h: &mut Harness) -> u64 {
@@ -40,7 +40,7 @@ fn a_new_sweep_takes_its_options_from_the_dialog() {
     assert!(h.app.dialog.is_none(), "{:?}", h.app.session.log);
     let f = h.app.session.doc.features.last().unwrap();
     let FeatureKind::Sweep { orientation, twist, scale, .. } = &f.kind else { panic!("{:?}", f.kind) };
-    assert_eq!(*orientation, SweepOrientation::Direction(solidcraft_engine::doc::Dir(Vec3::X)));
+    assert_eq!(*orientation, SweepOrientation::Direction(polykrom_engine::doc::Dir(Vec3::X)));
     assert_eq!(twist.as_ref().map(|t| t.as_str()), Some("90 deg"));
     assert_eq!(scale.as_ref().map(|k| k.as_str()), Some("0.5"));
 }
@@ -130,8 +130,8 @@ fn a_rail_picked_in_the_dialog_is_kept_through_an_edit() {
         k => panic!("{k:?}"),
     };
     let (stored, fit) = rails(&h);
-    assert_eq!(stored, vec![solidcraft_engine::doc::SweepRail { sketch: solidcraft_engine::doc::SketchId(rail_sketch), curves: vec!["out".into()] }]);
-    assert_eq!(fit, solidcraft_engine::doc::RailFit::Stretch);
+    assert_eq!(stored, vec![polykrom_engine::doc::SweepRail { sketch: polykrom_engine::doc::SketchId(rail_sketch), curves: vec!["out".into()] }]);
+    assert_eq!(fit, polykrom_engine::doc::RailFit::Stretch);
     h.step(&json!({"call":"ui.editFeature","params":{"feature":name}})).unwrap();
     h.frames(8);
     let d = h.app.dialog.as_ref().unwrap();

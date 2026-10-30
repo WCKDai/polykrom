@@ -32,7 +32,7 @@ fn solved(s: &Session, id: &str) -> Vec2 {
 }
 
 fn reopened(s: &Session) -> Session {
-    Session::new(solidcraft_doc::Document::from_json(&s.doc.to_json()).unwrap())
+    Session::new(polykrom_doc::Document::from_json(&s.doc.to_json()).unwrap())
 }
 
 #[test]
@@ -126,6 +126,6 @@ fn a_point_its_parameters_put_out_of_range_is_an_error_not_a_crash() {
     let file = s.doc.to_json();
     let hostile = file.replace("\"x\": \"W\"", "\"x\": \"W * 1e300 * 1e300\"").replace("\"x\":\"W\"", "\"x\":\"W * 1e300 * 1e300\"");
     assert_ne!(hostile, file, "the point's expression is in the file");
-    let r = Session::new(solidcraft_doc::Document::from_json(&hostile).unwrap());
+    let r = Session::new(polykrom_doc::Document::from_json(&hostile).unwrap());
     assert!(r.model.results.iter().any(|r| r.error.is_some()), "the sketch reports the bad point");
 }

@@ -15,7 +15,7 @@ on:
       - "vendor/**"
       - "assets/fonts/**"
       - "crates/engine/**"
-      - "apps/solidcraft-cli/**"
+      - "apps/polykrom-cli/**"
       - "xtask/**"
       - ".github/workflows/generated.yml"
   workflow_dispatch:

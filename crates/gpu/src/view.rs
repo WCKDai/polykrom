@@ -368,7 +368,7 @@ pub struct BlockBytes {
 }
 
 impl GpuScene {
-    pub fn pbr_tri(&mut self, p: [f32; 3], n: [f32; 3], surface: solidcraft_render::surface::OpaqueSurface) {
+    pub fn pbr_tri(&mut self, p: [f32; 3], n: [f32; 3], surface: polykrom_render::surface::OpaqueSurface) {
         let base = surface.base_color().to_f32();
         let parameters = [surface.metallic() as f32, surface.roughness() as f32, surface.dielectric_ior() as f32];
         for value in p.into_iter().chain(n).chain(base).chain(parameters) {
@@ -616,8 +616,8 @@ impl AccessMap {
 
 /// The shader's surface analysis uniform (see [`Frame::analysis`]) for `mode`; Accessibility
 /// reads its depth map's scale and size from `access`.
-pub fn analysis_uniform(mode: Option<solidcraft_render::AnalysisMode>, access: Option<&AccessMap>) -> [f32; 8] {
-    use solidcraft_render::AnalysisMode as A;
+pub fn analysis_uniform(mode: Option<polykrom_render::AnalysisMode>, access: Option<&AccessMap>) -> [f32; 8] {
+    use polykrom_render::AnalysisMode as A;
     match mode {
         Some(A::Zebra { stripes }) => [1.0, stripes as f32, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0],
         Some(A::Draft { pull, angle }) => [2.0, angle as f32, 0.0, 0.0, pull.x as f32, pull.y as f32, pull.z as f32, 0.0],
@@ -2654,7 +2654,7 @@ pub fn uniform_bytes(cb: &Frame, w: f32, h: f32, linear: bool, reversed: bool) -
 /// The shader's analysis colours (`ana_c`: draft positive, between, negative; reachable,
 /// blocked; curvature flat, middle, tight; alpha 1) and flags (`ana_f.x`: 1 to stripe the bad
 /// faces).
-pub fn analysis_colors(c: &solidcraft_render::AnalysisColors) -> [f32; 36] {
+pub fn analysis_colors(c: &polykrom_render::AnalysisColors) -> [f32; 36] {
     let mut v = [0.0; 36];
     let colors = c.draft.iter().chain(&c.access).chain(&c.curvature).flat_map(|rgb| [rgb[0], rgb[1], rgb[2], 1.0]);
     for (slot, x) in v.iter_mut().zip(colors) {

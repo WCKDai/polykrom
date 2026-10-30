@@ -100,7 +100,7 @@ class RealWorkspace(unittest.TestCase):
     def test_render_change_selects_render_and_dependents_not_kernel(self):
         full, pk = affected.select(self.meta, ["crates/render/src/lib.rs"])
         self.assertFalse(full)
-        self.assertIn("solidcraft-render", pk)
+        self.assertIn("polykrom-render", pk)
         self.assertGreater(len(pk), 1)
         self.assertNotIn("solidcraft-kernel", pk)
 
@@ -113,21 +113,21 @@ class RealWorkspace(unittest.TestCase):
     def test_goldens_select_the_engine_and_its_dependents_not_the_kernel(self):
         full, pk = affected.select(self.meta, ["tests/robustness/goldens.json"])
         self.assertFalse(full)
-        self.assertIn("solidcraft-engine", pk)
+        self.assertIn("polykrom-engine", pk)
         self.assertNotIn("solidcraft-kernel", pk)
-        self.assertNotIn("solidcraft-render", pk)
+        self.assertNotIn("polykrom-render", pk)
 
     def test_oracle_cases_select_the_cli_and_xtask_not_the_kernel(self):
         full, pk = affected.select(self.meta, ["tests/oracle/box/recipe.json"])
         self.assertFalse(full)
-        self.assertIn("solidcraft-cli", pk)
+        self.assertIn("polykrom-cli", pk)
         self.assertIn("xtask", pk)
         self.assertNotIn("solidcraft-kernel", pk)
 
     def test_embedded_root_files_select_their_crate(self):
-        for path, pkg in [("ATTRIBUTION.md", "solidcraft-ui-egui"), ("LICENSE-MIT", "solidcraft-engine"),
-                          ("NOTICE", "solidcraft-engine"), ("THIRD-PARTY-LICENSES.txt", "solidcraft-engine"),
-                          ("skills/solidcraft-modeling/SKILL.md", "solidcraft-mcp")]:
+        for path, pkg in [("ATTRIBUTION.md", "polykrom-ui-egui"), ("LICENSE-MIT", "polykrom-engine"),
+                          ("NOTICE", "polykrom-engine"), ("THIRD-PARTY-LICENSES.txt", "polykrom-engine"),
+                          ("skills/solidcraft-modeling/SKILL.md", "polykrom-mcp")]:
             full, pk = affected.select(self.meta, [path])
             self.assertFalse(full, path)
             self.assertIn(pkg, pk, path)
@@ -146,10 +146,10 @@ class RealWorkspace(unittest.TestCase):
     def test_vendored_egui_wgpu_selects_the_ui_and_apps_not_the_kernel(self):
         full, pk = affected.select(self.meta, ["vendor/egui-wgpu/src/winit.rs"])
         self.assertFalse(full)
-        self.assertIn("solidcraft-ui-egui", pk)
-        self.assertIn("solidcraft", pk)
+        self.assertIn("polykrom-ui-egui", pk)
+        self.assertIn("polykrom", pk)
         self.assertNotIn("solidcraft-kernel", pk)
-        self.assertNotIn("solidcraft-engine", pk)
+        self.assertNotIn("polykrom-engine", pk)
 
     def test_vendor_readme_alone_selects_nothing(self):
         self.assertEqual(affected.select(self.meta, ["vendor/README.md"]), (False, []))
@@ -157,10 +157,10 @@ class RealWorkspace(unittest.TestCase):
     def test_translation_selects_the_ui_and_xtask_not_the_kernel(self):
         full, pk = affected.select(self.meta, ["assets/locales/ja.json", "assets/locales/it.json"])
         self.assertFalse(full)
-        self.assertIn("solidcraft-ui-egui", pk)
+        self.assertIn("polykrom-ui-egui", pk)
         self.assertIn("xtask", pk)
         self.assertNotIn("solidcraft-kernel", pk)
-        self.assertNotIn("solidcraft-engine", pk)
+        self.assertNotIn("polykrom-engine", pk)
 
 
 if __name__ == "__main__":

@@ -83,7 +83,7 @@ fn a_rail_sweeps_a_frustum_and_stretching_is_an_edit() {
     let a = measure(&s, "Side").area;
     assert!((a - lateral).abs() < 2e-3 * lateral, "side {a} vs {lateral}");
 
-    let doc = solidcraft_doc::Document::from_json(&s.doc.to_json()).unwrap();
+    let doc = polykrom_doc::Document::from_json(&s.doc.to_json()).unwrap();
     let reopened = Session::new(doc);
     assert!((measure(&reopened, "Frustum").volume - m.volume).abs() < 1e-9 * volume);
 

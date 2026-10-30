@@ -4,11 +4,11 @@ use std::io::{BufRead, BufReader, Read, Write};
 use std::net::{TcpStream, ToSocketAddrs};
 use std::time::{Duration, Instant};
 
+use polykrom_engine::Session;
+use polykrom_engine::control_pending;
+use polykrom_engine::render::StandardView;
+use polykrom_engine::view::Guides;
 use serde_json::{Value, json};
-use solidcraft_engine::Session;
-use solidcraft_engine::control_pending;
-use solidcraft_engine::render::StandardView;
-use solidcraft_engine::view::Guides;
 
 /// Something that answers control-channel methods: `engine.execute`, `engine.commands`,
 /// `document.inspect`, `ui.view`, `ui.render`, `ui.screenshot`, `control.running`, and
@@ -262,12 +262,12 @@ impl Remote {
         self.next_id += 1;
         let mut params = params;
         // The app confines the files this request reaches to the agent's folders (control.rs).
-        if let (Some(scope), Some(o)) = (solidcraft_engine::io::vfs::current_scope(), params.as_object_mut()) {
+        if let (Some(scope), Some(o)) = (polykrom_engine::io::vfs::current_scope(), params.as_object_mut()) {
             o.insert("allow_paths".into(), json!(scope.roots().iter().map(|r| r.to_string_lossy()).collect::<Vec<_>>()));
         }
         let mut msg = json!({"id": id, "method": method, "params": params});
         // The token goes with every request (an app restarted mid-session has a new one).
-        if let Some(t) = solidcraft_engine::control_auth::client_token(self.port, self.explicit_token.as_deref()) {
+        if let Some(t) = polykrom_engine::control_auth::client_token(self.port, self.explicit_token.as_deref()) {
             msg["token"] = json!(t);
         }
         msg.to_string()
@@ -308,7 +308,7 @@ impl Remote {
             }
             if told.elapsed() >= PROGRESS_EVERY {
                 let secs = self.outstanding.as_ref().map_or(0, Outstanding::secs);
-                eprintln!("solidcraft-mcp: {what} is still running in the app ({secs} s); waiting for it");
+                eprintln!("polykrom-mcp: {what} is still running in the app ({secs} s); waiting for it");
                 told = Instant::now();
             }
             std::thread::sleep(self.waits.poll.min(limit.saturating_sub(waited)));
@@ -401,7 +401,7 @@ impl Remote {
         if v.get("running").and_then(Value::as_bool) == Some(true) {
             self.outstanding = Some(Outstanding { what: what.clone(), effect: Some(effect), since: sent });
             eprintln!(
-                "solidcraft-mcp: {what} is still running in the app after {} s; waiting up to {} s more for it",
+                "polykrom-mcp: {what} is still running in the app after {} s; waiting up to {} s more for it",
                 sent.elapsed().as_secs(),
                 self.waits.pending.as_secs()
             );
@@ -465,7 +465,7 @@ impl Default for Headless {
 
 impl Headless {
     pub fn new(mut session: Session) -> Self {
-        match solidcraft_engine::render::job::CpuHost::for_platform() {
+        match polykrom_engine::render::job::CpuHost::for_platform() {
             Ok(host) => {
                 if let Err(e) = session.set_render_job_host(Some(host)) {
                     session.log.push(format!("image host unavailable: {e}"));
@@ -499,7 +499,7 @@ impl Backend for Headless {
                 match v {
                     // Fit keeps the orientation, also of a camera `view.apply` chose.
                     "fit" => {
-                        let b = solidcraft_engine::view::bounds(s);
+                        let b = polykrom_engine::view::bounds(s);
                         if let Some(c) = s.camera.as_mut() {
                             c.fit(&b);
                         }
@@ -515,7 +515,7 @@ impl Backend for Headless {
                 let (w, h) = (dim(&p, "width", 1280.0), dim(&p, "height", 800.0));
                 // The camera `view.apply` chose, else the standard view framing the model.
                 let cam = s.camera.unwrap_or_else(|| {
-                    let mut cam = solidcraft_engine::view::home_camera(s);
+                    let mut cam = polykrom_engine::view::home_camera(s);
                     cam.set_view(self.view);
                     cam
                 });
@@ -524,18 +524,18 @@ impl Backend for Headless {
                 let guides = Guides { grid: shown("grid"), axes: shown("axes") };
                 let path = str_p("path").ok_or("missing `path`")?;
                 // A path outside the agent's folders is refused before anything is drawn.
-                solidcraft_engine::io::vfs::check(path).map_err(|e| format!("{path}: {e}"))?;
-                let scene = solidcraft_engine::view::scene_with_guides(s, &cam, s.section, guides);
+                polykrom_engine::io::vfs::check(path).map_err(|e| format!("{path}: {e}"))?;
+                let scene = polykrom_engine::view::scene_with_guides(s, &cam, s.section, guides);
                 // Drawn on the GPU by the renderer the host installed (`polykrom-cli mcp`).
-                let png = solidcraft_engine::capture::png(&scene, &cam, w, h)?;
-                solidcraft_engine::io::vfs::write(path, &png.bytes).map_err(|e| format!("{path}: {e}"))?;
+                let png = polykrom_engine::capture::png(&scene, &cam, w, h)?;
+                polykrom_engine::io::vfs::write(path, &png.bytes).map_err(|e| format!("{path}: {e}"))?;
                 Ok(json!({
                     "path": path,
                     "bytes": png.bytes.len(),
                     "width": w,
                     "height": h,
                     "renderer": png.renderer,
-                    "warning": solidcraft_engine::capture::warning(png.renderer),
+                    "warning": polykrom_engine::capture::warning(png.renderer),
                 }))
             }
             "ui.screenshot" => Err("no window in headless mode; use ui.render".into()),

@@ -1,11 +1,11 @@
 use crate::{Result, Session, params::bad, render_jobs::job_error};
-use serde::Deserialize;
-use serde_json::{Value, json};
-use solidcraft_doc::render_settings::RenderSetup;
-use solidcraft_render::{
+use polykrom_doc::render_settings::RenderSetup;
+use polykrom_render::{
     RenderOperation, RenderRequest,
     job::{ImageRequest, JobId},
 };
+use serde::Deserialize;
+use serde_json::{Value, json};
 
 #[derive(Default, Deserialize)]
 #[serde(default, deny_unknown_fields)]
@@ -16,7 +16,7 @@ struct Start {
     replace: bool,
 }
 
-fn prepare(s: &Session, params: &Value, command: &str) -> Result<(Start, solidcraft_render::ProductScene, ImageRequest, Value)> {
+fn prepare(s: &Session, params: &Value, command: &str) -> Result<(Start, polykrom_render::ProductScene, ImageRequest, Value)> {
     let input: Start = serde_json::from_value(params.clone()).map_err(|e| bad(command, e.to_string()))?;
     if input.setup.is_some() && input.settings.is_some() {
         return Err(bad(command, "choose either setup or settings"));
@@ -43,7 +43,7 @@ fn prepare(s: &Session, params: &Value, command: &str) -> Result<(Start, solidcr
     if !host.is_available() {
         return Err(bad(command, "image host is unavailable"));
     }
-    let resolved = solidcraft_render::resolve_request(
+    let resolved = polykrom_render::resolve_request(
         &[s.render_backend()],
         &RenderRequest {
             backend: Some(settings.backend.clone()),
@@ -67,7 +67,7 @@ fn prepare(s: &Session, params: &Value, command: &str) -> Result<(Start, solidcr
         background: settings.background,
         transparent_background: input.transparent_background,
     };
-    let admission = solidcraft_render::job::admit(&scene, &request).map_err(job_error)?;
+    let admission = polykrom_render::job::admit(&scene, &request).map_err(job_error)?;
     let reply = json!({"resolved":resolved,"admission":admission,"request":request,"scene_generation":s.revision,"host":host.kind(),"transparency":"sorted_alpha_approximation","refraction":false});
     Ok((input, scene, request, reply))
 }
@@ -119,15 +119,12 @@ pub(super) fn export(s: &mut Session, params: &Value) -> Result<Value> {
     }
     // Atomic native writers are also used for the app's own files and do not
     // apply a request's path scope. Check the caller's destination explicitly.
-    solidcraft_io::vfs::check(&input.path).map_err(|e| bad("render.export", e.to_string()))?;
+    polykrom_io::vfs::check(&input.path).map_err(|e| bad("render.export", e.to_string()))?;
     let frame = s.render_jobs.frame(input.job).map_err(job_error)?;
     // Replace atomically without reading an arbitrarily large previous target into memory.
     // Design saves retain their independent backup policy.
-    let result = if input.overwrite {
-        solidcraft_io::write_atomic(path, frame.png(), false)
-    } else {
-        solidcraft_io::safe_write::create_atomic(path, frame.png())
-    };
+    let result =
+        if input.overwrite { polykrom_io::write_atomic(path, frame.png(), false) } else { polykrom_io::safe_write::create_atomic(path, frame.png()) };
     result.map_err(|e| bad("render.export", format!("could not export PNG: {e}")))?;
     Ok(json!({"job":input.job,"path":input.path,"bytes":frame.png().len(),"frame":frame.info}))
 }

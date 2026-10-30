@@ -45,7 +45,7 @@ fn a_part_set_in_from_a_corner_stays_there_as_the_panel_grows() {
     }
     let snap = s.doc.assembly.joints.first().map(|j| j.a.snap.clone());
     assert!(
-        matches!(&snap, Some(solidcraft_doc::joints::Snap::Edge { edge: Some(_), face: Some(_), corner: Some(_), .. })),
+        matches!(&snap, Some(polykrom_doc::joints::Snap::Edge { edge: Some(_), face: Some(_), corner: Some(_), .. })),
         "the edge, the face and the corner's other edge are kept by name: {snap:?}"
     );
 }
@@ -98,7 +98,7 @@ fn edge_origins_refuse_bad_picks_and_report_a_lost_edge() {
     );
     let mut doc = (*s.doc).clone();
     if let Some(j) = doc.assembly.joints.first_mut()
-        && let solidcraft_doc::joints::Snap::Edge { edge, .. } = &mut j.a.snap
+        && let polykrom_doc::joints::Snap::Edge { edge, .. } = &mut j.a.snap
     {
         *edge = Some("F999:nothing|F998:nowhere".into());
     }

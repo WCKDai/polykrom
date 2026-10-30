@@ -1,11 +1,11 @@
 //! A portable picture from warm display meshes only; never evaluate on save.
 use crate::Session;
+use polykrom_render::{Camera, Rgb, Scene, SceneMesh, StandardView};
 use solidcraft_geom::Aabb3;
-use solidcraft_render::{Camera, Rgb, Scene, SceneMesh, StandardView};
 
 pub(super) fn saved(s: &Session) -> Option<Vec<u8>> {
     let (scene, camera) = scene(s)?;
-    let [width, height] = solidcraft_io::THUMBNAIL_SIZE;
+    let [width, height] = polykrom_io::THUMBNAIL_SIZE;
     // Drawn by the renderer the host installed (the GPU); none installed, no thumbnail.
     let renderer = crate::capture::installed()?;
     crate::capture::png_with(Some(&*renderer), &scene, &camera, u32::try_from(width).ok()?, u32::try_from(height).ok()?).ok().map(|p| p.bytes)
@@ -68,16 +68,16 @@ mod tests {
         }
         assert_eq!(scene(&session).unwrap().0.meshes.len(), 1, "the hidden body is not in the picture");
         let expected = saved(&session).unwrap();
-        let bytes = session.design_container(solidcraft_io::DesignCompression::Fast, false, true).unwrap();
-        let doc = solidcraft_io::read_design(&bytes).unwrap();
+        let bytes = session.design_container(polykrom_io::DesignCompression::Fast, false, true).unwrap();
+        let doc = polykrom_io::read_design(&bytes).unwrap();
         assert_eq!(doc.visibility.hidden_bodies, vec!["Hidden"]);
         assert_eq!(doc, *session.design());
-        assert_eq!(solidcraft_io::read_design_thumbnail(&bytes), Some(expected));
+        assert_eq!(polykrom_io::read_design_thumbnail(&bytes), Some(expected));
         let reopened = Session::new(doc);
         assert_eq!(reopened.visibility, session.visibility);
-        let disabled = session.design_container(solidcraft_io::DesignCompression::Fast, false, false).unwrap();
-        assert_eq!(solidcraft_io::read_design(&disabled).unwrap().visibility, session.visibility);
-        assert!(solidcraft_io::read_design_thumbnail(&disabled).is_none());
+        let disabled = session.design_container(polykrom_io::DesignCompression::Fast, false, false).unwrap();
+        assert_eq!(polykrom_io::read_design(&disabled).unwrap().visibility, session.visibility);
+        assert!(polykrom_io::read_design_thumbnail(&disabled).is_none());
     }
 
     #[test]
@@ -93,11 +93,11 @@ mod tests {
             body.mesh();
         }
         let png = saved(&session).unwrap();
-        let bytes = session.design_container(solidcraft_io::DesignCompression::Fast, false, true).unwrap();
-        assert_eq!(solidcraft_io::read_design_thumbnail(&bytes), Some(png));
-        assert_eq!(solidcraft_io::read_design(&bytes).unwrap(), *session.doc);
-        let disabled = session.design_container(solidcraft_io::DesignCompression::Fast, false, false).unwrap();
-        assert!(solidcraft_io::read_design_thumbnail(&disabled).is_none());
+        let bytes = session.design_container(polykrom_io::DesignCompression::Fast, false, true).unwrap();
+        assert_eq!(polykrom_io::read_design_thumbnail(&bytes), Some(png));
+        assert_eq!(polykrom_io::read_design(&bytes).unwrap(), *session.doc);
+        let disabled = session.design_container(polykrom_io::DesignCompression::Fast, false, false).unwrap();
+        assert!(polykrom_io::read_design_thumbnail(&disabled).is_none());
     }
 
     /// Without a renderer installed (a browser, a tool that draws nothing) a save has no

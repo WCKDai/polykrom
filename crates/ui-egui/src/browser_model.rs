@@ -6,9 +6,9 @@
 use std::collections::{BTreeMap, HashMap};
 use std::sync::Arc;
 
-use solidcraft_engine::Session;
-use solidcraft_engine::doc::{Document, FeatureKind, Mat, ModelState};
-use solidcraft_engine::occurrences::OccurrencePlacement;
+use polykrom_engine::Session;
+use polykrom_engine::doc::{Document, FeatureKind, Mat, ModelState};
+use polykrom_engine::occurrences::OccurrencePlacement;
 
 pub(super) struct Model {
     doc: Arc<Document>,

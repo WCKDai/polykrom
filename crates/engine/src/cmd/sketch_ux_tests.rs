@@ -1,8 +1,8 @@
 //! Sketch interaction tests: dimension placement, Fix/Unfix, the construction toggle, and
 //! which entity moves when a two-entity constraint is applied.
 
+use polykrom_sketch::{DimFrame, Sketch, dim_frame, dim_layout};
 use serde_json::{Value, json};
-use solidcraft_sketch::{DimFrame, Sketch, dim_frame, dim_layout};
 
 use crate::Session;
 
@@ -468,7 +468,7 @@ fn palette_options_are_kept_with_each_sketch() {
     let first = s.active_sketch.expect("sketch");
     run(&mut s, "sketch.finish", json!({}));
     run(&mut s, "sketch.create", json!({"plane": "XZ"}));
-    assert_eq!(sketch(&s).view, solidcraft_sketch::SketchView::default());
+    assert_eq!(sketch(&s).view, polykrom_sketch::SketchView::default());
     let o = run(&mut s, "sketch.options", json!({"sketch": first}));
     assert_eq!(o["options"]["show_dimensions"], false);
     // Saved with the design.
@@ -596,7 +596,7 @@ fn dragging_a_conic_reads_rho_off_the_cursor_and_its_apex_slides_like_any_point(
     let mut s = new_sketch();
     run(&mut s, "sketch.conic", json!({"start": [0, 0], "end": [40, 0], "apex": [20, 20]}));
     let rho = |s: &Session| match sketch(s).curves[0].kind {
-        solidcraft_sketch::CurveKind::Conic { rho, .. } => rho,
+        polykrom_sketch::CurveKind::Conic { rho, .. } => rho,
         ref k => panic!("not a conic: {k:?}"),
     };
     assert!((rho(&s) - 0.5).abs() < 1e-9, "default rho: {}", rho(&s));
@@ -904,7 +904,7 @@ fn the_step_cap_leaves_the_plan_and_is_restored() {
 /// Stored (counter-clockwise) sweep of an arc, degrees in [0, 360).
 fn sweep_deg(s: &Session, arc: &str) -> f64 {
     let sk = sketch(s);
-    let Some(solidcraft_sketch::CurveKind::Arc { c, a, b }) = sk.curve_index(arc).map(|i| sk.curves[i].kind.clone()) else { panic!("no arc {arc}") };
+    let Some(polykrom_sketch::CurveKind::Arc { c, a, b }) = sk.curve_index(arc).map(|i| sk.curves[i].kind.clone()) else { panic!("no arc {arc}") };
     let (c, a, b) = (sk.points[c].pos, sk.points[a].pos, sk.points[b].pos);
     ((b - c).angle() - (a - c).angle()).rem_euclid(std::f64::consts::TAU).to_degrees()
 }
@@ -976,7 +976,7 @@ fn a_dragged_fillet_stays_in_its_corner() {
         run(&mut s, "sketch.constraint.fix", json!({"entities": ["l1.start"]}));
         run(&mut s, "sketch.constraint.horizontal_vertical", json!({"line": "l1", "mode": "horizontal"}));
         let sk0 = sketch(&s);
-        let arc = sk0.curves.iter().position(|c| matches!(c.kind, solidcraft_sketch::CurveKind::Arc { .. })).expect("fillet arc");
+        let arc = sk0.curves.iter().position(|c| matches!(c.kind, polykrom_sketch::CurveKind::Arc { .. })).expect("fillet arc");
         let arc_id = sk0.curves[arc].id.clone();
         let inside = |s: &Session| {
             let sk = sketch(s);
@@ -1112,7 +1112,7 @@ fn the_drag_step_counts_every_held_size_but_the_dragged_length() {
     run(&mut s, "sketch.line", json!({"points": [[100, 100], [100, 110]], "ids": ["la"]}));
     run(&mut s, "sketch.line", json!({"points": [[100.05, 120], [110, 120]], "ids": ["lb"], "connect": false}));
     run(&mut s, "sketch.dimension", json!({"entities": ["la.start", "lb.start"], "type": "horizontal", "value": 0.05}));
-    assert!(sketch(&s).constraints.iter().any(|c| matches!(c.kind, solidcraft_sketch::ConstraintKind::DistanceX { .. })));
+    assert!(sketch(&s).constraints.iter().any(|c| matches!(c.kind, polykrom_sketch::ConstraintKind::DistanceX { .. })));
     let steps = drag_steps(&s, "la.start", [100.0, 100.0], [101.0, 100.0]);
     drag(&mut s, "la.start", [100.0, 100.0], [101.0, 100.0]);
     let (a, b) = (pt(&s, "la.start"), pt(&s, "lb.start"));
@@ -1130,7 +1130,7 @@ fn a_circle_centred_on_a_dragged_end_does_not_set_the_step() {
     run(&mut s, "sketch.constraint.fix", json!({"entities": ["la.start"]}));
     run(&mut s, "sketch.dimension", json!({"entities": ["la"], "value": 20}));
     run(&mut s, "sketch.circle.center", json!({"center": [120, 100], "radius": 0.01}));
-    assert!(sketch(&s).constraints.iter().any(|c| matches!(c.kind, solidcraft_sketch::ConstraintKind::Coincident { .. })));
+    assert!(sketch(&s).constraints.iter().any(|c| matches!(c.kind, polykrom_sketch::ConstraintKind::Coincident { .. })));
     let steps = drag_steps(&s, "la.end", [120.0, 100.0], [120.0, 101.0]);
     eprintln!("1 mm drag next to a 0.01 mm circle on the end: {steps} steps");
     assert_eq!(steps, 1);
@@ -1336,7 +1336,7 @@ fn pipe_and_sweep_follow_3d_sketch_curves() {
 /// past that above or below them the horizontal distance, beside them the vertical one (#257).
 #[test]
 fn auto_dimension_orientation_follows_where_its_text_is_placed() {
-    use solidcraft_sketch::ConstraintKind;
+    use polykrom_sketch::ConstraintKind;
     // The ends of a 30 × 40 line: 50 long, and the slope keeps "across" and "past" distinct.
     let dimension = |end: [f64; 2], entities: Value, extra: Value| {
         let mut s = new_sketch();

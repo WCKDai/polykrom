@@ -3,12 +3,12 @@
 
 use crate::dialogs::put;
 use crate::ui_kit::{choice_row, expr_row, hint_row};
+use polykrom_engine::Sel;
+use polykrom_engine::doc::FeatureKind;
+use polykrom_engine::doc::expr::Kind as ValueKind;
+use polykrom_engine::doc::plastic::PlasticRule;
+use polykrom_engine::geom::Vec3;
 use serde_json::{Map, Value, json};
-use solidcraft_engine::Sel;
-use solidcraft_engine::doc::FeatureKind;
-use solidcraft_engine::doc::expr::Kind as ValueKind;
-use solidcraft_engine::doc::plastic::PlasticRule;
-use solidcraft_engine::geom::Vec3;
 
 use crate::SolveApp;
 use crate::dialogs::{Kind, combo, face_sel, field, form_row, shown_expr};
@@ -335,7 +335,7 @@ pub fn commands(app: &SolveApp, k: &Pl, inputs: &[SelInput], extra: &Map<String,
     Ok(vec![(cmd.to_string(), p)])
 }
 
-fn s(o: &Option<solidcraft_engine::doc::Expr>) -> String {
+fn s(o: &Option<polykrom_engine::doc::Expr>) -> String {
     o.as_deref().map(str::to_string).unwrap_or_default()
 }
 

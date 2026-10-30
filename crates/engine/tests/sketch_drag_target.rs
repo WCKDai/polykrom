@@ -5,7 +5,7 @@ mod four_bar;
 use serde_json::json;
 use solidcraft_geom::Vec2;
 
-fn drag(s: &mut solidcraft_engine::Session, target: Vec2) {
+fn drag(s: &mut polykrom_engine::Session, target: Vec2) {
     let from = four_bar::point(s, "crank.end").unwrap();
     s.execute("sketch.drag", &json!({"entity":"crank.end","from":[from.x,from.y],"to":[target.x,target.y],"live":true})).unwrap();
 }
@@ -106,7 +106,7 @@ fn four_bar_other_joint_follows_the_rocker_arc_and_its_limits() {
     }
 }
 
-fn grab(s: &solidcraft_engine::Session, line: &str, fraction: f64) -> Vec2 {
+fn grab(s: &polykrom_engine::Session, line: &str, fraction: f64) -> Vec2 {
     let a = four_bar::point(s, &format!("{line}.start")).unwrap();
     let b = four_bar::point(s, &format!("{line}.end")).unwrap();
     a + (b - a) * fraction
@@ -115,7 +115,7 @@ fn grab(s: &solidcraft_engine::Session, line: &str, fraction: f64) -> Vec2 {
 #[test]
 fn a_free_line_grabbed_slightly_off_its_edge_still_translates_rigidly() {
     for from in [Vec2::new(15.0, 12.0), Vec2::new(32.0, 11.0)] {
-        let mut s = solidcraft_engine::Session::default();
+        let mut s = polykrom_engine::Session::default();
         s.execute("sketch.create", &json!({"plane":"XZ"})).unwrap();
         s.execute("sketch.line", &json!({"points":[[10,10],[30,10]],"ids":["free"],"infer":false})).unwrap();
         let to = from + Vec2::new(3.0, 5.0);
@@ -133,7 +133,7 @@ fn an_offset_edge_grab_rotates_with_the_link_and_does_not_drift() {
         let mut s = four_bar::session().unwrap();
         let target = Vec2::new(-7.0, 11.2);
         let closest = target * (10.0 * local.len() / target.len());
-        let attached = |s: &solidcraft_engine::Session| {
+        let attached = |s: &polykrom_engine::Session| {
             let a = four_bar::point(s, "crank.start").unwrap();
             let d = four_bar::point(s, "crank.end").unwrap() - a;
             a + d * local.x + Vec2::new(-d.y, d.x) * local.y
@@ -266,9 +266,9 @@ fn the_coupler_edge_follows_with_both_ends_free_to_rotate() {
 /// Two parallelogram linkages, each held parallel and equal on both pairs of sides (two
 /// redundant constraints each), the upper one hanging off the lower one's moving side and tied
 /// to a fixed pivot by a 30 mm rod: one degree of freedom (#4585).
-fn parallelograms() -> solidcraft_engine::Session {
-    let mut s = solidcraft_engine::Session::default();
-    let run = |s: &mut solidcraft_engine::Session, id: &str, p: serde_json::Value| {
+fn parallelograms() -> polykrom_engine::Session {
+    let mut s = polykrom_engine::Session::default();
+    let run = |s: &mut polykrom_engine::Session, id: &str, p: serde_json::Value| {
         s.execute(id, &p).unwrap_or_else(|e| panic!("{id} {p}: {e}"));
     };
     run(&mut s, "sketch.create", json!({"plane":"XY"}));
@@ -297,7 +297,7 @@ fn parallelograms() -> solidcraft_engine::Session {
 }
 
 /// The parallelograms' lengths, directions and fixed points, as the largest error.
-fn parallelogram_error(s: &solidcraft_engine::Session) -> f64 {
+fn parallelogram_error(s: &polykrom_engine::Session) -> f64 {
     let p = |name: &str| four_bar::point(s, name).unwrap();
     let side = |line: &str| p(&format!("{line}.end")) - p(&format!("{line}.start"));
     let mut error = p("bot.start").len().max(p("right.start").dist(Vec2::new(0.0, 20.0)));

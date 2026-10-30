@@ -31,7 +31,7 @@ fn centre(s: &Session) -> (String, Vec3) {
         .curves
         .iter()
         .find_map(|c| match c.kind {
-            solidcraft_sketch::CurveKind::Circle { c, .. } => Some((ss.sketch.points[c].id.clone(), ss.plane.to_world(ss.sketch.points[c].pos))),
+            polykrom_sketch::CurveKind::Circle { c, .. } => Some((ss.sketch.points[c].id.clone(), ss.plane.to_world(ss.sketch.points[c].pos))),
             _ => None,
         })
         .unwrap()
@@ -73,11 +73,11 @@ fn a_single_hole_follows_its_sketch_point() {
     assert!(solid_at(&s, before - Vec3::new(0.0, 0.0, 5.0)), "the old spot is filled again");
 
     // Saved and reopened, the hole is still a Single one at the point.
-    let mut t = Session::new(solidcraft_doc::Document::from_json(&s.doc.to_json()).unwrap());
+    let mut t = Session::new(polykrom_doc::Document::from_json(&s.doc.to_json()).unwrap());
     t.refresh();
     bore_at(&t, after);
     let f = t.doc.find_feature("H").unwrap();
-    assert!(matches!(&f.kind, solidcraft_doc::FeatureKind::Hole { points: Some(sp), .. } if sp.single && sp.ids == [id.clone()]), "{:?}", f.kind);
+    assert!(matches!(&f.kind, polykrom_doc::FeatureKind::Hole { points: Some(sp), .. } if sp.single && sp.ids == [id.clone()]), "{:?}", f.kind);
     assert!((block - volume(&mut t) - bore).abs() < 1e-3 * bore);
 }
 

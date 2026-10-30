@@ -66,7 +66,7 @@ commands. Where members meet they overlap until corner treatments land.
   them unless the edit changes `body_name`.
 
 Every built-in profile is SolidCraft's own parametric definition, built in code
-(`solidcraft_doc::frame`). SolidCraft ships no vendor's or standard's size table: you give the
+(`polykrom_doc::frame`). SolidCraft ships no vendor's or standard's size table: you give the
 dimensions of the stock you buy. Any other section, a vendor's aluminium extrusion for example, comes
 from a sketch: draw it or insert the vendor's DXF.
 

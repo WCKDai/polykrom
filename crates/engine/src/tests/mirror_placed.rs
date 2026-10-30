@@ -47,7 +47,7 @@ fn a_moved_components_body_is_mirrored_where_it_is_shown() {
     run(&mut s, "occurrence.move", json!({"occurrence": occurrence, "space": "world", "translate": [0, 200, 0]}));
     assert_box(world_box(&s, &copy), mirrored_yz(&s, "ArmBody"));
     // It survives a save and reopen.
-    let t = Session::new(solidcraft_doc::Document::from_json(&s.doc.to_json()).unwrap());
+    let t = Session::new(polykrom_doc::Document::from_json(&s.doc.to_json()).unwrap());
     assert_box(world_box(&t, &copy), mirrored_yz(&t, "ArmBody"));
 }
 
@@ -98,7 +98,7 @@ fn bodies_in_place_keep_no_placement() {
     run(&mut s, "solid.box", json!({"length": 10, "width": 10, "height": 10, "body_name": "Base"}));
     run(&mut s, "solid.mirror", json!({"bodies": ["Base"], "plane": "YZ"}));
     let f = s.doc.features.last().unwrap();
-    assert!(matches!(&f.kind, solidcraft_doc::FeatureKind::Mirror { placements, .. } if placements.is_empty()), "{:?}", f.kind);
+    assert!(matches!(&f.kind, polykrom_doc::FeatureKind::Mirror { placements, .. } if placements.is_empty()), "{:?}", f.kind);
 }
 
 #[test]
@@ -117,7 +117,7 @@ fn a_copy_goes_beside_its_source_in_that_component() {
         let mut s = Session::default();
         let (component, occurrence) = moved_arm(&mut s);
         if !moved {
-            run(&mut s, "occurrence.move", json!({"occurrence": occurrence, "base_transform": solidcraft_doc::IDENTITY}));
+            run(&mut s, "occurrence.move", json!({"occurrence": occurrence, "base_transform": polykrom_doc::IDENTITY}));
         }
         let copy = created(&run(&mut s, "solid.mirror", json!({"bodies": ["ArmBody"], "plane": "YZ"})));
         let st = s.model.state();
@@ -223,7 +223,7 @@ fn a_placement_leading_to_another_component_is_reported_lost() {
     let copy = created(&run(&mut s, "solid.mirror", json!({"bodies": ["ArmBody"], "plane": "YZ"})));
     let mirror = s.doc.features.last().unwrap().id;
     if let Some(f) = std::sync::Arc::make_mut(&mut s.doc).feature_mut(mirror)
-        && let solidcraft_doc::FeatureKind::Mirror { placements, .. } = &mut f.kind
+        && let polykrom_doc::FeatureKind::Mirror { placements, .. } = &mut f.kind
     {
         *placements = vec![vec![other]];
     }

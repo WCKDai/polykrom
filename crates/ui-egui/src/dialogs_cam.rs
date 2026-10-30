@@ -5,10 +5,10 @@
 //! turns on. Play turns the cam a full turn so the follower shows its motion before OK.
 
 use egui::RichText;
+use polykrom_engine::Sel;
+use polykrom_engine::Session;
+use polykrom_engine::doc::joints::JointKind;
 use serde_json::{Value, json};
-use solidcraft_engine::Sel;
-use solidcraft_engine::Session;
-use solidcraft_engine::doc::joints::JointKind;
 
 use super::{ROUND, joint_row, occurrence, pick, picked_radius, trim, turn};
 use crate::SolveApp;

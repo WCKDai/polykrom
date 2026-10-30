@@ -4,8 +4,8 @@
 //! components, canvases and joints. `dry_run` reports what would go and what would fail without
 //! changing anything, so the UI can ask first.
 
+use polykrom_doc::FeatureKind;
 use serde_json::{Value, json};
-use solidcraft_doc::FeatureKind;
 use solidcraft_geom::Vec3;
 
 use super::CommandSpec;

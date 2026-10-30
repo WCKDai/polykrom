@@ -2,9 +2,9 @@
 //! pieces (cubic Béziers become single-span control splines, conic arcs conics), so the result
 //! stays exact; the pieces replace the original curve.
 
+use polykrom_sketch::{ConstraintKind, CurveKind, Sketch};
 use serde_json::{Value, json};
 use solidcraft_geom::{Seg2, Vec2};
-use solidcraft_sketch::{ConstraintKind, CurveKind, Sketch};
 
 use super::sketch::add_c;
 use crate::Result;

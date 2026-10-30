@@ -1,11 +1,11 @@
 //! Plastic (enclosure) features: Boss, Lip / Groove, Snap Fit and Rest, and plastic rules.
 
+use polykrom_doc::BodyName;
+use polykrom_doc::FeatureKind;
+use polykrom_doc::expr::Kind;
+use polykrom_doc::plastic::PlasticRule;
+use polykrom_doc::{Dir, FacePick, Position};
 use serde_json::{Value, json};
-use solidcraft_doc::BodyName;
-use solidcraft_doc::FeatureKind;
-use solidcraft_doc::expr::Kind;
-use solidcraft_doc::plastic::PlasticRule;
-use solidcraft_doc::{Dir, FacePick, Position};
 use solidcraft_geom::Vec3;
 
 use super::CommandSpec;
@@ -174,7 +174,7 @@ fn rest(s: &mut Session, p: &Value) -> Result<Value> {
     add_feature(s, p, kind)
 }
 
-fn checked(s: &Session, p: &Value, k: &str, kind: Kind, cmd: &str) -> Result<Option<solidcraft_doc::Expr>> {
+fn checked(s: &Session, p: &Value, k: &str, kind: Kind, cmd: &str) -> Result<Option<polykrom_doc::Expr>> {
     match expr(p, k) {
         Some(e) => {
             check_expr(s, &e, kind, cmd, k)?;
@@ -184,7 +184,7 @@ fn checked(s: &Session, p: &Value, k: &str, kind: Kind, cmd: &str) -> Result<Opt
     }
 }
 
-fn required(s: &Session, p: &Value, k: &str, kind: Kind, cmd: &str) -> Result<solidcraft_doc::Expr> {
+fn required(s: &Session, p: &Value, k: &str, kind: Kind, cmd: &str) -> Result<polykrom_doc::Expr> {
     let e = req_expr(cmd, p, k)?;
     check_expr(s, &e, kind, cmd, k)?;
     Ok(e)
@@ -384,7 +384,7 @@ mod tests {
                         assert!(body.validity().is_empty());
                     };
                     check(&s);
-                    check(&Session::new(solidcraft_doc::Document::from_json(&s.doc.to_json()).unwrap()));
+                    check(&Session::new(polykrom_doc::Document::from_json(&s.doc.to_json()).unwrap()));
                 }
             }
         }
@@ -468,7 +468,7 @@ mod tests {
         run(&mut s, "parameters.change", json!({"name":"board_d","expression":"50 mm"}));
         let before = s.model.state_before(feature.id);
         let name = feature.face_names.first().unwrap();
-        let point = solidcraft_doc::naming::point_on_face(&before, name, Vec3::new(0., -28., 20.))
+        let point = polykrom_doc::naming::point_on_face(&before, name, Vec3::new(0., -28., 20.))
             .expect("the original wall identity survives merged pieces")
             .0;
         assert!((point - Vec3::new(0., -33., 20.)).len() < 1e-8, "{point:?}");
@@ -488,7 +488,7 @@ mod tests {
             assert!(!mesh.contains(Vec3::new(0., -24., 19.4)), "the arm ends at its specified length");
         };
         check(&s);
-        let cold = Session::new(solidcraft_doc::Document::from_json(&s.doc.to_json()).unwrap());
+        let cold = Session::new(polykrom_doc::Document::from_json(&s.doc.to_json()).unwrap());
         assert!(cold.model.results.iter().all(|result| result.error.is_none()));
         check(&cold);
     }

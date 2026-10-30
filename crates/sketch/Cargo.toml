@@ -1,5 +1,5 @@
 [package]
-name = "solidcraft-sketch"
+name = "polykrom-sketch"
 description = "Polykrom sketches: points, curves, geometric constraints and dimensions, the constraint solver, and profile detection"
 version.workspace = true
 edition.workspace = true

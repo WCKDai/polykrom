@@ -1,6 +1,6 @@
 //! The walks over a feature: its expressions (`params`), its references to the rest of the design
 //! (`feature_refs`) and its geometry (`feature_geometry`). `#[derive(Walk)]`
-//! (`solidcraft-derive`) generates them from `#[walk(...)]` roles on the fields of `FeatureKind`
+//! (`polykrom-derive`) generates them from `#[walk(...)]` roles on the fields of `FeatureKind`
 //! and the types inside it, so what a field is, is written once, where it is declared. The
 //! traits here carry the walks through the types the fields have: options, lists, arrays, planes
 //! and construction definitions.
@@ -45,8 +45,8 @@ impl Walk for u32 {}
 impl Walk for ProfileSel {}
 impl Walk for std::collections::BTreeMap<String, String> {}
 impl Walk for crate::frame::Anchor {}
-impl Walk for solidcraft_sketch::Sketch {}
-impl Walk for solidcraft_sketch::PatternAlignment {}
+impl Walk for polykrom_sketch::Sketch {}
+impl Walk for polykrom_sketch::PatternAlignment {}
 impl Walk for solidcraft_kernel::StepNode {}
 impl Walk for crate::document::Operation {}
 impl Walk for solidcraft_kernel::Continuity {}

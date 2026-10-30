@@ -18,7 +18,7 @@ pub(super) fn occ(s: &Session, component: &str) -> u64 {
 }
 
 pub(super) fn place(s: &Session, component: &str, p: Vec3) -> Vec3 {
-    solidcraft_doc::apply_point(&solidcraft_doc::joints::occurrence_world(&s.doc, occ(s, component)), p)
+    polykrom_doc::apply_point(&polykrom_doc::joints::occurrence_world(&s.doc, occ(s, component)), p)
 }
 
 fn near(a: Vec3, b: Vec3) -> bool {
@@ -37,7 +37,7 @@ fn deleted_joint_ids_are_not_reused_after_reopening() {
         };
         let first = run(&mut s, command, params.clone())["joint"].as_u64().unwrap();
         run(&mut s, "joint.delete", json!({"joint": first}));
-        let doc = solidcraft_doc::Document::from_json(&s.doc.to_json()).unwrap();
+        let doc = polykrom_doc::Document::from_json(&s.doc.to_json()).unwrap();
         *s.doc_mut() = doc;
         let second = run(&mut s, command, params)["joint"].as_u64().unwrap();
         assert!(second > first, "{command}: deleted joint {first} was reused as {second}");
@@ -79,8 +79,8 @@ fn circle_given_by_its_centre_takes_that_round_end() {
     // and the face its end opens onto, so it follows them.
     run(&mut s, "joint.origin", json!({"occurrence": "Knob", "circle": [0, 0, 16], "name": "Top"}));
     let top = s.doc.assembly.origins.iter().find(|o| o.name == "Top").map(|o| o.origin.clone()).unwrap();
-    assert!(matches!(&top.snap, solidcraft_doc::joints::Snap::CircleCenter { face: Some(_), end: Some(_), .. }), "{top:?}");
-    let m = solidcraft_doc::joints::resolve_origin(&s.doc, &s.model.state(), &top).unwrap();
+    assert!(matches!(&top.snap, polykrom_doc::joints::Snap::CircleCenter { face: Some(_), end: Some(_), .. }), "{top:?}");
+    let m = polykrom_doc::joints::resolve_origin(&s.doc, &s.model.state(), &top).unwrap();
     assert!(near(Vec3::new(m[3][0], m[3][1], m[3][2]), Vec3::new(0.0, 0.0, 16.0)) && near(Vec3::new(m[2][0], m[2][1], m[2][2]), Vec3::Z), "{m:?}");
     // Off the axis is still refused; a coupling size given by a centre is that round face's
     // radius (it follows the face).
@@ -109,9 +109,9 @@ fn revolute_hinge_turns_about_the_knuckle() {
     assert_eq!(dof, 1, "{l}");
     // Drive 90°: B turns about the knuckle axis (through (0, 33, 4), along the frame's z = −X).
     run(&mut s, "joint.drive", json!({"joint": "Hinge", "value": 90}));
-    let want = solidcraft_doc::rigid(Vec3::ZERO, Vec3::new(0.0, 33.0, 4.0), Vec3::new(-1.0, 0.0, 0.0), FRAC_PI_2);
+    let want = polykrom_doc::rigid(Vec3::ZERO, Vec3::new(0.0, 33.0, 4.0), Vec3::new(-1.0, 0.0, 0.0), FRAC_PI_2);
     let p = Vec3::new(20.0, 0.0, 0.0);
-    assert!(near(place(&s, "LeafB", p), solidcraft_doc::apply_point(&want, p)), "{:?}", place(&s, "LeafB", p));
+    assert!(near(place(&s, "LeafB", p), polykrom_doc::apply_point(&want, p)), "{:?}", place(&s, "LeafB", p));
     assert!(near(place(&s, "LeafB", p), Vec3::new(20.0, 29.0, 37.0)));
     // LeafA did not move; the knuckle axis is fixed.
     assert!(near(place(&s, "LeafA", p), p));
@@ -162,7 +162,7 @@ fn slider_limits_clamp() {
         .doc
         .features
         .iter()
-        .find(|f| matches!(f.kind, solidcraft_doc::FeatureKind::Box { .. }))
+        .find(|f| matches!(f.kind, polykrom_doc::FeatureKind::Box { .. }))
         .and_then(|f| f.param_names.get(2).cloned())
         .unwrap_or_default();
     run(&mut s, "parameters.change", json!({"name": h, "expression": "15"}));
@@ -281,7 +281,7 @@ fn motion_links_and_interference() {
     run(&mut s, "joint.drive", json!({"joint": "Screw", "values": [0, 3]}));
     assert!(near(place(&s, "D", Vec3::new(65.0, 5.0, 0.0)), Vec3::new(5.0, 5.0, 16.0)), "{:?}", place(&s, "D", Vec3::new(65.0, 5.0, 0.0)));
     // Saved and reopened, joints come back.
-    let back = solidcraft_doc::Document::from_json(&s.doc.to_json()).unwrap();
+    let back = polykrom_doc::Document::from_json(&s.doc.to_json()).unwrap();
     assert_eq!(back.assembly, s.doc.assembly);
     let mut t = Session::new(back);
     let l = run(&mut t, "joint.list", json!({}));
@@ -1091,7 +1091,7 @@ fn hidden_joints_still_drive_and_are_saved_with_the_design() {
 fn older_designs_show_every_joint_and_new_joints_start_shown() {
     let (dir, path) = temp_design("legacy", "json");
     let mut s = hinged();
-    let mut legacy: Value = serde_json::from_slice(&solidcraft_io::write_design(&s.doc)).unwrap();
+    let mut legacy: Value = serde_json::from_slice(&polykrom_io::write_design(&s.doc)).unwrap();
     legacy["format"] = json!("solidcraft/19");
     legacy["visibility"] =
         json!({"hidden_bodies": [], "hidden_occurrences": [], "hidden_origin": ["XY"], "hidden_sketches": [], "shown_sketches": []});
@@ -1505,7 +1505,7 @@ fn associative_trace_follows_a_study_and_survives_serialization() {
     );
     assert_eq!(kept_trace_fit(&s, id).len(), 37);
     assert_ne!(kept_trace_fit(&s, id), original);
-    let doc: solidcraft_doc::Document = serde_json::from_value(serde_json::to_value(&*s.doc).unwrap()).unwrap();
+    let doc: polykrom_doc::Document = serde_json::from_value(serde_json::to_value(&*s.doc).unwrap()).unwrap();
     let mut opened = Session::new(doc);
     run(&mut opened, "motion.trace.edit", json!({"sketch":id,"samples":25}));
     assert_eq!(kept_trace_fit(&opened, id).len(), 25);
@@ -1536,9 +1536,9 @@ fn associative_trace_follows_a_resized_picked_face_and_keeps_downstream_paths_cu
     run(&mut s, "solid.pipe", json!({"path_sketch":id,"path":r["curves"],"diameter":1,"operation":"new","body_name":"TracePipe"}));
     let pipe_before = s.model.state().body("TracePipe").unwrap().outline_bounds();
     let comp = s.doc.find_component("B").unwrap();
-    let height =
-        s.doc.features.iter().find(|f| f.component == comp && matches!(f.kind, solidcraft_doc::FeatureKind::Box { .. })).unwrap().param_names[2]
-            .clone();
+    let height = s.doc.features.iter().find(|f| f.component == comp && matches!(f.kind, polykrom_doc::FeatureKind::Box { .. })).unwrap().param_names
+        [2]
+    .clone();
     let count = s.motion_traces.recomputations;
     run(&mut s, "parameters.change", json!({"name":height,"expression":"15 mm"}));
     let updated = kept_trace_fit(&s, id);
@@ -1956,7 +1956,7 @@ fn joint_inspect_reads_only() {
 /// report is optional: loop stops, errors and the resulting pose must not depend on it.
 #[test]
 fn placement_analysis_preserves_held_loop_constraints_and_diagnostics() {
-    use solidcraft_doc::joints::{self, Analysis};
+    use polykrom_doc::joints::{self, Analysis};
     use std::collections::BTreeMap;
 
     let (s, _, _) = four_bar();
@@ -1982,7 +1982,7 @@ fn placement_analysis_preserves_held_loop_constraints_and_diagnostics() {
     }
     // A degenerate origin remains an error even in a placement-only trial.
     let mut broken = (*s.doc).clone();
-    broken.assembly.joints[0].b.snap = solidcraft_doc::joints::Snap::Point { point: Vec3::ZERO, z: Some(Vec3::ZERO), x: None };
+    broken.assembly.joints[0].b.snap = polykrom_doc::joints::Snap::Point { point: Vec3::ZERO, z: Some(Vec3::ZERO), x: None };
     let full = joints::solve(&broken, &s.model.state());
     let placement = joints::solve_holding_with_analysis(&broken, &s.model.state(), &BTreeMap::new(), Analysis::Placement);
     assert!(!full.errors.is_empty());
@@ -2001,7 +2001,7 @@ fn joint_drive_and_refresh_do_not_repeat_dof_analysis() {
         let (all, full) = super::solve_counts::take();
         assert!(all > full, "placement trials must still run");
         assert_eq!(full, usize::from(!quiet), "only a published DOF report needs full analysis");
-        let expected = super::sol_json(&solidcraft_doc::joints::solve(&s.doc, &s.model.state()), &json!({"quiet":quiet}));
+        let expected = super::sol_json(&polykrom_doc::joints::solve(&s.doc, &s.model.state()), &json!({"quiet":quiet}));
         for key in ["dof", "fixed", "errors", "conflicts"] {
             assert_eq!(r.get(key), expected.get(key), "{key}: {r}");
         }
@@ -2091,7 +2091,7 @@ fn a_corexy_head_follows_both_motors() {
     let also = &l["links"][0]["also"][0];
     assert!((also["ratio"].as_f64().unwrap_or(0.0) - k).abs() < 1e-12, "{l}");
     // Saved and reopened, the head follows the same way.
-    let back = solidcraft_doc::Document::from_json(&s.doc.to_json()).unwrap();
+    let back = polykrom_doc::Document::from_json(&s.doc.to_json()).unwrap();
     assert_eq!(back.assembly, s.doc.assembly);
     let mut t = Session::new(back);
     assert!(close(at(&mut t, 45.0, -45.0), (0.0, 90.0 * k)));

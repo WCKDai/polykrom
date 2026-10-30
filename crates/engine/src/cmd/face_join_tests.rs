@@ -2,8 +2,8 @@
 #![allow(clippy::unwrap_used, clippy::panic)]
 
 use crate::Session;
+use polykrom_doc::{Document, FeatureKind};
 use serde_json::{Value, json};
-use solidcraft_doc::{Document, FeatureKind};
 use solidcraft_geom::Vec3;
 
 fn run(s: &mut Session, command: &str, params: Value) -> Value {
@@ -100,8 +100,8 @@ fn face_join_of_a_step_import_keeps_all_32_neighbours_unchanged() {
     for i in 0..31 {
         run(&mut source, "solid.box", json!({"corner":[100+20*i,100,0],"length":5,"width":5,"height":5,"body_name":format!("Distant{i}")}));
     }
-    let step = solidcraft_io::export(&source.model.state(), &[], solidcraft_io::Format::Step, "Original assembly").unwrap();
-    let imported = solidcraft_io::step_import_feature(&step, "original-assembly.step").unwrap();
+    let step = polykrom_io::export(&source.model.state(), &[], polykrom_io::Format::Step, "Original assembly").unwrap();
+    let imported = polykrom_io::step_import_feature(&step, "original-assembly.step").unwrap();
     let mut doc = Document::new("Imported assembly");
     let feature = doc.add_feature(imported.kind, None).unwrap();
     doc.feature_mut(feature).unwrap().body_names = imported.body_names;

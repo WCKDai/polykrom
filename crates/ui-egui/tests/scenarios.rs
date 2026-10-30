@@ -1,10 +1,10 @@
-//! User scenarios in the real UI, headless (see `solidcraft_ui_egui::scenario`). Each JSON file
+//! User scenarios in the real UI, headless (see `polykrom_ui_egui::scenario`). Each JSON file
 //! under `tests/scenarios/` is one workflow done with clicks, keys and drags, and one test here:
 //! `build.rs` makes a test per file, named after it. A scenario waiting for a fix starts with a
 //! `{"pending": "why"}` step (its test is ignored with that reason). Adding a scenario is adding
 //! its file.
 
-use solidcraft_ui_egui::scenario::Harness;
+use polykrom_ui_egui::scenario::Harness;
 
 fn run(name: &str) {
     let path = format!("{}/tests/scenarios/{name}.json", env!("CARGO_MANIFEST_DIR"));
@@ -23,7 +23,7 @@ include!(concat!(env!("OUT_DIR"), "/scenario_tests.rs"));
 #[test]
 #[ignore]
 fn adhoc() {
-    let Ok(path) = solidcraft_engine::geom::env::var("SCENARIO_FILE").ok_or(()) else { return };
+    let Ok(path) = polykrom_engine::geom::env::var("SCENARIO_FILE").ok_or(()) else { return };
     let text = std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("{path}: {e}"));
     let steps: serde_json::Value = serde_json::from_str(&text).unwrap_or_else(|e| panic!("{path}: {e}"));
     let mut h = Harness::new();
@@ -63,7 +63,7 @@ fn angle_dimension_both_interactive_workflows() {
         ]))
         .unwrap();
         let sk = &h.app.session.model.state().sketches[0].sketch;
-        assert!(sk.constraints.iter().any(|c| matches!(c.kind, solidcraft_engine::sketch::ConstraintKind::Angle { .. })));
+        assert!(sk.constraints.iter().any(|c| matches!(c.kind, polykrom_engine::sketch::ConstraintKind::Angle { .. })));
     }
 }
 
@@ -97,13 +97,13 @@ fn dragging_a_conic_after_the_tool_sets_rho_and_its_apex_stays_separately_dragga
         .iter()
         .enumerate()
         .find_map(|(i, c)| match c.kind {
-            solidcraft_engine::sketch::CurveKind::Conic { apex, rho, .. } => Some((i, apex, rho)),
+            polykrom_engine::sketch::CurveKind::Conic { apex, rho, .. } => Some((i, apex, rho)),
             _ => None,
         })
         .expect("the three clicks created a conic");
     assert!((rho - 0.5).abs() < 1e-6, "default rho {rho}");
     let apex_before = sk.point(apex_idx).expect("apex point resolves");
-    assert!(apex_before.dist(solidcraft_engine::geom::Vec2::new(20.0, 20.0)) < 1e-6);
+    assert!(apex_before.dist(polykrom_engine::geom::Vec2::new(20.0, 20.0)) < 1e-6);
 
     // Grabbed on the curve itself, at its default-rho midpoint (20, 10): the chord's midpoint
     // is (20, 0), the apex (20, 20), so (20, 14) is 0.7 of the way from one to the other.
@@ -114,7 +114,7 @@ fn dragging_a_conic_after_the_tool_sets_rho_and_its_apex_stays_separately_dragga
     .unwrap();
     let sk_after_rho_drag = h.app.session.model.state().sketches[0].sketch.clone();
     let rho_after = match sk_after_rho_drag.curves[ci].kind {
-        solidcraft_engine::sketch::CurveKind::Conic { rho, .. } => rho,
+        polykrom_engine::sketch::CurveKind::Conic { rho, .. } => rho,
         ref k => panic!("not a conic: {k:?}"),
     };
     assert!((rho_after - 0.7).abs() < 0.02, "rho after drag {rho_after}");
@@ -131,7 +131,7 @@ fn dragging_a_conic_after_the_tool_sets_rho_and_its_apex_stays_separately_dragga
     let apex_after = sk_after_apex_drag.point(apex_idx).expect("apex point still resolves");
     assert!(apex_before.dist(apex_after) > 1.0, "apex did not move: still at {apex_after:?}");
     let rho_final = match sk_after_apex_drag.curves[ci].kind {
-        solidcraft_engine::sketch::CurveKind::Conic { rho, .. } => rho,
+        polykrom_engine::sketch::CurveKind::Conic { rho, .. } => rho,
         ref k => panic!("not a conic: {k:?}"),
     };
     assert!((rho_final - 0.7).abs() < 0.02, "rho changed on an apex drag: {rho_final}");

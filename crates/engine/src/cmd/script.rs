@@ -6,8 +6,8 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
+use polykrom_doc::{Document, Feature, FeatureKind, Param, expr};
 use serde_json::{Map, Value, json};
-use solidcraft_doc::{Document, Feature, FeatureKind, Param, expr};
 
 use super::CommandSpec;
 use crate::params::{bad, str_};
@@ -27,7 +27,7 @@ pub static COMMANDS: &[CommandSpec] = &[
 ];
 
 /// Most model parameters one `timeline.add` step may bring (a sketch's dimensions).
-const MAX_STEP_PARAMS: usize = solidcraft_sketch::MAX_CONSTRAINTS;
+const MAX_STEP_PARAMS: usize = polykrom_sketch::MAX_CONSTRAINTS;
 
 fn add(s: &mut Session, p: &Value) -> Result<Value> {
     let cmd = "timeline.add";
@@ -61,7 +61,7 @@ fn recorded_feature(cmd: &str, raw: &Map<String, Value>) -> Result<Feature> {
         Some(_) => return Err(bad(cmd, "`param_names` must be a list of names")),
     };
     let design = json!({
-        "format": solidcraft_doc::format::format_string(solidcraft_doc::format::FORMAT),
+        "format": polykrom_doc::format::format_string(polykrom_doc::format::FORMAT),
         "name": "",
         "params": [],
         "features": [Value::Object(raw)],
@@ -100,7 +100,7 @@ fn export_script(s: &mut Session, p: &Value) -> Result<Value> {
     let script = json!({
         "about": {
             "design": s.doc.name,
-            "format": solidcraft_doc::format::format_string(solidcraft_doc::format::FORMAT),
+            "format": polykrom_doc::format::format_string(polykrom_doc::format::FORMAT),
             "version": env!("CARGO_PKG_VERSION"),
             "replay": "polykrom-cli eval script.json (timeline.add steps need a build that reads this design format)",
         },
@@ -109,7 +109,7 @@ fn export_script(s: &mut Session, p: &Value) -> Result<Value> {
     let path = str_(p, "path");
     if let Some(path) = path {
         let text = serde_json::to_string_pretty(&script).map_err(|e| EngineError::Other(e.to_string()))?;
-        solidcraft_io::vfs::write(path, text.as_bytes()).map_err(|e| EngineError::Other(format!("{path}: {e}")))?;
+        polykrom_io::vfs::write(path, text.as_bytes()).map_err(|e| EngineError::Other(format!("{path}: {e}")))?;
     } else if p.get("path").is_some_and(|v| !v.is_null()) {
         return Err(bad(cmd, "`path` must be a file path"));
     }
@@ -160,7 +160,7 @@ pub(crate) fn script_steps(doc: &Document) -> Result<(Vec<Value>, Vec<String>)> 
     // Design properties, in one step. Keys `document.metadata.set` would refuse (a well-known
     // key holding something other than text, a key another tool wrote outside the rules) are
     // listed as left out instead of failing the replay.
-    let mut properties = solidcraft_doc::Metadata::default();
+    let mut properties = polykrom_doc::Metadata::default();
     let mut odd = Vec::new();
     for (key, value) in &doc.metadata.0 {
         if properties.set(key, value.clone()).is_err() {

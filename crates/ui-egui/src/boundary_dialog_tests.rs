@@ -4,10 +4,10 @@
 use crate::dialogs::Kind;
 use crate::dialogs_surface::Surf;
 use crate::scenario::Harness;
+use polykrom_engine::Sel;
+use polykrom_engine::doc::{FeatureKind, Operation, kernel::Continuity};
+use polykrom_engine::geom::Vec3;
 use serde_json::{Map, json};
-use solidcraft_engine::Sel;
-use solidcraft_engine::doc::{FeatureKind, Operation, kernel::Continuity};
-use solidcraft_engine::geom::Vec3;
 
 fn ok(h: &mut Harness) {
     h.frames(2);

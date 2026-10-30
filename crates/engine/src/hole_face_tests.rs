@@ -243,7 +243,7 @@ fn pattern_of_a_flipped_hole_and_round_trip() {
     run(&mut s, "solid.pattern.rectangular", json!({"features": ["H"], "dir1": [1, 0, 0], "count1": 3, "spacing1": 12, "name": "Row"}));
     near(removed(&mut s), 3.0 * 628.3);
     let before = volume(&mut s);
-    let doc = solidcraft_doc::Document::from_json(&s.doc.to_json()).unwrap();
+    let doc = polykrom_doc::Document::from_json(&s.doc.to_json()).unwrap();
     let mut again = Session::new(doc);
     near(volume(&mut again), before);
 }
@@ -370,7 +370,7 @@ fn drilled_sketch_points_break_through_a_sloping_back_face() {
     run(&mut s, "edit.redo", json!({}));
     assert_eq!(s.doc.to_json(), saved);
     near(volume(&mut s), left);
-    let mut reopened = Session::new(solidcraft_doc::Document::from_json(&saved).unwrap());
+    let mut reopened = Session::new(polykrom_doc::Document::from_json(&saved).unwrap());
     assert!(reopened.model.result(id).unwrap().error.is_none());
     near(volume(&mut reopened), left);
 }
@@ -400,7 +400,7 @@ fn holes_from_a_sketch_on_a_face_drill_that_body_only() {
     for (x, y) in [(5.0, 5.0), (35.0, 35.0), (20.0, 20.0)] {
         assert!(solid_at(&s, x, y, 5.5) && solid_at(&s, x, y, 3.0), "Back is not drilled at ({x}, {y})");
     }
-    let mut reopened = Session::new(solidcraft_doc::Document::from_json(&s.doc.to_json()).unwrap());
+    let mut reopened = Session::new(polykrom_doc::Document::from_json(&s.doc.to_json()).unwrap());
     near(base - volume(&mut reopened), pi() * 6.25 * 4.0);
 }
 

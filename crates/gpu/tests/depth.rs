@@ -5,13 +5,13 @@
 //! fallback. Skipped, with the reason printed, without a GPU adapter (`SOLIDCRAFT_REQUIRE_GPU=1`
 //! makes that a failure).
 
+use polykrom_engine::Session;
+use polykrom_engine::geom::{Mesh, Vec3};
+use polykrom_engine::render::{Camera, Rgb, Scene, SceneLine, SceneMesh, StandardView};
+use polykrom_engine::view::{self, Guides};
+use polykrom_gpu::GpuError;
+use polykrom_gpu::capture::{self, Capturer};
 use serde_json::json;
-use solidcraft_engine::Session;
-use solidcraft_engine::geom::{Mesh, Vec3};
-use solidcraft_engine::render::{Camera, Rgb, Scene, SceneLine, SceneMesh, StandardView};
-use solidcraft_engine::view::{self, Guides};
-use solidcraft_gpu::GpuError;
-use solidcraft_gpu::capture::{self, Capturer};
 use std::sync::{Arc, OnceLock};
 
 fn or_skip(c: Result<&'static Capturer, &'static GpuError>) -> Option<&'static Capturer> {
@@ -27,7 +27,7 @@ fn or_skip(c: Result<&'static Capturer, &'static GpuError>) -> Option<&'static C
 
 /// The device's own depth, then the 24-bit fallback (the same device kind, its own instance).
 fn capturers() -> Vec<(&'static str, &'static Capturer)> {
-    static FALLBACK: OnceLock<solidcraft_gpu::Result<Capturer>> = OnceLock::new();
+    static FALLBACK: OnceLock<polykrom_gpu::Result<Capturer>> = OnceLock::new();
     let Some(own) = or_skip(capture::shared()) else { return Vec::new() };
     let Some(fallback) = or_skip(FALLBACK.get_or_init(|| Capturer::headless_with_depth(wgpu::TextureFormat::Depth24PlusStencil8)).as_ref()) else {
         return Vec::new();
@@ -37,7 +37,7 @@ fn capturers() -> Vec<(&'static str, &'static Capturer)> {
 }
 
 fn reversed(c: &Capturer) -> bool {
-    solidcraft_gpu::view::reversed_depth(Some(c.depth_format()))
+    polykrom_gpu::view::reversed_depth(Some(c.depth_format()))
 }
 
 /// RGBA pixels as `[r, g, b, a]`.

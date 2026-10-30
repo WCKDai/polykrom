@@ -8,12 +8,12 @@
 use crate::fonts::RichTextExt as _;
 use crate::ui_kit::{choice_row, expr_row, text_row};
 use egui::{Color32, Pos2, RichText, Stroke, vec2};
+use polykrom_engine::Sel;
+use polykrom_engine::Session;
+use polykrom_engine::doc::expr::Kind as ValueKind;
+use polykrom_engine::doc::joints::JointKind;
+use polykrom_engine::geom::{Aabb3, Mesh, Vec3};
 use serde_json::{Value, json};
-use solidcraft_engine::Sel;
-use solidcraft_engine::Session;
-use solidcraft_engine::doc::expr::Kind as ValueKind;
-use solidcraft_engine::doc::joints::JointKind;
-use solidcraft_engine::geom::{Aabb3, Mesh, Vec3};
 
 use crate::SolveApp;
 use crate::dialogs::{Dialog, Kind, combo, field, form_row};
@@ -458,7 +458,7 @@ pub fn snap_of(s: &Session, sel: &Sel) -> Option<SnapPt> {
             match f.plane_normal {
                 Some(n) => (body, SnapPt { at: f.centroid, z: n, kind: SnapKind::FaceCenter, param: json!({"face": pt(*point)}) }),
                 None => {
-                    let c = solidcraft_engine::kernel::cylinder_face_at(&b.body, *point)?;
+                    let c = polykrom_engine::kernel::cylinder_face_at(&b.body, *point)?;
                     let sv = (*point - c.axis_point).dot(c.axis);
                     let (at, dir) = if (sv - c.start).abs() <= (c.end - sv).abs() { (c.start, -1.0) } else { (c.end, 1.0) };
                     (
@@ -782,8 +782,8 @@ fn stress(app: &mut SolveApp, inputs: &[SelInput], force: &[String; 3]) -> Value
 
 /// A force typed into a field, in N: a number or a unitless expression ("2*50").
 fn force_newtons(text: &str) -> Option<f64> {
-    use solidcraft_engine::doc::expr;
-    let no_params = |n: &str| Err(solidcraft_engine::doc::DocError::Expr(format!("unknown parameter `{n}`")));
+    use polykrom_engine::doc::expr;
+    let no_params = |n: &str| Err(polykrom_engine::doc::DocError::Expr(format!("unknown parameter `{n}`")));
     let defaults = expr::Defaults::default();
     expr::eval_with_defaults(text.trim(), &no_params, defaults)
         .ok()
@@ -863,7 +863,7 @@ fn interference(app: &mut SolveApp, picked: &[Sel], clearance: &str) -> (Value, 
     let mut meshes = Vec::new();
     for hit in r["overlaps"].as_array().into_iter().flatten() {
         let (Some(a), Some(b)) = (hit["a"].as_str().and_then(|n| st.body(n)), hit["b"].as_str().and_then(|n| st.body(n))) else { continue };
-        if let Ok(Some(o)) = solidcraft_engine::kernel::boolean(&a.body, &b.body, solidcraft_engine::kernel::BoolOp::Intersect)
+        if let Ok(Some(o)) = polykrom_engine::kernel::boolean(&a.body, &b.body, polykrom_engine::kernel::BoolOp::Intersect)
             && let Ok(m) = o.tessellate((o.size() * 2e-3).max(1e-3))
         {
             meshes.push(m);
@@ -1141,7 +1141,7 @@ pub fn world_preview(s: &Session, cmds: &[(String, Value)], colors: Colors) -> O
     // Any feature, when components are placed away from their frames: the preview must show
     // the world the viewport shows.
     let moves = cmds.iter().all(|(c, _)| MOVES.contains(&c.as_str()));
-    if cmds.is_empty() || !(moves || solidcraft_engine::frames::placed(s)) {
+    if cmds.is_empty() || !(moves || polykrom_engine::frames::placed(s)) {
         return None;
     }
     let preview = match s.preview_visible_world(cmds) {
@@ -1525,12 +1525,12 @@ mod tests;
 
 thread_local! {
     /// Named joint origins in the world, for the design state they were found in.
-    static ORIGINS: std::cell::RefCell<Option<(String, Vec<(String, solidcraft_engine::doc::Mat)>)>> = const { std::cell::RefCell::new(None) };
+    static ORIGINS: std::cell::RefCell<Option<(String, Vec<(String, polykrom_engine::doc::Mat)>)>> = const { std::cell::RefCell::new(None) };
 }
 
 /// Named joint origins in the world: on their occurrence's component, so they move with it
 /// (joint drives, free moves not captured yet, Capture Position).
-pub fn origins_world(s: &Session) -> Vec<(String, solidcraft_engine::doc::Mat)> {
+pub fn origins_world(s: &Session) -> Vec<(String, polykrom_engine::doc::Mat)> {
     if s.doc.assembly.origins.is_empty() {
         return Vec::new();
     }
@@ -1538,7 +1538,7 @@ pub fn origins_world(s: &Session) -> Vec<(String, solidcraft_engine::doc::Mat)> 
     if let Some(v) = ORIGINS.with(|o| o.borrow().as_ref().filter(|(k, _)| *k == key).map(|(_, v)| v.clone())) {
         return v;
     }
-    let doc: std::borrow::Cow<solidcraft_engine::doc::Document> = if s.pending_moves.is_empty() {
+    let doc: std::borrow::Cow<polykrom_engine::doc::Document> = if s.pending_moves.is_empty() {
         std::borrow::Cow::Borrowed(&*s.doc)
     } else {
         let mut d = (*s.doc).clone();
@@ -1560,10 +1560,10 @@ pub fn origins(app: &SolveApp, painter: &egui::Painter, proj: &Proj) {
     let t = Tokens::get();
     let len = app.cam.half_height() * 2.0 * 0.04;
     for (_, m) in origins_world(&app.session) {
-        let at = solidcraft_engine::doc::apply_point(&m, Vec3::ZERO);
+        let at = polykrom_engine::doc::apply_point(&m, Vec3::ZERO);
         let Some(c) = proj.to_screen(at) else { continue };
         for (axis, col) in [(Vec3::X, t.axis_x), (Vec3::Y, t.axis_y), (Vec3::Z, t.axis_z)] {
-            if let Some(tip) = proj.to_screen(at + solidcraft_engine::doc::apply_vector(&m, axis) * len) {
+            if let Some(tip) = proj.to_screen(at + polykrom_engine::doc::apply_vector(&m, axis) * len) {
                 painter.line_segment([c, tip], Stroke::new(2.0, col));
             }
         }
@@ -1573,12 +1573,12 @@ pub fn origins(app: &SolveApp, painter: &egui::Painter, proj: &Proj) {
 
 thread_local! {
     /// Joint frames in the world (joint id → A's frame), for the design state they were found in.
-    static JOINT_FRAMES: std::cell::RefCell<Option<(String, Vec<(u64, solidcraft_engine::doc::Mat)>)>> = const { std::cell::RefCell::new(None) };
+    static JOINT_FRAMES: std::cell::RefCell<Option<(String, Vec<(u64, polykrom_engine::doc::Mat)>)>> = const { std::cell::RefCell::new(None) };
 }
 
 /// Each joint's frame in the world (where its glyph sits): the frame of its first origin, on
 /// its occurrence as placed (including moves not captured yet).
-pub fn joint_frames_world(s: &Session) -> Vec<(u64, solidcraft_engine::doc::Mat)> {
+pub fn joint_frames_world(s: &Session) -> Vec<(u64, polykrom_engine::doc::Mat)> {
     if s.doc.assembly.joints.is_empty() {
         return Vec::new();
     }
@@ -1586,7 +1586,7 @@ pub fn joint_frames_world(s: &Session) -> Vec<(u64, solidcraft_engine::doc::Mat)
     if let Some(v) = JOINT_FRAMES.with(|o| o.borrow().as_ref().filter(|(k, _)| *k == key).map(|(_, v)| v.clone())) {
         return v;
     }
-    let doc: std::borrow::Cow<solidcraft_engine::doc::Document> = if s.pending_moves.is_empty() {
+    let doc: std::borrow::Cow<polykrom_engine::doc::Document> = if s.pending_moves.is_empty() {
         std::borrow::Cow::Borrowed(&*s.doc)
     } else {
         let mut d = (*s.doc).clone();
@@ -1630,7 +1630,7 @@ pub fn joint_glyphs(app: &SolveApp, painter: &egui::Painter, proj: &Proj) {
     let t = Tokens::get();
     let frames = joint_frames_world(&app.session);
     let len = app.cam.half_height() * 2.0 * 0.05;
-    let at = |m: &solidcraft_engine::doc::Mat, x: f64, y: f64, z: f64| solidcraft_engine::doc::apply_point(m, Vec3::new(x, y, z));
+    let at = |m: &polykrom_engine::doc::Mat, x: f64, y: f64, z: f64| polykrom_engine::doc::apply_point(m, Vec3::new(x, y, z));
     for (id, picked) in drawn {
         let Some(j) = app.session.doc.assembly.joints.iter().find(|j| j.id == id) else { continue };
         let Some((_, m)) = frames.iter().find(|(f, _)| *f == id) else { continue };

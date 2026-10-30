@@ -11,7 +11,7 @@
 //!
 //! Ratchet: cases that fail today are listed in `tests/hole_matrix/known_failures.txt`. A listed
 //! case that passes fails the test (take it off the list), and so does an unlisted one that fails.
-//! `HOLE_MATRIX_BLESS=1 cargo test -p solidcraft-engine hole_matrix` rewrites the list.
+//! `HOLE_MATRIX_BLESS=1 cargo test -p polykrom-engine hole_matrix` rewrites the list.
 
 use std::f64::consts::PI;
 
@@ -674,7 +674,7 @@ fn check(case: &Case) -> Result<(), String> {
     let (mut s, start, faces0) = match case.open {
         Some(file) => {
             let text = old_design(file).ok_or("no such design")?;
-            let doc = solidcraft_doc::Document::from_json(text).map_err(|e| format!("open: {e}"))?;
+            let doc = polykrom_doc::Document::from_json(text).map_err(|e| format!("open: {e}"))?;
             let s = Session::new(doc);
             (s, case.start.unwrap_or_default(), None)
         }
@@ -709,7 +709,7 @@ fn check(case: &Case) -> Result<(), String> {
         .doc
         .find_feature("H")
         .map(|f| f.id)
-        .or_else(|| s.doc.features.iter().rev().find(|f| matches!(f.kind, solidcraft_doc::FeatureKind::Hole { .. })).map(|f| f.id))
+        .or_else(|| s.doc.features.iter().rev().find(|f| matches!(f.kind, polykrom_doc::FeatureKind::Hole { .. })).map(|f| f.id))
         && let Some(r) = s.model.result(id)
         && let Some(e) = &r.error
     {
@@ -757,7 +757,7 @@ fn check(case: &Case) -> Result<(), String> {
             return Err(format!("after {:?}: removed {:.2} mm³, expected {after:.2}", case.after.iter().map(|x| x.0).collect::<Vec<_>>(), start - v));
         }
         // Saved and opened again, it rebuilds the same.
-        let doc = solidcraft_doc::Document::from_json(&s.doc.to_json()).map_err(|e| format!("reopen: {e}"))?;
+        let doc = polykrom_doc::Document::from_json(&s.doc.to_json()).map_err(|e| format!("reopen: {e}"))?;
         let mut again = Session::new(doc);
         let (v2, _) = measure(&mut again)?;
         if !close(start - v2, after, start) {

@@ -44,7 +44,7 @@ fn it_is_picked_far_beyond_its_two_points() {
     let rect = h.app.viewport.rect.unwrap();
     let proj = projection(&h.app, rect);
     let ss_plane = h.app.session.world_state().sketch(h.app.session.active_sketch.unwrap()).unwrap().plane;
-    let far = proj.to_screen(ss_plane.to_world(solidcraft_engine::geom::Vec2::new(150.0, 0.0))).unwrap();
+    let far = proj.to_screen(ss_plane.to_world(polykrom_engine::geom::Vec2::new(150.0, 0.0))).unwrap();
     assert!(rect.contains(far));
     let hits = pick(&h.app, &proj, far);
     assert!(hits.iter().any(|h| matches!(h, Hit::SketchCurve { id, .. } if id == "inf")), "{hits:?}");

@@ -4,8 +4,8 @@
 //! (`joint.reach` moves those as far as their joints allow). A chain of joints joined to nothing
 //! fixed moves as one, so its joints stay as they are.
 
+use polykrom_doc::{mat_inverse, mat_mul};
 use serde_json::{Value, json};
-use solidcraft_doc::{mat_inverse, mat_mul};
 
 use super::{move_vector, occurrence, occurrence_path, translation, valid_position};
 use crate::params::bad;
@@ -149,7 +149,7 @@ pub(super) fn drag(s: &mut Session, p: &Value) -> Result<Value> {
         moves.push((placement.occurrence, next));
     }
     let moved: Vec<u64> = moves.iter().map(|(id, _)| *id).collect();
-    if world_move != solidcraft_doc::IDENTITY {
+    if world_move != polykrom_doc::IDENTITY {
         for (id, next) in moves {
             s.pending_moves.remove(&id);
             if let Some(o) = s.doc_mut().occurrences.iter_mut().find(|o| o.id == id) {

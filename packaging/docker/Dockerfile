@@ -2,8 +2,8 @@
 # Polykrom in the browser as a container: the static site (the one packaging/web/package.sh
 # zips) served by nginx on port 8080, as an unprivileged user. From the repository root:
 #
-#   docker build -f packaging/docker/Dockerfile -t solidcraft-web .
-#   docker run --rm -p 8080:8080 solidcraft-web          then open http://localhost:8080/
+#   docker build -f packaging/docker/Dockerfile -t polykrom-web .
+#   docker run --rm -p 8080:8080 polykrom-web          then open http://localhost:8080/
 #
 # Or `docker compose up` with packaging/docker/compose.yaml. Saving designs needs HTTPS or
 # localhost (the browser's private file storage), so put a TLS reverse proxy in front of it on a
@@ -27,7 +27,7 @@ RUN rustup target add wasm32-unknown-unknown \
     | tar -xz -C /usr/local/bin trunk
 WORKDIR /src
 COPY . .
-WORKDIR /src/apps/solidcraft-web
+WORKDIR /src/apps/polykrom-web
 # Trunk downloads the wasm-bindgen and wasm-opt its build needs; its post-build hook writes sw.js.
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=/src/target \

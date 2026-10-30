@@ -4,10 +4,10 @@
 
 use crate::selection::SelectionExt as _;
 use crate::ui_kit::{choice_row, expr_row};
+use polykrom_engine::Sel;
+use polykrom_engine::doc::{Expr, Mat, RailFit, SweepOrientation, SweepRail};
+use polykrom_engine::geom::Vec3;
 use serde_json::{Value, json};
-use solidcraft_engine::Sel;
-use solidcraft_engine::doc::{Expr, Mat, RailFit, SweepOrientation, SweepRail};
-use solidcraft_engine::geom::Vec3;
 
 use crate::SolveApp;
 use crate::selection::{AXES, CURVES, EDGES, SelInput};
@@ -65,7 +65,7 @@ impl SweepOpts {
             SweepOrientation::Parallel => o.orientation = 1,
             SweepOrientation::Direction(d) => {
                 o.orientation = DIRECTION;
-                let world = solidcraft_engine::doc::apply_vector(frame, d.0);
+                let world = polykrom_engine::doc::apply_vector(frame, d.0);
                 match world.normalized().and_then(world_axis) {
                     Some(name) => pick = Some(Sel::Axis { name: name.into() }),
                     None => o.direction = Some(world),

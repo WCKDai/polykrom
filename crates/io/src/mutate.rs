@@ -504,9 +504,9 @@ outer
 
     #[test]
     fn designs_survive_mutation() {
-        let mut doc = solidcraft_doc::Document::new("Fuzz");
+        let mut doc = polykrom_doc::Document::new("Fuzz");
         doc.set_param("width", "40", Some("mm"), None).unwrap();
-        let mesh = solidcraft_doc::MeshData {
+        let mesh = polykrom_doc::MeshData {
             name: "Preview".into(),
             positions: vec![0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0].into(),
             triangles: vec![0, 1, 2].into(),

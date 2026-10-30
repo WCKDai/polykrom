@@ -7,8 +7,8 @@
 
 use std::collections::{BTreeMap, HashSet};
 
+use polykrom_doc::metadata::{DESCRIPTION, MAX_KEYS, MAX_TEXT_BYTES, PART_NUMBER, REVISION, WELL_KNOWN};
 use serde_json::{Map, Value, json};
-use solidcraft_doc::metadata::{DESCRIPTION, MAX_KEYS, MAX_TEXT_BYTES, PART_NUMBER, REVISION, WELL_KNOWN};
 
 use super::CommandSpec;
 use crate::params::{bad, str_};
@@ -408,7 +408,7 @@ fn bom(s: &mut Session, p: &Value) -> Result<Value> {
             "json" => serde_json::to_string_pretty(&json!({"rows": rows, "total_occurrences": total})).map_err(|e| bad(cmd, e.to_string()))?,
             other => return Err(bad(cmd, format!("unknown format `{other}` (csv or json)"))),
         };
-        solidcraft_io::vfs::write(path, text.as_bytes()).map_err(|e| EngineError::Other(format!("{path}: {e}")))?;
+        polykrom_io::vfs::write(path, text.as_bytes()).map_err(|e| EngineError::Other(format!("{path}: {e}")))?;
         out.insert("path".into(), json!(path));
         out.insert("format".into(), json!(format));
     }

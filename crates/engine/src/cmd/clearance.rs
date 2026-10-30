@@ -67,7 +67,7 @@ const PAIR_ATTEMPTS: usize = 128;
 const FIRST_ATTEMPTS: usize = 8;
 
 /// Pairs measured before, by the two bodies' geometry where they stood
-/// ([`solidcraft_doc::ModelBody::geometry_key`]) and the settings that shape the result
+/// ([`polykrom_doc::ModelBody::geometry_key`]) and the settings that shape the result
 /// (clearance, smallest overlap, tolerance).
 #[derive(Default)]
 pub(crate) struct PairCache(HashMap<(u64, u64, [u64; 3]), PairResult>);
@@ -83,8 +83,8 @@ struct PairResult {
 
 impl PairResult {
     /// This result for another placement of the same two parts: its points moved by `m`.
-    fn moved(&self, m: &solidcraft_doc::Mat) -> PairResult {
-        let at = |v: solidcraft_geom::Vec3| solidcraft_doc::apply_point(m, v);
+    fn moved(&self, m: &polykrom_doc::Mat) -> PairResult {
+        let at = |v: solidcraft_geom::Vec3| polykrom_doc::apply_point(m, v);
         let boxed = |b: &Aabb3| {
             let mut out = Aabb3::EMPTY;
             for k in 0..8 {
@@ -141,7 +141,7 @@ fn clearance(s: &mut Session, p: &Value) -> Result<Value> {
     };
 
     let st = s.world_state();
-    let (mesh_bodies, solid): (Vec<&solidcraft_doc::ModelBody>, Vec<&solidcraft_doc::ModelBody>) = st.bodies.iter().partition(|b| b.body.is_mesh());
+    let (mesh_bodies, solid): (Vec<&polykrom_doc::ModelBody>, Vec<&polykrom_doc::ModelBody>) = st.bodies.iter().partition(|b| b.body.is_mesh());
     // Mesh bodies are not measured. A mesh body named in `bodies` or `against` is left out of the
     // pairs and listed as unchecked, rather than refused as "no solid body".
     let named = |key: &str| -> Result<Vec<usize>> {
@@ -277,24 +277,24 @@ fn clearance(s: &mut Session, p: &Value) -> Result<Value> {
     // definitions placed the same way relative to each other comes to the same, so one is measured
     // and the others take its result, moved to where they are.
     let mut first: HashMap<(u64, u64, Vec<i64>), usize> = HashMap::new();
-    let mut copies: Vec<(usize, usize, solidcraft_doc::Mat)> = Vec::new();
+    let mut copies: Vec<(usize, usize, polykrom_doc::Mat)> = Vec::new();
     let todo: Vec<usize> = todo
         .into_iter()
         .filter(|&k| {
             let Some(&(i, j)) = close.get(k) else { return true };
             let (Some(a), Some(b)) = (solid.get(i), solid.get(j)) else { return true };
-            let (Some(ka), Some(kb), Some(inv_a)) = (a.definition_key(), b.definition_key(), solidcraft_doc::mat_inverse(&a.source_transform)) else {
+            let (Some(ka), Some(kb), Some(inv_a)) = (a.definition_key(), b.definition_key(), polykrom_doc::mat_inverse(&a.source_transform)) else {
                 return true;
             };
-            let relative = solidcraft_doc::mat_mul(&inv_a, &b.source_transform);
+            let relative = polykrom_doc::mat_mul(&inv_a, &b.source_transform);
             let key = (ka, kb, relative.iter().flatten().map(|v| (v * 1e6).round() as i64).collect::<Vec<_>>());
             match first.get(&key).copied() {
                 Some(rep) => {
                     let moved = close
                         .get(rep)
                         .and_then(|&(ri, _)| solid.get(ri))
-                        .and_then(|r| solidcraft_doc::mat_inverse(&r.source_transform))
-                        .map(|inv| solidcraft_doc::mat_mul(&a.source_transform, &inv));
+                        .and_then(|r| polykrom_doc::mat_inverse(&r.source_transform))
+                        .map(|inv| polykrom_doc::mat_mul(&a.source_transform, &inv));
                     match moved {
                         Some(m) => {
                             copies.push((k, rep, m));
@@ -472,14 +472,14 @@ fn clearance(s: &mut Session, p: &Value) -> Result<Value> {
 /// at the major diameter in a hole tapped at the drill size shares just that ring with the part
 /// around it, where a rod down the axis shares its core).
 pub(super) fn engagement<'t>(
-    threads: &'t [solidcraft_doc::ThreadInfo],
-    a: &solidcraft_doc::ModelBody,
-    b: &solidcraft_doc::ModelBody,
+    threads: &'t [polykrom_doc::ThreadInfo],
+    a: &polykrom_doc::ModelBody,
+    b: &polykrom_doc::ModelBody,
     volume: f64,
     bbox: &Aabb3,
     center: solidcraft_geom::Vec3,
-) -> Option<(&'t solidcraft_doc::ThreadInfo, f64)> {
-    let owns = |m: &solidcraft_doc::ModelBody, t: &solidcraft_doc::ThreadInfo| m.name == t.body || m.definition_name() == t.body;
+) -> Option<(&'t polykrom_doc::ThreadInfo, f64)> {
+    let owns = |m: &polykrom_doc::ModelBody, t: &polykrom_doc::ThreadInfo| m.name == t.body || m.definition_name() == t.body;
     threads.iter().filter(|t| owns(a, t) || owns(b, t)).find_map(|t| {
         let u = *t.axis;
         let (outer, inner) = (t.major_diameter / 2.0, (t.major_diameter - 1.25 * t.pitch) / 2.0);
@@ -507,7 +507,7 @@ pub(super) fn engagement<'t>(
 
 /// The radius of a hole wall of `body` on the thread's axis, with a radius in `radii`, running
 /// along the axis over `lo..hi` (measured from the thread's axis point).
-fn hole_wall(body: &solidcraft_kernel::Body, t: &solidcraft_doc::ThreadInfo, (lo, hi): (f64, f64), radii: (f64, f64), slack: f64) -> Option<f64> {
+fn hole_wall(body: &solidcraft_kernel::Body, t: &polykrom_doc::ThreadInfo, (lo, hi): (f64, f64), radii: (f64, f64), slack: f64) -> Option<f64> {
     let u = *t.axis;
     let across = |p: solidcraft_geom::Vec3| {
         let off = p - t.axis_point;
@@ -529,9 +529,9 @@ fn hole_wall(body: &solidcraft_kernel::Body, t: &solidcraft_doc::ThreadInfo, (lo
 /// One pair: its overlap when the meshes meet or one holds the other, otherwise its distance
 /// when it may be closer than `gap`.
 fn measure_pair(
-    (ba, ka): (&solidcraft_doc::ModelBody, &solidcraft_kernel::Body),
+    (ba, ka): (&polykrom_doc::ModelBody, &solidcraft_kernel::Body),
     a: &DistanceShape,
-    (bb, kb): (&solidcraft_doc::ModelBody, &solidcraft_kernel::Body),
+    (bb, kb): (&polykrom_doc::ModelBody, &solidcraft_kernel::Body),
     b: &DistanceShape,
     gap: f64,
     min_volume: f64,
@@ -540,7 +540,7 @@ fn measure_pair(
     let mut out = PairResult::default();
     let slack = 2.0 * (a.chord() + b.chord());
     let mesh = a.mesh_closest(b, gap + slack);
-    let holds = |outer: &solidcraft_doc::ModelBody, inner: &solidcraft_doc::ModelBody| {
+    let holds = |outer: &polykrom_doc::ModelBody, inner: &polykrom_doc::ModelBody| {
         let (o, i) = (outer.mesh(), inner.mesh());
         let (ob, ib) = (o.bounds(), i.bounds());
         let nested = ob.min.x <= ib.min.x

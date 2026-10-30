@@ -6,9 +6,9 @@
 //! `GeoRef` (`{"type": "edge", "at": …}`). Picked faces and edges are stored with their
 //! persistent names.
 
+use polykrom_doc::construct::{AxisDef, GeoRef, PointDef};
+use polykrom_doc::{FeatureKind, PlaneRef};
 use serde_json::Value;
-use solidcraft_doc::construct::{AxisDef, GeoRef, PointDef};
-use solidcraft_doc::{FeatureKind, PlaneRef};
 
 use super::CommandSpec;
 use super::features::{add_feature, check_expr, plane_param, sketch_id};
@@ -135,9 +135,9 @@ fn geo(s: &Session, v: Option<&Value>, cmd: &str, what: &str) -> Result<GeoRef> 
     Ok(g)
 }
 
-fn t_param(s: &Session, p: &Value, cmd: &str) -> Result<solidcraft_doc::Expr> {
+fn t_param(s: &Session, p: &Value, cmd: &str) -> Result<polykrom_doc::Expr> {
     let t = if p.get("t").is_some() { req_expr(cmd, p, "t")? } else { "0.5".into() };
-    check_expr(s, &t, solidcraft_doc::expr::Kind::Unitless, cmd, "t")?;
+    check_expr(s, &t, polykrom_doc::expr::Kind::Unitless, cmd, "t")?;
     Ok(t)
 }
 

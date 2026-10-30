@@ -258,10 +258,10 @@ fn an_edit_turns_a_loop_into_a_network_and_back() {
     let network = json!({"sketch": "Square", "u": [sides[0], sides[2]], "v": [sides[1], sides[3]]});
     run(&mut s, "timeline.redefine", json!({"feature": "Patch", "command": "surface.boundary", "params": network}));
     let kind = |s: &Session| s.doc.find_feature("Patch").map(|f| f.kind.clone());
-    assert!(matches!(kind(&s), Some(solidcraft_doc::FeatureKind::SurfaceNetwork { .. })), "{:?}", kind(&s));
+    assert!(matches!(kind(&s), Some(polykrom_doc::FeatureKind::SurfaceNetwork { .. })), "{:?}", kind(&s));
     let body = s.world_state().bodies.first().map(|b| b.name.clone()).unwrap_or_default();
     assert!((areas(&mut s, &body).0 - 100.0).abs() < 1e-6);
     run(&mut s, "timeline.redefine", json!({"feature": "Patch", "command": "surface.boundary", "params": {"sketch": "Square", "curves": sides}}));
-    assert!(matches!(kind(&s), Some(solidcraft_doc::FeatureKind::SurfaceBoundary { .. })), "{:?}", kind(&s));
+    assert!(matches!(kind(&s), Some(polykrom_doc::FeatureKind::SurfaceBoundary { .. })), "{:?}", kind(&s));
     assert!((areas(&mut s, &body).0 - 100.0).abs() < 1e-6);
 }

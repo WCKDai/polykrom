@@ -1,5 +1,5 @@
 [package]
-name = "solidcraft-mcp"
+name = "polykrom-mcp"
 description = "Polykrom MCP server: JSON-RPC 2.0 over stdio, driving a headless session or the running app"
 version.workspace = true
 edition.workspace = true
@@ -9,9 +9,9 @@ license.workspace = true
 workspace = true
 
 [dependencies]
-solidcraft-engine = { workspace = true }
+polykrom-engine = { workspace = true }
 serde_json = { workspace = true }
 
 [dev-dependencies]
 # The renderer `solidcraft-cli mcp` installs, so the tests' screenshots are drawn as the server's.
-solidcraft-gpu = { workspace = true }
+polykrom-gpu = { workspace = true }

@@ -1,10 +1,10 @@
 //! Rib, Web, Emboss, Replace Face, Align and Remove.
 
+use polykrom_doc::FeatureKind;
+use polykrom_doc::expr::Kind;
+use polykrom_doc::{BodyName, SketchId};
+use polykrom_doc::{Dir, FacePick, Position};
 use serde_json::Value;
-use solidcraft_doc::FeatureKind;
-use solidcraft_doc::expr::Kind;
-use solidcraft_doc::{BodyName, SketchId};
-use solidcraft_doc::{Dir, FacePick, Position};
 use solidcraft_geom::Vec3;
 
 use super::CommandSpec;
@@ -47,7 +47,7 @@ pub static COMMANDS: &[CommandSpec] = &[
 
 fn coil(s: &mut Session, p: &Value) -> Result<Value> {
     let cmd = "solid.coil";
-    let base = point_param(s, p, "base", cmd)?.unwrap_or_else(|| solidcraft_doc::point_expr(Vec3::ZERO));
+    let base = point_param(s, p, "base", cmd)?.unwrap_or_else(|| polykrom_doc::point_expr(Vec3::ZERO));
     let axis = axis_dir_param(p, cmd)?;
     let diameter = req_expr(cmd, p, "diameter")?;
     check_expr(s, &diameter, Kind::Length, cmd, "diameter")?;
@@ -72,8 +72,8 @@ fn coil(s: &mut Session, p: &Value) -> Result<Value> {
     let section_size = req_expr(cmd, p, "section_size")?;
     check_expr(s, &section_size, Kind::Length, cmd, "section_size")?;
     let section = match str_(p, "section").map(str::to_ascii_lowercase).as_deref() {
-        None | Some("circular" | "circle") => solidcraft_doc::CoilSection::Circular,
-        Some("square") => solidcraft_doc::CoilSection::Square,
+        None | Some("circular" | "circle") => polykrom_doc::CoilSection::Circular,
+        Some("square") => polykrom_doc::CoilSection::Square,
         Some(o) => return Err(bad(cmd, format!("unknown section `{o}` (circular or square)"))),
     };
     let position = match str_(p, "section_position").map(str::to_ascii_lowercase).as_deref() {
@@ -163,7 +163,7 @@ fn emboss(s: &mut Session, p: &Value) -> Result<Value> {
     let mut targets = string_list(p, "targets");
     let face = if let Some(value) = p.get("face") {
         let local = vec3(value).ok_or_else(|| bad(cmd, "`face` must be a finite point [x,y,z]"))?;
-        let at = solidcraft_doc::apply_point(&s.active_component_frame(), local);
+        let at = polykrom_doc::apply_point(&s.active_component_frame(), local);
         let state = s.world_state();
         let mut candidates = Vec::new();
         // The nearest face off the point: (distance, body), for the error when none holds it.
@@ -248,7 +248,7 @@ fn emboss(s: &mut Session, p: &Value) -> Result<Value> {
     )
 }
 
-fn emboss_selection(s: &Session, selected: &solidcraft_doc::ModelBody, at: Vec3) -> Result<solidcraft_doc::EmbossFace> {
+fn emboss_selection(s: &Session, selected: &polykrom_doc::ModelBody, at: Vec3) -> Result<polykrom_doc::EmbossFace> {
     let cmd = "solid.emboss";
     let name = selected.definition_name();
     let original = s.model.state();
@@ -268,11 +268,11 @@ fn emboss_selection(s: &Session, selected: &solidcraft_doc::ModelBody, at: Vec3)
     if path.len() > 64 || author_path.len() > 64 {
         return Err(bad(cmd, "cylinder placement is too deep"));
     }
-    let inverse = solidcraft_doc::mat_inverse(&s.active_component_frame()).ok_or_else(|| bad(cmd, "invalid active frame"))?;
-    Ok(solidcraft_doc::EmbossFace { body: name.into(), at: FacePick(solidcraft_doc::apply_point(&inverse, at)), path, author_path })
+    let inverse = polykrom_doc::mat_inverse(&s.active_component_frame()).ok_or_else(|| bad(cmd, "invalid active frame"))?;
+    Ok(polykrom_doc::EmbossFace { body: name.into(), at: FacePick(polykrom_doc::apply_point(&inverse, at)), path, author_path })
 }
 
-fn check_emboss_positions(s: &Session, sketch: u64, body: &solidcraft_doc::ModelBody, face: &solidcraft_doc::EmbossFace) -> Result<()> {
+fn check_emboss_positions(s: &Session, sketch: u64, body: &polykrom_doc::ModelBody, face: &polykrom_doc::EmbossFace) -> Result<()> {
     let cmd = "solid.emboss";
     let owner = s.doc.model_body_component(body);
     let sketch_owner = s.doc.feature(sketch).map(|f| f.component).ok_or_else(|| bad(cmd, "profile sketch no longer exists"))?;
@@ -292,15 +292,15 @@ fn check_emboss_positions(s: &Session, sketch: u64, body: &solidcraft_doc::Model
 fn infer_emboss_selection(
     s: &Session,
     sketch: u64,
-    profiles: &solidcraft_doc::ProfileSel,
+    profiles: &polykrom_doc::ProfileSel,
     depth: &str,
     deboss: bool,
     targets: &[String],
-) -> Result<Option<solidcraft_doc::EmbossFace>> {
+) -> Result<Option<polykrom_doc::EmbossFace>> {
     let cmd = "solid.emboss";
     let original = s.model.state();
     let ss = original.sketch(sketch).ok_or_else(|| bad(cmd, "the sketch is not evaluated"))?;
-    let regions = solidcraft_doc::select_profiles(ss, profiles).map_err(|e| bad(cmd, e.to_string()))?;
+    let regions = polykrom_doc::select_profiles(ss, profiles).map_err(|e| bad(cmd, e.to_string()))?;
     let sketch_owner = s.doc.feature(sketch).map(|f| f.component).ok_or_else(|| bad(cmd, "profile sketch no longer exists"))?;
     let d = s.doc.eval(&s.doc.with_design_unit(depth, Kind::Length), Kind::Length).map_err(|e| bad(cmd, e.to_string()))?;
     let world = s.world_state();
@@ -322,12 +322,12 @@ fn infer_emboss_selection(
         }
         let mut face = emboss_selection(s, selected, Vec3::ZERO)?;
         let body_frame = face.body_frame(&placed, raw).map_err(|e| bad(cmd, e.to_string()))?;
-        let inverse = solidcraft_doc::mat_inverse(&body_frame).ok_or_else(|| bad(cmd, "invalid cylinder body frame"))?;
+        let inverse = polykrom_doc::mat_inverse(&body_frame).ok_or_else(|| bad(cmd, "invalid cylinder body frame"))?;
         let displayed = world.sketch(sketch).ok_or_else(|| bad(cmd, "the profile sketch is not displayed"))?;
         let plane = solidcraft_geom::Plane::new(
-            solidcraft_doc::apply_point(&inverse, displayed.plane.origin),
-            solidcraft_doc::apply_vector(&inverse, displayed.plane.x),
-            solidcraft_doc::apply_vector(&inverse, displayed.plane.y),
+            polykrom_doc::apply_point(&inverse, displayed.plane.origin),
+            polykrom_doc::apply_vector(&inverse, displayed.plane.x),
+            polykrom_doc::apply_vector(&inverse, displayed.plane.y),
         )
         .ok_or_else(|| bad(cmd, "invalid cylinder sketch frame"))?;
         if let Some((_, at)) =
@@ -335,8 +335,8 @@ fn infer_emboss_selection(
         {
             face.sketch_frame(&placed, s.active_component, sketch_owner, raw).map_err(|e| bad(cmd, e.to_string()))?;
             check_emboss_positions(s, sketch, selected, &face)?;
-            let author_inverse = solidcraft_doc::mat_inverse(&s.active_component_frame()).ok_or_else(|| bad(cmd, "invalid author frame"))?;
-            face.at = FacePick(solidcraft_doc::apply_point(&solidcraft_doc::mat_mul(&author_inverse, &body_frame), at));
+            let author_inverse = polykrom_doc::mat_inverse(&s.active_component_frame()).ok_or_else(|| bad(cmd, "invalid author frame"))?;
+            face.at = FacePick(polykrom_doc::apply_point(&polykrom_doc::mat_mul(&author_inverse, &body_frame), at));
             if chosen.is_some() {
                 return Err(bad(cmd, "multiple tangent cylinders match the selected profiles; select a target face or body"));
             }
@@ -365,7 +365,7 @@ fn replace_face(s: &mut Session, p: &Value) -> Result<Value> {
         Some(tp) => {
             let n = super::face::face_normal(s, tp).ok_or_else(|| bad(cmd, "the target face must be planar"))?;
             let plane = solidcraft_geom::Plane::from_normal(tp, n).ok_or_else(|| bad(cmd, "the target face's plane"))?;
-            solidcraft_doc::PlaneRef::Custom { plane }
+            polykrom_doc::PlaneRef::Custom { plane }
         }
         None => plane_param(s, p.get("target"), cmd)?,
     };
@@ -388,11 +388,11 @@ fn align(s: &mut Session, p: &Value) -> Result<Value> {
     // A side is a plane (`from_plane`/`to_plane`: XY|XZ|YZ, a construction or offset plane, or
     // {origin, normal}), kept as a plane so the bodies follow it when it moves; or a point and, for
     // a face, its normal.
-    let plane = |s: &Session, key: &str| -> Result<Option<solidcraft_doc::PlaneRef>> {
+    let plane = |s: &Session, key: &str| -> Result<Option<polykrom_doc::PlaneRef>> {
         p.get(key).map(|_| super::features::plane_param(s, p.get(key), cmd)).transpose()
     };
     let (from_plane, to_plane) = (plane(s, "from_plane")?, plane(s, "to_plane")?);
-    let pick = |s: &Session, pk: &str, fk: &str, plane: &Option<solidcraft_doc::PlaneRef>| -> Result<(Vec3, Option<Vec3>)> {
+    let pick = |s: &Session, pk: &str, fk: &str, plane: &Option<polykrom_doc::PlaneRef>| -> Result<(Vec3, Option<Vec3>)> {
         if plane.is_some() {
             if p.get(pk).is_some() || p.get(fk).is_some() {
                 return Err(bad(cmd, format!("give `{pk}_plane` or `{pk}`/`{fk}`, not both")));
@@ -474,7 +474,7 @@ pub(super) fn snap_point(s: &Session, kind: &str, at: Vec3) -> Option<Vec3> {
                 .collect(),
         ),
         "edge_mid" => {
-            let d = |e: &solidcraft_doc::kernel::EdgeInfo| e.points.windows(2).map(|w| at.dist_to_segment(w[0], w[1])).fold(f64::MAX, f64::min);
+            let d = |e: &polykrom_doc::kernel::EdgeInfo| e.points.windows(2).map(|w| at.dist_to_segment(w[0], w[1])).fold(f64::MAX, f64::min);
             st.bodies
                 .iter()
                 .filter_map(|b| b.body.edges((b.body.size() * 2e-3).max(1e-3)).ok())
@@ -483,11 +483,11 @@ pub(super) fn snap_point(s: &Session, kind: &str, at: Vec3) -> Option<Vec3> {
                 .map(|e| e.mid)
         }
         "face_center" => st.bodies.iter().find_map(|b| {
-            let i = solidcraft_doc::appearance::face_index_at(b, at)?;
+            let i = polykrom_doc::appearance::face_index_at(b, at)?;
             b.body.faces((b.body.size() * 2e-3).max(1e-3)).ok()?.into_iter().find(|f| f.index == i).map(|f| f.centroid)
         }),
         "circle_center" => st.bodies.iter().find_map(|b| {
-            let c = solidcraft_doc::kernel::cylinder_face_at(&b.body, at)?;
+            let c = polykrom_doc::kernel::cylinder_face_at(&b.body, at)?;
             let along = (at - c.axis_point).dot(c.axis);
             let end = if (along - c.start).abs() <= (c.end - along).abs() { c.start } else { c.end };
             Some(c.axis_point + c.axis * end)

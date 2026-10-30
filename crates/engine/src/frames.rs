@@ -9,8 +9,8 @@
 //! Nothing changes while every placement is the identity (the common case, and every design
 //! without moved components).
 
+use polykrom_doc::{Mat, apply_point, apply_vector, is_identity, map_point_expr, mat_inverse};
 use serde_json::{Map, Value};
-use solidcraft_doc::{Mat, apply_point, apply_vector, is_identity, map_point_expr, mat_inverse};
 use solidcraft_geom::Vec3;
 
 use crate::Session;
@@ -208,8 +208,8 @@ impl Mapper<'_> {
     fn make_expr(&mut self, m: &Mat, v: &Value) -> Option<Value> {
         let a = v.as_array().filter(|a| a.len() == 3)?;
         let c = |i: usize| match a.get(i)? {
-            Value::Number(n) => n.as_f64().filter(|x| x.is_finite()).map(|x| solidcraft_doc::Expr::new(format!("{x}"))),
-            Value::String(e) => Some(solidcraft_doc::Expr::new(e.as_str())),
+            Value::Number(n) => n.as_f64().filter(|x| x.is_finite()).map(|x| polykrom_doc::Expr::new(format!("{x}"))),
+            Value::String(e) => Some(polykrom_doc::Expr::new(e.as_str())),
             _ => None,
         };
         let mut p = [c(0)?, c(1)?, c(2)?];
@@ -361,14 +361,14 @@ pub fn to_local(s: &Session, id: &str, params: &Value) -> Option<Value> {
         // component is active. Body-relative picks still use the picked body's frame.
         let mut context = s.scratch();
         context.active_component = feature.component;
-        if let solidcraft_doc::FeatureKind::Emboss { face: Some(face), .. } = &feature.kind {
+        if let polykrom_doc::FeatureKind::Emboss { face: Some(face), .. } = &feature.kind {
             context.active_occurrence_path = (!face.author_path.is_empty()).then(|| face.author_path.clone());
         }
         let mut inner = to_local(&context, cmd, params.get("params")?)?;
         // An untouched explicit axis is displayed in world coordinates by Edit
         // Feature. Keep its exact saved values instead of an affine round trip.
         if cmd == "solid.revolve"
-            && let solidcraft_doc::FeatureKind::Revolve { axis: solidcraft_doc::AxisRef::Line { origin, dir }, .. } = &feature.kind
+            && let polykrom_doc::FeatureKind::Revolve { axis: polykrom_doc::AxisRef::Line { origin, dir }, .. } = &feature.kind
         {
             let frame = context.active_component_frame();
             let displayed = serde_json::json!({"origin":pt(apply_point(&frame,origin.0)),"dir":pt(apply_vector(&frame,dir.0))});
@@ -377,8 +377,8 @@ pub fn to_local(s: &Session, id: &str, params: &Value) -> Option<Value> {
             }
         }
         let points = match (&feature.kind, cmd) {
-            (solidcraft_doc::FeatureKind::Revolve { to, .. }, "solid.revolve") => [("to", *to), ("from", None)],
-            (solidcraft_doc::FeatureKind::Extrude { extent, .. }, "solid.extrude") => [("to", extent.to), ("from", extent.from)],
+            (polykrom_doc::FeatureKind::Revolve { to, .. }, "solid.revolve") => [("to", *to), ("from", None)],
+            (polykrom_doc::FeatureKind::Extrude { extent, .. }, "solid.extrude") => [("to", extent.to), ("from", extent.from)],
             _ => [("to", None), ("from", None)],
         };
         for (key, point) in points {
@@ -407,7 +407,7 @@ pub fn to_local(s: &Session, id: &str, params: &Value) -> Option<Value> {
         let key = params.get("sketch").and_then(|value| value.as_str().map(str::to_string).or_else(|| value.as_u64().map(|id| id.to_string())))?;
         let feature = s.doc.find_feature(&key)?;
         let path = crate::cmd::author_path_for_rebind(s, feature, params, id).ok()?;
-        let frame = solidcraft_doc::EmbossFace::component_frame(&s.placed_document(), feature.component, &path).ok()?;
+        let frame = polykrom_doc::EmbossFace::component_frame(&s.placed_document(), feature.component, &path).ok()?;
         command_frames.active = frame;
         command_frames.sketch = frame;
     }

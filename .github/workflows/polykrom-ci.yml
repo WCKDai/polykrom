@@ -83,11 +83,11 @@ jobs:
         include:
           # The kernel lives in PolyCore and is tested there at the revision pinned in Cargo.toml.
           - part: engine
-            args: -p solidcraft-engine --lib
+            args: -p polykrom-engine --lib
           - part: ui
-            args: -p solidcraft-ui-egui
+            args: -p polykrom-ui-egui
           - part: rest
-            args: --workspace --exclude solidcraft-engine --exclude solidcraft-ui-egui
+            args: --workspace --exclude polykrom-engine --exclude polykrom-ui-egui
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: dtolnay/rust-toolchain@stable
@@ -111,7 +111,7 @@ jobs:
         run: |
           base='all()'
           if [ "$EVENT_NAME" = pull_request ]; then
-            base="default() | (package(solidcraft-engine) & test(/^tests::robustness_goldens::/) & not test(/^tests::robustness_goldens::seed_($SLOW_SEEDS)\$/))"
+            base="default() | (package(polykrom-engine) & test(/^tests::robustness_goldens::/) & not test(/^tests::robustness_goldens::seed_($SLOW_SEEDS)\$/))"
           fi
           cargo nextest run --locked --cargo-profile ci --profile ci --no-tests=pass --ignore-default-filter -E "$base" ${{ matrix.args }}
       # nextest does not run doc tests: the rest part runs them.

@@ -113,7 +113,7 @@ impl Document {
             (FaceCertificate::ExtrudeCap { sketch, .. }, FeatureKind::Extrude { sketch: current, extent, operation: crate::Operation::NewBody | crate::Operation::Join, .. }) => sketch == current && extent.taper.is_none(),
             (FaceCertificate::ExtrudeSide { sketch, curve }, FeatureKind::Extrude { sketch: current, extent, operation: crate::Operation::NewBody | crate::Operation::Join, .. }) => {
                 sketch == current && extent.taper.is_none()
-                    && self.feature(*sketch).is_some_and(|feature| matches!(&feature.kind, FeatureKind::Sketch { sketch, .. } if sketch.curves.iter().any(|candidate| candidate.id == *curve && !candidate.construction && matches!(candidate.kind, solidcraft_sketch::CurveKind::Line { .. } | solidcraft_sketch::CurveKind::Circle { .. } | solidcraft_sketch::CurveKind::Arc { .. }))))
+                    && self.feature(*sketch).is_some_and(|feature| matches!(&feature.kind, FeatureKind::Sketch { sketch, .. } if sketch.curves.iter().any(|candidate| candidate.id == *curve && !candidate.construction && matches!(candidate.kind, polykrom_sketch::CurveKind::Line { .. } | polykrom_sketch::CurveKind::Circle { .. } | polykrom_sketch::CurveKind::Arc { .. }))))
             }
             (FaceCertificate::Imported { .. }, FeatureKind::Import { .. }) => true,
             _ => false,
@@ -147,7 +147,7 @@ impl Document {
                 }
                 (super::FaceCertificate::ExtrudeSide { sketch, curve }, FeatureKind::Extrude { sketch: producer_sketch, extent, operation: crate::Operation::NewBody | crate::Operation::Join, .. }) => {
                     sketch == producer_sketch && extent.taper.is_none() && role == format!("side:{curve}")
-                        && self.feature(*sketch).is_some_and(|feature| matches!(&feature.kind, FeatureKind::Sketch { sketch, .. } if sketch.curves.iter().any(|candidate| candidate.id == *curve && !candidate.construction && matches!(candidate.kind, solidcraft_sketch::CurveKind::Line { .. } | solidcraft_sketch::CurveKind::Circle { .. } | solidcraft_sketch::CurveKind::Arc { .. }))))
+                        && self.feature(*sketch).is_some_and(|feature| matches!(&feature.kind, FeatureKind::Sketch { sketch, .. } if sketch.curves.iter().any(|candidate| candidate.id == *curve && !candidate.construction && matches!(candidate.kind, polykrom_sketch::CurveKind::Line { .. } | polykrom_sketch::CurveKind::Circle { .. } | polykrom_sketch::CurveKind::Arc { .. }))))
                 }
                 // A linked design's face is named after its name there (`link:…`, see lineage::link_role).
                 (super::FaceCertificate::Imported { .. }, FeatureKind::Import { .. }) => {

@@ -587,7 +587,7 @@ pub fn read(s: &str) -> Result<Document> {
         if let Some(crate::Feature { kind: crate::FeatureKind::Sketch { sketch, .. }, .. }) = d.features.get_mut(feature_index) {
             let mut spaces = std::collections::BTreeMap::new();
             for link in &sketch.links {
-                spaces.entry(link.id.as_str()).or_insert_with(|| solidcraft_sketch::WireSpace::from_legacy_link(link));
+                spaces.entry(link.id.as_str()).or_insert_with(|| polykrom_sketch::WireSpace::from_legacy_link(link));
             }
             for wire_index in wire_indices {
                 if let Some(wire) = sketch.wires.get_mut(wire_index) {
@@ -701,10 +701,10 @@ fn validate_sketch_sizes(value: &Value) -> Result<()> {
         }
         let Some(sketch) = feature.get("sketch") else { continue };
         let len = |key: &str| sketch.get(key).and_then(Value::as_array).map_or(0, Vec::len);
-        if len("points") > solidcraft_sketch::MAX_POINTS
-            || len("curves") > solidcraft_sketch::MAX_CURVES
-            || len("constraints") > solidcraft_sketch::MAX_CONSTRAINTS
-            || len("patterns") > solidcraft_sketch::MAX_CONSTRAINTS
+        if len("points") > polykrom_sketch::MAX_POINTS
+            || len("curves") > polykrom_sketch::MAX_CURVES
+            || len("constraints") > polykrom_sketch::MAX_CONSTRAINTS
+            || len("patterns") > polykrom_sketch::MAX_CONSTRAINTS
         {
             return Err(invalid());
         }
@@ -715,7 +715,7 @@ fn validate_sketch_sizes(value: &Value) -> Result<()> {
             for pattern in patterns {
                 let Some(entities) = pattern.get("entities").and_then(Value::as_array) else { return Err(invalid()) };
                 let Some(instances) = pattern.get("instances").and_then(Value::as_array) else { return Err(invalid()) };
-                if entities.len() > solidcraft_sketch::MAX_CURVES + solidcraft_sketch::MAX_POINTS || instances.len() >= 500 {
+                if entities.len() > polykrom_sketch::MAX_CURVES + polykrom_sketch::MAX_POINTS || instances.len() >= 500 {
                     return Err(invalid());
                 }
                 for instance in instances {
@@ -723,9 +723,7 @@ fn validate_sketch_sizes(value: &Value) -> Result<()> {
                     points = points.saturating_add(size("points"));
                     curves = curves.saturating_add(size("curves"));
                     constraints = constraints.saturating_add(size("constraints"));
-                    if points > solidcraft_sketch::MAX_POINTS
-                        || curves > solidcraft_sketch::MAX_CURVES
-                        || constraints > solidcraft_sketch::MAX_CONSTRAINTS
+                    if points > polykrom_sketch::MAX_POINTS || curves > polykrom_sketch::MAX_CURVES || constraints > polykrom_sketch::MAX_CONSTRAINTS
                     {
                         return Err(invalid());
                     }
@@ -921,7 +919,7 @@ fn validate_versioned_geometry(value: &Value) -> Result<()> {
             }
             let indices = curve.get("pts").and_then(Value::as_array).ok_or_else(invalid)?;
             work = work.saturating_add(indices.len());
-            if !(4..=solidcraft_sketch::MAX_SPLINE_POINTS).contains(&indices.len())
+            if !(4..=polykrom_sketch::MAX_SPLINE_POINTS).contains(&indices.len())
                 || work > 1_000_000
                 || curve.get("control").is_some_and(|control| control.as_bool() != Some(false))
                 || curve.get("degree").is_some_and(|degree| degree.as_u64() != Some(3))
@@ -998,7 +996,7 @@ fn validate_freeform_offsets(value: &Value) -> Result<()> {
             if !(1..=256).contains(&divisions)
                 || !divisions.is_power_of_two()
                 || !(1..=256).contains(&pieces)
-                || pieces * divisions >= solidcraft_sketch::MAX_SPLINE_POINTS as u64
+                || pieces * divisions >= polykrom_sketch::MAX_SPLINE_POINTS as u64
                 || !distance.is_finite()
                 || !(1e-9..=MAX_REAL).contains(&distance.abs())
                 || !tolerance.is_finite()
@@ -1348,8 +1346,8 @@ mod tests {
 
     #[test]
     fn version_nine_wire_spaces_preserve_saved_points_and_explicit_markers() {
+        use polykrom_sketch::{LinkKind, LinkSource, Sketch, WireSpace};
         use solidcraft_geom::Vec3;
-        use solidcraft_sketch::{LinkKind, LinkSource, Sketch, WireSpace};
         let mut sketch = Sketch::new();
         sketch.add_drawn_wire(&[Vec3::new(12.0, 3.0, 4.0)]).unwrap();
         let link = sketch
@@ -1445,7 +1443,7 @@ mod tests {
         let mut document = Document::new("legacy named extent");
         document.set_param("offset", "2", Some("mm"), None).unwrap();
         let sketch = document
-            .add_feature(FeatureKind::Sketch { plane: PlaneRef::Origin { name: "XY".into() }, sketch: solidcraft_sketch::Sketch::new() }, None)
+            .add_feature(FeatureKind::Sketch { plane: PlaneRef::Origin { name: "XY".into() }, sketch: polykrom_sketch::Sketch::new() }, None)
             .unwrap();
         document
             .add_feature(
@@ -1508,8 +1506,8 @@ mod tests {
 
     #[test]
     fn saved_offset_cannot_alias_and_overwrite_its_source_geometry() {
+        use polykrom_sketch::{CurveKind, Sketch};
         use solidcraft_geom::Vec2;
-        use solidcraft_sketch::{CurveKind, Sketch};
         let mut sketch = Sketch::new();
         let center = sketch.add_point(Vec2::ZERO, None).unwrap();
         let major = sketch.add_point(Vec2::new(10.0, 0.0), None).unwrap();
@@ -1532,7 +1530,7 @@ mod tests {
         let mut document = Document::new("missing offset geometry");
         document
             .add_feature(
-                crate::FeatureKind::Sketch { plane: crate::PlaneRef::Origin { name: "XY".into() }, sketch: solidcraft_sketch::Sketch::new() },
+                crate::FeatureKind::Sketch { plane: crate::PlaneRef::Origin { name: "XY".into() }, sketch: polykrom_sketch::Sketch::new() },
                 None,
             )
             .unwrap();
@@ -1608,7 +1606,7 @@ mod tests {
             ("degree", serde_json::json!(2)),
             ("pts", serde_json::json!([0, 1, 2])),
             ("pts", serde_json::json!([0, 1, 2, u64::MAX])),
-            ("pts", serde_json::json!(vec![0; solidcraft_sketch::MAX_SPLINE_POINTS + 1])),
+            ("pts", serde_json::json!(vec![0; polykrom_sketch::MAX_SPLINE_POINTS + 1])),
         ] {
             let mut damaged = curve.clone();
             damaged[key] = malformed;
@@ -1647,8 +1645,8 @@ mod tests {
 
     #[test]
     fn periodic_file_validation_refuses_damaged_closed_geometry() {
+        use polykrom_sketch::{CurveKind, Sketch};
         use solidcraft_geom::Vec2;
-        use solidcraft_sketch::{CurveKind, Sketch};
         let mut sketch = Sketch::new();
         let mut pts = Vec::new();
         for point in [Vec2::ZERO, Vec2::new(10.0, 0.0), Vec2::new(0.0, 10.0), Vec2::ZERO] {
@@ -1797,8 +1795,8 @@ mod tests {
 
     #[test]
     fn version_seven_origin_sketch_keeps_geometry_dimension_ids_and_expressions() {
+        use polykrom_sketch::{ConstraintKind, Sketch};
         use solidcraft_geom::Vec2;
-        use solidcraft_sketch::{ConstraintKind, Sketch};
         let mut d = Document::new("legacy origin dimensions");
         d.set_param("reach", "25 mm", Some("mm"), None).unwrap();
         let dim = d.new_model_param("reach", "mm");
@@ -1827,8 +1825,8 @@ mod tests {
 
     #[test]
     fn version_eight_persistent_angle_sweep_and_slot_dimensions_roundtrip() {
+        use polykrom_sketch::{ConstraintKind, Sketch};
         use solidcraft_geom::Vec2;
-        use solidcraft_sketch::{ConstraintKind, Sketch};
         let mut d = Document::new("persistent typed dimensions");
         let heading = d.new_model_param("45 deg", "deg");
         let sweep = d.new_model_param("180 deg", "deg");
@@ -1993,14 +1991,14 @@ mod tests {
     /// file too, before the arrays are deserialised.
     #[test]
     fn oversized_sketches_are_refused_before_typed_decoding() {
-        use solidcraft_sketch::{MAX_CONSTRAINTS, MAX_CURVES, MAX_POINTS, Sketch};
+        use polykrom_sketch::{MAX_CONSTRAINTS, MAX_CURVES, MAX_POINTS, Sketch};
 
         // A sketch right at the point cap, chained by coincident constraints.
         let mut sketch = Sketch::new();
         let mut previous = 0;
         while sketch.points.len() < MAX_POINTS {
             let i = sketch.add_point(solidcraft_geom::Vec2::new(0.001 * sketch.points.len() as f64, 0.0), None).unwrap();
-            sketch.add_constraint(solidcraft_sketch::ConstraintKind::Coincident { p: previous, q: i }, None).unwrap();
+            sketch.add_constraint(polykrom_sketch::ConstraintKind::Coincident { p: previous, q: i }, None).unwrap();
             previous = i;
         }
         let mut doc = Document::new("big sketch");
@@ -2110,7 +2108,7 @@ mod tests {
     /// may still be large integers (solidcraft#5021).
     #[test]
     fn integer_valued_coordinates_are_range_checked_and_large_ids_still_load() {
-        let mut sketch = solidcraft_sketch::Sketch::new();
+        let mut sketch = polykrom_sketch::Sketch::new();
         sketch.add_point(solidcraft_geom::Vec2::new(40.0, 0.0), None).unwrap();
         let mut d = Document::new("range");
         d.add_feature(crate::FeatureKind::Sketch { plane: crate::PlaneRef::Origin { name: "XY".into() }, sketch }, None).unwrap();

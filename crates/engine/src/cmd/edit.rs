@@ -2,8 +2,8 @@
 
 use std::collections::BTreeMap;
 
+use polykrom_doc::{Feature, FeatureKind};
 use serde_json::{Value, json};
-use solidcraft_doc::{Feature, FeatureKind};
 
 use super::CommandSpec;
 use crate::params::{bad, bool_, num, str_, string_list};
@@ -121,7 +121,7 @@ fn restore_checkpoint(s: &mut Session, p: &Value) -> Result<Value> {
 }
 
 fn compute_all(s: &mut Session, _p: &Value) -> Result<Value> {
-    s.model = solidcraft_doc::Model::new();
+    s.model = polykrom_doc::Model::new();
     s.refresh();
     let errors = s.model.results.iter().filter(|r| r.error.is_some()).count();
     Ok(json!({"features": s.model.results.len(), "errors": errors}))
@@ -204,7 +204,7 @@ pub(super) fn working_features(s: &Session) -> std::collections::BTreeSet<u64> {
 
 /// The session's model with the whole history evaluated: with the history rolled back, a copy
 /// evaluated past the marker (sharing the cache), so a feature after it counts too (#3471).
-fn whole_history(s: &Session) -> std::borrow::Cow<'_, solidcraft_doc::Model> {
+fn whole_history(s: &Session) -> std::borrow::Cow<'_, polykrom_doc::Model> {
     if s.doc.marker.is_none() {
         return std::borrow::Cow::Borrowed(&s.model);
     }
@@ -371,8 +371,8 @@ fn group_move_would_cycle(s: &Session, target: u64, sources: &[u64]) -> bool {
     false
 }
 
-fn group_feature_ids(doc: &solidcraft_doc::Document, roots: &[u64]) -> std::collections::BTreeSet<u64> {
-    let by_id: std::collections::BTreeMap<u64, &solidcraft_doc::TimelineGroup> = doc.timeline_groups.iter().map(|group| (group.id, group)).collect();
+fn group_feature_ids(doc: &polykrom_doc::Document, roots: &[u64]) -> std::collections::BTreeSet<u64> {
+    let by_id: std::collections::BTreeMap<u64, &polykrom_doc::TimelineGroup> = doc.timeline_groups.iter().map(|group| (group.id, group)).collect();
     let mut children = std::collections::BTreeMap::<u64, Vec<u64>>::new();
     for group in &doc.timeline_groups {
         if let Some(parent) = group.parent {
@@ -394,15 +394,15 @@ fn group_feature_ids(doc: &solidcraft_doc::Document, roots: &[u64]) -> std::coll
     features
 }
 
-fn sort_group_features(doc: &mut solidcraft_doc::Document) {
+fn sort_group_features(doc: &mut polykrom_doc::Document) {
     let positions: std::collections::BTreeMap<u64, usize> = doc.features.iter().enumerate().map(|(index, feature)| (feature.id, index)).collect();
     for group in &mut doc.timeline_groups {
         group.features.sort_by_key(|feature| positions.get(feature).copied().unwrap_or(usize::MAX));
     }
 }
 
-fn require_contiguous_groups(doc: &solidcraft_doc::Document, cmd: &str) -> Result<()> {
-    let Some(id) = solidcraft_doc::non_contiguous_timeline_group(&doc.features, &doc.timeline_groups) else { return Ok(()) };
+fn require_contiguous_groups(doc: &polykrom_doc::Document, cmd: &str) -> Result<()> {
+    let Some(id) = polykrom_doc::non_contiguous_timeline_group(&doc.features, &doc.timeline_groups) else { return Ok(()) };
     let name = doc.timeline_groups.iter().find(|group| group.id == id).map(|group| group.name.as_str()).unwrap_or("unknown");
     Err(bad(cmd, format!("timeline folder `{name}` must contain one contiguous run of features")))
 }
@@ -435,7 +435,7 @@ fn group(s: &mut Session, p: &Value) -> Result<Value> {
             group.parent = Some(id);
         }
     }
-    next.timeline_groups.push(solidcraft_doc::TimelineGroup { id, name: name.clone(), parent, features });
+    next.timeline_groups.push(polykrom_doc::TimelineGroup { id, name: name.clone(), parent, features });
     sort_group_features(&mut next);
     require_contiguous_groups(&next, cmd)?;
     *s.doc_mut() = next;
@@ -1067,11 +1067,11 @@ fn edit_feature(s: &mut Session, p: &Value) -> Result<Value> {
     let mut nf: Feature = serde_json::from_value(v.clone()).map_err(|e| bad(cmd, format!("invalid feature: {e}")))?;
     nf.id = f.id;
     if let (FeatureKind::Extrude { extent: old, .. }, FeatureKind::Extrude { extent: new, .. }) = (&f.kind, &mut nf.kind)
-        && old.direction != solidcraft_doc::Direction::Symmetric
-        && new.direction == solidcraft_doc::Direction::Symmetric
+        && old.direction != polykrom_doc::Direction::Symmetric
+        && new.direction == polykrom_doc::Direction::Symmetric
         && set.get("extent").and_then(|e| e.get("convention")).is_none()
     {
-        new.convention = solidcraft_doc::ExtrudeConvention::TotalDistance;
+        new.convention = polykrom_doc::ExtrudeConvention::TotalDistance;
     }
     if std::mem::discriminant(&nf.kind) != std::mem::discriminant(&f.kind) {
         return Err(bad(cmd, "the feature type cannot change"));
@@ -1083,7 +1083,7 @@ fn edit_feature(s: &mut Session, p: &Value) -> Result<Value> {
         return Err(bad(cmd, unknown_field_message(&field, &before, &f.kind)));
     }
     if let FeatureKind::BodyTransfer { bodies, from, to, transform } = &nf.kind {
-        solidcraft_doc::validate_body_transfer(&s.doc, &solidcraft_doc::plain(bodies), *from, *to, transform)?;
+        polykrom_doc::validate_body_transfer(&s.doc, &polykrom_doc::plain(bodies), *from, *to, transform)?;
         nf.component = *to;
     }
     if let (FeatureKind::Sketch { sketch: a, .. }, FeatureKind::Sketch { sketch: b, .. }) = (&nf.kind, &f.kind)
@@ -1099,29 +1099,29 @@ fn edit_feature(s: &mut Session, p: &Value) -> Result<Value> {
         && a != b
     {
         let before = s.model.state_before(id);
-        nf.edge_refs = solidcraft_doc::edge_refs(&before, body, &solidcraft_doc::plain(a));
-        nf.edge_names = solidcraft_doc::edge_names_for(&before, body, &solidcraft_doc::plain(a));
+        nf.edge_refs = polykrom_doc::edge_refs(&before, body, &polykrom_doc::plain(a));
+        nf.edge_names = polykrom_doc::edge_names_for(&before, body, &polykrom_doc::plain(a));
     }
     // New or reordered flange edges: their names now, so each edge's own angle and height stay
     // with the edge they were given for.
     if let (FeatureKind::SheetFlange { edges: a, .. }, FeatureKind::SheetFlange { edges: b, .. }) = (&nf.kind, &f.kind) {
-        let points = |e: &[solidcraft_doc::FlangeEdge]| e.iter().map(|x| x.point).collect::<Vec<_>>();
+        let points = |e: &[polykrom_doc::FlangeEdge]| e.iter().map(|x| x.point).collect::<Vec<_>>();
         if points(a) != points(b) {
-            nf.edge_names = solidcraft_doc::sheet::sheet_edge_names(&s.model.state_before(id), &solidcraft_doc::plain(&points(a)));
+            nf.edge_names = polykrom_doc::sheet::sheet_edge_names(&s.model.state_before(id), &polykrom_doc::plain(&points(a)));
         }
     }
     // New reference edges for a hole (#37): the names of the edges there now.
     if let (FeatureKind::Hole { references: a, position, .. }, FeatureKind::Hole { references: b, .. }) = (&nf.kind, &f.kind) {
-        let edges = |r: &[solidcraft_doc::HoleReference]| r.iter().map(|x| x.edge.0).collect::<Vec<_>>();
+        let edges = |r: &[polykrom_doc::HoleReference]| r.iter().map(|x| x.edge.0).collect::<Vec<_>>();
         if edges(a) != edges(b) {
-            nf.edge_names = solidcraft_doc::hole_reference::reference_edge_names(&s.model.state_before(id), position.0, &edges(a));
+            nf.edge_names = polykrom_doc::hole_reference::reference_edge_names(&s.model.state_before(id), position.0, &edges(a));
         }
     }
     // New bend edges for a conversion: the names of the body's edges there now.
     if let (FeatureKind::SheetConvert { bends: a, body, .. }, FeatureKind::SheetConvert { bends: b, body: was, .. }) = (&nf.kind, &f.kind)
         && (a != b || body != was)
     {
-        nf.edge_names = solidcraft_doc::sheet::bend_edge_names(&s.model.state_before(id), body, &solidcraft_doc::plain(a));
+        nf.edge_names = polykrom_doc::sheet::bend_edge_names(&s.model.state_before(id), body, &polykrom_doc::plain(a));
     }
     // Profiles picked by index or point are kept by their curves, as when the feature was made.
     if nf.kind.clone().profile_sels_mut() != f.kind.clone().profile_sels_mut() {
@@ -1129,7 +1129,7 @@ fn edit_feature(s: &mut Session, p: &Value) -> Result<Value> {
     }
     // New face points: their faces' names now.
     if nf.kind.face_points() != f.kind.face_points() {
-        nf.face_names = solidcraft_doc::face_point_names(&s.doc, &s.model.state_before(id), &nf.kind, nf.component);
+        nf.face_names = polykrom_doc::face_point_names(&s.doc, &s.model.state_before(id), &nf.kind, nf.component);
     }
     if let Some(slot) = s.doc_mut().feature_mut(id) {
         *slot = nf;
@@ -1173,7 +1173,7 @@ fn select_clear(s: &mut Session, _p: &Value) -> Result<Value> {
 }
 
 /// Features that worked in `before` and fail in `after`: (name, error).
-fn newly_broken(before: &solidcraft_doc::Model, after: &solidcraft_doc::Model) -> Vec<(String, String)> {
+fn newly_broken(before: &polykrom_doc::Model, after: &polykrom_doc::Model) -> Vec<(String, String)> {
     after
         .results
         .iter()
@@ -1191,15 +1191,15 @@ fn newly_broken(before: &solidcraft_doc::Model, after: &solidcraft_doc::Model) -
 /// rolled-back history that breaks them says so before it is made, rather than leaving error marks
 /// that only show at the end of the timeline (#3471).
 pub(super) fn newly_broken_in_history(
-    before_doc: &solidcraft_doc::Document,
-    before: &solidcraft_doc::Model,
-    after_doc: &solidcraft_doc::Document,
-    after: &solidcraft_doc::Model,
+    before_doc: &polykrom_doc::Document,
+    before: &polykrom_doc::Model,
+    after_doc: &polykrom_doc::Document,
+    after: &polykrom_doc::Model,
 ) -> Vec<(String, String)> {
     if before_doc.marker.is_none() && after_doc.marker.is_none() {
         return newly_broken(before, after);
     }
-    let whole = |doc: &solidcraft_doc::Document, model: &solidcraft_doc::Model| {
+    let whole = |doc: &polykrom_doc::Document, model: &polykrom_doc::Model| {
         let mut doc = doc.clone();
         doc.marker = None;
         let mut model = model.clone();
@@ -1252,7 +1252,7 @@ fn active_param(p: &Value, cmd: &str) -> Result<Option<bool>> {
 /// With `active` given, put the history marker of the reordered `next` so the `moving` features
 /// are active (before it) or rolled back (behind it) while every other feature keeps its state, in
 /// the same step as the move. Refused when `position` puts them on the other side of it.
-fn place_marker(s: &Session, next: &mut solidcraft_doc::Document, moving: &[u64], active: Option<bool>, cmd: &str) -> Result<()> {
+fn place_marker(s: &Session, next: &mut polykrom_doc::Document, moving: &[u64], active: Option<bool>, cmd: &str) -> Result<()> {
     let Some(active) = active else { return Ok(()) };
     let n = s.doc.features.len();
     let was_active: std::collections::BTreeSet<u64> = s.doc.features.iter().take(s.doc.marker.unwrap_or(n)).map(|feature| feature.id).collect();
@@ -1279,11 +1279,11 @@ fn reorder_many(s: &mut Session, p: &Value) -> Result<Value> {
 
 fn reorder_features(
     s: &Session,
-    mut next: solidcraft_doc::Document,
+    mut next: polykrom_doc::Document,
     ids: &[u64],
     slot: usize,
     cmd: &str,
-) -> Result<(solidcraft_doc::Document, Vec<u64>)> {
+) -> Result<(polykrom_doc::Document, Vec<u64>)> {
     let n = next.features.len();
     let slot = slot.min(n);
     let selected: std::collections::BTreeSet<u64> = ids.iter().copied().collect();
@@ -1309,7 +1309,7 @@ fn reorder_features(
     sort_group_features(&mut next);
     require_contiguous_groups(&next, cmd)?;
     if !unchanged {
-        let mut after = solidcraft_doc::Model::new();
+        let mut after = polykrom_doc::Model::new();
         after.evaluate(&next);
         let broken = newly_broken(&s.model, &after);
         if !broken.is_empty() {
@@ -1320,24 +1320,24 @@ fn reorder_features(
     Ok((next, ordered))
 }
 
-fn input_keys(kind: &FeatureKind) -> Vec<(String, solidcraft_doc::expr::Kind)> {
+fn input_keys(kind: &FeatureKind) -> Vec<(String, polykrom_doc::expr::Kind)> {
     let mut keys: Vec<_> = kind.inputs().into_iter().map(|(label, _, unit)| (label.to_string(), unit)).collect();
     if let FeatureKind::Fillet { style, .. } = kind {
         if let Some((key, _)) = keys.first_mut() {
             *key = "fillet.radius".into();
         }
         match style {
-            solidcraft_doc::FilletStyle::Variable { mid, .. } => {
+            polykrom_doc::FilletStyle::Variable { mid, .. } => {
                 for ((key, _), (position, _)) in keys.iter_mut().skip(2).zip(mid) {
                     *key = format!("fillet.mid.{}", position.to_bits());
                 }
             }
-            solidcraft_doc::FilletStyle::Spline { .. } => {
+            polykrom_doc::FilletStyle::Spline { .. } => {
                 for (i, (key, _)) in keys.iter_mut().enumerate().skip(1) {
                     *key = format!("fillet.control.{i}");
                 }
             }
-            solidcraft_doc::FilletStyle::Constant | solidcraft_doc::FilletStyle::Chord | solidcraft_doc::FilletStyle::Curvature => {}
+            polykrom_doc::FilletStyle::Constant | polykrom_doc::FilletStyle::Chord | polykrom_doc::FilletStyle::Curvature => {}
         }
     }
     keys
@@ -1382,10 +1382,10 @@ fn redefine(s: &mut Session, p: &Value) -> Result<Value> {
         && matches!(cid, "solid.extrude" | "surface.extrude")
         && let Some(parameters) = params.as_object_mut()
     {
-        let convention = if cid == "surface.extrude" || extent.direction == solidcraft_doc::Direction::Symmetric {
+        let convention = if cid == "surface.extrude" || extent.direction == polykrom_doc::Direction::Symmetric {
             extent.convention
         } else {
-            solidcraft_doc::ExtrudeConvention::TotalDistance
+            polykrom_doc::ExtrudeConvention::TotalDistance
         };
         parameters.entry("convention").or_insert_with(|| json!(convention));
     }

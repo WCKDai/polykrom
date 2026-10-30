@@ -5,12 +5,12 @@
 
 use std::collections::BTreeMap;
 
+use polykrom_doc::expr::Kind;
+use polykrom_doc::frame::{self, Anchor, MemberProfile, Profile, ProfileSpec};
+use polykrom_doc::{FeatureKind, SketchId};
+use polykrom_sketch::Sketch;
 use serde_json::{Value, json};
-use solidcraft_doc::expr::Kind;
-use solidcraft_doc::frame::{self, Anchor, MemberProfile, Profile, ProfileSpec};
-use solidcraft_doc::{FeatureKind, SketchId};
 use solidcraft_geom::{Loop2, Seg2, Vec2};
-use solidcraft_sketch::Sketch;
 
 use super::features::{add_feature, check_expr, sketch_id};
 use super::sketch::edit;
@@ -62,7 +62,7 @@ fn resolve(s: &Session, cmd: &str, spec: &ProfileSpec) -> Result<Profile> {
     let doc = &s.doc;
     spec.resolve(|name, e| {
         doc.eval(&doc.with_design_unit(e, Kind::Length), Kind::Length)
-            .map_err(|err| solidcraft_doc::DocError::Invalid(format!("profile `{name}`: {err}")))
+            .map_err(|err| polykrom_doc::DocError::Invalid(format!("profile `{name}`: {err}")))
     })
     .map_err(|e| bad(cmd, e.to_string()))
 }
@@ -234,7 +234,7 @@ fn member(s: &mut Session, p: &Value) -> Result<Value> {
         None | Some(Value::Null) => None,
         Some(_) => {
             let e = expr(p, "angle").ok_or_else(|| bad(cmd, "`angle` must be an angle expression"))?;
-            check_expr(s, &e, solidcraft_doc::expr::Kind::Angle, cmd, "angle")?;
+            check_expr(s, &e, polykrom_doc::expr::Kind::Angle, cmd, "angle")?;
             Some(e)
         }
     };

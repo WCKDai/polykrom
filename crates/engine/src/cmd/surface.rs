@@ -1,13 +1,13 @@
 //! Surface commands: Patch, Stitch, Thicken and Trim (surface bodies and turning them into
 //! solids), and the planned surface toolset (`planned!`: registered, not built yet).
 
-use serde_json::Value;
-use solidcraft_doc::{
+use polykrom_doc::{
     BlendSide, EdgeContinuity, Expr, ExtendMode, ExtendTo, FaceAt, FeatureKind, PatchContinuity, PlaneRef, ProfileSel, RuledCorners, RuledMode,
     TrimCurves, expr::Kind,
 };
-use solidcraft_doc::{BodyName, SketchId};
-use solidcraft_doc::{Dir, FacePick, Position};
+use polykrom_doc::{BodyName, SketchId};
+use polykrom_doc::{Dir, FacePick, Position};
+use serde_json::Value;
 use solidcraft_kernel::Continuity;
 
 use super::CommandSpec;
@@ -346,7 +346,7 @@ fn untrim(s: &mut Session, p: &Value) -> Result<Value> {
 
 /// The profiles and curves a surface builder takes: `curves`, and `profiles` (all of them when
 /// neither is given).
-fn sheet_inputs(p: &Value, cmd: &str) -> Result<(Option<solidcraft_doc::ProfileSel>, Vec<String>)> {
+fn sheet_inputs(p: &Value, cmd: &str) -> Result<(Option<polykrom_doc::ProfileSel>, Vec<String>)> {
     let curves = string_list(p, "curves");
     if curves.len() > 1000 {
         return Err(bad(cmd, "at most 1000 curves"));
@@ -418,7 +418,7 @@ fn surface_loft(s: &mut Session, p: &Value) -> Result<Value> {
             if sec.get("sketch").is_some() {
                 return Err(bad(cmd, "a section is either a sketch chain or a body edge chain"));
             }
-            sections.push(solidcraft_doc::SheetSection {
+            sections.push(polykrom_doc::SheetSection {
                 sketch: SketchId(0),
                 profiles: None,
                 curves: Vec::new(),
@@ -433,7 +433,7 @@ fn surface_loft(s: &mut Session, p: &Value) -> Result<Value> {
             return Err(bad(cmd, "at most 1000 curves a section"));
         }
         let profiles = if sec.get("profiles").is_some() { Some(profiles(sec, cmd)?) } else { None };
-        sections.push(solidcraft_doc::SheetSection { sketch: SketchId(sketch), profiles, curves, body: None, edges: Vec::new() });
+        sections.push(polykrom_doc::SheetSection { sketch: SketchId(sketch), profiles, curves, body: None, edges: Vec::new() });
     }
     let continuity = match p.get("continuity") {
         None => [Continuity::G0, Continuity::G0],
@@ -842,7 +842,7 @@ mod tests {
         assert!(s.world_state().body("Both").is_none());
         run(&mut s, "edit.redo", json!({}));
         assert!(s.world_state().body("Both").is_some());
-        let cold = Session::new(solidcraft_doc::Document::from_json(&s.doc.to_json()).unwrap());
+        let cold = Session::new(polykrom_doc::Document::from_json(&s.doc.to_json()).unwrap());
         assert!((area(&cold, "Wall") - area(&s, "Wall")).abs() < 1e-9);
         // Refused: no such curve, a zero distance, and an extent a sheet does not take yet.
         assert!(s.execute("surface.extrude", &json!({"sketch": "S", "curves": ["nope"], "distance": 4})).is_err());
@@ -881,7 +881,7 @@ mod tests {
     fn unstitch_a_box_and_stitch_it_back() {
         let mut s = Session::default();
         run(&mut s, "solid.box", json!({"length": 10, "width": 10, "height": 10, "body_name": "Box"}));
-        let names_before: Vec<String> = solidcraft_doc::naming::face_names(s.model.state().body("Box").unwrap()).to_vec();
+        let names_before: Vec<String> = polykrom_doc::naming::face_names(s.model.state().body("Box").unwrap()).to_vec();
         run(&mut s, "surface.unstitch", json!({"body": "Box"}));
         let st = s.world_state();
         assert!(st.body("Box").is_none());
@@ -891,7 +891,7 @@ mod tests {
         for n in &pieces {
             let b = st.body(n).unwrap();
             assert!(b.body.is_surface() && b.body.face_count() == 1);
-            names_after.extend(solidcraft_doc::naming::face_names(s.model.state().body(n).unwrap()).iter().cloned());
+            names_after.extend(polykrom_doc::naming::face_names(s.model.state().body(n).unwrap()).iter().cloned());
         }
         let (mut a, mut b) = (names_before.clone(), names_after);
         a.sort();
@@ -909,7 +909,7 @@ mod tests {
         let st = s.world_state();
         assert_eq!(st.bodies.len(), 3);
         assert_eq!(st.body("Box").unwrap().body.face_count(), 4);
-        let cold = Session::new(solidcraft_doc::Document::from_json(&s.doc.to_json()).unwrap());
+        let cold = Session::new(polykrom_doc::Document::from_json(&s.doc.to_json()).unwrap());
         assert_eq!(cold.world_state().bodies.len(), 3);
         assert!(s.execute("surface.unstitch", &json!({"body": "Nope"})).is_err());
         assert!(s.execute("surface.unstitch", &json!({})).is_err());
@@ -950,7 +950,7 @@ mod tests {
         run(&mut s, "surface.stitch", json!({"bodies": ["Box", "Lid"]}));
         assert!(!s.world_state().body("Box").unwrap().body.is_surface());
         assert!((volume(&s, "Box") - 1000.0).abs() < 1e-9);
-        let cold = Session::new(solidcraft_doc::Document::from_json(&s.doc.to_json()).unwrap());
+        let cold = Session::new(polykrom_doc::Document::from_json(&s.doc.to_json()).unwrap());
         assert!((volume(&cold, "Box") - 1000.0).abs() < 1e-9);
         // By default the gap heals, and a box's sides can't close its top: refused, the box kept.
         run(&mut s, "solid.box", json!({"length": 10, "width": 10, "height": 10, "corner": [20, 0, 0], "body_name": "Healed"}));
@@ -990,7 +990,7 @@ mod tests {
         run(&mut s, "edit.undo", json!({}));
         assert!(s.world_state().body("Cone").is_none());
         run(&mut s, "edit.redo", json!({}));
-        let cold = Session::new(solidcraft_doc::Document::from_json(&s.doc.to_json()).unwrap());
+        let cold = Session::new(polykrom_doc::Document::from_json(&s.doc.to_json()).unwrap());
         assert!((area(&cold, "Cone") - area(&s, "Cone")).abs() < 1e-9);
         // A rectangle off the axis turned all the way round closes into the ring solid.revolve makes.
         run(&mut s, "sketch.create", json!({"plane": "XY", "name": "R"}));
@@ -1044,7 +1044,7 @@ mod tests {
         run(&mut s, "edit.undo", json!({}));
         assert!(s.world_state().body("Walls").is_none());
         run(&mut s, "edit.redo", json!({}));
-        let cold = Session::new(solidcraft_doc::Document::from_json(&s.doc.to_json()).unwrap());
+        let cold = Session::new(polykrom_doc::Document::from_json(&s.doc.to_json()).unwrap());
         assert!((area(&cold, "Bend") - area(&s, "Bend")).abs() < 1e-9);
         // Refused: no path, and a path curve that is not there.
         assert!(s.execute("surface.sweep", &json!({"sketch": "S", "curves": ["l"], "path_sketch": "P"})).is_err());
@@ -1078,7 +1078,7 @@ mod tests {
         run(&mut s, "edit.undo", json!({}));
         assert!(s.world_state().body("Walls").is_none());
         run(&mut s, "edit.redo", json!({}));
-        let cold = Session::new(solidcraft_doc::Document::from_json(&s.doc.to_json()).unwrap());
+        let cold = Session::new(polykrom_doc::Document::from_json(&s.doc.to_json()).unwrap());
         assert!((area(&cold, "Walls") - area(&s, "Walls")).abs() < 1e-9);
         assert!(s.execute("surface.loft", &json!({"sections": [{"sketch": "A", "curves": ["a"]}, {"sketch": "B", "profiles": [0]}]})).is_err());
         assert!(s.execute("surface.loft", &json!({"sections": [{"sketch": "A", "curves": ["a"]}]})).is_err());
@@ -1134,11 +1134,11 @@ mod tests {
             let fid = s.doc.features.last().unwrap().id;
             let st = s.model.state();
             let b = st.body(&body).unwrap();
-            let names = solidcraft_doc::naming::face_names(b);
+            let names = polykrom_doc::naming::face_names(b);
             for curve in ["l1", "l2"] {
                 let want = format!("F{fid}:side:{curve}");
                 let i = names.iter().position(|n| n.starts_with(&want)).unwrap_or_else(|| panic!("{cmd}: no face named {want}: {names:?}"));
-                assert!(solidcraft_doc::naming::face_name_exact(b, i), "{cmd}: {want} is named from geometry");
+                assert!(polykrom_doc::naming::face_name_exact(b, i), "{cmd}: {want} is named from geometry");
             }
         }
     }
@@ -1169,7 +1169,7 @@ mod tests {
         run(&mut s, "edit.undo", json!({}));
         assert!(s.world_state().body("Copy").is_none());
         run(&mut s, "edit.redo", json!({}));
-        let cold = Session::new(solidcraft_doc::Document::from_json(&s.doc.to_json()).unwrap());
+        let cold = Session::new(polykrom_doc::Document::from_json(&s.doc.to_json()).unwrap());
         assert!((area(&cold, "Sleeve") - area(&s, "Sleeve")).abs() < 1e-9);
         assert!(s.execute("surface.offset", &json!({"distance": 1})).is_err());
     }
@@ -1205,7 +1205,7 @@ mod tests {
         let bb = solidcraft_kernel::measure(&s.world_state().body("Lip").unwrap().body).unwrap().bbox;
         assert!((area(&s, "Lip") - 20.0).abs() < 1e-9 && (bb.min.y + 2.0).abs() < 1e-9);
         let st = s.world_state();
-        let names = solidcraft_doc::naming::face_names(st.body("Flange").unwrap());
+        let names = polykrom_doc::naming::face_names(st.body("Flange").unwrap());
         assert!(names.len() == 4 && names.iter().all(|n| !n.is_empty()), "{names:?}");
         let before = s.doc.features.len();
         for bad in [
@@ -1223,7 +1223,7 @@ mod tests {
         run(&mut s, "edit.undo", json!({}));
         assert!(s.world_state().body("Lip").is_none());
         run(&mut s, "edit.redo", json!({}));
-        let cold = Session::new(solidcraft_doc::Document::from_json(&s.doc.to_json()).unwrap());
+        let cold = Session::new(polykrom_doc::Document::from_json(&s.doc.to_json()).unwrap());
         assert!((area(&cold, "Draft") - area(&s, "Draft")).abs() < 1e-9);
     }
 
@@ -1248,19 +1248,19 @@ mod tests {
         plate_with_three_holes(&mut s);
         let top = [5.0, 5.0, 2.0];
         let name =
-            solidcraft_doc::naming::face_name_at_body(s.model.state().body("Plate").unwrap(), solidcraft_geom::Vec3::new(5.0, 5.0, 2.0)).unwrap();
+            polykrom_doc::naming::face_name_at_body(s.model.state().body("Plate").unwrap(), solidcraft_geom::Vec3::new(5.0, 5.0, 2.0)).unwrap();
         run(&mut s, "surface.untrim", json!({"face": {"body": "Plate", "point": top}, "body_name": "Top"}));
         let st = s.world_state();
         let made = &st.body("Top").unwrap().body;
         assert!(made.is_surface() && made.face_count() == 1);
         assert_eq!(edge_count(&s, "Top"), 4, "the rectangle alone");
         assert!((area(&s, "Top") - 800.0).abs() < 1e-9, "{}", area(&s, "Top"));
-        assert_eq!(solidcraft_doc::naming::face_names(s.model.state().body("Top").unwrap()).first(), Some(&name), "the face keeps its name");
+        assert_eq!(polykrom_doc::naming::face_names(s.model.state().body("Top").unwrap()).first(), Some(&name), "the face keeps its name");
         assert!(st.body("Plate").is_some(), "the solid stays");
         run(&mut s, "edit.undo", json!({}));
         assert!(s.world_state().body("Top").is_none());
         run(&mut s, "edit.redo", json!({}));
-        let cold = Session::new(solidcraft_doc::Document::from_json(&s.doc.to_json()).unwrap());
+        let cold = Session::new(polykrom_doc::Document::from_json(&s.doc.to_json()).unwrap());
         assert!((area(&cold, "Top") - 800.0).abs() < 1e-9);
         // One hole, by a point on its rim.
         run(&mut s, "surface.untrim", json!({"face": {"body": "Plate", "point": top}, "holes": [[22, 10, 2]], "body_name": "Two"}));
@@ -1301,7 +1301,7 @@ mod tests {
         run(&mut s, "surface.trim", json!({"body": "Half", "plane": {"origin": [0, 0, 15], "normal": [0, 0.5, 1]}, "keep": [0, 10, 1]}));
         let pi = std::f64::consts::PI;
         assert!((area(&s, "Half") - (150.0 * pi - 100.0)).abs() < 150.0 * pi * 1e-3, "{}", area(&s, "Half"));
-        let name = solidcraft_doc::naming::face_names(s.model.state().body("Half").unwrap()).first().cloned().unwrap();
+        let name = polykrom_doc::naming::face_names(s.model.state().body("Half").unwrap()).first().cloned().unwrap();
         let on = [10.0 * 2.5f64.cos(), 10.0 * 2.5f64.sin(), 5.0];
         assert!(s.execute("surface.untrim", &json!({"face": {"body": "Half", "point": on}})).is_err(), "no holes, outer kept");
         run(&mut s, "surface.untrim", json!({"face": {"body": "Half", "point": on}, "outer": true, "in_place": true}));
@@ -1310,7 +1310,7 @@ mod tests {
         assert!((area(&s, "Half") - 150.0 * pi).abs() < 150.0 * pi * 1e-3, "{}", area(&s, "Half")); // (measured on meshes)
         let bb = solidcraft_kernel::measure(&st.body("Half").unwrap().body).unwrap().bbox;
         assert!(bb.min.z.abs() < 1e-9 && (bb.max.z - 15.0).abs() < 1e-6, "{bb:?}");
-        assert_eq!(solidcraft_doc::naming::face_names(s.model.state().body("Half").unwrap()).first(), Some(&name), "the face keeps its name");
+        assert_eq!(polykrom_doc::naming::face_names(s.model.state().body("Half").unwrap()).first(), Some(&name), "the face keeps its name");
     }
 
     /// The plate written to STEP and inserted back: its imported top face untrims to the whole
@@ -1363,7 +1363,7 @@ mod tests {
         run(&mut s, "edit.undo", json!({}));
         assert!((area(&s, "Strip") - 200.0 * pi / 4.0 * 2.0).abs() < 1.0);
         run(&mut s, "edit.redo", json!({}));
-        let cold = Session::new(solidcraft_doc::Document::from_json(&s.doc.to_json()).unwrap());
+        let cold = Session::new(polykrom_doc::Document::from_json(&s.doc.to_json()).unwrap());
         assert!((area(&cold, "Strip") - area(&s, "Strip")).abs() < 1e-9);
         run(&mut s, "edit.undo", json!({}));
 
@@ -1381,7 +1381,7 @@ mod tests {
             assert_eq!(st.body("Strip").unwrap().body.face_count(), 2, "{mode}");
             let want = 10.0 * pi / 2.0 * 20.0 + run_off * 20.0;
             assert!((area(&s, "Strip") - want).abs() < want * 1e-3, "{mode}: {} vs {want}", area(&s, "Strip")); // (measured on meshes)
-            let cold = Session::new(solidcraft_doc::Document::from_json(&s.doc.to_json()).unwrap());
+            let cold = Session::new(polykrom_doc::Document::from_json(&s.doc.to_json()).unwrap());
             assert!((area(&cold, "Strip") - area(&s, "Strip")).abs() < 1e-9, "{mode}");
             run(&mut s, "edit.undo", json!({}));
         }
@@ -1461,11 +1461,11 @@ mod tests {
     }
 
     fn names(s: &Session, body: &str) -> Vec<String> {
-        solidcraft_doc::naming::face_names(s.model.state().body(body).unwrap()).to_vec()
+        polykrom_doc::naming::face_names(s.model.state().body(body).unwrap()).to_vec()
     }
 
     fn exact(s: &Session, body: &str, i: usize) -> bool {
-        solidcraft_doc::naming::face_name_exact(s.model.state().body(body).unwrap(), i)
+        polykrom_doc::naming::face_name_exact(s.model.state().body(body).unwrap(), i)
     }
 
     /// Two 20 × 10 sheets crossing at right angles (z = 0 and x = 0, both y = 0…10), trimmed by
@@ -1499,7 +1499,7 @@ mod tests {
         run(&mut s, "edit.undo", json!({}));
         assert!(s.world_state().body("Wall").is_some() && (area(&s, "Floor") - 200.0).abs() < 1e-9);
         run(&mut s, "edit.redo", json!({}));
-        let cold = Session::new(solidcraft_doc::Document::from_json(&saved).unwrap());
+        let cold = Session::new(polykrom_doc::Document::from_json(&saved).unwrap());
         assert!((area(&cold, "Floor") - 200.0).abs() < 1e-9 && cold.world_state().body("Wall").is_none());
         // Without stitching, each keeps its half under its own name.
         run(&mut s, "edit.undo", json!({}));
@@ -1605,7 +1605,7 @@ mod tests {
         assert!((area(&s, "U") - 50.0).abs() < 1e-9, "{}", area(&s, "U"));
         let saved = s.doc.to_json();
         assert!(saved.contains("\"keep_more\""), "the other points are saved");
-        let cold = Session::new(solidcraft_doc::Document::from_json(&saved).unwrap());
+        let cold = Session::new(polykrom_doc::Document::from_json(&saved).unwrap());
         assert!((area(&cold, "U") - 50.0).abs() < 1e-9);
         run(&mut s, "edit.undo", json!({}));
         run(&mut s, "surface.trim", json!({"body": "U", "plane": cut, "keep": [[5, 0, 5], [10, 1, 5]]}));
@@ -1854,7 +1854,7 @@ mod tests {
         assert!(s.world_state().body("Bridge").is_none());
         run(&mut s, "edit.redo", json!({}));
         assert!((area(&s, "Bridge") - 400.0).abs() < 1e-6);
-        let cold = Session::new(solidcraft_doc::Document::from_json(&s.doc.to_json()).unwrap());
+        let cold = Session::new(polykrom_doc::Document::from_json(&s.doc.to_json()).unwrap());
         assert!((area(&cold, "Bridge") - 400.0).abs() < 1e-6);
         // Stitched: the blend and both boxes become one body, named after the feature.
         let mut sewn = blend.clone();
@@ -1938,7 +1938,7 @@ mod tests {
             }
         }
         strip_tangent(&mut old);
-        let cold = Session::new(solidcraft_doc::Document::from_json(&old.to_string()).unwrap());
+        let cold = Session::new(polykrom_doc::Document::from_json(&old.to_string()).unwrap());
         assert!((area(&cold, "Strip") - strip(chord / 9.0)).abs() < 1e-3 * strip(chord / 9.0), "{} vs {}", area(&cold, "Strip"), strip(chord / 9.0));
         // An explicit share, and one out of range.
         let mut thin = blend.clone();
@@ -1988,7 +1988,7 @@ mod tests {
         run(&mut s, "surface.blend", turned);
         assert!((turn(&s, "Twist") - 90.0).abs() < 0.1, "{}°", turn(&s, "Twist"));
         assert!(s.doc.to_json().contains("\"seam\""), "the seam is saved");
-        let cold = Session::new(solidcraft_doc::Document::from_json(&s.doc.to_json()).unwrap());
+        let cold = Session::new(polykrom_doc::Document::from_json(&s.doc.to_json()).unwrap());
         assert!((turn(&cold, "Twist") - 90.0).abs() < 0.1, "read back: {}°", turn(&cold, "Twist"));
         // A closed rim does not blend to an open edge; a seam that is not two points is refused.
         run(&mut s, "solid.box", json!({"length": 40, "width": 10, "height": 10, "corner": [-20, 30, 30], "body_name": "Block"}));
@@ -2144,7 +2144,7 @@ mod tests {
             run(&mut s, "surface.patch", json!({"edges": rim, "body": "Tube", "continuity": [{"edge": first, "g": "g2"}], "body_name": "Mixed"}));
         assert_eq!(reply["continuity"]["edges"][0]["g"], json!("g2"), "{reply}");
         // Saved and read back: the same patches.
-        let back = solidcraft_doc::Document::from_json(&s.doc.to_json()).unwrap();
+        let back = polykrom_doc::Document::from_json(&s.doc.to_json()).unwrap();
         let reopened = Session::new(back);
         for name in ["Cap", "Tall", "Mixed"] {
             let (a, b) = (mesh(&s, name).positions, mesh(&reopened, name).positions);
@@ -2201,7 +2201,7 @@ mod tests {
         let (mut old, mut seen) = (saved.clone(), 0);
         without_speed(&mut old, &mut seen);
         assert_eq!(seen, 1, "the speed is saved with the patch");
-        let cold = Session::new(solidcraft_doc::Document::from_json(&old.to_string()).unwrap());
+        let cold = Session::new(polykrom_doc::Document::from_json(&old.to_string()).unwrap());
         let legacy = top(&cold, "Cap");
         assert!((legacy - 35.0).abs() < 0.5, "an older design's cap, half as high: {legacy}");
         // Asked for explicitly, the old speed gives the old cap; out of range is refused.
@@ -2254,7 +2254,7 @@ mod tests {
         assert!((area(&s, "Shell") - area_before).abs() < 1e-9, "undo did not take the fairing back");
         run(&mut s, "edit.redo", json!({}));
         assert!((area(&s, "Shell") - area_after).abs() < 1e-9, "redo did not put the fairing back");
-        let cold = Session::new(solidcraft_doc::Document::from_json(&s.doc.to_json()).unwrap());
+        let cold = Session::new(polykrom_doc::Document::from_json(&s.doc.to_json()).unwrap());
         assert!((area(&cold, "Shell") - area_after).abs() < 1e-9, "a cold reopen did not rebuild the same sheet");
         // Refusals: an unknown body, a body whose faces are all planes, an out-of-range strength
         // or step count, and a missing tolerance expression.

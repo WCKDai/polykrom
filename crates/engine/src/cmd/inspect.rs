@@ -1,7 +1,7 @@
 //! Inspection: measure bodies, describe the document, sketches and model topology.
 
+use polykrom_sketch::CurveKind;
 use serde_json::{Value, json};
-use solidcraft_sketch::CurveKind;
 
 use super::CommandSpec;
 use crate::params::{bad, bool_, str_, string_list};
@@ -59,14 +59,14 @@ pub static COMMANDS: &[CommandSpec] = &[
         .params("command: a command id. Returns {id, label, params, input, output} (and param_warnings in the warn parameter-check mode): the command's parameter documentation and, once the command has a typed contract, the JSON Schemas (2020-12) of its parameters and of a successful result (null otherwise). Read-only."),
 ];
 
-/// Body measurements kept between calls, by [`solidcraft_doc::ModelBody::geometry_key`].
+/// Body measurements kept between calls, by [`polykrom_doc::ModelBody::geometry_key`].
 #[derive(Default)]
 pub(crate) struct MeasureCache(std::collections::HashMap<u64, Value>);
 
 /// Bodies [`MeasureCache`] keeps; it starts over when full.
 const MAX_MEASURED: usize = 20_000;
 
-pub fn measure_json(b: &solidcraft_doc::ModelBody) -> Value {
+pub fn measure_json(b: &polykrom_doc::ModelBody) -> Value {
     match solidcraft_kernel::measure(&b.body) {
         // An open sheet encloses nothing: its area, box and counts, and no volume, centre of mass
         // or mass (what the divergence theorem gives an open shell means nothing, and is often
@@ -233,7 +233,7 @@ fn measure(s: &mut Session, p: &Value) -> Result<Value> {
         let cache = s.measure_cache.lock().ok();
         selected.iter().map(|b| b.geometry_key().and_then(|k| cache.as_ref()?.0.get(&k).cloned())).collect()
     };
-    let todo: Vec<&&solidcraft_doc::ModelBody> = selected.iter().zip(&known).filter(|(_, k)| k.is_none()).map(|(b, _)| b).collect();
+    let todo: Vec<&&polykrom_doc::ModelBody> = selected.iter().zip(&known).filter(|(_, k)| k.is_none()).map(|(b, _)| b).collect();
     let mut fresh = solidcraft_kernel::map_on_threads(&todo, 16, |b| measure_json(b)).into_iter();
     let mut bodies: Vec<Value> = Vec::with_capacity(selected.len());
     for (b, k) in selected.iter().zip(known) {
@@ -453,7 +453,7 @@ fn inspect(s: &mut Session, p: &Value) -> Result<Value> {
     }))
 }
 
-fn body_of<'a>(st: &'a solidcraft_doc::ModelState, p: &Value, cmd: &str) -> Result<&'a solidcraft_doc::ModelBody> {
+fn body_of<'a>(st: &'a polykrom_doc::ModelState, p: &Value, cmd: &str) -> Result<&'a polykrom_doc::ModelBody> {
     let n = str_(p, "body").ok_or_else(|| bad(cmd, "`body` is required"))?;
     st.body(n).ok_or_else(|| bad(cmd, format!("no body `{n}`")))
 }
@@ -462,7 +462,7 @@ fn model_edges(s: &mut Session, p: &Value) -> Result<Value> {
     let st = s.world_state();
     let b = body_of(&st, p, "model.edges")?;
     let tol = (b.body.size() * 2e-3).max(1e-3);
-    let names = solidcraft_doc::naming::edge_names(b);
+    let names = polykrom_doc::naming::edge_names(b);
     let edges: Vec<Value> = b
         .body
         .edges(tol)?
@@ -475,20 +475,20 @@ fn model_edges(s: &mut Session, p: &Value) -> Result<Value> {
 fn model_faces(s: &mut Session, p: &Value) -> Result<Value> {
     let st = s.world_state();
     let b = body_of(&st, p, "model.faces")?;
-    let names = solidcraft_doc::naming::face_names(b);
+    let names = polykrom_doc::naming::face_names(b);
     let tol = (b.body.size() * 2e-3).max(1e-3);
-    let spots = solidcraft_doc::naming::face_spots(b);
+    let spots = polykrom_doc::naming::face_spots(b);
     // A folded sheet's faces also have the readable names its sheet gives them, worked out in
     // the body's own coordinates.
     let model = s.model.state();
-    let sheet_names = model.body(&b.name).map(|own| solidcraft_doc::sheet::body_sheet_face_names(&model, own)).unwrap_or_default();
+    let sheet_names = model.body(&b.name).map(|own| polykrom_doc::sheet::body_sheet_face_names(&model, own)).unwrap_or_default();
     let faces: Vec<Value> = b
         .body
         .faces(tol)?
         .iter()
         .map(|f| {
             let spot = spots.get(f.index).copied().flatten();
-            let mut v = json!({"index": f.index, "name": names.get(f.index), "exact": solidcraft_doc::naming::face_name_exact(b, f.index),
+            let mut v = json!({"index": f.index, "name": names.get(f.index), "exact": polykrom_doc::naming::face_name_exact(b, f.index),
                    "area": f.area, "centroid": f.centroid, "plane_normal": f.plane_normal, "point": spot.map(|x| x.point)});
             if let (Some(Some(name)), Some(o)) = (sheet_names.get(f.index), v.as_object_mut()) {
                 o.insert("sheet_face".into(), json!(name));
@@ -540,7 +540,7 @@ fn physical_material(s: &mut Session, p: &Value) -> Result<Value> {
         return Err(bad(cmd, "`bodies` must list existing bodies"));
     }
     for b in &bodies {
-        if canonical == solidcraft_doc::DEFAULT_MATERIAL {
+        if canonical == polykrom_doc::DEFAULT_MATERIAL {
             s.doc_mut().materials.remove(b);
         } else {
             s.doc_mut().materials.insert(b.clone(), canonical.clone());
@@ -565,7 +565,7 @@ pub(super) fn color_param(v: &Value) -> Option<[u8; 3]> {
 }
 
 fn appearance(s: &mut Session, p: &Value) -> Result<Value> {
-    use solidcraft_doc::appearance::{FaceLook, Look, library};
+    use polykrom_doc::appearance::{FaceLook, Look, library};
     let cmd = "appearance.assign";
     let mut look: Option<Look> = match (str_(p, "appearance"), p.get("color")) {
         // A colour with a name: that colour, called that (a name not in the library is fine).
@@ -611,7 +611,7 @@ fn appearance(s: &mut Session, p: &Value) -> Result<Value> {
             let pt = crate::params::vec3(v)
                 .or_else(|| v.get("point").and_then(crate::params::vec3))
                 .ok_or_else(|| bad(cmd, "`faces` must list points [x, y, z]"))?;
-            let on = |b: &solidcraft_doc::ModelBody| solidcraft_doc::appearance::face_index_at(b, pt).is_some();
+            let on = |b: &polykrom_doc::ModelBody| polykrom_doc::appearance::face_index_at(b, pt).is_some();
             let body = match v.get("body").and_then(Value::as_str).or_else(|| str_(p, "body")) {
                 Some(n) => st.body(n).filter(|b| on(b)).map(|b| b.name.clone()),
                 None => st.bodies.iter().filter(|b| on(b)).min_by(|a, b| dist_to(a, pt).total_cmp(&dist_to(b, pt))).map(|b| b.name.clone()),
@@ -636,9 +636,9 @@ fn appearance(s: &mut Session, p: &Value) -> Result<Value> {
     let st_names: Vec<(String, solidcraft_geom::Vec3, Option<String>)> = faces
         .iter()
         .map(|(b, pt)| {
-            let n = st.body(b).and_then(|mb| {
-                solidcraft_doc::appearance::face_index_at(mb, *pt).and_then(|i| solidcraft_doc::naming::face_names(mb).get(i).cloned())
-            });
+            let n = st
+                .body(b)
+                .and_then(|mb| polykrom_doc::appearance::face_index_at(mb, *pt).and_then(|i| polykrom_doc::naming::face_names(mb).get(i).cloned()));
             (b.clone(), *pt, n)
         })
         .collect();
@@ -675,20 +675,20 @@ fn appearance(s: &mut Session, p: &Value) -> Result<Value> {
             .map(|(b, pt)| {
                 (
                     b.clone(),
-                    st.body(b).and_then(|mb| solidcraft_doc::appearance::face_index_at(mb, *pt)),
+                    st.body(b).and_then(|mb| polykrom_doc::appearance::face_index_at(mb, *pt)),
                     st_names.iter().find(|(name, p, _)| name == b && p.dist(*pt) < 1e-12).and_then(|(_, _, name)| name.clone()),
                 )
             })
             .collect();
         doc.appearances.faces.retain(|f| {
-            let idx = st.body(&f.body).and_then(|mb| solidcraft_doc::appearance::face_index_at(mb, f.point));
+            let idx = st.body(&f.body).and_then(|mb| polykrom_doc::appearance::face_index_at(mb, f.point));
             !picked.iter().any(|(b, i, name)| {
                 *b == f.body
                     && (f
                         .name
                         .as_ref()
                         .zip(name.as_ref())
-                        .is_some_and(|(a, b)| solidcraft_doc::naming::strip_piece(a) == solidcraft_doc::naming::strip_piece(b))
+                        .is_some_and(|(a, b)| polykrom_doc::naming::strip_piece(a) == polykrom_doc::naming::strip_piece(b))
                         || (!f.strict_name && i.is_some() && *i == idx))
             })
         });
@@ -701,13 +701,13 @@ fn appearance(s: &mut Session, p: &Value) -> Result<Value> {
     }))
 }
 
-fn dist_to(b: &solidcraft_doc::ModelBody, p: solidcraft_geom::Vec3) -> f64 {
+fn dist_to(b: &polykrom_doc::ModelBody, p: solidcraft_geom::Vec3) -> f64 {
     let bb = b.mesh().bounds();
     let c = solidcraft_geom::Vec3::new(p.x.clamp(bb.min.x, bb.max.x), p.y.clamp(bb.min.y, bb.max.y), p.z.clamp(bb.min.z, bb.max.z));
     c.dist(p)
 }
 
-pub(super) fn look_json(l: &solidcraft_doc::appearance::Look) -> Value {
+pub(super) fn look_json(l: &polykrom_doc::appearance::Look) -> Value {
     let mut value = json!({"name": l.name, "color": l.hex(), "opacity": l.opacity});
     if let Some(pbr) = l.pbr {
         value["pbr"] = json!(pbr);
@@ -719,7 +719,7 @@ pub(super) fn look_json(l: &solidcraft_doc::appearance::Look) -> Value {
 #[path = "pbr_appearance_tests.rs"]
 mod pbr_tests;
 
-pub(super) fn attach_pbr(cmd: &str, params: &Value, look: &mut solidcraft_doc::appearance::Look) -> Result<()> {
+pub(super) fn attach_pbr(cmd: &str, params: &Value, look: &mut polykrom_doc::appearance::Look) -> Result<()> {
     let Some(value) = params.get("pbr") else { return Ok(()) };
     if value.is_null() {
         look.pbr = None;
@@ -735,7 +735,7 @@ pub(super) fn attach_pbr(cmd: &str, params: &Value, look: &mut solidcraft_doc::a
         .filter(|o| o.len() == 3 && o.keys().all(|k| matches!(k.as_str(), "metallic" | "roughness" | "dielectric_ior")))
         .ok_or_else(|| bad(cmd, "`pbr` requires exactly metallic, roughness and dielectric_ior"))?;
     let number = |key: &str| object.get(key).and_then(Value::as_f64).ok_or_else(|| bad(cmd, format!("`pbr.{key}` must be a finite number")));
-    let response = solidcraft_doc::pbr_appearance::PbrParameters::new(number("metallic")?, number("roughness")?, number("dielectric_ior")?)
+    let response = polykrom_doc::pbr_appearance::PbrParameters::new(number("metallic")?, number("roughness")?, number("dielectric_ior")?)
         .map_err(|e| bad(cmd, e.to_string()))?;
     if look.opacity != 1.0 {
         return Err(bad(cmd, "opaque PBR requires opacity 1; refraction/transmission is not supported"));
@@ -745,7 +745,7 @@ pub(super) fn attach_pbr(cmd: &str, params: &Value, look: &mut solidcraft_doc::a
 }
 
 fn appearance_library(_s: &mut Session, _p: &Value) -> Result<Value> {
-    let list: Vec<Value> = solidcraft_doc::appearance::LIBRARY
+    let list: Vec<Value> = polykrom_doc::appearance::LIBRARY
         .iter()
         .map(|(n, c, o)| {
             let category = n.split(" - ").next().unwrap_or(n);
@@ -758,8 +758,8 @@ fn appearance_library(_s: &mut Session, _p: &Value) -> Result<Value> {
 fn appearance_list(s: &mut Session, p: &Value) -> Result<Value> {
     let a = &s.doc.appearances;
     // "In this design": each look used, with where.
-    let mut used: Vec<(solidcraft_doc::appearance::Look, Vec<Value>, Vec<Value>, Vec<Value>)> = Vec::new();
-    fn slot(used: &mut Vec<(solidcraft_doc::appearance::Look, Vec<Value>, Vec<Value>, Vec<Value>)>, l: &solidcraft_doc::appearance::Look) -> usize {
+    let mut used: Vec<(polykrom_doc::appearance::Look, Vec<Value>, Vec<Value>, Vec<Value>)> = Vec::new();
+    fn slot(used: &mut Vec<(polykrom_doc::appearance::Look, Vec<Value>, Vec<Value>, Vec<Value>)>, l: &polykrom_doc::appearance::Look) -> usize {
         match used.iter().position(|(u, ..)| u == l) {
             Some(i) => i,
             None => {
@@ -816,7 +816,7 @@ fn appearance_list(s: &mut Session, p: &Value) -> Result<Value> {
 }
 
 fn material_list(s: &mut Session, _p: &Value) -> Result<Value> {
-    let built_in = solidcraft_doc::MATERIALS.iter().map(|(n, d)| json!({"name": n, "density_g_cm3": d}));
+    let built_in = polykrom_doc::MATERIALS.iter().map(|(n, d)| json!({"name": n, "density_g_cm3": d}));
     let user = s.doc.user_materials.iter().map(
         |m| json!({"name": m.name, "density_g_cm3": m.density, "appearance": s.doc.material_look(&m.name).as_ref().map(look_json), "user": true}),
     );

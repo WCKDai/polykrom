@@ -2,11 +2,11 @@
 //! are picked in the view; the section is a built-in profile with its dimensions, or the profiles
 //! picked in another sketch. Anchor, angle and mirror place the section on each line.
 
+use polykrom_engine::Sel;
+use polykrom_engine::doc::expr::Kind as ValueKind;
+use polykrom_engine::doc::frame::{self, MemberProfile};
+use polykrom_engine::doc::{FeatureKind, ProfileSel};
 use serde_json::{Map, Value, json};
-use solidcraft_engine::Sel;
-use solidcraft_engine::doc::expr::Kind as ValueKind;
-use solidcraft_engine::doc::frame::{self, MemberProfile};
-use solidcraft_engine::doc::{FeatureKind, ProfileSel};
 
 use crate::SolveApp;
 use crate::dialogs::{Kind, check, curves_sketch, form_row, profile_indices, put, shown_expr};

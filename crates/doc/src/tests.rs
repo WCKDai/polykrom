@@ -1,6 +1,6 @@
+use polykrom_sketch::{ConstraintKind, Sketch};
 use solidcraft_geom::{Vec2, Vec3};
 use solidcraft_kernel::measure;
-use solidcraft_sketch::{ConstraintKind, Sketch};
 
 use crate::*;
 

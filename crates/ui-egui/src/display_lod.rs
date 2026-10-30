@@ -16,10 +16,10 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use solidcraft_engine::doc::ModelBody;
-use solidcraft_engine::doc::display_quality::{DisplayQuality, MAX_REFINE, refinement_for};
-use solidcraft_engine::geom::tess::TessPlan;
-use solidcraft_engine::geom::{Aabb3, Mesh, Vec3};
+use polykrom_engine::doc::ModelBody;
+use polykrom_engine::doc::display_quality::{DisplayQuality, MAX_REFINE, refinement_for};
+use polykrom_engine::geom::tess::TessPlan;
+use polykrom_engine::geom::{Aabb3, Mesh, Vec3};
 
 /// Most triangles all refined bodies may draw together (on top of the rest of the model).
 pub(crate) const TRIANGLE_BUDGET: usize = 6_000_000;
@@ -69,7 +69,7 @@ pub(crate) struct Lens {
 
 impl Lens {
     /// The view of `cam` in a viewport `height_px` physical pixels high.
-    pub fn new(cam: &solidcraft_engine::render::Camera, height_px: f64) -> Lens {
+    pub fn new(cam: &polykrom_engine::render::Camera, height_px: f64) -> Lens {
         let perspective = cam.fov > 0.0;
         let scale = if perspective { height_px / (2.0 * (cam.fov * 0.5).tan()) } else { height_px / (2.0 * cam.half_height()) };
         Lens { eye: cam.eye(), back: cam.back(), scale, perspective, near: (cam.distance * 1e-2).max(1e-3) }
@@ -408,10 +408,10 @@ fn mesh_bytes(m: &Mesh) -> usize {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use solidcraft_engine::render::Camera;
+    use polykrom_engine::render::Camera;
 
     fn cylinder() -> ModelBody {
-        let body = solidcraft_engine::kernel::cylinder(Vec3::ZERO, Vec3::Z, 10.0, 20.0).unwrap();
+        let body = polykrom_engine::kernel::cylinder(Vec3::ZERO, Vec3::Z, 10.0, 20.0).unwrap();
         ModelBody::new("Body1".into(), body, 1)
     }
 

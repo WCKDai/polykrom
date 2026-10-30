@@ -76,10 +76,10 @@ pub use expr::Expr;
 pub use names::{BodyName, FeatureName, SketchId};
 pub use params::{ParamRow, ParamUser, cycles};
 pub use points::{Dir, FacePick, Position, plain};
+pub use polykrom_sketch as sketch;
 /// How fast patches leave their G1/G2 edges: what new ones save, what older ones were filled with.
 pub use solidcraft_geom::fill_general::{FILL_SPEED, LEGACY_FILL_SPEED};
 pub use solidcraft_kernel as kernel;
-pub use solidcraft_sketch as sketch;
 
 #[derive(Debug, Clone, PartialEq, thiserror::Error)]
 pub enum DocError {
@@ -90,7 +90,7 @@ pub enum DocError {
     #[error("unknown {0}")]
     Unknown(String),
     #[error(transparent)]
-    Sketch(#[from] solidcraft_sketch::SketchError),
+    Sketch(#[from] polykrom_sketch::SketchError),
     #[error(transparent)]
     Kernel(#[from] solidcraft_kernel::KernelError),
 }

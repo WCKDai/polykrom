@@ -1,9 +1,9 @@
 //! The Extrude dialog's Thin Extrude (#721): a picked profile's outline becomes the wall's
 //! curves, and editing a thin extrude keeps it thin.
 use crate::scenario::Harness;
+use polykrom_engine::Sel;
+use polykrom_engine::doc::{FeatureKind, ThinSide};
 use serde_json::json;
-use solidcraft_engine::Sel;
-use solidcraft_engine::doc::{FeatureKind, ThinSide};
 
 fn rectangle(h: &mut Harness) -> u64 {
     h.app.run("sketch.create", json!({"plane":"XY","name":"Base"})).unwrap();
@@ -13,7 +13,7 @@ fn rectangle(h: &mut Harness) -> u64 {
 }
 
 fn volume(h: &Harness) -> f64 {
-    h.app.session.world_state().bodies.iter().map(|b| solidcraft_engine::doc::kernel::measure(&b.body).unwrap().volume).sum()
+    h.app.session.world_state().bodies.iter().map(|b| polykrom_engine::doc::kernel::measure(&b.body).unwrap().volume).sum()
 }
 
 #[test]

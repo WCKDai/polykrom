@@ -1,6 +1,6 @@
 //! Exact placement identity and session view/authoring state.
 use crate::{EngineError, Result, Sel, Session};
-use solidcraft_doc::{FeatureKind, IDENTITY, Mat, PlaneRef, mat_mul};
+use polykrom_doc::{FeatureKind, IDENTITY, Mat, PlaneRef, mat_mul};
 
 #[derive(Clone, Debug)]
 pub struct OccurrenceBody {
@@ -43,7 +43,7 @@ pub(crate) struct RemovedLaterCache {
 impl Session {
     /// Visibility keeps construction names, while undo history keeps feature ids. Follow the
     /// same axis or point into the new document on rename, undo and redo (#4419).
-    pub(crate) fn follow_axis_point_renames(&mut self, previous: &solidcraft_doc::Document) {
+    pub(crate) fn follow_axis_point_renames(&mut self, previous: &polykrom_doc::Document) {
         if self.visibility.hidden_origin.is_empty() {
             return;
         }
@@ -62,7 +62,7 @@ impl Session {
     }
 
     /// Document with uncaptured occurrence positions applied, without changing saved geometry.
-    pub fn placed_document(&self) -> std::borrow::Cow<'_, solidcraft_doc::Document> {
+    pub fn placed_document(&self) -> std::borrow::Cow<'_, polykrom_doc::Document> {
         if self.pending_moves.is_empty() {
             return std::borrow::Cow::Borrowed(&self.doc);
         }

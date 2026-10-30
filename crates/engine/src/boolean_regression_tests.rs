@@ -124,7 +124,7 @@ fn shallow_cuts_rebuild_after_inserting_an_earlier_pocket() {
     let rounded_plate = 40.0 * 30.0 * 10.0 - (4.0 - std::f64::consts::PI) * 40.0;
     // Half of each circle overlaps the existing 0.75 mm pocket.
     let expected = rounded_plate - 30.0 * 10.0 * 0.75 - 2.0 * std::f64::consts::PI * 25.0 * (1.5 - 0.75 / 2.0);
-    let reopened = Session::new(solidcraft_doc::Document::from_json(&s.doc.to_json()).unwrap());
+    let reopened = Session::new(polykrom_doc::Document::from_json(&s.doc.to_json()).unwrap());
     for session in [s, reopened] {
         assert!(session.model.results.iter().all(|r| r.error.is_none()));
         assert_eq!(session.model.state().bodies.len(), 1);
@@ -173,7 +173,7 @@ fn eighteen_tabs_join_the_ribs_of_a_chamfered_base() {
         assert!((mesh.bounds().max.z - 16.0).abs() < 1e-8);
     };
     check(&s);
-    let reopened = Session::new(solidcraft_doc::Document::from_json(&s.doc.to_json()).unwrap());
+    let reopened = Session::new(polykrom_doc::Document::from_json(&s.doc.to_json()).unwrap());
     check(&reopened);
 }
 
@@ -449,7 +449,7 @@ fn cut_of_a_whole_face_beside_round_corners_after_a_chamfer() {
 /// the body fell back to the reference mesher, which drew a sheet across the down tube.
 #[test]
 fn joined_loft_frames_plan_their_display_at_every_quality() {
-    use solidcraft_doc::display_quality::{DisplayQuality, MAX_REFINE};
+    use polykrom_doc::display_quality::{DisplayQuality, MAX_REFINE};
     for (script, name) in [
         (include_str!("../../../examples/regressions/loft_join_bracket_hull_triangle.json"), "DT2"),
         (include_str!("../../../examples/regressions/front_triangle_hull_triangle.json"), "FrontTriangle"),
@@ -969,7 +969,7 @@ fn combine_of_a_piece_a_cut_used_to_split_off_takes_the_body_it_is_part_of() {
 
     let mut s = posts_cut();
     s.execute("solid.combine", &json!({"target": "Case", "tools": ["Posts", "Posts (1)"], "operation": "join"})).unwrap();
-    let reopened = Session::new(solidcraft_doc::Document::from_json(&s.doc.to_json()).unwrap());
+    let reopened = Session::new(polykrom_doc::Document::from_json(&s.doc.to_json()).unwrap());
     let join = reopened.model.results.last().unwrap();
     assert_eq!((join.error.as_deref(), join.warning.as_deref()), (None, piece));
     assert_eq!(reopened.model.state().bodies.iter().map(|b| b.name.as_str()).collect::<Vec<_>>(), ["Case"]);
@@ -1271,13 +1271,13 @@ fn empty_intersection_in_a_saved_design_fails_and_keeps_the_target() -> crate::R
     let result = s.execute("solid.extrude", &json!({"distance":10,"operation":"intersect","targets":["Tall","Base"]}))?;
     let id = result["feature"].as_u64().ok_or_else(|| crate::EngineError::Other("missing feature id".into()))?;
     assert!((volume(&s, "Base") - 500.0).abs() < 1e-6);
-    let mut doc = solidcraft_doc::Document::from_json(&s.doc.to_json())?;
+    let mut doc = polykrom_doc::Document::from_json(&s.doc.to_json())?;
     if let Some(f) = doc.feature_mut(id)
-        && let solidcraft_doc::FeatureKind::Extrude { extent, .. } = &mut f.kind
+        && let polykrom_doc::FeatureKind::Extrude { extent, .. } = &mut f.kind
     {
         extent.start_offset = Some("20 mm".into());
     }
-    let reopened = Session::new(solidcraft_doc::Document::from_json(&doc.to_json())?);
+    let reopened = Session::new(polykrom_doc::Document::from_json(&doc.to_json())?);
     assert!(reopened.model.result(id).and_then(|r| r.error.as_ref()).is_some_and(|e| e.contains("the intersection is empty")));
     assert_eq!(reopened.model.state().bodies.len(), 2);
     assert!((volume(&reopened, "Tall") - 4000.0).abs() < 1e-6);

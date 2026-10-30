@@ -4,11 +4,11 @@
 
 use std::borrow::Cow;
 
+use polykrom_doc::{Expr, Operation, ThinSide};
 use schemars::{JsonSchema, Schema, SchemaGenerator, json_schema};
 use serde::de::Error as _;
 use serde::{Deserialize, Deserializer};
 use serde_json::{Value, json};
-use solidcraft_doc::{Expr, Operation, ThinSide};
 use solidcraft_geom::{Vec2, Vec3};
 
 use super::check::whole;
@@ -455,7 +455,7 @@ impl JsonSchema for ExtentKeyword {
 
 /// Extrude's distance convention, as `extent_param` reads it (serde, case-sensitive).
 #[derive(Clone, Debug, PartialEq)]
-pub struct ConventionParam(pub solidcraft_doc::ExtrudeConvention);
+pub struct ConventionParam(pub polykrom_doc::ExtrudeConvention);
 
 impl<'de> Deserialize<'de> for ConventionParam {
     fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
@@ -587,7 +587,7 @@ impl JsonSchema for ProfilesParam {
 /// A face given to a command, as `face::face_ref` reads it: a point on the face (`[x, y, z]`,
 /// `{x, y, z}` or `{point}`) or its name as `model.faces` lists it (1 to 512 bytes; the
 /// schema's `maxLength` counts characters, so it can't say bytes). Whether it finds a face is
-/// checked by the handler, which has the design. (Not `solidcraft_doc::FacePick`, the stored
+/// checked by the handler, which has the design. (Not `polykrom_doc::FacePick`, the stored
 /// pick.)
 #[derive(Clone, Debug, PartialEq)]
 pub enum FaceRef {
@@ -626,7 +626,7 @@ impl JsonSchema for FaceRef {
 /// edge (`[x, y, z]`, `{x, y, z}` or `{point}`), else `{body, index}` in the body's edge order.
 /// The index is whole-number JSON, as `Value::as_u64` reads it: JSON Schema also counts `1.0`
 /// as an integer, which the reader refuses. Whether it finds an edge is checked by the handler,
-/// which has the design. (Not `solidcraft_doc::EdgeRef`, the stored edge position.)
+/// which has the design. (Not `polykrom_doc::EdgeRef`, the stored edge position.)
 #[derive(Clone, Debug, PartialEq)]
 pub enum EdgeRef {
     Point(Vec3),

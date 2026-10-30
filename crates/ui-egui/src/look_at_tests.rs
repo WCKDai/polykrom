@@ -1,8 +1,8 @@
 //! Look At on a sketch (#3198): it faces the sketch and frames its geometry, not its plane's
 //! origin, so a sketch drawn far from the origin (an imported part placed there) stays in view.
 
+use polykrom_engine::geom::Vec3;
 use serde_json::json;
-use solidcraft_engine::geom::Vec3;
 
 use crate::scenario::Harness;
 

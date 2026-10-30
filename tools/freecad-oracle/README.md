@@ -22,7 +22,7 @@ volume, area, centre of mass, bounding box) and the triangulated surface in `ref
 
 - `build.py`: runs inside FreeCAD. Reads a case's `recipe.json` and builds the part with
   FreeCAD's modelling operations, following the meaning Polykrom gives the recipe
-  (`apps/solidcraft-cli/src/recipe.rs`): sketches (solved by FreeCAD's sketcher when the recipe
+  (`apps/polykrom-cli/src/recipe.rs`): sketches (solved by FreeCAD's sketcher when the recipe
   constrains them, otherwise at their recorded coordinates), extrude (distance, symmetric, two
   sides, through all, taper), revolve, sweep, loft, holes (simple, drilled tip, counterbore,
   countersink), rectangular/circular/path patterns and mirror (each source feature's tool moved

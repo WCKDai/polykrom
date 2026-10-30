@@ -1,8 +1,8 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 use crate::Session;
+use polykrom_doc::construct::ConstructGeom;
+use polykrom_doc::{Document, FeatureKind, PlaneRef};
 use serde_json::{Value, json};
-use solidcraft_doc::construct::ConstructGeom;
-use solidcraft_doc::{Document, FeatureKind, PlaneRef};
 use solidcraft_geom::Plane;
 
 fn run(s: &mut Session, command: &str, params: Value) -> Value {

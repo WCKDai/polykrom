@@ -2,8 +2,8 @@
 
 use std::sync::Arc;
 
+use polykrom_engine::{Sel, doc::Document};
 use serde_json::{Value, json};
-use solidcraft_engine::{Sel, doc::Document};
 
 use crate::SolveApp;
 use crate::dialogs::Kind;
@@ -211,7 +211,7 @@ pub fn commands(app: &SolveApp, k: &Resize) -> Result<Vec<(String, Value)>, Stri
 mod tests {
     use super::*;
     use crate::context_menu::{self, Target};
-    use solidcraft_engine::{Session, geom::Vec3};
+    use polykrom_engine::{Session, geom::Vec3};
 
     fn part(family: &str, size: &str, length: Option<f64>) -> (SolveApp, u64) {
         let mut app = SolveApp::new(Session::default(), crate::Services::default());

@@ -1,7 +1,7 @@
 //! Canvases (reference images on planes) and decals (images on planar faces).
 
+use polykrom_doc::canvas::{Canvas, MAX_CANVAS_BYTES, base64_decode, base64_encode, image_info};
 use serde_json::{Value, json};
-use solidcraft_doc::canvas::{Canvas, MAX_CANVAS_BYTES, base64_decode, base64_encode, image_info};
 use solidcraft_geom::Vec2;
 
 use super::CommandSpec;
@@ -31,7 +31,7 @@ fn image_bytes(p: &Value, cmd: &str) -> Result<Vec<u8>> {
         base64_decode(d).ok_or_else(|| bad(cmd, "`data` is not base64"))?
     } else {
         let path = str_(p, "path").filter(|x| !x.trim().is_empty() && x.len() < 4096).ok_or_else(|| bad(cmd, "give `path` or `data`"))?;
-        solidcraft_io::vfs::read(path, MAX_CANVAS_BYTES).map_err(|e| EngineError::Other(format!("{path}: {e}")))?
+        polykrom_io::vfs::read(path, MAX_CANVAS_BYTES).map_err(|e| EngineError::Other(format!("{path}: {e}")))?
     };
     if b.len() > MAX_CANVAS_BYTES {
         return Err(bad(cmd, "the image is too large"));
@@ -161,8 +161,8 @@ fn delete_canvas(s: &mut Session, p: &Value) -> Result<Value> {
 
 #[cfg(test)]
 mod tests {
+    use polykrom_doc::canvas::base64_encode;
     use serde_json::json;
-    use solidcraft_doc::canvas::base64_encode;
 
     use crate::Session;
 
@@ -180,7 +180,7 @@ mod tests {
         let params = json!({"data": png(10, 10)});
         let first = s.execute("canvas.insert", &params).unwrap()["canvas"].as_u64().unwrap();
         s.execute("canvas.delete", &json!({"canvas": first})).unwrap();
-        let doc = solidcraft_doc::Document::from_json(&s.doc.to_json()).unwrap();
+        let doc = polykrom_doc::Document::from_json(&s.doc.to_json()).unwrap();
         *s.doc_mut() = doc;
         let second = s.execute("canvas.insert", &params).unwrap()["canvas"].as_u64().unwrap();
         assert!(second > first, "deleted canvas {first} was reused as {second}");
@@ -200,7 +200,7 @@ mod tests {
         assert!((s.doc.canvases[0].width - 200.0).abs() < 1e-9);
         s.execute("canvas.edit", &json!({"canvas": "Canvas1", "opacity": 0.8, "angle": 90})).unwrap();
         // Undo-able and saved with the design.
-        let back = solidcraft_doc::Document::from_json(&s.doc.to_json()).unwrap();
+        let back = polykrom_doc::Document::from_json(&s.doc.to_json()).unwrap();
         assert_eq!(back.canvases, s.doc.canvases);
         s.execute("canvas.delete", &json!({"canvas": id})).unwrap();
         assert!(s.doc.canvases.is_empty());

@@ -1,6 +1,6 @@
 //! The Parameters dialog's ▲ / ▼ buttons reorder user parameters (#1187).
+use polykrom_ui_egui::scenario::Harness;
 use serde_json::json;
-use solidcraft_ui_egui::scenario::Harness;
 
 fn order(h: &mut Harness) -> Vec<String> {
     let v = h.app.session.execute("parameters.list", &json!({"filter": "user"})).unwrap();

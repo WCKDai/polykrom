@@ -42,4 +42,4 @@ The `font_literals_tests` source guard scans production Rust, including the
 viewport icon sources, and rejects numeric font sizes, private font families
 outside `fonts.rs`, and direct dense-form spacing literals. Its small per-file
 allowance table documents graphic spinner diameters; it permits no text sizes.
-Run it with `cargo test -p solidcraft-ui-egui --lib font_literals_tests`.
+Run it with `cargo test -p polykrom-ui-egui --lib font_literals_tests`.

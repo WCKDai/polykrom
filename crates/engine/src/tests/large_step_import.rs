@@ -3,8 +3,8 @@
 
 use std::sync::Arc;
 
+use polykrom_doc::{FeatureKind, progress::Progress};
 use serde_json::json;
-use solidcraft_doc::{FeatureKind, progress::Progress};
 
 use crate::*;
 
@@ -68,7 +68,7 @@ fn cancelled_import_stops_and_leaves_the_design_alone() {
             progress.cancel();
         })
     };
-    let r = solidcraft_doc::progress::watch(progress.clone(), || s.execute("file.insert_step", &json!({"path": path})));
+    let r = polykrom_doc::progress::watch(progress.clone(), || s.execute("file.insert_step", &json!({"path": path})));
     canceller.join().unwrap();
     let err = r.unwrap_err().to_string();
     assert!(err.contains("cancelled"), "{err}");

@@ -2,8 +2,8 @@
 //! behind the parameters dialog — list, add, rename, favourite, comment, users, dependency
 //! graph, CSV/JSON import and export, expression evaluation and autocomplete.
 
+use polykrom_doc::expr::{self, Kind};
 use serde_json::{Value, json};
-use solidcraft_doc::expr::{self, Kind};
 
 use super::CommandSpec;
 use crate::params::{bad, bool_, str_};
@@ -159,7 +159,7 @@ fn list(s: &mut Session, p: &Value) -> Result<Value> {
         (_, Some(f)) => f.to_ascii_lowercase(),
         _ => "all".to_string(),
     };
-    let mut rows: Vec<solidcraft_doc::ParamRow> = s
+    let mut rows: Vec<polykrom_doc::ParamRow> = s
         .doc
         .param_rows()
         .into_iter()
@@ -172,7 +172,7 @@ fn list(s: &mut Session, p: &Value) -> Result<Value> {
         .collect();
     // Favourites first; otherwise the table order (user, sketch, feature).
     rows.sort_by_key(|r| !r.favorite);
-    let cycles = solidcraft_doc::cycles(&s.doc.all_param_exprs());
+    let cycles = polykrom_doc::cycles(&s.doc.all_param_exprs());
     Ok(json!({"parameters": rows, "count": rows.len(), "cycles": cycles}))
 }
 
@@ -252,7 +252,7 @@ fn graph(s: &mut Session, _p: &Value) -> Result<Value> {
     let (_, errs) = s.doc.param_values();
     let nodes: Vec<String> = s.doc.param_defs().into_iter().map(|d| d.name).collect();
     let edges: Vec<[String; 2]> = s.doc.param_graph().into_iter().map(|(a, b)| [a, b]).collect();
-    let cycles = solidcraft_doc::cycles(&s.doc.all_param_exprs());
+    let cycles = polykrom_doc::cycles(&s.doc.all_param_exprs());
     Ok(json!({"nodes": nodes, "edges": edges, "cycles": cycles, "errors": errs}))
 }
 
@@ -278,7 +278,7 @@ fn export(s: &mut Session, p: &Value) -> Result<Value> {
         other => return Err(bad(cmd, format!("unknown format `{other}` (csv or json)"))),
     };
     if let Some(path) = path {
-        solidcraft_io::vfs::write(path, text.as_bytes()).map_err(|e| EngineError::Other(format!("{path}: {e}")))?;
+        polykrom_io::vfs::write(path, text.as_bytes()).map_err(|e| EngineError::Other(format!("{path}: {e}")))?;
     }
     Ok(json!({"format": format, "path": path, "text": text}))
 }
@@ -290,9 +290,7 @@ fn import(s: &mut Session, p: &Value) -> Result<Value> {
     let cmd = "parameters.import";
     let text = match (str_(p, "text"), str_(p, "path")) {
         (Some(t), _) => t.to_string(),
-        (None, Some(path)) => {
-            solidcraft_io::vfs::read_to_string(path, MAX_PARAMETER_BYTES).map_err(|e| EngineError::Other(format!("{path}: {e}")))?
-        }
+        (None, Some(path)) => polykrom_io::vfs::read_to_string(path, MAX_PARAMETER_BYTES).map_err(|e| EngineError::Other(format!("{path}: {e}")))?,
         _ => return Err(bad(cmd, "give `text` or `path`")),
     };
     let solved = s.solved_sketches();
@@ -321,10 +319,10 @@ fn evaluate(s: &mut Session, p: &Value) -> Result<Value> {
     let (vals, _) = s.doc.param_values();
     let defaults = expr::Defaults::for_unit(unit.unwrap_or(""), 1.0);
     let refs = expr::references(&e);
-    let lookup = |n: &str| vals.get(n).copied().ok_or_else(|| solidcraft_doc::DocError::Expr(format!("unknown parameter `{n}`")));
+    let lookup = |n: &str| vals.get(n).copied().ok_or_else(|| polykrom_doc::DocError::Expr(format!("unknown parameter `{n}`")));
     let r = expr::eval_with_defaults(&e, &lookup, defaults).and_then(|v| match kind {
         Some(k) => v.to_kind_in(k, defaults).map(|x| (x, k)),
-        None => v.kind().map(|k| (v.v, k)).ok_or_else(|| solidcraft_doc::DocError::Expr(format!("the result is {}", v.describe()))),
+        None => v.kind().map(|k| (v.v, k)).ok_or_else(|| polykrom_doc::DocError::Expr(format!("the result is {}", v.describe()))),
     });
     Ok(match r {
         Ok((v, k)) => {
@@ -354,7 +352,7 @@ fn complete(s: &mut Session, p: &Value) -> Result<Value> {
     // `cab_side_thickness`, #2757); functions, constants and units match from the start.
     let within = |n: &str| word.is_empty() || n.to_ascii_lowercase().contains(&lower);
     let mut out: Vec<Value> = Vec::new();
-    let mut rows: Vec<solidcraft_doc::ParamRow> = s.doc.param_rows().into_iter().filter(|r| within(&r.name)).collect();
+    let mut rows: Vec<polykrom_doc::ParamRow> = s.doc.param_rows().into_iter().filter(|r| within(&r.name)).collect();
     // Names that start with the word, then the rest; within each, favourites, then user
     // parameters, then the others.
     rows.sort_by_key(|r| (!starts(&r.name), !r.favorite, r.source != "user"));

@@ -1,6 +1,6 @@
 # Bounded Radiance input
 
-`solidcraft_render::lighting` provides a caller-owned cooperative RGBE decoder.
+`polykrom_render::lighting` provides a caller-owned cooperative RGBE decoder.
 This is input preparation only: it enables no environment import command, document
 format, PBR material, lighting capability, GPU upload or image-render backend.
 The existing canvas decoder explicitly accepts PNG/JPEG only, so Cargo feature

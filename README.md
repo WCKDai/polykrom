@@ -60,9 +60,9 @@ status and plans are in [ROADMAP.md](ROADMAP.md). See also [what people built](d
 ## Build from source
 
 ```sh
-cargo run --release -p solidcraft -- --sample      # desktop app with a sample part
-cargo run --release -p solidcraft-cli -- commands  # the command registry (also: polykrom-cli)
-cargo run --release -p solidcraft-cli -- run examples/bracket.json --out bracket.step
+cargo run --release -p polykrom -- --sample      # desktop app with a sample part
+cargo run --release -p polykrom-cli -- commands  # the command registry (also: polykrom-cli)
+cargo run --release -p polykrom-cli -- run examples/bracket.json --out bracket.step
 cargo xtask ci                                     # fmt, clippy, tests, icons, assets, layers, wasm
 ```
 

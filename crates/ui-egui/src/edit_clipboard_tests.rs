@@ -1,8 +1,8 @@
 //! Copy and Paste from the keyboard and the context menu (#1480).
 
+use polykrom_engine::Sel;
+use polykrom_engine::geom::Vec2;
 use serde_json::{Value, json};
-use solidcraft_engine::Sel;
-use solidcraft_engine::geom::Vec2;
 
 use crate::scenario::Harness;
 
@@ -176,7 +176,7 @@ impl Drop for ContributionPart {
     }
 }
 fn contribution_saved_part(file: &ContributionPart) -> crate::SolveApp {
-    let mut app = crate::SolveApp::new(solidcraft_engine::Session::default(), crate::Services::default());
+    let mut app = crate::SolveApp::new(polykrom_engine::Session::default(), crate::Services::default());
     app.run("solid.box", json!({"length":20,"width":10,"height":5,"body_name":"Plate"})).unwrap();
     app.run("file.save", json!({"path":file.0.to_string_lossy()})).unwrap();
     app.tree.picked_components = vec![0];
@@ -188,7 +188,7 @@ fn contribution_linked_design_clipboard_crosses_tabs_reuses_links_and_undoes_onc
     let file = ContributionPart::new();
     let mut app = contribution_saved_part(&file);
     assert!(super::copy(&mut app));
-    crate::documents::open_tab(&mut app, solidcraft_engine::Session::default()).unwrap();
+    crate::documents::open_tab(&mut app, polykrom_engine::Session::default()).unwrap();
     assert!(super::can_paste(&app));
     for n in 1..=2 {
         assert!(super::paste(&mut app, None), "{:?}", app.status);
@@ -217,7 +217,7 @@ fn contribution_occurrence_move_panel_belongs_to_its_document() {
     let file = ContributionPart::new();
     let mut app = contribution_saved_part(&file);
     assert!(super::copy(&mut app));
-    crate::documents::open_tab(&mut app, solidcraft_engine::Session::default()).unwrap();
+    crate::documents::open_tab(&mut app, polykrom_engine::Session::default()).unwrap();
     assert!(super::paste(&mut app, None));
     let id = app.tree.occurrence_move.as_ref().unwrap().occurrence;
     app.run("occurrence.move", json!({"occurrence":id,"translate":[10,0,0],"capture":false})).unwrap();
@@ -232,12 +232,12 @@ fn contribution_occurrence_move_panel_belongs_to_its_document() {
 
 #[test]
 fn contribution_linked_paste_uses_the_pointer_and_pending_numeric_move() {
-    use solidcraft_engine::geom::Vec3;
+    use polykrom_engine::geom::Vec3;
     let file = ContributionPart::new();
     let mut h = crate::scenario::Harness::new();
     h.app = contribution_saved_part(&file);
     assert!(super::copy(&mut h.app));
-    crate::documents::open_tab(&mut h.app, solidcraft_engine::Session::default()).unwrap();
+    crate::documents::open_tab(&mut h.app, polykrom_engine::Session::default()).unwrap();
     h.app.run("solid.box", json!({"length":80,"width":50,"height":8,"body_name":"Destination"})).unwrap();
     h.app.fit_view();
     h.frames(3);
@@ -248,7 +248,7 @@ fn contribution_linked_paste_uses_the_pointer_and_pending_numeric_move() {
     assert!(super::paste(&mut h.app, Some(at)));
     h.frames(3);
     let path = h.app.tree.occurrence_move.as_ref().unwrap().path.clone();
-    let initial = solidcraft_engine::doc::apply_point(&h.app.session.occurrence_placement(&path).unwrap().world, Vec3::ZERO);
+    let initial = polykrom_engine::doc::apply_point(&h.app.session.occurrence_placement(&path).unwrap().world, Vec3::ZERO);
     assert!((initial - pointed).len() < 1e-5, "{initial:?}");
     assert_eq!(h.app.session.undo.len(), undo + 1);
     let camera = h.app.cam;
@@ -259,7 +259,7 @@ fn contribution_linked_paste_uses_the_pointer_and_pending_numeric_move() {
     h.step(&json!({"text":"12"})).unwrap();
     h.step(&json!({"key":"Enter"})).unwrap();
     h.frames(3);
-    let moved = solidcraft_engine::doc::apply_point(&h.app.session.occurrence_placement(&path).unwrap().world, Vec3::ZERO);
+    let moved = polykrom_engine::doc::apply_point(&h.app.session.occurrence_placement(&path).unwrap().world, Vec3::ZERO);
     assert!(moved.x > initial.x + 10., "numeric move must retain the pasted occurrence: {initial:?} -> {moved:?}");
     assert_eq!(h.app.cam, camera, "numeric editing does not move the camera");
     let movement = h.app.tree.occurrence_move.as_ref().unwrap();
@@ -275,7 +275,7 @@ fn contribution_linked_paste_uses_the_pointer_and_pending_numeric_move() {
 
 #[test]
 fn contribution_paste_pointer_uses_parent_coordinates_and_safe_fallbacks() {
-    use solidcraft_engine::{doc, geom::Vec3};
+    use polykrom_engine::{doc, geom::Vec3};
     let mut h = crate::scenario::Harness::new();
     let parent = h.app.run("component.create", json!({"name":"Parent","grounded":false})).unwrap();
     h.app
@@ -302,7 +302,7 @@ fn contribution_paste_pointer_uses_parent_coordinates_and_safe_fallbacks() {
 #[test]
 fn contribution_linked_clipboard_refuses_unsaved_dirty_self_and_missing_sources() {
     let file = ContributionPart::new();
-    let mut app = crate::SolveApp::new(solidcraft_engine::Session::default(), crate::Services::default());
+    let mut app = crate::SolveApp::new(polykrom_engine::Session::default(), crate::Services::default());
     assert!(!super::copy_design(&mut app));
     app = contribution_saved_part(&file);
     assert!(super::copy_design(&mut app));
@@ -311,7 +311,7 @@ fn contribution_linked_clipboard_refuses_unsaved_dirty_self_and_missing_sources(
     assert_eq!(app.session.doc, doc);
     app.run("solid.box", json!({"length":2,"width":2,"height":2,"corner":[30,0,0]})).unwrap();
     assert!(!super::copy_design(&mut app));
-    crate::documents::open_tab(&mut app, solidcraft_engine::Session::default()).unwrap();
+    crate::documents::open_tab(&mut app, polykrom_engine::Session::default()).unwrap();
     std::fs::remove_file(&file.0).unwrap();
     assert!(!super::paste(&mut app, None));
     assert!(app.session.doc.features.is_empty());
@@ -338,7 +338,7 @@ fn contribution_native_copy_paste_events_insert_the_saved_design_in_another_tab(
     h.frames(3);
     clipboard_event(&mut h, egui::Event::Copy, None);
     assert!(h.app.linked_design_clipboard.is_some());
-    crate::documents::open_tab(&mut h.app, solidcraft_engine::Session::default()).unwrap();
+    crate::documents::open_tab(&mut h.app, polykrom_engine::Session::default()).unwrap();
     clipboard_event(&mut h, egui::Event::Paste("Polykrom linked design".into()), None);
     assert_eq!(h.app.session.doc.links.len(), 1, "{:?}", h.app.status);
     assert_eq!(h.app.session.undo.len(), 1);

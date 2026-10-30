@@ -1,8 +1,8 @@
 //! World-axis component dimensions use the same endpoints as the displayed measurement.
 use crate::dialogs::Kind;
 use crate::scenario::Harness;
+use polykrom_engine::Sel;
 use serde_json::{Value, json};
-use solidcraft_engine::Sel;
 
 fn result(h: &Harness) -> &Value {
     match &h.app.dialog.as_ref().unwrap().kind {

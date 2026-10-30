@@ -2,8 +2,8 @@
 //! other dialogs do ("10 mm"), in the design's units. OK makes what the bare numbers made before,
 //! and a bare number typed into a field still means the design's units.
 
+use polykrom_engine::Session;
 use serde_json::{Value, json};
-use solidcraft_engine::Session;
 
 use crate::dialogs::{Kind, apply_commands};
 use crate::scenario::Harness;
@@ -158,7 +158,7 @@ fn a_centimetre_design_shows_centimetres() {
 
 /// The sizes a primitive feature keeps, as stored.
 fn stored(h: &Harness, id: u64) -> Vec<String> {
-    use solidcraft_engine::doc::FeatureKind;
+    use polykrom_engine::doc::FeatureKind;
     match h.app.session.doc.feature(id).map(|f| &f.kind) {
         Some(FeatureKind::Box { length, width, height, .. }) => vec![length.to_string(), width.to_string(), height.to_string()],
         Some(FeatureKind::Cylinder { radius, height, .. }) => vec![radius.to_string(), height.to_string()],

@@ -2,12 +2,12 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use serde_json::Value;
-use solidcraft_engine::{
+use polykrom_engine::{
     Sel,
     doc::Document,
     geom::{Aabb3, Seg2, Vec3},
 };
+use serde_json::Value;
 
 use crate::{
     SolveApp,
@@ -51,7 +51,7 @@ impl StraightPreview {
             let placed = app.session.occurrence_placement(path).ok()?;
             if path.len() != 1
                 || placed.component != app.session.active_component
-                || placed.world != solidcraft_engine::doc::IDENTITY
+                || placed.world != polykrom_engine::doc::IDENTITY
                 || app.session.doc.occurrences.iter().filter(|o| o.component == placed.component).count() != 1
             {
                 return None;
@@ -69,13 +69,13 @@ impl StraightPreview {
         }
         if let Some(taper) = params.get("taper") {
             let expression = taper.as_str().map(str::to_owned).unwrap_or_else(|| taper.to_string());
-            if app.session.doc.eval(&expression, solidcraft_engine::doc::expr::Kind::Angle).ok()?.abs() > 1e-12 {
+            if app.session.doc.eval(&expression, polykrom_engine::doc::expr::Kind::Angle).ok()?.abs() > 1e-12 {
                 return None;
             }
         }
         let distance = params.get("distance")?;
         let expression = distance.as_str().map(str::to_owned).unwrap_or_else(|| distance.to_string());
-        let mut distance = app.session.doc.eval(&expression, solidcraft_engine::doc::expr::Kind::Length).ok()?;
+        let mut distance = app.session.doc.eval(&expression, polykrom_engine::doc::expr::Kind::Length).ok()?;
         if direction == "negative" {
             distance = -distance;
         }
@@ -93,7 +93,7 @@ impl StraightPreview {
         // Zero makes no extrusion. Say so now rather than building the scratch design only
         // for the kernel to refuse it: that wait was a visible lag (#3254).
         if distance.abs() < 1e-9 {
-            return Some(Err(solidcraft_engine::kernel::KernelError::Invalid("extrude distance is zero".into()).to_string()));
+            return Some(Err(polykrom_engine::kernel::KernelError::Invalid("extrude distance is zero".into()).to_string()));
         }
         if self
             .cached

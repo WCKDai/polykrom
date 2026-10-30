@@ -1,7 +1,7 @@
 //! The confirmation and notice prompts share the kit's card: header (icon, title, close), body
 //! and pinned footer. Each keeps its answers (buttons, close, Esc, Enter).
+use polykrom_engine::Sel;
 use serde_json::json;
-use solidcraft_engine::Sel;
 
 use crate::scenario::{self, Harness};
 

@@ -2,7 +2,7 @@
 
 use std::collections::BTreeMap;
 
-use solidcraft_engine::CommandSpec;
+use polykrom_engine::CommandSpec;
 
 pub struct Family {
     pub label: &'static str,
@@ -62,7 +62,7 @@ impl Choices {
 
     pub fn selected(&self, f: &Family) -> Option<&'static CommandSpec> {
         let saved = self.0.get(f.label).and_then(|s| f.commands.iter().find(|c| **c == s.as_str()));
-        saved.or_else(|| f.commands.first()).copied().and_then(solidcraft_engine::find_command)
+        saved.or_else(|| f.commands.first()).copied().and_then(polykrom_engine::find_command)
     }
 
     /// What a family's main button or shortcut starts: its remembered variant when `id` is the
@@ -86,7 +86,7 @@ mod tests {
             assert!(!f.commands.is_empty());
             for id in f.commands {
                 assert!(seen.insert(id), "duplicate variant {id}");
-                let c = solidcraft_engine::find_command(id).unwrap();
+                let c = polykrom_engine::find_command(id).unwrap();
                 assert_eq!((c.tab, c.panel), ("SKETCH", "CREATE"));
             }
         }
