@@ -1,0 +1,43 @@
+# Explicit, time-boxed acceptance of known transitive/unmaintained advisories.
+# Owner decision: 2026-10-30 (requested in the engineering task). Review by 2027-01-31.
+# Each entry states why the risk is accepted; do not add a broad package override.
+
+[[IgnoredVulns]]
+id = "GHSA-qwgh-2vcv-g2f7"
+ignoreUntil = 2027-01-31
+reason = "block-buffer 0.10.4: exploitable only after a caught panic inside compression; the fixed 0.12 line requires a digest/sha2/zbus major transition. Low likelihood, tracked for the next keyring/zbus upgrade."
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2026-0196"
+ignoreUntil = 2027-01-31
+reason = "cgmath is unmaintained; it is a PolyCore/Truck dependency. Replacement needs a geometry-layer migration, tracked upstream."
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2026-0197"
+ignoreUntil = 2027-01-31
+reason = "cgmath swap_columns UB requires identical column indices. That API is not called in Polykrom or the pinned PolyCore checkout (searched 2026-10-30)."
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2024-0370"
+ignoreUntil = 2027-01-31
+reason = "proc-macro-error is a build-time proc-macro; it ships no runtime code and is pulled by the pinned Truck derivation chain."
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2026-0192"
+ignoreUntil = 2027-01-31
+reason = "ttf-parser is unmaintained. Font input remains a hostile surface; keep font size/collection caps and review the successor crate before replacing it."
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2026-0371"
+ignoreUntil = 2027-01-31
+reason = "zbus_names is unmaintained; it is in the Linux D-Bus/keyring/accesskit stack. No fixed release exists in the 3.x/4.x lines."
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2026-0370"
+ignoreUntil = 2027-01-31
+reason = "zvariant is unmaintained; it is in the Linux D-Bus/keyring/accesskit stack. No fixed release exists in the 4.x/5.x lines."
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2026-0372"
+ignoreUntil = 2027-01-31
+reason = "zvariant_derive is unmaintained; it is the proc-macro half of the same Linux D-Bus/keyring/accesskit stack."
