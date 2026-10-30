@@ -115,7 +115,12 @@ it at the draft's target commit.
 
 Items to carry into the next release's notes (step 3 below), then remove from here:
 
-- None yet.
+- 0.21.0-rc.2 (a release candidate: packaging corrections and an update fix, #304, #305).
+  - Release files are named Polykrom (`polykrom-<version>-<platform>`,
+    `Polykrom-<version>-windows-x64.exe`). The version-less installers are also attached under
+    their earlier `solidcraft-…` names, so old download links and installs keep finding them.
+  - In-app update checks work again: since the repository moved to the WCKDai organisation, the
+    check turned down every file of a release.
 
 ## Verify and publish
 
