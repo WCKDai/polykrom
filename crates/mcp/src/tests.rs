@@ -109,6 +109,23 @@ fn rel(a: f64, b: f64) -> f64 {
 }
 
 #[test]
+fn quality_gate_passes_a_solid_and_fails_an_under_constrained_model() {
+    let mut s = server();
+    tool(&mut s, "execute", json!({"command": "solid.box", "params": {"length": 10, "width": 10, "height": 10, "body_name": "Block"}}));
+    let q = tool(&mut s, "quality", json!({}));
+    assert_eq!(q["verdict"], "pass", "{q}");
+
+    tool(&mut s, "new_design", json!({"name": "Loose"}));
+    tool(&mut s, "execute", json!({"command": "sketch.create", "params": {"plane": "XY"}}));
+    tool(&mut s, "execute", json!({"command": "sketch.rectangle.two_point", "params": {"p0": [0, 0], "p1": [20, 10]}}));
+    tool(&mut s, "execute", json!({"command": "sketch.finish"}));
+    tool(&mut s, "execute", json!({"command": "solid.extrude", "params": {"distance": 5}}));
+    let q = tool(&mut s, "quality", json!({}));
+    assert_eq!(q["verdict"], "fail", "{q}");
+    assert!(q["hard_failures"].as_array().unwrap().iter().any(|x| x.as_str().unwrap().contains("under-constrained")), "{q}");
+}
+
+#[test]
 fn handshake_and_tools_list() {
     let mut s = server();
     let init =
@@ -132,6 +149,7 @@ fn handshake_and_tools_list() {
         "execute",
         "batch",
         "inspect_design",
+        "quality",
         "measure",
         "body_topology",
         "set_parameter",

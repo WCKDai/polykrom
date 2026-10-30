@@ -44,7 +44,7 @@ run mechanisms with `motion.study {name, steps, keys}`, check them with `motion.
 `motion.export_animation {study, path}`; check strength with `analysis.static_stress`, and that a robot stands and walks with `sim.mujoco {study?}`. Once it works, polish \
 the finish in passes with `polish {apply: safe, views: true}` (`inspect.polish` measures sharp edges, radius family, boxiness, \
 printability and tidiness; `polish.apply` applies its safe fillets and chamfers) until the score stops rising. Before modelling, state the numbers the result \
-must meet (sizes, volume, mass, clearances, travel); before saying it is done, check each with `measure` or the inspect commands. \
+must meet (sizes, volume, mass, clearances, travel); before saying it is done, run `quality` (inspect.quality) and check each with `measure` or the inspect commands. A quality pass is structural evidence, not a proof of tolerances or safety. \
 On large designs keep replies small with a select list on `execute` and on each `batch` step (dotted paths, * for list items: \
 [\"total.mass_g\", \"bodies.*.name\"]), check whole assemblies with `inspect.interference {method: mesh}` (seconds) before exact \
 checks of the pairs that matter, and give slow checks a budget_s.";

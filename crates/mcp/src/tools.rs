@@ -154,6 +154,21 @@ pub fn tool_definitions() -> Vec<Value> {
             Effect::ReadOnly,
         ),
         tool(
+            "quality",
+            "Model quality gate",
+            "Run the hard model-quality gate (`inspect.quality`) before calling a model done. It reports pass/fail for unresolved parameters, active feature errors, under-constrained sketches and invalid/open bodies, plus warnings for missing parameters, materials and suppressed features. A pass is structural evidence only: it does not prove tolerances, strength, safety or manufacturability. Pass `bodies` to limit the body checks; `allow_open`, `allow_underconstrained` and `require_parameters` make the intent explicit.",
+            obj(
+                json!({
+                    "bodies": {"type": "array", "items": {"type": "string"}, "description": "Bodies to check (default: all)"},
+                    "allow_open": {"type": "boolean", "description": "Treat open surface bodies as warnings instead of failures (default false)"},
+                    "allow_underconstrained": {"type": "boolean", "description": "Treat under-constrained sketches as warnings instead of failures (default false)"},
+                    "require_parameters": {"type": "boolean", "description": "Fail when the design has no user parameters (default false)"},
+                }),
+                &[],
+            ),
+            Effect::ReadOnly,
+        ),
+        tool(
             "measure",
             "Measure bodies",
             "Volume (mm³), surface area (mm²), centre of mass, bounding box and face/edge/vertex counts of one body or all \
@@ -627,6 +642,7 @@ fn dispatch(b: &mut dyn Backend, name: &str, a: &Map<String, Value>) -> Result<V
             let v = if a.get("verbose").and_then(Value::as_bool).unwrap_or(true) { v } else { compact(v) };
             Ok(selected(v, a.get("select")))
         }
+        "quality" => exec(b, "inspect.quality", pick(a, &["bodies", "allow_open", "allow_underconstrained", "require_parameters"])),
         "inspect_design" => {
             let measure = a.get("measure").and_then(Value::as_bool).unwrap_or(true);
             let mut d = b.call("document.inspect", json!({"measure": measure}))?;

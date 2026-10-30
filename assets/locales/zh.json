@@ -754,6 +754,7 @@
   "cmd.inspect_minimum_radius": "最小半径分析",
   "cmd.inspect_polish": "精修",
   "cmd.inspect_printability": "可打印性",
+  "cmd.inspect_quality": "模型质量",
   "cmd.inspect_silhouette": "轮廓",
   "cmd.inspect_statics": "静力学",
   "cmd.inspect_zebra": "斑马纹分析",
