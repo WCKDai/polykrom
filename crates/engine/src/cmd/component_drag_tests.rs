@@ -75,7 +75,7 @@ fn ungrounded_designs_stay_ungrounded_through_new_parts_and_reopening() {
     run(&mut s, "occurrence.ground", json!({"occurrence": first, "grounded": false}));
     let (_, second) = part(&mut s, "B", [20.0, 0.0, 0.0]);
     assert!(!grounded(&s, first) && !grounded(&s, second), "a part added later grounds nothing");
-    let back = solidcraft_doc::Document::from_json(&s.doc.to_json()).unwrap();
+    let back = polykrom_doc::Document::from_json(&s.doc.to_json()).unwrap();
     assert!(!back.occurrences.iter().any(|o| o.grounded), "opening a design grounds nothing");
     // With every part gone, the next one is the design's first part again.
     for c in ["A", "B"] {
@@ -97,7 +97,7 @@ fn dragging_moves_a_free_part_by_the_grabbed_point_in_one_undo_step() {
     assert_eq!(s.undo.len(), undo + 1);
     assert_eq!(s.undo.last().map(|u| u.label.as_str()), Some("Drag Occurrence"));
     // Saved and opened again, it is where it was dragged.
-    let back = solidcraft_doc::Document::from_json(&s.doc.to_json()).unwrap();
+    let back = polykrom_doc::Document::from_json(&s.doc.to_json()).unwrap();
     let t = back.occurrences.iter().find(|o| o.id == free).unwrap().transform;
     near([t[3][0], t[3][1], t[3][2]], [10.0, 5.0, 0.0]);
     run(&mut s, "edit.undo", json!({}));

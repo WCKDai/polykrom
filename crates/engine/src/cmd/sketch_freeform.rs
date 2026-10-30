@@ -2,9 +2,9 @@
 //! pieces (cubic Béziers become single-span control splines, conic arcs conics), so the result
 //! stays exact; the pieces replace the original curve.
 
+use polycore_geom::{Seg2, Vec2};
+use polykrom_sketch::{ConstraintKind, CurveKind, Sketch};
 use serde_json::{Value, json};
-use solidcraft_geom::{Seg2, Vec2};
-use solidcraft_sketch::{ConstraintKind, CurveKind, Sketch};
 
 use super::sketch::add_c;
 use crate::Result;
@@ -163,7 +163,7 @@ fn add_pieces(sk: &mut Sketch, segs: &[Seg2], start: Option<usize>, end: Option<
                 CurveKind::Conic { a: prev, b: to, apex: x, rho: w / (1.0 + w) }
             }
             Seg2::Bezier { n, p } => {
-                let k = (n as usize).clamp(1, solidcraft_geom::MAX_BEZIER_DEGREE);
+                let k = (n as usize).clamp(1, polycore_geom::MAX_BEZIER_DEGREE);
                 let mut pts = vec![prev];
                 for q in p.iter().take(k).skip(1) {
                     pts.push(sk.add_point(*q, None)?);

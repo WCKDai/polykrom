@@ -8,8 +8,8 @@
 //! a hard-coded count of 3 and could reach neither the command's second count nor either
 //! spacing.
 
+use polykrom_engine::Sel;
 use serde_json::json;
-use solidcraft_engine::Sel;
 
 use crate::dialogs::{Kind, apply_commands};
 use crate::scenario::Harness;
@@ -261,7 +261,7 @@ fn the_window_reflects_the_picked_circle_across_the_line() {
     assert_eq!(sk.curves.len(), 3, "{:?}", h.app.status);
     let made = sk.curves.last().unwrap();
     // `CurveKind` is not Copy: match the field behind its reference.
-    let solidcraft_engine::sketch::CurveKind::Circle { c, r } = &made.kind else { panic!("{:?}", made.kind) };
+    let polykrom_engine::sketch::CurveKind::Circle { c, r } = &made.kind else { panic!("{:?}", made.kind) };
     let at = sk.point(*c).unwrap();
     assert!((at.x + 10.0).abs() < 1e-6 && at.y.abs() < 1e-6, "{at:?}");
     assert!((*r - 3.0).abs() < 1e-6, "{r}");
@@ -281,7 +281,7 @@ fn moved(x: &str, y: &str, angle: &str) -> Mod {
 
 #[test]
 fn the_command_now_has_a_toolbar_placement_and_opens_a_window() {
-    let spec = solidcraft_engine::find_command("sketch.move").expect("sketch.move is registered");
+    let spec = polykrom_engine::find_command("sketch.move").expect("sketch.move is registered");
     assert_eq!((spec.tab, spec.panel), ("SKETCH", "MODIFY"));
     assert_eq!(spec.icon, "sketch_move");
     assert_eq!(crate::icon_svg::resolve(spec.icon).master, "move", "reuse the finished Move drawing");
@@ -481,7 +481,7 @@ fn rectangular_pattern_window_opens_instead_of_a_click_tool() {
 
 #[test]
 fn rectangular_sections_flip_and_center_independently_and_restore_even_counts_when_editing() {
-    use solidcraft_engine::sketch::PatternAlignment;
+    use polykrom_engine::sketch::PatternAlignment;
     let (mut h, id) = open("sketch.pattern.rectangular");
     h.app.dialog.as_mut().unwrap().inputs[0].items = vec![Sel::SketchCurve { id }];
     rect(&mut h, "4", "20", "2", "10");
@@ -643,11 +643,11 @@ fn the_spacing_gets_a_canvas_arrow_along_the_pattern_direction() {
     h.app.dialog.as_mut().unwrap().inputs[0].items = vec![Sel::SketchCurve { id }];
     let d = h.app.dialog.clone().unwrap();
     let (_, dir) = crate::canvas::anchor(&h.app, &d).expect("an anchor on the picked curve");
-    assert_eq!(dir, Some(solidcraft_engine::geom::Vec3::X));
+    assert_eq!(dir, Some(polykrom_engine::geom::Vec3::X));
     h.app.dialog.as_mut().unwrap().inputs[1].items = vec![Sel::Axis { name: "Y".into() }];
     let d = h.app.dialog.clone().unwrap();
     let (_, dir) = crate::canvas::anchor(&h.app, &d).expect("an anchor on the picked curve");
-    assert_eq!(dir, Some(solidcraft_engine::geom::Vec3::Y));
+    assert_eq!(dir, Some(polykrom_engine::geom::Vec3::Y));
 }
 
 /// A sketch holding one circle 30 mm out and a lone point at the origin, with the circular
@@ -715,7 +715,7 @@ fn the_typed_count_and_total_angle_reach_the_command() {
 
 #[test]
 fn circular_flip_and_center_buttons_apply_and_reopen_the_saved_placement() {
-    use solidcraft_engine::sketch::{PatternAlignment, SketchPatternKind};
+    use polykrom_engine::sketch::{PatternAlignment, SketchPatternKind};
     let (mut h, _) = open_circ();
     circ(&mut h, "6", "90 deg");
     h.frames(3);

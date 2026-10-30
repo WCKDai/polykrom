@@ -1,5 +1,5 @@
 [package]
-name = "solidcraft-space-mouse"
+name = "polykrom-space-mouse"
 description = "Polykrom 3D mouse input: HID report descriptors and reports, independent of the device API and the UI"
 version.workspace = true
 edition.workspace = true

@@ -37,23 +37,23 @@ build you also need `rustup target add wasm32-unknown-unknown` and [`trunk`](htt
 
 ```sh
 git clone https://github.com/wckdboy/polykrom && cd polykrom
-cargo run --release -p solidcraft -- --sample      # desktop app with a sample part
+cargo run --release -p polykrom -- --sample      # desktop app with a sample part
 cargo xtask test                                   # unit, engine and UI-scenario tests
 cargo xtask ci                                     # everything a PR must pass (see below)
 ```
 
 Polykrom is the product, repository, Cargo package and executable name.
-Build the desktop app with `cargo build --release -p solidcraft`, or the CLI with
-`cargo build --release -p solidcraft-cli`. Run the CLI with
-`cargo run --release -p solidcraft-cli -- commands` (or `target/release/polykrom-cli commands`
+Build the desktop app with `cargo build --release -p polykrom`, or the CLI with
+`cargo build --release -p polykrom-cli`. Run the CLI with
+`cargo run --release -p polykrom-cli -- commands` (or `target/release/polykrom-cli commands`
 after building). The old name appears only in the compatibility shims listed in
 [docs/compatibility.md](docs/compatibility.md); don't add new uses of it.
 
-Web: `cd apps/solidcraft-web && trunk serve --release`, then open the printed URL (`?sample`
+Web: `cd apps/polykrom-web && trunk serve --release`, then open the printed URL (`?sample`
 opens the sample part, `?webgl` forces WebGL2). Saving and opening files in the browser needs
 HTTPS or localhost, because it uses the Origin Private File System.
 
-Windows from Linux: `cargo xwin build --release --target x86_64-pc-windows-msvc -p solidcraft`.
+Windows from Linux: `cargo xwin build --release --target x86_64-pc-windows-msvc -p polykrom`.
 
 ### NixOS: `nix develop`
 
@@ -102,7 +102,7 @@ The [architecture page](docs/architecture.md) has the layer table. The short ver
   commands.
 - `crates/ui-egui`: the desktop/web front end (egui + wgpu). It's swappable; nothing below it
   depends on egui.
-- `crates/mcp`, `apps/solidcraft`, `apps/solidcraft-cli`, `apps/solidcraft-web`.
+- `crates/mcp`, `apps/polykrom`, `apps/polykrom-cli`, `apps/polykrom-web`.
 
 `cargo xtask layers` fails the build if a lower layer depends on a higher one.
 
@@ -127,12 +127,12 @@ The [architecture page](docs/architecture.md) has the layer table. The short ver
    `cargo xtask assets` enforces this.
 4. **Never crash.** People trust a CAD app with their work.
    - Non-test code never uses `unwrap`, `expect`, `panic!` or indexing on input-derived data.
-     There's no `unsafe` outside `apps/solidcraft/src/open_documents.rs` (macOS file-open events),
-     `apps/solidcraft/src/native_crash.rs` (Windows native crash capture) and
+     There's no `unsafe` outside `apps/polykrom/src/open_documents.rs` (macOS file-open events),
+     `apps/polykrom/src/native_crash.rs` (Windows native crash capture) and
      `crates/threedx-client/src/macos.rs` (the 3Dconnexion driver's client API on macOS), and the
      compiler denies it.
    - An unsupported case returns an error ("not supported yet: …"); it never panics.
-   - Every call into truck goes through `solidcraft_kernel::guard`.
+   - Every call into truck goes through `polycore::guard`.
    - Every crash fix comes with a regression test.
 5. **Everything is a command, with a test.** A new feature means a `CommandSpec` in
    `crates/engine/src/cmd/`, engine tests that measure the result (volume, area,
@@ -160,7 +160,7 @@ the most complete description of the house style.
 | Reference tests | `cargo xtask oracle` | `tests/oracle/` (see below) |
 
 A geometry change that changes the robustness goldens re-records them in the same pull request:
-`ROBUSTNESS_GOLDENS_BLESS="why it changed" cargo test --profile ci -p solidcraft-engine --lib robustness_goldens::`
+`ROBUSTNESS_GOLDENS_BLESS="why it changed" cargo test --profile ci -p polykrom-engine --lib robustness_goldens::`
 (see [docs/robustness.md](docs/robustness.md)); CI runs every seed on pull requests that touch geometry.
 [docs/mutation-testing.md](docs/mutation-testing.md) shows how to find kernel behaviour these
 black-box suites miss.
@@ -212,14 +212,14 @@ Pull requests skip a few heavy tests (one to twelve minutes each), which run in 
 Check that validation after merging. They are listed in
 `.config/nextest.toml` and the [testing page](docs/book/src/dev/testing.md):
 
-- `solidcraft-engine`: `tests::hostile_params_never_panic`, everything in `tests::robustness` and
+- `polykrom-engine`: `tests::hostile_params_never_panic`, everything in `tests::robustness` and
   the seeds of `tests::robustness_goldens` (`seed_00` … `seed_95`; pull requests that change the kernel, truck or the goldens run all but the slowest, `SLOW_SEEDS` in `ci.yml`),
   `pattern_suppress_tests::enclosure_arc_extinction_keeps_a_real_sharp_inner_lip_after_resize_and_reopen`,
   `pattern_suppress_tests::enclosure_datums_follow_wall_height_and_board_depth_with_material_proofs`,
   `cmd::plastic::tests::enclosure_snap_fit_follows_resized_front_wall`, the `atomic_commands` contract tests
-- `solidcraft-kernel`: `tests::boolean_identity_on_tangent_primitives`, `tspline::tests::hostile_tsplines_never_panic`, and the `boolean_props` property tests
+- `polycore`: `tests::boolean_identity_on_tangent_primitives`, `tspline::tests::hostile_tsplines_never_panic`, and the `boolean_props` property tests
   (these run only in the nightly "Property tests" job: their inputs are random, so main skips them too)
-- `solidcraft-ui-egui` scenarios: `acceptance_sensor_enclosure`
+- `polykrom-ui-egui` scenarios: `acceptance_sensor_enclosure`
 
 **The action matrix** tries every ordinary action on every face, edge, vertex and body of a
 corpus of designs against a checked-in ratchet ([docs/action-matrix.md](docs/action-matrix.md)).

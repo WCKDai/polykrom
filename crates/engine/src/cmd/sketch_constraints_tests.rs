@@ -1,5 +1,5 @@
+use polycore_geom::Vec2;
 use serde_json::{Value, json};
-use solidcraft_geom::Vec2;
 
 use crate::Session;
 
@@ -20,7 +20,7 @@ fn new_sketch() -> Session {
     s
 }
 
-fn sketch(s: &Session) -> solidcraft_sketch::Sketch {
+fn sketch(s: &Session) -> polykrom_sketch::Sketch {
     s.model.state().sketch(s.active_sketch.unwrap()).unwrap().sketch.clone()
 }
 
@@ -97,7 +97,7 @@ fn curvature_polygon_arc_length_linear_diameter() {
     let sk = sketch(&s);
     let ai = sk.curve_index(&a).unwrap();
     let len = match sk.segs(ai)[0] {
-        solidcraft_geom::Seg2::Arc { radius, sweep, .. } => radius * sweep,
+        polycore_geom::Seg2::Arc { radius, sweep, .. } => radius * sweep,
         _ => 0.0,
     };
     assert!((len - 20.0).abs() < 1e-6, "{len}");
@@ -157,7 +157,7 @@ fn auto_constrain_fully_constrains_a_rough_sketch() {
 
 #[test]
 fn internal_freedom_queries_skip_redundancy_and_keep_constraint_acceptance() {
-    use solidcraft_sketch::{ConstraintKind, Sketch, profiling::capture};
+    use polykrom_sketch::{ConstraintKind, Sketch, profiling::capture};
 
     let mut sk = Sketch::new();
     let q = sk.add_point(Vec2::new(10.0, 2.0), None).unwrap();
@@ -168,7 +168,7 @@ fn internal_freedom_queries_skip_redundancy_and_keep_constraint_acceptance() {
     assert_eq!(dof, 1);
     assert_eq!(profile.counters.redundancy_checks, 0);
 
-    let mut doc = solidcraft_doc::Document::default();
+    let mut doc = polykrom_doc::Document::default();
     let before = sk.clone();
     let (rejected, profile) = capture(|| super::try_add(&mut sk, &mut doc, k, dof, false));
     assert_eq!(rejected, None, "a duplicate must not be accepted as a DOF reduction");
@@ -178,7 +178,7 @@ fn internal_freedom_queries_skip_redundancy_and_keep_constraint_acceptance() {
     let (accepted, profile) = capture(|| super::try_add(&mut sk, &mut doc, ConstraintKind::DistanceX { p: 0, q, value: 6.0 }, dof, false));
     assert_eq!(accepted, Some(0));
     assert_eq!(profile.counters.redundancy_checks, 0);
-    let full = solidcraft_sketch::solve(&mut sk);
+    let full = polykrom_sketch::solve(&mut sk);
     assert!(full.ok());
     assert_eq!(full.dof, 0);
     assert!(full.redundant.contains(&redundant), "the final full report must retain diagnostics");
@@ -479,7 +479,7 @@ fn symmetry_slides_a_rectangle_whose_width_is_dimensioned() {
 
 #[test]
 fn midpoint_alignment_persists_undoes_and_survives_endpoint_edits() {
-    use solidcraft_sketch::ConstraintKind;
+    use polykrom_sketch::ConstraintKind;
     for mode in ["horizontal", "vertical"] {
         for reverse in [false, true] {
             let mut s = new_sketch();
@@ -499,7 +499,7 @@ fn midpoint_alignment_persists_undoes_and_survives_endpoint_edits() {
             assert_eq!(s.doc.to_json(), before);
             run(&mut s, "edit.redo", json!({}));
             assert_eq!(s.doc.to_json(), after);
-            let mut reopened = Session::new(solidcraft_doc::Document::from_json(&after).unwrap());
+            let mut reopened = Session::new(polykrom_doc::Document::from_json(&after).unwrap());
             reopened.active_sketch = s.active_sketch;
             for end in [[50., -15.], [-20., 65.]] {
                 run(&mut reopened, "sketch.move_point", json!({"point":"l1.end","to":end}));
@@ -542,16 +542,16 @@ fn midpoint_alignment_rejects_invalid_or_conflicting_references_atomically() {
     }
 }
 
-fn line_midpoint(sk: &solidcraft_sketch::Sketch, id: &str) -> Vec2 {
+fn line_midpoint(sk: &polykrom_sketch::Sketch, id: &str) -> Vec2 {
     // Read the curve's current endpoints: after a corner cut an original endpoint
     // id can still name the retained construction side's corner.
-    let solidcraft_sketch::CurveKind::Line { a, b } = sk.curves[sk.curve_index(id).unwrap()].kind else { panic!("expected line") };
+    let polykrom_sketch::CurveKind::Line { a, b } = sk.curves[sk.curve_index(id).unwrap()].kind else { panic!("expected line") };
     (sk.point(a).unwrap() + sk.point(b).unwrap()) * 0.5
 }
 
 #[test]
 fn midpoint_alignment_reuses_associative_points_and_rejects_self_alignment() {
-    use solidcraft_sketch::ConstraintKind;
+    use polykrom_sketch::ConstraintKind;
     let mut s = new_sketch();
     run(&mut s, "sketch.line", json!({"points":[[10,10],[30,20]],"infer":false,"connect":false}));
     // A drawing-time midpoint is an ordinary, reusable point too.
@@ -575,7 +575,7 @@ fn midpoint_alignment_reuses_associative_points_and_rejects_self_alignment() {
 
 #[test]
 fn midpoint_alignment_constraints_delete_independently_and_leave_the_point() {
-    use solidcraft_sketch::ConstraintKind;
+    use polykrom_sketch::ConstraintKind;
     for delete_midpoint in [false, true] {
         let mut s = new_sketch();
         run(&mut s, "sketch.line", json!({"points":[[10,10],[30,20]],"infer":false,"connect":false}));
@@ -600,7 +600,7 @@ fn midpoint_alignment_constraints_delete_independently_and_leave_the_point() {
         assert_eq!(s.doc.to_json(), before);
         run(&mut s, "edit.redo", json!({}));
         assert_eq!(s.doc.to_json(), after);
-        let mut reopened = Session::new(solidcraft_doc::Document::from_json(&after).unwrap());
+        let mut reopened = Session::new(polykrom_doc::Document::from_json(&after).unwrap());
         reopened.active_sketch = s.active_sketch;
         assert_eq!(sketch(&reopened).points.len(), 5);
         if delete_midpoint {
@@ -623,7 +623,7 @@ fn midpoint_alignment_constraints_delete_independently_and_leave_the_point() {
 
 #[test]
 fn midpoint_alignment_keeps_original_side_after_fillet_and_chamfer() {
-    use solidcraft_sketch::ConstraintKind;
+    use polykrom_sketch::ConstraintKind;
     for (command, params) in
         [("sketch.fillet", json!({"point":"l1.end","radius":3})), ("sketch.chamfer.equal_distance", json!({"point":"l1.end","distance":3}))]
     {
@@ -636,7 +636,7 @@ fn midpoint_alignment_keeps_original_side_after_fillet_and_chamfer() {
         let original_mid = before.point(before.resolve_point(helper).unwrap()).unwrap();
         run(&mut s, command, params);
         let after = s.doc.to_json();
-        let mut reopened = Session::new(solidcraft_doc::Document::from_json(&after).unwrap());
+        let mut reopened = Session::new(polykrom_doc::Document::from_json(&after).unwrap());
         reopened.active_sketch = s.active_sketch;
         let sk = sketch(&reopened);
         let (point, line) = sk
@@ -658,7 +658,7 @@ fn midpoint_alignment_keeps_original_side_after_fillet_and_chamfer() {
 
 #[test]
 fn midpoint_alignment_remaps_after_unrelated_geometry_is_deleted() {
-    use solidcraft_sketch::ConstraintKind;
+    use polykrom_sketch::ConstraintKind;
     let mut s = new_sketch();
     run(&mut s, "sketch.line", json!({"points":[[-30,-20],[-10,-10]],"infer":false,"connect":false}));
     run(&mut s, "sketch.line", json!({"points":[[10,10],[30,20]],"infer":false,"connect":false}));
@@ -676,14 +676,14 @@ fn midpoint_alignment_remaps_after_unrelated_geometry_is_deleted() {
     assert!(sketch(&s).constraints.is_empty());
 }
 
-fn line_ends(sk: &solidcraft_sketch::Sketch, id: &str) -> (Vec2, Vec2) {
-    let solidcraft_sketch::CurveKind::Line { a, b } = sk.curves[sk.curve_index(id).unwrap()].kind else { panic!("expected line") };
+fn line_ends(sk: &polykrom_sketch::Sketch, id: &str) -> (Vec2, Vec2) {
+    let polykrom_sketch::CurveKind::Line { a, b } = sk.curves[sk.curve_index(id).unwrap()].kind else { panic!("expected line") };
     (sk.point(a).unwrap(), sk.point(b).unwrap())
 }
 
 #[test]
 fn midpoint_of_two_lines_centres_the_second_on_the_first() {
-    use solidcraft_sketch::ConstraintKind;
+    use polykrom_sketch::ConstraintKind;
     for reverse in [false, true] {
         let mut s = new_sketch();
         run(&mut s, "sketch.line", json!({"points":[[0,0],[60,0]],"infer":false,"connect":false}));
@@ -713,7 +713,7 @@ fn midpoint_of_two_lines_centres_the_second_on_the_first() {
         assert_eq!(s.doc.to_json(), before);
         run(&mut s, "edit.redo", json!({}));
         assert_eq!(s.doc.to_json(), after);
-        let mut reopened = Session::new(solidcraft_doc::Document::from_json(&after).unwrap());
+        let mut reopened = Session::new(polykrom_doc::Document::from_json(&after).unwrap());
         reopened.active_sketch = s.active_sketch;
         run(&mut reopened, "sketch.move_point", json!({"point":"l1.end","to":[80,15]}));
         let sk = sketch(&reopened);
@@ -736,7 +736,7 @@ fn midpoint_takes_a_point_and_a_line_in_either_pick_order() {
 
 #[test]
 fn midpoint_of_two_lines_reuses_an_existing_midpoint() {
-    use solidcraft_sketch::ConstraintKind;
+    use polykrom_sketch::ConstraintKind;
     let mut s = new_sketch();
     run(&mut s, "sketch.line", json!({"points":[[0,0],[60,0]],"infer":false,"connect":false}));
     run(&mut s, "sketch.line", json!({"points":[[5,-10],[25,-10]],"infer":false,"connect":false}));
@@ -948,7 +948,7 @@ fn coincident_circles_lie_on_each_other() {
     let circle = |id: &str| {
         let c = sk.curve_index(id).unwrap();
         match sk.curves[c].kind {
-            solidcraft_sketch::CurveKind::Circle { c, r } => (sk.point(c).unwrap(), r),
+            polykrom_sketch::CurveKind::Circle { c, r } => (sk.point(c).unwrap(), r),
             _ => panic!("{id} is a circle"),
         }
     };
@@ -962,7 +962,7 @@ fn coincident_circles_lie_on_each_other() {
     run(&mut s, "sketch.constraint.coincident", json!({"a":"c1","b":"a1"}));
     let sk = sketch(&s);
     let a = sk.curve_index("a1").unwrap();
-    let solidcraft_sketch::CurveKind::Arc { c, a: start, .. } = sk.curves[a].kind else { panic!("a1 is an arc") };
+    let polykrom_sketch::CurveKind::Arc { c, a: start, .. } = sk.curves[a].kind else { panic!("a1 is an arc") };
     assert!(sk.point(c).unwrap().dist(Vec2::new(0.0, 0.0)) < 1e-6);
     assert!((sk.point(start).unwrap().dist(sk.point(c).unwrap()) - 10.0).abs() < 1e-6);
 }
@@ -994,7 +994,7 @@ fn midpoint_edge_dimensions_track_the_midpoint_and_reuse_it() {
             .constraints
             .iter()
             .filter_map(|c| match c.kind {
-                solidcraft_sketch::ConstraintKind::Midpoint { p, l } if l == sk.curve_index("l1").unwrap() => Some(p),
+                polykrom_sketch::ConstraintKind::Midpoint { p, l } if l == sk.curve_index("l1").unwrap() => Some(p),
                 _ => None,
             })
             .collect();
@@ -1005,7 +1005,7 @@ fn midpoint_edge_dimensions_track_the_midpoint_and_reuse_it() {
         assert!(mid.dist((a + b) * 0.5) < 1e-6);
         assert!((mid.x - 20.).abs() < 1e-6, "distance from the fixed x=-10 edge is 30 mm");
         assert!((a.dist(b) - 40.).abs() < 1e-6);
-        let mut reopened = Session::new(solidcraft_doc::Document::from_json(&s.doc.to_json()).unwrap());
+        let mut reopened = Session::new(polykrom_doc::Document::from_json(&s.doc.to_json()).unwrap());
         reopened.active_sketch = s.active_sketch;
         assert_eq!(sketch(&reopened), sk);
     }
@@ -1025,7 +1025,7 @@ fn invalid_midpoint_dimension_references_leave_the_design_unchanged() {
 
 #[test]
 fn midpoint_pair_orientation_uses_the_text_box_and_respects_explicit_types() {
-    use solidcraft_sketch::ConstraintKind as K;
+    use polykrom_sketch::ConstraintKind as K;
     let mut s = new_sketch();
     run(&mut s, "sketch.line", json!({"points":[[0,10],[20,10]],"infer":false}));
     run(&mut s, "sketch.line", json!({"points":[[40,20],[40,40]],"infer":false}));
@@ -1055,7 +1055,7 @@ fn midpoint_pair_orientation_uses_the_text_box_and_respects_explicit_types() {
             'y' => 20.,
             _ => 1300_f64.sqrt(),
         };
-        assert!((solidcraft_sketch::measure_dimension(&sk, &c.kind).unwrap() - expected).abs() < 1e-6);
+        assert!((polykrom_sketch::measure_dimension(&sk, &c.kind).unwrap() - expected).abs() < 1e-6);
     }
 }
 

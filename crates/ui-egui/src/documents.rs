@@ -6,9 +6,9 @@
 
 use crate::ui_kit::{Container, Surface};
 use egui::{FontId, Rect, Sense, pos2, vec2};
+use polykrom_engine::Session;
+use polykrom_engine::render::Camera;
 use serde_json::{Value, json};
-use solidcraft_engine::Session;
-use solidcraft_engine::render::Camera;
 
 use crate::SolveApp;
 use crate::theme::Tokens;
@@ -20,7 +20,7 @@ pub const MAX_OPEN: usize = 32;
 /// A design that is not the active one: everything that belongs to it alone.
 pub struct DocSlot {
     pub(crate) session: Session,
-    pub(crate) autosave: Option<solidcraft_engine::recovery::Autosaver>,
+    pub(crate) autosave: Option<polykrom_engine::recovery::Autosaver>,
     pub(crate) big_operation: bool,
     cam: Camera,
     pre_sketch_marker: Option<Option<usize>>,
@@ -1093,7 +1093,7 @@ mod tests {
     fn tabs_keep_their_own_design() {
         let mut a = app();
         a.run("solid.box", json!({"length": 10, "width": 10, "height": 10})).unwrap();
-        a.session.selection = vec![solidcraft_engine::Sel::Body { name: "Body1".into() }];
+        a.session.selection = vec![polykrom_engine::Sel::Body { name: "Body1".into() }];
         a.cam.distance = 123.0;
         new_design(&mut a);
         assert_eq!(a.docs.count(), 2);
@@ -1160,7 +1160,7 @@ mod tests {
         crate::save_job::tick(&mut a, true);
         assert!(!dirty(&a, 0), "saved");
         assert_eq!(
-            std::fs::read(&file).ok().and_then(|b| solidcraft_engine::io::read_design(&b).ok()).map(|d| d.features.len()),
+            std::fs::read(&file).ok().and_then(|b| polykrom_engine::io::read_design(&b).ok()).map(|d| d.features.len()),
             Some(2),
             "the file holds the change"
         );
@@ -1280,7 +1280,7 @@ mod tests {
     fn adopt_reuses_a_blank_design() {
         let mut a = app();
         let mut s = Session::default();
-        s.run_script(&solidcraft_engine::sample::script()).unwrap();
+        s.run_script(&polykrom_engine::sample::script()).unwrap();
         adopt(&mut a, s);
         assert_eq!(a.docs.count(), 1);
         assert!(!a.session.doc.features.is_empty());

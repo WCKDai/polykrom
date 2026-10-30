@@ -32,8 +32,8 @@ impl Class {
     }
 }
 
-/// The layering table. Names are package names without the `solidcraft-`
-/// prefix.
+/// The layering table. Names are package names without the `polykrom-` prefix (PolyCore's:
+/// `polycore` is `kernel`, `polycore-geom` is `geom`; see [`short_name`]).
 pub const TABLE: &[(&str, Class)] = &[
     ("geom", Class::Layer(0)),
     // 3D mouse descriptors and reports (no workspace dependencies; the apps read the device)
@@ -53,7 +53,7 @@ pub const TABLE: &[(&str, Class)] = &[
     ("mcp", Class::Layer(5)),
     ("testkit", Class::Testkit),
     // apps and tooling
-    ("solidcraft", Class::Exempt),
+    ("polykrom", Class::Exempt),
     ("cli", Class::Exempt),
     ("web", Class::Exempt),
     ("xtask", Class::Exempt),
@@ -80,7 +80,11 @@ pub const UI_CRATES: &[&str] = &["egui", "eframe", "egui-wgpu", "wgpu", "winit",
 pub const UI_MIN_LAYER: u8 = 5;
 
 pub fn short_name(pkg: &str) -> &str {
-    pkg.strip_prefix("solidcraft-").unwrap_or(pkg)
+    // PolyCore's packages (#304): `polycore` is the kernel, `polycore-geom` the geometry crate.
+    match pkg {
+        "polycore" => "kernel",
+        _ => pkg.strip_prefix("polykrom-").or_else(|| pkg.strip_prefix("polycore-")).or_else(|| pkg.strip_prefix("solidcraft-")).unwrap_or(pkg),
+    }
 }
 
 pub fn classify(pkg: &str) -> Option<Class> {
@@ -245,46 +249,46 @@ mod tests {
     #[test]
     fn clean_downward_graph_passes() {
         let g = [
-            c("solidcraft-geom", &[("kurbo", Normal, false)]),
-            c("solidcraft-doc", &[("solidcraft-geom", Normal, true)]),
-            c("solidcraft-engine", &[("solidcraft-doc", Normal, true), ("solidcraft-testkit", Dev, true)]),
-            c("solidcraft-ui-egui", &[("solidcraft-engine", Normal, true), ("egui", Normal, false)]),
-            c("solidcraft-cli", &[("solidcraft-ui-egui", Normal, true)]),
+            c("polycore-geom", &[("kurbo", Normal, false)]),
+            c("polykrom-doc", &[("polycore-geom", Normal, true)]),
+            c("polykrom-engine", &[("polykrom-doc", Normal, true), ("solidcraft-testkit", Dev, true)]),
+            c("polykrom-ui-egui", &[("polykrom-engine", Normal, true), ("egui", Normal, false)]),
+            c("polykrom-cli", &[("polykrom-ui-egui", Normal, true)]),
         ];
         assert!(check(&g).is_empty(), "{:?}", check(&g));
     }
 
     #[test]
     fn upward_dependency_flagged() {
-        let v = check(&[c("solidcraft-doc", &[("solidcraft-engine", Normal, true)])]);
+        let v = check(&[c("polykrom-doc", &[("polykrom-engine", Normal, true)])]);
         assert!(matches!(v[..], [Violation::Upward { from: 2, to: 4, .. }]));
     }
 
     #[test]
     fn sideways_dependency_flagged() {
-        let v = check(&[c("solidcraft-kernel", &[("solidcraft-sketch", Normal, true)])]);
+        let v = check(&[c("polycore", &[("polykrom-sketch", Normal, true)])]);
         assert!(matches!(v[..], [Violation::Upward { from: 1, to: 1, .. }]));
     }
 
     #[test]
     fn self_dev_dependency_ignored() {
-        assert!(check(&[c("solidcraft-doc", &[("solidcraft-doc", Dev, true)])]).is_empty());
+        assert!(check(&[c("polykrom-doc", &[("polykrom-doc", Dev, true)])]).is_empty());
     }
 
     #[test]
     fn upward_dev_dependency_flagged() {
-        let v = check(&[c("solidcraft-geom", &[("solidcraft-doc", Dev, true)])]);
+        let v = check(&[c("polycore-geom", &[("polykrom-doc", Dev, true)])]);
         assert!(matches!(v[..], [Violation::Upward { kind: Dev, .. }]));
     }
 
     #[test]
     fn ui_crates_below_l6_flagged() {
         for dep in ["egui", "eframe", "winit", "egui_kittest", "rfd", "bevy_ecs", "bevy"] {
-            let v = check(&[c("solidcraft-engine", &[(dep, Normal, false)])]);
+            let v = check(&[c("polykrom-engine", &[(dep, Normal, false)])]);
             assert!(matches!(v[..], [Violation::UiBelowL5 { layer: 4, .. }]), "{dep}");
         }
-        assert!(check(&[c("solidcraft-engine", &[("egui_extras_not", Normal, false)])]).is_empty());
-        assert!(check(&[c("solidcraft-ui-egui", &[("winit", Normal, false)])]).is_empty());
+        assert!(check(&[c("polykrom-engine", &[("egui_extras_not", Normal, false)])]).is_empty());
+        assert!(check(&[c("polykrom-ui-egui", &[("winit", Normal, false)])]).is_empty());
     }
 
     #[test]
@@ -296,16 +300,16 @@ mod tests {
 
     #[test]
     fn testkit_only_as_dev_dependency() {
-        let v = check(&[c("solidcraft-doc", &[("solidcraft-testkit", Normal, true)])]);
+        let v = check(&[c("polykrom-doc", &[("solidcraft-testkit", Normal, true)])]);
         assert!(matches!(v[..], [Violation::TestkitAsNormalDep { .. }]));
-        assert!(check(&[c("solidcraft-doc", &[("solidcraft-testkit", Dev, true)])]).is_empty());
-        assert!(check(&[c("solidcraft-testkit", &[("solidcraft-engine", Normal, true)])]).is_empty());
+        assert!(check(&[c("polykrom-doc", &[("solidcraft-testkit", Dev, true)])]).is_empty());
+        assert!(check(&[c("solidcraft-testkit", &[("polykrom-engine", Normal, true)])]).is_empty());
     }
 
     #[test]
     fn apps_and_xtask_exempt() {
-        for app in ["solidcraft", "solidcraft-cli", "xtask"] {
-            assert!(check(&[c(app, &[("egui", Normal, false), ("solidcraft-ui-egui", Normal, true)])]).is_empty());
+        for app in ["polykrom", "polykrom-cli", "xtask"] {
+            assert!(check(&[c(app, &[("egui", Normal, false), ("polykrom-ui-egui", Normal, true)])]).is_empty());
         }
     }
 
@@ -313,17 +317,17 @@ mod tests {
     fn metadata_parsing() {
         let meta: Value = serde_json::from_str(
             r#"{"packages":[
-                {"name":"solidcraft-doc","dependencies":[
-                    {"name":"solidcraft-geom","kind":null,"path":"/x/crates/geom"},
+                {"name":"polykrom-doc","dependencies":[
+                    {"name":"polycore-geom","kind":null,"path":"/x/crates/geom"},
                     {"name":"serde","kind":null},
                     {"name":"proptest","kind":"dev"}]},
-                {"name":"solidcraft-geom","dependencies":[]}
+                {"name":"polycore-geom","dependencies":[]}
             ]}"#,
         )
         .unwrap();
         let g = from_metadata(&meta).unwrap();
         assert_eq!(g.len(), 2);
-        let doc = g.iter().find(|c| c.name == "solidcraft-doc").unwrap();
+        let doc = g.iter().find(|c| c.name == "polykrom-doc").unwrap();
         assert!(doc.deps[0].workspace && !doc.deps[1].workspace);
         assert_eq!(doc.deps[2].kind, Dev);
         assert!(check(&g).is_empty());

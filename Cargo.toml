@@ -18,19 +18,19 @@ repository = "https://github.com/wckdboy/polykrom"
 # internal
 # The kernel and its geometry foundation are maintained in PolyCore and pinned by revision.
 # Bump both entries together; they must resolve to the same commit so their types are the same.
-solidcraft-geom = { git = "https://github.com/WCKDai/polycore", rev = "d26e7aba5d17969f372f59893af4616476e2fb52" }
-solidcraft-sketch = { path = "crates/sketch" }
-solidcraft-kernel = { git = "https://github.com/WCKDai/polycore", rev = "d26e7aba5d17969f372f59893af4616476e2fb52" }
-solidcraft-render = { path = "crates/render" }
-solidcraft-gpu = { path = "crates/gpu" }
-solidcraft-doc = { path = "crates/doc" }
-solidcraft-io = { path = "crates/io" }
-solidcraft-engine = { path = "crates/engine" }
-solidcraft-ui-egui = { path = "crates/ui-egui" }
-solidcraft-space-mouse = { path = "crates/space-mouse" }
-solidcraft-mcp = { path = "crates/mcp" }
-solidcraft-derive = { path = "crates/derive" }
-solidcraft-3dx-client = { path = "crates/threedx-client" }
+polycore-geom = { git = "https://github.com/WCKDai/polycore", rev = "be450be69896de2b63c2cc5830587321be86fcfc" }
+polykrom-sketch = { path = "crates/sketch" }
+polycore = { git = "https://github.com/WCKDai/polycore", rev = "be450be69896de2b63c2cc5830587321be86fcfc" }
+polykrom-render = { path = "crates/render" }
+polykrom-gpu = { path = "crates/gpu" }
+polykrom-doc = { path = "crates/doc" }
+polykrom-io = { path = "crates/io" }
+polykrom-engine = { path = "crates/engine" }
+polykrom-ui-egui = { path = "crates/ui-egui" }
+polykrom-space-mouse = { path = "crates/space-mouse" }
+polykrom-mcp = { path = "crates/mcp" }
+polykrom-derive = { path = "crates/derive" }
+polykrom-3dx-client = { path = "crates/threedx-client" }
 
 # foundation
 thiserror = "2"

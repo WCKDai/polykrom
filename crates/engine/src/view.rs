@@ -4,15 +4,15 @@
 
 use std::sync::Arc;
 
-use solidcraft_geom::{Aabb3, Plane, Vec3};
-use solidcraft_render::{AnalysisColors, Camera, Rgb, Scene, SceneAnalysis, SceneLine, SceneMesh};
-use solidcraft_sketch::Sketch;
+use polycore_geom::{Aabb3, Plane, Vec3};
+use polykrom_render::{AnalysisColors, Camera, Rgb, Scene, SceneAnalysis, SceneLine, SceneMesh};
+use polykrom_sketch::Sketch;
 
 use crate::{Sel, Session};
 
 /// Colours (shared with the GPU viewport).
 pub mod colors {
-    use solidcraft_render::Rgb;
+    use polykrom_render::Rgb;
     pub const BODY: Rgb = Rgb(184, 184, 190);
     pub const BODY_SELECTED: Rgb = Rgb(110, 170, 0);
     pub const EDGE: Rgb = Rgb(43, 43, 48);
@@ -36,7 +36,7 @@ pub mod colors {
     pub const BG_TOP: Rgb = Rgb(242, 242, 247);
     pub const BG_BOTTOM: Rgb = Rgb(209, 209, 215);
     /// What the section cap is tinted toward.
-    pub const SECTION_CAP: Rgb = solidcraft_render::SECTION_CAP;
+    pub const SECTION_CAP: Rgb = polykrom_render::SECTION_CAP;
 }
 
 /// The colours a headless scene is drawn in. [`Palette::DEFAULT`] is [`colors`], the light
@@ -114,13 +114,13 @@ pub fn visible_bounds(s: &Session, sketches: bool) -> Aabb3 {
 }
 
 /// [`visible_bounds`] without meshing anything: a body not meshed yet counts with its outline
-/// ([`solidcraft_kernel::Body::outline_bounds`]), which a face curving out past all of its edges
+/// ([`polycore::Body::outline_bounds`]), which a face curving out past all of its edges
 /// can exceed. Frames a design whose bodies are still being meshed.
 pub fn unmeshed_bounds(s: &Session, sketches: bool) -> Aabb3 {
     bounds_by(s, sketches, |body| body.cached_mesh().map(|m| m.bounds()).unwrap_or_else(|| body.outline_bounds()))
 }
 
-fn bounds_by(s: &Session, sketches: bool, of: impl Fn(&solidcraft_doc::ModelBody) -> Aabb3) -> Aabb3 {
+fn bounds_by(s: &Session, sketches: bool, of: impl Fn(&polykrom_doc::ModelBody) -> Aabb3) -> Aabb3 {
     let st = s.world_state();
     let mut b = Aabb3::EMPTY;
     for body in st.bodies.iter().filter(|x| s.body_visible(&x.name)) {
@@ -129,7 +129,7 @@ fn bounds_by(s: &Session, sketches: bool, of: impl Fn(&solidcraft_doc::ModelBody
     for ss in st.sketches.iter().filter(|x| sketch_drawn(s, x.feature, sketches)) {
         // All four corners: on a tilted plane two opposite ones don't span the rectangle.
         if let Some((lo, hi)) = ss.sketch.bounds() {
-            for p in [lo, hi, solidcraft_geom::Vec2::new(lo.x, hi.y), solidcraft_geom::Vec2::new(hi.x, lo.y)] {
+            for p in [lo, hi, polycore_geom::Vec2::new(lo.x, hi.y), polycore_geom::Vec2::new(hi.x, lo.y)] {
                 b.add(ss.plane.to_world(p));
             }
         }
@@ -327,7 +327,7 @@ impl<'a> SketchPointVisibility<'a> {
             .links
             .iter()
             .filter(|l| seen.insert(l.id.as_str()))
-            .filter(|l| l.kind == solidcraft_sketch::LinkKind::Text)
+            .filter(|l| l.kind == polykrom_sketch::LinkKind::Text)
             .map(|l| l.id.as_str())
             .collect();
         let mut hidden: std::collections::HashSet<&str> =
@@ -340,7 +340,7 @@ impl<'a> SketchPointVisibility<'a> {
         Self { hidden }
     }
 
-    pub fn takes(&self, point: &solidcraft_sketch::SPoint) -> bool {
+    pub fn takes(&self, point: &polykrom_sketch::SPoint) -> bool {
         !self.hidden.contains(point.id.as_str())
     }
 }
@@ -544,7 +544,7 @@ fn build_scene(
 
 /// Where the plane through `o` with normal `n` cuts a mesh: one segment per crossed triangle,
 /// nudged a hair to the kept side (so the clip leaves them drawn).
-pub fn section_segments(m: &solidcraft_geom::Mesh, o: Vec3, n: Vec3) -> Vec<(Vec3, Vec3)> {
+pub fn section_segments(m: &polycore_geom::Mesh, o: Vec3, n: Vec3) -> Vec<(Vec3, Vec3)> {
     let eps = section_nudge(m);
     let mut out = Vec::new();
     for t in &m.triangles {
@@ -554,12 +554,12 @@ pub fn section_segments(m: &solidcraft_geom::Mesh, o: Vec3, n: Vec3) -> Vec<(Vec
 }
 
 /// How far [`section_segments`] nudges the cut to the kept side.
-fn section_nudge(m: &solidcraft_geom::Mesh) -> f64 {
+fn section_nudge(m: &polycore_geom::Mesh) -> f64 {
     1e-4 * (1.0 + m.bounds().diagonal())
 }
 
 /// The segment where the plane through `o` with normal `n` crosses triangle `t`, if it does.
-fn cut_triangle(m: &solidcraft_geom::Mesh, t: &[u32; 3], o: Vec3, n: Vec3, eps: f64, out: &mut Vec<(Vec3, Vec3)>) {
+fn cut_triangle(m: &polycore_geom::Mesh, t: &[u32; 3], o: Vec3, n: Vec3, eps: f64, out: &mut Vec<(Vec3, Vec3)>) {
     let Some(p) = m.tri(t) else { return };
     let d = p.map(|q| n.dot(q - o));
     let mut pts = Vec::with_capacity(2);
@@ -592,7 +592,7 @@ pub struct SectionIndex {
 const SECTION_SLABS: usize = 4096;
 
 impl SectionIndex {
-    pub fn new(m: &solidcraft_geom::Mesh, normal: Vec3) -> SectionIndex {
+    pub fn new(m: &polycore_geom::Mesh, normal: Vec3) -> SectionIndex {
         let heights: Vec<Option<(f64, f64)>> = m
             .triangles
             .iter()
@@ -628,7 +628,7 @@ impl SectionIndex {
 
     /// [`section_segments`] of `m` (the mesh this index was made from) at the plane through
     /// `o` with this index's normal.
-    pub fn segments(&self, m: &solidcraft_geom::Mesh, o: Vec3) -> Vec<(Vec3, Vec3)> {
+    pub fn segments(&self, m: &polycore_geom::Mesh, o: Vec3) -> Vec<(Vec3, Vec3)> {
         let mut out = Vec::new();
         let at = self.normal.dot(o);
         if self.slabs.is_empty() || !at.is_finite() || at < self.start {
@@ -682,7 +682,7 @@ fn sketch_component_visible(s: &Session, id: u64) -> bool {
 
 /// Is a sketch used by a later feature?
 pub fn sketch_consumed(s: &Session, id: u64) -> bool {
-    use solidcraft_doc::FeatureKind;
+    use polykrom_doc::FeatureKind;
     s.doc.features.iter().any(|f| matches!(f.kind, FeatureKind::Extrude { sketch, .. } | FeatureKind::Revolve { sketch, .. } if sketch == id))
 }
 
@@ -703,7 +703,7 @@ pub fn construction_planes(s: &Session) -> Vec<(u64, String, Plane)> {
     constructs(s)
         .into_iter()
         .filter_map(|(id, name, g)| match g {
-            solidcraft_doc::construct::ConstructGeom::Plane(p) => Some((id, name, p)),
+            polykrom_doc::construct::ConstructGeom::Plane(p) => Some((id, name, p)),
             _ => None,
         })
         .collect()
@@ -714,7 +714,7 @@ pub fn construction_axes(s: &Session) -> Vec<(u64, String, Vec3, Vec3)> {
     constructs(s)
         .into_iter()
         .filter_map(|(id, name, g)| match g {
-            solidcraft_doc::construct::ConstructGeom::Axis { origin, dir } => Some((id, name, origin, dir)),
+            polykrom_doc::construct::ConstructGeom::Axis { origin, dir } => Some((id, name, origin, dir)),
             _ => None,
         })
         .collect()
@@ -725,25 +725,25 @@ pub fn construction_points(s: &Session) -> Vec<(u64, String, Vec3)> {
     constructs(s)
         .into_iter()
         .filter_map(|(id, name, g)| match g {
-            solidcraft_doc::construct::ConstructGeom::Point(p) => Some((id, name, p)),
+            polykrom_doc::construct::ConstructGeom::Point(p) => Some((id, name, p)),
             _ => None,
         })
         .collect()
 }
 
 /// Construction geometry of unsuppressed features, shown where its component is placed.
-fn constructs(s: &Session) -> Vec<(u64, String, solidcraft_doc::construct::ConstructGeom)> {
-    use solidcraft_doc::construct::ConstructGeom;
+fn constructs(s: &Session) -> Vec<(u64, String, polykrom_doc::construct::ConstructGeom)> {
+    use polykrom_doc::construct::ConstructGeom;
     let st = s.model.state();
     st.construct
         .iter()
         .filter_map(|c| {
             let f = s.doc.feature(c.feature).filter(|f| !f.suppressed)?;
             let m = s.doc.component_transform(f.component);
-            if solidcraft_doc::is_identity(&m) {
+            if polykrom_doc::is_identity(&m) {
                 return Some((c.feature, c.name.clone(), c.geom.clone()));
             }
-            let (pt, v) = (|p: Vec3| solidcraft_doc::apply_point(&m, p), |d: Vec3| solidcraft_doc::apply_vector(&m, d));
+            let (pt, v) = (|p: Vec3| polykrom_doc::apply_point(&m, p), |d: Vec3| polykrom_doc::apply_vector(&m, d));
             let g = match &c.geom {
                 ConstructGeom::Plane(p) => ConstructGeom::Plane(Plane::new(pt(p.origin), v(p.x), v(p.y)).unwrap_or(*p)),
                 ConstructGeom::Axis { origin, dir } => ConstructGeom::Axis { origin: pt(*origin), dir: v(*dir) },
@@ -761,7 +761,7 @@ mod tests {
     use super::*;
 
     /// Headless pictures show appearances as the viewport does: a body's colour and faces with
-    /// looks of their own (the picture itself: `solidcraft-gpu`'s capture tests).
+    /// looks of their own (the picture itself: `polykrom-gpu`'s capture tests).
     #[test]
     fn snapshot_scene_carries_appearances() {
         let mut s = Session::default();
@@ -823,7 +823,7 @@ mod tests {
     }
 
     /// A section cuts the headless scene: the clip plane and the cap colour, and the outline
-    /// where the plane cuts each body (the picture: `solidcraft-gpu`'s capture tests).
+    /// where the plane cuts each body (the picture: `polykrom-gpu`'s capture tests).
     #[test]
     fn the_section_cuts_the_scene() {
         let mut s = Session::default();
@@ -847,7 +847,7 @@ mod tests {
         assert!(scene(&s, &cam).analysis.is_none());
         s.analysis = Some(crate::SurfaceAnalysis::Curvature { radius: 5.0 });
         let a = scene(&s, &cam).analysis.unwrap();
-        assert_eq!((a.mode, a.colors), (solidcraft_render::AnalysisMode::Curvature { radius: 5.0 }, Palette::DEFAULT.analysis));
+        assert_eq!((a.mode, a.colors), (polykrom_render::AnalysisMode::Curvature { radius: 5.0 }, Palette::DEFAULT.analysis));
     }
 
     /// The CPU rasterizer (the last tier of headless pictures, `SOLIDCRAFT_GPU=cpu` or no adapter
@@ -857,7 +857,7 @@ mod tests {
         let mut s = Session::default();
         s.execute("solid.sphere", &json!({"diameter": 20})).unwrap();
         let cam = home_camera(&s);
-        let img = solidcraft_render::render(&scene(&s, &cam), &cam, 400, 400);
+        let img = polykrom_render::render(&scene(&s, &cam), &cam, 400, 400);
         let dark = img.rgba.chunks(4).filter(|p| p[0] < 70 && p[1] < 70 && p[2] < 75).count();
         assert!(dark > 40, "silhouette pixels: {dark}");
     }
@@ -868,11 +868,11 @@ mod tests {
         let mut s = Session::default();
         s.execute("solid.box", &json!({"length": 40, "width": 30, "height": 20})).unwrap();
         let cam = home_camera(&s);
-        let whole = solidcraft_render::render(&scene(&s, &cam), &cam, 200, 140).rgba;
+        let whole = polykrom_render::render(&scene(&s, &cam), &cam, 200, 140).rgba;
         s.execute("inspect.section", &json!({"plane": {"origin": [0, 15, 0], "normal": [0, -1, 0]}})).unwrap();
         let sc = scene(&s, &cam);
         assert!(sc.clip.is_some());
-        let cut = solidcraft_render::render(&sc, &cam, 200, 140).rgba;
+        let cut = polykrom_render::render(&sc, &cam, 200, 140).rgba;
         let changed = whole.chunks(4).zip(cut.chunks(4)).filter(|(a, b)| a != b).count();
         assert!(changed > 500, "{changed} pixels changed");
     }
@@ -894,7 +894,7 @@ mod tests {
             // A marker inside the body, behind the cut face.
             let red = Rgb(255, 0, 0);
             sc.lines.push(SceneLine { points: vec![Vec3::new(5.0, 25.0, 10.0), Vec3::new(35.0, 25.0, 10.0)], color: red, width: 3.0, on_top: false });
-            let img = solidcraft_render::render(&sc, &cam, 300, 220);
+            let img = polykrom_render::render(&sc, &cam, 300, 220);
             let px = || img.rgba.chunks(4);
             let marker = px().filter(|p| p[0] > 200 && p[1] < 60 && p[2] < 60).count();
             assert_eq!(marker, 0, "fov {fov}: the inside shows through the cut face");
@@ -915,7 +915,7 @@ mod tests {
         let mut picture = |hatch: bool| {
             let plane = json!({"origin": [0, 15, 0], "normal": [0, -1, 0]});
             s.execute("inspect.section", &json!({"plane": plane, "hatch": hatch})).unwrap();
-            solidcraft_render::render(&scene(&s, &cam), &cam, 300, 220).rgba
+            polykrom_render::render(&scene(&s, &cam), &cam, 300, 220).rgba
         };
         // Pixels in the body's exact colour: only a plain cut has them (lit faces are shaded).
         let solid = |img: &[u8]| img.chunks(4).filter(|p| p[..3] == [40, 160, 90]).count();

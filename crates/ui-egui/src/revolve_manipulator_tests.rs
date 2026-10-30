@@ -1,6 +1,6 @@
 use crate::scenario::Harness;
+use polykrom_engine::doc::{FeatureKind, kernel};
 use serde_json::{Value, json};
-use solidcraft_engine::doc::{FeatureKind, kernel};
 
 fn fixture(mut h: Harness, extra: Value) -> Harness {
     h.app.run("sketch.create", json!({"plane":"XY","name":"Profile"})).unwrap();
@@ -154,7 +154,7 @@ fn selected_second_placement_custom_axis_handle_and_preview_stay_in_its_frame() 
     let frame = h.app.session.active_component_frame();
     let world = |degrees: f64| {
         let a = degrees.to_radians();
-        let p = solidcraft_engine::doc::apply_point(&frame, solidcraft_engine::geom::Vec3::new(12.5 * a.cos(), 2.5, 12.5 * a.sin()));
+        let p = polykrom_engine::doc::apply_point(&frame, polykrom_engine::geom::Vec3::new(12.5 * a.cos(), 2.5, 12.5 * a.sin()));
         json!([p.x, p.y, p.z])
     };
     let axis = match &h.app.session.doc.find_feature("Turn").unwrap().kind {
@@ -186,7 +186,7 @@ fn curved_to_object_has_surface_feedback_without_an_angular_handle_or_input() {
     h.step(&json!({"click":{"handle":"dialog:Type:To Object"}})).unwrap();
     let mut dialog = h.app.dialog.take().unwrap();
     dialog.active = dialog.inputs.iter().position(|input| input.label == "To Object").unwrap();
-    dialog.pick(&h.app.session, solidcraft_engine::Sel::Vertex { body: "Target".into(), point: solidcraft_engine::geom::Vec3::new(0.0, 2.0, 15.0) });
+    dialog.pick(&h.app.session, polykrom_engine::Sel::Vertex { body: "Target".into(), point: polykrom_engine::geom::Vec3::new(0.0, 2.0, 15.0) });
     h.app.dialog = Some(dialog);
     h.frames(8);
     assert!(h.widget("To surface").is_some());
@@ -206,7 +206,7 @@ fn free_drag_and_invalid_expression_stay_editable_before_commit() {
     open(&mut h);
     h.step(&json!({"drag":[{"handle":"revolve"},{"world":at_angle(37.3)}],"ctrl":true})).unwrap();
     let crate::dialogs::Kind::Revolve { angle: entered, .. } = &h.app.dialog.as_ref().unwrap().kind else { panic!("revolve") };
-    assert!((h.app.session.doc.eval(entered, solidcraft_engine::doc::expr::Kind::Angle).unwrap().to_degrees() - 37.3).abs() < 0.2);
+    assert!((h.app.session.doc.eval(entered, polykrom_engine::doc::expr::Kind::Angle).unwrap().to_degrees() - 37.3).abs() < 0.2);
     h.step(&json!({"click":{"handle":"dialog:Angle"}})).unwrap();
     h.step(&json!({"key":"A","cmd":true})).unwrap();
     h.step(&json!({"text":"unknown_angle"})).unwrap();
@@ -265,7 +265,7 @@ fn legacy_reversed_axis_symmetric_interval_is_shown_and_preserved_exactly() {
     std::fs::write(&path, serde_json::to_vec(&saved).unwrap()).unwrap();
     h.app.run("doc.open", json!({"path":path})).unwrap();
     let FeatureKind::Revolve { convention, .. } = &h.app.session.doc.find_feature("Turn").unwrap().kind else { panic!("revolve") };
-    assert_eq!(*convention, solidcraft_engine::doc::RevolveConvention::LegacyAxisStart);
+    assert_eq!(*convention, polykrom_engine::doc::RevolveConvention::LegacyAxisStart);
     let original = serde_json::to_value(&h.app.session.doc.find_feature("Turn").unwrap().kind).unwrap();
     let before = h.app.session.world_state().body("Main").unwrap().mesh().bounds();
     assert!(before.min.x < -14.9 && before.max.x < 7.6 && before.min.z > -1e-6 && before.max.z > 14.9);
@@ -307,8 +307,8 @@ fn canonical_symmetric_ring_preview_drag_and_reopen_match_material() {
         let commands = crate::dialogs::apply_commands(&h.app, h.app.dialog.as_ref().unwrap()).unwrap();
         let preview = h.app.session.preview_world(&commands).unwrap();
         let body = &preview.after.body("Main").unwrap().body;
-        assert!(body.contains(solidcraft_engine::geom::Vec3::new(3.0, 5.0, 0.0)));
-        assert!(!body.contains(solidcraft_engine::geom::Vec3::new(0.0, 5.0, 3.0)));
+        assert!(body.contains(polykrom_engine::geom::Vec3::new(3.0, 5.0, 0.0)));
+        assert!(!body.contains(polykrom_engine::geom::Vec3::new(0.0, 5.0, 3.0)));
         let bounds = preview.after.body("Main").unwrap().mesh().bounds();
         assert!((bounds.min.x - 2.0f64.sqrt()).abs() < 0.02 && (bounds.max.x - 4.0).abs() < 0.02, "{bounds:?}");
         assert!((bounds.min.z + 2.0 * 2.0f64.sqrt()).abs() < 0.02 && (bounds.max.z - 2.0 * 2.0f64.sqrt()).abs() < 0.02);
@@ -327,7 +327,7 @@ fn canonical_symmetric_ring_preview_drag_and_reopen_match_material() {
         handle_at(&mut h, "revolve", at(30.0));
         handle_at(&mut h, "revolve2", at(-30.0));
         let FeatureKind::Revolve { convention, .. } = &h.app.session.doc.find_feature("Turn").unwrap().kind else { panic!("revolve") };
-        assert_eq!(*convention, solidcraft_engine::doc::RevolveConvention::SketchNormal);
+        assert_eq!(*convention, polykrom_engine::doc::RevolveConvention::SketchNormal);
         h.step(&json!({"widget":"Cancel"})).unwrap();
     }
 }
@@ -347,9 +347,9 @@ fn reversed_axis_to_object_canvas_sweep_and_preview_follow_the_quarter_target() 
     let preview = h.app.session.preview_world(&commands).unwrap();
     let result = preview.after.body("Main").unwrap();
     assert_eq!(result.mesh().bounds(), before);
-    assert!(result.body.contains(solidcraft_engine::geom::Vec3::new(p, 2.5, p)));
+    assert!(result.body.contains(polykrom_engine::geom::Vec3::new(p, 2.5, p)));
     for (x, z) in [(-p, p), (-p, -p), (p, -p)] {
-        assert!(!result.body.contains(solidcraft_engine::geom::Vec3::new(x, 2.5, z)));
+        assert!(!result.body.contains(polykrom_engine::geom::Vec3::new(x, 2.5, z)));
     }
     assert!((kernel::measure(&result.body).unwrap().volume - expected_volume(90.0)).abs() < 0.03);
     h.step(&json!({"widget":"OK"})).unwrap();

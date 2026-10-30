@@ -6,7 +6,7 @@ use crate::viewport::{Hit, pick, pick_all, projection};
 
 /// Overlapping bodies with flat and curved faces, filleted edges and seams.
 fn assembly() -> SolveApp {
-    let mut s = solidcraft_engine::Session::default();
+    let mut s = polykrom_engine::Session::default();
     s.execute("solid.box", &json!({"length": 40, "width": 30, "height": 20})).unwrap();
     s.execute("solid.fillet", &json!({"edges": [[40, 15, 20]], "radius": 4})).unwrap();
     s.execute("solid.cylinder", &json!({"radius": 8, "height": 35, "base": [10, 10, 0], "operation": "new_body"})).unwrap();
@@ -27,7 +27,7 @@ fn indexed_picks_match_the_full_scan() {
         app.ui.perspective = perspective;
         app.cam.yaw = yaw;
         app.cam.pitch = pitch;
-        app.cam.target = solidcraft_engine::geom::Vec3::new(20.0, 15.0, 12.0);
+        app.cam.target = polykrom_engine::geom::Vec3::new(20.0, 15.0, 12.0);
         app.cam.distance = 110.0;
         let proj = projection(&app, rect);
         for j in 0..48 {
@@ -54,9 +54,9 @@ fn indexed_picks_match_the_full_scan() {
 fn indexes_follow_the_model_state() {
     let mut app = assembly();
     let rect = Rect::from_min_size(pos2(0.0, 0.0), vec2(640.0, 480.0));
-    app.cam.target = solidcraft_engine::geom::Vec3::new(20.0, 15.0, 12.0);
+    app.cam.target = polykrom_engine::geom::Vec3::new(20.0, 15.0, 12.0);
     let proj = projection(&app, rect);
-    let centre = proj.to_screen(solidcraft_engine::geom::Vec3::new(20.0, 15.0, 10.0)).unwrap();
+    let centre = proj.to_screen(polykrom_engine::geom::Vec3::new(20.0, 15.0, 10.0)).unwrap();
     pick(&app, &proj, centre);
     assert!(app.viewport.pick_index.len() >= 1);
     app.session.execute("solid.box", &json!({"length": 5, "width": 5, "height": 5, "corner": [-20, -20, 0], "operation": "new_body"})).unwrap();
@@ -67,7 +67,7 @@ fn indexes_follow_the_model_state() {
     assert!(app.viewport.pick_index.len() <= 5);
 }
 
-/// Timing, not a check (`cargo test --release -p solidcraft-ui-egui --lib pick_timing -- --ignored
+/// Timing, not a check (`cargo test --release -p polykrom-ui-egui --lib pick_timing -- --ignored
 /// --nocapture`; `SOLIDCRAFT_BENCH_MESH=part.stl` adds 25 placements of that mesh): picks over a
 /// grid of a 1400 × 900 view, scanning every triangle and edge versus through the indexes, on many
 /// curved bodies, on one body with many curved faces, and on eight layers of bodies seen from
@@ -76,7 +76,7 @@ fn indexes_follow_the_model_state() {
 #[test]
 #[ignore]
 fn pick_timing_on_curved_models() {
-    let mut many = solidcraft_engine::Session::default();
+    let mut many = polykrom_engine::Session::default();
     for i in 0..12 {
         for j in 0..12 {
             let (x, y) = (f64::from(i) * 30.0, f64::from(j) * 30.0);
@@ -84,7 +84,7 @@ fn pick_timing_on_curved_models() {
             many.execute("solid.sphere", &json!({"radius": 8, "center": [x, y, 40], "operation": "new_body"})).unwrap();
         }
     }
-    let mut one = solidcraft_engine::Session::default();
+    let mut one = polykrom_engine::Session::default();
     one.execute("solid.box", &json!({"length": 340, "width": 340, "height": 10, "corner": [-15, -15, -5]})).unwrap();
     for i in 0..8 {
         for j in 0..8 {
@@ -92,7 +92,7 @@ fn pick_timing_on_curved_models() {
             one.execute("solid.cylinder", &json!({"radius": 14, "height": 30, "base": [x, y, 0], "operation": "join"})).unwrap();
         }
     }
-    let mut deep = solidcraft_engine::Session::default();
+    let mut deep = polykrom_engine::Session::default();
     for k in 0..8 {
         for i in 0..8 {
             for j in 0..8 {
@@ -107,7 +107,7 @@ fn pick_timing_on_curved_models() {
     ];
     scenes.push(("eight layers", SolveApp::new(deep, crate::Services::default()), 1.2));
     if let Some(path) = std::env::var_os("SOLIDCRAFT_BENCH_MESH") {
-        let mut app = SolveApp::new(solidcraft_engine::Session::default(), crate::Services::default());
+        let mut app = SolveApp::new(polykrom_engine::Session::default(), crate::Services::default());
         let component = app.run("file.insert_mesh", json!({"path": path.to_string_lossy()})).unwrap()["component"].clone();
         app.run("component.activate", json!({"component":"root"})).unwrap();
         let size = app.session.world_state().bodies[0].mesh_bounds().size();
@@ -121,7 +121,7 @@ fn pick_timing_on_curved_models() {
         app.ui.show_origin = false;
         (app.cam.yaw, app.cam.pitch) = (0.6, pitch);
         let st = app.session.world_state();
-        app.cam.fit(&st.bodies.iter().fold(solidcraft_engine::geom::Aabb3::EMPTY, |a, b| a.union(&b.mesh_bounds())));
+        app.cam.fit(&st.bodies.iter().fold(polykrom_engine::geom::Aabb3::EMPTY, |a, b| a.union(&b.mesh_bounds())));
         let (tris, segs) = st
             .bodies
             .iter()

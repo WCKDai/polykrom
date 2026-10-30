@@ -3,9 +3,9 @@
 //! the view. The whole drag is one undo step.
 
 use egui::Pos2;
+use polykrom_engine::doc::{apply_point, joints, mat_inverse};
+use polykrom_engine::geom::Vec3;
 use serde_json::json;
-use solidcraft_engine::doc::{apply_point, joints, mat_inverse};
-use solidcraft_engine::geom::Vec3;
 
 use crate::SolveApp;
 use crate::viewport::{Hit, Proj};
@@ -100,9 +100,9 @@ pub fn end(app: &mut SolveApp) {
 
 #[cfg(test)]
 mod tests {
+    use polykrom_engine::doc::{apply_point, joints};
+    use polykrom_engine::geom::Vec3;
     use serde_json::{Value, json};
-    use solidcraft_engine::doc::{apply_point, joints};
-    use solidcraft_engine::geom::Vec3;
 
     use crate::scenario::Harness;
     use crate::test_support::play;

@@ -2,9 +2,9 @@
 //! up, and letting go trims them all (`sketch.trim.path`) in one undo step. A click still trims
 //! the one piece under it.
 
+use polykrom_engine::geom::Vec2;
+use polykrom_engine::sketch::Shape;
 use serde_json::{Value, json};
-use solidcraft_engine::geom::Vec2;
-use solidcraft_engine::sketch::Shape;
 
 use crate::scenario::Harness;
 
@@ -115,7 +115,7 @@ fn run(h: &mut Harness, id: &str, p: Value) -> Value {
     }
 }
 
-fn sketch(h: &Harness) -> solidcraft_engine::sketch::Sketch {
+fn sketch(h: &Harness) -> polykrom_engine::sketch::Sketch {
     let sid = h.app.session.active_sketch.expect("sketch mode");
     h.app.session.world_state().sketch(sid).expect("the sketch").sketch.clone()
 }

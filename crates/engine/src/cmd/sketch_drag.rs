@@ -14,8 +14,8 @@
 
 use std::f64::consts::{PI, TAU};
 
-use solidcraft_geom::Vec2;
-use solidcraft_sketch::{Analysis, Budget, ConstraintKind, CurveKind, Hold, Sketch, conic_rho_from_point};
+use polycore_geom::Vec2;
+use polykrom_sketch::{Analysis, Budget, ConstraintKind, CurveKind, Hold, Sketch, conic_rho_from_point};
 
 use super::{Ent, Left, counted_solve};
 
@@ -48,7 +48,7 @@ enum Path {
     /// An arc's ends move along their rays from the centre `o` to the cursor's radius.
     ArcRadius { o: Vec2, ends: Vec<(usize, Vec2)>, from: f64, to: f64 },
     /// A conic's `rho` follows the cursor, read off its position between the chord's midpoint
-    /// and the apex (see [`solidcraft_sketch::conic_rho_from_point`]). `a`, `b` and `apex` stay
+    /// and the apex (see [`polykrom_sketch::conic_rho_from_point`]). `a`, `b` and `apex` stay
     /// put; only the curve's fullness changes, the way an ellipse's outline changes its minor
     /// radius rather than sliding the ellipse.
     ConicRho { c: usize, from: f64, to: f64 },
@@ -135,7 +135,7 @@ pub(super) fn drag_entity(
     from: Vec2,
     to: Vec2,
     live: bool,
-    solved: Option<&solidcraft_doc::SolvedSketch>,
+    solved: Option<&polykrom_doc::SolvedSketch>,
 ) -> (Dragged, Left) {
     // An unchanged, solved entity with no freedom cannot follow a drag. Holding it at a
     // different position only makes its constraints conflict, and a large pattern would spend
@@ -274,8 +274,8 @@ pub(super) fn drag_entity(
             !geometry.sweep_wrapped(after)
         };
         let followed = match (e, line_grab) {
-            (Ent::Point(q), _) => solidcraft_sketch::move_point_towards(sk, q, to, max_step, frame.as_mut(), valid),
-            (_, Some(g)) => solidcraft_sketch::move_line_towards(sk, g.curve, g.local, to, max_step, frame.as_mut(), valid),
+            (Ent::Point(q), _) => polykrom_sketch::move_point_towards(sk, q, to, max_step, frame.as_mut(), valid),
+            (_, Some(g)) => polykrom_sketch::move_line_towards(sk, g.curve, g.local, to, max_step, frame.as_mut(), valid),
             _ => false,
         };
         #[cfg(test)]

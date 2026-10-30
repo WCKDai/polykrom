@@ -28,16 +28,16 @@ fn a_ring_section_keeps_its_hole_and_rejects_a_disc() {
     run(&mut s, "solid.loft", json!({"sections": sections, "operation": "new"}));
     let want = PI * (400.0 - 144.0) * 20.0;
     assert!(rel(volume(&mut s), want) < 1e-3);
-    let reopened = Session::new(solidcraft_doc::Document::from_json(&s.doc.to_json()).unwrap());
+    let reopened = Session::new(polykrom_doc::Document::from_json(&s.doc.to_json()).unwrap());
     assert!(reopened.model.results.iter().all(|r| r.error.is_none()));
     let st = reopened.model.state();
     let body = &st.bodies[0];
     assert!(body.body.validity().is_empty());
     assert_eq!(body.body.shell_count(), 1);
     for face in 0..body.body.face_count() {
-        assert!(solidcraft_doc::naming::face_name_exact(body, face), "face {face} lost its sketch-curve provenance");
+        assert!(polykrom_doc::naming::face_name_exact(body, face), "face {face} lost its sketch-curve provenance");
     }
-    assert!(!body.body.tessellate(0.001).unwrap().contains(solidcraft_geom::Vec3::new(0.0, 0.0, 10.0)));
+    assert!(!body.body.tessellate(0.001).unwrap().contains(polycore_geom::Vec3::new(0.0, 0.0, 10.0)));
     run(&mut s, "edit.undo", json!({}));
     assert!(s.model.state().bodies.is_empty());
     run(&mut s, "edit.redo", json!({}));

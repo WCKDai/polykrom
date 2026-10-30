@@ -1,9 +1,9 @@
 //! `sketch.create` `flip`: a sketch on a plane seen from its other side (#1586). Without it a
 //! sketch keeps the plane's own side, and older designs open, rebuild and save as before.
 
+use polycore_geom::{Plane, Vec3};
+use polykrom_doc::{FeatureKind, PlaneRef};
 use serde_json::{Value, json};
-use solidcraft_doc::{FeatureKind, PlaneRef};
-use solidcraft_geom::{Plane, Vec3};
 
 use crate::Session;
 
@@ -109,7 +109,7 @@ fn flip_is_refused_on_a_face() {
 /// same bodies and save and reopen unchanged.
 #[test]
 fn older_designs_open_rebuild_and_save_unchanged() {
-    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../apps/solidcraft-cli/tests/corpus");
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../apps/polykrom-cli/tests/corpus");
     let mut files: Vec<_> =
         std::fs::read_dir(&dir).unwrap().flatten().map(|e| e.path()).filter(|p| p.extension().is_some_and(|x| x == "solidcraft")).collect();
     files.sort();

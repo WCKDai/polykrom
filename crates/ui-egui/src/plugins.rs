@@ -43,9 +43,9 @@ struct Manifest {
 }
 
 /// The plugins directory: `$XDG_DATA_HOME/solidcraft/plugins` (and the platform equivalents of
-/// [`solidcraft_engine::recovery::data_dir`]). `None` when that folder cannot be named.
+/// [`polykrom_engine::recovery::data_dir`]). `None` when that folder cannot be named.
 pub fn plugins_dir() -> Option<PathBuf> {
-    solidcraft_engine::recovery::data_dir().map(|d| d.join("plugins"))
+    polykrom_engine::recovery::data_dir().map(|d| d.join("plugins"))
 }
 
 /// An id a folder and a manifest may share: 1–64 characters, lowercase letters, digits and
@@ -242,14 +242,14 @@ mod tests {
     #[test]
     fn turning_a_plugin_off_is_saved_and_restore_defaults_turns_it_back_on() {
         use serde_json::json;
-        let mut app = crate::SolveApp::new(solidcraft_engine::Session::default(), crate::Services::default());
+        let mut app = crate::SolveApp::new(polykrom_engine::Session::default(), crate::Services::default());
         assert!(enabled(&app, "ftc-frc-parts"));
         crate::prefs::set(&mut app, &json!({"disabled_plugins": ["ftc-frc-parts"]})).unwrap();
         assert!(!enabled(&app, "ftc-frc-parts"));
         let err = crate::prefs::set(&mut app, &json!({"disabled_plugins": ["Bad Id"]})).unwrap_err();
         assert!(err.contains("disabled_plugins"), "{err}");
         assert!(!enabled(&app, "ftc-frc-parts"), "a refused list leaves the previous choice");
-        let mut other = crate::SolveApp::new(solidcraft_engine::Session::default(), crate::Services::default());
+        let mut other = crate::SolveApp::new(polykrom_engine::Session::default(), crate::Services::default());
         other.load_prefs(&app.prefs());
         assert!(!enabled(&other, "ftc-frc-parts"));
         crate::prefs::control(&mut app, &json!({"open": "Plugins", "button": "defaults"})).unwrap();

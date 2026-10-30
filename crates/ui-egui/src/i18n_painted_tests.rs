@@ -5,7 +5,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use solidcraft_engine::Session;
+use polykrom_engine::Session;
 
 use crate::context_menu::Target;
 use crate::scenario::Harness;
@@ -59,7 +59,7 @@ fn design_names(app: &SolveApp) -> BTreeSet<String> {
     names.extend(doc.components.iter().map(|c| c.name.clone()));
     names.extend(doc.occurrences.iter().map(|o| o.name.clone()));
     names.extend(app.session.model.state().bodies.iter().map(|b| b.name.clone()));
-    names.extend(solidcraft_engine::command_specs().iter().filter_map(|c| crate::keymap::effective(app, c.id)));
+    names.extend(polykrom_engine::command_specs().iter().filter_map(|c| crate::keymap::effective(app, c.id)));
     names
 }
 
@@ -80,7 +80,7 @@ fn english_leaks(language: &str, texts: &BTreeSet<String>, english: &BTreeMap<St
 fn sample() -> Harness {
     let mut h = Harness::new();
     let mut session = Session::default();
-    session.run_script(&solidcraft_engine::sample::script()).unwrap();
+    session.run_script(&polykrom_engine::sample::script()).unwrap();
     h.app = SolveApp::new(session, Services::default());
     h.app.home.open = false;
     h.frames(3);

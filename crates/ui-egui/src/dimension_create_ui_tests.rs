@@ -11,7 +11,7 @@ fn line(end: [f64; 2]) -> Harness {
     // Leave room around the measured shape while testing the draft itself. Separate Fit
     // tests exercise measured dock occlusion without changing the picking projection.
     h.app.cam.distance = 80.0;
-    h.app.cam.target = solidcraft_engine::geom::Vec3::new(end[0] * 0.5, end[1] * 0.5, 0.0);
+    h.app.cam.target = polykrom_engine::geom::Vec3::new(end[0] * 0.5, end[1] * 0.5, 0.0);
     h.settle();
     h
 }
@@ -62,7 +62,7 @@ fn dimension_editor_names_and_reference_picks_drive_new_and_existing_dimensions(
     h.step(&json!({"key":"Enter"})).unwrap();
     assert_eq!(h.app.session.doc.param(&target).unwrap().expr, format!("2 * {source}"));
     h.app.run("parameters.change", json!({"name":source,"expression":"15 mm"})).unwrap();
-    assert!((h.app.session.doc.eval(&target, solidcraft_engine::doc::expr::Kind::Length).unwrap() - 30.).abs() < 1e-6);
+    assert!((h.app.session.doc.eval(&target, polykrom_engine::doc::expr::Kind::Length).unwrap() - 30.).abs() < 1e-6);
     crate::dim_view::cancel();
 }
 
@@ -287,7 +287,7 @@ fn rectangle_side_and_fixed_origin_line_dimensions_preserve_other_constraints() 
         h.app.run("sketch.rectangle.two_point", json!({"p0":[0,0],"p1":[20,10]})).unwrap();
         h.call("ui.view", json!({"view":"top"}));
         h.app.cam.distance = 80.;
-        h.app.cam.target = solidcraft_engine::geom::Vec3::new(10., 5., 0.);
+        h.app.cam.target = polykrom_engine::geom::Vec3::new(10., 5., 0.);
         h.settle();
         let baseline = h.app.session.doc.to_json();
         let undo = h.app.session.undo.len();
@@ -306,7 +306,7 @@ fn rectangle_side_and_fixed_origin_line_dimensions_preserve_other_constraints() 
 
 #[test]
 fn pending_second_nested_plane_uses_world_picks_but_one_local_dimension() {
-    use solidcraft_engine::geom::Vec2;
+    use polykrom_engine::geom::Vec2;
     crate::dim_view::cancel();
     let mut h = Harness::new();
     let parent = h.app.run("component.create", json!({"name":"Assembly"})).unwrap();
@@ -398,7 +398,7 @@ fn dimension_to_fillet_virtual_sharp_keeps_the_arc_and_fixed_origin() {
     let corner = fillet["virtual_corners"][0].as_str().unwrap().to_string();
     h.call("ui.view", json!({"view":"top"}));
     h.app.cam.distance = 90.;
-    h.app.cam.target = solidcraft_engine::geom::Vec3::new(5., 10., 0.);
+    h.app.cam.target = polykrom_engine::geom::Vec3::new(5., 10., 0.);
     h.settle();
     let baseline = h.app.session.doc.to_json();
     let undo = h.app.session.undo.len();
@@ -413,7 +413,7 @@ fn dimension_to_fillet_virtual_sharp_keeps_the_arc_and_fixed_origin() {
     let sk = &solved.sketch;
     assert!((sk.point(sk.point_index(&corner).unwrap()).unwrap().y - 30.).abs() < 1e-6);
     assert!(sk.point(sk.resolve_point("riser.start").unwrap()).unwrap().len() < 1e-8);
-    assert!(sk.curves.iter().any(|c| matches!(c.kind, solidcraft_engine::sketch::CurveKind::Arc { .. })), "the dimension retains the fillet arc");
+    assert!(sk.curves.iter().any(|c| matches!(c.kind, polykrom_engine::sketch::CurveKind::Arc { .. })), "the dimension retains the fillet arc");
     h.app.run("edit.undo", json!({})).unwrap();
     assert_eq!(h.app.session.doc.to_json(), baseline);
 }
@@ -427,7 +427,7 @@ fn draft_annotation_does_not_move_committed_dimension_hitboxes() {
     let width = h.app.run("sketch.dimension", json!({"entities":["l3"],"value":20})).unwrap()["param"].as_str().unwrap().to_string();
     h.call("ui.view", json!({"view":"top"}));
     h.app.cam.distance = 80.;
-    h.app.cam.target = solidcraft_engine::geom::Vec3::new(10., 5., 0.);
+    h.app.cam.target = polykrom_engine::geom::Vec3::new(10., 5., 0.);
     h.settle();
     let at = crate::dim_view::text_at(&width).unwrap();
     let drawn = crate::dim_view::drawn();
@@ -468,8 +468,8 @@ fn inch_dimension_entry_survives_unit_changes_undo_and_reopen() {
     assert_eq!(h.app.session.world_state().sketch(sketch).unwrap().sketch, before);
     h.app.run("edit.undo", json!({})).unwrap();
     assert_eq!(h.app.session.doc.units, "in");
-    let doc = solidcraft_engine::doc::Document::from_json(&h.app.session.doc.to_json()).unwrap();
-    let reopened = solidcraft_engine::Session::new(doc);
+    let doc = polykrom_engine::doc::Document::from_json(&h.app.session.doc.to_json()).unwrap();
+    let reopened = polykrom_engine::Session::new(doc);
     assert_eq!(reopened.doc.units, "in");
     assert_eq!(reopened.world_state().sketch(sketch).unwrap().sketch, before);
     crate::dim_view::cancel();
@@ -480,7 +480,7 @@ fn inch_dimension_entry_survives_unit_changes_undo_and_reopen() {
 #[test]
 fn placing_a_two_point_dimension_picks_horizontal_vertical_or_aligned() {
     // What each placement fixes at 10 mm: the X span, the Y span, or the length.
-    let spans = |a: solidcraft_engine::geom::Vec2, b: solidcraft_engine::geom::Vec2| [(b.x - a.x).abs(), (b.y - a.y).abs(), a.dist(b)];
+    let spans = |a: polykrom_engine::geom::Vec2, b: polykrom_engine::geom::Vec2| [(b.x - a.x).abs(), (b.y - a.y).abs(), a.dist(b)];
     for (at, measured) in [([6., 25.], 0), ([-10., 1.], 1), ([-5., 12.], 2)] {
         let mut h = line([12., 16.]);
         place(&mut h, &[[0., 0.], [12., 16.]], at);
@@ -544,7 +544,7 @@ fn sketch_with(setup: &[(&str, serde_json::Value)], centre: [f64; 2]) -> Harness
     }
     h.call("ui.view", json!({"view":"top"}));
     h.app.cam.distance = 80.0;
-    h.app.cam.target = solidcraft_engine::geom::Vec3::new(centre[0], centre[1], 0.0);
+    h.app.cam.target = polykrom_engine::geom::Vec3::new(centre[0], centre[1], 0.0);
     h.settle();
     h.step(&json!({"start":"sketch.dimension"})).unwrap();
     h
@@ -568,13 +568,13 @@ fn keys(h: &mut Harness, text: &str) {
     h.settle();
 }
 
-fn solved(h: &Harness) -> solidcraft_engine::sketch::Sketch {
+fn solved(h: &Harness) -> polykrom_engine::sketch::Sketch {
     let state = h.app.session.world_state();
     state.sketch(h.app.session.active_sketch.unwrap()).unwrap().sketch.clone()
 }
 
 /// The dimensions added since `before` (constraints with a parameter or a value).
-fn added(h: &Harness, before: usize) -> Vec<solidcraft_engine::sketch::Constraint> {
+fn added(h: &Harness, before: usize) -> Vec<polykrom_engine::sketch::Constraint> {
     solved(h).constraints.into_iter().filter(|c| c.kind.is_dimension()).skip(before).collect()
 }
 
@@ -591,7 +591,7 @@ fn assert_live(h: &Harness) {
 
 #[test]
 fn type_first_line_circle_arc_distance_and_angle_commit_one_undo_step_each() {
-    use solidcraft_engine::sketch::ConstraintKind as K;
+    use polykrom_engine::sketch::ConstraintKind as K;
     let line = [("sketch.line", json!({"points":[[0,0],[20,0]],"infer":false}))];
     let circle = [("sketch.circle.center", json!({"center":[10,0],"radius":5}))];
     let arc = [("sketch.arc.center_point", json!({"center":[10,0],"start":[18,0],"sweep":90}))];
@@ -622,7 +622,7 @@ fn type_first_line_circle_arc_distance_and_angle_commit_one_undo_step_each() {
         assert_eq!(h.app.session.doc.to_json(), original, "nothing changes until Enter");
         // The text follows the pointer while typing: Enter places it there.
         // (For the angle, inside the wedge both before and after it changes.)
-        let cursor = if check(&solidcraft_engine::sketch::ConstraintKind::Angle { a: 0, b: 1, value: 60f64.to_radians(), flip: false }) {
+        let cursor = if check(&polykrom_engine::sketch::ConstraintKind::Angle { a: 0, b: 1, value: 60f64.to_radians(), flip: false }) {
             [10.4, 6.0]
         } else {
             [centre[0] + 3.0, centre[1] + 9.0]
@@ -752,7 +752,7 @@ fn type_first_keeps_the_place_first_flow() {
 /// picked points where they are (it neither moves nor scales them) and Enter keeps them there.
 #[test]
 fn type_first_switching_between_aligned_horizontal_and_vertical_keeps_the_picked_points() {
-    use solidcraft_engine::sketch::ConstraintKind as K;
+    use polykrom_engine::sketch::ConstraintKind as K;
     let end = [12., 16.];
     let mid = [6., 8.];
     // Across from the picks, above them, beside them.
@@ -787,7 +787,7 @@ fn type_first_switching_between_aligned_horizontal_and_vertical_keeps_the_picked
                 let a = sk.point(sk.resolve_point("l1.start").unwrap()).unwrap();
                 let b = sk.point(sk.resolve_point("l1.end").unwrap()).unwrap();
                 assert!(
-                    a.dist(solidcraft_engine::geom::Vec2::new(0., 0.)) < 1e-6 && b.dist(solidcraft_engine::geom::Vec2::new(end[0], end[1])) < 1e-6,
+                    a.dist(polykrom_engine::geom::Vec2::new(0., 0.)) < 1e-6 && b.dist(polykrom_engine::geom::Vec2::new(end[0], end[1])) < 1e-6,
                     "{ctx}: the preview moved the points to {a:?} {b:?}"
                 );
             }
@@ -798,7 +798,7 @@ fn type_first_switching_between_aligned_horizontal_and_vertical_keeps_the_picked
             let a = sk.point(sk.resolve_point("l1.start").unwrap()).unwrap();
             let b = sk.point(sk.resolve_point("l1.end").unwrap()).unwrap();
             assert!(
-                a.dist(solidcraft_engine::geom::Vec2::new(0., 0.)) < 1e-6 && b.dist(solidcraft_engine::geom::Vec2::new(end[0], end[1])) < 1e-6,
+                a.dist(polykrom_engine::geom::Vec2::new(0., 0.)) < 1e-6 && b.dist(polykrom_engine::geom::Vec2::new(end[0], end[1])) < 1e-6,
                 "{picks:?} at {commit_at:?}: {a:?} {b:?}"
             );
             let new = added(&h, 0);
@@ -818,7 +818,7 @@ fn type_first_switching_between_aligned_horizontal_and_vertical_keeps_the_picked
 
 #[test]
 fn midpoint_then_edge_creates_a_distance_in_one_undo_step() {
-    use solidcraft_engine::sketch::ConstraintKind;
+    use polykrom_engine::sketch::ConstraintKind;
     let mut h = line([20., 0.]);
     h.app.run("sketch.line", json!({"points":[[-10,-10],[-10,20]]})).unwrap();
     h.app.run("sketch.constraint.fix", json!({"entity":"l2"})).unwrap();
@@ -847,7 +847,7 @@ fn midpoint_then_edge_creates_a_distance_in_one_undo_step() {
         let sk = &solved.sketch;
         let c = sk.constraints.iter().find(|c| c.param.is_some()).unwrap();
         assert!(matches!(c.kind, ConstraintKind::PointLineDistance { .. }));
-        assert!((solidcraft_engine::sketch::measure_dimension(sk, &c.kind).unwrap() - 25.).abs() < 1e-6);
+        assert!((polykrom_engine::sketch::measure_dimension(sk, &c.kind).unwrap() - 25.).abs() < 1e-6);
         let accepted = h.app.session.doc.to_json();
         h.app.run("edit.undo", json!({})).unwrap();
         assert_eq!(h.app.session.doc.to_json(), baseline);
@@ -859,7 +859,7 @@ fn midpoint_then_edge_creates_a_distance_in_one_undo_step() {
 
 /// The short sketch edge overlaps a face's automatically projected boundary.
 fn midpoint_face_sketch() -> Harness {
-    use solidcraft_engine::geom::Vec3;
+    use polykrom_engine::geom::Vec3;
     crate::dim_view::cancel();
     let mut h = Harness::new();
     h.app.run("sketch.create", json!({"plane":"XY"})).unwrap();
@@ -890,7 +890,7 @@ fn midpoint_face_sketch() -> Harness {
 
 #[test]
 fn overlapping_sketch_midpoint_to_model_edge_dimensions_the_snapped_point() {
-    use solidcraft_engine::sketch::{ConstraintKind, Shape};
+    use polykrom_engine::sketch::{ConstraintKind, Shape};
     let mut h = midpoint_face_sketch();
     let baseline = h.app.session.doc.to_json();
     let undo = h.app.session.undo.len();
@@ -912,7 +912,7 @@ fn overlapping_sketch_midpoint_to_model_edge_dimensions_the_snapped_point() {
     assert!(sk.curves[source].link.is_none(), "the short sketch edge won the overlapping pick");
     let Shape::Line { a, b } = sk.shape(source).unwrap() else { panic!() };
     assert!((a.dist(b) - 10.).abs() < 1e-6);
-    assert!((solidcraft_engine::sketch::measure_dimension(&sk, &c.kind).unwrap() - 13.).abs() < 1e-6);
+    assert!((polykrom_engine::sketch::measure_dimension(&sk, &c.kind).unwrap() - 13.).abs() < 1e-6);
     assert_eq!(h.app.session.doc.to_json(), baseline);
     type_value(&mut h, "12 mm");
     h.step(&json!({"key":"Enter"})).unwrap();
@@ -925,7 +925,7 @@ fn overlapping_sketch_midpoint_to_model_edge_dimensions_the_snapped_point() {
 
 #[test]
 fn midpoint_pairs_dimension_sketch_and_projected_model_edges() {
-    use solidcraft_engine::sketch::ConstraintKind;
+    use polykrom_engine::sketch::ConstraintKind;
     for (first, second, projected) in [
         ([-3_f64, -5.], [5., 4.], [false, false]),
         ([-3., -5.], [10., 5.], [false, true]),
@@ -961,7 +961,7 @@ fn midpoint_pairs_dimension_sketch_and_projected_model_edges() {
             assert_eq!(sk.curves[l].link.is_some(), expected);
         }
         let measured = ((first[0] - second[0]).powi(2) + (first[1] - second[1]).powi(2)).sqrt();
-        assert!((solidcraft_engine::sketch::measure_dimension(sk, &c.kind).unwrap() - measured).abs() < 1e-6);
+        assert!((polykrom_engine::sketch::measure_dimension(sk, &c.kind).unwrap() - measured).abs() < 1e-6);
         assert_eq!(h.app.session.undo.len(), undo + 1);
         h.app.run("edit.undo", json!({})).unwrap();
         assert_eq!(h.app.session.doc.to_json(), baseline);
@@ -971,7 +971,7 @@ fn midpoint_pairs_dimension_sketch_and_projected_model_edges() {
 
 #[test]
 fn midpoint_selection_keeps_line_circle_gap_dimensions_in_both_orders() {
-    use solidcraft_engine::sketch::ConstraintKind;
+    use polykrom_engine::sketch::ConstraintKind;
     for reverse in [false, true] {
         let mut h = line([20., 0.]);
         h.app.run("sketch.circle.center", json!({"center":[10,10],"radius":3})).unwrap();
@@ -990,7 +990,7 @@ fn midpoint_selection_keeps_line_circle_gap_dimensions_in_both_orders() {
 
 #[test]
 fn midpoint_dimension_orientation_follows_the_pointer_before_placement() {
-    use solidcraft_engine::sketch::ConstraintKind;
+    use polykrom_engine::sketch::ConstraintKind;
     for (first, second) in [([-3_f64, -5.], [5., 4.]), ([-3., -5.], [10., 5.]), ([10., 5.], [-3., -5.]), ([0., -5.], [10., 5.])] {
         for (horizontal, held_y, reused) in
             [(true, false, false), (false, false, false), (true, true, false), (false, true, false), (true, false, true), (false, false, true)]
@@ -1010,7 +1010,7 @@ fn midpoint_dimension_orientation_follows_the_pointer_before_placement() {
                     .enumerate()
                     .find_map(|(i, c)| {
                         c.link.as_ref()?;
-                        let solidcraft_engine::sketch::Shape::Line { a, b } = ss.sketch.shape(i)? else {
+                        let polykrom_engine::sketch::Shape::Line { a, b } = ss.sketch.shape(i)? else {
                             return None;
                         };
                         ((ss.plane.to_world(a).y + 5.).abs() < 1e-6 && (ss.plane.to_world(b).y + 5.).abs() < 1e-6).then(|| c.id.clone())
@@ -1030,7 +1030,7 @@ fn midpoint_dimension_orientation_follows_the_pointer_before_placement() {
                         .iter()
                         .enumerate()
                         .find_map(|(i, c)| {
-                            let solidcraft_engine::sketch::Shape::Line { a, b } = ss.sketch.shape(i)? else {
+                            let polykrom_engine::sketch::Shape::Line { a, b } = ss.sketch.shape(i)? else {
                                 return None;
                             };
                             let at = ss.plane.to_world((a + b) * 0.5);

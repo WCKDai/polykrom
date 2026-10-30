@@ -186,10 +186,10 @@ are Coons grids; only genuinely trimmed curved faces (holes, more than four corn
 spade's constrained Delaunay with sag and Ruppert refinement. A body the planner cannot
 handle is meshed by truck-meshalgo as before, which also still meshes for modelling
 (booleans, measure, provenance). Evaluating a plan (surface points and normals) runs on the
-CPU (`TessPlan::evaluate`) or in a compute shader (`solidcraft-gpu`).
+CPU (`TessPlan::evaluate`) or in a compute shader (`polykrom-gpu`).
 
 Release build, Apple M4 Max, medians of five. 400-hole plate (200 × 200 × 5 mm, 806
-faces), `cargo test --release -p solidcraft-gpu bench_plate -- --ignored --nocapture`:
+faces), `cargo test --release -p polykrom-gpu bench_plate -- --ignored --nocapture`:
 
 | Tolerance | Reference mesher | Plan | CPU evaluation | GPU evaluation | Triangles (reference / plan) |
 |---|---:|---:|---:|---:|---:|
@@ -240,9 +240,9 @@ Cross-part scheduling, parallel B-rep reconstruction and later display meshes re
 Reproduce after compiling, without other builds running:
 
 ```sh
-cargo test -p solidcraft-kernel --profile ci benchmark_independent_step_solids --no-run
+cargo test -p polycore --profile ci benchmark_independent_step_solids --no-run
 SOLIDCRAFT_STEP_BENCH_COUNT=512 SOLIDCRAFT_STEP_BENCH_KIND=cylinder \
-  cargo test -p solidcraft-kernel --profile ci benchmark_independent_step_solids \
+  cargo test -p polycore --profile ci benchmark_independent_step_solids \
   -- --ignored --nocapture --test-threads=1
 ```
 
@@ -264,7 +264,7 @@ checks archive budgets, CRCs, hashes, exact lengths, finite coordinates and inde
 Reproduce the storage measurements with an optimized `ci` IO test executable:
 
 ```sh
-cargo test -p solidcraft-io --profile ci benchmark_ -- --ignored --nocapture --test-threads=1
+cargo test -p polykrom-io --profile ci benchmark_ -- --ignored --nocapture --test-threads=1
 ```
 
 The benchmarks generate an original 100,000-vertex/100,000-triangle mesh and a STEP
@@ -368,9 +368,9 @@ The reproducible engine benchmarks separate atomic saving, provisional mesh read
 reconstruction and final display-mesh readiness:
 
 ```sh
-cargo test -p solidcraft-io --profile ci benchmark_step_storage -- --ignored --nocapture --test-threads=1
-cargo test -p solidcraft-engine --profile ci benchmark_native_cache_save -- --ignored --nocapture --test-threads=1
-cargo test -p solidcraft-engine --profile ci benchmark_native_cache_open -- --ignored --nocapture --test-threads=1
+cargo test -p polykrom-io --profile ci benchmark_step_storage -- --ignored --nocapture --test-threads=1
+cargo test -p polykrom-engine --profile ci benchmark_native_cache_save -- --ignored --nocapture --test-threads=1
+cargo test -p polykrom-engine --profile ci benchmark_native_cache_open -- --ignored --nocapture --test-threads=1
 ```
 
 Use an absolute `CARGO_TARGET_DIR`. The save benchmark defaults to the generated
@@ -468,7 +468,7 @@ across edits.
 The reproducible microbenchmark is:
 
 ```sh
-cargo test -p solidcraft-doc --profile ci benchmark_prepared_extrude_sources -- --ignored --nocapture
+cargo test -p polykrom-doc --profile ci benchmark_prepared_extrude_sources -- --ignored --nocapture
 ```
 
 Three Windows x64 optimized `ci` runs, during other compilation, compared the previous
@@ -784,7 +784,7 @@ drag's steps are a quarter of the smallest held size instead of an eighth, excep
 ran out of budget: the rest of that drag goes in eighths, as before, and continuation keeps
 the branch the seed no longer places.
 
-`cargo run --release -p solidcraft-sketch --example solve_bench`, macOS arm64, load average
+`cargo run --release -p polykrom-sketch --example solve_bench`, macOS arm64, load average
 45–75 (best of 5):
 
 | Grid (origin corner fixed, rows horizontal, columns vertical, every edge a distance) | Start | Before | After |

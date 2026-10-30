@@ -63,8 +63,8 @@
             echo "Polykrom: ${driverLibDir pkgs} is missing — on NixOS enable hardware.graphics; on other distributions use a matching nixGL driver wrapper." >&2
           fi
         ''}
-        command -v cc >/dev/null || echo "solidcraft: no C linker on PATH, cargo cannot link — use nix develop .#rust" >&2
-        echo "solidcraft: cargo run --release -p solidcraft -- --sample"
+        command -v cc >/dev/null || echo "polykrom: no C linker on PATH, cargo cannot link — use nix develop .#rust" >&2
+        echo "polykrom: cargo run --release -p polykrom -- --sample"
         ${pkgs.lib.optionalString pkgs.stdenv.isLinux ''
           export XDG_DATA_DIRS="${driverShareDir pkgs}:''${XDG_DATA_DIRS:-/usr/local/share:/usr/share}"
         ''}
@@ -97,18 +97,20 @@
           CARGO_TARGET_DIR = "target/nix";
           shellHook = ''
             ${shellHook pkgs}
-            echo "solidcraft: $(rustc --version), building into target/nix"
+            echo "polykrom: $(rustc --version), building into target/nix"
           '';
         };
       });
 
       packages = forAllSystems (pkgs: rec {
-        default = solidcraft;
-        solidcraft = assert pkgs.lib.assertMsg
+        default = polykrom;
+        # The package's earlier name (#304), so `nix run .#solidcraft` keeps working.
+        solidcraft = polykrom;
+        polykrom = assert pkgs.lib.assertMsg
           (pkgs.lib.versionAtLeast pkgs.rustc.version (pkgs.lib.importTOML ./Cargo.toml).workspace.package.rust-version)
           "Polykrom requires the Rust version advertised in Cargo.toml; update the pinned nixpkgs input.";
           pkgs.rustPlatform.buildRustPackage {
-          pname = "solidcraft";
+          pname = "polykrom";
           version = (pkgs.lib.importTOML ./Cargo.toml).workspace.package.version;
           src = self;
 
@@ -116,15 +118,15 @@
           # The CLI draws the same packaging icons as the other Linux distributions.
           cargoBuildFlags = [
             "-p"
-            "solidcraft"
+            "polykrom"
             "-p"
-            "solidcraft-cli"
+            "polykrom-cli"
           ];
           cargoInstallFlags = [
             "-p"
-            "solidcraft"
+            "polykrom"
             "-p"
-            "solidcraft-cli"
+            "polykrom-cli"
           ];
           # `cargo xtask ci` is the test gate (it wants a wasm target and a GPU); the sandbox has
           # neither.
@@ -158,7 +160,7 @@
 
           meta = {
             description = "Rust-native parametric 3D CAD app";
-            homepage = "https://github.com/bherbruck/solidcraft";
+            homepage = "https://github.com/WCKDai/polykrom";
             license = with pkgs.lib.licenses; [
               mit
               asl20

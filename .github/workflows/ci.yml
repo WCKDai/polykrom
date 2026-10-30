@@ -188,7 +188,7 @@ jobs:
               # What the Windows D3D12 jobs exercise: the GPU crate and its shaders, the app and
               # its startup, the viewport's wgpu glue, the vendored egui-wgpu, their scripts.
               case "$path" in
-                crates/gpu/*|apps/solidcraft/*|crates/ui-egui/src/gpu.rs|vendor/egui-wgpu/*) windows=true ;;
+                crates/gpu/*|apps/polykrom/*|crates/ui-egui/src/gpu.rs|vendor/egui-wgpu/*) windows=true ;;
                 tools/windows-*.ps1|.github/workflows/ci.yml|rust-toolchain*|.cargo/*) windows=true ;;
               esac
             done < "$RUNNER_TEMP/ci-paths"
@@ -202,16 +202,16 @@ jobs:
             # selected means no code changed.
             select_packages "$RUNNER_TEMP/ci-paths"
             if [ "$full" = true ] || [ -n "$packages" ]; then native=true; fi
-            # The goldens are solidcraft-engine tests: its tests must be in the archive.
+            # The goldens are polykrom-engine tests: its tests must be in the archive.
             if [ "$goldens" = true ] && [ "$full" != true ]; then
-              case " $packages " in *" solidcraft-engine "*) ;; *) packages="$packages solidcraft-engine" ;; esac
+              case " $packages " in *" polykrom-engine "*) ;; *) packages="$packages polykrom-engine" ;; esac
             fi
           fi
-          # The reference tests replay recipes through solidcraft-cli: needed when it, or anything
+          # The reference tests replay recipes through polykrom-cli: needed when it, or anything
           # it depends on, is selected.
           oracle=$native
           if [ "$EVENT_NAME" = pull_request ] && [ "$full" != true ]; then
-            case " $packages " in *" solidcraft-cli "*) ;; *) oracle=false ;; esac
+            case " $packages " in *" polykrom-cli "*) ;; *) oracle=false ;; esac
           fi
           # The pull request fast lane: Windows, the reference tests and the doc tests run on main
           # (and the nightly), not on every pull request push; a break there is fixed forward on
@@ -475,11 +475,11 @@ jobs:
           if [ "$EVENT_NAME" != pull_request ]; then
             # The boolean property tests draw new random inputs every run; they run only in the
             # nightly property-tests job, so a known kernel bug cannot turn main red at random.
-            base='not (package(solidcraft-kernel) & binary(boolean_props))'
+            base='not (package(polycore) & binary(boolean_props))'
           elif [ "$GOLDENS" = true ]; then
             # A pull request that can change a robustness golden (tests/robustness/goldens.json)
             # also checks every seed but the slow ones, in the same run so they share its cores.
-            base="(default() & not (binary(action_matrix) & test(=action_matrix_sample))) | (package(solidcraft-engine) & test(/^tests::robustness_goldens::/) & not test(/^tests::robustness_goldens::seed_($SLOW_SEEDS)\$/))"
+            base="(default() & not (binary(action_matrix) & test(=action_matrix_sample))) | (package(polykrom-engine) & test(/^tests::robustness_goldens::/) & not test(/^tests::robustness_goldens::seed_($SLOW_SEEDS)\$/))"
           fi
           junit=${CARGO_TARGET_DIR:-target}/nextest/ci/junit.xml
           rm -f "$junit"
@@ -493,7 +493,7 @@ jobs:
             # A failed golden gets the hint to re-record it (junit.xml lists the failures).
             if [ -f "$junit" ] && tr '\n' ' ' < "$junit" | grep -q '<testcase name="tests::robustness_goldens::[^"]*"[^>]*>[[:space:]]*<failure'; then
               echo "::error::A robustness golden changed. If the new result is intended, re-record it in this pull request and say why:"
-              echo "::error::ROBUSTNESS_GOLDENS_BLESS=\"why it changed\" cargo test --profile ci -p solidcraft-engine --lib robustness_goldens::   (see docs/robustness.md)"
+              echo "::error::ROBUSTNESS_GOLDENS_BLESS=\"why it changed\" cargo test --profile ci -p polykrom-engine --lib robustness_goldens::   (see docs/robustness.md)"
             fi
             exit 1
           fi
@@ -694,7 +694,7 @@ jobs:
         with:
           version: v0.16.0
       - name: Build the command line
-        run: cargo build -p solidcraft-cli --profile ci --locked
+        run: cargo build -p polykrom-cli --profile ci --locked
       - name: Replay tests/oracle and compare with expected.json
         run: cargo xtask oracle --cli "${CARGO_TARGET_DIR:-target}/ci/polykrom-cli"
       - name: Upload the report
@@ -732,7 +732,7 @@ jobs:
       # d3d10warp.dll's JIT optimizer, about 1 run in 60) when several devices compile compute
       # pipelines at once, which the parallel tests do. Minidumps showed it in WARP itself, not
       # in Polykrom or FXC; serial runs never hit it.
-      - run: cargo test -p solidcraft-gpu --profile ci --locked -- --test-threads=1
+      - run: cargo test -p polykrom-gpu --profile ci --locked -- --test-threads=1
 
   # The Windows app starts D3D12 first and only the backend it uses (a Vulkan driver crashed the
   # app at startup on Intel). Start the real app on the runner (its D3D12 adapter is WARP) with
@@ -753,9 +753,9 @@ jobs:
           key: windows-startup
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: Backend order and probing on Windows
-        run: cargo test -p solidcraft --profile ci --locked -- startup::tests native_crash::tests native_frame::tests
+        run: cargo test -p polykrom --profile ci --locked -- startup::tests native_crash::tests native_frame::tests
       - name: Build the app
-        run: cargo build -p solidcraft --profile ci --locked
+        run: cargo build -p polykrom --profile ci --locked
       - name: Start the app under different settings
         shell: pwsh
         run: tools/windows-startup-smoke.ps1 -Exe target/ci/polykrom.exe

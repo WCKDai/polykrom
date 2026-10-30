@@ -5,7 +5,7 @@ agent control that stay aligned with the desktop app, the control channel, and
 [MCP](mcp.md). Implementation lives primarily in
 [craft-libs](https://github.com/storytold/craft-libs) (`craft-tier-store`, `craft-worker-host`,
 `craft-gpu`, `craft-runtime`); Polykrom wires those crates into
-[`apps/solidcraft-web`](../apps/solidcraft-web) and [`files.rs`](../apps/solidcraft-web/src/files.rs)
+[`apps/polykrom-web`](../apps/polykrom-web) and [`files.rs`](../apps/polykrom-web/src/files.rs)
 rather than growing a second stack here.
 
 Related: [plugins.md](plugins.md) and [#1221](https://github.com/bherbruck/solidcraft/issues/1221)
@@ -72,7 +72,7 @@ call the same `run(command, args)` JSON.
 
 | Today | Target |
 |-------|--------|
-| [`files.rs`](../apps/solidcraft-web/src/files.rs) OPFS + `/opfs/` VFS | Warm tier keys; migration keeps existing filenames initially |
+| [`files.rs`](../apps/polykrom-web/src/files.rs) OPFS + `/opfs/` VFS | Warm tier keys; migration keeps existing filenames initially |
 | Recovery autosave | Warm tier, same semantics as [`compatibility.md`](compatibility.md) |
 | [Design containers](design-container.md) content-addressed blobs | Tier keys by hash; cold tier holds large blobs without copying into OPFS |
 | [Control protocol](control-protocol.md) over TCP | Same methods over `MessagePort` to broker headless session (WebMCP-shaped, not a second registry) |

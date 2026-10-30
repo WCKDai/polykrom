@@ -27,7 +27,7 @@ fn settings_history_preserves_geometry_cache_and_dirty_state() {
     assert!(Arc::ptr_eq(&doc, &s.doc));
     assert_eq!(s.revision, revision);
     assert_eq!(s.undo.len(), undo + 1);
-    let restored = solidcraft_doc::Document::from_json(&s.doc.to_json()).unwrap();
+    let restored = polykrom_doc::Document::from_json(&s.doc.to_json()).unwrap();
     assert_eq!(restored.render, s.doc.render);
     s.execute("edit.undo", &json!({})).unwrap();
     assert!(!s.is_dirty());
@@ -69,7 +69,7 @@ fn settings_history_preserves_geometry_cache_and_dirty_state() {
 #[test]
 fn invalid_settings_and_limit_are_atomic() {
     let mut s = Session::default();
-    let mut camera_with_typo = serde_json::to_value(solidcraft_render::Camera::default()).unwrap();
+    let mut camera_with_typo = serde_json::to_value(polykrom_render::Camera::default()).unwrap();
     camera_with_typo["fov_degrees"] = json!(45);
     for patch in [
         json!({"width":0}),

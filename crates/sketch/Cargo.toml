@@ -1,5 +1,5 @@
 [package]
-name = "solidcraft-sketch"
+name = "polykrom-sketch"
 description = "Polykrom sketches: points, curves, geometric constraints and dimensions, the constraint solver, and profile detection"
 version.workspace = true
 edition.workspace = true
@@ -17,7 +17,7 @@ name = "solve_profile"
 required-features = ["solver-profiling"]
 
 [dependencies]
-solidcraft-geom = { workspace = true }
+polycore-geom = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }
 ttf-parser = { workspace = true }

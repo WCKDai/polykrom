@@ -1,6 +1,6 @@
-use solidcraft_geom::{Vec2, Vec3};
-use solidcraft_kernel::measure;
-use solidcraft_sketch::{ConstraintKind, Sketch};
+use polycore::measure;
+use polycore_geom::{Vec2, Vec3};
+use polykrom_sketch::{ConstraintKind, Sketch};
 
 use crate::*;
 
@@ -413,7 +413,7 @@ fn input_sketches_cover_points_and_patches() {
 
 #[test]
 fn timeline_clones_share_meshes_even_when_cloned_before_tessellation() {
-    let body = solidcraft_kernel::box_solid(Vec3::ZERO, Vec3::new(10., 10., 10.)).unwrap();
+    let body = polycore::box_solid(Vec3::ZERO, Vec3::new(10., 10., 10.)).unwrap();
     let a = crate::eval::ModelBody::new("box".into(), body, 1);
     let b = a.clone();
     assert!(std::sync::Arc::ptr_eq(&a.mesh(), &b.mesh()));

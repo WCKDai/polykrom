@@ -1,9 +1,9 @@
 //! Joint origins found by their face's name: a part jointed to a hole stays on it, on the same
 //! side and turned the same way, as the design's parameters change.
 
+use polycore_geom::Vec3;
+use polykrom_doc::joints::{Snap, XRef};
 use serde_json::{Value, json};
-use solidcraft_doc::joints::{Snap, XRef};
-use solidcraft_geom::Vec3;
 
 use super::tests::{occ, place, run};
 use crate::Session;
@@ -146,7 +146,7 @@ fn a_circle_given_by_its_centre_follows_its_hole() {
 fn face_name(s: &mut Session, component: &str, p: Vec3) -> String {
     let st = s.model.state();
     let c = s.doc.find_component(component).unwrap_or(0);
-    solidcraft_doc::joints::face_name_at(&s.doc, &st, c, p, false).unwrap_or_default()
+    polykrom_doc::joints::face_name_at(&s.doc, &st, c, p, false).unwrap_or_default()
 }
 
 #[test]
@@ -195,11 +195,11 @@ fn a_face_centre_by_name_follows_its_face() {
     run(&mut s, "joint.origin", json!({"name": "End", "face": right, "x": [0, 1, 0]}));
     let frame = |s: &Session| {
         let o = s.doc.assembly.origins.iter().find(|o| o.name == "End").map(|o| o.origin.clone());
-        o.and_then(|o| solidcraft_doc::joints::resolve_origin(&s.doc, &s.model.state(), &o).ok())
+        o.and_then(|o| polykrom_doc::joints::resolve_origin(&s.doc, &s.model.state(), &o).ok())
     };
     for w in [300.0, 330.0, 510.0] {
         width(&mut s, w);
-        let m = frame(&s).unwrap_or(solidcraft_doc::IDENTITY);
+        let m = frame(&s).unwrap_or(polykrom_doc::IDENTITY);
         let (o, x, z) = (Vec3::new(m[3][0], m[3][1], m[3][2]), Vec3::new(m[0][0], m[0][1], m[0][2]), Vec3::new(m[2][0], m[2][1], m[2][2]));
         assert!(near(o, Vec3::new(w, 50.0, 0.5)) && near(z, Vec3::X) && near(x, Vec3::Y), "W = {w}: {o:?} {x:?} {z:?}");
     }
@@ -225,7 +225,7 @@ fn an_origin_without_an_end_or_turn_opens_as_before() {
 /// The frame a named joint origin resolves to: its origin and z.
 fn origin_frame(s: &Session, name: &str) -> Option<(Vec3, Vec3)> {
     let o = s.doc.assembly.origins.iter().find(|o| o.name == name)?;
-    let m = solidcraft_doc::joints::resolve_origin(&s.doc, &s.model.state(), &o.origin).ok()?;
+    let m = polykrom_doc::joints::resolve_origin(&s.doc, &s.model.state(), &o.origin).ok()?;
     Some((Vec3::new(m[3][0], m[3][1], m[3][2]), Vec3::new(m[2][0], m[2][1], m[2][2])))
 }
 
@@ -237,11 +237,11 @@ fn a_round_origin_saved_without_an_end_takes_the_end_it_took_before() {
     run(&mut s, "parameters.change", json!({"name": "T", "expression": "5 mm"}));
     run(&mut s, "solid.box", json!({"length": 40, "width": 40, "height": "T", "corner": [0, 0, 0]}));
     run(&mut s, "solid.hole", json!({"position": [20, 20, "T"], "diameter": 6}));
-    let wall = solidcraft_doc::joints::face_name_at(&s.doc, &s.model.state(), 0, Vec3::new(23.0, 20.0, 2.5), true).unwrap_or_default();
+    let wall = polykrom_doc::joints::face_name_at(&s.doc, &s.model.state(), 0, Vec3::new(23.0, 20.0, 2.5), true).unwrap_or_default();
     assert!(!wall.is_empty());
     for (name, z) in [("High", 4.0), ("Low", 1.0)] {
         let saved = json!({"name": name, "origin": {"occurrence": 0, "snap": {"face": wall, "pick": [23.0, 20.0, z], "type": "circle_center"}}});
-        let o: solidcraft_doc::joints::NamedOrigin = serde_json::from_value(saved).unwrap_or_else(|e| panic!("{e}"));
+        let o: polykrom_doc::joints::NamedOrigin = serde_json::from_value(saved).unwrap_or_else(|e| panic!("{e}"));
         s.doc_mut().assembly.origins.push(o);
     }
     let dir = std::env::temp_dir().join(format!("solidcraft-joint-end-tie-{}", std::process::id()));
@@ -271,19 +271,19 @@ fn origins_on_a_body_placed_by_an_offset_agree_named_or_not() {
     let mut s = Session::default();
     run(&mut s, "solid.box", json!({"length": 40, "width": 40, "height": 5, "corner": [0, 0, 0], "body_name": "Plate"}));
     run(&mut s, "solid.hole", json!({"position": [20, 20, 5], "diameter": 6}));
-    let offset = solidcraft_doc::rigid(Vec3::new(7.0, 0.0, 3.0), Vec3::ZERO, Vec3::X, std::f64::consts::FRAC_PI_2);
+    let offset = polykrom_doc::rigid(Vec3::new(7.0, 0.0, 3.0), Vec3::ZERO, Vec3::X, std::f64::consts::FRAC_PI_2);
     s.doc_mut().body_offsets.insert("Plate".into(), offset);
     s.refresh();
-    let at = |p: Vec3| solidcraft_doc::apply_point(&offset, p);
-    let up = solidcraft_doc::apply_vector(&offset, Vec3::Z);
+    let at = |p: Vec3| polykrom_doc::apply_point(&offset, p);
+    let up = polykrom_doc::apply_vector(&offset, Vec3::Z);
     let st = s.model.state();
     let (top_pick, wall_pick) = (at(Vec3::new(10.0, 10.0, 5.0)), at(Vec3::new(23.0, 20.0, 4.0)));
-    let top = solidcraft_doc::joints::face_name_at(&s.doc, &st, 0, top_pick, false);
-    let wall = solidcraft_doc::joints::face_name_at(&s.doc, &st, 0, wall_pick, true);
+    let top = polykrom_doc::joints::face_name_at(&s.doc, &st, 0, top_pick, false);
+    let wall = polykrom_doc::joints::face_name_at(&s.doc, &st, 0, wall_pick, true);
     assert!(top.is_some() && wall.is_some(), "{top:?} {wall:?}");
     let resolve = |snap: Snap| {
-        let o = solidcraft_doc::joints::JointOrigin { occurrence: 0, snap };
-        let m = solidcraft_doc::joints::resolve_origin(&s.doc, &st, &o).unwrap_or_else(|e| panic!("{e}"));
+        let o = polykrom_doc::joints::JointOrigin { occurrence: 0, snap };
+        let m = polykrom_doc::joints::resolve_origin(&s.doc, &st, &o).unwrap_or_else(|e| panic!("{e}"));
         (Vec3::new(m[3][0], m[3][1], m[3][2]), Vec3::new(m[2][0], m[2][1], m[2][2]))
     };
     // The top face's centre: by its name, and by the point alone.
@@ -315,7 +315,7 @@ fn a_round_origin_keeps_its_end_when_the_face_it_opens_onto_gets_other_neighbour
     run(&mut s, "joint.origin", json!({"occurrence": "Plate", "circle": [23, 50, 1.6], "name": "O"}));
     let top = |s: &Session| {
         let o = s.doc.assembly.origins.iter().find(|o| o.name == "O").map(|o| o.origin.clone());
-        o.and_then(|o| solidcraft_doc::joints::resolve_origin(&s.doc, &s.model.state(), &o).ok()).map(|m| (m[3][2], m[2][2]))
+        o.and_then(|o| polykrom_doc::joints::resolve_origin(&s.doc, &s.model.state(), &o).ok()).map(|m| (m[3][2], m[2][2]))
     };
     assert_eq!(top(&s), Some((2.0, 1.0)));
     // Thicker, the pick is nearer the bottom; without the small hole the top piece is named by
@@ -345,7 +345,7 @@ fn a_cut_from_another_component_keeps_a_seated_joint() {
         let body = s.model.state().bodies.iter().find(|b| b.component == tray_comp).map(|b| b.name.clone()).unwrap();
         let names = |s: &Session| {
             let st = s.model.state();
-            let mut n: Vec<String> = solidcraft_doc::naming::face_names(st.body(&body).unwrap()).iter().cloned().collect();
+            let mut n: Vec<String> = polykrom_doc::naming::face_names(st.body(&body).unwrap()).iter().cloned().collect();
             n.sort();
             n
         };
@@ -407,7 +407,7 @@ fn a_cut_late_in_a_long_design_keeps_a_seated_joint() {
     let tray_comp = s.doc.find_component("Tray").unwrap_or(0);
     let body = s.model.state().bodies.iter().find(|b| b.component == tray_comp).map(|b| b.name.clone()).unwrap();
     let names = |s: &Session| {
-        let mut n: Vec<String> = solidcraft_doc::naming::face_names(s.model.state().body(&body).unwrap()).iter().cloned().collect();
+        let mut n: Vec<String> = polykrom_doc::naming::face_names(s.model.state().body(&body).unwrap()).iter().cloned().collect();
         n.sort();
         n
     };
@@ -433,7 +433,7 @@ fn a_cut_late_in_a_long_design_keeps_a_seated_joint() {
     for f in json["features"].as_array_mut().unwrap() {
         f.as_object_mut().unwrap().remove("own_chain_depth");
     }
-    let old = Session::opened(solidcraft_doc::Document::from_json(&json.to_string()).unwrap(), None);
+    let old = Session::opened(polykrom_doc::Document::from_json(&json.to_string()).unwrap(), None);
     assert!(names(&old).iter().all(|n| n.starts_with(&format!("{body}:face:"))), "{:?}", names(&old));
 }
 

@@ -7,10 +7,10 @@ use crate::ui_kit::{choice_row, expr_row, text_row};
 use std::collections::BTreeMap;
 
 use egui::{Pos2, RichText, Sense, Stroke, pos2, vec2};
+use polykrom_engine::Session;
+use polykrom_engine::doc::Mat;
+use polykrom_engine::doc::joints::JointKind;
 use serde_json::{Value, json};
-use solidcraft_engine::Session;
-use solidcraft_engine::doc::Mat;
-use solidcraft_engine::doc::joints::JointKind;
 
 use crate::SolveApp;
 use crate::dialogs::{Dialog, Kind, combo, form_row};
@@ -321,10 +321,10 @@ pub fn table(v: &Value) -> Table {
 }
 
 /// The unit a value of this kind is shown in.
-fn unit_of(k: solidcraft_engine::doc::expr::Kind) -> Option<&'static str> {
+fn unit_of(k: polykrom_engine::doc::expr::Kind) -> Option<&'static str> {
     match k {
-        solidcraft_engine::doc::expr::Kind::Length => Some("mm"),
-        solidcraft_engine::doc::expr::Kind::Angle => Some("deg"),
+        polykrom_engine::doc::expr::Kind::Length => Some("mm"),
+        polykrom_engine::doc::expr::Kind::Angle => Some("deg"),
         _ => None,
     }
 }
@@ -767,7 +767,7 @@ pub fn commands(app: &SolveApp, k: &Mo, inputs: &[SelInput]) -> Result<Vec<(Stri
         Mo::ContactSet { name, .. } => {
             let mut occs: Vec<u64> = Vec::new();
             for x in inputs.first().map(|i| i.items.as_slice()).unwrap_or(&[]) {
-                if let solidcraft_engine::Sel::Body { name } = x
+                if let polykrom_engine::Sel::Body { name } = x
                     && let Some(b) = app.session.world_state().body(name)
                 {
                     let comp = app.session.doc.model_body_component(b);
@@ -811,9 +811,9 @@ mod tests {
     #[test]
     fn shown_poses_are_put_back() {
         let mut app = SolveApp::new(Session::default(), crate::Services::default());
-        app.session.pending_moves.insert(9, solidcraft_engine::doc::IDENTITY);
+        app.session.pending_moves.insert(9, polykrom_engine::doc::IDENTITY);
         let before = app.session.pending_moves.clone();
-        let mut m = solidcraft_engine::doc::IDENTITY;
+        let mut m = polykrom_engine::doc::IDENTITY;
         m[3] = [5.0, 0.0, 0.0, 1.0];
         let shown: BTreeMap<u64, Mat> = [(3, m)].into_iter().collect();
         for (kind, applied, kept) in [("study", true, false), ("explode", false, false), ("explode", true, true)] {
@@ -955,7 +955,7 @@ mod tests {
         click_config_handle(&mut h, "config:save_rule");
         assert!(!h.app.session.doc.configs.rules.is_empty(), "{:?}", h.app.dialog);
         assert!(
-            matches!(&h.app.session.doc.configs.rules[0].condition,solidcraft_engine::doc::config::RuleCondition::All{conditions} if matches!(&conditions[0],solidcraft_engine::doc::config::RuleCondition::Parameter{..})),
+            matches!(&h.app.session.doc.configs.rules[0].condition,polykrom_engine::doc::config::RuleCondition::All{conditions} if matches!(&conditions[0],polykrom_engine::doc::config::RuleCondition::Parameter{..})),
             "{:?}",
             h.app.dialog
         );
@@ -1089,8 +1089,8 @@ mod tests {
         assert!(h.widget("side:outer").is_some());
         assert!(h.widget("side:inner").is_some());
         h.run(&json!([{"widget":"side:outer"},{"widget":"Library"},{"widget":"ABS - Red"},{"widget":"Apply"}])).unwrap();
-        let solidcraft_engine::doc::config::Column::FaceAppearance(target) = &h.app.session.doc.configs.columns[0] else { panic!() };
-        assert!(matches!(&target.certificate, Some(solidcraft_engine::doc::config::FaceCertificate::ExtrudeSide { curve, .. }) if curve == "outer"));
+        let polykrom_engine::doc::config::Column::FaceAppearance(target) = &h.app.session.doc.configs.columns[0] else { panic!() };
+        assert!(matches!(&target.certificate, Some(polykrom_engine::doc::config::FaceCertificate::ExtrudeSide { curve, .. }) if curve == "outer"));
         let state = h.app.session.model.state();
         let body = state.body("Ring").unwrap();
         let indices = h.app.session.doc.configuration_face_indices(body, target).unwrap();
@@ -1186,10 +1186,10 @@ mod tests {
     fn export_animation_saves_the_dialogs_study_as_a_gif() {
         // Drawn as the CLI draws (the headless device), as scenario shots are.
         #[cfg(not(target_arch = "wasm32"))]
-        if solidcraft_engine::capture::installed().is_none() {
-            solidcraft_engine::capture::install(std::sync::Arc::new(|scene, cam, w, h| {
-                let (rgba, renderer) = solidcraft_gpu::capture::headless_rgba(scene, cam, w, h)?;
-                Ok(solidcraft_engine::capture::Picture { rgba, renderer })
+        if polykrom_engine::capture::installed().is_none() {
+            polykrom_engine::capture::install(std::sync::Arc::new(|scene, cam, w, h| {
+                let (rgba, renderer) = polykrom_gpu::capture::headless_rgba(scene, cam, w, h)?;
+                Ok(polykrom_engine::capture::Picture { rgba, renderer })
             }));
         }
         let mut h = crate::scenario::Harness::new();

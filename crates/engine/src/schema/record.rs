@@ -5,7 +5,7 @@
 //! is compiled (so it is linted and tested) but never on.
 //!
 //! ```text
-//! SOLIDCRAFT_PARAM_AUDIT=$PWD/audit cargo test --workspace --no-fail-fast --features solidcraft-engine/param-audit
+//! SOLIDCRAFT_PARAM_AUDIT=$PWD/audit cargo test --workspace --no-fail-fast --features polykrom-engine/param-audit
 //! python3 scripts/param_audit.py audit
 //! ```
 //!

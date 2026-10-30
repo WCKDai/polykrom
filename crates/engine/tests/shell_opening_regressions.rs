@@ -9,8 +9,8 @@
 //!
 //! The shell's volume is the solid's volume less those two boxes. The open face used to be
 //! pushed out past the lower box's top, cutting a strip through that wall.
+use polykrom_engine::Session;
 use serde_json::json;
-use solidcraft_engine::Session;
 
 fn run(s: &mut Session, id: &str, p: serde_json::Value) {
     if let Err(e) = s.execute(id, &p) {
@@ -41,7 +41,7 @@ fn check(s: &Session, want: f64) {
     let b = &st.bodies[0].body;
     assert!(b.validity().is_empty(), "{:?}", b.validity());
     assert_eq!(b.shell_count(), 1, "one shell");
-    let got = solidcraft_kernel::measure(b).map(|m| m.volume).unwrap_or(f64::NAN);
+    let got = polycore::measure(b).map(|m| m.volume).unwrap_or(f64::NAN);
     assert!((got - want).abs() < 1e-6 * want, "shell volume {got}, want {want}");
 }
 

@@ -15,8 +15,8 @@
 
 use std::collections::BTreeMap;
 
+use polycore_geom::{Loop2, Region2, Seg2, Vec2, Vec3};
 use serde::{Deserialize, Serialize};
-use solidcraft_geom::{Loop2, Region2, Seg2, Vec2, Vec3};
 
 use crate::expr::Kind;
 use crate::{DocError, Expr, Result};
@@ -262,7 +262,7 @@ impl crate::walk::Walk for ProfileSpec {
 pub use crate::eval::frame_member::{member_line_ids, member_names};
 
 /// Where a frame member's cross-section comes from.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, solidcraft_derive::Walk)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, polykrom_derive::Walk)]
 #[serde(tag = "source", rename_all = "snake_case")]
 pub enum MemberProfile {
     /// A built-in profile, from its dimensions.

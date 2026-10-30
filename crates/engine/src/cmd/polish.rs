@@ -10,10 +10,10 @@
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
+use polycore_geom::compare::closest_on_triangle;
+use polycore_geom::{Aabb3, Bvh, Mesh, MeshIndex, Vec3};
+use polykrom_doc::ModelBody;
 use serde_json::{Value, json};
-use solidcraft_doc::ModelBody;
-use solidcraft_geom::compare::closest_on_triangle;
-use solidcraft_geom::{Aabb3, Bvh, Mesh, MeshIndex, Vec3};
 
 use super::CommandSpec;
 use super::printability::{AXES, measure};
@@ -199,7 +199,7 @@ fn polish(s: &mut Session, p: &Value) -> Result<Value> {
     // The pairs whose boxes meet.
     // A body whose mesh can't be made is listed as skipped, not judged on nothing.
     let meshes: Vec<std::sync::Arc<Mesh>> =
-        solidcraft_kernel::map_with_local_pools(&shown, usize::MAX, |b| Ok(b.mesh())).into_iter().map(|m| m.unwrap_or_default()).collect();
+        polycore::map_with_local_pools(&shown, usize::MAX, |b| Ok(b.mesh())).into_iter().map(|m| m.unwrap_or_default()).collect();
     let names: Vec<&str> = shown.iter().map(|b| b.name.as_str()).collect();
     skipped.extend(unmeshed(&mut todo, &meshes, &names));
     let tols: Vec<f64> = shown.iter().map(|b| b.display_tol()).collect();
@@ -213,8 +213,7 @@ fn polish(s: &mut Session, p: &Value) -> Result<Value> {
     }
     let used: Vec<usize> =
         todo.iter().flat_map(|i| partners.get(*i).into_iter().flatten().copied()).collect::<BTreeSet<usize>>().into_iter().collect();
-    let built =
-        solidcraft_kernel::map_with_local_pools(&used, usize::MAX, |&i| Ok(meshes.get(i).map(|m| Near::new(m, tols.get(i).copied().unwrap_or(0.0)))));
+    let built = polycore::map_with_local_pools(&used, usize::MAX, |&i| Ok(meshes.get(i).map(|m| Near::new(m, tols.get(i).copied().unwrap_or(0.0)))));
     let mut near: HashMap<usize, Near> = HashMap::new();
     for (i, n) in used.iter().zip(built) {
         if let Some(n) = n? {
@@ -227,7 +226,7 @@ fn polish(s: &mut Session, p: &Value) -> Result<Value> {
     };
     let jobs: Vec<(usize, bool)> = todo.iter().filter_map(|i| Some((*i, filament(shown.get(*i)?)))).collect();
     let report_all = |style: Style| {
-        solidcraft_kernel::map_with_local_pools(&jobs, usize::MAX, |&(i, printed)| {
+        polycore::map_with_local_pools(&jobs, usize::MAX, |&(i, printed)| {
             let (Some(b), Some(m)) = (shown.get(i), meshes.get(i)) else { return Ok(None) };
             let others: Vec<&Near> = partners.get(i).into_iter().flatten().filter_map(|j| near.get(j)).collect();
             let taps: Vec<(Vec3, Vec3)> = st
@@ -450,11 +449,9 @@ fn body_report(b: &ModelBody, m: &Mesh, others: &[&Near], printed: bool, sharp: 
     let mut blend = vec![false; nf];
     for f in 0..nf {
         if planar.get(f).copied().flatten().is_none() && tangent.get(f).copied().unwrap_or(0) >= 2 {
-            let r = match solidcraft_kernel::face_surface(&b.body, f) {
-                Some(solidcraft_kernel::FaceSurface::Cylinder { radius, .. }) | Some(solidcraft_kernel::FaceSurface::Sphere { radius, .. }) => {
-                    Some(radius)
-                }
-                Some(solidcraft_kernel::FaceSurface::Torus { minor, .. }) => Some(minor),
+            let r = match polycore::face_surface(&b.body, f) {
+                Some(polycore::FaceSurface::Cylinder { radius, .. }) | Some(polycore::FaceSurface::Sphere { radius, .. }) => Some(radius),
+                Some(polycore::FaceSurface::Torus { minor, .. }) => Some(minor),
                 _ => None,
             };
             if let (Some(r), Some(x)) = (r, blend.get_mut(f)) {
@@ -474,10 +471,8 @@ fn body_report(b: &ModelBody, m: &Mesh, others: &[&Near], printed: bool, sharp: 
             all.iter().filter(|e| e.convex && e.faces.contains(&f) && (CHAMFER_DEG.0..=CHAMFER_DEG.1).contains(&e.angle)).collect();
         let across = bevel_edges.iter().filter_map(|e| e.faces.iter().find(|g| **g != f)).map(|g| strip(*g)).fold(0.0, f64::max);
         // Flat, or a cone: the chamfer round a hole's or a cylinder's rim.
-        let flat_or_cone = || {
-            planar.get(f).copied().flatten().is_some()
-                || matches!(solidcraft_kernel::face_surface(&b.body, f), Some(solidcraft_kernel::FaceSurface::Cone { .. }))
-        };
+        let flat_or_cone =
+            || planar.get(f).copied().flatten().is_some() || matches!(polycore::face_surface(&b.body, f), Some(polycore::FaceSurface::Cone { .. }));
         if bevel_edges.len() >= 2 && w(f) < 0.2 * size && strip(f) < 0.5 * across && flat_or_cone() {
             blend.get_mut(f).into_iter().for_each(|x| *x = true);
             chamfers.push(round(strip(f)));
@@ -688,8 +683,8 @@ fn body_report(b: &ModelBody, m: &Mesh, others: &[&Near], printed: bool, sharp: 
     }
     // Fixes pick edges where they are shown, as an agent sees them; a command run on its own maps
     // them into the body's own frame (crate::frames). Placements of one part share `own`.
-    let to_own = solidcraft_doc::mat_inverse(&b.source_transform).unwrap_or(solidcraft_doc::IDENTITY);
-    let own = |p: Vec3| solidcraft_doc::apply_point(&to_own, p);
+    let to_own = polykrom_doc::mat_inverse(&b.source_transform).unwrap_or(polykrom_doc::IDENTITY);
+    let own = |p: Vec3| polykrom_doc::apply_point(&to_own, p);
     let mut groups: BTreeMap<(&'static str, i64), Vec<(Vec3, f64, Vec3)>> = BTreeMap::new();
     // The chamfer size a faceted body already uses most, to keep to it.
     let usual = bevel_family.iter().max_by(|a, b| a.1.cmp(&b.1).then(b.0.total_cmp(&a.0))).map(|(c, _)| *c);
@@ -715,7 +710,7 @@ fn body_report(b: &ModelBody, m: &Mesh, others: &[&Near], printed: bool, sharp: 
         let d = if w(e.faces[0]).min(w(e.faces[1])) > 2.5 { 0.5 } else { 0.3 };
         groups.entry(("chamfer", (d * 1000.0) as i64)).or_default().push((e.mid, e.length, own(e.mid)));
     }
-    let names = if exposed.is_empty() { Vec::new() } else { solidcraft_doc::naming::edge_names(b) };
+    let names = if exposed.is_empty() { Vec::new() } else { polykrom_doc::naming::edge_names(b) };
     let mut longest = exposed.clone();
     longest.sort_by(|x, y| y.length.total_cmp(&x.length).then(x.index.cmp(&y.index)));
     let listed: Vec<Value> = longest
@@ -797,7 +792,7 @@ fn tight_holes(b: &ModelBody, m: &Mesh, nf: usize, planar: &[Option<Vec3>], taps
     // By size, the holes' axes (a hole in two halves is one hole).
     let mut found: BTreeMap<(i64, i64), BTreeSet<[i64; 3]>> = BTreeMap::new();
     for (f, vs) in corners.iter().enumerate().filter(|(_, v)| !v.is_empty()) {
-        let Some(solidcraft_kernel::FaceSurface::Cylinder { origin, axis, radius }) = solidcraft_kernel::face_surface(&b.body, f) else { continue };
+        let Some(polycore::FaceSurface::Cylinder { origin, axis, radius }) = polycore::face_surface(&b.body, f) else { continue };
         let at = |v: &u32| Some((*m.positions.get(*v as usize)?, *m.normals.get(*v as usize)?));
         let Some((p, np)) = vs.first().and_then(at) else { continue };
         let far = vs.iter().filter_map(at).max_by(|x, y| x.0.dist(p).total_cmp(&y.0.dist(p)));
@@ -1007,7 +1002,7 @@ mod tests {
 
     #[test]
     fn a_body_without_a_mesh_is_skipped_not_scored() {
-        let cube = solidcraft_kernel::box_solid(Vec3::ZERO, Vec3::new(1.0, 1.0, 1.0)).and_then(|b| b.tessellate(0.01)).unwrap();
+        let cube = polycore::box_solid(Vec3::ZERO, Vec3::new(1.0, 1.0, 1.0)).and_then(|b| b.tessellate(0.01)).unwrap();
         let meshes = vec![std::sync::Arc::new(cube), std::sync::Arc::new(Mesh::default())];
         let mut todo = vec![0, 1];
         let skipped = unmeshed(&mut todo, &meshes, &["Good", "Broken"]);

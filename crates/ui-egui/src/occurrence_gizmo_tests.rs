@@ -3,8 +3,8 @@ use crate::{
     context_menu::{self, Target},
     scenario::Harness,
 };
+use polykrom_engine::{Sel, doc, geom::Vec3};
 use serde_json::json;
-use solidcraft_engine::{Sel, doc, geom::Vec3};
 
 #[test]
 fn occurrence_gizmo_drag_matches_numeric_input_and_preserves_joints_capture_and_undo() {

@@ -1,7 +1,7 @@
 //! Reduced diagnostics must preserve placement, rollback, feasibility and exact freedom results.
 
-use solidcraft_geom::Vec2;
-use solidcraft_sketch::{Analysis, ConstraintKind, Hold, Sketch, solve_with};
+use polycore_geom::Vec2;
+use polykrom_sketch::{Analysis, ConstraintKind, Hold, Sketch, solve_with};
 
 fn compare(sketch: &Sketch, hold: &Hold) {
     let mut full_geometry = sketch.clone();

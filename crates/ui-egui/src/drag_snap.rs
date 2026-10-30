@@ -7,9 +7,9 @@
 use std::cell::{Cell, RefCell};
 
 use egui::{Align2, FontId, Shape, Stroke};
+use polykrom_engine::geom::Vec2;
+use polykrom_engine::sketch::{CurveKind, Sketch};
 use serde_json::{Value, json};
-use solidcraft_engine::geom::Vec2;
-use solidcraft_engine::sketch::{CurveKind, Sketch};
 
 use crate::SolveApp;
 use crate::theme::Tokens;
@@ -90,7 +90,7 @@ pub fn find(sk: &Sketch, moving: &[(usize, Vec2)], exclude: &[usize], mm_px: f64
         return keep(None);
     }
     let id = |i: usize| sk.points.get(i).map(|p| p.id.clone()).unwrap_or_default();
-    let visible = solidcraft_engine::view::SketchPointVisibility::new(sk);
+    let visible = polykrom_engine::view::SketchPointVisibility::new(sk);
     let targets: Vec<(usize, Vec2)> =
         sk.points.iter().enumerate().filter(|(i, p)| !exclude.contains(i) && visible.takes(p)).map(|(i, p)| (i, p.pos)).collect();
     let free_curves: Vec<usize> =

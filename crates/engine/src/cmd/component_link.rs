@@ -10,8 +10,8 @@
 
 use std::path::{Component as PathPart, Path, PathBuf};
 
+use polykrom_doc::{DesignLink, Document, FeatureKind};
 use serde_json::{Value, json};
-use solidcraft_doc::{DesignLink, Document, FeatureKind};
 
 use super::CommandSpec;
 use crate::params::{bad, str_, vec3};
@@ -125,7 +125,7 @@ pub(super) fn rebased(doc: &Document, from: Option<&str>, to: &str) -> std::coll
 
 /// The bodies of a linked design: its name, the Import feature that holds them and the names
 /// the design gives their faces (`Feature::link_faces`).
-type Linked = (String, solidcraft_io::StepFeature, Vec<Vec<String>>);
+type Linked = (String, polykrom_io::StepFeature, Vec<Vec<String>>);
 
 /// The solid bodies of the design at `file`, evaluated, as an Import feature.
 fn linked_bodies(file: &Path, own: Option<&str>) -> Result<Linked> {
@@ -133,8 +133,8 @@ fn linked_bodies(file: &Path, own: Option<&str>) -> Result<Linked> {
     if own.is_some_and(|o| absolute(Path::new(o)) == absolute(file)) {
         return Err(EngineError::Other(format!("{shown}: a design can't be linked into itself")));
     }
-    let bytes = solidcraft_io::vfs::read(&shown, solidcraft_io::MAX_DESIGN_BYTES).map_err(|e| EngineError::Other(format!("{shown}: {e}")))?;
-    let doc = solidcraft_io::read_design(&bytes).map_err(|e| EngineError::Other(format!("{shown}: {e}")))?;
+    let bytes = polykrom_io::vfs::read(&shown, polykrom_io::MAX_DESIGN_BYTES).map_err(|e| EngineError::Other(format!("{shown}: {e}")))?;
+    let doc = polykrom_io::read_design(&bytes).map_err(|e| EngineError::Other(format!("{shown}: {e}")))?;
     session_bodies(&Session::new(doc), &shown)
 }
 
@@ -149,15 +149,15 @@ fn session_bodies(part: &Session, shown: &str) -> Result<Linked> {
     if solids.is_empty() {
         return Err(EngineError::Other(format!("{shown}: the design has no solid bodies to link")));
     }
-    let step = solidcraft_io::export(&part.doc.painted(&world), &solids, solidcraft_io::Format::Step, &name)
+    let step = polykrom_io::export(&part.doc.painted(&world), &solids, polykrom_io::Format::Step, &name)
         .map_err(|e| EngineError::Other(format!("{shown}: {e}")))?;
-    let mut feature = solidcraft_io::step_import_feature(&step, shown).map_err(|e| EngineError::Other(format!("{shown}: {e}")))?;
+    let mut feature = polykrom_io::step_import_feature(&step, shown).map_err(|e| EngineError::Other(format!("{shown}: {e}")))?;
     if world.bodies.len() > solids.len() {
         feature.warnings.push(format!("{} mesh bodies of {shown} are not linked", world.bodies.len() - solids.len()));
     }
     // The STEP text keeps no face names: carry the design's own, so references into the linked
     // bodies follow them as they do inside the design (#3330).
-    let faces = solidcraft_doc::naming::carried_face_names(&world, &feature.import.bodies);
+    let faces = polykrom_doc::naming::carried_face_names(&world, &feature.import.bodies);
     Ok((name, feature, faces))
 }
 
@@ -174,7 +174,7 @@ fn insert_design(s: &mut Session, p: &Value) -> Result<Value> {
     let cmd = "component.insert_design";
     let given = str_(p, "path").filter(|x| !x.trim().is_empty() && x.len() < 4096).ok_or_else(|| bad(cmd, "`path` is required"))?;
     let translate = match p.get("translate") {
-        None => solidcraft_geom::Vec3::ZERO,
+        None => polycore_geom::Vec3::ZERO,
         Some(v) => vec3(v).filter(|t| t.is_finite() && t.len() < 1e9).ok_or_else(|| bad(cmd, "`translate` must be [x, y, z] in mm"))?,
     };
     let file = absolute(Path::new(given));
@@ -285,7 +285,7 @@ fn update_links(s: &mut Session, p: &Value) -> Result<Value> {
     }
     // A reference whose face the design no longer has says so here, not only in the joint list.
     if !updated.is_empty() {
-        let sol = solidcraft_doc::joints::solve(&s.doc, &s.model.state());
+        let sol = polykrom_doc::joints::solve(&s.doc, &s.model.state());
         warnings.extend(sol.errors.iter().chain(&sol.conflicts).map(|(_, name, why)| format!("joint {name}: {why}")));
     }
     Ok(json!({"updated": updated, "unchanged": unchanged, "warnings": warnings}))
@@ -296,9 +296,9 @@ fn update_links(s: &mut Session, p: &Value) -> Result<Value> {
 /// an update can give to another face.
 fn numbered_references(s: &Session, comp: u64, feature: u64) -> Vec<String> {
     let numbered = format!("F{feature}:face:");
-    let on = |o: &solidcraft_doc::joints::JointOrigin| {
+    let on = |o: &polykrom_doc::joints::JointOrigin| {
         s.doc.occurrences.iter().any(|x| x.id == o.occurrence && x.component == comp)
-            && o.snap.face_names().iter().any(|n| n.trim_start_matches(solidcraft_doc::naming::LEGACY_MARK).starts_with(&numbered))
+            && o.snap.face_names().iter().any(|n| n.trim_start_matches(polykrom_doc::naming::LEGACY_MARK).starts_with(&numbered))
     };
     let joints = s.doc.assembly.joints.iter().filter(|j| on(&j.a) || on(&j.b)).map(|j| format!("joint {}", j.name));
     let origins = s.doc.assembly.origins.iter().filter(|o| on(&o.origin)).map(|o| format!("joint origin {}", o.name));
@@ -314,7 +314,7 @@ fn relink(s: &mut Session, p: &Value) -> Result<Value> {
     }
     let given = str_(p, "path").filter(|x| !x.trim().is_empty() && x.len() < 4096).ok_or_else(|| bad(cmd, "`path` is required"))?;
     let file = absolute(Path::new(given));
-    if !file.extension().and_then(|e| e.to_str()).is_some_and(|e| solidcraft_io::DESIGN_EXTS.iter().any(|x| e.eq_ignore_ascii_case(x))) {
+    if !file.extension().and_then(|e| e.to_str()).is_some_and(|e| polykrom_io::DESIGN_EXTS.iter().any(|x| e.eq_ignore_ascii_case(x))) {
         return Err(bad(cmd, "choose a saved .solidcraft design"));
     }
     // The ordinary lexical check in linked_bodies also works in the browser VFS. On native
@@ -356,7 +356,7 @@ fn relink(s: &mut Session, p: &Value) -> Result<Value> {
     }
     // Report the solver's diagnostics. A resolved joint can still describe the wrong
     // connection after a source edit; the reminder above does not depend on solve errors.
-    let sol = solidcraft_doc::joints::solve(&s.doc, &s.model.state());
+    let sol = polykrom_doc::joints::solve(&s.doc, &s.model.state());
     let diagnostics =
         |rows: &[(u64, String, String)]| rows.iter().map(|(id, name, why)| json!({"joint": id, "name": name, "why": why})).collect::<Vec<_>>();
     for (_, name, why) in sol.errors.iter().chain(&sol.conflicts) {

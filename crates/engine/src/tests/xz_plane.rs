@@ -90,7 +90,7 @@ fn format_5_xz_design_opens_where_it_was_saved() {
     let resaved = dir.join("resaved.solidcraft");
     run(&mut old, "file.save_as", json!({"path": resaved.to_string_lossy(), "format": "json"}));
     let text = std::fs::read_to_string(&resaved).unwrap();
-    assert!(text.contains(&format!("\"solidcraft/{}\"", solidcraft_doc::format::FORMAT)), "resaved at the current format");
+    assert!(text.contains(&format!("\"solidcraft/{}\"", polykrom_doc::format::FORMAT)), "resaved at the current format");
     let mut again = Session::default();
     run(&mut again, "doc.open", json!({"path": resaved.to_string_lossy()}));
     expect(&bodies(&mut again), &want);

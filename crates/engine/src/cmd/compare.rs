@@ -1,12 +1,12 @@
 //! Compare Bodies: two versions of one part laid over each other. Both are measured, each
 //! surface's distance to the other is sampled, and the places where only one of them has
 //! material are found, measured and, on request, coloured. It works from the surfaces
-//! ([`solidcraft_geom::compare`]), not from a boolean of the two bodies, so bodies that share
+//! ([`polycore_geom::compare`]), not from a boolean of the two bodies, so bodies that share
 //! almost every face compare as well as any.
 
+use polycore_geom::Vec3;
+use polycore_geom::compare::{self, CompareOptions, Side};
 use serde_json::{Value, json};
-use solidcraft_geom::Vec3;
-use solidcraft_geom::compare::{self, CompareOptions, Side};
 
 use super::CommandSpec;
 use crate::params::bad;
@@ -46,7 +46,7 @@ fn number(cmd: &str, p: &Value, key: &str, default: f64, range: std::ops::RangeI
 }
 
 /// The two bodies: `a` and `b`, else the two selected bodies, else the design's only two.
-fn pair(s: &Session, st: &solidcraft_doc::ModelState, p: &Value, cmd: &str) -> Result<(String, String)> {
+fn pair(s: &Session, st: &polykrom_doc::ModelState, p: &Value, cmd: &str) -> Result<(String, String)> {
     let given = |k: &str| -> Result<Option<String>> {
         match p.get(k) {
             None | Some(Value::Null) => Ok(None),
@@ -118,14 +118,14 @@ fn difference(ma: &Value, mb: &Value) -> Value {
 }
 
 /// The volume a closed mesh encloses (divergence theorem, about its box's centre).
-fn enclosed_volume(m: &solidcraft_geom::Mesh) -> f64 {
+fn enclosed_volume(m: &polycore_geom::Mesh) -> f64 {
     let o = m.bounds().center();
     m.triangles.iter().filter_map(|t| m.tri(t)).map(|[a, b, c]| (a - o).dot((b - o).cross(c - o)) / 6.0).sum()
 }
 
 /// What makes the comparison less certain: a body whose surface does not enclose what it
 /// measures (open, or faces that failed), lines left out of region volumes.
-fn warnings(bodies: [(&str, &Value, &solidcraft_geom::Mesh); 2], chord: f64, c: &compare::Comparison) -> Vec<String> {
+fn warnings(bodies: [(&str, &Value, &polycore_geom::Mesh); 2], chord: f64, c: &compare::Comparison) -> Vec<String> {
     let mut out = Vec::new();
     for (name, measure, mesh) in bodies {
         let (Some(v), area) = (measure["volume_mm3"].as_f64(), measure["area_mm2"].as_f64().unwrap_or(0.0)) else { continue };
@@ -161,10 +161,10 @@ fn compare_bodies(s: &mut Session, p: &Value) -> Result<Value> {
     // Meshed within a quarter of the tolerance (the kernel goes no finer than a millionth of a
     // body's size), so two meshes of one surface agree well within it.
     let chord = tolerance / 4.0;
-    let mut done = solidcraft_kernel::map_on_threads(&[ba, bb], 2, |b| (super::inspect::measure_json(b), b.body.tessellate_with(chord, true)))
+    let mut done = polycore::map_on_threads(&[ba, bb], 2, |b| (super::inspect::measure_json(b), b.body.tessellate_with(chord, true)))
         .into_iter()
         .zip([&na, &nb]);
-    let mut next = || -> Result<(Value, solidcraft_geom::Mesh)> {
+    let mut next = || -> Result<(Value, polycore_geom::Mesh)> {
         let Some((r, name)) = done.next() else { return Err(bad(cmd, "no such body")) };
         let (m, mesh) = r.ok_or_else(|| bad(cmd, format!("`{name}`: measuring it failed")))?;
         let mesh = mesh.map_err(|e| bad(cmd, format!("`{name}`: {e}")))?;
@@ -177,7 +177,7 @@ fn compare_bodies(s: &mut Session, p: &Value) -> Result<Value> {
     let options = CompareOptions { tolerance, spacing, max_points, max_regions, ..CompareOptions::default() };
     let each = |n: usize, job: &(dyn Fn(usize) + Sync)| {
         let jobs: Vec<usize> = (0..n).collect();
-        solidcraft_kernel::for_each_on_threads(&jobs, 16, |i| job(*i));
+        polycore::for_each_on_threads(&jobs, 16, |i| job(*i));
     };
     let c = compare::compare(&mesh_a, &mesh_b, &options, &each);
     let axis = |k: usize| ["X", "Y", "Z"].get(k).copied().unwrap_or("?");
@@ -269,12 +269,12 @@ fn faces_to_color(c: &compare::Comparison, r: &compare::Region) -> Vec<(usize, u
 /// Give the faces holding each region the colour of its side (a face holding several takes the
 /// largest one's); returns how many face appearances were set.
 fn color_regions(s: &mut Session, c: &compare::Comparison, names: [&String; 2], colors: [[u8; 3]; 2]) -> Result<usize> {
-    use solidcraft_doc::appearance::{FaceLook, Look};
+    use polykrom_doc::appearance::{FaceLook, Look};
     let st = s.model.state();
     // Where each face of the two bodies is, as the design file names and finds it. A body placed
     // by an occurrence is coloured where it is defined, if at all.
     let found: Vec<_> =
-        names.iter().map(|n| st.body(n).map(|b| (solidcraft_doc::naming::face_spots(b), solidcraft_doc::naming::face_names(b)))).collect();
+        names.iter().map(|n| st.body(n).map(|b| (polykrom_doc::naming::face_spots(b), polykrom_doc::naming::face_names(b)))).collect();
     let mut picks: Vec<(String, Vec3, Option<String>, Look)> = Vec::new();
     // Smallest region first, so the largest one's colour is the one that stays.
     for r in c.regions.iter().rev() {

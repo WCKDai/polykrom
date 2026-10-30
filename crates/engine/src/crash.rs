@@ -4,7 +4,7 @@
 //! - **Panics** are caught by a hook. One inside a command becomes a report with the design as
 //!   it was before the command and the command itself, so `polykrom-cli run replay.json --in
 //!   design.solidcraft` reproduces it. Panics the third-party kernel raises (and
-//!   `solidcraft_kernel::guard` turns into errors) are reported the same way, marked recovered.
+//!   `polycore::guard` turns into errors) are reported the same way, marked recovered.
 //! - **Crashes no hook sees** (an abort, a stack overflow, a segfault, the process being killed)
 //!   are found at the next start: every running app keeps a small, locked command journal; a
 //!   journal nobody holds any more belongs to an app that died. Its report carries the design
@@ -36,8 +36,8 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Mutex, OnceLock};
 
+use polykrom_doc::Document;
 use serde_json::{Value, json};
-use solidcraft_doc::Document;
 
 use crate::Session;
 
@@ -134,7 +134,7 @@ pub fn default_dir() -> Option<PathBuf> {
     if cfg!(test) {
         return Some(std::env::temp_dir().join(format!("solidcraft-test-crashes-{}", std::process::id())));
     }
-    if let Some(d) = solidcraft_geom::env::var_os("CRASH_DIR").filter(|d| !d.is_empty()) {
+    if let Some(d) = polycore_geom::env::var_os("CRASH_DIR").filter(|d| !d.is_empty()) {
         return Some(PathBuf::from(d));
     }
     crate::recovery::default_dir().and_then(|d| d.parent().map(|p| p.join("crashes")))
@@ -418,7 +418,7 @@ fn hook(info: &std::panic::PanicHookInfo<'_>) -> bool {
     let message = limited(info.payload_as_str().unwrap_or("(not a text message)"), MAX_MESSAGE);
     let location = info.location().map_or_else(|| "(unknown)".to_string(), |l| format!("{}:{}", l.file(), l.line()));
     let sig = signature(&location, &message);
-    let recovered = solidcraft_kernel::guarded();
+    let recovered = polycore::guarded();
     let in_command = IN_COMMAND.with(Cell::get) > 0;
     // Already reported (this run or before): count it, nothing else.
     let repeat = match state.known.lock() {
@@ -530,7 +530,7 @@ pub(crate) fn command_done(
     let pending: Vec<Panic> = PENDING.with(|q| std::mem::take(&mut *q.borrow_mut()));
     for p in pending {
         let kind = if p.recovered { "kernel_panic_recovered" } else { "command_panic" };
-        let design = solidcraft_io::write_design(before);
+        let design = polykrom_io::write_design(before);
         let replay = json!({ "commands": [{ "command": id, "params": params }] });
         let recent = if journaled { read_live_journal(state).recent } else { Vec::new() };
         let extra = Extra {
@@ -964,7 +964,7 @@ fn write_report(state: &State, kind: &str, p: Option<&Panic>, extra: Extra) -> O
         let mut notes = extra.notes;
         if let Some(d) = &extra.design {
             if d.len() <= MAX_DESIGN_BYTES {
-                if solidcraft_io::write_atomic(&folder.join("design.solidcraft"), d, false).is_ok() {
+                if polykrom_io::write_atomic(&folder.join("design.solidcraft"), d, false).is_ok() {
                     files.insert("design".into(), json!("design.solidcraft"));
                 }
             } else {
@@ -973,7 +973,7 @@ fn write_report(state: &State, kind: &str, p: Option<&Panic>, extra: Extra) -> O
         }
         if let Some(r) = &extra.replay
             && let Ok(b) = serde_json::to_vec_pretty(r)
-            && solidcraft_io::write_atomic(&folder.join("replay.json"), &b, false).is_ok()
+            && polykrom_io::write_atomic(&folder.join("replay.json"), &b, false).is_ok()
         {
             files.insert("replay".into(), json!("replay.json"));
         }
@@ -1017,7 +1017,7 @@ fn write_report(state: &State, kind: &str, p: Option<&Panic>, extra: Extra) -> O
             }
         }
         let bytes = serde_json::to_vec_pretty(&report).ok()?;
-        solidcraft_io::write_atomic(&folder.join("report.json"), &bytes, false).ok()?;
+        polykrom_io::write_atomic(&folder.join("report.json"), &bytes, false).ok()?;
         prune(&state.dir, t);
         return Some(id);
     }
@@ -1035,7 +1035,7 @@ fn bump(dir: &Path, id: &str, n: u64) {
     v["count"] = json!(count);
     v["last_seen"] = json!(utc(now()));
     if let Ok(b) = serde_json::to_vec_pretty(&v) {
-        let _ = solidcraft_io::write_atomic(&path, &b, false);
+        let _ = polykrom_io::write_atomic(&path, &b, false);
     }
 }
 

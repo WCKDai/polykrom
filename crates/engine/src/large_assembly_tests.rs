@@ -4,12 +4,12 @@
 //! that grow with the number of bodies after every feature show up (#255, #662).
 //!
 //! The test keeps it small. The benchmark times the open phases at any size:
-//! `SOLIDCRAFT_BENCH_PARTS=400 cargo test --release -p solidcraft-engine bench_generated_assembly -- --ignored --nocapture`
+//! `SOLIDCRAFT_BENCH_PARTS=400 cargo test --release -p polykrom-engine bench_generated_assembly -- --ignored --nocapture`
 
+use polycore_geom::Vec3;
+use polykrom_doc::BodyName;
+use polykrom_doc::{Document, FeatureKind, Operation, mat_inverse, point_expr, rigid};
 use serde_json::json;
-use solidcraft_doc::BodyName;
-use solidcraft_doc::{Document, FeatureKind, Operation, mat_inverse, point_expr, rigid};
-use solidcraft_geom::Vec3;
 
 use crate::Session;
 
@@ -17,7 +17,7 @@ use crate::Session;
 fn generated_assembly(parts: usize) -> Document {
     let mut doc = Document::new("generated assembly");
     let groups = parts.div_ceil(4).max(1);
-    let comps: Vec<(u64, solidcraft_doc::Mat)> = (0..groups)
+    let comps: Vec<(u64, polykrom_doc::Mat)> = (0..groups)
         .map(|g| {
             let id = doc.add_component(Some(&format!("Module {g}")), 0).unwrap();
             let m = rigid(Vec3::new(5.0 * g as f64, -3.0, 2.0), Vec3::ZERO, Vec3::Z, 0.1 * g as f64);
@@ -25,7 +25,7 @@ fn generated_assembly(parts: usize) -> Document {
             (id, m)
         })
         .collect();
-    let mm = |v: f64| solidcraft_doc::Expr::new(format!("{v} mm"));
+    let mm = |v: f64| polykrom_doc::Expr::new(format!("{v} mm"));
     let mut made = Vec::new();
     for i in 0..parts {
         let o = Vec3::new(30.0 * (i % 20) as f64, 30.0 * (i / 20) as f64, 0.0);
@@ -34,7 +34,7 @@ fn generated_assembly(parts: usize) -> Document {
         for (k, x) in [2.0, 9.0, 16.0].into_iter().enumerate() {
             let pin = FeatureKind::Cylinder {
                 base: point_expr(o + Vec3::new(x, 20.0, 0.0)),
-                axis: solidcraft_doc::Dir(Vec3::Z),
+                axis: polykrom_doc::Dir(Vec3::Z),
                 radius: mm(1.5),
                 height: mm(4.0 + k as f64),
                 operation: Operation::NewBody,
@@ -90,7 +90,7 @@ fn generated_assembly_opens_with_every_body_in_place() {
         }
     }
     // A saved copy opens to the same model.
-    let reopened = solidcraft_io::read_design(&solidcraft_io::write_design(&doc)).unwrap();
+    let reopened = polykrom_io::read_design(&polykrom_io::write_design(&doc)).unwrap();
     assert_eq!(measured(&mut Session::new(reopened)), after);
 }
 
@@ -99,10 +99,10 @@ fn generated_assembly_opens_with_every_body_in_place() {
 #[ignore = "benchmark: run with --release --ignored --nocapture"]
 fn bench_generated_assembly() {
     let parts = std::env::var("SOLIDCRAFT_BENCH_PARTS").ok().and_then(|v| v.parse().ok()).unwrap_or(200);
-    let bytes = solidcraft_io::write_design(&generated_assembly(parts));
+    let bytes = polykrom_io::write_design(&generated_assembly(parts));
     let ms = |t: std::time::Instant| t.elapsed().as_secs_f64() * 1000.0;
     let t = std::time::Instant::now();
-    let doc = solidcraft_io::read_design(&bytes).unwrap();
+    let doc = polykrom_io::read_design(&bytes).unwrap();
     let parse = ms(t);
     let t = std::time::Instant::now();
     let s = Session::new(doc);

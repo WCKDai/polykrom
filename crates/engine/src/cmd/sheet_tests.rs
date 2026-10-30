@@ -60,7 +60,7 @@ fn plain_solid_sheet_operations_explain_how_to_start_sheet_metal() {
 
 #[test]
 fn side_edge_flanges_across_a_bend_keep_their_relief_through_rebuild_and_reopen() {
-    use solidcraft_geom::Vec3;
+    use polycore_geom::Vec3;
 
     for shape in ["round", "rectangular"] {
         for reverse in [false, true] {
@@ -75,7 +75,7 @@ fn side_edge_flanges_across_a_bend_keep_their_relief_through_rebuild_and_reopen(
             let sheet = &s.model.state().sheets[0];
             let parent = &sheet.flanges[0];
             let point = parent.p + parent.d * parent.len + parent.n * (sheet.allowance(parent) + parent.leg * 0.5);
-            let side = solidcraft_doc::apply_point(&sheet.world(Some(0)), Vec3::new(point.x, point.y, sheet.t));
+            let side = polykrom_doc::apply_point(&sheet.world(Some(0)), Vec3::new(point.x, point.y, sheet.t));
             let mut edges = vec![json!([120, 45, 2]), json!([side.x, side.y, side.z])];
             if reverse {
                 edges.reverse();
@@ -100,12 +100,12 @@ fn side_edge_flanges_across_a_bend_keep_their_relief_through_rebuild_and_reopen(
                 run(&mut s, command, json!({}));
                 assert!((volume(&mut s) - formed).abs() < formed * 1e-3);
             }
-            let mut reopened = Session::new(solidcraft_doc::Document::from_json(&s.doc.to_json()).unwrap());
+            let mut reopened = Session::new(polykrom_doc::Document::from_json(&s.doc.to_json()).unwrap());
             assert!(no_errors_or_warnings(&reopened), "{:?}", reopened.model.results);
             assert!((volume(&mut reopened) - formed).abs() < 1e-6);
             assert_eq!(flat(&mut reopened), pattern);
             let dxf = run(&mut reopened, "sheet.export_dxf", json!({}))["dxf"].as_str().unwrap().to_owned();
-            assert!(!solidcraft_io::read_dxf(&dxf).unwrap().is_empty());
+            assert!(!polykrom_io::read_dxf(&dxf).unwrap().is_empty());
         }
     }
 }
@@ -123,7 +123,7 @@ fn shallow_sheet_pocket_preserves_material_depth_export_undo_and_reopen() {
     assert_eq!(f["pockets"][0]["depth_mm"], 1.0);
     let dxf = run(&mut s, "sheet.export_dxf", json!({}))["dxf"].as_str().unwrap().to_string();
     assert!(dxf.contains("POCKET_BOTTOM_Z0.000000_TO_1.000000_MM"));
-    assert_eq!(solidcraft_io::read_dxf(&dxf).unwrap().len(), 8);
+    assert_eq!(polykrom_io::read_dxf(&dxf).unwrap().len(), 8);
     run(&mut s, "edit.undo", json!({}));
     assert!((volume(&mut s) - 15000.0).abs() < 1e-6);
     run(&mut s, "edit.redo", json!({}));
@@ -132,10 +132,10 @@ fn shallow_sheet_pocket_preserves_material_depth_export_undo_and_reopen() {
         assert!((volume(&mut s) - 14900.0).abs() < 1e-6);
         let state = s.model.state();
         let body = &state.bodies[0].body;
-        assert!(!body.contains(solidcraft_geom::Vec3::new(25.0, 25.0, 0.5)));
-        assert!(body.contains(solidcraft_geom::Vec3::new(25.0, 25.0, 1.5)));
+        assert!(!body.contains(polycore_geom::Vec3::new(25.0, 25.0, 0.5)));
+        assert!(body.contains(polycore_geom::Vec3::new(25.0, 25.0, 1.5)));
     }
-    let mut reopened = Session::new(solidcraft_doc::Document::from_json(&s.doc.to_json()).unwrap());
+    let mut reopened = Session::new(polykrom_doc::Document::from_json(&s.doc.to_json()).unwrap());
     assert!((volume(&mut reopened) - 14900.0).abs() < 1e-6);
     assert_eq!(flat(&mut reopened)["pockets"], f["pockets"]);
 }
@@ -154,7 +154,7 @@ fn planar_sheet_intersection_retains_exact_outline_and_islands() {
         assert_eq!(flat(&mut s)["flat_size_mm"], json!([10.0, 10.0, 2.5]));
     }
     let dxf = run(&mut s, "sheet.export_dxf", json!({}))["dxf"].as_str().unwrap().to_string();
-    assert_eq!(solidcraft_io::read_dxf(&dxf).unwrap().len(), 4);
+    assert_eq!(polykrom_io::read_dxf(&dxf).unwrap().len(), 4);
     let mut imported = Session::default();
     run(&mut imported, "sketch.insert_dxf", json!({"name":"Retained","text":dxf}));
     run(&mut imported, "sketch.finish", json!({}));
@@ -286,26 +286,26 @@ fn intersect_preserves_both_material_regions_of_a_logical_ring_sheet() {
         let area: f64 = regions.iter().map(|r| r.area()).sum();
         assert!((area - (900.0 - PI * 75.0)).abs() < 1e-8, "area={area}");
         let body = &state.bodies[0].body;
-        assert!(body.contains(solidcraft_geom::Vec3::new(50.0, 30.0, 1.0)));
-        assert!(!body.contains(solidcraft_geom::Vec3::new(57.0, 30.0, 1.0)));
-        assert!(body.contains(solidcraft_geom::Vec3::new(64.0, 30.0, 1.0)));
-        assert!(!body.contains(solidcraft_geom::Vec3::new(70.0, 30.0, 1.0)));
+        assert!(body.contains(polycore_geom::Vec3::new(50.0, 30.0, 1.0)));
+        assert!(!body.contains(polycore_geom::Vec3::new(57.0, 30.0, 1.0)));
+        assert!(body.contains(polycore_geom::Vec3::new(64.0, 30.0, 1.0)));
+        assert!(!body.contains(polycore_geom::Vec3::new(70.0, 30.0, 1.0)));
         assert!((volume(&mut s) - (900.0 - PI * 75.0) * 2.5).abs() < 0.2);
     }
     let dxf = run(&mut s, "sheet.export_dxf", json!({}))["dxf"].as_str().unwrap().to_string();
-    assert_eq!(solidcraft_io::read_dxf(&dxf).unwrap().len(), 6);
+    assert_eq!(polykrom_io::read_dxf(&dxf).unwrap().len(), 6);
 }
 
 #[test]
 fn machining_a_folded_parallel_panel_preserves_its_pocket_on_unfold() {
-    use solidcraft_doc::{apply_point, apply_vector};
-    use solidcraft_geom::Vec3;
+    use polycore_geom::Vec3;
+    use polykrom_doc::{apply_point, apply_vector};
     let mut s = Session::default();
     base(&mut s, 100.0, 60.0);
     run(&mut s, "sheet.flange", json!({"edges":[[50,0,2.5]],"height":20}));
     let sh = s.model.state().sheets[0].clone();
     let points = sh.panel(&sh.flanges[0]).outer.polyline(1e-3);
-    let c = points.iter().copied().fold(solidcraft_geom::Vec2::ZERO, |sum, p| sum + p) / (points.len() as f64);
+    let c = points.iter().copied().fold(polycore_geom::Vec2::ZERO, |sum, p| sum + p) / (points.len() as f64);
     let w = sh.world(Some(0));
     let origin = apply_point(&w, Vec3::ZERO);
     let x = apply_vector(&w, Vec3::X);
@@ -342,8 +342,8 @@ fn flipped_sheet_pocket_keeps_depth_in_the_local_thickness_direction() {
         }
         assert!((volume(&mut s) - 14900.0).abs() < 1e-6);
         let state = s.model.state();
-        assert!(!state.bodies[0].body.contains(solidcraft_geom::Vec3::new(25.0, 25.0, -0.5)));
-        assert!(state.bodies[0].body.contains(solidcraft_geom::Vec3::new(25.0, 25.0, -1.5)));
+        assert!(!state.bodies[0].body.contains(polycore_geom::Vec3::new(25.0, 25.0, -0.5)));
+        assert!(state.bodies[0].body.contains(polycore_geom::Vec3::new(25.0, 25.0, -1.5)));
     }
 }
 
@@ -374,10 +374,10 @@ fn multiple_profile_intersect_keeps_tool_union_for_solids_and_sheet_groups() {
         }
         let state = s.model.state();
         for x in [25.0, 65.0] {
-            assert!(state.bodies.iter().any(|b| b.body.contains(solidcraft_geom::Vec3::new(x, 25.0, 1.0))));
+            assert!(state.bodies.iter().any(|b| b.body.contains(polycore_geom::Vec3::new(x, 25.0, 1.0))));
         }
-        assert!(!state.bodies.iter().any(|b| b.body.contains(solidcraft_geom::Vec3::new(50.0, 25.0, 1.0))));
-        assert!(state.bodies.iter().any(|b| b.name == "Control" && b.body.contains(solidcraft_geom::Vec3::new(205.0, 5.0, 5.0))));
+        assert!(!state.bodies.iter().any(|b| b.body.contains(polycore_geom::Vec3::new(50.0, 25.0, 1.0))));
+        assert!(state.bodies.iter().any(|b| b.name == "Control" && b.body.contains(polycore_geom::Vec3::new(205.0, 5.0, 5.0))));
     }
 }
 
@@ -396,14 +396,14 @@ fn deleting_sheet_material_prunes_cosmetic_threads_and_undo_restores_them() {
     assert!(s.model.state().bodies.is_empty());
     assert!(s.model.state().sheets.is_empty());
     assert!(s.model.state().threads.is_empty());
-    assert!(solidcraft_doc::world_state(&s.doc, &s.model.state()).threads.is_empty());
+    assert!(polykrom_doc::world_state(&s.doc, &s.model.state()).threads.is_empty());
     run(&mut s, "edit.undo", json!({}));
     assert_eq!(s.model.state().threads.len(), 1);
 }
 
 #[test]
 fn sheet_pocket_transfer_keeps_local_depth_world_pose_and_history() {
-    use solidcraft_geom::Vec3;
+    use polycore_geom::Vec3;
     fn check(s: &Session, name: &str, owner: u64, local_origin: Vec3, local_y: Vec3, transferred: bool) {
         let state = s.model.state();
         let mb = state.body(name).unwrap();
@@ -415,8 +415,8 @@ fn sheet_pocket_transfer_keeps_local_depth_world_pose_and_history() {
         assert!(sh.frame.y.dist(local_y) < 1e-8);
         assert_eq!(sh.pockets.len(), 1);
         assert_eq!((sh.pockets[0].z0, sh.pockets[0].z1), (0.0, 1.0));
-        let cut = sh.frame.to_world(solidcraft_geom::Vec2::new(25.0, 25.0)) + sh.frame.normal() * 0.5;
-        let floor = sh.frame.to_world(solidcraft_geom::Vec2::new(25.0, 25.0)) + sh.frame.normal() * 1.5;
+        let cut = sh.frame.to_world(polycore_geom::Vec2::new(25.0, 25.0)) + sh.frame.normal() * 0.5;
+        let floor = sh.frame.to_world(polycore_geom::Vec2::new(25.0, 25.0)) + sh.frame.normal() * 1.5;
         assert!(!mb.body.contains(cut));
         assert!(mb.body.contains(floor));
         let world = s.world_state();
@@ -426,7 +426,7 @@ fn sheet_pocket_transfer_keeps_local_depth_world_pose_and_history() {
         assert!(bounds.max.dist(Vec3::new(100.0, 60.0, 2.5)) < 1e-6, "{bounds:?}");
         assert!(!body.contains(Vec3::new(25.0, 25.0, 0.5)));
         assert!(body.contains(Vec3::new(25.0, 25.0, 1.5)));
-        assert!((solidcraft_kernel::measure(body).unwrap().volume - 14900.0).abs() < 1e-6);
+        assert!((polycore::measure(body).unwrap().volume - 14900.0).abs() < 1e-6);
     }
     let mut s = Session::default();
     base(&mut s, 100.0, 60.0);
@@ -455,7 +455,7 @@ fn sheet_pocket_transfer_keeps_local_depth_world_pose_and_history() {
         assert_eq!(f["pockets"][0]["side"], "bottom");
         assert_eq!(f["pockets"][0]["depth_mm"], 1.0);
     }
-    let mut reopened = Session::new(solidcraft_doc::Document::from_json(&s.doc.to_json()).unwrap());
+    let mut reopened = Session::new(polykrom_doc::Document::from_json(&s.doc.to_json()).unwrap());
     check(&reopened, &name, component, origin, y, true);
     run(&mut reopened, "component.activate", json!({"component":component}));
     run(&mut reopened, "sheet.unfold", json!({"body":name}));
@@ -976,7 +976,7 @@ fn cut_through(s: &mut Session, sketch: &str) {
 }
 
 fn contains(s: &Session, p: [f64; 3]) -> bool {
-    s.model.state().bodies.first().is_some_and(|b| b.body.contains(solidcraft_geom::Vec3::new(p[0], p[1], p[2])))
+    s.model.state().bodies.first().is_some_and(|b| b.body.contains(polycore_geom::Vec3::new(p[0], p[1], p[2])))
 }
 
 #[test]
@@ -992,8 +992,8 @@ fn a_sketch_on_a_flange_face_attaches_to_its_panel() {
     assert_eq!(made["attachment"], "sheet_face");
     // The sketch keeps the face's name: the body, the panel (its flange) and the side of the sheet.
     let sketch = s.doc.find_feature("Holes").cloned().unwrap();
-    let solidcraft_doc::FeatureKind::Sketch { plane, .. } = &sketch.kind else { panic!("{:?}", sketch.kind) };
-    let name = solidcraft_doc::sheet::plane_sheet_face(plane).unwrap_or_default();
+    let polykrom_doc::FeatureKind::Sketch { plane, .. } = &sketch.kind else { panic!("{:?}", sketch.kind) };
+    let name = polykrom_doc::sheet::plane_sheet_face(plane).unwrap_or_default();
     assert!(name.starts_with("sheet:Body1:F") && name.ends_with(":top"), "{name}");
     // A cut through the flange from that sketch is a round hole 7 mm up the face, at x = 30.
     run(&mut s, "solid.extrude", json!({"sketch": "Holes", "distance": 2.5, "direction": "negative", "operation": "cut"}));
@@ -1095,7 +1095,7 @@ fn sketches_on_the_top_and_bottom_faces_of_a_sheet_survive_unfold_refold_and_reo
         assert!((centres[1].0 - 60.0).abs() < 0.01 && (centres[1].1 - 20.0).abs() < 0.01, "{centres:?}");
         assert!((volume(&mut s) - want).abs() < 0.1);
     }
-    let mut reopened = Session::new(solidcraft_doc::Document::from_json(&s.doc.to_json()).unwrap());
+    let mut reopened = Session::new(polykrom_doc::Document::from_json(&s.doc.to_json()).unwrap());
     assert!((volume(&mut reopened) - want).abs() < 0.1);
     assert_eq!(holes(&flat(&mut reopened)), holes(&flat(&mut s)));
 }
@@ -1123,24 +1123,24 @@ fn a_sketch_on_a_sheet_face_reports_a_lost_attachment_instead_of_moving_to_anoth
     circle_sketch(&mut s, "Holes", json!({"face": [50, 2.5, 12]}), [30.0, -8.0], 3.6);
     let id = s.doc.find_feature("Holes").map(|f| f.id).unwrap_or(0);
     let status = |s: &Session| s.placed_document().sketch_face_attachment(id, &s.model);
-    assert!(matches!(status(&s), solidcraft_doc::FaceAttachmentStatus::Sheet { plane: Some(_) }));
+    assert!(matches!(status(&s), polykrom_doc::FaceAttachmentStatus::Sheet { plane: Some(_) }));
     // With the flange suppressed there is no such face; the base's top face is not a substitute.
     run(&mut s, "timeline.suppress", json!({"feature": "EdgeFlange1", "suppressed": true}));
     let error = run(&mut s, "timeline.inspect", json!({"feature": "Holes"}))["error"].as_str().unwrap_or_default().to_string();
     assert!(error.contains("lost face attachment") && error.contains("reattach"), "{error}");
-    let solidcraft_doc::FaceAttachmentStatus::Lost { message, repair_plane } = status(&s) else { panic!("{:?}", status(&s)) };
+    let polykrom_doc::FaceAttachmentStatus::Lost { message, repair_plane } = status(&s) else { panic!("{:?}", status(&s)) };
     assert!(message.contains("sheet face") && repair_plane.is_some(), "{message}");
     // Redefine Sketch Plane repairs it on another face, here the base's top (its sketch keeps its geometry).
     let repaired = run(&mut s, "sketch.redefine", json!({"sketch": "Holes", "plane": {"face": [10, 30, 2.5]}}));
     assert_eq!(repaired["attachment"], "sheet_face");
     assert!(run(&mut s, "timeline.inspect", json!({"feature": "Holes"}))["error"].is_null());
-    assert!(matches!(status(&s), solidcraft_doc::FaceAttachmentStatus::Sheet { .. }));
+    assert!(matches!(status(&s), polykrom_doc::FaceAttachmentStatus::Sheet { .. }));
     // The flange is back, and a sketch attached to it again is healthy.
     run(&mut s, "timeline.suppress", json!({"feature": "EdgeFlange1", "suppressed": false}));
     let again = run(&mut s, "sketch.redefine", json!({"sketch": "Holes", "plane": {"face": [50, 2.5, 12]}}));
     assert_eq!(again["attachment"], "sheet_face");
     assert!(run(&mut s, "timeline.inspect", json!({"feature": "Holes"}))["error"].is_null());
-    assert!(matches!(status(&s), solidcraft_doc::FaceAttachmentStatus::Sheet { .. }));
+    assert!(matches!(status(&s), polykrom_doc::FaceAttachmentStatus::Sheet { .. }));
 }
 
 #[test]
@@ -1154,8 +1154,8 @@ fn renaming_a_sheet_body_keeps_its_sketches_on_their_faces() {
     run(&mut s, "body.rename", json!({"body": "Body1", "name": "Bracket"}));
     for (sketch, face) in [("Holes", "sheet:Bracket:F"), ("Above", "sheet:Bracket:base:top")] {
         let feature = s.doc.find_feature(sketch).cloned().unwrap();
-        let solidcraft_doc::FeatureKind::Sketch { plane, .. } = &feature.kind else { panic!("{:?}", feature.kind) };
-        assert!(solidcraft_doc::sheet::plane_sheet_face(plane).is_some_and(|name| name.starts_with(face)), "{sketch}: {:?}", feature.kind);
+        let polykrom_doc::FeatureKind::Sketch { plane, .. } = &feature.kind else { panic!("{:?}", feature.kind) };
+        assert!(polykrom_doc::sheet::plane_sheet_face(plane).is_some_and(|name| name.starts_with(face)), "{sketch}: {:?}", feature.kind);
         assert!(run(&mut s, "timeline.inspect", json!({"feature": sketch}))["error"].is_null(), "{sketch}");
     }
     cut_through(&mut s, "Holes");
@@ -1269,11 +1269,11 @@ fn the_bend_table_and_the_dxf_follow_what_flat_cuts_leave_of_a_bend() {
     let bend_lines = |s: &mut Session| -> Vec<(f64, f64)> {
         let text = run(s, "sheet.export_dxf", json!({}))["dxf"].as_str().unwrap_or_default().to_string();
         let on_layer = text.lines().collect::<Vec<_>>().windows(2).filter(|w| w[0].trim() == "8" && w[1].trim() == "BEND_UP").count();
-        let mut found: Vec<(f64, f64)> = solidcraft_io::read_dxf(&text)
+        let mut found: Vec<(f64, f64)> = polykrom_io::read_dxf(&text)
             .unwrap()
             .iter()
             .filter_map(|g| match g {
-                solidcraft_io::Geom2::Line(a, b) if (a.y + FRAC_PI_2).abs() < 1e-6 && (b.y + FRAC_PI_2).abs() < 1e-6 => {
+                polykrom_io::Geom2::Line(a, b) if (a.y + FRAC_PI_2).abs() < 1e-6 && (b.y + FRAC_PI_2).abs() < 1e-6 => {
                     Some((a.x.min(b.x), a.x.max(b.x)))
                 }
                 _ => None,
@@ -1562,10 +1562,10 @@ fn a_flange_bent_inside_keeps_the_base_sketchs_arcs_in_the_flat_pattern_and_the_
         run(&mut s, "sheet.flange", json!({"edges": [[100, 0, 2]], "height": 40, "angle": 90, "position": position}));
         assert!(no_errors_or_warnings(&s), "{position}: {:?}", s.model.results);
         let text = run(&mut s, "sheet.export_dxf", json!({}))["dxf"].as_str().unwrap_or_default().to_string();
-        let shapes = solidcraft_io::read_dxf(&text).unwrap();
-        let lines = shapes.iter().filter(|g| matches!(g, solidcraft_io::Geom2::Line(..))).count();
+        let shapes = polykrom_io::read_dxf(&text).unwrap();
+        let lines = shapes.iter().filter(|g| matches!(g, polykrom_io::Geom2::Line(..))).count();
         let radii: Vec<f64> =
-            shapes.iter().filter_map(|g| if let solidcraft_io::Geom2::Arc { c, a, .. } = g { Some(c.dist(*a)) } else { None }).collect();
+            shapes.iter().filter_map(|g| if let polykrom_io::Geom2::Arc { c, a, .. } = g { Some(c.dist(*a)) } else { None }).collect();
         // Eight lines of outline and the bend's centre line; the four corners.
         assert_eq!((lines, radii.len(), shapes.len()), (9, 4, 13), "{position}");
         assert!(radii.iter().all(|r| (r - 8.0).abs() < 1e-9), "{position}: {radii:?}");
@@ -1636,7 +1636,7 @@ fn malformed_fold_points_are_rejected_atomically() {
 
 #[test]
 fn flat_dxf_preserves_exact_cutout_entities() {
-    use solidcraft_geom::{Loop2, Region2, Seg2, Vec2};
+    use polycore_geom::{Loop2, Region2, Seg2, Vec2};
     let mut s = Session::default();
     base(&mut s, 100.0, 60.0);
     let mut sh = s.model.state().sheets[0].clone();
@@ -1647,9 +1647,9 @@ fn flat_dxf_preserves_exact_cutout_entities() {
     let dxf = super::flat_dxf(&sh, &super::DxfOptions::default()).unwrap();
     assert_eq!(dxf.matches("0\nCIRCLE\n").count(), 1, "{dxf}");
     assert!(!dxf.contains("0\nARC\n"), "a full circle must not become a zero-length ARC");
-    let read = solidcraft_io::read_dxf(&dxf).unwrap();
+    let read = polykrom_io::read_dxf(&dxf).unwrap();
     assert_eq!(read.len(), 5);
-    assert!(read.iter().any(|g| matches!(g, solidcraft_io::Geom2::Circle(c, r) if *c == Vec2::new(40.0, 30.0) && (*r - 5.0).abs() < 1e-9)));
+    assert!(read.iter().any(|g| matches!(g, polykrom_io::Geom2::Circle(c, r) if *c == Vec2::new(40.0, 30.0) && (*r - 5.0).abs() < 1e-9)));
     sh.holes[0].outer = Loop2 {
         segs: vec![
             Seg2::Line { a: Vec2::new(10.0, 10.0), b: Vec2::new(30.0, 10.0) },
@@ -1660,9 +1660,9 @@ fn flat_dxf_preserves_exact_cutout_entities() {
     assert_eq!(dxf.matches("0\nLINE\n").count(), 5, "four outline lines and one exact cutout line");
     assert_eq!(dxf.matches("0\nARC\n").count(), 1);
     assert!(dxf.contains(" 50\n0.0\n 51\n180.0\n"), "{dxf}");
-    let read = solidcraft_io::read_dxf(&dxf).unwrap();
+    let read = polykrom_io::read_dxf(&dxf).unwrap();
     assert_eq!(read.len(), 6);
-    assert!(read.iter().any(|g| matches!(g, solidcraft_io::Geom2::Arc { c, a, b } if *c == Vec2::new(20.0, 10.0) && a.dist(Vec2::new(30.0, 10.0)) < 1e-9 && b.dist(Vec2::new(10.0, 10.0)) < 1e-9)));
+    assert!(read.iter().any(|g| matches!(g, polykrom_io::Geom2::Arc { c, a, b } if *c == Vec2::new(20.0, 10.0) && a.dist(Vec2::new(30.0, 10.0)) < 1e-9 && b.dist(Vec2::new(10.0, 10.0)) < 1e-9)));
 }
 
 // A profile chosen by a point outside its inner loop must keep that inner loop through
@@ -1680,7 +1680,7 @@ fn inherited_base_profile_holes_survive_every_sheet_state() {
         let f = flat(&mut s);
         assert_eq!(f["cutouts"].as_array().map(Vec::len), Some(1));
         let dxf = run(&mut s, "sheet.export_dxf", json!({}))["dxf"].as_str().unwrap().to_string();
-        assert_eq!(solidcraft_io::read_dxf(&dxf).unwrap().len(), 8);
+        assert_eq!(polykrom_io::read_dxf(&dxf).unwrap().len(), 8);
         let mut reopened = Session::default();
         run(&mut reopened, "sketch.insert_dxf", json!({"text": dxf, "name": "Blank"}));
         run(&mut reopened, "sketch.finish", json!({}));
@@ -1708,7 +1708,7 @@ fn edge_notch_uses_the_same_material_boundary_in_solid_flat_and_dxf() {
     assert_eq!(f["outline"][0].as_array().map(Vec::len), Some(8));
     assert_eq!(f["cutouts"].as_array().map(Vec::len), Some(0));
     let dxf = run(&mut s, "sheet.export_dxf", json!({}))["dxf"].as_str().unwrap().to_string();
-    assert_eq!(solidcraft_io::read_dxf(&dxf).unwrap().len(), 8);
+    assert_eq!(polykrom_io::read_dxf(&dxf).unwrap().len(), 8);
     let mut reopened = Session::default();
     run(&mut reopened, "sketch.insert_dxf", json!({"text": dxf, "name": "Blank"}));
     run(&mut reopened, "sketch.finish", json!({}));
@@ -1737,8 +1737,8 @@ fn inherited_round_hole_survives_flange_and_unfold_in_flipped_frames() {
         let sh = s.model.state().sheets[0].clone();
         let regions = sh.flat_regions().unwrap();
         assert_eq!(regions[0].holes[0].segs.len(), 2);
-        assert!(regions[0].holes[0].segs.iter().all(|s| matches!(s, solidcraft_geom::Seg2::Arc { radius, .. } if (*radius - 5.0).abs() < 1e-9)));
-        let expected = regions.iter().map(solidcraft_geom::Region2::area).sum::<f64>() * 2.5;
+        assert!(regions[0].holes[0].segs.iter().all(|s| matches!(s, polycore_geom::Seg2::Arc { radius, .. } if (*radius - 5.0).abs() < 1e-9)));
+        let expected = regions.iter().map(polycore_geom::Region2::area).sum::<f64>() * 2.5;
         run(&mut s, "sheet.unfold", json!({}));
         assert!((volume(&mut s) - expected).abs() < 0.1);
         run(&mut s, "sheet.refold", json!({}));
@@ -1753,7 +1753,7 @@ fn faces(s: &mut Session) -> (u64, u64) {
 
 #[test]
 fn elliptic_cut_out_stays_exact_in_the_flat_pattern_and_follows_arcs_when_folded() {
-    use solidcraft_geom::Seg2;
+    use polycore_geom::Seg2;
     let mut s = Session::default();
     base(&mut s, 100.0, 60.0);
     run(&mut s, "sheet.flange", json!({"edges": [[50, 0, 2.5]], "height": 20}));
@@ -1803,7 +1803,7 @@ fn flipped_base_flange_keeps_its_elliptic_outline() {
         let regions = s.model.state().sheets[0].flat_regions().unwrap();
         let outline = &regions[0].outer.segs;
         assert!(
-            outline.len() == 4 && outline.iter().all(|x| matches!(x, solidcraft_geom::Seg2::Conic { .. })),
+            outline.len() == 4 && outline.iter().all(|x| matches!(x, polycore_geom::Seg2::Conic { .. })),
             "flip {flip}: {} segments",
             outline.len()
         );
@@ -1944,7 +1944,7 @@ fn tiny_cut_inside_exact_circle_survives_unfold_refold_and_dxf() {
             assert!((regions[0].holes[0].signed_area().abs() - 2.5e-9).abs() < 1e-13);
             assert_eq!(s.model.state().bodies.len(), 1);
             let dxf = run(&mut s, "sheet.export_dxf", json!({}))["dxf"].as_str().unwrap().to_string();
-            assert_eq!(solidcraft_io::read_dxf(&dxf).unwrap().len(), 5);
+            assert_eq!(polykrom_io::read_dxf(&dxf).unwrap().len(), 5);
             if stage == "sheet.unfold" && initially_flat {
                 run(&mut s, "sheet.refold", json!({}));
             }
@@ -1986,8 +1986,8 @@ fn unrelated_box_cut_preserves_logical_ring_sheet_compound() {
         assert_eq!(s.model.state().bodies.len(), 2);
         let state = s.model.state();
         let body = &state.bodies.iter().find(|b| b.name == sheet_name).unwrap().body;
-        assert!(body.contains(solidcraft_geom::Vec3::new(50.0, 30.0, 1.25)));
-        assert!(!body.contains(solidcraft_geom::Vec3::new(57.0, 30.0, 1.25)));
+        assert!(body.contains(polycore_geom::Vec3::new(50.0, 30.0, 1.25)));
+        assert!(!body.contains(polycore_geom::Vec3::new(57.0, 30.0, 1.25)));
     }
 }
 
@@ -2022,9 +2022,9 @@ fn specialized_sheet_cuts_respect_component_and_explicit_participants() {
 fn ring_cut_preserves_retained_island_through_unfold_and_refold() {
     fn material_probes(s: &Session) {
         let body = &s.model.state().bodies[0].body;
-        assert!(body.contains(solidcraft_geom::Vec3::new(50.0, 30.0, 1.25)));
-        assert!(!body.contains(solidcraft_geom::Vec3::new(57.0, 30.0, 1.25)));
-        assert!(body.contains(solidcraft_geom::Vec3::new(65.0, 30.0, 1.25)));
+        assert!(body.contains(polycore_geom::Vec3::new(50.0, 30.0, 1.25)));
+        assert!(!body.contains(polycore_geom::Vec3::new(57.0, 30.0, 1.25)));
+        assert!(body.contains(polycore_geom::Vec3::new(65.0, 30.0, 1.25)));
     }
     let mut s = Session::default();
     base(&mut s, 100.0, 60.0);
@@ -2042,9 +2042,9 @@ fn ring_cut_preserves_retained_island_through_unfold_and_refold() {
     material_probes(&s);
     assert_eq!(flat(&mut s)["outline"].as_array().map(Vec::len), Some(2));
     let regions = s.model.state().sheets[0].flat_regions().unwrap();
-    assert!(regions.iter().any(|r| r.contains(solidcraft_geom::Vec2::new(50.0, 30.0))));
-    assert!(!regions.iter().any(|r| r.contains(solidcraft_geom::Vec2::new(57.0, 30.0))));
-    assert!(regions.iter().any(|r| r.contains(solidcraft_geom::Vec2::new(65.0, 30.0))));
+    assert!(regions.iter().any(|r| r.contains(polycore_geom::Vec2::new(50.0, 30.0))));
+    assert!(!regions.iter().any(|r| r.contains(polycore_geom::Vec2::new(57.0, 30.0))));
+    assert!(regions.iter().any(|r| r.contains(polycore_geom::Vec2::new(65.0, 30.0))));
     let dxf = run(&mut s, "sheet.export_dxf", json!({}))["dxf"].as_str().unwrap().to_string();
     let mut reopened = Session::default();
     run(&mut reopened, "sketch.insert_dxf", json!({"text": dxf, "name": "RingBlank"}));
@@ -2060,7 +2060,7 @@ fn ring_cut_preserves_retained_island_through_unfold_and_refold() {
 }
 
 fn retained_depth_check(s: &mut Session, want: f64, z0: f64, z1: f64) {
-    use solidcraft_geom::Vec3;
+    use polycore_geom::Vec3;
     assert!((volume(s) - want).abs() < 1e-6, "{} vs {want}", volume(s));
     let state = s.model.state();
     assert_eq!(state.sheets.len(), 1);
@@ -2073,7 +2073,7 @@ fn retained_depth_check(s: &mut Session, want: f64, z0: f64, z1: f64) {
     assert!((bounds.min.z - z0).abs() < 1e-8 && (bounds.max.z - z1).abs() < 1e-8, "{bounds:?}");
 }
 
-fn depth_step_reopen(s: &mut Session, suffix: &str, want: f64, inside: solidcraft_geom::Vec3, outside: solidcraft_geom::Vec3) {
+fn depth_step_reopen(s: &mut Session, suffix: &str, want: f64, inside: polycore_geom::Vec3, outside: polycore_geom::Vec3) {
     let path = std::env::temp_dir().join(format!("solidcraft-depth-intersect-{suffix}-{}.step", std::process::id()));
     run(s, "file.export", json!({"path":path.to_string_lossy()}));
     let mut imported = Session::default();
@@ -2110,7 +2110,7 @@ fn dxf_outline_only(text: &str) -> String {
 
 #[test]
 fn partial_depth_intersect_retains_bottom_top_and_middle_material_through_history_and_exports() {
-    use solidcraft_geom::Vec3;
+    use polycore_geom::Vec3;
     for (offset, z0, z1, layers) in [
         (0.0, 0.0, 1.0, vec![("top", 1.0, 2.5)]),
         (1.5, 1.5, 2.5, vec![("bottom", 0.0, 1.5)]),
@@ -2136,7 +2136,7 @@ fn partial_depth_intersect_retains_bottom_top_and_middle_material_through_histor
             assert!(dxf.contains(&format!("POCKET_{}_Z{a:.6}_TO_{b:.6}_MM", side.to_uppercase())));
         }
         let outline = dxf_outline_only(&dxf);
-        assert_eq!(solidcraft_io::read_dxf(&outline).unwrap().len(), 4);
+        assert_eq!(polykrom_io::read_dxf(&outline).unwrap().len(), 4);
         let mut outline_import = Session::default();
         run(&mut outline_import, "sketch.insert_dxf", json!({"text":outline,"name":"Outline"}));
         run(&mut outline_import, "sketch.finish", json!({}));
@@ -2150,7 +2150,7 @@ fn partial_depth_intersect_retains_bottom_top_and_middle_material_through_histor
             retained_depth_check(&mut s, 100.0, z0, z1);
             assert_eq!(flat(&mut s)["pockets"], exported["pockets"]);
         }
-        let mut reopened = Session::new(solidcraft_doc::Document::from_json(&s.doc.to_json()).unwrap());
+        let mut reopened = Session::new(polykrom_doc::Document::from_json(&s.doc.to_json()).unwrap());
         retained_depth_check(&mut reopened, 100.0, z0, z1);
         depth_step_reopen(&mut s, &format!("offset{offset}"), 100.0, Vec3::new(25.0, 25.0, (z0 + z1) * 0.5), Vec3::new(25.0, 25.0, z1 + 0.1));
     }
@@ -2158,7 +2158,7 @@ fn partial_depth_intersect_retains_bottom_top_and_middle_material_through_histor
 
 #[test]
 fn partial_depth_intersect_preserves_prior_pockets_and_actual_interval_intersections() {
-    use solidcraft_geom::Vec3;
+    use polycore_geom::Vec3;
     let mut s = Session::default();
     base(&mut s, 100.0, 60.0);
     rectangle_tool(&mut s, "OldPocket", [20.0, 20.0], [25.0, 30.0]);
@@ -2185,14 +2185,14 @@ fn partial_depth_intersect_preserves_prior_pockets_and_actual_interval_intersect
     assert!((volume(&mut s) - 25.0).abs() < 1e-6);
     run(&mut s, "sheet.unfold", json!({}));
     assert!((volume(&mut s) - 25.0).abs() < 1e-6);
-    let mut cold = Session::new(solidcraft_doc::Document::from_json(&s.doc.to_json()).unwrap());
+    let mut cold = Session::new(polykrom_doc::Document::from_json(&s.doc.to_json()).unwrap());
     assert!((volume(&mut cold) - 25.0).abs() < 1e-6);
     depth_step_reopen(&mut s, "prior", 25.0, Vec3::new(22.0, 25.0, 1.125), Vec3::new(22.0, 25.0, 0.75));
 }
 
 #[test]
 fn partial_depth_intersect_keeps_disconnected_tool_islands_and_annular_curves() {
-    use solidcraft_geom::Vec3;
+    use polycore_geom::Vec3;
     let mut s = Session::default();
     base(&mut s, 100.0, 60.0);
     rectangle_tool(&mut s, "Islands", [20.0, 20.0], [30.0, 30.0]);
@@ -2234,7 +2234,7 @@ fn partial_depth_intersect_keeps_disconnected_tool_islands_and_annular_curves() 
     }
     let dxf = run(&mut ring, "sheet.export_dxf", json!({}))["dxf"].as_str().unwrap().to_string();
     assert!(dxf.contains("POCKET_TOP_Z1.000000_TO_2.500000_MM"));
-    assert_eq!(solidcraft_io::read_dxf(&dxf_outline_only(&dxf)).unwrap().len(), 2);
+    assert_eq!(polykrom_io::read_dxf(&dxf_outline_only(&dxf)).unwrap().len(), 2);
 }
 
 #[test]
@@ -2253,7 +2253,7 @@ fn partial_depth_intersect_of_material_already_removed_by_a_pocket_is_refused() 
 
 #[test]
 fn partial_depth_intersect_flipped_tool_and_transferred_sheet_keep_depth_side_and_world_pose() {
-    use solidcraft_geom::Vec3;
+    use polycore_geom::Vec3;
     let mut flipped = Session::default();
     base(&mut flipped, 100.0, 60.0);
     run(&mut flipped, "sketch.create", json!({"name":"FlippedTool","plane":{"origin":[0,0,2.5],"x_dir":[1,0,0],"y_dir":[0,-1,0]}}));
@@ -2293,24 +2293,24 @@ fn partial_depth_intersect_flipped_tool_and_transferred_sheet_keep_depth_side_an
         assert!(!body.contains(Vec3::new(25.0, 25.0, 2.0)));
         let bounds = world.body(&name).unwrap().mesh().bounds();
         assert!(before.min.dist(bounds.min) < 1e-8 && before.max.dist(bounds.max) < 1e-8);
-        assert!((solidcraft_kernel::measure(body).unwrap().volume - 100.0).abs() < 1e-6);
+        assert!((polycore::measure(body).unwrap().volume - 100.0).abs() < 1e-6);
     }
-    let mut reopened = Session::new(solidcraft_doc::Document::from_json(&s.doc.to_json()).unwrap());
+    let mut reopened = Session::new(polykrom_doc::Document::from_json(&s.doc.to_json()).unwrap());
     let reopened_world = reopened.world_state();
     let body = &reopened_world.body(&name).unwrap().body;
     assert!(body.contains(Vec3::new(25.0, 25.0, 1.0)));
-    assert!((solidcraft_kernel::measure(body).unwrap().volume - 100.0).abs() < 1e-6);
+    assert!((polycore::measure(body).unwrap().volume - 100.0).abs() < 1e-6);
     run(&mut reopened, "timeline.edit", json!({"feature":"RetainSlab","set":{"extent":{"distance":"1.5"}}}));
     let world = reopened.world_state();
     let body = &world.body(&name).unwrap().body;
-    assert!((solidcraft_kernel::measure(body).unwrap().volume - 150.0).abs() < 1e-6);
+    assert!((polycore::measure(body).unwrap().volume - 150.0).abs() < 1e-6);
     assert!(body.contains(Vec3::new(25.0, 25.0, 1.75)));
     assert!(!body.contains(Vec3::new(25.0, 25.0, 2.25)));
 }
 
 #[test]
 fn partial_depth_intersect_full_gauge_in_rotated_frames_does_not_invent_pockets() {
-    use solidcraft_geom::Vec3;
+    use polycore_geom::Vec3;
     for (angle, translate) in [(37.0, [30.0, 20.0, 10.0]), (121.0, [12345.678, 98765.432, 4321.123])] {
         let mut s = Session::default();
         base(&mut s, 100.0, 60.0);
@@ -2327,7 +2327,7 @@ fn partial_depth_intersect_full_gauge_in_rotated_frames_does_not_invent_pockets(
         run(&mut s, "sketch.create", json!({"name":"WorldTool","plane":{"origin":[0,0,0],"x_dir":[1,0,0],"y_dir":[0,1,0]}}));
         run(&mut s, "sketch.rectangle.two_point", json!({"p0":[20,20],"p1":[30,30]}));
         run(&mut s, "sketch.finish", json!({}));
-        let mut tool_session = Session::new(solidcraft_doc::Document::from_json(&s.doc.to_json()).unwrap());
+        let mut tool_session = Session::new(polykrom_doc::Document::from_json(&s.doc.to_json()).unwrap());
         // The witness is built in the sketch's own component, so its caps lie in the sketch's frame.
         run(&mut tool_session, "component.activate", json!({"component":owner}));
         run(&mut tool_session, "solid.extrude", json!({"sketch":"WorldTool","distance":2.5,"body_name":"CapWitness"}));
@@ -2338,7 +2338,7 @@ fn partial_depth_intersect_full_gauge_in_rotated_frames_does_not_invent_pockets(
         assert_eq!(sources.len(), witness.face_count());
         let mut cap_count = 0;
         for (index, source) in sources.iter().enumerate() {
-            if let Some(solidcraft_kernel::FaceSource::CertifiedExtrudeCap { high, plane, .. }) = source {
+            if let Some(polycore::FaceSource::CertifiedExtrudeCap { high, plane, .. }) = source {
                 cap_count += 1;
                 let current = witness.planar_face(index).unwrap();
                 assert!(current.normal().cross(tool_plane.normal()).len() < 1e-10);
@@ -2355,12 +2355,12 @@ fn partial_depth_intersect_full_gauge_in_rotated_frames_does_not_invent_pockets(
             assert!(s.model.state().sheets[0].pockets.is_empty(), "full gauge must not acquire roundoff-depth pockets");
             let world = s.world_state();
             let body = &world.body(&name).unwrap().body;
-            assert!((solidcraft_kernel::measure(body).unwrap().volume - 250.0).abs() < 1e-5);
+            assert!((polycore::measure(body).unwrap().volume - 250.0).abs() < 1e-5);
             assert!(body.contains(Vec3::new(25.0, 25.0, 0.1)));
             assert!(body.contains(Vec3::new(25.0, 25.0, 2.4)));
             assert!(!body.contains(Vec3::new(10.0, 25.0, 1.0)));
         }
-        let mut cold = Session::new(solidcraft_doc::Document::from_json(&s.doc.to_json()).unwrap());
+        let mut cold = Session::new(polykrom_doc::Document::from_json(&s.doc.to_json()).unwrap());
         assert!(cold.model.state().sheets[0].pockets.is_empty());
         assert!(flat(&mut cold)["pockets"].as_array().unwrap().is_empty());
         run(&mut s, "timeline.edit", json!({"feature":"PostTransferRetain","set":{"extent":{"distance":"1","start_offset":"0.5"}}}));
@@ -2371,16 +2371,16 @@ fn partial_depth_intersect_full_gauge_in_rotated_frames_does_not_invent_pockets(
             assert_eq!(s.model.state().sheets[0].pockets.len(), 2);
             let world = s.world_state();
             let body = &world.body(&name).unwrap().body;
-            let measured = solidcraft_kernel::measure(body).unwrap().volume;
+            let measured = polycore::measure(body).unwrap().volume;
             assert!((measured - 100.0).abs() < 1e-5, "retained volume {measured}");
             assert!(body.contains(Vec3::new(25.0, 25.0, 1.0)));
             assert!(!body.contains(Vec3::new(25.0, 25.0, 0.1)));
             assert!(!body.contains(Vec3::new(25.0, 25.0, 2.4)));
         }
-        let cold = Session::new(solidcraft_doc::Document::from_json(&s.doc.to_json()).unwrap());
+        let cold = Session::new(polykrom_doc::Document::from_json(&s.doc.to_json()).unwrap());
         let world = cold.world_state();
         let body = &world.body(&name).unwrap().body;
-        assert!((solidcraft_kernel::measure(body).unwrap().volume - 100.0).abs() < 1e-5);
+        assert!((polycore::measure(body).unwrap().volume - 100.0).abs() < 1e-5);
         assert!(body.contains(Vec3::new(25.0, 25.0, 1.0)));
         assert!(!body.contains(Vec3::new(25.0, 25.0, 0.1)));
     }
@@ -2388,7 +2388,7 @@ fn partial_depth_intersect_full_gauge_in_rotated_frames_does_not_invent_pockets(
 
 #[test]
 fn partial_depth_intersect_planar_to_object_retains_current_target_depth() {
-    use solidcraft_geom::Vec3;
+    use polycore_geom::Vec3;
     let mut s = Session::default();
     base(&mut s, 100.0, 60.0);
     let name = s.model.state().sheets[0].body.clone();
@@ -2401,15 +2401,15 @@ fn partial_depth_intersect_planar_to_object_retains_current_target_depth() {
         }
         let state = s.model.state();
         let body = &state.body(&name).unwrap().body;
-        assert!((solidcraft_kernel::measure(body).unwrap().volume - 100.0).abs() < 1e-6);
+        assert!((polycore::measure(body).unwrap().volume - 100.0).abs() < 1e-6);
         assert!(body.contains(Vec3::new(25.0, 25.0, 1.0)));
         assert!(!body.contains(Vec3::new(25.0, 25.0, 0.1)));
         assert!(!body.contains(Vec3::new(25.0, 25.0, 2.0)));
         assert_eq!(state.sheets[0].pockets.len(), 2);
-        assert!((solidcraft_kernel::measure(&state.body("Roof").unwrap().body).unwrap().volume - 100.0).abs() < 1e-6);
+        assert!((polycore::measure(&state.body("Roof").unwrap().body).unwrap().volume - 100.0).abs() < 1e-6);
     }
-    let cold = Session::new(solidcraft_doc::Document::from_json(&s.doc.to_json()).unwrap());
-    assert!((solidcraft_kernel::measure(&cold.model.state().body(&name).unwrap().body).unwrap().volume - 100.0).abs() < 1e-6);
+    let cold = Session::new(polykrom_doc::Document::from_json(&s.doc.to_json()).unwrap());
+    assert!((polycore::measure(&cold.model.state().body(&name).unwrap().body).unwrap().volume - 100.0).abs() < 1e-6);
 }
 
 #[test]
@@ -2429,14 +2429,14 @@ fn partial_depth_intersect_curved_to_object_refuses_unrepresentable_depth_atomic
             run(&mut s, command, json!({"body":name}));
         }
         let state = s.model.state();
-        assert!((solidcraft_kernel::measure(&state.body(&name).unwrap().body).unwrap().volume - 15000.0).abs() < 1e-6);
+        assert!((polycore::measure(&state.body(&name).unwrap().body).unwrap().volume - 15000.0).abs() < 1e-6);
         assert!(state.sheets[0].pockets.is_empty());
     }
 }
 
 #[test]
 fn partial_depth_intersect_curved_to_object_preserves_current_trimmed_cap_footprint() {
-    use solidcraft_geom::Vec3;
+    use polycore_geom::Vec3;
     let mut s = Session::default();
     base(&mut s, 100.0, 60.0);
     let name = s.model.state().sheets[0].body.clone();
@@ -2444,11 +2444,11 @@ fn partial_depth_intersect_curved_to_object_preserves_current_trimmed_cap_footpr
     run(&mut s, "solid.box", json!({"corner":[19,19,1],"length":12,"width":12,"height":1,"body_name":"StopPlate"}));
     run(&mut s, "solid.combine", json!({"target":"CurvedRoof","tools":["StopPlate"],"operation":"join"}));
     rectangle_tool(&mut s, "Tool", [20.0, 20.0], [30.0, 30.0]);
-    let mut tool_session = Session::new(solidcraft_doc::Document::from_json(&s.doc.to_json()).unwrap());
+    let mut tool_session = Session::new(polykrom_doc::Document::from_json(&s.doc.to_json()).unwrap());
     run(&mut tool_session, "solid.extrude", json!({"sketch":"Tool","to":[27,25,10],"body_name":"TrimWitness"}));
     let ts = tool_session.model.state();
     let witness = &ts.body("TrimWitness").unwrap().body;
-    assert!((solidcraft_kernel::measure(witness).unwrap().volume - (100.0 - 4.0 * std::f64::consts::PI)).abs() < 0.01);
+    assert!((polycore::measure(witness).unwrap().volume - (100.0 - 4.0 * std::f64::consts::PI)).abs() < 0.01);
     assert!(witness.contains(Vec3::new(21.0, 21.0, 0.5)));
     assert!(!witness.contains(Vec3::new(25.0, 25.0, 0.5)));
     run(&mut s, "solid.extrude", json!({"sketch":"Tool","to":[27,25,10],"operation":"intersect","participants":[name]}));
@@ -2458,7 +2458,7 @@ fn partial_depth_intersect_curved_to_object_preserves_current_trimmed_cap_footpr
         }
         let state = s.model.state();
         let body = &state.body(&name).unwrap().body;
-        let measured = solidcraft_kernel::measure(body).unwrap().volume;
+        let measured = polycore::measure(body).unwrap().volume;
         assert!((measured - (100.0 - 4.0 * std::f64::consts::PI)).abs() < 0.01);
         let area: f64 = state.sheets[0].flat_regions().unwrap().iter().map(|r| r.area()).sum();
         assert!((area - (100.0 - 4.0 * std::f64::consts::PI)).abs() < 1e-8);
@@ -2466,12 +2466,12 @@ fn partial_depth_intersect_curved_to_object_preserves_current_trimmed_cap_footpr
         assert!(!body.contains(Vec3::new(25.0, 25.0, 0.5)));
         assert!(!body.contains(Vec3::new(21.0, 21.0, 1.5)));
     }
-    let cold = Session::new(solidcraft_doc::Document::from_json(&s.doc.to_json()).unwrap());
+    let cold = Session::new(polykrom_doc::Document::from_json(&s.doc.to_json()).unwrap());
     assert!(!cold.model.state().body(&name).unwrap().body.contains(Vec3::new(25.0, 25.0, 0.5)));
     let dxf = run(&mut s, "sheet.export_dxf", json!({"body":name}))["dxf"].as_str().unwrap().to_string();
     assert!(dxf.contains("POCKET_TOP_Z1.000000_TO_2.500000_MM"));
     let outline = dxf_outline_only(&dxf);
-    assert_eq!(solidcraft_io::read_dxf(&outline).unwrap().len(), 5);
+    assert_eq!(polykrom_io::read_dxf(&outline).unwrap().len(), 5);
     let mut outline_import = Session::default();
     run(&mut outline_import, "sketch.insert_dxf", json!({"text":outline,"name":"Outline"}));
     run(&mut outline_import, "sketch.finish", json!({}));
@@ -2513,7 +2513,7 @@ fn partial_depth_intersect_sub_extrusion_resolution_layers_refuse_atomically() {
         assert!(error.contains("resolution") || error.contains("distance is zero") || error.contains("sheet machining"), "{error}");
         assert_eq!(s.doc.to_json(), before);
         assert!(s.model.state().sheets[0].pockets.is_empty());
-        assert!((solidcraft_kernel::measure(&s.world_state().body(&name).unwrap().body).unwrap().volume - 15000.0).abs() < 1e-5);
+        assert!((polycore::measure(&s.world_state().body(&name).unwrap().body).unwrap().volume - 15000.0).abs() < 1e-5);
     }
 }
 
@@ -2808,11 +2808,11 @@ fn has_round_cutout(f: &Value, c: [f64; 2], r: f64) -> bool {
 /// Whether the flat DXF holds the circle of radius `r` about `c` as a `CIRCLE`.
 fn dxf_has_circle(s: &mut Session, c: [f64; 2], r: f64) -> bool {
     let dxf = run(s, "sheet.export_dxf", json!({}))["dxf"].as_str().unwrap_or_default().to_string();
-    let centre = solidcraft_geom::Vec2::new(c[0], c[1]);
-    solidcraft_io::read_dxf(&dxf)
+    let centre = polycore_geom::Vec2::new(c[0], c[1]);
+    polykrom_io::read_dxf(&dxf)
         .unwrap_or_default()
         .iter()
-        .any(|g| matches!(g, solidcraft_io::Geom2::Circle(at, radius) if at.dist(centre) < 1e-5 && (radius - r).abs() < 1e-5))
+        .any(|g| matches!(g, polykrom_io::Geom2::Circle(at, radius) if at.dist(centre) < 1e-5 && (radius - r).abs() < 1e-5))
 }
 
 /// A hole on a flange lands in the flat pattern where the bend allowance puts its panel.
@@ -3060,7 +3060,7 @@ fn closed_corners_reach_the_flat_pattern_and_the_dxf() {
 
 #[test]
 fn corner_reliefs_of_the_rule_reach_the_part_the_flat_pattern_and_the_dxf() {
-    use solidcraft_geom::Vec2;
+    use polycore_geom::Vec2;
     // The tray at 72°: its bends meet at the corners of the base, s0 = 3·tan 36° in from the sheet's
     // edges, and are BA = 2θ wide in the flat. A relief 8 mm across reaches r = 4 mm along both edges
     // and takes, at each corner, r²·π/4 (round) or r² (rectangular) of the base and r of two bends.
@@ -3094,10 +3094,10 @@ fn corner_reliefs_of_the_rule_reach_the_part_the_flat_pattern_and_the_dxf() {
         assert_eq!(f["outline"].as_array().map(Vec::len), Some(1), "{shape}");
         // The DXF: the round reliefs are arcs of radius 4 about the four corners, the square ones lines.
         let dxf = export(&mut s);
-        let arcs: Vec<(Vec2, f64)> = solidcraft_io::read_dxf(&dxf)
+        let arcs: Vec<(Vec2, f64)> = polykrom_io::read_dxf(&dxf)
             .unwrap_or_default()
             .iter()
-            .filter_map(|g| if let solidcraft_io::Geom2::Arc { c, a, .. } = g { Some((*c, a.dist(*c))) } else { None })
+            .filter_map(|g| if let polykrom_io::Geom2::Arc { c, a, .. } = g { Some((*c, a.dist(*c))) } else { None })
             .collect();
         if shape == "round" {
             assert_eq!(arcs.len(), 4, "{arcs:?}");
@@ -3106,9 +3106,8 @@ fn corner_reliefs_of_the_rule_reach_the_part_the_flat_pattern_and_the_dxf() {
             }
         } else {
             let corner = Vec2::new(s0 + 4.0, s0 + 4.0);
-            let read = solidcraft_io::read_dxf(&dxf).unwrap_or_default();
-            let at_corner =
-                |g: &solidcraft_io::Geom2| matches!(g, solidcraft_io::Geom2::Line(a, b) if a.dist(corner) < 1e-6 || b.dist(corner) < 1e-6);
+            let read = polykrom_io::read_dxf(&dxf).unwrap_or_default();
+            let at_corner = |g: &polykrom_io::Geom2| matches!(g, polykrom_io::Geom2::Line(a, b) if a.dist(corner) < 1e-6 || b.dist(corner) < 1e-6);
             assert!(arcs.is_empty() && read.iter().any(at_corner), "{arcs:?}");
         }
         // Unfold and refold keep it, and a cut made folded still goes through: a Ø20 hole in the base.
@@ -3121,7 +3120,7 @@ fn corner_reliefs_of_the_rule_reach_the_part_the_flat_pattern_and_the_dxf() {
         run(&mut s, "sketch.finish", json!({}));
         run(&mut s, "solid.extrude", json!({"sketch": "Hole", "distance": 10, "operation": "cut", "through_all": true}));
         assert!((v - volume(&mut s) - PI * 100.0 * 2.0).abs() < 0.5, "{shape}: {v} - {}", volume(&mut s));
-        let mut reopened = Session::new(solidcraft_doc::Document::from_json(&s.doc.to_json()).unwrap());
+        let mut reopened = Session::new(polykrom_doc::Document::from_json(&s.doc.to_json()).unwrap());
         assert!((volume(&mut reopened) - volume(&mut s)).abs() < 1e-6, "{shape}");
     }
 }
@@ -3253,7 +3252,7 @@ fn corner_reliefs_at_non_orthogonal_corners_reach_the_flat_pattern_and_the_dxf()
         run(&mut s, "sheet.unfold", json!({}));
         run(&mut s, "sheet.refold", json!({}));
         assert!((volume(&mut s) - v).abs() < 1e-6 * v, "{shape}");
-        let mut reopened = Session::new(solidcraft_doc::Document::from_json(&s.doc.to_json()).unwrap());
+        let mut reopened = Session::new(polykrom_doc::Document::from_json(&s.doc.to_json()).unwrap());
         assert!((volume(&mut reopened) - v).abs() < 1e-6 * v, "{shape}");
     }
 }
@@ -3312,9 +3311,9 @@ fn a_tear_of_the_rule_reaches_the_part_the_flat_pattern_and_the_dxf() {
         // The DXF: the outline in straight lines, each cut one of them, and four bend lines.
         let dxf = run(&mut s, "sheet.export_dxf", json!({}))["dxf"].as_str().unwrap_or_default().to_string();
         assert_eq!(dxf.matches("0\nLINE\n").count(), outline.len() + 4, "{deg}");
-        let cut_end = solidcraft_geom::Vec2::new(x_end(s0), s0 - ba);
-        let read = solidcraft_io::read_dxf(&dxf).unwrap_or_default();
-        let at_cut_end = |g: &solidcraft_io::Geom2| matches!(g, solidcraft_io::Geom2::Line(a, b) if a.dist(cut_end) < 1e-6 || b.dist(cut_end) < 1e-6);
+        let cut_end = polycore_geom::Vec2::new(x_end(s0), s0 - ba);
+        let read = polykrom_io::read_dxf(&dxf).unwrap_or_default();
+        let at_cut_end = |g: &polykrom_io::Geom2| matches!(g, polykrom_io::Geom2::Line(a, b) if a.dist(cut_end) < 1e-6 || b.dist(cut_end) < 1e-6);
         assert!(read.iter().any(at_cut_end), "{deg}");
         // Unfold and refold keep it, and a cut made folded still goes through: a Ø20 hole in the base.
         run(&mut s, "sheet.unfold", json!({}));
@@ -3326,7 +3325,7 @@ fn a_tear_of_the_rule_reaches_the_part_the_flat_pattern_and_the_dxf() {
         run(&mut s, "sketch.finish", json!({}));
         run(&mut s, "solid.extrude", json!({"sketch": "Hole", "distance": 10, "operation": "cut", "through_all": true}));
         assert!((v - volume(&mut s) - PI * 100.0 * 2.0).abs() < 0.5, "{deg}: {v} - {}", volume(&mut s));
-        let mut reopened = Session::new(solidcraft_doc::Document::from_json(&s.doc.to_json()).unwrap());
+        let mut reopened = Session::new(polykrom_doc::Document::from_json(&s.doc.to_json()).unwrap());
         assert!((volume(&mut reopened) - volume(&mut s)).abs() < 1e-6, "{deg}");
     }
 }
@@ -3388,17 +3387,17 @@ fn two_flange_groups(rule: Value, near: Value, far: Value) -> Session {
 
 /// What the DXF of the flat pattern draws of the corner reliefs: the arcs (centre, radius) and the
 /// lines' end points.
-fn relief_drawing(s: &mut Session) -> (Vec<(solidcraft_geom::Vec2, f64)>, Vec<solidcraft_geom::Vec2>) {
+fn relief_drawing(s: &mut Session) -> (Vec<(polycore_geom::Vec2, f64)>, Vec<polycore_geom::Vec2>) {
     let dxf = run(s, "sheet.export_dxf", json!({}))["dxf"].as_str().unwrap_or_default().to_string();
-    let read = solidcraft_io::read_dxf(&dxf).unwrap_or_default();
-    let arcs = read.iter().filter_map(|g| if let solidcraft_io::Geom2::Arc { c, a, .. } = g { Some((*c, a.dist(*c))) } else { None }).collect();
-    let ends = read.iter().flat_map(|g| if let solidcraft_io::Geom2::Line(a, b) = g { vec![*a, *b] } else { Vec::new() }).collect();
+    let read = polykrom_io::read_dxf(&dxf).unwrap_or_default();
+    let arcs = read.iter().filter_map(|g| if let polykrom_io::Geom2::Arc { c, a, .. } = g { Some((*c, a.dist(*c))) } else { None }).collect();
+    let ends = read.iter().flat_map(|g| if let polykrom_io::Geom2::Line(a, b) = g { vec![*a, *b] } else { Vec::new() }).collect();
     (arcs, ends)
 }
 
 #[test]
 fn each_edge_flange_feature_chooses_the_corner_relief_of_its_own_corners() {
-    use solidcraft_geom::Vec2;
+    use polycore_geom::Vec2;
     // At 90° the bends of a corner meet at (s0, s0) in from the sheet's edges, s0 = (R + T)·tan 45° = 3,
     // and are BA = π/2·(R + K·T) = π wide. A relief d across reaches r = d/2 along both bends and takes,
     // at its corner, r²·π/4 (round) or r² (rectangular) of the base and r of each bend, 2 mm thick.
@@ -3430,11 +3429,11 @@ fn each_edge_flange_feature_chooses_the_corner_relief_of_its_own_corners() {
     run(&mut s, "sheet.unfold", json!({}));
     run(&mut s, "sheet.refold", json!({}));
     assert!((volume(&mut s) - v).abs() < 1e-6 * v);
-    let mut reopened = Session::new(solidcraft_doc::Document::from_json(&s.doc.to_json()).unwrap());
+    let mut reopened = Session::new(polykrom_doc::Document::from_json(&s.doc.to_json()).unwrap());
     assert!((volume(&mut reopened) - v).abs() < 1e-6 * v);
     assert_eq!(relief_drawing(&mut reopened).0.len(), 1);
     // The size is an input of the feature like its height: another size moves the relief.
-    let near_feature = s.doc.features.iter().find(|f| matches!(f.kind, solidcraft_doc::FeatureKind::SheetFlange { .. }));
+    let near_feature = s.doc.features.iter().find(|f| matches!(f.kind, polykrom_doc::FeatureKind::SheetFlange { .. }));
     let names = near_feature.map(|f| f.param_names.clone()).unwrap_or_default();
     assert_eq!(names.len(), 3, "height, angle and the relief: {names:?}");
     run(&mut s, "parameters.change", json!({"name": names[2], "expression": "4 mm"}));
@@ -3444,7 +3443,7 @@ fn each_edge_flange_feature_chooses_the_corner_relief_of_its_own_corners() {
 
 #[test]
 fn an_edge_flange_feature_follows_the_rule_for_the_relief_it_leaves_out() {
-    use solidcraft_geom::Vec2;
+    use polycore_geom::Vec2;
     let s0 = 3.0;
     let at = |ends: &[Vec2], x: f64, y: f64| ends.iter().any(|p| p.dist(Vec2::new(x, y)) < 1e-6);
     let round8 = json!({"corner_relief_shape": "round", "corner_relief": "8 mm"});
@@ -3571,7 +3570,7 @@ fn a_corner_relief_of_an_edge_flange_is_saved_with_it_and_designs_without_one_sa
     assert_eq!(features[1]["corner_relief_shape"], "tear");
     assert!(features[1].get("corner_relief").is_none(), "{}", features[1]);
     let saved = s.doc.to_json();
-    let mut reopened = Session::new(solidcraft_doc::Document::from_json(&saved).unwrap());
+    let mut reopened = Session::new(polykrom_doc::Document::from_json(&saved).unwrap());
     assert_eq!(reopened.doc.features, s.doc.features);
     assert!((volume(&mut reopened) - volume(&mut s)).abs() < 1e-6);
     assert_eq!(relief_drawing(&mut reopened), relief_drawing(&mut s));
@@ -3749,7 +3748,7 @@ fn edge_flanges_take_their_own_angle_and_height_per_edge() {
         "{saved}"
     );
     // Reopened, it is the same part.
-    let mut again = Session::new(solidcraft_doc::Document::from_json(&text).unwrap());
+    let mut again = Session::new(polykrom_doc::Document::from_json(&text).unwrap());
     assert!(no_errors_or_warnings(&again), "{:?}", again.model.results);
     assert!(rel(volume(&mut again), v1) < 1e-9);
 }
@@ -3879,7 +3878,7 @@ fn returns_on_a_tray_close_at_its_corners() {
     run(&mut s, "sheet.refold", json!({}));
     assert!(rel(volume(&mut s), v) < 1e-9);
     // Reopened, it is the same part.
-    let mut again = Session::new(solidcraft_doc::Document::from_json(&s.doc.to_json()).unwrap());
+    let mut again = Session::new(polykrom_doc::Document::from_json(&s.doc.to_json()).unwrap());
     assert!(no_errors_or_warnings(&again), "{:?}", again.model.results);
     assert!(rel(volume(&mut again), v) < 1e-9);
     assert!(same_points(&outline_points(&flat(&mut again)), &outline));
@@ -4069,11 +4068,11 @@ fn designs_without_per_edge_values_are_read_and_written_as_before() {
     let mut design: Value = serde_json::from_str(&text).unwrap();
     let flange = design["features"].as_array().and_then(|f| f.iter().position(|f| f["type"] == "sheet_flange")).unwrap();
     assert_eq!(design["features"][flange]["edges"], json!([[60.0, 0.0, 2.0], [120.0, 45.0, 2.0], [60.0, 90.0, 2.0], [0.0, 45.0, 2.0]]));
-    let mut same = Session::new(solidcraft_doc::Document::from_json(&text).unwrap());
+    let mut same = Session::new(polykrom_doc::Document::from_json(&text).unwrap());
     assert!(rel(volume(&mut same), v) < 1e-12);
     // A design file whose last edge carries its own angle is the part the command makes.
     design["features"][flange]["edges"][3] = json!({"point": [0.0, 45.0, 2.0], "angle": "100 deg"});
-    let mut opened = Session::new(solidcraft_doc::Document::from_json(&design.to_string()).unwrap());
+    let mut opened = Session::new(polykrom_doc::Document::from_json(&design.to_string()).unwrap());
     assert!(no_errors_or_warnings(&opened), "{:?}", opened.model.results);
     let mut made = Session::default();
     alu_base(&mut made);
@@ -4083,7 +4082,7 @@ fn designs_without_per_edge_values_are_read_and_written_as_before() {
     assert!(rel(vo, vm) < 1e-9 && rel(vo, v) > 1e-4, "{vo} vs {vm} vs {v}");
     // A key this build doesn't know is refused, not dropped.
     design["features"][flange]["edges"][3] = json!({"point": [0.0, 45.0, 2.0], "twist": "3 deg"});
-    assert!(solidcraft_doc::Document::from_json(&design.to_string()).is_err());
+    assert!(polykrom_doc::Document::from_json(&design.to_string()).is_err());
 }
 
 /// Names of the hole's side faces (curved, smaller than the bend faces) in `Body1`.
@@ -4313,7 +4312,7 @@ fn fold_fixed_point_must_touch_the_sheet_but_any_face_will_do() {
 }
 
 /// The middle of the largest triangle of each flat face of the first body: well inside it.
-fn flat_face_points(s: &Session) -> Vec<(usize, solidcraft_geom::Vec3, solidcraft_geom::Vec3)> {
+fn flat_face_points(s: &Session) -> Vec<(usize, polycore_geom::Vec3, polycore_geom::Vec3)> {
     let state = s.model.state();
     let body = &state.bodies[0].body;
     let mesh = body.tessellate(0.01).unwrap();
@@ -4359,7 +4358,7 @@ fn every_flat_face_of_a_sheet_takes_an_attached_sketch() {
         run(&mut s, "sketch.finish", json!({}));
         assert_eq!(made["attachment"], "sheet_face", "face {index} at {point:?}");
         let id = made["sketch"].as_u64().unwrap();
-        let solidcraft_doc::FaceAttachmentStatus::Sheet { plane: Some(plane) } = s.placed_document().sketch_face_attachment(id, &s.model) else {
+        let polykrom_doc::FaceAttachmentStatus::Sheet { plane: Some(plane) } = s.placed_document().sketch_face_attachment(id, &s.model) else {
             panic!("face {index} at {point:?}")
         };
         assert!(plane.normal().dot(normal) > 1.0 - 1e-9 && (point - plane.origin).dot(normal).abs() < 1e-6, "face {index}: {plane:?}");
@@ -4370,7 +4369,7 @@ fn every_flat_face_of_a_sheet_takes_an_attached_sketch() {
     // The base's rim along x = W (the sketch's l2) moves with W.
     let side = on_side.expect("the base rim on x = 100");
     run(&mut s, "parameters.change", json!({"name": "W", "expression": "120 mm"}));
-    let solidcraft_doc::FaceAttachmentStatus::Sheet { plane: Some(plane) } = s.placed_document().sketch_face_attachment(side, &s.model) else {
+    let polykrom_doc::FaceAttachmentStatus::Sheet { plane: Some(plane) } = s.placed_document().sketch_face_attachment(side, &s.model) else {
         panic!("the rim sketch after the edit")
     };
     assert!((plane.origin.x - 120.0).abs() < 1e-9 && (plane.normal().x - 1.0).abs() < 1e-9, "{plane:?}");
@@ -4410,7 +4409,7 @@ fn a_hole_drilled_into_a_rim_is_a_bore_the_sheet_keeps_when_it_unfolds() {
     let f = flat(&mut s);
     assert_eq!(f["bores"].as_array().map(Vec::len), Some(1), "{f}");
     assert_eq!(f["cutouts"], json!([]));
-    let inside = |s: &Session, p: [f64; 3]| s.model.state().bodies[0].body.contains(solidcraft_geom::Vec3::new(p[0], p[1], p[2]));
+    let inside = |s: &Session, p: [f64; 3]| s.model.state().bodies[0].body.contains(polycore_geom::Vec3::new(p[0], p[1], p[2]));
     // The flat pattern loses the same bore (the bends unroll to their own length).
     let flat_after = unfolded_volume(&mut s);
     assert!(rel(flat_before - flat_after, removed) < 0.02, "flat: removed {} of {removed}", flat_before - flat_after);
@@ -4418,7 +4417,7 @@ fn a_hole_drilled_into_a_rim_is_a_bore_the_sheet_keeps_when_it_unfolds() {
     // Folded again: the bore is where it was drilled, the material beside it stays.
     assert!(!inside(&s, [30.0, y, t / 2.0]));
     assert!(inside(&s, [30.0, y + d, t / 2.0]));
-    let mut reopened = Session::new(solidcraft_doc::Document::from_json(&s.doc.to_json()).unwrap());
+    let mut reopened = Session::new(polykrom_doc::Document::from_json(&s.doc.to_json()).unwrap());
     assert!(rel(volume(&mut reopened), folded) < 1e-3);
     assert!(rel(unfolded_volume(&mut reopened), flat_after) < 1e-6);
 }
@@ -4437,7 +4436,7 @@ fn a_rim_hole_in_a_flange_follows_it_into_the_flat_pattern() {
     let t = l_bracket(&mut s);
     let before = volume(&mut s);
     let flat_before = unfolded_volume(&mut s);
-    let inside = |s: &Session, p: [f64; 3]| s.model.state().bodies[0].body.contains(solidcraft_geom::Vec3::new(p[0], p[1], p[2]));
+    let inside = |s: &Session, p: [f64; 3]| s.model.state().bodies[0].body.contains(polycore_geom::Vec3::new(p[0], p[1], p[2]));
     // Halfway up the flange, in the middle of its thickness (whichever way the rule put it).
     let mid = [[40.0 - t / 2.0, 15.0], [40.0 - t / 2.0, -15.0], [40.0 + t / 2.0, 15.0], [40.0 + t / 2.0, -15.0]]
         .into_iter()
@@ -4612,7 +4611,7 @@ fn perforation_skips_bend_zones_and_survives_fold_unfold_and_reopen() {
     assert_eq!(flat(&mut s)["perforations"][0]["count"].as_u64(), Some(count));
     run(&mut s, "sheet.refold", json!({}));
     assert!(rel(volume(&mut s), volume_folded) < 1e-9);
-    let mut reopened = Session::new(solidcraft_doc::Document::from_json(&s.doc.to_json()).unwrap());
+    let mut reopened = Session::new(polykrom_doc::Document::from_json(&s.doc.to_json()).unwrap());
     assert_eq!(flat(&mut reopened)["perforations"][0]["count"].as_u64(), Some(count));
     assert!(rel(volume(&mut reopened), volume_folded) < 1e-9);
 }
@@ -4678,7 +4677,7 @@ fn parted_note(area: f64, at: [f64; 2]) -> String {
 }
 
 fn flat_pieces(s: &Session) -> Vec<f64> {
-    s.model.state().sheets[0].flat_regions().unwrap().iter().map(solidcraft_geom::Region2::area).collect()
+    s.model.state().sheets[0].flat_regions().unwrap().iter().map(polycore_geom::Region2::area).collect()
 }
 
 #[test]
@@ -4966,7 +4965,7 @@ fn a_mirrored_sheet_copy_is_the_opposite_hand_with_the_mirror_image_flat_pattern
     assert_eq!(bends(&mirrored).len(), 2);
     // The hole is where the mirror put it, on the copy and in its flat pattern.
     let in_copy = |p: [f64; 3]| {
-        s.model.state().bodies.iter().find(|b| b.name == "Body1 (2)").is_some_and(|b| b.body.contains(solidcraft_geom::Vec3::new(p[0], p[1], p[2])))
+        s.model.state().bodies.iter().find(|b| b.name == "Body1 (2)").is_some_and(|b| b.body.contains(polycore_geom::Vec3::new(p[0], p[1], p[2])))
     };
     assert!(!in_copy([-25.0, 40.0, 1.0]) && in_copy([-35.0, 40.0, 1.0]));
     let hole = flat_points(&mirrored["cutouts"], 1.0);

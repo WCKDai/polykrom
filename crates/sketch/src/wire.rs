@@ -2,8 +2,8 @@
 //! planar geometry — included 3D edges, curves projected onto surfaces, intersection curves.
 //! They are reference geometry: drawn and usable as paths, not part of profiles or the solver.
 
+use polycore_geom::Vec3;
 use serde::{Deserialize, Serialize};
-use solidcraft_geom::Vec3;
 
 use crate::link::{Link, LinkGeom, LinkKind, LinkSource};
 use crate::model::{Result, Sketch, SketchError, in_range3};

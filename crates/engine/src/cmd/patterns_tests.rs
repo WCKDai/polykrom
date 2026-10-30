@@ -63,7 +63,7 @@ fn rectangular_hole_pattern_warns_for_copies_that_miss_and_clears_after_edit() {
     assert_eq!(reply["warning"], "3 of 3 cut copies remove no material");
     // The remaining copy lands in the existing through hole, so the plate stays intact.
     assert!(rel(volume(&mut s), before) < 1e-8);
-    let reopened = Session::new(solidcraft_doc::Document::from_json(&s.doc.to_json()).unwrap());
+    let reopened = Session::new(polykrom_doc::Document::from_json(&s.doc.to_json()).unwrap());
     check(&reopened);
     run(
         &mut s,
@@ -95,14 +95,14 @@ fn rectangular_cut_pattern_counts_only_target_contacts_and_keeps_landing_copies(
     assert_eq!(reply["warning"], "2 of 3 cut copies remove no material");
     let state = s.world_state();
     let plate = &state.body("Plate").unwrap().body;
-    assert!(!plate.contains(solidcraft_geom::Vec3::new(30., 15., 5.)));
-    assert!(state.body("Neighbor").unwrap().body.contains(solidcraft_geom::Vec3::new(50., 15., 5.)));
+    assert!(!plate.contains(polycore_geom::Vec3::new(30., 15., 5.)));
+    assert!(state.body("Neighbor").unwrap().body.contains(polycore_geom::Vec3::new(50., 15., 5.)));
     assert!(rel(volume(&mut s), 24000.0 - 2.0 * PI * 4.0 * 10.0) < 1e-3);
 }
 
 #[test]
 fn feature_rectangular_center_flip_and_oblique_direction_keep_source_and_recompute() {
-    use solidcraft_geom::Vec3;
+    use polycore_geom::Vec3;
     for flipped in [false, true] {
         let mut s = feature_pattern_plate();
         let before = s.doc.to_json();
@@ -132,7 +132,7 @@ fn feature_rectangular_center_flip_and_oblique_direction_keep_source_and_recompu
         assert_eq!(s.doc.to_json(), before);
         run(&mut s, "edit.redo", json!({}));
         assert_eq!(s.doc.to_json(), saved);
-        let mut reopened = Session::new(solidcraft_doc::Document::from_json(&saved).unwrap());
+        let mut reopened = Session::new(polykrom_doc::Document::from_json(&saved).unwrap());
         assert!(rel(volume(&mut reopened), volume(&mut s)) < 1e-8);
         // The copies replay the edited feature rather than freezing its original tool.
         run(&mut reopened, "timeline.redefine", json!({"feature":"Hole","command":"solid.hole","params":{"position":[60,60,5],"diameter":3}}));
@@ -142,7 +142,7 @@ fn feature_rectangular_center_flip_and_oblique_direction_keep_source_and_recompu
 
 #[test]
 fn feature_circular_center_flip_uses_partial_arc_endpoints_and_full_circle_spacing() {
-    use solidcraft_geom::Vec3;
+    use polycore_geom::Vec3;
     for total in [90.0_f64, 360.0] {
         for flipped in [false, true] {
             let mut s = feature_pattern_plate();
@@ -164,7 +164,7 @@ fn feature_circular_center_flip_uses_partial_arc_endpoints_and_full_circle_spaci
             }
             assert!(rel(volume(&mut s), 120.0 * 120.0 * 5.0 - 6.0 * PI * 5.0) < 1e-5);
             let saved = s.doc.to_json();
-            let mut reopened = Session::new(solidcraft_doc::Document::from_json(&saved).unwrap());
+            let mut reopened = Session::new(polykrom_doc::Document::from_json(&saved).unwrap());
             assert!(rel(volume(&mut reopened), volume(&mut s)) < 1e-8);
         }
     }
@@ -235,7 +235,7 @@ fn circular_numeric_axis_origin_preserves_hole_geometry_and_reopens() {
         assert_eq!(s.doc.to_json(), before);
         run(&mut s, "edit.redo", json!({}));
         assert_eq!(s.doc.to_json(), saved);
-        let mut reopened = Session::new(solidcraft_doc::Document::from_json(&saved).unwrap());
+        let mut reopened = Session::new(polykrom_doc::Document::from_json(&saved).unwrap());
         assert!(rel(volume(&mut reopened), expected) < 1e-4);
     }
     // The documented omission of origin still means zero.
@@ -244,7 +244,7 @@ fn circular_numeric_axis_origin_preserves_hole_geometry_and_reopens() {
     let before = s.doc.to_json();
     run(&mut s, "solid.pattern.circular", json!({"bodies":["Cube"],"axis":{"dir":[0,0,1]},"count":4}));
     let implicit = s.doc.to_json();
-    let mut explicit = Session::new(solidcraft_doc::Document::from_json(&before).unwrap());
+    let mut explicit = Session::new(polykrom_doc::Document::from_json(&before).unwrap());
     run(&mut explicit, "solid.pattern.circular", json!({"bodies":["Cube"],"axis":{"origin":[0,0,0],"dir":[0,0,1]},"count":4}));
     assert_eq!(implicit, explicit.doc.to_json());
 }
@@ -303,7 +303,7 @@ fn circular_pattern_about_a_construction_axis_follows_it() {
         let st = s.model.state();
         assert_eq!(st.bodies.len(), 4);
         let mut out = [f64::INFINITY, f64::NEG_INFINITY, f64::INFINITY, f64::NEG_INFINITY];
-        for b in st.bodies.iter().filter_map(|mb| solidcraft_kernel::measure(&mb.body).ok()).map(|m| m.bbox) {
+        for b in st.bodies.iter().filter_map(|mb| polycore::measure(&mb.body).ok()).map(|m| m.bbox) {
             out = [out[0].min(b.min.x), out[1].max(b.max.x), out[2].min(b.min.y), out[3].max(b.max.y)];
         }
         out
@@ -669,7 +669,7 @@ fn copies_of_a_join_that_merged_its_targets_join_the_merged_body() {
 /// middle; the rib's triangle (8, 5)-(8, 25)-(30, 5) in the XZ plane, 4 thick, is 880 mm³.
 #[test]
 fn patterns_and_mirrors_of_a_rib() {
-    use solidcraft_geom::Vec3;
+    use polycore_geom::Vec3;
     let rib = 0.5 * 22.0 * 20.0 * 4.0;
     let ribbed = || {
         let mut s = Session::default();
@@ -713,7 +713,7 @@ fn patterns_and_mirrors_of_a_rib() {
 /// box with a hole `H` at (−15, −10) and `Pat`, two more holes along x at 10 mm steps.
 #[test]
 fn patterns_and_mirrors_of_patterns_and_mirrors() {
-    use solidcraft_geom::Vec3;
+    use polycore_geom::Vec3;
     let hole = PI * 1.5 * 1.5 * 20.0;
     let design = || {
         let mut s = Session::default();

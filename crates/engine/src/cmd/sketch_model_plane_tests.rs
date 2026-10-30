@@ -3,8 +3,8 @@
 //! Text resolve the sketch's plane against the model before the sketch, as evaluation does, and
 //! the links follow when a parameter moves the plane.
 
+use polycore_geom::Vec3;
 use serde_json::{Value, json};
-use solidcraft_geom::Vec3;
 
 use crate::Session;
 
@@ -76,7 +76,7 @@ fn project_onto_a_plane_built_from_a_sketch_line_follows_the_parameter() {
         assert!(world_point(s, "B", "c1.center").dist(end) < 1e-9);
     };
     check(&s);
-    check(&Session::new(solidcraft_doc::Document::from_json(&s.doc.to_json()).unwrap()));
+    check(&Session::new(polykrom_doc::Document::from_json(&s.doc.to_json()).unwrap()));
     // Editing the sketch again after the change refreshes its links on the moved plane.
     run(&mut s, "sketch.edit", json!({"sketch": "B"}));
     run(&mut s, "sketch.point", json!({"point": [10, 10]}));

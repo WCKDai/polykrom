@@ -4,10 +4,10 @@
 
 use crate::ui_kit::{choice_row, expr_row, text_row};
 use egui::{Pos2, RichText, Stroke};
+use polykrom_engine::doc::{IDENTITY, Mat, apply_point, mat_inverse, mat_mul};
+use polykrom_engine::geom::Vec3;
+use polykrom_engine::{Sel, Session};
 use serde_json::{Value, json};
-use solidcraft_engine::doc::{IDENTITY, Mat, apply_point, mat_inverse, mat_mul};
-use solidcraft_engine::geom::Vec3;
-use solidcraft_engine::{Sel, Session};
 
 use super::{Hover, body_of, capital, movable, num, pt, sel_items, snap_of};
 use crate::dialogs::{combo, form_row};
@@ -83,7 +83,7 @@ pub fn params(s: &Session, f: &TraceForm, inputs: &[SelInput]) -> Result<Value, 
         let mut reference = snap.param;
         reference["occurrence"] = json!(path.last().copied().unwrap_or(0));
         for key in ["point", "face", "circle", "edge"] {
-            if let Some(at) = reference.get(key).and_then(solidcraft_engine::params::vec3) {
+            if let Some(at) = reference.get(key).and_then(polykrom_engine::params::vec3) {
                 reference[key] = pt(apply_point(&placed, apply_point(&inverse, at)));
             }
         }

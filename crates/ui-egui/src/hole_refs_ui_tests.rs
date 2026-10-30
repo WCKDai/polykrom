@@ -3,10 +3,10 @@
 //! the dialog, one in its box on the canvas), OK. The hole sits at those distances; Edit Feature
 //! picks the edges again with their distances, and moving the hole's place measures them again.
 
+use polykrom_engine::Sel;
+use polykrom_engine::doc::FeatureKind;
+use polykrom_engine::geom::Vec3;
 use serde_json::json;
-use solidcraft_engine::Sel;
-use solidcraft_engine::doc::FeatureKind;
-use solidcraft_engine::geom::Vec3;
 
 use crate::dialogs::Kind;
 use crate::scenario::Harness;
@@ -83,7 +83,7 @@ fn a_hole_is_placed_by_its_distances_from_two_edges() {
     assert!(picked_edge(&h, "Reference 1").is_some_and(|p| p.x.abs() < 1e-6), "the left edge is Reference 1: {:?}", picked_edge(&h, "Reference 1"));
     assert!(picked_edge(&h, "Reference 2").is_some_and(|p| p.y.abs() < 1e-6), "the front edge is Reference 2: {:?}", picked_edge(&h, "Reference 2"));
     let measured = distances(&h);
-    let value = |s: &str| h.app.session.doc.eval(s, solidcraft_engine::doc::expr::Kind::Length).unwrap();
+    let value = |s: &str| h.app.session.doc.eval(s, polykrom_engine::doc::expr::Kind::Length).unwrap();
     assert!((value(&measured[0]) - picked.x).abs() < 1e-3 && (value(&measured[1]) - picked.y).abs() < 1e-3, "{measured:?} from {picked:?}");
     // The distances show on the canvas, each with a box to type in.
     assert!(h.at(&json!({"handle": "canvas:Distance 1"})).is_ok() && h.at(&json!({"handle": "canvas:Distance 2"})).is_ok());

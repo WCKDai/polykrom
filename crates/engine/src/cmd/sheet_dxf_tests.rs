@@ -4,8 +4,8 @@
 
 use std::f64::consts::{PI, TAU};
 
+use polycore_geom::{Seg2, Vec2};
 use serde_json::{Value, json};
-use solidcraft_geom::{Seg2, Vec2};
 
 use crate::Session;
 
@@ -103,7 +103,7 @@ fn point(e: &Entity, code: i32) -> Vec2 {
 }
 
 /// All loops of the flat pattern (outlines, cut-outs, islands).
-fn loops(s: &Session) -> Vec<solidcraft_geom::Loop2> {
+fn loops(s: &Session) -> Vec<polycore_geom::Loop2> {
     let regions = s.model.state().sheets[0].flat_regions().unwrap_or_default();
     regions.iter().flat_map(|r| std::iter::once(r.outer.clone()).chain(r.holes.clone())).collect()
 }
@@ -133,8 +133,8 @@ fn an_elliptic_cut_out_is_one_ellipse() {
     assert!((values(e, 40)[0] - 8.0 / 15.0).abs() < 1e-9 && values(e, 41)[0] == 0.0 && (values(e, 42)[0] - TAU).abs() < 1e-9);
     assert_eq!(values(e, 230), [1.0]);
     // Our reader gets the same ellipse back, and the same plate: 6000 mm² less π·15·8.
-    let read = solidcraft_io::read_dxf(&dxf).unwrap();
-    assert!(read.iter().any(|g| matches!(g, solidcraft_io::Geom2::Ellipse { c, major, minor }
+    let read = polykrom_io::read_dxf(&dxf).unwrap();
+    assert!(read.iter().any(|g| matches!(g, polykrom_io::Geom2::Ellipse { c, major, minor }
         if c.dist(Vec2::new(40.0, 30.0)) < 1e-9 && (major.dist(*c) - 15.0).abs() < 1e-9 && (minor - 8.0).abs() < 1e-9)));
     let areas = reimported_areas(&dxf);
     assert!(areas.len() == 2 && (areas[0] - (6000.0 - PI * 120.0)).abs() < 1e-6 && (areas[1] - PI * 120.0).abs() < 1e-6, "{areas:?}");
@@ -345,8 +345,8 @@ fn the_flat_pattern_is_on_layers_by_role_and_inner_contours_come_first() {
     // OUTLINE: the tray's outer contour alone, one entity for each of its segments (lines and arcs).
     let regions = s.model.state().sheets[0].flat_regions().unwrap_or_default();
     let plate =
-        regions.iter().max_by(|a, b| a.area().total_cmp(&b.area())).map(|r| r.outer.clone()).unwrap_or(solidcraft_geom::Loop2 { segs: Vec::new() });
-    assert_eq!(on("OUTLINE").len(), solidcraft_io::loop_shapes(&plate).len());
+        regions.iter().max_by(|a, b| a.area().total_cmp(&b.area())).map(|r| r.outer.clone()).unwrap_or(polycore_geom::Loop2 { segs: Vec::new() });
+    assert_eq!(on("OUTLINE").len(), polykrom_io::loop_shapes(&plate).len());
     assert!(on("OUTLINE").iter().all(|e| e.0 == "LINE" || e.0 == "ARC"), "{:?}", on("OUTLINE").iter().map(|e| &e.0).collect::<Vec<_>>());
     // CUT: what is cut out inside it that is no text: the Ø5 hole as one CIRCLE, the slot's four lines.
     let cut = on("CUT");
@@ -499,7 +499,7 @@ fn each_sheet_body_can_have_a_file_of_its_own() {
     let bend_lines = |f: &Value| entities(f["dxf"].as_str().unwrap_or_default()).iter().filter(|e| layer_of(e) == "BEND_UP").count();
     assert_eq!((bend_lines(&files[0]), bend_lines(&files[1])), (0, 1));
     // With a path, each body is written to a file named after it, beside the path, and no text comes back.
-    let dir = solidcraft_io::vfs::temp_dir().join(format!("solidcraft-dxf-per-body-{}", std::process::id()));
+    let dir = polykrom_io::vfs::temp_dir().join(format!("solidcraft-dxf-per-body-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap_or_default();
     let path = dir.join("panel.dxf").to_string_lossy().to_string();

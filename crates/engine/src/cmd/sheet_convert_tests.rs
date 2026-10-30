@@ -375,10 +375,10 @@ fn the_sheet_follows_the_solid_through_parameter_changes_undo_and_reopening() {
     // The design file keeps the bend edges, and reopens to the same sheet.
     let saved = s.doc.to_json();
     assert!(saved.contains("\"bends\""), "{saved}");
-    let mut reopened = Session::new(solidcraft_doc::Document::from_json(&saved).unwrap());
+    let mut reopened = Session::new(polykrom_doc::Document::from_json(&saved).unwrap());
     assert!(same_size(flat_size(&mut reopened), thick, 1e-6));
     // Bend edges came with format 17: a build from before them asks for an update.
-    let version = serde_json::from_str::<Value>(&saved).unwrap()["format"].as_str().and_then(solidcraft_doc::format::version_of);
+    let version = serde_json::from_str::<Value>(&saved).unwrap()["format"].as_str().and_then(polykrom_doc::format::version_of);
     assert!(version >= Some(17), "{version:?}");
 }
 
@@ -393,9 +393,9 @@ fn designs_from_before_bend_edges_open_unchanged() {
     let mut older: Value = serde_json::from_str(&s.doc.to_json()).unwrap();
     assert!(!older.to_string().contains("\"bends\""), "{older}");
     older["format"] = json!("solidcraft/16");
-    let doc = solidcraft_doc::Document::from_json(&older.to_string()).unwrap();
+    let doc = polykrom_doc::Document::from_json(&older.to_string()).unwrap();
     // An older design keeps the numbering of the pieces it was saved with (#3902).
-    let mut same = solidcraft_doc::Document::clone(&s.doc);
+    let mut same = polykrom_doc::Document::clone(&s.doc);
     same.features.iter_mut().for_each(|f| f.kernel_piece_order = true);
     assert_eq!(doc, same);
     let mut reopened = Session::new(doc);
@@ -462,7 +462,7 @@ fn a_chamfer_picked_in_its_middle_is_one_bend_at_the_virtual_sharp() {
     assert!((volume(&mut s) - expect).abs() < 2e-3 * expect, "{} vs {expect}", volume(&mut s));
     // The design keeps the chamfers' points and reopens to the same sheet.
     let saved = s.doc.to_json();
-    let mut reopened = Session::new(solidcraft_doc::Document::from_json(&saved).unwrap());
+    let mut reopened = Session::new(polykrom_doc::Document::from_json(&saved).unwrap());
     assert!(same_size(flat_size(&mut reopened), (across, 100.0), 1e-6), "{:?}", flat_size(&mut reopened));
 
     // Picked on the inner skin, from the inside of the base: the same sheet, bent down.
@@ -577,7 +577,7 @@ fn a_bend_modelled_with_its_radius_is_one_bend_of_the_rules_radius() {
     assert!((volume(&mut s) - expect).abs() < 2e-3 * expect, "{} vs {expect}", volume(&mut s));
     // The design keeps the cylinder's point and reopens to the same sheet.
     let saved = s.doc.to_json();
-    let mut reopened = Session::new(solidcraft_doc::Document::from_json(&saved).unwrap());
+    let mut reopened = Session::new(polykrom_doc::Document::from_json(&saved).unwrap());
     assert!(same_size(flat_size(&mut reopened), (across, 100.0), 1e-6), "{:?}", flat_size(&mut reopened));
 
     // The inner cylinder is the same bend; and from the inside of the base, the sheet's other
@@ -1109,7 +1109,7 @@ fn label_rectangle(s: &mut Session) {
 }
 
 fn contains(s: &Session, p: [f64; 3]) -> bool {
-    s.model.state().bodies.first().is_some_and(|b| b.body.contains(solidcraft_geom::Vec3::new(p[0], p[1], p[2])))
+    s.model.state().bodies.first().is_some_and(|b| b.body.contains(polycore_geom::Vec3::new(p[0], p[1], p[2])))
 }
 
 /// The LINE entities a DXF draws on `layer` (group codes and values alternate, a line each).
@@ -1163,7 +1163,7 @@ fn a_plate_with_an_engraving_converts_with_the_engraving_as_a_pocket() {
         let dxf = run(&mut s, "sheet.export_dxf", json!({}))["dxf"].as_str().unwrap().to_string();
         assert_eq!((lines_on(&dxf, "OUTLINE"), lines_on(&dxf, layer)), (4, 4), "{pick:?}: {dxf}");
         // Nothing is stored for it: reopened, the design builds the same sheet.
-        let mut reopened = Session::new(solidcraft_doc::Document::from_json(&s.doc.to_json()).unwrap());
+        let mut reopened = Session::new(polykrom_doc::Document::from_json(&s.doc.to_json()).unwrap());
         assert!((volume(&mut reopened) - 2380.0).abs() < 1e-6);
         assert_eq!(flat(&mut reopened), f);
     }
@@ -1180,7 +1180,7 @@ fn a_large_plate_keeps_an_engraving_shallower_than_its_tessellation_tolerance() 
     run(&mut s, "sketch.finish", json!({}));
     run(&mut s, "solid.extrude", json!({"sketch": "Label", "distance": 0.1, "direction": "negative", "operation": "cut"}));
     for pick in [[450.0, 300.0, 0.0], [450.0, 300.0, 1.0]] {
-        let mut s = Session::new(solidcraft_doc::Document::from_json(&s.doc.to_json()).unwrap());
+        let mut s = Session::new(polykrom_doc::Document::from_json(&s.doc.to_json()).unwrap());
         run(&mut s, "sheet.convert", json!({"body": "Plate", "face": pick}));
         // 600·400·1 less the engraving's 20·10·0.1.
         assert!((volume(&mut s) - 239_980.0).abs() < 1e-3, "{pick:?}: {}", volume(&mut s));
@@ -1650,18 +1650,18 @@ fn a_converted_trays_corners_are_closed_and_relieved_as_a_flanged_trays_are() {
         // corners R + T in from the sharps, 92 and 52 apart.
         if shape == "round" {
             let dxf = run(&mut s, "sheet.export_dxf", json!({}))["dxf"].as_str().unwrap_or_default().to_string();
-            let arcs: Vec<(solidcraft_geom::Vec2, f64)> = solidcraft_io::read_dxf(&dxf)
+            let arcs: Vec<(polycore_geom::Vec2, f64)> = polykrom_io::read_dxf(&dxf)
                 .unwrap_or_default()
                 .iter()
-                .filter_map(|g| if let solidcraft_io::Geom2::Arc { c, a, .. } = g { Some((*c, a.dist(*c))) } else { None })
+                .filter_map(|g| if let polykrom_io::Geom2::Arc { c, a, .. } = g { Some((*c, a.dist(*c))) } else { None })
                 .collect();
             assert_eq!(arcs.len(), 4, "{arcs:?}");
-            let lo = solidcraft_geom::Vec2::new(
+            let lo = polycore_geom::Vec2::new(
                 arcs.iter().map(|(c, _)| c.x).fold(f64::MAX, f64::min),
                 arcs.iter().map(|(c, _)| c.y).fold(f64::MAX, f64::min),
             );
             for (x, y) in [(0.0, 0.0), (92.0, 0.0), (92.0, 52.0), (0.0, 52.0)] {
-                let at = lo + solidcraft_geom::Vec2::new(x, y);
+                let at = lo + polycore_geom::Vec2::new(x, y);
                 assert!(arcs.iter().any(|(c, r)| c.dist(at) < 1e-6 && (r - 4.0).abs() < 1e-6), "({x}, {y}): {arcs:?}");
             }
         }

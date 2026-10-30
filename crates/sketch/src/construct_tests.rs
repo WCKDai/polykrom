@@ -2,7 +2,7 @@
 //! points that keep a degree of freedom, drag continuity, and hostile input. Deterministic
 //! (fixed LCG seeds), no timing.
 
-use solidcraft_geom::Vec2;
+use polycore_geom::Vec2;
 
 use crate::construct::{Placement, seed};
 use crate::decompose::Budget;

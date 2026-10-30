@@ -2,9 +2,9 @@
 //! result has it: into the face that was picked (also the underside of a thin plate on XY, and a
 //! round face), and, at sketch points, into the part unless Flip is on.
 
+use polykrom_engine::doc::FeatureKind;
+use polykrom_engine::geom::Vec3;
 use serde_json::json;
-use solidcraft_engine::doc::FeatureKind;
-use solidcraft_engine::geom::Vec3;
 
 use crate::scenario::Harness;
 
@@ -110,7 +110,7 @@ fn flip_drills_holes_at_sketch_points_the_other_way() {
             *depth = "5 mm".into();
         }
         d.inputs = vec![crate::selection::SelInput::new("Points", crate::selection::POINTS, true)];
-        d.inputs[0].items = vec![solidcraft_engine::Sel::SketchPoint { id: format!("{sketch}:q") }];
+        d.inputs[0].items = vec![polykrom_engine::Sel::SketchPoint { id: format!("{sketch}:q") }];
     }
     h.frames(2);
     // The arrow shows the way the hole goes: down from the top, and up once Flip is on.

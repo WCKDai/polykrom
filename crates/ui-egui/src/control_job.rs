@@ -4,9 +4,9 @@
 //!
 //! The window thread still owns the design. What leaves it is the computing:
 //! - **Design changes** (`engine.execute` of a modelling command, `engine.batch`) are evaluated
-//!   ahead on a copy of the session ([`solidcraft_engine::Session::ahead`]), as the history
+//!   ahead on a copy of the session ([`polykrom_engine::Session::ahead`]), as the history
 //!   marker and undo are ([`crate::deferred`]). What that computes is kept
-//!   ([`solidcraft_engine::doc::KeptResults`]); once it is in, the request runs here for real, as
+//!   ([`polykrom_engine::doc::KeptResults`]); once it is in, the request runs here for real, as
 //!   it always did (undo step, recovery autosave, crash journal, agent cursor, reply), and finds
 //!   every feature it computed there, whatever the bounded evaluation cache dropped meanwhile.
 //!   One design change computes at a time; later ones wait their turn, in order.
@@ -30,7 +30,7 @@ use std::sync::mpsc::{Receiver, TryRecvError};
 
 use serde_json::{Value, json};
 
-use solidcraft_engine::doc::KeptResults;
+use polykrom_engine::doc::KeptResults;
 
 use crate::SolveApp;
 use crate::control::ControlRequest;
@@ -83,7 +83,7 @@ const MAX_TRIES: u8 = 3;
 
 /// The command's own id (as registered), if it has one.
 fn spec_id(command: &str) -> Option<&'static str> {
-    solidcraft_engine::find_command(command).map(|c| c.id)
+    polykrom_engine::find_command(command).map(|c| c.id)
 }
 
 fn names_a_file(params: &Value) -> bool {
@@ -129,7 +129,7 @@ pub(crate) fn changes_the_design(method: &str) -> bool {
 enum Work {
     /// Evaluated ahead: once in, the request runs here. `doc` and `revision` are the design it
     /// was computed for.
-    Ahead { commands: Vec<(String, Value)>, doc: Arc<solidcraft_engine::doc::Document>, revision: u64, tries: u8, kept: Arc<KeptResults> },
+    Ahead { commands: Vec<(String, Value)>, doc: Arc<polykrom_engine::doc::Document>, revision: u64, tries: u8, kept: Arc<KeptResults> },
     /// Run on a copy; the reply comes from there.
     Answer,
 }
@@ -158,20 +158,17 @@ impl ControlJob {
 
 fn label(app: &SolveApp, command: &str) -> String {
     let language = crate::i18n::Locale::for_language(&app.preferences.language);
-    language.label(solidcraft_engine::find_command(command).map_or(command, |c| c.label)).to_string()
+    language.label(polykrom_engine::find_command(command).map_or(command, |c| c.label)).to_string()
 }
 
 /// Run `f` on a worker thread (with the request's folder scope), answering on the returned
 /// channel. `None` without threads (the web).
-fn spawn(
-    scope: Option<solidcraft_engine::io::vfs::PathScope>,
-    f: impl FnOnce() -> Option<Value> + Send + 'static,
-) -> Option<Receiver<Option<Value>>> {
+fn spawn(scope: Option<polykrom_engine::io::vfs::PathScope>, f: impl FnOnce() -> Option<Value> + Send + 'static) -> Option<Receiver<Option<Value>>> {
     let (tx, rx) = std::sync::mpsc::channel();
     std::thread::Builder::new()
         .name("agent".into())
         .spawn(move || {
-            let r = solidcraft_engine::io::vfs::scoped(scope, f);
+            let r = polykrom_engine::io::vfs::scoped(scope, f);
             let _ = tx.send(r);
         })
         .ok()?;

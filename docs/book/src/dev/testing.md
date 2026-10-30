@@ -11,8 +11,8 @@ profile and the wasm build check.
 | Sketch fuzz | `crates/engine/src/cmd/sketch_fuzz_tests.rs` | random sketches through the solver and profile finder |
 | UI scenarios | `crates/ui-egui/tests/scenarios/*.json` | the real app, headless: clicks, keys, drags, assertions |
 | Layout tests | `crates/ui-egui/tests/ui_layout.rs`, `window_widths.rs` | panels and dialogs at every window width |
-| Design-file corpus | `apps/solidcraft-cli/tests/corpus` | every saved file version still opens and evaluates the same |
-| Kill mid-save | `apps/solidcraft-cli/tests/kill_mid_save.rs` | a save killed at any moment leaves a readable file |
+| Design-file corpus | `apps/polykrom-cli/tests/corpus` | every saved file version still opens and evaluates the same |
+| Kill mid-save | `apps/polykrom-cli/tests/kill_mid_save.rs` | a save killed at any moment leaves a readable file |
 | Reference tests | `cargo xtask oracle` → [docs/oracle.md](oracle.md) | parts rebuilt from `tests/oracle/*/recipe.json`, compared with analytic or FreeCAD expected values |
 
 ## Dependency advisories
@@ -88,7 +88,7 @@ The default concurrency is at most four tests; `NEXTEST_TEST_THREADS` overrides 
 matrix's child workers default to the smaller of that budget and the host CPU count;
 `ACTION_MATRIX_JOBS` explicitly overrides this worker count. The local profile reserves CPU
 slots for the matrix and keeps its scheduling changes separate from GitHub CI. On Windows,
-the `solidcraft-gpu` and app packages, plus UI offscreen/GPU tests, use a serial group. The Wasm check and doc tests still run alongside,
+the `polykrom-gpu` and app packages, plus UI offscreen/GPU tests, use a serial group. The Wasm check and doc tests still run alongside,
 and the web-offline gate still follows a successful native/Wasm/doc run.
 
 The backend keeps Cargo and binary metadata under `target/xtask-nextest/` and reuses it for the
@@ -105,18 +105,18 @@ settings in `.config/nextest.toml`), the slowest tests first; doc tests run in t
 Pull requests skip a few heavy tests (each takes one to twelve minutes); they run on every push to
 `main`, nightly, and in `cargo xtask test`:
 
-- `solidcraft-engine`: `tests::hostile_params_never_panic`, everything in `tests::robustness` and
+- `polykrom-engine`: `tests::hostile_params_never_panic`, everything in `tests::robustness` and
   the seeds of `tests::robustness_goldens` (`seed_00` … `seed_95`; pull requests that change the kernel, truck or
   the goldens run all but the slowest, `SLOW_SEEDS` in `ci.yml`),
   `pattern_suppress_tests::enclosure_arc_extinction_keeps_a_real_sharp_inner_lip_after_resize_and_reopen`,
   `pattern_suppress_tests::enclosure_datums_follow_wall_height_and_board_depth_with_material_proofs`,
   `cmd::plastic::tests::enclosure_snap_fit_follows_resized_front_wall`, the `atomic_commands` contract tests
-- `solidcraft-kernel`: `tests::boolean_identity_on_tangent_primitives`,
+- `polycore`: `tests::boolean_identity_on_tangent_primitives`,
   `tspline::tests::hostile_tsplines_never_panic`, and the `boolean_props` property tests
   (these run only in the nightly "Property tests" job: their inputs are random, so main skips them too)
-- `solidcraft-ui-egui` scenarios: `acceptance_sensor_enclosure`
+- `polykrom-ui-egui` scenarios: `acceptance_sensor_enclosure`
 
-The **action matrix** (`apps/solidcraft-cli/tests/action_matrix.rs`) tries every ordinary action
+The **action matrix** (`apps/polykrom-cli/tests/action_matrix.rs`) tries every ordinary action
 (sketch, offset plane, press pull, hole, draft, shell, fillet, chamfer, construction geometry, move,
 mirror, pattern) on every face, edge, vertex and body of a corpus of designs and compares with a
 checked-in baseline: an action that passed there and fails now fails the test. Every run checks a

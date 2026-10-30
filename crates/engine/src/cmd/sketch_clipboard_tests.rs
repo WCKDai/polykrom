@@ -1,6 +1,6 @@
+use polycore_geom::Vec2;
+use polykrom_sketch::{ConstraintKind, CurveKind, LinkKind, Sketch};
 use serde_json::{Value, json};
-use solidcraft_geom::Vec2;
-use solidcraft_sketch::{ConstraintKind, CurveKind, LinkKind, Sketch};
 
 use crate::{Sel, Session};
 
@@ -155,7 +155,7 @@ fn every_kind_of_sketch_geometry_pastes() {
     // The text came as a new, editable text 100 mm up.
     let texts: Vec<_> = sk.links.iter().filter(|l| l.kind == LinkKind::Text).collect();
     assert_eq!(texts.len(), 2);
-    let Some(solidcraft_sketch::LinkSource::Text { at, text, .. }) =
+    let Some(polykrom_sketch::LinkSource::Text { at, text, .. }) =
         texts.iter().map(|l| &l.source).find(|src| !before.links.iter().any(|b| &b.source == *src))
     else {
         panic!()

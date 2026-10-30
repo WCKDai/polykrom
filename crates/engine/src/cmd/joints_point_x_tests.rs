@@ -1,8 +1,8 @@
 //! A point joint origin keeps the x it is given: two origins given at one point with the same z
 //! and x meet as they are, whichever way their parts are turned.
 
+use polycore_geom::Vec3;
 use serde_json::json;
-use solidcraft_geom::Vec3;
 
 use super::tests::{occ, place, run};
 use crate::Session;
@@ -36,7 +36,7 @@ fn origins_given_the_same_x_meet_as_they_are() {
     // Saved and read back, the x stays.
     let saved = serde_json::to_string(&s.doc.assembly.joints).unwrap_or_default();
     assert!(saved.contains("\"x\""), "{saved}");
-    let back: Vec<solidcraft_doc::joints::Joint> = serde_json::from_str(&saved).unwrap_or_default();
+    let back: Vec<polykrom_doc::joints::Joint> = serde_json::from_str(&saved).unwrap_or_default();
     assert_eq!(back, s.doc.assembly.joints);
 }
 
@@ -48,7 +48,7 @@ fn a_point_origin_without_x_is_placed_as_before_and_a_bad_x_is_refused() {
     let at = |o: &str| json!({"occurrence": o, "point": [60, 10, 10], "z": [0, 0, 1]});
     run(&mut s, "joint.create", json!({"type": "rigid", "a": at("Base"), "b": at("Block"), "flip": true, "name": "J"}));
     let snap = s.doc.assembly.joints.first().map(|j| j.b.snap.clone());
-    assert!(matches!(snap, Some(solidcraft_doc::joints::Snap::Point { x: None, .. })), "{snap:?}");
+    assert!(matches!(snap, Some(polykrom_doc::joints::Snap::Point { x: None, .. })), "{snap:?}");
     let far = place(&s, "Block", Vec3::new(100.0, 10.0, 10.0));
     assert!(far.dist(Vec3::new(100.0, 10.0, 10.0)) < 1e-9, "{far:?}");
     // An x along z, or no direction at all, is refused.

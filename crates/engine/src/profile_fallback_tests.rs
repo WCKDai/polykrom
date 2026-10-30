@@ -199,6 +199,6 @@ fn a_picked_profile_and_the_sketch_on_its_cap_survive_together() {
     assert!(result(&s, "E1").1.is_some_and(|w| w.contains("`l2` no longer on it")));
     assert_hole_follows(&s, 8000.0, true);
     // Saved and opened again, it evaluates the same way.
-    let reopened = Session::new(solidcraft_doc::format::read(&s.doc.to_json()).unwrap());
+    let reopened = Session::new(polykrom_doc::format::read(&s.doc.to_json()).unwrap());
     assert_hole_follows(&reopened, 8000.0, true);
 }

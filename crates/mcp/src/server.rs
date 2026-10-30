@@ -2,11 +2,11 @@
 
 use std::io::{BufRead, Write};
 
-use serde_json::{Value, json};
 /// Longest accepted request line, shared with the control server.
-use solidcraft_engine::MAX_LINE;
+use polykrom_engine::MAX_LINE;
+use serde_json::{Value, json};
 
-use solidcraft_engine::io::vfs::{self, PathScope};
+use polykrom_engine::io::vfs::{self, PathScope};
 
 use crate::backend::Backend;
 use crate::tools::{call_tool, check_arguments, tool_definitions};

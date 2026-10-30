@@ -1,6 +1,6 @@
 use super::*;
-use solidcraft_geom::{Vec2, Vec3};
-use solidcraft_render::StandardView;
+use polycore_geom::{Vec2, Vec3};
+use polykrom_render::StandardView;
 
 fn run(s: &mut Session, id: &str, p: Value) -> Value {
     s.execute(id, &p).unwrap()
@@ -32,7 +32,7 @@ fn view_dxf_cancellation_at_each_stage_preserves_the_destination_and_document() 
         cancelled: AtomicBool,
         reached: AtomicBool,
     }
-    impl solidcraft_kernel::watch::Watch for CancelAt {
+    impl polycore::watch::Watch for CancelAt {
         fn cancelled(&self) -> bool {
             self.cancelled.load(Ordering::Relaxed)
         }
@@ -52,9 +52,8 @@ fn view_dxf_cancellation_at_each_stage_preserves_the_destination_and_document() 
     for stage in ["dxf_meshes", "dxf_index", "dxf_projection", "dxf_occlusion", "dxf_write"] {
         std::fs::write(&path, b"previous drawing").unwrap();
         let watch = Arc::new(CancelAt { stage, cancelled: AtomicBool::new(false), reached: AtomicBool::new(false) });
-        let result = solidcraft_kernel::watch::watching(watch.clone(), || {
-            s.execute(CMD, &json!({"camera":camera(StandardView::Top),"path":path.to_string_lossy()}))
-        });
+        let result =
+            polycore::watch::watching(watch.clone(), || s.execute(CMD, &json!({"camera":camera(StandardView::Top),"path":path.to_string_lossy()})));
         assert!(result.unwrap_err().to_string().contains("cancelled"), "{stage}");
         assert!(watch.reached.load(Ordering::Relaxed), "{stage}");
         assert_eq!(std::fs::read(&path).unwrap(), b"previous drawing", "{stage}");
@@ -94,8 +93,8 @@ fn view_dxf_respects_hidden_bodies_mm_and_camera_roll() {
     let drawing = export(&mut s, c, "omit");
     let size = |v: &Value| {
         let mut points = Vec::new();
-        for g in solidcraft_io::read_dxf(v["dxf"].as_str().unwrap()).unwrap() {
-            if let solidcraft_io::Geom2::Line(a, b) = g {
+        for g in polykrom_io::read_dxf(v["dxf"].as_str().unwrap()).unwrap() {
+            if let polykrom_io::Geom2::Line(a, b) = g {
                 points.extend([a, b]);
             }
         }
@@ -119,8 +118,8 @@ fn view_dxf_cylinders_have_side_silhouettes_and_perspective_is_supported() {
     let mut c = camera(StandardView::Front);
     c.target = Vec3::new(0., 0., 10.);
     let v = export(&mut s, c, "omit");
-    let lines = solidcraft_io::read_dxf(v["dxf"].as_str().unwrap()).unwrap();
-    assert!(lines.iter().filter(|g| matches!(g,solidcraft_io::Geom2::Line(a,b) if (a.y-b.y).abs()>19.9)).count() >= 2);
+    let lines = polykrom_io::read_dxf(v["dxf"].as_str().unwrap()).unwrap();
+    assert!(lines.iter().filter(|g| matches!(g,polykrom_io::Geom2::Line(a,b) if (a.y-b.y).abs()>19.9)).count() >= 2);
     c.fov = 0.6;
     let v = export(&mut s, c, "dashed");
     assert_eq!(v["projection"], "perspective");
@@ -159,10 +158,10 @@ fn view_dxf_keeps_every_occurrence_while_sharing_geometry() {
     assert_eq!(result["stats"]["shared_meshes"], 1);
     assert_eq!(result["stats"]["worker_limit"], meshes::WORKERS);
     assert!(result["hidden"].as_u64().unwrap() > 0);
-    let lines = solidcraft_io::read_dxf(result["dxf"].as_str().unwrap()).unwrap();
+    let lines = polykrom_io::read_dxf(result["dxf"].as_str().unwrap()).unwrap();
     let mut centers = std::collections::BTreeSet::new();
     for line in lines {
-        if let solidcraft_io::Geom2::Line(a, b) = line {
+        if let polykrom_io::Geom2::Line(a, b) = line {
             // Each translated copy has a visible top perimeter, including the offscreen one.
             if (a.y - b.y).abs() > 5.9 {
                 centers.insert(((a.x + 20.) / 15.).floor() as i64);
@@ -187,10 +186,10 @@ fn view_dxf_exports_a_sketch_only_design_on_the_sketch_layer() {
         let v = export(&mut s, camera(StandardView::Top), "omit");
         // Four rectangle sides and one circle, each its own entity.
         assert_eq!(v["sketch"], 5, "{v}");
-        let geometry = solidcraft_io::read_dxf(v["dxf"].as_str().unwrap()).unwrap();
+        let geometry = polykrom_io::read_dxf(v["dxf"].as_str().unwrap()).unwrap();
         let (mut sides, mut circle) = (Vec::new(), 0);
         for g in geometry {
-            let solidcraft_io::Geom2::Line(a, b) = g else { panic!("{g:?}") };
+            let polykrom_io::Geom2::Line(a, b) = g else { panic!("{g:?}") };
             // The drawing is centred on the camera target (20, 15).
             let on_circle = |p: Vec2| ((p - Vec2::new(10., 5.)).len() - 8.).abs() < 0.02;
             if on_circle(a) && on_circle(b) {
@@ -214,10 +213,10 @@ fn view_dxf_hides_finished_sketches_behind_bodies_but_draws_the_active_sketch_on
     // The box's edges run along y = 0 and y = 30; only the sketch line lies on y = 15 (0 in the
     // drawing, which is centred on the camera target; the top view is tilted a hair).
     let length = |v: &Value| {
-        let lines = solidcraft_io::read_dxf(v["dxf"].as_str().unwrap()).unwrap();
+        let lines = polykrom_io::read_dxf(v["dxf"].as_str().unwrap()).unwrap();
         lines
             .iter()
-            .filter_map(|g| if let solidcraft_io::Geom2::Line(a, b) = g { Some((*a, *b)) } else { None })
+            .filter_map(|g| if let polykrom_io::Geom2::Line(a, b) = g { Some((*a, *b)) } else { None })
             .filter(|(a, b)| a.y.abs() < 1e-3 && b.y.abs() < 1e-3)
             .map(|(a, b)| a.dist(b))
             .sum::<f64>()

@@ -1,7 +1,7 @@
 //! Original, code-drawn navigation cube. Flat faces share invisible picking regions.
 use super::*;
 use crate::icons::navigation::{Facet, arrow, curved_arrow, paint_cube};
-use solidcraft_engine::geom::Ring;
+use polykrom_engine::geom::Ring;
 
 pub(super) const SIZE: f32 = 112.0;
 // Paint and picking use the same original coordinate space, scaled as a group.
@@ -239,7 +239,7 @@ mod tests {
     use super::*;
     #[cfg(test)]
     use crate::icons::navigation::{LABEL_PIXELS, face_text};
-    use solidcraft_engine::render::{StandardView, UpAxis};
+    use polykrom_engine::render::{StandardView, UpAxis};
 
     fn paint_frame(ctx: &egui::Context, paint: impl FnMut(&mut egui::Ui)) -> egui::FullOutput {
         let mut output = ctx.run_ui(egui::RawInput::default(), paint);

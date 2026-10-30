@@ -5,8 +5,8 @@
 
 use std::collections::BTreeMap;
 
+use polykrom_engine::{CommandSpec, command_specs};
 use serde_json::{Value, json};
-use solidcraft_engine::{CommandSpec, command_specs};
 
 use crate::SolveApp;
 use crate::ui_kit;
@@ -214,7 +214,7 @@ pub fn effective(app: &SolveApp, id: &str) -> Option<String> {
     match app.keymap.custom.get(id) {
         Some(k) if k.is_empty() => None,
         Some(k) => Some(k.clone()),
-        None => solidcraft_engine::find_command(id).and_then(|c| c.shortcut).map(str::to_string),
+        None => polykrom_engine::find_command(id).and_then(|c| c.shortcut).map(str::to_string),
     }
 }
 
@@ -260,7 +260,7 @@ enum Scope {
 }
 
 fn scope(id: &str) -> Scope {
-    match solidcraft_engine::find_command(id).map(|c| c.tab) {
+    match polykrom_engine::find_command(id).map(|c| c.tab) {
         Some("SKETCH") => Scope::Sketch,
         Some("") | None => Scope::Everywhere,
         Some(_) => Scope::Model,
@@ -279,7 +279,7 @@ fn clash(a: &str, b: &str) -> bool {
 pub fn command_for(app: &SolveApp, key: &str) -> Option<&'static str> {
     let here = if app.session.active_sketch.is_some() { Scope::Sketch } else { Scope::Model };
     let enabled: Vec<&'static str> =
-        commands_for(app, key).into_iter().filter(|id| solidcraft_engine::find_command(id).is_some_and(|c| c.info(&app.session).enabled)).collect();
+        commands_for(app, key).into_iter().filter(|id| polykrom_engine::find_command(id).is_some_and(|c| c.info(&app.session).enabled)).collect();
     enabled.iter().find(|id| scope(id) == here).or(enabled.first()).copied()
 }
 
@@ -319,7 +319,7 @@ fn sketch_tool_for(app: &SolveApp, key: &str) -> Option<&'static str> {
         return None;
     }
     commands_for(app, key).into_iter().find(|id| {
-        solidcraft_engine::find_command(id).is_some_and(|c| c.tab == "SKETCH" && c.panel != "FINISH SKETCH" && c.id != "sketch.construction")
+        polykrom_engine::find_command(id).is_some_and(|c| c.tab == "SKETCH" && c.panel != "FINISH SKETCH" && c.id != "sketch.construction")
     })
 }
 
@@ -327,14 +327,14 @@ fn sketch_tool_for(app: &SolveApp, key: &str) -> Option<&'static str> {
 /// use the key unless `replace` (they lose it). A sketch tool and a model command may share a
 /// key: each runs in its own mode.
 pub fn bind(app: &mut SolveApp, id: &str, key: &str, replace: bool) -> Result<(), String> {
-    let spec = solidcraft_engine::find_command(id).ok_or_else(|| format!("no command `{id}`"))?;
+    let spec = polykrom_engine::find_command(id).ok_or_else(|| format!("no command `{id}`"))?;
     if RESERVED.contains(&key) {
         return Err(format!("{key} is used by Polykrom itself"));
     }
     if !key.is_empty() {
         let others: Vec<&'static str> = commands_for(app, key).into_iter().filter(|o| *o != id && clash(o, id)).collect();
         if !others.is_empty() && !replace {
-            let names: Vec<&str> = others.iter().filter_map(|o| solidcraft_engine::find_command(o).map(|c| c.label)).collect();
+            let names: Vec<&str> = others.iter().filter_map(|o| polykrom_engine::find_command(o).map(|c| c.label)).collect();
             return Err(format!("{key} is already used by {}", names.join(", ")));
         }
         for o in others {
@@ -611,7 +611,7 @@ mod tests {
     use super::*;
 
     fn app() -> SolveApp {
-        SolveApp::new(solidcraft_engine::Session::default(), Default::default())
+        SolveApp::new(polykrom_engine::Session::default(), Default::default())
     }
 
     fn recorder_frame(a: &mut SolveApp, ctx: &egui::Context, time: f64, events: Vec<egui::Event>) {

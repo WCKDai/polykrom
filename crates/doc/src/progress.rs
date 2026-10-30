@@ -91,7 +91,7 @@ impl Progress {
 /// The kernel's long work (STEP import) reports to the same progress and stops on Cancel.
 struct KernelWatch(Arc<Progress>);
 
-impl solidcraft_kernel::watch::Watch for KernelWatch {
+impl polycore::watch::Watch for KernelWatch {
     fn cancelled(&self) -> bool {
         self.0.is_cancelled()
     }
@@ -127,7 +127,7 @@ pub fn watch<R>(progress: Arc<Progress>, f: impl FnOnce() -> R) -> R {
         }
     }
     let _restore = Restore(Some(previous));
-    solidcraft_kernel::watch::watching(kernel, f)
+    polycore::watch::watching(kernel, f)
 }
 
 /// Entered at the start of an evaluation; the guard leaves it.
@@ -248,7 +248,7 @@ mod tests {
     fn partial_models_go_only_to_a_watcher_that_wants_them() {
         let mut doc = crate::Document::new("partial");
         let block = crate::FeatureKind::Box {
-            corner: crate::point_expr(solidcraft_geom::Vec3::ZERO),
+            corner: crate::point_expr(polycore_geom::Vec3::ZERO),
             length: "2 mm".into(),
             width: "3 mm".into(),
             height: "4 mm".into(),

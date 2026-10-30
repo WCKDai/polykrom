@@ -5,8 +5,8 @@
 
 use crate::ui_kit::{choice_row, text_row};
 use egui::vec2;
+use polykrom_engine::{Sel, Session};
 use serde_json::{Value, json};
-use solidcraft_engine::{Sel, Session};
 
 use crate::SolveApp;
 use crate::dialogs::{Kind, combo, form_row};
@@ -208,14 +208,14 @@ pub fn commands(app: &SolveApp, k: &Pt, inputs: &[SelInput]) -> Result<Vec<(Stri
     };
     let p = insert_params(&lib, k, inputs.first().and_then(|i| i.items.first()))?;
     // The toolbar's command when the engine has it (same parameters).
-    let id = if solidcraft_engine::find_command("parts.fastener").is_some() { "parts.fastener" } else { "parts.insert" };
+    let id = if polykrom_engine::find_command("parts.fastener").is_some() { "parts.fastener" } else { "parts.insert" };
     Ok(vec![(id.into(), p)])
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use solidcraft_engine::geom::Vec3;
+    use polykrom_engine::geom::Vec3;
 
     fn lib() -> Vec<Family> {
         families(&json!({"families": [

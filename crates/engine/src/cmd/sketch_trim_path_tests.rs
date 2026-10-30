@@ -1,9 +1,9 @@
 //! `sketch.trim.path`: dragging across curves trims each piece the path crosses, as clicking it
 //! with `sketch.trim` would, in one undo step.
 
+use polycore_geom::Vec2;
+use polykrom_sketch::Shape;
 use serde_json::{Value, json};
-use solidcraft_geom::Vec2;
-use solidcraft_sketch::Shape;
 
 use crate::Session;
 
@@ -18,7 +18,7 @@ fn ids(v: &Value) -> Vec<String> {
     v.as_array().map(|a| a.iter().filter_map(|x| x.as_str().map(str::to_string)).collect()).unwrap_or_default()
 }
 
-fn sketch(s: &Session) -> solidcraft_sketch::Sketch {
+fn sketch(s: &Session) -> polykrom_sketch::Sketch {
     let id = s.active_sketch.unwrap();
     s.model.state().sketch(id).unwrap().sketch.clone()
 }

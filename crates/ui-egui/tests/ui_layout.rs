@@ -1,9 +1,9 @@
-//! Layout checks over every toolbar command, headless (see `solidcraft_ui_egui::scenario`):
+//! Layout checks over every toolbar command, headless (see `polykrom_ui_egui::scenario`):
 //! each command's dialog opens docked at the viewport's right within its width limits, and
 //! every window it opens fits on screen.
 
+use polykrom_ui_egui::scenario::{Harness, check, rect_of};
 use serde_json::{Value, json};
-use solidcraft_ui_egui::scenario::{Harness, check, rect_of};
 
 /// A box body (its sketch finished) to give feature dialogs something to work on.
 fn harness() -> Harness {
@@ -24,7 +24,7 @@ fn harness() -> Harness {
 fn every_dialog_opens_docked_within_its_width_limits() {
     let mut bad = Vec::new();
     let mut seen = 0;
-    for spec in solidcraft_engine::command_specs() {
+    for spec in polykrom_engine::command_specs() {
         if spec.tab.is_empty() || spec.tab == "SKETCH" {
             continue;
         }
@@ -36,7 +36,7 @@ fn every_dialog_opens_docked_within_its_width_limits() {
             // Wide cards use the kit's bounded table/timeline width.
             let w = rect_of("dialog:outer").map_or(0.0, |r| r.width());
             let limits = if matches!(spec.id, "config.table" | "config.configure" | "motion.study") {
-                let width = solidcraft_ui_egui::theme::Tokens::get().form_card_width * 3.0;
+                let width = polykrom_ui_egui::theme::Tokens::get().form_card_width * 3.0;
                 json!({"min":width - 4.0,"max":width + 2.0})
             } else if w > 400.0 {
                 json!({"min":480,"max":562})
@@ -75,7 +75,7 @@ fn other_windows_fit_on_screen() {
 /// existing panel menus and S box remain usable through the new painted hit targets.
 #[test]
 fn docked_ribbon_geometry_and_search() {
-    use solidcraft_ui_egui::{scenario::handle_at, toolbar};
+    use polykrom_ui_egui::{scenario::handle_at, toolbar};
     for theme in ["light", "dark"] {
         let mut h = harness();
         h.call("ui.set", json!({"layout":"docked"}));
@@ -97,12 +97,12 @@ fn docked_ribbon_geometry_and_search() {
             assert_eq!(search.top(), ribbon.top() + 4.0);
             assert_eq!(search.right(), ribbon.right() - 4.0);
             assert_eq!(search.center().y, ribbon.top() + 15.0);
-            let t = solidcraft_ui_egui::theme::Tokens::get();
+            let t = polykrom_ui_egui::theme::Tokens::get();
             let (hint_width, key_width) = h.ctx.fonts_mut(|fonts| {
                 (
                     fonts
                         .layout_no_wrap(
-                            solidcraft_ui_egui::i18n::tr_label("Search commands").to_owned(),
+                            polykrom_ui_egui::i18n::tr_label("Search commands").to_owned(),
                             egui::FontId::proportional(t.font_button),
                             t.form_dim,
                         )
@@ -126,7 +126,7 @@ fn docked_ribbon_geometry_and_search() {
             assert_eq!(Some(field), rect_of("shortcut:search"));
             assert_eq!(Some(field), rect_of("palette:search"));
             let popup = rect_of("ribbon:search_popup").unwrap();
-            assert_eq!(popup.top(), field.bottom() + solidcraft_ui_egui::theme::Tokens::get().space_6);
+            assert_eq!(popup.top(), field.bottom() + polykrom_ui_egui::theme::Tokens::get().space_6);
             assert_eq!(popup.x_range(), field.x_range());
             assert!(popup.top() >= search.bottom());
             assert!(popup.left() <= search.left());
@@ -161,7 +161,7 @@ fn docked_ribbon_geometry_and_search() {
 
 #[test]
 fn finish_sketch_stays_at_the_right_when_groups_collapse() {
-    use solidcraft_ui_egui::scenario::{count_of, handle_at};
+    use polykrom_ui_egui::scenario::{count_of, handle_at};
     for layout in ["docked", "floating"] {
         let mut h = Harness::new();
         h.call("ui.set", json!({"layout":layout}));

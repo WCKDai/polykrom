@@ -1,9 +1,9 @@
 //! Exact planar face capture for sketch attachment. World labels are lookup keys only.
 use crate::params::{bad, vec3};
 use crate::{Result, Session};
+use polycore_geom::Plane;
+use polykrom_doc::{EmbossFace, PlaneRef, apply_point, apply_vector, mat_inverse, mat_mul};
 use serde_json::Value;
-use solidcraft_doc::{EmbossFace, PlaneRef, apply_point, apply_vector, mat_inverse, mat_mul};
-use solidcraft_geom::Plane;
 
 pub(in crate::cmd) fn is_face(p: &Value) -> bool {
     p.get("plane").and_then(|plane| plane.get("face")).is_some()
@@ -118,7 +118,7 @@ fn capture_impl(s: &Session, value: &Value, cmd: &str, internal: bool) -> Result
                 let relative = mat_mul(&author_inverse, &frame);
                 let plane = Plane::new(apply_point(&relative, plane.origin), apply_vector(&relative, plane.x), apply_vector(&relative, plane.y))
                     .ok_or_else(|| bad(cmd, "invalid sheet face plane"))?;
-                sheet_face = Some((solidcraft_doc::sheet::sheet_face_name(&body.name, &face), plane));
+                sheet_face = Some((polykrom_doc::sheet::sheet_face_name(&body.name, &face), plane));
                 continue;
             }
             let faces = body.body.faces(tolerance)?;
@@ -167,10 +167,10 @@ fn capture_impl(s: &Session, value: &Value, cmd: &str, internal: bool) -> Result
         return Ok(PlaneRef::Custom { plane });
     }
     let at = apply_point(&author_inverse, point);
-    let name = solidcraft_doc::naming::face_names(body).get(index).cloned();
+    let name = polykrom_doc::naming::face_names(body).get(index).cloned();
     let anchor = match doc.capture_face_anchor(body, index, &plane, &path, s.active_component, &author_path) {
         Ok(anchor) => Some(Box::new(anchor)),
-        Err(solidcraft_doc::DocError::Invalid(message))
+        Err(polykrom_doc::DocError::Invalid(message))
             if internal
                 && matches!(
                     message.as_str(),
@@ -183,7 +183,7 @@ fn capture_impl(s: &Session, value: &Value, cmd: &str, internal: bool) -> Result
             }
             None
         }
-        Err(solidcraft_doc::DocError::Invalid(message))
+        Err(polykrom_doc::DocError::Invalid(message))
             if matches!(
                 message.as_str(),
                 "this face has no exact planar source; choose a fixed plane instead"
@@ -203,7 +203,7 @@ fn capture_impl(s: &Session, value: &Value, cmd: &str, internal: bool) -> Result
 }
 
 /// The sole durable face attachment beneath an offset/angle wrapper.
-pub(in crate::cmd) fn anchor(mut plane: &PlaneRef) -> Option<&solidcraft_doc::FaceAnchor> {
+pub(in crate::cmd) fn anchor(mut plane: &PlaneRef) -> Option<&polykrom_doc::FaceAnchor> {
     loop {
         match plane {
             PlaneRef::Offset { base, .. } | PlaneRef::AtAngle { base, .. } | PlaneRef::Flipped { base, .. } => plane = base,
@@ -213,7 +213,7 @@ pub(in crate::cmd) fn anchor(mut plane: &PlaneRef) -> Option<&solidcraft_doc::Fa
     }
 }
 
-pub(in crate::cmd) fn anchor_mut(mut plane: &mut PlaneRef) -> Option<&mut solidcraft_doc::FaceAnchor> {
+pub(in crate::cmd) fn anchor_mut(mut plane: &mut PlaneRef) -> Option<&mut polykrom_doc::FaceAnchor> {
     loop {
         match plane {
             PlaneRef::Offset { base, .. } | PlaneRef::AtAngle { base, .. } | PlaneRef::Flipped { base, .. } => plane = base,

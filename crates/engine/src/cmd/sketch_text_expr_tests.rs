@@ -1,9 +1,9 @@
 //! A sketch text's height, place and angle can be expressions of the design's parameters: the
 //! text keeps the expression, follows the parameters, and a number typed instead replaces it.
 
+use polycore_geom::Vec2;
+use polykrom_sketch::LinkSource;
 use serde_json::{Value, json};
-use solidcraft_geom::Vec2;
-use solidcraft_sketch::LinkSource;
 
 use crate::Session;
 
@@ -34,14 +34,14 @@ fn no_trouble(s: &Session) {
 }
 
 /// The numbers and expressions stored for the text `link` of sketch `S`.
-fn stored(s: &Session, link: &str) -> (Vec2, f64, f64, solidcraft_sketch::TextExprs) {
+fn stored(s: &Session, link: &str) -> (Vec2, f64, f64, polykrom_sketch::TextExprs) {
     let id = s.doc.find_feature("S").unwrap().id;
     let LinkSource::Text { at, height, angle, exprs, .. } = &s.doc.sketch(id).unwrap().link(link).unwrap().source else { panic!("not a text") };
     (*at, *height, *angle, exprs.clone())
 }
 
 fn reopened(s: &Session) -> Session {
-    Session::new(solidcraft_doc::Document::from_json(&s.doc.to_json()).unwrap())
+    Session::new(polykrom_doc::Document::from_json(&s.doc.to_json()).unwrap())
 }
 
 #[test]
@@ -265,7 +265,7 @@ fn a_cloned_components_text_follows_the_cloned_dimension_it_names_not_the_origin
     assert!((outline_height(&s, original) - 15.0).abs() < 1e-6);
 
     let copy = run(&mut s, "component.paste_new", json!({"component": part, "translate": [0, 50, 0]}))["component"].as_u64().unwrap();
-    let clone = s.doc.features.iter().find(|f| f.component == copy && matches!(f.kind, solidcraft_doc::FeatureKind::Sketch { .. })).unwrap().id;
+    let clone = s.doc.features.iter().find(|f| f.component == copy && matches!(f.kind, polykrom_doc::FeatureKind::Sketch { .. })).unwrap().id;
     let (theirs, expression) = dimension_and_expression(&s, clone);
     assert_ne!(theirs, own, "the copy's dimension is its own");
     assert_eq!(expression, Some(format!("{theirs} / 4")), "and so is the expression that uses it");

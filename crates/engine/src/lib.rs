@@ -29,19 +29,19 @@ pub mod view;
 
 use std::sync::Arc;
 
+use polycore_geom::Vec3;
+use polykrom_doc::{Document, Model, ModelState};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use solidcraft_doc::{Document, Model, ModelState};
-use solidcraft_geom::Vec3;
 
 pub use cmd::{CommandInfo, CommandSpec, auto_operation, command_specs, extrude_reach, find_command};
-pub use solidcraft_doc as doc;
-pub use solidcraft_doc::Visibility;
-pub use solidcraft_geom as geom;
-pub use solidcraft_io as io;
-pub use solidcraft_kernel as kernel;
-pub use solidcraft_render as render;
-pub use solidcraft_sketch as sketch;
+pub use polycore as kernel;
+pub use polycore_geom as geom;
+pub use polykrom_doc as doc;
+pub use polykrom_doc::Visibility;
+pub use polykrom_io as io;
+pub use polykrom_render as render;
+pub use polykrom_sketch as sketch;
 
 /// Longest accepted request line on the JSON-lines channels (MCP over stdio and the control
 /// server over loopback), so both refuse runaway input at the same size.
@@ -62,23 +62,23 @@ pub enum EngineError {
     Internal(String, String),
 }
 
-impl From<solidcraft_doc::DocError> for EngineError {
-    fn from(e: solidcraft_doc::DocError) -> Self {
+impl From<polykrom_doc::DocError> for EngineError {
+    fn from(e: polykrom_doc::DocError) -> Self {
         EngineError::Other(e.to_string())
     }
 }
-impl From<solidcraft_sketch::SketchError> for EngineError {
-    fn from(e: solidcraft_sketch::SketchError) -> Self {
+impl From<polykrom_sketch::SketchError> for EngineError {
+    fn from(e: polykrom_sketch::SketchError) -> Self {
         EngineError::Other(e.to_string())
     }
 }
-impl From<solidcraft_kernel::KernelError> for EngineError {
-    fn from(e: solidcraft_kernel::KernelError) -> Self {
+impl From<polycore::KernelError> for EngineError {
+    fn from(e: polycore::KernelError) -> Self {
         EngineError::Other(e.to_string())
     }
 }
-impl From<solidcraft_io::IoError> for EngineError {
-    fn from(e: solidcraft_io::IoError) -> Self {
+impl From<polykrom_io::IoError> for EngineError {
+    fn from(e: polykrom_io::IoError) -> Self {
         EngineError::Other(e.to_string())
     }
 }
@@ -164,7 +164,7 @@ pub struct Snapshot {
     pub label: String,
     pub doc: Arc<Document>,
     pub active_sketch: Option<u64>,
-    pub pending_moves: std::collections::BTreeMap<u64, solidcraft_doc::Mat>,
+    pub pending_moves: std::collections::BTreeMap<u64, polykrom_doc::Mat>,
 }
 
 /// Where the open sketch was entered (`sketch.create`, `sketch.edit`): the design before it and
@@ -186,8 +186,8 @@ pub struct Ahead(Session);
 
 impl Ahead {
     /// What the evaluation computes, kept for the run that follows here whatever the evaluation
-    /// cache drops meanwhile: hand it to [`solidcraft_doc::Model::keep`] for that run.
-    pub fn kept(&self) -> Arc<solidcraft_doc::KeptResults> {
+    /// cache drops meanwhile: hand it to [`polykrom_doc::Model::keep`] for that run.
+    pub fn kept(&self) -> Arc<polykrom_doc::KeptResults> {
         self.0.model.kept().unwrap_or_default()
     }
 
@@ -212,7 +212,7 @@ impl Ahead {
 
 /// The model a session copy evaluated ahead ([`Ahead::evaluate`]).
 #[derive(Clone, Debug)]
-pub struct Evaluated(solidcraft_doc::Model);
+pub struct Evaluated(polykrom_doc::Model);
 
 /// What some commands would make, evaluated on a scratch copy of a session
 /// ([`Session::preview`]). The session itself is not changed.
@@ -231,17 +231,17 @@ pub struct Preview {
 #[derive(Clone)]
 struct WorldCache {
     doc: Arc<Document>,
-    model: Arc<solidcraft_doc::ModelState>,
-    pending_moves: std::collections::BTreeMap<u64, solidcraft_doc::Mat>,
+    model: Arc<polykrom_doc::ModelState>,
+    pending_moves: std::collections::BTreeMap<u64, polykrom_doc::Mat>,
     active_component: u64,
     active_occurrence_path: Option<Vec<u64>>,
-    world: Arc<solidcraft_doc::ModelState>,
+    world: Arc<polykrom_doc::ModelState>,
     /// The moved components' bodies as placed for `world`, reused by the next world state.
-    placed: Arc<std::sync::Mutex<solidcraft_doc::PlacedBodies>>,
+    placed: Arc<std::sync::Mutex<polykrom_doc::PlacedBodies>>,
 }
 
 impl WorldCache {
-    fn matches(&self, session: &Session, model: &Arc<solidcraft_doc::ModelState>) -> bool {
+    fn matches(&self, session: &Session, model: &Arc<polykrom_doc::ModelState>) -> bool {
         Arc::ptr_eq(&self.doc, &session.doc)
             && Arc::ptr_eq(&self.model, model)
             && self.pending_moves == session.pending_moves
@@ -264,7 +264,7 @@ pub struct Session {
     pub path: Option<String>,
     /// One-shot display-only notification during doc.open, before authoritative evaluation.
     /// Interactive loaders may show it provisionally; it never becomes model state.
-    pub open_preview: Option<Box<dyn Fn(solidcraft_io::DesignPreview) + Send + Sync>>,
+    pub open_preview: Option<Box<dyn Fn(polykrom_io::DesignPreview) + Send + Sync>>,
     saved: Arc<Document>,
     /// Messages for the command line / log.
     pub log: Vec<String>,
@@ -280,7 +280,7 @@ pub struct Session {
     /// The placement used when authoring shared component geometry.
     pub active_occurrence_path: Option<Vec<u64>>,
     /// Occurrence moves not captured yet (Capture Position keeps them, a recompute drops them).
-    pub pending_moves: std::collections::BTreeMap<u64, solidcraft_doc::Mat>,
+    pub pending_moves: std::collections::BTreeMap<u64, polykrom_doc::Mat>,
     world_cache: std::sync::Mutex<Option<WorldCache>>,
     occurrence_visibility_cache: std::sync::Mutex<Option<occurrences::VisibilityCache>>,
     removed_later_cache: std::sync::Mutex<Option<occurrences::RemovedLaterCache>>,
@@ -300,7 +300,7 @@ pub struct Session {
     /// that did not change.
     contact_meshes: std::sync::Arc<std::sync::Mutex<cmd::motion::contact_sweep::ContactMeshes>>,
     /// Features copied with `timeline.copy` (pasted by `timeline.paste`).
-    pub clipboard: Vec<solidcraft_doc::Feature>,
+    pub clipboard: Vec<polykrom_doc::Feature>,
     /// Sketch geometry copied with `sketch.copy` (pasted by `sketch.paste`).
     pub sketch_clipboard: Option<cmd::sketch_clipboard::SketchClip>,
     /// Section Analysis: a view cut by a plane (origin, unit normal; the normal side is hidden).
@@ -345,7 +345,7 @@ pub struct LiveEdit {
     /// What the frame's solve found: a full solve's report, or, when the sketch was solved
     /// without a rank analysis, its last report's degrees of freedom and determined flags (a
     /// drag does not change them; the evaluation at the gesture's end brings them up to date).
-    pub report: solidcraft_sketch::SolveReport,
+    pub report: polykrom_sketch::SolveReport,
 }
 
 /// The design, active sketch, pending positions and undo history at an `edit.checkpoint`.
@@ -354,7 +354,7 @@ pub(crate) struct Checkpoint {
     pub id: u64,
     pub doc: Arc<Document>,
     pub active_sketch: Option<u64>,
-    pub pending_moves: std::collections::BTreeMap<u64, solidcraft_doc::Mat>,
+    pub pending_moves: std::collections::BTreeMap<u64, polykrom_doc::Mat>,
     pub undo: Vec<Snapshot>,
     pub redo: Vec<Snapshot>,
 }
@@ -423,12 +423,12 @@ impl Session {
     /// A session on `doc` whose evaluation is the model its file kept (`saved`), when that is
     /// `doc`'s evaluation ([`Model::adopt`]); otherwise the timeline is evaluated.
     /// `SOLIDCRAFT_NO_MODEL_CACHE` set always evaluates.
-    pub fn opened(mut doc: Document, saved: Option<&solidcraft_doc::SavedModel>) -> Self {
+    pub fn opened(mut doc: Document, saved: Option<&polykrom_doc::SavedModel>) -> Self {
         // The session keeps what is hidden (not an undo step); the design file carries it.
         let visibility = std::mem::take(&mut doc.visibility);
         let doc = Arc::new(doc);
         let adopted = saved
-            .filter(|_| solidcraft_geom::env::var_os("NO_MODEL_CACHE").is_none())
+            .filter(|_| polycore_geom::env::var_os("NO_MODEL_CACHE").is_none())
             .and_then(|saved| Model::adopt(&doc, saved).map_err(|e| log::info!("the saved model is not used: {e}")).ok());
         let model = adopted.unwrap_or_else(|| {
             let mut model = Model::new();
@@ -590,7 +590,7 @@ impl Session {
     }
 
     /// Prepared placements only: optional save caches must not compute a cold world.
-    pub(crate) fn cached_world_state(&self) -> Option<Arc<solidcraft_doc::ModelState>> {
+    pub(crate) fn cached_world_state(&self) -> Option<Arc<polykrom_doc::ModelState>> {
         let state = self.model.state();
         if self.doc.occurrences.is_empty() {
             return Some(state);
@@ -601,7 +601,7 @@ impl Session {
     /// Re-evaluate the model after a document change.
     /// The model placed in the world through component occurrences (and uncaptured moves): what
     /// to display, measure, pick and export. The same as `model.state()` without components.
-    pub fn world_state(&self) -> Arc<solidcraft_doc::ModelState> {
+    pub fn world_state(&self) -> Arc<polykrom_doc::ModelState> {
         let st = self.model.state();
         if self.doc.occurrences.is_empty() {
             return st;
@@ -619,7 +619,7 @@ impl Session {
         let mut reuse = placed.lock().map(|mut p| std::mem::take(&mut *p)).unwrap_or_default();
         let mut w = {
             if self.pending_moves.is_empty() {
-                solidcraft_doc::world_state_reusing(&self.doc, &st, &mut reuse)
+                polykrom_doc::world_state_reusing(&self.doc, &st, &mut reuse)
             } else {
                 let mut d = (*self.doc).clone();
                 for o in &mut d.occurrences {
@@ -627,7 +627,7 @@ impl Session {
                         o.transform = *m;
                     }
                 }
-                solidcraft_doc::world_state_reusing(&d, &st, &mut reuse)
+                polykrom_doc::world_state_reusing(&d, &st, &mut reuse)
             }
         };
         if let Ok(mut p) = placed.lock() {
@@ -635,23 +635,23 @@ impl Session {
         }
         // Sketch definitions are displayed once, at the placement currently being authored.
         if self.active_occurrence_path.is_some() && self.active_component != 0 {
-            let first = self.occurrence_placement(&self.doc.first_path(self.active_component)).map(|p| p.world).unwrap_or(solidcraft_doc::IDENTITY);
-            if let Some(inverse) = solidcraft_doc::mat_inverse(&first) {
-                let delta = solidcraft_doc::mat_mul(&self.active_component_frame(), &inverse);
+            let first = self.occurrence_placement(&self.doc.first_path(self.active_component)).map(|p| p.world).unwrap_or(polykrom_doc::IDENTITY);
+            if let Some(inverse) = polykrom_doc::mat_inverse(&first) {
+                let delta = polykrom_doc::mat_mul(&self.active_component_frame(), &inverse);
                 for sketch in w.sketches.iter_mut().filter(|sk| self.doc.feature(sk.feature).is_some_and(|f| f.component == self.active_component)) {
                     let sketch = Arc::make_mut(sketch);
                     let plane = sketch.plane;
-                    if let Some(mapped) = solidcraft_geom::Plane::new(
-                        solidcraft_doc::apply_point(&delta, plane.origin),
-                        solidcraft_doc::apply_vector(&delta, plane.x),
-                        solidcraft_doc::apply_vector(&delta, plane.y),
+                    if let Some(mapped) = polycore_geom::Plane::new(
+                        polykrom_doc::apply_point(&delta, plane.origin),
+                        polykrom_doc::apply_vector(&delta, plane.x),
+                        polykrom_doc::apply_vector(&delta, plane.y),
                     ) {
                         sketch.plane = mapped;
                     }
                     for wire in &mut sketch.sketch.wires {
-                        if wire.space == solidcraft_doc::sketch::WireSpace::Component {
+                        if wire.space == polykrom_doc::sketch::WireSpace::Component {
                             for point in wire.pts.iter_mut().chain(&mut wire.fit) {
-                                *point = solidcraft_doc::apply_point(&delta, *point);
+                                *point = polykrom_doc::apply_point(&delta, *point);
                             }
                         }
                     }
@@ -679,7 +679,7 @@ impl Session {
         {
             self.evaluations += 1;
             // Shadow mode (`POLYKROM_REBASE_SHADOW`): no rebased result may differ (#169).
-            assert_eq!(solidcraft_doc::rebase_shadow_mismatches(), 0, "a rebased result differed from evaluating the feature");
+            assert_eq!(polykrom_doc::rebase_shadow_mismatches(), 0, "a rebased result differed from evaluating the feature");
         }
         self.revision += 1;
         self.prune_occurrence_state();
@@ -729,7 +729,7 @@ impl Session {
         let before: std::collections::HashMap<u64, &str> = previous
             .features
             .iter()
-            .filter(|f| matches!(f.kind, solidcraft_doc::FeatureKind::ConstructionPlane { .. }))
+            .filter(|f| matches!(f.kind, polykrom_doc::FeatureKind::ConstructionPlane { .. }))
             .map(|f| (f.id, f.name.as_str()))
             .collect();
         for f in &self.doc.features {
@@ -763,7 +763,7 @@ impl Session {
         // from the body is solved again by evaluating.
         let made_by = |name: &str| model.state().body(name).map(|b| b.feature);
         let sketches_kept = |d: &Document| {
-            d.features.iter().zip(&previous.features).all(|(a, b)| !matches!(a.kind, solidcraft_doc::FeatureKind::Sketch { .. }) || a.kind == b.kind)
+            d.features.iter().zip(&previous.features).all(|(a, b)| !matches!(a.kind, polykrom_doc::FeatureKind::Sketch { .. }) || a.kind == b.kind)
         };
         let refs = |d: &mut Document, old: &str, new: &str| {
             made_by(old).is_some_and(|fid| cmd::browser::rename_body_refs(d, fid, old, new).is_ok()) && sketches_kept(d)
@@ -832,7 +832,7 @@ impl Session {
             .features
             .iter()
             .filter_map(|feature| match &feature.kind {
-                solidcraft_doc::FeatureKind::Sketch { sketch, .. } if sketch.patterns.iter().any(|p| p.count_expression.is_some()) => {
+                polykrom_doc::FeatureKind::Sketch { sketch, .. } if sketch.patterns.iter().any(|p| p.count_expression.is_some()) => {
                     Some((feature.id, sketch.clone()))
                 }
                 _ => None,
@@ -991,12 +991,12 @@ impl Session {
     /// keep where the bodies they change in other components are placed now (#168): driving a
     /// joint afterwards moves those bodies without reshaping them.
     fn capture_tool_frames(&mut self, previous: &Document) {
-        let before: std::collections::HashMap<u64, &solidcraft_doc::Feature> = previous.features.iter().map(|f| (f.id, f)).collect();
+        let before: std::collections::HashMap<u64, &polykrom_doc::Feature> = previous.features.iter().map(|f| (f.id, f)).collect();
         let mut input = Arc::new(ModelState::default());
-        let mut frames: Vec<(u64, Vec<(String, solidcraft_doc::Mat)>)> = Vec::new();
+        let mut frames: Vec<(u64, Vec<(String, polykrom_doc::Mat)>)> = Vec::new();
         for f in &self.doc.features {
             // The state the feature starts from: the last evaluation's, after the feature before it.
-            if let Some(m) = solidcraft_doc::captured_tool_frames(&self.doc, f, before.get(&f.id).copied(), &input) {
+            if let Some(m) = polykrom_doc::captured_tool_frames(&self.doc, f, before.get(&f.id).copied(), &input) {
                 frames.push((f.id, m));
             }
             if let Some(r) = self.model.result(f.id) {
@@ -1372,12 +1372,12 @@ pub(crate) type SketchValues = std::collections::BTreeMap<u64, std::collections:
 
 /// The values of a sketch's driving dimensions that come from parameters: what a value edit
 /// changes in it (as opposed to geometry it projects or links from upstream).
-fn own_values(sk: &solidcraft_sketch::Sketch) -> std::collections::BTreeMap<String, f64> {
+fn own_values(sk: &polykrom_sketch::Sketch) -> std::collections::BTreeMap<String, f64> {
     let mut values: std::collections::BTreeMap<_, _> =
         sk.constraints.iter().filter(|c| c.param.is_some() && !c.driven).filter_map(|c| Some((c.id.clone(), c.kind.value()?))).collect();
     for pattern in &sk.patterns {
         if pattern.count_expression.is_some()
-            && let solidcraft_sketch::SketchPatternKind::Circular { count, .. } = pattern.kind
+            && let polykrom_sketch::SketchPatternKind::Circular { count, .. } = pattern.kind
         {
             values.insert(format!("pattern:{}:count", pattern.id), count as f64);
         }

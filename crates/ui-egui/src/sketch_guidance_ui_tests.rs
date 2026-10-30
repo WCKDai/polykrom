@@ -2,8 +2,8 @@
 use crate::scenario::Harness;
 use crate::sketch_modify_ui::{Mod, candidate};
 use crate::viewport::Hit;
+use polykrom_engine::Sel;
 use serde_json::{Value, json};
-use solidcraft_engine::Sel;
 
 fn step(h: &mut Harness, value: Value) {
     h.step(&value).unwrap();
@@ -112,7 +112,7 @@ fn sketch_dialog_offset_precise_distance_flip_and_editable_dimension() {
     let state = h.app.session.world_state();
     let sk = &state.sketch(1).unwrap().sketch;
     assert_eq!(sk.offsets[0].distance, -3.0);
-    assert!(sk.constraints.iter().any(|c| matches!(c.kind, solidcraft_engine::sketch::ConstraintKind::OffsetDistance { .. })));
+    assert!(sk.constraints.iter().any(|c| matches!(c.kind, polykrom_engine::sketch::ConstraintKind::OffsetDistance { .. })));
 }
 
 #[test]
@@ -162,7 +162,7 @@ fn sketch_modify_inputs_refuse_other_sketches_without_changing_hole_points() {
         h.app.start(command);
         let d = h.app.dialog.as_ref().unwrap();
         assert!(candidate(d, &h.app.session, &Hit::SketchCurve { sketch: 2, id: "l1".into(), straight: true }).is_none());
-        assert!(candidate(d, &h.app.session, &Hit::SketchPoint { sketch: 2, id: "p1".into(), at: solidcraft_engine::geom::Vec2::ZERO }).is_none());
+        assert!(candidate(d, &h.app.session, &Hit::SketchPoint { sketch: 2, id: "p1".into(), at: polykrom_engine::geom::Vec2::ZERO }).is_none());
         if command != "sketch.offset" {
             assert!(d.inputs[0].accept & crate::selection::SKETCH_POINTS != 0);
             assert_eq!(d.inputs[0].accept & crate::selection::POINTS, 0);
@@ -170,7 +170,7 @@ fn sketch_modify_inputs_refuse_other_sketches_without_changing_hole_points() {
     }
     let input = crate::selection::SelInput::new("Hole points", crate::selection::POINTS, true);
     assert_eq!(
-        input.accepts(&Hit::SketchPoint { sketch: 2, id: "p1".into(), at: solidcraft_engine::geom::Vec2::ZERO }, |_, _| false),
+        input.accepts(&Hit::SketchPoint { sketch: 2, id: "p1".into(), at: polykrom_engine::geom::Vec2::ZERO }, |_, _| false),
         Some(Sel::SketchPoint { id: "2:p1".into() })
     );
     h.app.start("sketch.pattern.circular");
@@ -190,7 +190,7 @@ fn sketch_preselected_points_toggle_once_and_empty_shift_box_keeps_reference() {
     let d = h.app.dialog.as_mut().unwrap();
     assert_eq!(d.inputs[0].items, vec![Sel::SketchPoint { id: point.clone() }]);
     d.active = 0;
-    let selected = candidate(d, &h.app.session, &Hit::SketchPoint { sketch: 1, id: point, at: solidcraft_engine::geom::Vec2::ZERO }).unwrap();
+    let selected = candidate(d, &h.app.session, &Hit::SketchPoint { sketch: 1, id: point, at: polykrom_engine::geom::Vec2::ZERO }).unwrap();
     d.pick(&h.app.session, selected);
     assert!(d.inputs[0].items.is_empty(), "clicking a preselection removes it instead of duplicating it");
     d.active = 1;

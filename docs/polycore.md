@@ -28,7 +28,7 @@ The RFC says how the code gets through the kernel stages K0–K7 in [ENGINES.md]
 
 ## Current wiring
 
-`Cargo.toml` pins `solidcraft-kernel` and `solidcraft-geom` to one PolyCore revision. Both entries
+`Cargo.toml` pins `polycore` and `polycore-geom` to one PolyCore revision. Both entries
 must name the same revision: the kernel's public types are the geometry crate's types.
 
 - Polykrom no longer patches registry Truck crates. PolyCore carries the patched closure as
@@ -42,8 +42,8 @@ must name the same revision: the kernel's public types are the geometry crate's 
 
   ```toml
   [patch."https://github.com/WCKDai/polycore"]
-  solidcraft-kernel = { path = "../polycore/crates/polycore" }
-  solidcraft-geom = { path = "../polycore/crates/solidcraft-geom" }
+  polycore = { path = "../polycore/crates/polycore" }
+  polycore-geom = { path = "../polycore/crates/polycore-geom" }
   ```
 
 Remaining follow-ups after this dependency switch:

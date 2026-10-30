@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
+use polykrom_engine::Sel;
 use serde_json::json;
-use solidcraft_engine::Sel;
 
 use crate::test_support::component_box as fixture;
 
@@ -29,7 +29,7 @@ fn pending_and_reverted_moves_replace_cached_transforms() {
     h.app.run("occurrence.move", json!({"occurrence":occurrence,"translate":[20,0,0],"capture":false})).unwrap();
     let moved = super::model_placement(&mut h.app, &[occurrence]).unwrap();
     assert!(!Arc::ptr_eq(&first, &moved));
-    assert!((solidcraft_engine::doc::apply_point(&moved.world, solidcraft_engine::geom::Vec3::ZERO).x - 20.0).abs() < 1e-9);
+    assert!((polykrom_engine::doc::apply_point(&moved.world, polykrom_engine::geom::Vec3::ZERO).x - 20.0).abs() < 1e-9);
     h.app.run("component.revert_position", json!({"occurrences":[occurrence]})).unwrap();
     let reverted = super::model_placement(&mut h.app, &[occurrence]).unwrap();
     assert!(!Arc::ptr_eq(&moved, &reverted));
@@ -76,7 +76,7 @@ fn body_index_and_placements_follow_geometry_undo_and_document_identity() {
     assert_eq!(super::model_placement(&mut h.app, &[occurrence]).unwrap().bodies.len(), 1);
     assert_eq!(super::entries(&h.app, component, "bodies").len(), 1);
     // A separate session can have the same revision and the same occurrence ids.
-    h.app.session = solidcraft_engine::Session::default();
+    h.app.session = polykrom_engine::Session::default();
     assert!(super::model_placement(&mut h.app, &[occurrence]).is_none());
     assert!(super::model_children(&h.app, 0).is_empty());
     assert!(super::entries(&h.app, component, "bodies").is_empty());
@@ -96,7 +96,7 @@ fn a_face_picked_in_the_viewport_opens_the_browser_to_its_placements_body() {
     h.app.tree.collapsed.extend([one.clone(), two.clone(), format!("{two}/bodies")]);
     h.frames(2);
     assert!(!h.app.tree.order.contains(&format!("b:{second}")), "the body's row is closed away");
-    let face = Sel::Face { body: second.clone(), index: 0, point: solidcraft_engine::geom::Vec3::new(55.0, 5.0, 10.0) };
+    let face = Sel::Face { body: second.clone(), index: 0, point: polykrom_engine::geom::Vec3::new(55.0, 5.0, 10.0) };
     crate::viewport::select(&mut h.app, Some(face), false, false);
     assert_eq!(h.app.tree.reveal.as_deref(), Some(second.as_str()));
     h.frames(2);

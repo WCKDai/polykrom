@@ -8,7 +8,7 @@
 # Keep this list in sync with docs/book/src/dev/testing.md and CONTRIBUTING.md.
 default-filter = """
 not (
-    (package(solidcraft-engine) & (
+    (package(polykrom-engine) & (
         test(=tests::hostile_params_never_panic)
         | test(/^tests::robustness::/)
         | test(/^tests::robustness_goldens::seed_/)
@@ -16,8 +16,8 @@ not (
         | test(=pattern_suppress_tests::enclosure_datums_follow_wall_height_and_board_depth_with_material_proofs)
         | test(=cmd::plastic::tests::enclosure_snap_fit_follows_resized_front_wall)
     ))
-    | (package(solidcraft-engine) & binary(atomic_commands))
-    | (package(solidcraft-ui-egui) & binary(scenarios) & test(=acceptance_sensor_enclosure))
+    | (package(polykrom-engine) & binary(atomic_commands))
+    | (package(polykrom-ui-egui) & binary(scenarios) & test(=acceptance_sensor_enclosure))
 )
 """
 fail-fast = false
@@ -45,7 +45,7 @@ priority = 100
 # from the CI test timings (the junit artifacts), slowest first; a test over ~100 s belongs here.
 [[profile.ci.overrides]]
 filter = """
-(package(solidcraft-engine) & (
+(package(polykrom-engine) & (
     test(/^tests::robustness_goldens::seed_(81|45|20|24|95|02|57|40|18|48|32|46|85|61)$/)
     | test(/^tests::robustness::/)
     | test(=tests::hostile_params_never_panic)
@@ -56,7 +56,7 @@ filter = """
     | test(=cmd::sheet::tests::perforated_sheet_takes_a_thousand_round_holes)
     | test(=boolean_regression_tests::joined_loft_frames_plan_their_display_at_every_quality)
 ))
-| (package(solidcraft-engine) & (binary(atomic_commands) | binary(step_export_regressions)))
+| (package(polykrom-engine) & (binary(atomic_commands) | binary(step_export_regressions)))
 """
 priority = 100
 
@@ -71,12 +71,12 @@ threads-required = "num-cpus"
 priority = 100
 
 [[profile.local-ci.overrides]]
-filter = "package(solidcraft-engine) & test(=tests::robustness_goldens::seed_81)"
+filter = "package(polykrom-engine) & test(=tests::robustness_goldens::seed_81)"
 priority = 99
 
 [[profile.local-ci.overrides]]
 filter = """
-(package(solidcraft-engine) & (
+(package(polykrom-engine) & (
     test(/^tests::robustness_goldens::seed_(81|45|20|24|95|02|57|40|18|48|32|46|85|61)$/)
     | test(/^tests::robustness::/)
     | test(=tests::hostile_params_never_panic)
@@ -87,7 +87,7 @@ filter = """
     | test(=cmd::sheet::tests::perforated_sheet_takes_a_thousand_round_holes)
     | test(=boolean_regression_tests::joined_loft_frames_plan_their_display_at_every_quality)
 ))
-| (package(solidcraft-engine) & (binary(atomic_commands) | binary(step_export_regressions)))
+| (package(polykrom-engine) & (binary(atomic_commands) | binary(step_export_regressions)))
 """
 priority = 98
 
@@ -97,5 +97,5 @@ max-threads = 1
 
 [[profile.local-ci.overrides]]
 platform = "cfg(windows)"
-filter = "package(solidcraft-gpu) | package(solidcraft) | (package(solidcraft-ui-egui) & test(/(offscreen|gpu)/))"
+filter = "package(polykrom-gpu) | package(polykrom) | (package(polykrom-ui-egui) & test(/(offscreen|gpu)/))"
 test-group = "windows-gpu"

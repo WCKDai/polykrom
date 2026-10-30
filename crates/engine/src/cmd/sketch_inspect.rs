@@ -1,8 +1,8 @@
 //! Inspection: curvature combs and minimum radius on sketch curves, model edges and faces;
 //! centre of mass of bodies.
 
+use polycore_geom::{Aabb3, Seg2, Vec2, Vec3};
 use serde_json::{Value, json};
-use solidcraft_geom::{Aabb3, Seg2, Vec2, Vec3};
 
 use super::CommandSpec;
 use crate::params::{bad, num, string_list, vec3};
@@ -125,7 +125,7 @@ fn curvature_comb(s: &mut Session, p: &Value) -> Result<Value> {
             let at = vec3(v).ok_or_else(|| bad(cmd, "`faces` must list points [x,y,z]"))?;
             let (bi, f) = face_at(&st, at).ok_or_else(|| bad(cmd, "no face there"))?;
             let m = st.bodies.get(bi).map(|b| b.mesh()).ok_or_else(|| bad(cmd, "that face's body is not evaluated"))?;
-            for (k, w) in solidcraft_doc::iso_grid(&m, f, at, count).iter().enumerate() {
+            for (k, w) in polykrom_doc::iso_grid(&m, f, at, count).iter().enumerate() {
                 combs.push((format!("face@{},{},{}#{k}", at.x, at.y, at.z), teeth_3d(w)));
             }
         }
@@ -162,7 +162,7 @@ fn min_of(teeth: &[(Vec3, f64, Vec3)]) -> Option<(f64, Vec3)> {
 }
 
 /// The face of a body at `at` (nearest triangle): (body index, face index).
-fn face_at(st: &solidcraft_doc::ModelState, at: Vec3) -> Option<(usize, u32)> {
+fn face_at(st: &polykrom_doc::ModelState, at: Vec3) -> Option<(usize, u32)> {
     let mut best: Option<(f64, usize, u32)> = None;
     for (bi, b) in st.bodies.iter().enumerate() {
         let m = b.mesh();
@@ -199,7 +199,7 @@ fn closest_on_triangle(p: Vec3, a: Vec3, b: Vec3, c: Vec3) -> Vec3 {
 
 /// Smallest radius of curvature over a face of a mesh, from the turn of the vertex normals
 /// along each triangle side: (radius, where).
-fn face_min_radius(m: &solidcraft_geom::Mesh, face: u32) -> Option<(f64, Vec3)> {
+fn face_min_radius(m: &polycore_geom::Mesh, face: u32) -> Option<(f64, Vec3)> {
     let mut best: Option<(f64, Vec3)> = None;
     for (ti, t) in m.triangles.iter().enumerate() {
         if m.tri_face.get(ti) != Some(&face) {
@@ -309,7 +309,7 @@ fn isocurves(s: &mut Session, p: &Value) -> Result<Value> {
         let at = vec3(v).ok_or_else(|| bad(cmd, "`faces` must list points [x,y,z]"))?;
         let (bi, f) = face_at(&st, at).ok_or_else(|| bad(cmd, "no face there"))?;
         let m = st.bodies.get(bi).map(|b| b.mesh()).ok_or_else(|| bad(cmd, "body"))?;
-        for w in solidcraft_doc::iso_grid(&m, f, at, count) {
+        for w in polykrom_doc::iso_grid(&m, f, at, count) {
             out.push(w.iter().map(|q| [q.x, q.y, q.z]).collect::<Vec<_>>());
         }
     }

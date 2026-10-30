@@ -1,5 +1,5 @@
 use super::*;
-use solidcraft_render::job::{CpuHost, JobId};
+use polykrom_render::job::{CpuHost, JobId};
 
 fn session() -> (Session, CpuHost) {
     let host = CpuHost::cooperative();
@@ -115,25 +115,25 @@ fn open_close_and_host_replacement_cancel_work_and_reject_old_ids() {
     let id = start(&mut s);
     let handle = s.render_job_handle(id).unwrap();
     s.execute("doc.open", &json!({"path":path})).unwrap();
-    assert_eq!(handle.status().unwrap().progress.phase, solidcraft_render::job::Phase::Cancelled);
+    assert_eq!(handle.status().unwrap().progress.phase, polykrom_render::job::Phase::Cancelled);
     assert!(s.execute("render.status", &json!({"job":id})).is_err());
     assert!(s.render_job_host().unwrap().same_host(&host));
     let id = start(&mut s);
     let handle = s.render_job_handle(id).unwrap();
     s.replace_design(Session::default());
-    assert_eq!(handle.status().unwrap().progress.phase, solidcraft_render::job::Phase::Cancelled);
+    assert_eq!(handle.status().unwrap().progress.phase, polykrom_render::job::Phase::Cancelled);
     assert!(s.execute("render.status", &json!({"job":id})).is_err());
     assert!(s.render_job_host().unwrap().same_host(&host));
     let id = start(&mut s);
     let handle = s.render_job_handle(id).unwrap();
     let replacement = CpuHost::cooperative();
     s.set_render_job_host(Some(replacement.clone())).unwrap();
-    assert_eq!(handle.status().unwrap().progress.phase, solidcraft_render::job::Phase::Cancelled);
+    assert_eq!(handle.status().unwrap().progress.phase, polykrom_render::job::Phase::Cancelled);
     assert!(s.execute("render.status", &json!({"job":id})).is_err());
     let id = start(&mut s);
     let handle = s.render_job_handle(id).unwrap();
     drop(s);
-    assert_eq!(handle.status().unwrap().progress.phase, solidcraft_render::job::Phase::Cancelled);
+    assert_eq!(handle.status().unwrap().progress.phase, polykrom_render::job::Phase::Cancelled);
     finish(&host);
     finish(&replacement);
     std::fs::remove_file(path).unwrap();
@@ -187,8 +187,8 @@ fn native_start_and_cancel_measure_cached_capture_without_timing_assertions() {
     let cancel_request_time = before.elapsed();
     let status = s.render_job_handle(id).unwrap().wait_timeout(Duration::from_secs(60)).unwrap();
     let cancellation_time = before.elapsed();
-    assert!(matches!(status.progress.phase, solidcraft_render::job::Phase::Cancelled | solidcraft_render::job::Phase::Completed));
-    if status.progress.phase == solidcraft_render::job::Phase::Cancelled {
+    assert!(matches!(status.progress.phase, polykrom_render::job::Phase::Cancelled | polykrom_render::job::Phase::Completed));
+    if status.progress.phase == polykrom_render::job::Phase::Cancelled {
         assert!(status.frame.is_none());
     }
     eprintln!(
@@ -200,7 +200,7 @@ fn native_start_and_cancel_measure_cached_capture_without_timing_assertions() {
     let watch = Instant::now();
     let observed = loop {
         let phase = handle.status().unwrap().progress.phase;
-        if phase == solidcraft_render::job::Phase::Running || phase.terminal() {
+        if phase == polykrom_render::job::Phase::Running || phase.terminal() {
             break phase;
         }
         assert!(watch.elapsed() < Duration::from_secs(60), "native worker did not advance");

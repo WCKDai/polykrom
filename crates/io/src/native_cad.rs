@@ -22,12 +22,10 @@ pub fn is_native_cad_path(path: &str) -> bool {
 /// and warnings cadmpeg reported. Panics inside cadmpeg become errors.
 pub fn native_cad_to_step(bytes: &[u8], file: &str) -> Result<(String, Vec<String>), String> {
     let name = std::path::Path::new(file).file_name().map(|s| s.to_string_lossy().to_string()).unwrap_or_else(|| file.to_string());
-    solidcraft_kernel::guard("cadmpeg import", || convert::to_step(&name, bytes).map_err(solidcraft_kernel::KernelError::Invalid)).map_err(
-        |e| match e {
-            solidcraft_kernel::KernelError::Invalid(m) => m,
-            e => e.to_string(),
-        },
-    )
+    polycore::guard("cadmpeg import", || convert::to_step(&name, bytes).map_err(polycore::KernelError::Invalid)).map_err(|e| match e {
+        polycore::KernelError::Invalid(m) => m,
+        e => e.to_string(),
+    })
 }
 
 mod convert {

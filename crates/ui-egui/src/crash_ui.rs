@@ -1,7 +1,7 @@
-//! The Crash Reports window (Help > Crash Reports…): the reports `solidcraft_engine::crash`
+//! The Crash Reports window (Help > Crash Reports…): the reports `polykrom_engine::crash`
 //! keeps on this computer, each with a reviewed issue draft. It opens by itself after a crash.
 
-use solidcraft_engine::crash::{self, Summary};
+use polykrom_engine::crash::{self, Summary};
 
 use crate::SolveApp;
 use crate::ui_kit;
@@ -210,7 +210,7 @@ mod tests {
         report["message"] = json!("Polykrom 0.3.2 (started 2026-10-01T10:00:00Z) ended without a clean exit between commands");
         report["command"] = serde_json::Value::Null;
         std::fs::write(&path, report.to_string()).unwrap();
-        super::announce(&mut h.app, &solidcraft_engine::crash::list(&d));
+        super::announce(&mut h.app, &polykrom_engine::crash::list(&d));
         h.frames(6);
         assert!(h.app.crashes.open, "unclean exits still alert the user");
         let status = &h.app.status.as_ref().unwrap().0;
@@ -232,7 +232,7 @@ mod tests {
         let mut report: serde_json::Value = serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
         report["kind"] = json!("command_panic");
         std::fs::write(&path, report.to_string()).unwrap();
-        super::announce(&mut h.app, &solidcraft_engine::crash::list(&d));
+        super::announce(&mut h.app, &polykrom_engine::crash::list(&d));
         h.frames(6);
         assert!(h.app.crashes.open);
         assert!(h.widget("2026-10-12 16:23:41 UTC  Internal error in a command  ×2").is_some());
@@ -245,7 +245,7 @@ mod tests {
         let d = folder("draft");
         let mut h = crate::scenario::Harness::new();
         h.app.crashes.folder = Some(d.clone());
-        let fresh = solidcraft_engine::crash::list(&d);
+        let fresh = polykrom_engine::crash::list(&d);
         assert_eq!(fresh.len(), 1);
         super::announce(&mut h.app, &fresh);
         assert!(h.app.crashes.open, "a real crash opens the window");
@@ -270,7 +270,7 @@ mod tests {
         h.frames(2);
         h.step(&json!({"widget": "Delete all"})).unwrap();
         h.frames(2);
-        assert!(solidcraft_engine::crash::list(&d).is_empty());
+        assert!(polykrom_engine::crash::list(&d).is_empty());
         let _ = std::fs::remove_dir_all(&d);
     }
 
@@ -290,7 +290,7 @@ mod tests {
     #[test]
     fn recovered_kernel_errors_do_not_interrupt() {
         let mut h = crate::scenario::Harness::new();
-        let quiet = solidcraft_engine::crash::Summary {
+        let quiet = polykrom_engine::crash::Summary {
             id: "x".into(),
             kind: "kernel_panic_recovered".into(),
             time: String::new(),

@@ -70,7 +70,7 @@ user-selectable engine families.
 
 ## Pure request resolution
 
-`solidcraft_render::resolve_request` accepts a descriptor slice and a `RenderRequest`.
+`polykrom_render::resolve_request` accepts a descriptor slice and a `RenderRequest`.
 It validates and resolves metadata only: it does not allocate an image, start a job,
 reroute `snapshot` or call a renderer. A request can be deserialized from:
 

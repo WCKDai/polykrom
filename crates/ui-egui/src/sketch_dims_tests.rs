@@ -148,7 +148,7 @@ fn clicking_a_parameter_suggestion_fills_the_length_box() {
     let sk = &state.sketch(h.app.session.active_sketch.unwrap()).unwrap().sketch;
     assert_eq!(sk.curves.len(), 1);
     let length = sk.shape(0).map(|s| match s {
-        solidcraft_engine::sketch::Shape::Line { a, b } => a.dist(b),
+        polykrom_engine::sketch::Shape::Line { a, b } => a.dist(b),
         _ => 0.0,
     });
     assert!(length.is_some_and(|l| (l - 24.0).abs() < 1e-6), "{length:?}");
@@ -168,7 +168,7 @@ fn two_point_circle_takes_a_typed_diameter() {
     assert!(sk.radius(0).is_some_and(|r| (r - 15.0).abs() < 1e-6), "{:?}", sk.radius(0));
     let c = sk.center(0).unwrap();
     // From the first point (the origin) toward the cursor at (20, 10).
-    let dir = solidcraft_engine::geom::Vec2::new(20.0, 10.0).normalized().unwrap();
+    let dir = polykrom_engine::geom::Vec2::new(20.0, 10.0).normalized().unwrap();
     assert!((c - dir * 15.0).len() < 1e-6, "{c:?}");
 }
 
@@ -223,13 +223,13 @@ fn a_typed_rho_shapes_the_conic_whose_apex_is_placed_next() {
         .curves
         .iter()
         .find_map(|curve| match curve.kind {
-            solidcraft_engine::sketch::CurveKind::Conic { apex, rho, .. } => Some((apex, rho)),
+            polykrom_engine::sketch::CurveKind::Conic { apex, rho, .. } => Some((apex, rho)),
             _ => None,
         })
         .expect("the typed value placed a conic");
     assert!((rho - 0.8).abs() < 1e-9, "typed rho reached the command: {rho}");
     // The apex lands where the cursor was, within the pixel the cursor was converted through.
-    assert!(sketch.point(apex).unwrap().dist(solidcraft_engine::geom::Vec2::new(20.0, 20.0)) < 0.5, "{:?}", sketch.point(apex));
+    assert!(sketch.point(apex).unwrap().dist(polykrom_engine::geom::Vec2::new(20.0, 20.0)) < 0.5, "{:?}", sketch.point(apex));
 }
 
 /// A rho the command would refuse stays in its box to be corrected, and places nothing.
@@ -269,7 +269,7 @@ fn rounded_rectangle_takes_typed_width_height_and_radius() {
     h.step(&json!({"key": "Enter"})).unwrap();
     let state = h.app.session.world_state();
     let sketch = state.sketch(h.app.session.active_sketch.unwrap()).unwrap();
-    let kinds: Vec<_> = sketch.sketch.curves.iter().map(|c| matches!(c.kind, solidcraft_engine::sketch::CurveKind::Arc { .. })).collect();
+    let kinds: Vec<_> = sketch.sketch.curves.iter().map(|c| matches!(c.kind, polykrom_engine::sketch::CurveKind::Arc { .. })).collect();
     assert_eq!(kinds.iter().filter(|arc| **arc).count(), 4, "four corner arcs");
     assert_eq!(kinds.len(), 8);
     assert_eq!(sketch.profiles.len(), 1);
@@ -299,8 +299,8 @@ fn rounded_rectangle_clicks_use_a_default_radius() {
 /// snaps to horizontal or vertical, so the click must place exactly that line, on the circle.
 #[test]
 fn a_line_end_on_a_circle_within_the_axis_snap_lands_on_the_quadrant_the_preview_shows() {
-    use solidcraft_engine::geom::Vec2;
-    use solidcraft_engine::sketch::{ConstraintKind, CurveKind};
+    use polykrom_engine::geom::Vec2;
+    use polykrom_engine::sketch::{ConstraintKind, CurveKind};
     let r = 30.0_f64;
     for (deg, end, horizontal) in [(-1.5_f64, Vec2::new(r, 0.0), true), (91.8, Vec2::new(0.0, r), false), (178.0, Vec2::new(-r, 0.0), true)] {
         let mut h = Harness::new();
@@ -343,8 +343,8 @@ fn a_line_end_on_a_circle_within_the_axis_snap_lands_on_the_quadrant_the_preview
 /// Outside the axis snap a line end on a circle stays where the cursor meets the circle.
 #[test]
 fn a_line_end_on_a_circle_outside_the_axis_snap_stays_at_the_cursor() {
-    use solidcraft_engine::geom::Vec2;
-    use solidcraft_engine::sketch::CurveKind;
+    use polykrom_engine::geom::Vec2;
+    use polykrom_engine::sketch::CurveKind;
     let mut h = Harness::new();
     h.app.run("sketch.create", json!({"plane": "XY"})).unwrap();
     h.app.run("sketch.circle.center", json!({"center": [0, 0], "radius": 30})).unwrap();

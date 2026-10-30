@@ -1,5 +1,5 @@
+use polycore_geom::Vec3;
 use serde_json::{Value, json};
-use solidcraft_geom::Vec3;
 
 use crate::Session;
 
@@ -30,7 +30,7 @@ fn deleted_motion_item_ids_are_not_reused_after_reopening() {
         let first = run(&mut s, create, params.clone())[key].as_u64().unwrap();
         let deletion = json!({key: first, "delete": true});
         run(&mut s, delete, deletion.clone());
-        let doc = solidcraft_doc::Document::from_json(&s.doc.to_json()).unwrap();
+        let doc = polykrom_doc::Document::from_json(&s.doc.to_json()).unwrap();
         *s.doc_mut() = doc;
         let second = run(&mut s, create, params)[key].as_u64().unwrap();
         assert!(second > first, "{create}: deleted item {first} was reused as {second}");
@@ -622,7 +622,7 @@ fn motion_study_plays_and_exports() {
     // The B occurrence's origin moves by the slider value (it starts at 0 offset with value 0 at 10 mm… so 10 → −5).
     assert!((bx(&rows[1]) - bx(&rows[0]) + 3.75).abs() < 1e-6, "{e}");
     assert!(rows[4]["stopped_by_contact"].is_object());
-    let dir = solidcraft_io::vfs::temp_dir().join(format!("solidcraft-motion-{}", std::process::id()));
+    let dir = polykrom_io::vfs::temp_dir().join(format!("solidcraft-motion-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     let csv = dir.join("push.csv");
     run(&mut s, "motion.export", json!({"study": "Push", "samples": 3, "path": csv.to_string_lossy()}));
@@ -631,7 +631,7 @@ fn motion_study_plays_and_exports() {
     // For an agent (#205) the export lands only inside its folders.
     let root = dir.join("root");
     std::fs::create_dir_all(&root).unwrap();
-    solidcraft_io::vfs::scoped(Some(solidcraft_io::vfs::PathScope::new([root.clone()])), || {
+    polykrom_io::vfs::scoped(Some(polykrom_io::vfs::PathScope::new([root.clone()])), || {
         run(&mut s, "motion.export", json!({"study": "Push", "samples": 2, "path": root.join("in.json").to_string_lossy()}));
         let e = s.execute("motion.export", &json!({"study": "Push", "samples": 2, "path": dir.join("out.json").to_string_lossy()})).unwrap_err();
         assert!(e.to_string().contains("outside the folders this agent may use"), "{e}");
@@ -673,7 +673,7 @@ fn cpu(scene: &crate::render::Scene, cam: &crate::render::Camera, w: u32, h: u32
 
 /// A folder of its own for one test's files.
 fn out_dir(test: &str) -> std::path::PathBuf {
-    let dir = solidcraft_io::vfs::temp_dir().join(format!("solidcraft-anim-{test}-{}", std::process::id()));
+    let dir = polykrom_io::vfs::temp_dir().join(format!("solidcraft-anim-{test}-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
     dir
@@ -889,7 +889,7 @@ fn hostile_animation_params_are_refused() {
     // An agent's export lands only inside its folders.
     let root = dir.join("root");
     std::fs::create_dir_all(&root).unwrap();
-    solidcraft_io::vfs::scoped(Some(solidcraft_io::vfs::PathScope::new([root.clone()])), || {
+    polykrom_io::vfs::scoped(Some(polykrom_io::vfs::PathScope::new([root.clone()])), || {
         let e = refused(json!({"path": dir.join("out").to_string_lossy()})).unwrap();
         assert!(e.contains("outside the folders this agent may use"), "{e}");
         assert!(refused(json!({"path": root.join("in.gif").to_string_lossy()})).is_none());
@@ -940,7 +940,7 @@ fn pivot(in_context: bool) -> Session {
 }
 
 /// Every body of `model` and `full` the same: names, faces and where their meshes lie.
-fn same_bodies(model: &solidcraft_doc::ModelState, full: &solidcraft_doc::ModelState) {
+fn same_bodies(model: &polykrom_doc::ModelState, full: &polykrom_doc::ModelState) {
     assert_eq!(model.bodies.len(), full.bodies.len());
     for (a, b) in model.bodies.iter().zip(&full.bodies) {
         assert_eq!(a.name, b.name);
@@ -951,8 +951,8 @@ fn same_bodies(model: &solidcraft_doc::ModelState, full: &solidcraft_doc::ModelS
 }
 
 /// The model `s` shows, evaluated again from nothing.
-fn rebuilt(s: &Session) -> std::sync::Arc<solidcraft_doc::ModelState> {
-    let mut full = solidcraft_doc::Model::default();
+fn rebuilt(s: &Session) -> std::sync::Arc<polykrom_doc::ModelState> {
+    let mut full = polykrom_doc::Model::default();
     full.no_cache = true;
     full.evaluate(&s.doc);
     full.state()
@@ -997,9 +997,9 @@ fn an_in_context_sketch_follows_only_the_parts_it_reads() {
     // The whole assembly moved as one (both occurrences by the same turn and shift): nothing the
     // sketch reads moved relative to it.
     let model = s.model.state();
-    let turn = solidcraft_doc::rigid(Vec3::new(5.0, -3.0, 2.0), Vec3::new(1.0, 2.0, 0.0), Vec3::new(0.3, 0.2, 1.0), 0.7);
+    let turn = polykrom_doc::rigid(Vec3::new(5.0, -3.0, 2.0), Vec3::new(1.0, 2.0, 0.0), Vec3::new(0.3, 0.2, 1.0), 0.7);
     for o in &mut s.doc_mut().occurrences {
-        o.transform = solidcraft_doc::mat_mul(&turn, &o.transform);
+        o.transform = polykrom_doc::mat_mul(&turn, &o.transform);
     }
     s.refresh();
     assert_eq!(s.model.last_recomputed, 0);

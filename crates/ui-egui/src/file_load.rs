@@ -15,8 +15,8 @@ use std::sync::{
     mpsc::{Receiver, Sender, TryRecvError},
 };
 
+use polykrom_engine::{Session, doc::Document, doc::progress::Progress};
 use serde_json::{Value, json};
-use solidcraft_engine::{Session, doc::Document, doc::progress::Progress};
 
 use crate::SolveApp;
 use crate::control::ControlResponse;
@@ -42,7 +42,7 @@ pub struct Request {
     /// A control-channel caller waiting for the command's reply.
     pub reply: Option<Sender<ControlResponse>>,
     /// The folders that caller's agent may use: the worker reads the file inside them.
-    pub scope: Option<solidcraft_engine::io::vfs::PathScope>,
+    pub scope: Option<polykrom_engine::io::vfs::PathScope>,
     /// What that caller asked of an open or import besides its path (`up`, `names`, `matrix`,
     /// `name`, ...): the command gets them as given and checks them as it does run directly.
     pub options: serde_json::Map<String, Value>,
@@ -64,7 +64,7 @@ impl Request {
     fn command(&self) -> (&'static str, Value) {
         match &self.kind {
             Kind::Open => ("doc.open", self.params()),
-            Kind::Insert if solidcraft_engine::io::is_mesh_path(&self.path) => ("file.insert_mesh", self.params()),
+            Kind::Insert if polykrom_engine::io::is_mesh_path(&self.path) => ("file.insert_mesh", self.params()),
             Kind::Insert => ("file.insert_step", self.params()),
             Kind::Recover { id, dir } => ("doc.recover", json!({"id": id, "dir": dir})),
             Kind::ExportDxf => ("file.export_view_dxf", Value::Object(self.options.clone())),
@@ -122,7 +122,7 @@ struct Staged {
     session: Option<Session>,
     command: &'static str,
     params: Value,
-    reading: Option<solidcraft_engine::kernel::StepReading>,
+    reading: Option<polykrom_engine::kernel::StepReading>,
     /// The command's result once it has run; then the bodies' meshes are made, a few a frame,
     /// so the first frame that draws the design doesn't make them all at once.
     ran: Option<Value>,
@@ -145,9 +145,9 @@ const STAGED_FRAME_MS: f64 = 30.0;
 fn staged_kind(request: &Request) -> bool {
     let p = &request.path;
     matches!(request.kind, Kind::Insert | Kind::Open)
-        && solidcraft_engine::io::is_step_path(p)
-        && !solidcraft_engine::io::is_iges_path(p)
-        && !solidcraft_engine::io::is_native_cad_path(p)
+        && polykrom_engine::io::is_step_path(p)
+        && !polykrom_engine::io::is_iges_path(p)
+        && !polykrom_engine::io::is_native_cad_path(p)
 }
 
 impl Running {
@@ -304,7 +304,7 @@ fn reoffer(app: &mut SolveApp, id: &str, dir: Option<&str>) {
     if app.recoverable.iter().any(|e| e.id == id) {
         return;
     }
-    if let Some(e) = solidcraft_engine::recovery::orphans(&dir).into_iter().find(|e| e.id == id) {
+    if let Some(e) = polykrom_engine::recovery::orphans(&dir).into_iter().find(|e| e.id == id) {
         app.recoverable.insert(0, e);
     }
 }
@@ -368,7 +368,7 @@ fn start(app: &mut SolveApp) {
                 let Some(partial) = watch.take_partial() else { continue };
                 let began = std::time::Instant::now();
                 let picture = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| partial_picture(&partial.world, &stop))).ok().flatten();
-                if solidcraft_engine::geom::env::var_os("PROFILE_OPEN").is_some() {
+                if polykrom_engine::geom::env::var_os("PROFILE_OPEN").is_some() {
                     eprintln!(
                         "Polykrom partial picture: features={} bodies={} drawn={} ms={:.1}",
                         partial.features,
@@ -406,7 +406,7 @@ fn start(app: &mut SolveApp) {
                     let picture = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| saved_picture(preview))).ok().flatten();
                     if let Some(picture) = picture.filter(|_| !progress.is_cancelled()) {
                         let _ = preview_tx.send(picture);
-                        if solidcraft_engine::geom::env::var_os("PROFILE_OPEN").is_some() {
+                        if polykrom_engine::geom::env::var_os("PROFILE_OPEN").is_some() {
                             eprintln!("Polykrom saved preview: ready_ms={:.3}", preview_began.elapsed().as_secs_f64() * 1000.0);
                         }
                     }
@@ -527,11 +527,11 @@ fn step_staged(running: &mut Running) {
     let Some(reading) = staged.reading.as_mut() else {
         // Parse and walk the file. The reading keeps the watch: its steps report progress and
         // stop on Cancel.
-        let read = solidcraft_engine::io::vfs::scoped(scope, || {
-            let bytes = solidcraft_engine::io::vfs::read(&path, solidcraft_engine::io::MAX_STEP_BYTES).map_err(|e| format!("{path}: {e}"))?;
+        let read = polykrom_engine::io::vfs::scoped(scope, || {
+            let bytes = polykrom_engine::io::vfs::read(&path, polykrom_engine::io::MAX_STEP_BYTES).map_err(|e| format!("{path}: {e}"))?;
             // The same text the import command makes of the bytes, so it finds this reading.
             let text = String::from_utf8_lossy(&bytes).into_owned();
-            solidcraft_engine::doc::progress::watch(progress.clone(), || solidcraft_engine::kernel::StepReading::new(&text))
+            polykrom_engine::doc::progress::watch(progress.clone(), || polykrom_engine::kernel::StepReading::new(&text))
                 .map_err(|e| format!("{path}: {e}"))
         });
         match read {
@@ -562,8 +562,8 @@ fn step_staged(running: &mut Running) {
         return;
     };
     let (command, params) = (staged.command, staged.params.clone());
-    let result = solidcraft_engine::io::vfs::scoped(running.request.scope.clone(), || {
-        solidcraft_engine::doc::progress::watch(progress.clone(), || session.execute(command, &params))
+    let result = polykrom_engine::io::vfs::scoped(running.request.scope.clone(), || {
+        polykrom_engine::doc::progress::watch(progress.clone(), || session.execute(command, &params))
     });
     drop(import);
     match result {
@@ -581,8 +581,8 @@ fn step_staged(running: &mut Running) {
 /// the finished model), or `None` when there is nothing to show yet, too much to draw, or the
 /// load ended meanwhile (`stop`).
 #[cfg(not(target_arch = "wasm32"))]
-fn partial_picture(world: &solidcraft_engine::doc::ModelState, stop: &dyn Fn() -> bool) -> Option<egui::ColorImage> {
-    use solidcraft_engine::{
+fn partial_picture(world: &polykrom_engine::doc::ModelState, stop: &dyn Fn() -> bool) -> Option<egui::ColorImage> {
+    use polykrom_engine::{
         geom::Aabb3,
         render::{Camera, Rgb, Scene, SceneMesh, StandardView},
     };
@@ -615,8 +615,8 @@ fn partial_picture(world: &solidcraft_engine::doc::ModelState, stop: &dyn Fn() -
 }
 
 #[cfg(not(target_arch = "wasm32"))]
-fn saved_picture(preview: solidcraft_engine::io::DesignPreview) -> Option<egui::ColorImage> {
-    use solidcraft_engine::{
+fn saved_picture(preview: polykrom_engine::io::DesignPreview) -> Option<egui::ColorImage> {
+    use polykrom_engine::{
         geom::{Aabb3, Mesh, Vec3},
         render::{Camera, Rgb, Scene, SceneMesh, StandardView},
     };
@@ -662,8 +662,8 @@ fn saved_picture(preview: solidcraft_engine::io::DesignPreview) -> Option<egui::
 
 /// The preview picture, drawn on the GPU by the renderer the app installs (none: no picture).
 #[cfg(not(target_arch = "wasm32"))]
-fn preview_image(scene: &solidcraft_engine::render::Scene, camera: &solidcraft_engine::render::Camera) -> Option<egui::ColorImage> {
-    match solidcraft_engine::capture::rgba(scene, camera, 320, 200) {
+fn preview_image(scene: &polykrom_engine::render::Scene, camera: &polykrom_engine::render::Camera) -> Option<egui::ColorImage> {
+    match polykrom_engine::capture::rgba(scene, camera, 320, 200) {
         Ok(picture) => Some(egui::ColorImage::from_rgba_unmultiplied([320, 200], &picture.rgba)),
         Err(e) => {
             log::warn!("no preview picture: {e}");
@@ -676,7 +676,7 @@ fn preview_image(scene: &solidcraft_engine::render::Scene, camera: &solidcraft_e
 /// not monopolize the file worker or a software GPU. Counts each triangle's pixel box at twice the
 /// picture's size.
 #[cfg(not(target_arch = "wasm32"))]
-fn preview_work_fits(scene: &solidcraft_engine::render::Scene, camera: &solidcraft_engine::render::Camera) -> bool {
+fn preview_work_fits(scene: &polykrom_engine::render::Scene, camera: &polykrom_engine::render::Camera) -> bool {
     let mut pixels = 0.0;
     let projection = camera.view_proj(640.0 / 400.0, scene.radius.max(1.0));
     for body in &scene.meshes {
@@ -720,12 +720,12 @@ fn compute(
     mut session: Session,
     command: &str,
     params: &Value,
-    scope: Option<solidcraft_engine::io::vfs::PathScope>,
+    scope: Option<polykrom_engine::io::vfs::PathScope>,
     thumbnail: bool,
     phase: &AtomicU8,
     progress: &Arc<Progress>,
 ) -> Job {
-    let profile = solidcraft_engine::geom::env::var_os("PROFILE_OPEN").is_some();
+    let profile = polykrom_engine::geom::env::var_os("PROFILE_OPEN").is_some();
     let began = std::time::Instant::now();
     let cancelled = || Err("file operation cancelled".to_string());
     if progress.is_cancelled() {
@@ -734,7 +734,7 @@ fn compute(
     // The timeline's rebuild reports each feature and stops at the next one after Cancel. An
     // agent's scope is per thread, so it is set again here.
     let result =
-        solidcraft_engine::io::vfs::scoped(scope, || solidcraft_engine::doc::progress::watch(progress.clone(), || session.execute(command, params)))
+        polykrom_engine::io::vfs::scoped(scope, || polykrom_engine::doc::progress::watch(progress.clone(), || session.execute(command, params)))
             .map_err(|e| e.to_string())?;
     if command == "file.export_view_dxf" {
         // A successful export has already published its complete file. A Cancel arriving
@@ -752,7 +752,7 @@ fn compute(
     // The display meshes are made once the design is in the window, which shows its bodies as
     // they come ([`crate::open_meshing`]): framing, picking and drawing never mesh on the UI.
     // Its outlines frame it in the window until it is meshed: measured here, not there.
-    solidcraft_engine::kernel::for_each_on_threads(&world.bodies, 16, |b| {
+    polykrom_engine::kernel::for_each_on_threads(&world.bodies, 16, |b| {
         let _ = b.outline_bounds();
     });
     drop(world);
@@ -1014,8 +1014,8 @@ mod tests {
         let undo = h.app.session.undo.len();
         let cam = h.app.cam;
         let progress = Arc::new(Progress::default());
-        solidcraft_engine::doc::progress::watch(progress.clone(), || {
-            solidcraft_engine::kernel::watch::current().unwrap().progress("dxf_occlusion", 64, 128);
+        polykrom_engine::doc::progress::watch(progress.clone(), || {
+            polykrom_engine::kernel::watch::current().unwrap().progress("dxf_occlusion", 64, 128);
         });
         let (tx, rx) = std::sync::mpsc::channel();
         h.app.file_load.running = Some(Running {
@@ -1120,8 +1120,8 @@ mod tests {
         if !crate::gpu::test_picture_renderer() {
             return;
         }
-        let preview = solidcraft_engine::io::DesignPreview {
-            meshes: vec![solidcraft_engine::doc::MeshData {
+        let preview = polykrom_engine::io::DesignPreview {
+            meshes: vec![polykrom_engine::doc::MeshData {
                 name: "Saved triangle".into(),
                 positions: vec![0.0, 0.0, 0.0, 10.0, 0.0, 0.0, 0.0, 10.0, 0.0].into(),
                 triangles: vec![0, 1, 2].into(),
@@ -1136,8 +1136,8 @@ mod tests {
     #[cfg(not(target_arch = "wasm32"))]
     #[test]
     fn repeated_large_preview_triangles_are_a_cache_miss_before_drawing() {
-        let preview = solidcraft_engine::io::DesignPreview {
-            meshes: vec![solidcraft_engine::doc::MeshData {
+        let preview = polykrom_engine::io::DesignPreview {
+            meshes: vec![polykrom_engine::doc::MeshData {
                 name: "Hostile overdraw".into(),
                 positions: vec![0.0, 0.0, 0.0, 10.0, 0.0, 0.0, 0.0, 10.0, 0.0].into(),
                 triangles: (0..10_000).flat_map(|_| [0, 1, 2]).collect(),

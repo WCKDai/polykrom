@@ -59,7 +59,7 @@ jobs:
           curl -fsSL "https://github.com/trunk-rs/trunk/releases/download/${TRUNK_VERSION}/trunk-x86_64-unknown-linux-gnu.tar.gz" | tar -xz -C "$HOME/.local/bin"
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
       - name: Build the web app
-        working-directory: apps/solidcraft-web
+        working-directory: apps/polykrom-web
         run: trunk build --release
       - name: Image name
         id: image
@@ -87,9 +87,9 @@ jobs:
           build-contexts: site=dist/web
           platforms: linux/amd64
           load: true
-          tags: solidcraft-web:test
+          tags: polykrom-web:test
       - name: Smoke test
-        run: bash packaging/docker/smoke-test.sh solidcraft-web:test
+        run: bash packaging/docker/smoke-test.sh polykrom-web:test
       - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
         if: github.event_name != 'pull_request'
         with:

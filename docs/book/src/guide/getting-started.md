@@ -14,12 +14,12 @@ stable Rust (1.95 or newer):
 
 ```sh
 git clone https://github.com/bherbruck/solidcraft && cd solidcraft
-cargo run --release -p solidcraft -- --sample   # opens with a sample part
+cargo run --release -p polykrom -- --sample   # opens with a sample part
 ```
 
 `solidcraft part.step` opens a STEP, IGES, 3MF, STL or OBJ file as a new design, and
 `solidcraft design.polykrom` opens a saved design. Windows builds cross-compile from Linux with
-`cargo xwin build --release --target x86_64-pc-windows-msvc -p solidcraft`.
+`cargo xwin build --release --target x86_64-pc-windows-msvc -p polykrom`.
 
 ### macOS
 
@@ -111,7 +111,7 @@ To build it yourself:
 
 ```sh
 rustup target add wasm32-unknown-unknown
-cd apps/solidcraft-web && trunk serve --release --no-autoreload
+cd apps/polykrom-web && trunk serve --release --no-autoreload
 ```
 
 Offline use needs `--no-autoreload`: Trunk's live reload changes the page as it serves it, so it
@@ -141,7 +141,7 @@ docker compose -f packaging/docker/compose.yaml up -d --build   # build the imag
 Then open `http://localhost:8080/`. On another machine the browser only saves designs over HTTPS,
 so put a reverse proxy with a certificate in front (Caddy, Traefik, nginx); the app works under
 any URL path, such as `https://example.com/cad/`. To build the image without Compose, from the
-repository root: `docker build -f packaging/docker/Dockerfile -t solidcraft-web .`
+repository root: `docker build -f packaging/docker/Dockerfile -t polykrom-web .`
 
 ### 3D mouse in the browser
 
@@ -198,12 +198,12 @@ joystick instead of the mouse wheel. Delete the file to undo it.
 `polykrom-cli` runs the same commands without a window:
 
 ```sh
-cargo run --release -p solidcraft-cli -- commands                       # every command, as JSON
-cargo run --release -p solidcraft-cli -- run examples/bracket.json --out bracket.step
-cargo run --release -p solidcraft-cli -- eval examples/bracket.json     # volume, area, faces…
-cargo run --release -p solidcraft-cli -- snapshot examples/bracket.json --out bracket.png
-cargo run --release -p solidcraft-cli -- exec solid.box '{"length": 20, "width": 10, "height": 5}'
-cargo run --release -p solidcraft-cli -- run mechanism.json --in arm.polykrom  # with a motion.export_animation step: a GIF
+cargo run --release -p polykrom-cli -- commands                       # every command, as JSON
+cargo run --release -p polykrom-cli -- run examples/bracket.json --out bracket.step
+cargo run --release -p polykrom-cli -- eval examples/bracket.json     # volume, area, faces…
+cargo run --release -p polykrom-cli -- snapshot examples/bracket.json --out bracket.png
+cargo run --release -p polykrom-cli -- exec solid.box '{"length": 20, "width": 10, "height": 5}'
+cargo run --release -p polykrom-cli -- run mechanism.json --in arm.polykrom  # with a motion.export_animation step: a GIF
 ```
 
 A script is a list of commands:
@@ -270,8 +270,8 @@ PowerShell's `>` re-encodes a program's output, as UTF-16 or as UTF-8 with a byt
 depending on its settings, and strict JSON readers such as Python's `json.load` then refuse it.
 
 ```sh
-cargo run --release -p solidcraft-cli -- run examples/bracket.json --results --json-out results.json
-cargo run --release -p solidcraft-cli -- eval examples/bracket.json --json-out measures.json
+cargo run --release -p polykrom-cli -- run examples/bracket.json --results --json-out results.json
+cargo run --release -p polykrom-cli -- eval examples/bracket.json --json-out measures.json
 ```
 
 To find the slow steps of a script, `--timings` prints how long each command took instead of
@@ -282,15 +282,15 @@ its wall time in the kernel's booleans, in tessellation and in everything else. 
 prints a plain array.
 
 ```sh
-cargo run --release -p solidcraft-cli -- run examples/bracket.json --profile
+cargo run --release -p polykrom-cli -- run examples/bracket.json --profile
 ```
 
 A design's history turns into a script that rebuilds it, which makes a bug that only shows
 on one design a one-file reproduction:
 
 ```sh
-cargo run --release -p solidcraft-cli -- script part.polykrom --out repro.json
-cargo run --release -p solidcraft-cli -- eval repro.json               # the same part
+cargo run --release -p polykrom-cli -- script part.polykrom --out repro.json
+cargo run --release -p polykrom-cli -- eval repro.json               # the same part
 ```
 
 The script starts with the user parameters (`parameters.add`) and the design's units, sheet

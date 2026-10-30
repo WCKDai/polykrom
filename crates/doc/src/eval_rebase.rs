@@ -345,7 +345,7 @@ pub(super) fn take_lane(f: &Feature, ahead: &super::lanes::Ahead, now: &ModelSta
 
 /// `POLYKROM_REBASE_SHADOW`: evaluate rebased features as well, and compare.
 pub(super) fn shadow() -> bool {
-    solidcraft_geom::env::var_os("REBASE_SHADOW").is_some_and(|v| !v.is_empty() && v != "0")
+    polycore_geom::env::var_os("REBASE_SHADOW").is_some_and(|v| !v.is_empty() && v != "0")
 }
 
 /// Rebased results that shadow mode found differing from an evaluation, in this process.
@@ -379,7 +379,7 @@ pub(super) fn shadow_check(
         Some(d) => format!("MISMATCH {} {} ({}): {d}", f.kind.type_name(), f.id, f.name),
         None => format!("ok {} {}", f.kind.type_name(), f.id),
     };
-    if let Some(path) = solidcraft_geom::env::var("REBASE_SHADOW").filter(|v| v != "1") {
+    if let Some(path) = polycore_geom::env::var("REBASE_SHADOW").filter(|v| v != "1") {
         use std::io::Write;
         if let Ok(mut file) = std::fs::OpenOptions::new().create(true).append(true).open(path) {
             let _ = writeln!(file, "{note}");

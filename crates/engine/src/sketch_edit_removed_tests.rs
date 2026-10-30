@@ -2,9 +2,9 @@
 //! after it is then part of the model again, but it must not be shown while the sketch is edited
 //! (#1167): the history is rolled back, the view of it is not. A body the sketch is built on stays.
 
+use polycore_geom::Vec3;
+use polykrom_sketch::LinkSource;
 use serde_json::{Value, json};
-use solidcraft_geom::Vec3;
-use solidcraft_sketch::LinkSource;
 
 use crate::Session;
 
@@ -120,7 +120,7 @@ fn a_body_the_sketch_sits_on_stays_shown() {
     };
     run(&mut s, "sketch.create", json!({"plane": top, "name": "Edited"}));
     let anchored = match s.doc.find_feature("Edited").map(|f| &f.kind) {
-        Some(solidcraft_doc::FeatureKind::Sketch { plane: solidcraft_doc::PlaneRef::Face { anchor, .. }, .. }) => anchor.is_some(),
+        Some(polykrom_doc::FeatureKind::Sketch { plane: polykrom_doc::PlaneRef::Face { anchor, .. }, .. }) => anchor.is_some(),
         other => panic!("not attached to a face: {other:?}"),
     };
     assert!(anchored, "the face attachment names its body");

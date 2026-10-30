@@ -10,7 +10,7 @@ sample builds its editable design through the normal commands.
 Regenerate after changing a sample script:
 
 ```sh
-cargo test --profile ci -p solidcraft-ui-egui --lib home::tests::regenerate_sample_thumbnails -- --ignored --exact --nocapture
+cargo test --profile ci -p polykrom-ui-egui --lib home::tests::regenerate_sample_thumbnails -- --ignored --exact --nocapture
 ```
 
 `exports/scripts.json` records SHA-256 hashes of the scripts. The regular tests

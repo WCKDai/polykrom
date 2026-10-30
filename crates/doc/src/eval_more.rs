@@ -5,7 +5,7 @@ use super::*;
 use crate::EmbossFace;
 use crate::apply_point;
 use crate::sheet;
-use solidcraft_geom::{Aabb3, Loop2, Ring, Seg2};
+use polycore_geom::{Aabb3, Loop2, Ring, Seg2};
 
 pub(super) fn eval(doc: &Document, vals: &BTreeMap<String, Value>, f: &Feature, st: &mut ModelState) -> Result<()> {
     match &f.kind {
@@ -504,7 +504,7 @@ pub(super) fn sheet_eval(
     match &f.kind {
         FeatureKind::SheetBase { sketch, profiles, rule, flip } => {
             let ss = st.sketch(sketch.0).ok_or_else(|| DocError::Unknown(format!("sketch {sketch}")))?.clone();
-            let regions = solidcraft_sketch::merge_regions(&select_profiles(&ss, profiles)?);
+            let regions = polykrom_sketch::merge_regions(&select_profiles(&ss, profiles)?);
             let r = doc.sheet_rule(rule.as_deref());
             let rv = doc.rule_values(vals, &r)?;
             for (k, region) in regions.into_iter().enumerate() {
@@ -757,7 +757,7 @@ pub(super) fn sheet_eval(
             let mb = st.body(body).cloned().ok_or_else(|| DocError::Unknown(format!("body `{body}`")))?;
             let n = planar_normal_at(&mb.body, face.0).ok_or_else(|| DocError::Invalid("pick a planar face of the plate".into()))?;
             // Thickness: the body's extent along the face normal.
-            let extent = |mesh: &solidcraft_geom::Mesh| {
+            let extent = |mesh: &polycore_geom::Mesh| {
                 mesh.positions.iter().map(|p| (*p - face.0).dot(n)).fold((f64::MAX, f64::MIN), |(lo, hi), d| (lo.min(d), hi.max(d)))
             };
             // The tolerance (the mesh's chords, and how far off the face's plane a point of it may
@@ -896,13 +896,13 @@ pub(super) fn sheet_cut(
         return Ok(Vec::new());
     }
     let Some(ss) = st.sketch(sketch.0).cloned() else { return Ok(Vec::new()) };
-    let regions = solidcraft_sketch::merge_regions(&select_profiles(&ss, profiles)?);
+    let regions = polykrom_sketch::merge_regions(&select_profiles(&ss, profiles)?);
     // The outlines of the sketch's text: the sheet remembers where its letters went.
     let text: Vec<Seg2> = ss
         .sketch
         .links
         .iter()
-        .filter(|l| matches!(l.source, solidcraft_sketch::LinkSource::Text { .. }))
+        .filter(|l| matches!(l.source, polykrom_sketch::LinkSource::Text { .. }))
         .flat_map(|l| ss.sketch.link_curves(&l.id))
         .flat_map(|ci| ss.sketch.exact_segs(ci).unwrap_or_else(|| ss.sketch.segs(ci)))
         .collect();
@@ -1403,7 +1403,7 @@ fn mesh_box(mb: &ModelBody) -> Option<Aabb3> {
     padded_box(&mb.mesh(), mb.display_tol())
 }
 
-fn padded_box(mesh: &solidcraft_geom::Mesh, tol: f64) -> Option<Aabb3> {
+fn padded_box(mesh: &polycore_geom::Mesh, tol: f64) -> Option<Aabb3> {
     let b = mesh.bounds();
     (!b.is_empty() && b.min.is_finite() && b.max.is_finite()).then(|| b.inflated(2.0 * tol + 1e-6))
 }
@@ -1445,13 +1445,13 @@ fn parted_note(sh: &sheet::SheetBody, material: &[Region2], before: &sheet::Shee
 
 /// Outline loops (in `plane` coordinates) of the mesh triangles lying in the plane at distance
 /// `level` from `at` along `n`: the edges used by one of them only, chained.
-fn face_loops(mesh: &solidcraft_geom::Mesh, plane: &Plane, at: Vec3, n: Vec3, level: f64, tol: f64) -> Vec<Ring<Vec2>> {
+fn face_loops(mesh: &polycore_geom::Mesh, plane: &Plane, at: Vec3, n: Vec3, level: f64, tol: f64) -> Vec<Ring<Vec2>> {
     face_outline(mesh, plane, at, n, level, tol).into_iter().map(|l| l.into_iter().map(|(p, _)| p).collect()).collect()
 }
 
 /// [`face_loops`] with each point's B-rep face across the outline from it to the next point (the
 /// wall the outline runs along there): the face off the plane that meets both points.
-fn face_outline(mesh: &solidcraft_geom::Mesh, plane: &Plane, at: Vec3, n: Vec3, level: f64, tol: f64) -> Vec<Vec<(Vec2, Option<u32>)>> {
+fn face_outline(mesh: &polycore_geom::Mesh, plane: &Plane, at: Vec3, n: Vec3, level: f64, tol: f64) -> Vec<Vec<(Vec2, Option<u32>)>> {
     let on_plane = |t: &[u32; 3]| t.iter().all(|k| mesh.positions.get(*k as usize).is_some_and(|p| ((*p - at).dot(n) - level).abs() < tol));
     let on: Vec<[u32; 3]> = mesh.triangles.iter().copied().filter(on_plane).collect();
     let pos = |k: u32| mesh.positions.get(k as usize).copied().unwrap_or_default();
@@ -1483,14 +1483,14 @@ fn face_outline(mesh: &solidcraft_geom::Mesh, plane: &Plane, at: Vec3, n: Vec3, 
 }
 
 /// The loops (in `plane` coordinates) that bound the triangles `on` of the mesh.
-fn boundary_loops(mesh: &solidcraft_geom::Mesh, plane: &Plane, on: &[[u32; 3]]) -> Vec<Ring<Vec2>> {
+fn boundary_loops(mesh: &polycore_geom::Mesh, plane: &Plane, on: &[[u32; 3]]) -> Vec<Ring<Vec2>> {
     chain_loops(mesh, plane, on, |_, _| None).into_iter().map(|l| l.into_iter().map(|(p, _)| p).collect()).collect()
 }
 
 /// The loops (in `plane` coordinates) that bound the triangles `on` of the mesh, each point with
 /// `across(it, next)`: the face the outline runs along from it to the next point.
 fn chain_loops(
-    mesh: &solidcraft_geom::Mesh,
+    mesh: &polycore_geom::Mesh,
     plane: &Plane,
     on: &[[u32; 3]],
     across: impl Fn(Vec3, Vec3) -> Option<u32>,

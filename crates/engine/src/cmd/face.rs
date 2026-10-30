@@ -2,9 +2,9 @@
 //! with `face`, Press Pull). The face boundary is copied into a new sketch on the face: straight
 //! edges become lines, circular edges circles or arcs, anything else a chain of lines.
 
+use polycore_geom::{Mesh, Vec2, Vec3};
+use polykrom_doc::{EmbossFace, apply_point, mat_inverse, mat_mul};
 use serde_json::{Value, json};
-use solidcraft_doc::{EmbossFace, apply_point, mat_inverse, mat_mul};
-use solidcraft_geom::{Mesh, Vec2, Vec3};
 
 use crate::params::{bad, vec3};
 use crate::{Result, Session};
@@ -67,7 +67,7 @@ pub(super) fn face_ref(s: &Session, v: &Value, body: Option<&str>, cmd: &str) ->
         FaceRefForm::Point(p) => Ok(p),
         FaceRefForm::Name(name) => {
             let st = if crate::frames::mapped() { s.model.state() } else { s.world_state() };
-            solidcraft_doc::naming::named_face_point(&st, body, name).map_err(|why| bad(cmd, why))
+            polykrom_doc::naming::named_face_point(&st, body, name).map_err(|why| bad(cmd, why))
         }
     }
 }
@@ -103,7 +103,7 @@ fn face_at_in(s: &Session, p: Vec3, only: Option<&str>) -> std::result::Result<O
     face_at_state(&st, p, only)
 }
 
-pub(super) fn face_at_state(st: &solidcraft_doc::ModelState, p: Vec3, only: Option<&str>) -> std::result::Result<Option<FacePick>, Vec<String>> {
+pub(super) fn face_at_state(st: &polykrom_doc::ModelState, p: Vec3, only: Option<&str>) -> std::result::Result<Option<FacePick>, Vec<String>> {
     let mut best: Option<FacePick> = None;
     let mut tied: Vec<String> = Vec::new();
     for b in st.bodies.iter().filter(|b| only.is_none_or(|n| b.name == n)) {
@@ -156,7 +156,7 @@ pub(super) fn sketch_of_faces(s: &mut Session, points: &[Vec3], cmd: &str, face_
     }
     let state = s.model.state();
     let mut picked = Vec::new();
-    let mut common: Option<(String, solidcraft_geom::Plane)> = None;
+    let mut common: Option<(String, polycore_geom::Plane)> = None;
     for &point in points {
         if !point.is_finite() {
             return Err(bad(cmd, "faces must be finite points"));

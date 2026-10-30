@@ -5,8 +5,7 @@ mod raster;
 use std::collections::HashMap;
 
 use egui::{ColorImage, TextureId};
-use serde_json::json;
-use solidcraft_ui_egui::{
+use polykrom_ui_egui::{
     agent_chat::{
         Item,
         backend::{PermissionOption, ToolStatus},
@@ -14,6 +13,7 @@ use solidcraft_ui_egui::{
     scenario::{self, Harness},
     theme,
 };
+use serde_json::json;
 
 #[test]
 fn assistant_transcript_tools_and_approvals_fit_in_both_themes() {
@@ -64,7 +64,7 @@ fn assistant_transcript_tools_and_approvals_fit_in_both_themes() {
             ];
             h.ctx = egui::Context::default();
             h.ctx.enable_accesskit();
-            solidcraft_ui_egui::fonts::setup_fonts(&h.ctx);
+            polykrom_ui_egui::fonts::setup_fonts(&h.ctx);
             theme::apply(&h.ctx);
             let mut textures: HashMap<TextureId, ColorImage> = HashMap::new();
             for _ in 0..8 {

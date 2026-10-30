@@ -1,5 +1,5 @@
 [package]
-name = "solidcraft-io"
+name = "polykrom-io"
 description = "Polykrom file formats: designs (JSON), STL, OBJ, STEP, IGES, 3MF and glTF, and FreeCAD/Rhino import"
 version.workspace = true
 edition.workspace = true
@@ -9,9 +9,9 @@ license.workspace = true
 workspace = true
 
 [dependencies]
-solidcraft-geom = { workspace = true }
-solidcraft-kernel = { workspace = true }
-solidcraft-doc = { workspace = true }
+polycore-geom = { workspace = true }
+polycore = { workspace = true }
+polykrom-doc = { workspace = true }
 thiserror = { workspace = true }
 log = { workspace = true }
 zip = { workspace = true }

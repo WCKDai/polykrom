@@ -910,7 +910,7 @@ fn the_sections_messages_are_in_every_catalog() {
 }
 
 fn app() -> crate::SolveApp {
-    crate::SolveApp::new(solidcraft_engine::Session::default(), crate::Services::default())
+    crate::SolveApp::new(polykrom_engine::Session::default(), crate::Services::default())
 }
 
 #[test]

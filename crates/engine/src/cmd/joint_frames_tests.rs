@@ -1,7 +1,7 @@
 //! A joint origin on a face or a hole keeps its turn about z as the geometry tilts.
 
+use polycore_geom::Vec3;
 use serde_json::{Value, json};
-use solidcraft_geom::Vec3;
 
 use super::tests::{occ, run};
 use crate::Session;
@@ -38,8 +38,8 @@ fn top(s: &mut Session) -> Value {
 
 /// How far the bar's long axis is turned from Y, the plate's axis of tilt (degrees, 0…90).
 fn bar_from_tilt_axis(s: &Session) -> f64 {
-    let m = solidcraft_doc::joints::occurrence_world(&s.doc, occ(s, "Bar"));
-    let x = solidcraft_doc::apply_vector(&m, Vec3::X);
+    let m = polykrom_doc::joints::occurrence_world(&s.doc, occ(s, "Bar"));
+    let x = polykrom_doc::apply_vector(&m, Vec3::X);
     x.dot(Vec3::Y).abs().min(1.0).acos().to_degrees()
 }
 
@@ -65,7 +65,7 @@ fn a_part_on_a_tilting_face_keeps_its_turn_where_the_face_normal_crosses_0_9_alo
     }
     // The origin keeps that x in the design.
     let snap = s.doc.assembly.joints.first().map(|j| j.a.snap.clone());
-    assert!(snap.as_ref().and_then(solidcraft_doc::joints::Snap::frame_x).is_some(), "{snap:?}");
+    assert!(snap.as_ref().and_then(polykrom_doc::joints::Snap::frame_x).is_some(), "{snap:?}");
 }
 
 #[test]
@@ -83,7 +83,7 @@ fn an_origin_saved_without_a_kept_x_is_placed_as_before() {
     let mut doc = (*s.doc).clone();
     for j in &mut doc.assembly.joints {
         for o in [&mut j.a, &mut j.b] {
-            if let solidcraft_doc::joints::Snap::FaceCenter { x, .. } | solidcraft_doc::joints::Snap::CircleCenter { x, .. } = &mut o.snap {
+            if let polykrom_doc::joints::Snap::FaceCenter { x, .. } | polykrom_doc::joints::Snap::CircleCenter { x, .. } = &mut o.snap {
                 *x = None;
             }
         }

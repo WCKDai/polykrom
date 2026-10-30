@@ -2,12 +2,12 @@
 
 use std::collections::BTreeSet;
 
+use polycore::Body;
+use polycore_geom::{Aabb3, Vec3};
+use polykrom_doc::Mat;
+use polykrom_doc::joints::{self, JointKind};
+use polykrom_doc::motion::{ContactSet, ExplodedView, MotionStudy, StudyKey};
 use serde_json::{Value, json};
-use solidcraft_doc::Mat;
-use solidcraft_doc::joints::{self, JointKind};
-use solidcraft_doc::motion::{ContactSet, ExplodedView, MotionStudy, StudyKey};
-use solidcraft_geom::{Aabb3, Vec3};
-use solidcraft_kernel::Body;
 
 use super::CommandSpec;
 use super::joints::{cannot_move, effective_values, joint_id, occurrence_id, place_holding, value};
@@ -142,8 +142,8 @@ fn placed(s: &Session) -> Vec<(Vec<u64>, Body)> {
             // Moving a body into another component preserves its world placement using an
             // offset from its authoring frame. Contact and explode centres must use that
             // same offset as display and physical properties.
-            let frame = s.doc.model_body_offset(b).map(|offset| solidcraft_doc::mat_mul(&m, offset)).unwrap_or(m);
-            if let Ok(t) = solidcraft_kernel::transform_matrix(&b.body, frame) {
+            let frame = s.doc.model_body_offset(b).map(|offset| polykrom_doc::mat_mul(&m, offset)).unwrap_or(m);
+            if let Ok(t) = polycore::transform_matrix(&b.body, frame) {
                 out.push((path.clone(), t));
             }
         }
@@ -192,12 +192,12 @@ fn overlap(a: &Body, b: &Body) -> Option<f64> {
     mesh_overlap(&ma, &mb, 1e-4 * a.size().max(b.size()).max(1.0))
 }
 
-fn mesh_overlap(ma: &solidcraft_geom::Mesh, mb: &solidcraft_geom::Mesh, tol: f64) -> Option<f64> {
+fn mesh_overlap(ma: &polycore_geom::Mesh, mb: &polycore_geom::Mesh, tol: f64) -> Option<f64> {
     mesh_overlap_counted(ma, mb, tol, &mut 0)
 }
 
 /// [`mesh_overlap`], adding the triangles it tests to `work` (what contact budgets limit).
-pub(super) fn mesh_overlap_counted(ma: &solidcraft_geom::Mesh, mb: &solidcraft_geom::Mesh, tol: f64, work: &mut usize) -> Option<f64> {
+pub(super) fn mesh_overlap_counted(ma: &polycore_geom::Mesh, mb: &polycore_geom::Mesh, tol: f64, work: &mut usize) -> Option<f64> {
     let (ba, bb) = (ma.bounds(), mb.bounds());
     if ba.max.x < bb.min.x + tol
         || bb.max.x < ba.min.x + tol
@@ -215,7 +215,7 @@ pub(super) fn mesh_overlap_counted(ma: &solidcraft_geom::Mesh, mb: &solidcraft_g
 }
 
 /// The triangle tree a contact check asks about `m`.
-pub(super) fn tree_of(m: &solidcraft_geom::Mesh) -> TriTree {
+pub(super) fn tree_of(m: &polycore_geom::Mesh) -> TriTree {
     TriTree::new(tris(m))
 }
 
@@ -224,18 +224,18 @@ pub(super) fn tree_of(m: &solidcraft_geom::Mesh) -> TriTree {
 /// world) and asked of the other's tree. A rigid move keeps every distance, so the depth is the
 /// one the placed meshes give, without building a tree per sample.
 pub(super) fn overlap_framed(
-    (ma, ta, fa): (&solidcraft_geom::Mesh, &TriTree, &Mat),
-    (mb, tb, fb): (&solidcraft_geom::Mesh, &TriTree, &Mat),
+    (ma, ta, fa): (&polycore_geom::Mesh, &TriTree, &Mat),
+    (mb, tb, fb): (&polycore_geom::Mesh, &TriTree, &Mat),
     tol: f64,
     work: &mut usize,
 ) -> Option<f64> {
-    let (ia, ib) = (solidcraft_doc::mat_inverse(fa)?, solidcraft_doc::mat_inverse(fb)?);
-    let moved = |m: &solidcraft_geom::Mesh, to: &Mat| solidcraft_geom::Mesh {
-        positions: m.positions.iter().map(|p| solidcraft_doc::apply_point(to, *p)).collect(),
+    let (ia, ib) = (polykrom_doc::mat_inverse(fa)?, polykrom_doc::mat_inverse(fb)?);
+    let moved = |m: &polycore_geom::Mesh, to: &Mat| polycore_geom::Mesh {
+        positions: m.positions.iter().map(|p| polykrom_doc::apply_point(to, *p)).collect(),
         triangles: m.triangles.clone(),
-        ..solidcraft_geom::Mesh::default()
+        ..polycore_geom::Mesh::default()
     };
-    let (a_in_b, b_in_a) = (moved(ma, &solidcraft_doc::mat_mul(&ib, fa)), moved(mb, &solidcraft_doc::mat_mul(&ia, fb)));
+    let (a_in_b, b_in_a) = (moved(ma, &polykrom_doc::mat_mul(&ib, fa)), moved(mb, &polykrom_doc::mat_mul(&ia, fb)));
     *work += ma.positions.len() + mb.positions.len();
     let (ba, bb) = (ta.bounds(), tb.bounds());
     let ab = a_in_b.bounds();
@@ -252,7 +252,7 @@ pub(super) fn overlap_framed(
     (depth > tol).then_some(depth)
 }
 
-fn tris(m: &solidcraft_geom::Mesh) -> Vec<[Vec3; 3]> {
+fn tris(m: &polycore_geom::Mesh) -> Vec<[Vec3; 3]> {
     m.triangles.iter().filter_map(|t| m.tri(t)).collect()
 }
 
@@ -262,7 +262,7 @@ fn surface_distance(p: Vec3, tb: &TriTree, work: &mut usize) -> f64 {
 }
 
 /// The deepest any sample point of `a` lies inside `b` (0 if none); `bx` is b's box.
-fn deepest(a: &solidcraft_geom::Mesh, tb: &TriTree, bx: Aabb3, tol: f64, work: &mut usize) -> f64 {
+fn deepest(a: &polycore_geom::Mesh, tb: &TriTree, bx: Aabb3, tol: f64, work: &mut usize) -> f64 {
     let mut pts: Vec<Vec3> = a.positions.clone();
     let mut edges: Vec<(Vec3, Vec3)> = Vec::new();
     for [p, q, r] in tris(a) {
@@ -861,8 +861,8 @@ fn export(s: &mut Session, p: &Value) -> Result<Value> {
         } else {
             serde_json::to_string_pretty(&out).unwrap_or_default()
         };
-        solidcraft_io::vfs::check(path).map_err(|e| EngineError::Other(e.to_string()))?;
-        solidcraft_io::write_atomic(std::path::Path::new(path), text.as_bytes(), false).map_err(|e| EngineError::Other(format!("{path}: {e}")))?;
+        polykrom_io::vfs::check(path).map_err(|e| EngineError::Other(e.to_string()))?;
+        polykrom_io::write_atomic(std::path::Path::new(path), text.as_bytes(), false).map_err(|e| EngineError::Other(format!("{path}: {e}")))?;
         return Ok(json!({"path": path, "samples": rows.len()}));
     }
     Ok(out)
@@ -870,7 +870,7 @@ fn export(s: &mut Session, p: &Value) -> Result<Value> {
 
 /// Most samples of a motion trace: each is a solve, and a kept trace keeps every one as a fit
 /// point of its spline.
-const MAX_TRACE: usize = solidcraft_sketch::MAX_FIT_POINTS;
+const MAX_TRACE: usize = polykrom_sketch::MAX_FIT_POINTS;
 
 /// The joint values a trace drives to at sample `k` of `n`.
 type Plan = Box<dyn Fn(&Session, usize, usize) -> Vec<(u64, Vec<f64>)>>;
@@ -896,15 +896,15 @@ fn traced_point(s: &Session, p: &Value, cmd: &str) -> Result<(Vec<u64>, Vec3)> {
     let at = p.get("point").and_then(vec3).filter(|v| v.len() < 1e7).ok_or_else(|| bad(cmd, "`point` must be [x, y, z], a world point"))?;
     let mut t = s.scratch();
     t.pending_moves.clear();
-    let local = solidcraft_doc::mat_inverse(&path_world(&t, &path, cmd)?)
-        .map(|m| solidcraft_doc::apply_point(&m, at))
+    let local = polykrom_doc::mat_inverse(&path_world(&t, &path, cmd)?)
+        .map(|m| polykrom_doc::apply_point(&m, at))
         .ok_or_else(|| bad(cmd, "the occurrence's placement is not invertible"))?;
     Ok((path, local))
 }
 
 /// The world placement of an occurrence path (empty: the root).
 fn path_world(t: &Session, path: &[u64], cmd: &str) -> Result<Mat> {
-    if path.is_empty() { Ok(solidcraft_doc::IDENTITY) } else { t.occurrence_placement(path).map(|o| o.world).map_err(|e| bad(cmd, e.to_string())) }
+    if path.is_empty() { Ok(polykrom_doc::IDENTITY) } else { t.occurrence_placement(path).map(|o| o.world).map_err(|e| bad(cmd, e.to_string())) }
 }
 
 /// Where a point of an occurrence goes as a study plays or a joint is driven: its world
@@ -925,7 +925,7 @@ fn sample_trace(s: &Session, p: &Value, cmd: &str) -> Result<(Vec<Vec3>, Value)>
     for k in 0..n {
         let want = plan(&t, k, n);
         let (r, _) = drive_with_contact(&mut t, &want, &given)?;
-        points.push(solidcraft_doc::apply_point(&world(&t)?, local));
+        points.push(polykrom_doc::apply_point(&world(&t)?, local));
         if r["stopped_by_loop"].is_object() || r["stopped_by_contact"].is_object() {
             stop = (json!(k), r["stopped_by_loop"].clone(), r["stopped_by_contact"].clone());
             break;
@@ -1035,7 +1035,7 @@ fn keep_sampled_trace(
     cmd: &str,
     points: Vec<Vec3>,
     mut out: Value,
-    source: Option<solidcraft_doc::motion::MotionTrace>,
+    source: Option<polykrom_doc::motion::MotionTrace>,
 ) -> Result<Value> {
     let name = match str_(p, "name").map(str::trim).filter(|n| !n.is_empty()) {
         Some(n) => n.to_string(),
@@ -1194,7 +1194,7 @@ fn explode_delete(s: &mut Session, p: &Value) -> Result<Value> {
 /// World position of a point of an occurrence (tests).
 #[cfg(test)]
 pub fn world_point(s: &Session, occurrence: u64, p: Vec3) -> Vec3 {
-    solidcraft_doc::apply_point(&joints::occurrence_world(&s.doc, occurrence), p)
+    polykrom_doc::apply_point(&joints::occurrence_world(&s.doc, occurrence), p)
 }
 
 #[cfg(test)]

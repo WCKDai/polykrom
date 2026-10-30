@@ -1,7 +1,7 @@
 // Home and Fit frame what is visible now: bodies where they are placed (occurrence moves,
 // joints, motion), sketches only while they are drawn, nothing hidden or consumed.
+use polycore_geom::{Aabb3, Vec3};
 use serde_json::{Value, json};
-use solidcraft_geom::{Aabb3, Vec3};
 
 use crate::Session;
 
@@ -14,7 +14,7 @@ fn run(s: &mut Session, id: &str, p: Value) -> Value {
 
 /// What the viewport draws: visible bodies' meshes and the sketches it shows, from the scene.
 fn drawn(s: &Session) -> Aabb3 {
-    let cam = solidcraft_render::Camera { distance: 1e5, ..Default::default() };
+    let cam = polykrom_render::Camera { distance: 1e5, ..Default::default() };
     let scene = crate::view::scene(s, &cam);
     let mut b = Aabb3::EMPTY;
     for m in &scene.meshes {

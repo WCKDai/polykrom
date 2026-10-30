@@ -4,7 +4,7 @@
 
 use std::path::PathBuf;
 
-use solidcraft_geom::Vec2;
+use polycore_geom::Vec2;
 
 use crate::fonts::find_family_in;
 use crate::tests::v;

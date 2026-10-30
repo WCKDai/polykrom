@@ -10,8 +10,8 @@ fn cube20(s: &mut Session, name: &str) {
     run(s, "solid.box", json!({"length": 20, "width": 20, "height": 20, "body_name": name}));
 }
 
-fn volume(body: &solidcraft_doc::ModelBody) -> f64 {
-    solidcraft_kernel::measure(&body.body).unwrap().volume
+fn volume(body: &polykrom_doc::ModelBody) -> f64 {
+    polycore::measure(&body.body).unwrap().volume
 }
 
 #[test]
@@ -77,7 +77,7 @@ fn an_older_design_with_no_copy_key_at_all_still_loads_and_moves_in_place() {
     }
     assert!(touched, "the move feature must be present in the saved design");
 
-    let migrated = solidcraft_doc::Document::from_json(&old.to_string()).unwrap();
+    let migrated = polykrom_doc::Document::from_json(&old.to_string()).unwrap();
     let reopened = Session::new(migrated);
     let state = reopened.model.state();
     assert_eq!(state.bodies.len(), 1, "a pre-copy design must still move the one body in place, never duplicate it");

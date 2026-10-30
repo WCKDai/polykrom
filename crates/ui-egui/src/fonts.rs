@@ -122,7 +122,7 @@ pub fn ui_font(name: &str) -> Option<egui::FontData> {
     if name.is_empty() {
         return None;
     }
-    let data = solidcraft_engine::sketch::font_data(Some(name)).ok()?;
+    let data = polykrom_engine::sketch::font_data(Some(name)).ok()?;
     ttf_parser::Face::parse(data.bytes(), data.index).ok()?;
     let mut font = egui::FontData::from_owned(data.bytes().to_vec());
     font.index = data.index;
@@ -976,7 +976,7 @@ mod tests {
         // #1290: the chosen font leads the Proportional family; the default face stays after it.
         assert!(ui_font("").is_none());
         assert!(ui_font("No Such Font 1290").is_none());
-        let font = ui_font(solidcraft_engine::sketch::DEFAULT_FONT_FAMILY).expect("the built-in sketch font reads");
+        let font = ui_font(polykrom_engine::sketch::DEFAULT_FONT_FAMILY).expect("the built-in sketch font reads");
         let defaults = base_font_definitions();
         let fonts = with_ui_font(defaults.clone(), font.clone());
         let again = with_ui_font(fonts, font);
@@ -1035,7 +1035,7 @@ mod tests {
     #[test]
     fn web_download_and_preference_changes_compose_without_losing_the_ui_face_or_japanese() {
         let ctx = test_context();
-        let chosen = solidcraft_engine::sketch::DEFAULT_FONT_FAMILY;
+        let chosen = polykrom_engine::sketch::DEFAULT_FONT_FAMILY;
         install(&ctx, web_font_definitions(chosen, None));
         // Both installations happen before the first frame, like a fast cached web fetch.
         assert!(install_cjk_font_for(

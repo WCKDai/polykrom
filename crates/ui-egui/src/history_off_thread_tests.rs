@@ -468,7 +468,7 @@ fn the_timelines_delete_checks_off_the_window_thread() {
 fn delete_on_the_selection_checks_off_the_window_thread() {
     let mut h = block_boss_hole();
     let boss = feature_ids(&h)[1];
-    h.app.session.selection = vec![solidcraft_engine::Sel::Feature { id: boss }];
+    h.app.session.selection = vec![polykrom_engine::Sel::Feature { id: boss }];
     let params = crate::delete::selection_params(&h.app);
     crate::delete::request(&mut h.app, params);
     assert!(h.app.computing_since().is_some(), "checking");

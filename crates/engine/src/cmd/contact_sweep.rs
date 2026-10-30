@@ -4,9 +4,9 @@ use std::cell::Cell;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::sync::Arc;
 
-use solidcraft_doc::joints;
-use solidcraft_doc::{Document, IDENTITY, Mat, apply_point, mat_mul};
-use solidcraft_geom::{Aabb3, Bvh, Mesh, Vec3};
+use polycore_geom::{Aabb3, Bvh, Mesh, Vec3};
+use polykrom_doc::joints;
+use polykrom_doc::{Document, IDENTITY, Mat, apply_point, mat_mul};
 
 use crate::params::bad;
 use crate::{Result, Session};
@@ -49,14 +49,14 @@ pub(crate) struct ContactMesh {
     thickness: f64,
 }
 
-/// Contact meshes by the body's geometry ([`solidcraft_doc::ModelBody::geometry_key`]), shared
+/// Contact meshes by the body's geometry ([`polykrom_doc::ModelBody::geometry_key`]), shared
 /// by a session and its scratch copies: driving a joint again meshes no body that did not change.
 #[derive(Default)]
 pub(crate) struct ContactMeshes(HashMap<u64, ContactMesh>);
 
 /// Whether bodies `a` and `b` have the same placement relative to each other in `now` as in `base`.
 fn same_relative(base: &[Mat], now: &[Mat], a: usize, b: usize) -> bool {
-    let relative = |f: &[Mat]| -> Option<Mat> { Some(mat_mul(&solidcraft_doc::mat_inverse(f.get(a)?)?, f.get(b)?)) };
+    let relative = |f: &[Mat]| -> Option<Mat> { Some(mat_mul(&polykrom_doc::mat_inverse(f.get(a)?)?, f.get(b)?)) };
     match (relative(base), relative(now)) {
         (Some(x), Some(y)) => x.iter().flatten().zip(y.iter().flatten()).all(|(p, q)| (p - q).abs() <= 1e-9 * (1.0 + p.abs())),
         _ => false,
@@ -64,7 +64,7 @@ fn same_relative(base: &[Mat], now: &[Mat], a: usize, b: usize) -> bool {
 }
 
 /// Tessellate `body` for contact checks and measure how thin it is.
-fn contact_mesh(body: &solidcraft_doc::ModelBody) -> Result<ContactMesh> {
+fn contact_mesh(body: &polykrom_doc::ModelBody) -> Result<ContactMesh> {
     let tolerance = (body.body.size() * 1e-3).max(1e-3);
     let mesh = body.body.tessellate(tolerance)?;
     if mesh.triangles.len() > MAX_TRIANGLES || mesh.positions.len().saturating_add(mesh.triangles.len().saturating_mul(4)) > 200_000 {

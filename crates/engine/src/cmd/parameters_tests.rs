@@ -157,7 +157,7 @@ fn rename_updates_every_reference() {
     assert!(rel(volume(&mut s), 40.0 * 40.0 * 10.0) < 1e-9);
     // Model and feature parameters can be renamed too: dimensions and features follow.
     let dim = s.doc.features.first().and_then(|f| match &f.kind {
-        solidcraft_doc::FeatureKind::Sketch { sketch, .. } => sketch.constraints.iter().filter_map(|c| c.param.clone()).next(),
+        polykrom_doc::FeatureKind::Sketch { sketch, .. } => sketch.constraints.iter().filter_map(|c| c.param.clone()).next(),
         _ => None,
     });
     let dim = dim.unwrap_or_default();
@@ -205,7 +205,7 @@ fn rules_and_canvases_follow_a_renamed_parameter() {
     }
     let mut png = b"\x89PNG\r\n\x1a\n\0\0\0\rIHDR".to_vec();
     png.extend([0, 0, 0, 4, 0, 0, 0, 2, 8, 6, 0, 0, 0, 0, 0, 0, 0]);
-    run(&mut s, "canvas.insert", json!({"data": solidcraft_doc::canvas::base64_encode(&png), "plane": "XY", "offset": "lift"}));
+    run(&mut s, "canvas.insert", json!({"data": polykrom_doc::canvas::base64_encode(&png), "plane": "XY", "offset": "lift"}));
     run(&mut s, "sheet.manage_rules", json!({"name": "Steel", "thickness": "gauge", "active": true}));
     run(&mut s, "solid.box", json!({"length": 60, "width": 40, "height": 2, "body_name": "Tray"}));
     run(&mut s, "sheet.convert", json!({"body": "Tray", "face": [30, 20, 2], "rule": "Steel"}));
@@ -243,7 +243,7 @@ fn rules_and_canvases_follow_a_renamed_parameter() {
     assert_eq!((housing.draft.as_str(), housing.clearance.as_str()), ("draft_angle", "sheet_t / 10"));
     assert!(run(&mut s, "plastic.rules", json!({}))["rules"].as_array().unwrap().iter().any(|r| r["name"] == "Housing" && !r["values"].is_null()));
     match &s.doc.canvases[0].plane {
-        solidcraft_doc::PlaneRef::Offset { distance, .. } => assert_eq!(distance.as_ref(), "raise"),
+        polykrom_doc::PlaneRef::Offset { distance, .. } => assert_eq!(distance.as_ref(), "raise"),
         other => panic!("{other:?}"),
     }
     assert_eq!(users(&mut s, "raise"), ["canvas"]);
@@ -387,7 +387,7 @@ fn dimension_edits_of_a_triconnected_linkage_continue_and_store_the_solved_sketc
     let solved = s.model.state().sketch(feature).unwrap().report.clone();
     assert!(solved.ok(), "{solved:?}");
     assert_eq!(linkage_turns(&s, feature), before);
-    let mut fresh = solidcraft_doc::Model::default();
+    let mut fresh = polykrom_doc::Model::default();
     fresh.evaluate(&s.doc);
     let again = fresh.state().sketch(feature).unwrap().report.clone();
     assert!(again.ok() && again.continuations == 0, "{again:?}");
@@ -428,7 +428,7 @@ fn a_failed_edit_keeps_the_stored_sketch_solved_for_its_values() {
     run(&mut s, "sketch.point", json!({"point": [200, 200]}));
     let stored = s.doc.sketch(feature).unwrap();
     for c in stored.constraints.iter().filter(|c| c.param.is_some()) {
-        let measured = solidcraft_sketch::measure_dimension(stored, &c.kind).unwrap();
+        let measured = polykrom_sketch::measure_dimension(stored, &c.kind).unwrap();
         assert!((measured - c.kind.value().unwrap()).abs() < 1e-6, "{}: {measured} vs {:?}", c.id, c.kind.value());
     }
 }
@@ -476,7 +476,7 @@ fn a_design_stored_with_other_values_still_rebuilds() {
     run(&mut s, "sketch.finish", json!({}));
     run(&mut s, "solid.extrude", json!({"sketch": "Linkage", "distance": 5}));
     set_params(&mut s, &params, &FLIPPING);
-    let s = Session::new(solidcraft_doc::Document::from_json(&s.doc.to_json()).unwrap());
+    let s = Session::new(polykrom_doc::Document::from_json(&s.doc.to_json()).unwrap());
     let state = s.model.state();
     let solved = state.sketch(feature).unwrap();
     assert!(solved.report.ok() && !solved.report.folded.is_empty(), "{:?}", solved.report);
@@ -530,7 +530,7 @@ fn a_failed_auto_constrain_keeps_the_stored_sketch_consistent() {
     let consistent = |s: &Session, feature: u64| {
         let stored = s.doc.sketch(feature).unwrap();
         stored.constraints.iter().filter(|c| c.param.is_some()).all(|c| {
-            let measured = solidcraft_sketch::measure_dimension(stored, &c.kind).unwrap();
+            let measured = polykrom_sketch::measure_dimension(stored, &c.kind).unwrap();
             (measured - c.kind.value().unwrap()).abs() < 1e-6
         })
     };
@@ -553,7 +553,7 @@ fn a_failed_auto_constrain_keeps_the_stored_sketch_consistent() {
 }
 
 /// The stored sketch's points, by id.
-fn stored_points(s: &Session, feature: u64) -> Vec<solidcraft_geom::Vec2> {
+fn stored_points(s: &Session, feature: u64) -> Vec<polycore_geom::Vec2> {
     s.doc.sketch(feature).unwrap().points.iter().map(|p| p.pos).collect()
 }
 
@@ -584,7 +584,7 @@ fn an_unsolvable_value_edit_is_refused_and_changes_nothing() {
 fn value_edits_continue_from_the_last_solved_state() {
     // A → B → C, each a small edit solved in one jump; C is solved from B (the stored state),
     // and setting both values back reproduces A (the linkage is fully constrained).
-    let close = |a: &[solidcraft_geom::Vec2], b: &[solidcraft_geom::Vec2], tol: f64| a.iter().zip(b).all(|(p, q)| p.dist(*q) < tol);
+    let close = |a: &[polycore_geom::Vec2], b: &[polycore_geom::Vec2], tol: f64| a.iter().zip(b).all(|(p, q)| p.dist(*q) < tol);
     let (mut s, feature, params) = linkage_session();
     run(&mut s, "sketch.finish", json!({}));
     let a = stored_points(&s, feature);
@@ -600,7 +600,7 @@ fn value_edits_continue_from_the_last_solved_state() {
     let stored = from_b.driving_values();
     let (vals, _) = s.doc.param_values();
     s.doc.apply_dimension_values(&vals, &mut from_b).unwrap();
-    assert!(solidcraft_sketch::solve_after_value_edit(&mut from_b, &stored).ok());
+    assert!(polykrom_sketch::solve_after_value_edit(&mut from_b, &stored).ok());
     assert!(close(&c, &from_b.points.iter().map(|p| p.pos).collect::<Vec<_>>(), 1e-6) && !close(&c, &b, 1e-3));
     run(&mut s, "parameters.change", json!({"name": params[7], "expression": p7}));
     run(&mut s, "parameters.change", json!({"name": params[8], "expression": p8}));
@@ -649,7 +649,7 @@ fn user_parameters_reorder_with_undo() {
     let c = list["parameters"].as_array().unwrap().iter().find(|r| r["name"] == "c").unwrap().clone();
     assert_eq!(c["expression"], "a + b");
     assert!((c["value"].as_f64().unwrap() - 3.0).abs() < 1e-9, "{c}");
-    let back = Session::new(solidcraft_doc::Document::from_json(&s.doc.to_json()).unwrap());
+    let back = Session::new(polykrom_doc::Document::from_json(&s.doc.to_json()).unwrap());
     let names: Vec<&str> = back.doc.params.iter().filter(|p| !p.model).map(|p| p.name.as_str()).collect();
     assert_eq!(names, ["a", "c", "b"]);
     run(&mut s, "edit.undo", json!({}));
@@ -693,23 +693,19 @@ fn a_large_import_is_checked_once_and_keeps_each_rows_unit() {
     let unit = |n: &str| s.doc.param(n).map(|p| p.unit.clone()).unwrap_or_default();
     assert_eq!((unit("p2999"), unit("turn"), unit("ratio"), unit("later")), ("mm".into(), "deg".into(), String::new(), "mm".into()));
     assert!(
-        vals.get("p2999").is_some_and(|v| (v.to_kind(solidcraft_doc::expr::Kind::Length).unwrap_or(f64::NAN) - 3000.0).abs() < 1e-9),
+        vals.get("p2999").is_some_and(|v| (v.to_kind(polykrom_doc::expr::Kind::Length).unwrap_or(f64::NAN) - 3000.0).abs() < 1e-9),
         "{:?}",
         vals.get("p2999")
     );
     assert!(
-        vals.get("a").is_some_and(|v| (v.to_kind(solidcraft_doc::expr::Kind::Length).unwrap_or(f64::NAN) - 10.0).abs() < 1e-9),
+        vals.get("a").is_some_and(|v| (v.to_kind(polykrom_doc::expr::Kind::Length).unwrap_or(f64::NAN) - 10.0).abs() < 1e-9),
         "{:?}",
         vals.get("a")
     );
     // Changing the first moves the whole chain; a row that breaks changes nothing.
     run(&mut s, "parameters.import", json!({"text": "name,expression\np0,101 mm\n"}));
     assert!(
-        s.doc
-            .param_values()
-            .0
-            .get("p2999")
-            .is_some_and(|v| (v.to_kind(solidcraft_doc::expr::Kind::Length).unwrap_or(f64::NAN) - 3100.0).abs() < 1e-9)
+        s.doc.param_values().0.get("p2999").is_some_and(|v| (v.to_kind(polykrom_doc::expr::Kind::Length).unwrap_or(f64::NAN) - 3100.0).abs() < 1e-9)
     );
     assert!(s.execute("parameters.import", &json!({"text": "name,expression\np0,2 mm\np5,p0 + 1 deg\n"})).is_err());
     assert_eq!(s.doc.param("p0").map(|p| p.expr.as_str()), Some("101 mm"));

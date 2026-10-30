@@ -1,8 +1,8 @@
 //! Autosave ticks and the "Recover unsaved design?" window shown at launch.
 
+use polykrom_engine::recovery::{self, Autosaver, Entry};
+use polykrom_engine::{Result, Session};
 use serde_json::json;
-use solidcraft_engine::recovery::{self, Autosaver, Entry};
-use solidcraft_engine::{Result, Session};
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
@@ -402,7 +402,7 @@ mod tests {
         edit(&mut app);
         tick_and_wait(&mut app);
         let id = entries(&dir)[0].id.clone();
-        let blocked = dir.join(format!("{id}.{}", solidcraft_engine::io::DESIGN_EXT));
+        let blocked = dir.join(format!("{id}.{}", polykrom_engine::io::DESIGN_EXT));
         fs::remove_file(&blocked).unwrap();
         fs::create_dir(&blocked).unwrap();
         edit(&mut app);

@@ -6,9 +6,9 @@
 
 use crate::ui_kit::{Container, Surface};
 use egui::{Pos2, vec2};
+use polykrom_engine::doc::expr::Kind as ValueKind;
+use polykrom_engine::geom::Vec2;
 use serde_json::{Value, json};
-use solidcraft_engine::doc::expr::Kind as ValueKind;
-use solidcraft_engine::geom::Vec2;
 
 use crate::SolveApp;
 use crate::theme::Tokens;
@@ -169,9 +169,9 @@ fn on_curve_axis(app: &SolveApp, t: &Tool, p: &(Vec2, Option<String>)) -> Option
     let shape = sk.shape(sk.curve_index(curve)?)?;
     let dir = Vec2::from_angle(ang);
     let horizontal = dir.y.abs() < dir.x.abs();
-    let axis = solidcraft_engine::sketch::Shape::Line { a, b: a + dir };
+    let axis = polykrom_engine::sketch::Shape::Line { a, b: a + dir };
     let tol = 1e-9 * (1.0 + v.len());
-    let q = solidcraft_engine::sketch::intersections(&axis, &shape)
+    let q = polykrom_engine::sketch::intersections(&axis, &shape)
         .into_iter()
         // Exactly on the axis, so the command infers the horizontal/vertical constraint.
         .map(|q| if horizontal { Vec2::new(q.x, a.y) } else { Vec2::new(a.x, q.y) })

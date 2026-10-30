@@ -9,7 +9,7 @@ use crate::*;
 
 fn min_x(s: &Session, body: &str) -> f64 {
     let b = s.model.state().body(body).map(|b| b.body.clone()).unwrap();
-    solidcraft_kernel::measure(&b).unwrap().bbox.min.x
+    polycore::measure(&b).unwrap().bbox.min.x
 }
 
 #[test]
@@ -56,7 +56,7 @@ fn mirror_plane_origin_follows_its_parameters() {
     run(&mut s, "parameters.change", json!({"name": "mid", "expression": "25 mm"}));
     assert!((at(&s) - 30.0).abs() < 1e-6, "{}", at(&s));
     // Saved and opened again, the plane still names the parameter.
-    let mut s2 = Session::new(solidcraft_doc::Document::from_json(&s.doc.to_json()).unwrap());
+    let mut s2 = Session::new(polykrom_doc::Document::from_json(&s.doc.to_json()).unwrap());
     assert!(s2.doc.to_json().contains("\"mid\""));
     run(&mut s2, "parameters.change", json!({"name": "mid", "expression": "60 mm"}));
     assert!((at(&s2) - 100.0).abs() < 1e-6, "{}", at(&s2));
@@ -66,7 +66,7 @@ fn mirror_plane_origin_follows_its_parameters() {
     let r = run(&mut s2, "solid.mirror", json!({"features": ["Box1"], "plane": {"origin": [-10, 0, 0], "normal": [1, 0, 0]}}));
     let id = r["feature"].as_u64().unwrap();
     let f = s2.doc.feature(id).unwrap();
-    assert!(matches!(f.kind, solidcraft_doc::FeatureKind::Mirror { plane: solidcraft_doc::PlaneRef::Custom { .. }, .. }), "{:?}", f.kind);
+    assert!(matches!(f.kind, polykrom_doc::FeatureKind::Mirror { plane: polykrom_doc::PlaneRef::Custom { .. }, .. }), "{:?}", f.kind);
     assert!((at(&s2) + 40.0).abs() < 1e-6, "{}", at(&s2));
 }
 

@@ -4,9 +4,9 @@
 //! builds the face; this is the command's parameters and its checks, so that what it cannot hold
 //! is refused before anything is built.
 
+use polycore::Continuity;
+use polykrom_doc::{BodyName, FeatureKind, NetworkCurve, Operation, Position, SketchId};
 use serde_json::Value;
-use solidcraft_doc::{BodyName, FeatureKind, NetworkCurve, Operation, Position, SketchId};
-use solidcraft_kernel::Continuity;
 
 use super::CommandSpec;
 use super::features::{add_feature, feature_sketch, sketch_id};
@@ -14,17 +14,17 @@ use crate::params::{bad, str_, string_list, vec3};
 use crate::{Result, Session};
 
 /// The stations a boundary carries by default (the patch's resolution along the loop).
-const DEFAULT_SAMPLES: usize = solidcraft_doc::BOUNDARY_SAMPLES;
+const DEFAULT_SAMPLES: usize = polykrom_doc::BOUNDARY_SAMPLES;
 /// The fewest stations a patch can hold the widest continuity pair with: a G3 side needs four rows
 /// at each of two opposite sides, so eight.
 const MIN_SAMPLES: usize = 8;
 /// The most stations a boundary may carry (the kernel's own cap).
 const MAX_SAMPLES: usize = 512;
 /// The most curves one direction of a network may list (the kernel's own cap).
-const MAX_NETWORK_CURVES: usize = solidcraft_geom::network::MAX_NETWORK_CURVES;
+const MAX_NETWORK_CURVES: usize = polycore_geom::network::MAX_NETWORK_CURVES;
 /// The most sketch curves one network curve may chain, and points picking one chain of edges
 /// (the kernel's own caps).
-use solidcraft_kernel::{MAX_CHAIN_CURVES as MAX_CHAIN, MAX_EDGE_PICKS as MAX_PICKS};
+use polycore::{MAX_CHAIN_CURVES as MAX_CHAIN, MAX_EDGE_PICKS as MAX_PICKS};
 
 pub static COMMANDS: &[CommandSpec] = &[CommandSpec::new("surface.boundary", "Boundary Surface", boundary)
     .at("SURFACE", "CREATE")
@@ -56,7 +56,7 @@ fn loop_patch(s: &mut Session, p: &Value) -> Result<Value> {
     // of each is the first of the next, and the last boundary's end is the first one's start.
     let state = s.model.state();
     let sk = state.sketch(sketch).ok_or_else(|| bad(cmd, "the sketch has not been solved"))?;
-    let mut ends: Vec<(solidcraft_geom::Vec2, solidcraft_geom::Vec2)> = Vec::with_capacity(curves.len());
+    let mut ends: Vec<(polycore_geom::Vec2, polycore_geom::Vec2)> = Vec::with_capacity(curves.len());
     for id in &curves {
         let ci = sk.sketch.curve_index(id).ok_or_else(|| bad(cmd, format!("no sketch curve `{id}`")))?;
         let pieces = sk.sketch.exact_pieces(ci);
@@ -105,7 +105,7 @@ fn loop_patch(s: &mut Session, p: &Value) -> Result<Value> {
         None | Some(Value::Null) => 0.0,
         Some(v) => v
             .as_f64()
-            .filter(|x| x.is_finite() && (solidcraft_geom::fill::MIN_CROWN..=solidcraft_geom::fill::MAX_CROWN).contains(x))
+            .filter(|x| x.is_finite() && (polycore_geom::fill::MIN_CROWN..=polycore_geom::fill::MAX_CROWN).contains(x))
             .ok_or_else(|| bad(cmd, "`crown` must be a number between -0.9 and 3"))?,
     };
     let samples = match p.get("samples") {

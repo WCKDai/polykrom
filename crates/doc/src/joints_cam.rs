@@ -14,8 +14,8 @@
 
 use std::f64::consts::TAU;
 
+use polycore_geom::{Aabb2, Aabb3, Ring, Vec2, Vec3};
 use serde::{Deserialize, Serialize};
-use solidcraft_geom::{Aabb2, Aabb3, Ring, Vec2, Vec3};
 
 use super::{JointKind, JointOrigin, MotionLink, Size, component_bodies, component_of, flip_of, occurrence_world, size_of};
 use crate::{DocError, Document, IDENTITY, Mat, ModelState, Result, apply_point, apply_vector, mat_inverse, mat_mul};
@@ -322,7 +322,7 @@ fn profile_points(doc: &Document, st: &ModelState, p: &CamProfile, cam: &super::
             }
             // Each body sampled to its own size (a large part beside the cam leaves the cam fine).
             // Each body's edges with the faces beside them.
-            let meshes: Vec<solidcraft_geom::Mesh> =
+            let meshes: Vec<polycore_geom::Mesh> =
                 bodies.iter().map(|b| b.body.tessellate(tolerance(b.body.size()))).collect::<std::result::Result<_, _>>()?;
             let edges: Vec<(usize, &Vec<Vec3>, &[u32])> = meshes
                 .iter()
@@ -470,13 +470,13 @@ fn chain(lines: &[&Vec<Vec3>], pool: &[&Vec<Vec3>], tol: f64) -> Option<Vec<Vec3
 /// on a tie), or with none named the one with the largest outer loop. `None` when no profile
 /// shares at least half of them (most of the cam's outline gone: a neighbouring region sharing a
 /// curve with it is not the cam).
-pub fn sketch_profile<'a>(sk: &'a crate::SolvedSketch, curves: &[String]) -> Option<&'a solidcraft_sketch::Profile> {
+pub fn sketch_profile<'a>(sk: &'a crate::SolvedSketch, curves: &[String]) -> Option<&'a polykrom_sketch::Profile> {
     if curves.len() > MAX_PROFILE_POINTS {
         return None;
     }
     let named: std::collections::BTreeSet<&String> = curves.iter().collect();
-    let shared = |p: &solidcraft_sketch::Profile| p.outer_curves.iter().filter(|c| named.contains(c)).count();
-    let area = |p: &solidcraft_sketch::Profile| p.region.outer.signed_area().abs();
+    let shared = |p: &polykrom_sketch::Profile| p.outer_curves.iter().filter(|c| named.contains(c)).count();
+    let area = |p: &polykrom_sketch::Profile| p.region.outer.signed_area().abs();
     sk.profiles
         .iter()
         .filter(|p| curves.is_empty() || 2 * shared(p) >= curves.len())
@@ -484,7 +484,7 @@ pub fn sketch_profile<'a>(sk: &'a crate::SolvedSketch, curves: &[String]) -> Opt
 }
 
 /// A loop's polyline within `tol`, segment by segment: `None` past `MAX_PROFILE_POINTS` points.
-fn sampled(lp: &solidcraft_geom::Loop2, tol: f64) -> Option<Vec<Vec2>> {
+fn sampled(lp: &polycore_geom::Loop2, tol: f64) -> Option<Vec<Vec2>> {
     let mut out = Vec::new();
     for seg in &lp.segs {
         let p = seg.polyline(tol);
@@ -768,7 +768,7 @@ pub fn default_reverse(doc: &Document, st: &ModelState, l: &MotionLink, c: &Cam)
         return Ok(off < 0.0);
     }
     let comp = component_of(doc, s.moving)?;
-    let bb = component_bodies(doc, st, comp).iter().fold(solidcraft_geom::Aabb3::EMPTY, |bb, b| bb.union(&b.mesh().bounds()));
+    let bb = component_bodies(doc, st, comp).iter().fold(polycore_geom::Aabb3::EMPTY, |bb, b| bb.union(&b.mesh().bounds()));
     if bb.min.x > bb.max.x {
         return Ok(false);
     }

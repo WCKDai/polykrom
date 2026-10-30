@@ -93,7 +93,7 @@ fn check_form(command: &str, labels: &[&str]) {
     let mut h = fixture();
     let mut d = representative(&h, command);
     assert_eq!(super::command(&d.kind), Some(command));
-    let spec = solidcraft_engine::find_command(command).unwrap();
+    let spec = polykrom_engine::find_command(command).unwrap();
     assert!(!spec.icon.is_empty());
     let expected = apply_commands(&h.app, &d).unwrap_or_else(|e| panic!("{command}: representative parameters: {e}"));
     // Rendering must never discard an optional/default value or add a new parameter.
@@ -289,7 +289,7 @@ form_case!(trace, "motion.trace", ["Joint", "From", "To", "Samples"]);
 #[test]
 fn registry_dialog_inventory_has_no_unclassified_feature_forms() {
     let h = fixture();
-    for spec in solidcraft_engine::command_specs() {
+    for spec in polykrom_engine::command_specs() {
         let Some(d) = Dialog::for_command(&h.app, spec.id) else { continue };
         assert!(super::command(&d.kind).is_some(), "{}: {:?}", spec.id, d.kind);
     }
@@ -392,7 +392,7 @@ fn blend_editor_refills_named_edges_after_sketch_resize() {
         let names = &s.doc.feature(id).unwrap().edge_names;
         for (pick, name) in picks.iter().zip(names) {
             let Sel::Edge { point, index, .. } = pick else { panic!("{pick:?}") };
-            let hit = solidcraft_engine::doc::naming::locate_edge(&body, name, *point).unwrap();
+            let hit = polykrom_engine::doc::naming::locate_edge(&body, name, *point).unwrap();
             assert_eq!(*index, hit.edge);
             assert!(hit.on_point, "{command}: {point:?} must lie on the resized edge");
         }

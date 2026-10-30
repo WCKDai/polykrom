@@ -7,9 +7,9 @@
 use std::cell::RefCell;
 
 use egui::{Align2, CursorIcon, FontId, Painter, Pos2, Rect, Shape, Stroke, StrokeKind, vec2};
+use polykrom_engine::geom::Vec2;
+use polykrom_engine::sketch::{LinkKind, LinkSource};
 use serde_json::json;
-use solidcraft_engine::geom::Vec2;
-use solidcraft_engine::sketch::{LinkKind, LinkSource};
 
 use crate::SolveApp;
 use crate::theme::Tokens;
@@ -382,7 +382,7 @@ mod tests {
     }
 
     use crate::scenario::Harness;
-    use solidcraft_engine::Sel;
+    use polykrom_engine::Sel;
 
     /// A sketch with "II" (10 mm) seen from the top, the text selected: its handles are up.
     fn setup() -> (Harness, String) {

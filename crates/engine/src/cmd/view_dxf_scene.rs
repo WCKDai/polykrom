@@ -6,9 +6,9 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Instant;
 
-use solidcraft_doc::apply_point;
-use solidcraft_geom::{Aabb3, Mesh, Vec3};
-use solidcraft_render::Camera;
+use polycore_geom::{Aabb3, Mesh, Vec3};
+use polykrom_doc::apply_point;
+use polykrom_render::Camera;
 
 use super::super::meshes::{Placement, Scene, WORKERS, claim, transformed_bounds};
 use super::super::progress::Stage;
@@ -23,7 +23,7 @@ const MAX_VIEW_NODES: usize = 256 * 1024 * 1024 / std::mem::size_of::<Aabb3>();
 const WORK: usize = 200_000_000;
 
 fn parallel<T: Sync, R: Send>(items: &[T], f: impl Fn(&T) -> Result<R, &'static str> + Sync) -> Result<Vec<R>, &'static str> {
-    solidcraft_kernel::map_on_threads(items, WORKERS, f).into_iter().map(|r| r.ok_or("export worker failed")?).collect()
+    polycore::map_on_threads(items, WORKERS, f).into_iter().map(|r| r.ok_or("export worker failed")?).collect()
 }
 
 struct Node {
@@ -617,7 +617,7 @@ mod tests {
     }
 
     fn canonical(lines: Vec<Line>) -> Vec<([i64; 2], [i64; 2], bool)> {
-        let k = |p: solidcraft_geom::Vec2| [(p.x * 1e6).round() as i64, (p.y * 1e6).round() as i64];
+        let k = |p: polycore_geom::Vec2| [(p.x * 1e6).round() as i64, (p.y * 1e6).round() as i64];
         let mut result = lines
             .into_iter()
             .map(|l| {
@@ -636,7 +636,7 @@ mod tests {
         let mut placements = Vec::new();
         let mut flat = Vec::new();
         for (offset, angle) in [(Vec3::ZERO, 0.), (Vec3::new(3., 2., 4.), 0.3), (Vec3::new(2., 1., -4.), -0.6)] {
-            let transform = solidcraft_doc::rigid(offset, Vec3::ZERO, Vec3::Z, angle);
+            let transform = polykrom_doc::rigid(offset, Vec3::ZERO, Vec3::Z, angle);
             placements.push(Placement { mesh: 0, transform, visibility: vec![true; mesh.edges.len()] });
             let mut placed = mesh.clone();
             placed.positions = placed.positions.iter().map(|p| apply_point(&transform, *p)).collect();
@@ -656,7 +656,7 @@ mod tests {
 
     #[test]
     fn repeated_surface_over_one_million_triangles_keeps_one_mesh_and_exports_all_placements() {
-        use solidcraft_render::StandardView;
+        use polykrom_render::StandardView;
         use std::sync::Arc;
         let mut mesh = Mesh::default();
         for y in 0..=100 {
@@ -679,7 +679,7 @@ mod tests {
         let placements = (0..60)
             .map(|i| Placement {
                 mesh: 0,
-                transform: solidcraft_doc::rigid(Vec3::new((i % 10) as f64 * 20., (i / 10) as f64 * 20., 0.), Vec3::ZERO, Vec3::Z, 0.),
+                transform: polykrom_doc::rigid(Vec3::new((i % 10) as f64 * 20., (i / 10) as f64 * 20., 0.), Vec3::ZERO, Vec3::Z, 0.),
                 visibility: vec![true; 4],
             })
             .collect();

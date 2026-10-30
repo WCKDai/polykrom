@@ -5,7 +5,7 @@
 //! volume and area (within a relative 1e-6) and their face, edge and shell counts (exact). Any
 //! change fails, the better and the worse alike: a seed that used to be refused and now builds
 //! is recorded on purpose, with the reason. To record: `ROBUSTNESS_GOLDENS_BLESS="why" cargo
-//! test --profile ci -p solidcraft-engine --lib robustness_goldens::` (docs/robustness.md); run
+//! test --profile ci -p polykrom-engine --lib robustness_goldens::` (docs/robustness.md); run
 //! it with `cargo test`, whose tests share one process and so one lock on the file, not with
 //! nextest. The reason goes into the file's `notes` with the seeds it changed.
 //!

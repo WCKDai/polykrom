@@ -6,7 +6,7 @@
 //! It's a generic cap on a round base, drawn in code, not any maker's device.
 
 use egui::{Pos2, Shape, Stroke};
-use solidcraft_space_mouse::{Calibration, Kind, Step};
+use polykrom_space_mouse::{Calibration, Kind, Step};
 
 #[cfg(test)]
 #[path = "space_mouse_model_tests.rs"]
@@ -231,7 +231,7 @@ pub(crate) fn corner(ui: &mut egui::Ui, rect: egui::Rect, calibration: Option<&C
     let (kind, travel, moving) = match calibration {
         Some(calibration) => (calibration.kind, calibration.travel(raw), calibration.apply(raw).map(|value| value != 0)),
         None => {
-            let travel = raw.map(|value| f32::from(value) / f32::from(solidcraft_space_mouse::FULL_SCALE));
+            let travel = raw.map(|value| f32::from(value) / f32::from(polykrom_space_mouse::FULL_SCALE));
             (Kind::ReturnToCenter, travel, travel.map(|value| value.abs() > 0.05))
         }
     };

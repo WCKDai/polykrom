@@ -1,7 +1,7 @@
 //! Tapped-hole catalogues and metric Thread choices share document sizing data.
 //! Browsing choices does not edit the model or freeze an automatic Thread feature.
 
-use solidcraft_engine::doc::{Document, TappedThreadFamily, metric_thread_sizes, parse_metric_thread, parse_tapped_thread, tapped_thread_sizes};
+use polykrom_engine::doc::{Document, TappedThreadFamily, metric_thread_sizes, parse_metric_thread, parse_tapped_thread, tapped_thread_sizes};
 
 use crate::dialogs::{combo, form_row};
 use crate::i18n::tr;
@@ -39,8 +39,8 @@ impl HoleThreadDraft {
 
     fn update(&mut self, doc: &Document, authored: &mut String) {
         let candidate = || -> Result<String, String> {
-            let d = doc.eval(&self.diameter, solidcraft_engine::doc::expr::Kind::Length).map_err(|e| format!("nominal diameter: {e}"))?;
-            let p = doc.eval(&self.pitch, solidcraft_engine::doc::expr::Kind::Length).map_err(|e| format!("pitch: {e}"))?;
+            let d = doc.eval(&self.diameter, polykrom_engine::doc::expr::Kind::Length).map_err(|e| format!("nominal diameter: {e}"))?;
+            let p = doc.eval(&self.pitch, polykrom_engine::doc::expr::Kind::Length).map_err(|e| format!("pitch: {e}"))?;
             let text = designation(d, p);
             parse_metric_thread(&text).ok_or("use a positive nominal diameter and a pitch smaller than it")?;
             Ok(text)
@@ -238,8 +238,8 @@ mod contribution_tests {
         Services, SolveApp,
         dialogs::{Dialog, Kind, apply_commands},
     };
+    use polykrom_engine::{Sel, Session, geom::Vec3};
     use serde_json::json;
-    use solidcraft_engine::{Sel, Session, geom::Vec3};
     fn hole() -> (SolveApp, Dialog) {
         let mut app = SolveApp::new(Session::default(), Services::default());
         app.run("solid.box", json!({"length":20,"width":20,"height":10,"body_name":"Plate"})).unwrap();
@@ -389,8 +389,8 @@ mod contribution_tests {
             assert_eq!(p["thread"], designation);
             let out = app.run(id, p.clone()).unwrap();
             let f = app.session.doc.feature(out["feature"].as_u64().unwrap()).unwrap();
-            let solidcraft_engine::doc::FeatureKind::Hole { diameter, .. } = &f.kind else { panic!("not a Hole") };
-            let drill = app.session.doc.eval(diameter, solidcraft_engine::doc::expr::Kind::Length).unwrap();
+            let polykrom_engine::doc::FeatureKind::Hole { diameter, .. } = &f.kind else { panic!("not a Hole") };
+            let drill = app.session.doc.eval(diameter, polykrom_engine::doc::expr::Kind::Length).unwrap();
             assert!((drill - expected).abs() < 1e-9, "{designation}: {drill}");
         }
     }
@@ -483,18 +483,18 @@ mod contribution_tests {
             assert!((t.major_diameter - major).abs() < 1e-9 && (t.pitch - pitch).abs() < 1e-9);
             let body = &world.bodies[0].body;
             assert!(body.validity().is_empty());
-            let face = solidcraft_engine::kernel::cylinder_face_at(body, Vec3::new(10.0 + drill / 2.0, 10.0, 5.0)).unwrap();
+            let face = polykrom_engine::kernel::cylinder_face_at(body, Vec3::new(10.0 + drill / 2.0, 10.0, 5.0)).unwrap();
             assert!(face.internal && (2.0 * face.radius - drill).abs() < 1e-8);
             let actual = body.tessellate(0.001).unwrap().measure().volume;
             let expected = 4000.0 - std::f64::consts::PI * (drill / 2.0).powi(2) * 10.0;
             assert!((actual - expected).abs() < 0.5, "{name}: {actual} versus {expected}");
             // A saved explicit drill remains authoritative, including a legacy metric bore.
             let mut doc = Document::from_json(&saved).unwrap();
-            let solidcraft_engine::doc::FeatureKind::Hole { diameter, .. } = &mut doc.feature_mut(id).unwrap().kind else { panic!("not Hole") };
+            let polykrom_engine::doc::FeatureKind::Hole { diameter, .. } = &mut doc.feature_mut(id).unwrap().kind else { panic!("not Hole") };
             *diameter = format!("{} mm", drill + 0.05).as_str().into();
             let reopened = Session::new(Document::from_json(&doc.to_json()).unwrap());
             let world = reopened.world_state();
-            let face = solidcraft_engine::kernel::cylinder_face_at(&world.bodies[0].body, Vec3::new(10.0 + (drill + 0.05) / 2.0, 10.0, 5.0)).unwrap();
+            let face = polykrom_engine::kernel::cylinder_face_at(&world.bodies[0].body, Vec3::new(10.0 + (drill + 0.05) / 2.0, 10.0, 5.0)).unwrap();
             assert!((2.0 * face.radius - drill - 0.05).abs() < 1e-8);
         }
     }
@@ -517,7 +517,7 @@ mod contribution_tests {
         }
         assert_eq!(app.session.doc.to_json(), before);
         let out = app.run("solid.thread", json!({"face":[13.375,10,5],"designation":"M8"})).unwrap();
-        let solidcraft_engine::doc::FeatureKind::Thread { designation, modeled, .. } =
+        let polykrom_engine::doc::FeatureKind::Thread { designation, modeled, .. } =
             &mut app.session.doc_mut().feature_mut(out["feature"].as_u64().unwrap()).unwrap().kind
         else {
             panic!("not Thread")
@@ -600,10 +600,10 @@ mod contribution_tests {
             let commands = apply_commands(&app, &dialog).unwrap();
             let result = app.run(&commands[0].0, commands[0].1.clone()).unwrap();
             let feature = app.session.doc.feature(result["feature"].as_u64().unwrap()).unwrap();
-            let solidcraft_engine::doc::FeatureKind::Hole { diameter, .. } = &feature.kind else { panic!("not a hole") };
-            assert!((app.session.doc.eval(diameter, solidcraft_engine::doc::expr::Kind::Length).unwrap() - drill).abs() < 1e-9);
+            let polykrom_engine::doc::FeatureKind::Hole { diameter, .. } = &feature.kind else { panic!("not a hole") };
+            assert!((app.session.doc.eval(diameter, polykrom_engine::doc::expr::Kind::Length).unwrap() - drill).abs() < 1e-9);
             let saved = app.session.doc.to_json();
-            let reopened = Session::new(solidcraft_engine::doc::Document::from_json(&saved).unwrap());
+            let reopened = Session::new(polykrom_engine::doc::Document::from_json(&saved).unwrap());
             let state = reopened.world_state();
             assert_eq!(state.threads.len(), 1);
             assert!((state.threads[0].pitch - pitch).abs() < 1e-9);
@@ -632,7 +632,7 @@ mod contribution_tests {
 
     #[test]
     fn parallel_pipe_holes_have_the_tabulated_cylinders_depth_and_saved_designations() {
-        use solidcraft_engine::doc::{TappedThreadFamily, tapped_thread_sizes};
+        use polykrom_engine::doc::{TappedThreadFamily, tapped_thread_sizes};
         for family in [TappedThreadFamily::G, TappedThreadFamily::Rp] {
             for size in tapped_thread_sizes(family) {
                 let mut app = SolveApp::new(Session::default(), Services::default());
@@ -649,7 +649,7 @@ mod contribution_tests {
                 let body = &state.bodies[0].body;
                 assert!(body.validity().is_empty());
                 for z in [6.0, 10.0, 14.0] {
-                    let c = solidcraft_engine::kernel::cylinder_face_at(body, Vec3::new(40.0 + size.tap_drill / 2.0, 40.0, z)).unwrap();
+                    let c = polykrom_engine::kernel::cylinder_face_at(body, Vec3::new(40.0 + size.tap_drill / 2.0, 40.0, z)).unwrap();
                     assert!(c.internal && (2.0 * c.radius - size.tap_drill).abs() < 1e-8);
                 }
                 let actual = body.tessellate(0.001).unwrap().measure().volume;
@@ -658,7 +658,7 @@ mod contribution_tests {
                 assert_eq!(reopened.doc.to_json(), saved);
                 if size.designation.ends_with(" 1/4") {
                     let mut doc = Document::from_json(&saved).unwrap();
-                    let solidcraft_engine::doc::FeatureKind::Hole { diameter, .. } =
+                    let polykrom_engine::doc::FeatureKind::Hole { diameter, .. } =
                         &mut doc.feature_mut(result["feature"].as_u64().unwrap()).unwrap().kind
                     else {
                         panic!("not Hole")
@@ -666,11 +666,9 @@ mod contribution_tests {
                     *diameter = format!("{} mm", size.tap_drill + 0.03).as_str().into();
                     let reopened = Session::new(Document::from_json(&doc.to_json()).unwrap());
                     let state = reopened.world_state();
-                    let c = solidcraft_engine::kernel::cylinder_face_at(
-                        &state.bodies[0].body,
-                        Vec3::new(40.0 + (size.tap_drill + 0.03) / 2.0, 40.0, 10.0),
-                    )
-                    .unwrap();
+                    let c =
+                        polykrom_engine::kernel::cylinder_face_at(&state.bodies[0].body, Vec3::new(40.0 + (size.tap_drill + 0.03) / 2.0, 40.0, 10.0))
+                            .unwrap();
                     assert!((2.0 * c.radius - size.tap_drill - 0.03).abs() < 1e-8);
                 }
             }

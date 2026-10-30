@@ -3,7 +3,7 @@
 //! advances its pitch per turn.
 
 use super::*;
-use solidcraft_doc::joints::{Coupling, Size};
+use polykrom_doc::joints::{Coupling, Size};
 
 /// A joint's value as `joint.list` gives it (degrees or mm).
 fn shown(s: &mut Session, joint: &str) -> f64 {
@@ -103,7 +103,7 @@ fn gears_save_and_open_with_their_definition() {
     let mut s = gear_train();
     run(&mut s, "joint.drive", json!({"joint": "G1", "value": 30}));
     let text = s.doc.to_json();
-    let back = solidcraft_doc::format::read(&text).unwrap_or_else(|e| panic!("{e}"));
+    let back = polykrom_doc::format::read(&text).unwrap_or_else(|e| panic!("{e}"));
     assert_eq!(back.assembly.links, s.doc.assembly.links);
     assert!(matches!(back.assembly.links.first().and_then(|l| l.coupling.as_ref()), Some(Coupling::Gear { ra: Size::Circle(_), .. })));
     // A link saved before couplings (no `coupling`) opens as a plain link.
@@ -111,7 +111,7 @@ fn gears_save_and_open_with_their_definition() {
     for l in v["assembly"]["links"].as_array_mut().into_iter().flatten() {
         l.as_object_mut().map(|o| o.remove("coupling"));
     }
-    let old = solidcraft_doc::format::read(&v.to_string()).unwrap_or_else(|e| panic!("{e}"));
+    let old = polykrom_doc::format::read(&v.to_string()).unwrap_or_else(|e| panic!("{e}"));
     assert!(old.assembly.links.iter().all(|l| l.coupling.is_none()) && old.assembly.links.len() == 2);
 }
 
@@ -319,9 +319,9 @@ fn a_redefined_gear_stays_in_mesh_where_it_is() {
     run(&mut s, "edit.redo", json!({}));
     assert!(close_to(shown(&mut s, "GA"), 0.0) && close_to(shown(&mut s, "GB"), 25.0), "{}", run(&mut s, "joint.list", json!({})));
     // Saved and opened again: the same link, the same pose.
-    let back = solidcraft_doc::format::read(&s.doc.to_json()).unwrap_or_else(|e| panic!("{e}"));
+    let back = polykrom_doc::format::read(&s.doc.to_json()).unwrap_or_else(|e| panic!("{e}"));
     assert_eq!(back.assembly.links, s.doc.assembly.links);
-    let vals = solidcraft_doc::joints::joint_values(&back.assembly);
+    let vals = polykrom_doc::joints::joint_values(&back.assembly);
     let gb = back.assembly.joints.iter().find(|j| j.name == "GB").map(|j| j.id).unwrap_or(0);
     assert!(vals.get(&gb).and_then(|q| q.first()).is_some_and(|v| close_to(v.to_degrees(), 25.0)), "{vals:?}");
 }

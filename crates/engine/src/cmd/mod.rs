@@ -381,8 +381,8 @@ pub(crate) fn edit_distance(a: &str, b: &str) -> usize {
     row[b.len()]
 }
 
-pub(super) fn alignment_param(p: &Value, key: &str, cmd: &str) -> Result<solidcraft_sketch::PatternAlignment> {
-    p.get(key).map_or(Ok(solidcraft_sketch::PatternAlignment::default()), |value| {
+pub(super) fn alignment_param(p: &Value, key: &str, cmd: &str) -> Result<polykrom_sketch::PatternAlignment> {
+    p.get(key).map_or(Ok(polykrom_sketch::PatternAlignment::default()), |value| {
         serde_json::from_value(value.clone()).map_err(|_| crate::params::bad(cmd, format!("`{key}` must be left, center or right")))
     })
 }

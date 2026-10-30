@@ -1,5 +1,5 @@
 [package]
-name = "solidcraft-doc"
+name = "polykrom-doc"
 description = "Polykrom document model: parameters and expressions, sketches and features on a parametric timeline, incremental evaluation"
 version.workspace = true
 edition.workspace = true
@@ -9,11 +9,11 @@ license.workspace = true
 workspace = true
 
 [dependencies]
-solidcraft-geom = { workspace = true }
-solidcraft-sketch = { workspace = true }
-solidcraft-kernel = { workspace = true }
-solidcraft-render = { workspace = true }
-solidcraft-derive = { workspace = true }
+polycore-geom = { workspace = true }
+polykrom-sketch = { workspace = true }
+polycore = { workspace = true }
+polykrom-render = { workspace = true }
+polykrom-derive = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }

@@ -1,7 +1,7 @@
 //! The Move window's main value: the one the canvas box shows and the keyboard types into.
 //! It follows the move type, because each type uses a different value.
+use polykrom_engine::Session;
 use serde_json::json;
-use solidcraft_engine::Session;
 
 use super::*;
 use crate::Services;

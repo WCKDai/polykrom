@@ -160,8 +160,7 @@ fn relink_keeps_joint_definitions_and_reports_solver_diagnostics() {
     // A deliberately lost named face exercises the ordinary solver diagnostics, without
     // requiring relink to guess which face of a different design was intended.
     let joint = s.doc_mut().assembly.joints.first_mut().unwrap();
-    joint.b.snap =
-        solidcraft_doc::joints::Snap::FaceCenter { pick: solidcraft_geom::Vec3::ZERO, face: Some("no-such-linked-face".to_string()), x: None };
+    joint.b.snap = polykrom_doc::joints::Snap::FaceCenter { pick: polycore_geom::Vec3::ZERO, face: Some("no-such-linked-face".to_string()), x: None };
     s.refresh();
     let result = run(&mut s, "component.relink", json!({"component": component, "path": replacement}));
     assert!(result["joint_errors"].as_array().unwrap().iter().any(|e| e["name"] == "Seat"));

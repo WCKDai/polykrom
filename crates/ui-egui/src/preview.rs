@@ -1,5 +1,5 @@
 //! Live operation previews. While a feature dialog is open, its commands are evaluated on a
-//! scratch copy of the session ([`solidcraft_engine::Session::preview`]), off the UI thread
+//! scratch copy of the session ([`polykrom_engine::Session::preview`]), off the UI thread
 //! where threads exist, and the result is drawn in place of the bodies it changes: new surface
 //! tinted, removed material as a translucent ghost. The last good preview stays up while the
 //! next one computes; once the current inputs make the feature fail, nothing is previewed and
@@ -13,10 +13,10 @@
 use std::hash::{Hash, Hasher};
 use std::sync::mpsc::{Receiver, TryRecvError};
 
+use polykrom_engine::Session;
+use polykrom_engine::doc::ModelState;
+use polykrom_engine::geom::{Aabb3, Mesh, Ring, Vec3};
 use serde_json::Value;
-use solidcraft_engine::Session;
-use solidcraft_engine::doc::ModelState;
-use solidcraft_engine::geom::{Aabb3, Mesh, Ring, Vec3};
 
 use crate::SolveApp;
 use crate::gpu::{GpuScene, SceneSlot};
@@ -52,7 +52,7 @@ impl Colors {
 }
 
 pub struct SketchPreview {
-    pub sketch: std::sync::Arc<solidcraft_engine::doc::SolvedSketch>,
+    pub sketch: std::sync::Arc<polykrom_engine::doc::SolvedSketch>,
     pub curves: Vec<usize>,
     pub points: Vec<usize>,
 }
@@ -70,7 +70,7 @@ pub struct Built {
     /// (`fit: reduce`).
     pub applied: Option<(f64, f64)>,
     /// The radius spline of each edge a fillet tapered (`fit: taper`), with a point on the edge.
-    pub tapered: Vec<(Vec3, solidcraft_engine::kernel::Taper)>,
+    pub tapered: Vec<(Vec3, polykrom_engine::kernel::Taper)>,
     /// The reply of a previewed drive that stopped short of the asked values (the dialog says
     /// where and why, in the UI's language).
     pub stopped: Option<serde_json::Value>,
@@ -109,7 +109,7 @@ pub struct PreviewState {
     /// The reply of a previewed drive that stopped short (see [`Built::stopped`]).
     pub stopped: Option<serde_json::Value>,
     /// The radius splines the previewed fillet tapered its edges with.
-    pub tapered: Vec<(Vec3, solidcraft_engine::kernel::Taper)>,
+    pub tapered: Vec<(Vec3, polykrom_engine::kernel::Taper)>,
     straight: crate::extrude_preview::StraightPreview,
     /// PreviewReselect: Primary held - hide the preview and restore replaced bodies for picks.
     pub rolled_back: bool,
@@ -575,7 +575,7 @@ pub fn build(before: &ModelState, after: &ModelState, c: Colors) -> Built {
         if before.construct.iter().any(|old| old == construct) {
             continue;
         }
-        if let solidcraft_engine::doc::construct::ConstructGeom::Plane(plane) = construct.geom {
+        if let polykrom_engine::doc::construct::ConstructGeom::Plane(plane) = construct.geom {
             let (o, x, y) = (plane.origin, plane.x * 10.0, plane.y * 10.0);
             let quad = [o - x - y, o + x - y, o + x + y, o - x + y];
             let color = [c.added[0], c.added[1], c.added[2], 64];
@@ -805,7 +805,7 @@ pub fn paint_sketches(app: &SolveApp, painter: &egui::Painter, proj: &crate::vie
         return;
     }
     let stroke = egui::Stroke::new(2.5, Tokens::get().preview_sketch);
-    let mut budget = solidcraft_engine::render::SamplingBudget::new(32_768, 65_536);
+    let mut budget = polykrom_engine::render::SamplingBudget::new(32_768, 65_536);
     let mut curves = 0;
     for preview in &app.preview.sketches {
         let sketch = &preview.sketch;
@@ -1013,7 +1013,7 @@ mod tests {
     /// intersect".
     #[test]
     fn combine_previews_its_result_without_an_error() {
-        let mut s = solidcraft_engine::Session::default();
+        let mut s = polykrom_engine::Session::default();
         s.execute("solid.box", &json!({"length": 20, "width": 20, "height": 20, "body_name": "Cube"})).unwrap();
         s.execute("solid.cylinder", &json!({"base": [10, 10, -5], "diameter": 6, "height": 30, "body_name": "Pin"})).unwrap();
         for op in ["cut", "join", "intersect"] {
@@ -1029,7 +1029,7 @@ mod tests {
 
     #[test]
     fn a_hole_shows_its_cut_through_the_body() {
-        let mut s = solidcraft_engine::Session::default();
+        let mut s = polykrom_engine::Session::default();
         s.execute("solid.box", &json!({"length": 40, "width": 30, "height": 20})).unwrap();
         let p = s.preview(&[("solid.hole".to_string(), json!({"position": [20, 15, 20], "diameter": 5, "depth": 10}))]).unwrap();
         let b = build(&p.before, &p.after, colors());
@@ -1209,7 +1209,7 @@ mod tests {
         let cmds = vec![("solid.extrude".to_string(), params.clone())];
         assert_eq!(extrusion_target_error(&s, &cmds, &s.model.state()), None);
         s.execute("solid.extrude", &params).unwrap();
-        let volume = s.model.state().body("Block").map(|b| solidcraft_engine::kernel::measure(&b.body).unwrap().volume).unwrap_or(0.0);
+        let volume = s.model.state().body("Block").map(|b| polykrom_engine::kernel::measure(&b.body).unwrap().volume).unwrap_or(0.0);
         assert!((volume - (1000.0 - 160.0)).abs() < 1e-6, "{volume}");
     }
 

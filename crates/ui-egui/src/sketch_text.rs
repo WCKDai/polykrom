@@ -4,12 +4,12 @@
 //! back. The Text tool places a text and opens this dialog on it, so a new text is typed here too.
 use std::sync::{Arc, OnceLock};
 
-use serde_json::{Value, json};
-use solidcraft_engine::{
+use polykrom_engine::{
     Sel,
     doc::expr::Kind as ValueKind,
     sketch::{LinkKind, LinkSource, TextAlign, TextStyle},
 };
+use serde_json::{Value, json};
 
 use crate::SolveApp;
 use crate::dialogs::{Dialog, Kind};
@@ -125,11 +125,11 @@ pub(crate) fn one_letter() -> bool {
 /// over) is cut into pieces bounded by both: each piece inside the letter is picked, so the
 /// letter is picked whole. The letters' counters (the inside of an O) are left out; inside one,
 /// a letter is a letter again. The picked profile comes first when it is a letter.
-pub(crate) fn text_profiles(s: &solidcraft_engine::Session, sketch: u64, index: usize) -> Option<Vec<usize>> {
+pub(crate) fn text_profiles(s: &polykrom_engine::Session, sketch: u64, index: usize) -> Option<Vec<usize>> {
     let state = s.world_state();
     let ss = state.sketch(sketch)?;
     // The text bounding a profile, with or without other curves; whether only it bounds it.
-    let text_of = |profile: &solidcraft_engine::sketch::Profile| -> Option<(String, bool)> {
+    let text_of = |profile: &polykrom_engine::sketch::Profile| -> Option<(String, bool)> {
         let (mut link, mut alone): (Option<&str>, bool) = (None, true);
         for id in profile.curve_ids() {
             let curve = ss.sketch.curves.iter().find(|curve| curve.id == id)?;
@@ -150,7 +150,7 @@ pub(crate) fn text_profiles(s: &solidcraft_engine::Session, sketch: u64, index: 
             curve.construction = true;
         }
     }
-    let outlines = solidcraft_engine::sketch::find_profiles(&own);
+    let outlines = polykrom_engine::sketch::find_profiles(&own);
     let in_letter = |i: usize| {
         ss.profiles.get(i).is_some_and(|p| {
             let at = p.region.interior_point();
@@ -327,7 +327,7 @@ pub(crate) fn open(app: &mut SolveApp, entity: &str) {
 /// The Text tool's click: put a placeholder text down at `at` (sketch coordinates) and open
 /// Edit Text on it, its text selected so that typing replaces it. Cancel takes it away again;
 /// OK keeps it as one undo step.
-pub(crate) fn place(app: &mut SolveApp, at: solidcraft_engine::geom::Vec2, height: f64) {
+pub(crate) fn place(app: &mut SolveApp, at: polykrom_engine::geom::Vec2, height: f64) {
     let Some(checkpoint) = app.session.execute("edit.checkpoint", &json!({})).ok().and_then(|r| r["checkpoint"].as_u64()) else { return };
     let placed = app.run("sketch.text", json!({"text": PLACEHOLDER, "at": [at.x, at.y], "height": height}));
     let curve = placed.as_ref().ok().and_then(|v| v["curves"].get(0)?.as_str().map(str::to_owned));
@@ -554,7 +554,7 @@ pub(crate) fn families(ctx: &egui::Context) -> Option<Arc<Vec<String>>> {
         {
             let ctx = ctx.clone();
             let spawned = std::thread::Builder::new().name("font list".into()).spawn(move || {
-                let _ = FAMILIES.set(Arc::new(solidcraft_engine::sketch::installed_families()));
+                let _ = FAMILIES.set(Arc::new(polykrom_engine::sketch::installed_families()));
                 ctx.request_repaint();
             });
             if spawned.is_err() {
@@ -576,7 +576,7 @@ fn is_font_file(s: &str) -> bool {
 
 /// The application supplies families/file recognition; the kit owns search and list widgets.
 fn font_row(ui: &mut egui::Ui, k: &mut Tx) {
-    let builtin = crate::i18n::format("sketch_text.builtin_font", &[("family", solidcraft_engine::sketch::DEFAULT_FONT_FAMILY)]);
+    let builtin = crate::i18n::format("sketch_text.builtin_font", &[("family", polykrom_engine::sketch::DEFAULT_FONT_FAMILY)]);
     let current = if k.font.trim().is_empty() { builtin.clone() } else { k.font.clone() };
     let families = families(ui.ctx());
     let mut options = vec![ui_kit::SearchOption { value: "", label: &builtin, handle: Some("dialog:Font built-in") }];
@@ -628,7 +628,7 @@ fn edit_params(app: &SolveApp, k: &Tx) -> Result<Value, String> {
             }
             v
         };
-        let names_parameters = i < ANGLE_END && !solidcraft_engine::doc::expr::references(value).is_empty();
+        let names_parameters = i < ANGLE_END && !polykrom_engine::doc::expr::references(value).is_empty();
         sent[i] = match given {
             Some(e) => json!(e),
             None if value != initial && names_parameters => json!(value.trim()),
@@ -825,7 +825,7 @@ mod tests {
         let sk = h.app.session.doc.sketch(sid).unwrap();
         let expected = LinkSource::Text {
             text: "O".into(),
-            at: solidcraft_engine::geom::Vec2::new(25.0, 12.0),
+            at: polykrom_engine::geom::Vec2::new(25.0, 12.0),
             height: 20.0,
             angle: std::f64::consts::FRAC_PI_2,
             font: None,
@@ -835,7 +835,7 @@ mod tests {
         assert_eq!(sk.link(&link).unwrap().source, expected);
         assert!(!h.app.session.world_state().sketch(sid).unwrap().profiles.is_empty());
         let changed = h.app.session.doc.to_json();
-        let reopened = solidcraft_engine::Session::new(solidcraft_engine::doc::Document::from_json(&changed).unwrap());
+        let reopened = polykrom_engine::Session::new(polykrom_engine::doc::Document::from_json(&changed).unwrap());
         assert_eq!(reopened.doc.sketch(sid).unwrap().link(&link).unwrap().source, expected);
         h.app.run("edit.undo", json!({})).unwrap();
         assert_eq!(h.app.session.doc.to_json(), before);
@@ -985,7 +985,7 @@ mod tests {
         assert!(!editing(&h.app));
         h.app.start("sketch.edit_text");
         assert!(editing(&h.app));
-        crate::documents::open_tab(&mut h.app, solidcraft_engine::Session::default()).unwrap();
+        crate::documents::open_tab(&mut h.app, polykrom_engine::Session::default()).unwrap();
         assert!(!editing(&h.app));
     }
 
@@ -1048,7 +1048,7 @@ mod tests {
         h.frames(3);
     }
 
-    fn exprs_of(h: &Harness, link: &str) -> solidcraft_engine::sketch::TextExprs {
+    fn exprs_of(h: &Harness, link: &str) -> polykrom_engine::sketch::TextExprs {
         let sid = h.app.session.active_sketch.unwrap();
         let LinkSource::Text { exprs, .. } = h.app.session.doc.sketch(sid).unwrap().link(link).unwrap().source.clone() else { panic!("text source") };
         exprs
@@ -1189,7 +1189,7 @@ mod tests {
         // A placeholder is down at once, Edit Text is open on it with the text selected, and the tool has ended.
         assert!(editing(&h.app));
         assert!(h.app.tool.is_none());
-        let at = solidcraft_engine::geom::Vec2::new(5.0, 5.0);
+        let at = polykrom_engine::geom::Vec2::new(5.0, 5.0);
         assert!(matches!(texts(&h).as_slice(), [LinkSource::Text { text, at: a, .. }] if text == PLACEHOLDER && a.dist(at) < 1e-9));
         // Typing replaces it, and the canvas follows every key.
         h.step(&json!({"text":"Hi"})).unwrap();
@@ -1320,16 +1320,16 @@ mod tests {
         };
         let whole = area(&h, &text_profiles(&h.app.session, sid, i).unwrap());
         // The I's stem, below where the rectangle's top will cross it.
-        let stem = solidcraft_engine::geom::Vec2::new(h.app.session.world_state().sketch(sid).unwrap().profiles[i].centroid.x, 2.0);
+        let stem = polykrom_engine::geom::Vec2::new(h.app.session.world_state().sketch(sid).unwrap().profiles[i].centroid.x, 2.0);
         h.app.run("sketch.rectangle.two_point", json!({"p0":[-5,-5],"p1":[40,8]})).unwrap();
         let state = h.app.session.world_state();
         let profiles = &state.sketch(sid).unwrap().profiles;
-        let below = solidcraft_engine::sketch::profile_at_point(profiles, stem).unwrap();
+        let below = polykrom_engine::sketch::profile_at_point(profiles, stem).unwrap();
         let picked = text_profiles(&h.app.session, sid, below).unwrap();
         assert_eq!(picked[0], below);
         assert!(picked.len() > 2, "the letters are cut in pieces: {picked:?}");
         assert!((area(&h, &picked) - whole).abs() < 1e-5 * whole, "{} {whole}", area(&h, &picked));
-        let round = solidcraft_engine::sketch::profile_at_point(profiles, solidcraft_engine::geom::Vec2::new(-3.0, -3.0)).unwrap();
+        let round = polykrom_engine::sketch::profile_at_point(profiles, polykrom_engine::geom::Vec2::new(-3.0, -3.0)).unwrap();
         assert!(text_profiles(&h.app.session, sid, round).is_none());
     }
 

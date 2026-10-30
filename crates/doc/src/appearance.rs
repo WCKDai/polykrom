@@ -5,8 +5,8 @@
 
 use std::collections::BTreeMap;
 
+use polycore_geom::Vec3;
 use serde::{Deserialize, Serialize};
-use solidcraft_geom::Vec3;
 
 use crate::Document;
 
@@ -50,7 +50,7 @@ impl Look {
     pub fn custom(color: [u8; 3], opacity: f64) -> Look {
         Look { name: "Custom".into(), color, opacity: opacity.clamp(0.0, 1.0), pbr: None }
     }
-    pub fn opaque_surface(&self) -> crate::Result<Option<solidcraft_render::surface::OpaqueSurface>> {
+    pub fn opaque_surface(&self) -> crate::Result<Option<polykrom_render::surface::OpaqueSurface>> {
         if self.pbr.is_some() && self.opacity != 1.0 {
             return Err(crate::DocError::Invalid("opaque PBR requires opacity 1".into()));
         }

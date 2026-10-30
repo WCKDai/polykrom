@@ -3,8 +3,8 @@
 
 use std::f64::consts::PI;
 
+use polycore_geom::Vec3;
 use serde_json::{Value, json};
-use solidcraft_geom::Vec3;
 
 use crate::Session;
 
@@ -119,7 +119,7 @@ fn a_shaft_thicker_than_a_modelled_thread_is_turned_down_to_it() {
         };
         assert_eq!(round(8.0, 3.05), 0, "{shaft} mm: the threaded part is turned to 6 mm");
         assert_eq!(round(2.0, shaft / 2.0 - 0.05), 24, "{shaft} mm: the stub is whole");
-        let names = solidcraft_doc::naming::face_names(b);
+        let names = polykrom_doc::naming::face_names(b);
         let fid = s.doc.features.last().map(|f| f.id).unwrap_or(0);
         let named = |role: &str| names.iter().any(|n| n.starts_with(&format!("F{fid}:{role}")));
         assert_eq!(named("turned"), turned, "{shaft} mm: {names:?}");

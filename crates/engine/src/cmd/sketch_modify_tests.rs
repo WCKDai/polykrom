@@ -1,6 +1,6 @@
+use polycore_geom::Vec2;
+use polykrom_sketch::{ConstraintKind, CurveKind};
 use serde_json::{Value, json};
-use solidcraft_geom::Vec2;
-use solidcraft_sketch::{ConstraintKind, CurveKind};
 
 use crate::Session;
 
@@ -18,7 +18,7 @@ fn ids(v: &Value) -> Vec<String> {
     v.as_array().map(|a| a.iter().filter_map(|x| x.as_str().map(str::to_string)).collect()).unwrap_or_default()
 }
 
-fn sketch(s: &Session) -> solidcraft_sketch::Sketch {
+fn sketch(s: &Session) -> polykrom_sketch::Sketch {
     let id = s.active_sketch.unwrap();
     s.model.state().sketch(id).unwrap().sketch.clone()
 }
@@ -66,7 +66,7 @@ fn explicit_freeform_break_preserves_exact_geometry_and_undo() {
             }
         }
         let encoded = serde_json::to_value(&after).unwrap();
-        let restored: solidcraft_sketch::Sketch = serde_json::from_value(encoded).unwrap();
+        let restored: polykrom_sketch::Sketch = serde_json::from_value(encoded).unwrap();
         assert_eq!(restored.curves.len(), after.curves.len());
         run(&mut s, "edit.undo", json!({}));
         assert!(sketch(&s).curve_index(&id).is_some());
@@ -123,7 +123,7 @@ fn analytic_trim_and_break_use_freeform_cutters() {
     let sk = sketch(&s);
     for id in ids(&out["curves"]) {
         let shape = sk.shape(sk.curve_index(&id).unwrap()).unwrap();
-        assert!(matches!(shape, solidcraft_sketch::Shape::Line { a, b } if (a.y - 5.0).abs() < 1e-6 && (b.y - 5.0).abs() < 1e-6));
+        assert!(matches!(shape, polykrom_sketch::Shape::Line { a, b } if (a.y - 5.0).abs() < 1e-6 && (b.y - 5.0).abs() < 1e-6));
     }
 
     let mut s = new_sketch();
@@ -147,7 +147,7 @@ fn trim_extend_break() {
     let sk = sketch(&s);
     let sh = sk.shape(sk.curve_index(&h).unwrap()).unwrap();
     assert!(
-        matches!(sh, solidcraft_sketch::Shape::Line { a, b } if a.dist(Vec2::new(0.0, 0.0)) < 1e-9 && b.dist(Vec2::new(10.0, 0.0)) < 1e-9),
+        matches!(sh, polykrom_sketch::Shape::Line { a, b } if a.dist(Vec2::new(0.0, 0.0)) < 1e-9 && b.dist(Vec2::new(10.0, 0.0)) < 1e-9),
         "{sh:?}"
     );
     // Trim the lower half of the vertical line: the original id survives on the upper piece.
@@ -201,7 +201,7 @@ fn exact_extend_ellipse_preserves_support_target_and_history() {
         assert!(end.dist(Vec2::new(expected_x, y)) < 1e-7, "exact ellipse contact {end:?}");
         assert_eq!(sk.exact_segs(0).unwrap(), target);
         let persisted = s.doc.to_json();
-        let reopened = solidcraft_doc::format::read(&persisted).unwrap();
+        let reopened = polykrom_doc::format::read(&persisted).unwrap();
         assert_eq!(reopened.to_json(), persisted);
         run(&mut s, "edit.undo", json!({}));
         assert_eq!(s.doc.to_json(), before);
@@ -412,7 +412,7 @@ fn three_point_arc_keeps_referenced_through_points_when_dimensions_change() {
 
             let sid = s.active_sketch.unwrap();
             // Saving and reopening preserves the ordinary point-on-curve constraint too.
-            let reopened = Session::new(solidcraft_doc::Document::from_json(&s.doc.to_json()).unwrap());
+            let reopened = Session::new(polykrom_doc::Document::from_json(&s.doc.to_json()).unwrap());
             for session in [&s, &reopened] {
                 let state = session.model.state();
                 let ss = state.sketch(sid).unwrap();
@@ -501,7 +501,7 @@ fn two_tangent_circle_from_a_click_on_a_curve_leaves_the_curves_as_drawn() {
             .iter()
             .find(|c| {
                 let i = sk.curve_index(c).unwrap();
-                matches!(sk.shape(i), Some(solidcraft_sketch::Shape::Line { a, b }) if on(a) && on(b))
+                matches!(sk.shape(i), Some(polykrom_sketch::Shape::Line { a, b }) if on(a) && on(b))
             })
             .unwrap()
             .clone()
@@ -550,7 +550,7 @@ fn centre_circle_through_a_point_keeps_it_on_the_circle() {
     run(&mut s, "sketch.dimension", json!({"entities": [l], "value": 60}));
     let sk = sketch(&s);
     let line = sk.shape(li).unwrap();
-    let solidcraft_sketch::Shape::Line { a, b } = line else { panic!("{line:?}") };
+    let polykrom_sketch::Shape::Line { a, b } = line else { panic!("{line:?}") };
     assert!(close(a.dist(b), 60.0));
     assert!(close(sk.radius(ci).unwrap(), 30.0), "the circle followed the line's end: {:?}", sk.radius(ci));
     // Through a plain position: nothing to keep it on.
@@ -727,9 +727,9 @@ fn text_takes_a_font_and_edit_text_keeps_or_changes_it() {
     near(&s, 4.0 * 13.5557);
     run(&mut s, "sketch.edit_text", json!({"link": link, "font": font}));
     // The font is kept in the design: after saving and reopening, the text is still in it.
-    let reopened = Session::new(solidcraft_doc::Document::from_json(&s.doc.to_json()).unwrap());
+    let reopened = Session::new(polykrom_doc::Document::from_json(&s.doc.to_json()).unwrap());
     let source = reopened.doc.sketch(s.active_sketch.unwrap()).unwrap().link(&link).unwrap().source.clone();
-    assert!(matches!(&source, solidcraft_sketch::LinkSource::Text { font: Some(f), .. } if f == font), "{source:?}");
+    assert!(matches!(&source, polykrom_sketch::LinkSource::Text { font: Some(f), .. } if f == font), "{source:?}");
     // A new text takes the font too. Unknown fonts and values that are not names are errors.
     let mut s = new_sketch();
     run(&mut s, "sketch.text", json!({"text": "I", "at": [0, 0], "height": 10, "font": font}));
@@ -1038,7 +1038,7 @@ fn irregular_closed_spline_offset_certificate_edits_undoes_and_reopens() {
                 max_error = max_error.max((normal_distance - distance).abs());
             }
         }
-        assert!(max_error < solidcraft_sketch::OFFSET_TOLERANCE, "normal-distance error {max_error}");
+        assert!(max_error < polykrom_sketch::OFFSET_TOLERANCE, "normal-distance error {max_error}");
         eprintln!("#971 offset {distance} mm: maximum sampled normal-distance error {max_error} mm");
         assert_eq!(sk.freeform_offsets.len(), 1);
         assert_eq!(sk.freeform_offsets[0].divisions, 32);
@@ -1055,7 +1055,7 @@ fn irregular_closed_spline_offset_certificate_edits_undoes_and_reopens() {
     verify(&s, 3.0);
     run(&mut s, "edit.undo", json!({}));
     verify(&s, 2.0);
-    let mut reopened = Session::new(solidcraft_doc::Document::from_json(&s.doc.to_json()).unwrap());
+    let mut reopened = Session::new(polykrom_doc::Document::from_json(&s.doc.to_json()).unwrap());
     verify(&reopened, 2.0);
     run(&mut reopened, "parameters.change", json!({"name":parameter,"expression":"3 mm"}));
     verify(&reopened, 3.0);
@@ -1090,7 +1090,7 @@ fn certified_offset_follows_dimension_drag_reopen_break_and_undo() {
     run(&mut s, "sketch.drag", json!({"entity":ellipse,"from":[0,0],"to":[4,3]}));
     verify(&s);
     let mut reopened = Session {
-        doc: std::sync::Arc::new(solidcraft_doc::format::read(&s.doc.to_json()).unwrap()),
+        doc: std::sync::Arc::new(polykrom_doc::format::read(&s.doc.to_json()).unwrap()),
         active_sketch: s.active_sketch,
         ..Session::default()
     };
@@ -1122,7 +1122,7 @@ fn certified_offset_delete_output_undo_reopen_and_refuse_dependent_source() {
     assert!(sk.curve_index(&id).is_none());
     assert!(sk.curve_index("e1").is_some());
     let deleted = s.doc.to_json();
-    let reopened = solidcraft_doc::format::read(&deleted).unwrap();
+    let reopened = polykrom_doc::format::read(&deleted).unwrap();
     assert_eq!(reopened.to_json(), deleted);
     run(&mut s, "edit.undo", json!({}));
     assert_eq!(s.doc.to_json(), attached);
@@ -1151,7 +1151,7 @@ fn periodic_closed_offset_chain_break_drag_reopen_and_material_volume() {
     let check = |session: &Session| {
         let sk = sketch(session);
         assert_eq!(sk.freeform_offsets.iter().map(|r| r.certificate).collect::<Vec<_>>(), [2, 2]);
-        assert_eq!(solidcraft_sketch::find_profiles(&sk).len(), 3);
+        assert_eq!(polykrom_sketch::find_profiles(&sk).len(), 3);
         for id in [&a, &b] {
             assert!(matches!(sk.curves[sk.curve_index(id).unwrap()].kind, CurveKind::Spline { periodic: true, .. }));
         }
@@ -1164,7 +1164,7 @@ fn periodic_closed_offset_chain_break_drag_reopen_and_material_volume() {
     run(&mut s, "parameters.change", json!({"name":"d1","expression":12}));
     check(&s);
     let mut reopened =
-        Session { doc: solidcraft_doc::format::read(&s.doc.to_json()).unwrap().into(), active_sketch: s.active_sketch, ..Default::default() };
+        Session { doc: polykrom_doc::format::read(&s.doc.to_json()).unwrap().into(), active_sketch: s.active_sketch, ..Default::default() };
     reopened.refresh();
     check(&reopened);
     let attached = reopened.doc.to_json();
@@ -1181,12 +1181,12 @@ fn periodic_closed_offset_chain_break_drag_reopen_and_material_volume() {
     let indices = moved.curves[moved.curve_index(&b).unwrap()].kind.point_ids();
     assert_eq!(moved.point(indices[0]), moved.point(*indices.last().unwrap()));
     assert!(moved.point(indices[0]).unwrap().dist(from) > 0.1);
-    assert_eq!(solidcraft_doc::format::read(&reopened.doc.to_json()).unwrap().to_json(), reopened.doc.to_json());
+    assert_eq!(polykrom_doc::format::read(&reopened.doc.to_json()).unwrap().to_json(), reopened.doc.to_json());
     run(&mut reopened, "edit.undo", json!({}));
     run(&mut reopened, "edit.undo", json!({}));
     assert_eq!(reopened.doc.to_json(), attached);
     // An independent ring area multiplied by height probes actual profile material.
-    let regions = solidcraft_sketch::find_profiles(&sketch(&s));
+    let regions = polykrom_sketch::find_profiles(&sketch(&s));
     let selected = regions.iter().enumerate().min_by(|(_, x), (_, y)| x.area.total_cmp(&y.area)).unwrap();
     let n = 4096;
     let h = std::f64::consts::TAU / n as f64;
@@ -1212,7 +1212,7 @@ fn periodic_closed_offset_chain_break_drag_reopen_and_material_volume() {
     run(&mut s, "sketch.finish", json!({}));
     run(&mut s, "solid.extrude", json!({"sketch":sketch_id,"profiles":[selected.0],"distance":3,"operation":"new"}));
     let state = s.world_state();
-    let volume = solidcraft_kernel::measure(&state.bodies.last().unwrap().body).unwrap().volume;
+    let volume = polycore::measure(&state.bodies.last().unwrap().body).unwrap().volume;
     assert!((volume - expected).abs() < 0.05, "{volume} vs {expected}");
 }
 
@@ -1225,7 +1225,7 @@ fn periodic_fit_creator_keeps_legacy_and_refuses_hostile_intent_atomically() {
     let i = sk.curve_index(&id).unwrap();
     assert!(matches!(sk.curves[i].kind, CurveKind::Spline { periodic: true, .. }));
     sk.validate_periodic_splines().unwrap();
-    assert_eq!(solidcraft_sketch::find_profiles(&sk).len(), 1);
+    assert_eq!(polykrom_sketch::find_profiles(&sk).len(), 1);
     let before = s.doc.to_json();
     let history = s.undo.len();
     for (cmd, p) in [
@@ -1267,7 +1267,7 @@ fn analytic_offset_partial_delete_releases_survivors_preserves_source_and_undo()
     }
     assert!(sk.curve_index("l1").is_some());
     let saved = s.doc.to_json();
-    assert_eq!(solidcraft_doc::format::read(&saved).unwrap().to_json(), saved);
+    assert_eq!(polykrom_doc::format::read(&saved).unwrap().to_json(), saved);
     run(&mut s, "edit.undo", json!({}));
     assert_eq!(s.doc.to_json(), before);
 }
@@ -1280,7 +1280,7 @@ fn periodic_offset_extrusion_survives_post_extrude_span_changes_and_cold_reopen(
     let a = run(&mut s, "sketch.offset", json!({"curves":["e1"],"distance":-1,"chain":false}))["curves"][0].as_str().unwrap().to_string();
     run(&mut s, "sketch.offset", json!({"curves":[a],"distance":-0.5,"chain":false}));
     let sk_id = s.active_sketch.unwrap();
-    let initial = solidcraft_sketch::find_profiles(&sketch(&s));
+    let initial = polykrom_sketch::find_profiles(&sketch(&s));
     let (index, ring) = initial.iter().enumerate().min_by(|(_, a), (_, b)| a.area.total_cmp(&b.area)).unwrap();
     let initial_count = ring.outer_curves.len();
     let boundary = ring.whole_curve_boundaries().unwrap();
@@ -1332,21 +1332,21 @@ fn periodic_offset_extrusion_survives_post_extrude_span_changes_and_cold_reopen(
         let body = &state.bodies[0].body;
         for (distance, material) in [(1.25, true), (0.5, false), (1.75, false)] {
             let point = ellipse + normal * distance;
-            assert_eq!(body.contains(solidcraft_geom::Vec3::new(point.x, point.y, 1.5)), material);
+            assert_eq!(body.contains(polycore_geom::Vec3::new(point.x, point.y, 1.5)), material);
         }
         // Repeat at the exact major-axis seam as a physical material control.
         for (distance, material) in [(1.25, true), (0.5, false), (1.75, false)] {
             let point = centre + u * (major + distance);
             assert_eq!(ring.region.contains(point), material);
-            assert_eq!(body.contains(solidcraft_geom::Vec3::new(point.x, point.y, 1.5)), material);
+            assert_eq!(body.contains(polycore_geom::Vec3::new(point.x, point.y, 1.5)), material);
         }
-        let volume = solidcraft_kernel::measure(body).unwrap().volume;
+        let volume = polycore::measure(body).unwrap().volume;
         assert!((volume - expected).abs() < 0.05, "{major}: {volume} vs independent {expected}");
-        let mut cold = Session { doc: solidcraft_doc::format::read(&s.doc.to_json()).unwrap().into(), ..Default::default() };
+        let mut cold = Session { doc: polykrom_doc::format::read(&s.doc.to_json()).unwrap().into(), ..Default::default() };
         cold.refresh();
         let cold_state = cold.world_state();
         assert_eq!(cold_state.bodies.len(), 1);
-        let cold_volume = solidcraft_kernel::measure(&cold_state.bodies[0].body).unwrap().volume;
+        let cold_volume = polycore::measure(&cold_state.bodies[0].body).unwrap().volume;
         assert!((cold_volume - volume).abs() < 1e-8);
         let edited = s.doc.to_json();
         run(&mut s, "edit.undo", json!({}));
@@ -1358,7 +1358,7 @@ fn periodic_offset_extrusion_survives_post_extrude_span_changes_and_cold_reopen(
 }
 
 /// The bounding box of a set of sketch curves, from their polylines.
-fn bounds(sk: &solidcraft_sketch::Sketch, curves: &[String]) -> (Vec2, Vec2) {
+fn bounds(sk: &polykrom_sketch::Sketch, curves: &[String]) -> (Vec2, Vec2) {
     let mut lo = Vec2::new(f64::INFINITY, f64::INFINITY);
     let mut hi = Vec2::new(f64::NEG_INFINITY, f64::NEG_INFINITY);
     for id in curves {
@@ -1371,7 +1371,7 @@ fn bounds(sk: &solidcraft_sketch::Sketch, curves: &[String]) -> (Vec2, Vec2) {
     (lo, hi)
 }
 
-fn box_is(sk: &solidcraft_sketch::Sketch, curves: &[String], lo: [f64; 2], hi: [f64; 2]) -> bool {
+fn box_is(sk: &polykrom_sketch::Sketch, curves: &[String], lo: [f64; 2], hi: [f64; 2]) -> bool {
     let (a, b) = bounds(sk, curves);
     a.dist(Vec2::new(lo[0], lo[1])) < 1e-6 && b.dist(Vec2::new(hi[0], hi[1])) < 1e-6
 }
@@ -1553,7 +1553,7 @@ fn offset_driver_edits_reopens_and_undoes_without_moving_sources() {
         let sk = &state.sketch(1).unwrap().sketch;
         assert!((sk.offset_distance(&outputs[0]).unwrap().abs() - distance).abs() < 1e-8);
         let constraint = sk.constraints.iter().find(|c| c.param.as_deref() == Some(&param)).unwrap();
-        assert!(solidcraft_sketch::dim_frame(sk, &constraint.kind).is_some());
+        assert!(polykrom_sketch::dim_frame(sk, &constraint.kind).is_some());
         for (a, b) in sk.points.iter().zip(&original) {
             assert!(a.pos.dist(b.pos) < 1e-7);
         }
@@ -1573,7 +1573,7 @@ fn offset_driver_edits_reopens_and_undoes_without_moving_sources() {
     check(&s, 2.0);
     run(&mut s, "edit.redo", json!({}));
     check(&s, 4.0);
-    let mut reopened = Session::new(solidcraft_doc::Document::from_json(&s.doc.to_json()).unwrap());
+    let mut reopened = Session::new(polykrom_doc::Document::from_json(&s.doc.to_json()).unwrap());
     check(&reopened, 4.0);
     run(&mut reopened, "parameters.change", json!({"name":param,"expression":"3 mm"}));
     check(&reopened, 3.0);
@@ -1594,7 +1594,7 @@ fn an_offset_leaves_its_source_lines_free_to_turn() {
     let o = run(&mut s, "sketch.offset", json!({"curves": ["l1"], "distance": 2, "side": [5, 5]}));
     assert_eq!(o["sketch"]["dof"], 8, "the offset follows its source and takes no freedom away: {o}");
     let outputs = ids(&o["curves"]);
-    let line = |sk: &solidcraft_sketch::Sketch, id: &str| match sk.curves[sk.curve_index(id).unwrap()].kind {
+    let line = |sk: &polykrom_sketch::Sketch, id: &str| match sk.curves[sk.curve_index(id).unwrap()].kind {
         CurveKind::Line { a, b } => (sk.points[a].pos, sk.points[b].pos),
         ref other => panic!("{id} is {other:?}"),
     };
@@ -1683,7 +1683,7 @@ fn offset_driver_uses_design_units_and_dimension_delete_freezes_current_distance
     run(&mut s, "sketch.delete", json!({"entities":[annotation]}));
     assert!((sketch(&s).offsets[0].distance - 5.08).abs() < 1e-8);
     assert!(s.doc.param(param).is_none());
-    let reopened = Session::new(solidcraft_doc::Document::from_json(&s.doc.to_json()).unwrap());
+    let reopened = Session::new(polykrom_doc::Document::from_json(&s.doc.to_json()).unwrap());
     assert!((reopened.world_state().sketch(1).unwrap().sketch.offsets[0].distance - 5.08).abs() < 1e-8);
 }
 
@@ -1698,7 +1698,7 @@ fn offset_driver_arc_first_retires_breaks_undoes_and_reopens() {
     run(&mut s, "parameters.change", json!({"name":param,"expression":"3 mm"}));
     let sk = sketch(&s);
     let driver = sk.constraints.iter().find(|c| c.param.as_deref() == Some(param)).unwrap();
-    let solidcraft_sketch::ConstraintKind::OffsetDistance { output, .. } = &driver.kind else {
+    let polykrom_sketch::ConstraintKind::OffsetDistance { output, .. } = &driver.kind else {
         panic!("missing offset driver");
     };
     let record = sk.offsets.iter().find(|o| o.owns_output(output)).unwrap();
@@ -1710,7 +1710,7 @@ fn offset_driver_arc_first_retires_breaks_undoes_and_reopens() {
     assert!(s.doc.param(param).is_none());
     assert!(sketch(&s).offsets.is_empty());
     assert_eq!(sketch(&s).segs(sketch(&s).curve_index(&survivor).unwrap()), before);
-    let reopened = Session::new(solidcraft_doc::Document::from_json(&s.doc.to_json()).unwrap());
+    let reopened = Session::new(polykrom_doc::Document::from_json(&s.doc.to_json()).unwrap());
     assert!(reopened.world_state().sketch(1).unwrap().sketch.offsets.is_empty());
     run(&mut s, "edit.undo", json!({}));
     assert!(s.doc.param(param).is_some());
@@ -1756,7 +1756,7 @@ fn offset_driver_two_sides_edit_independently_and_reopen() {
     assert!(box_is(&sketch(&s), &inside, [4.0, 4.0], [36.0, 26.0]));
     assert!(box_is(&sketch(&s), &outside, [-1.0, -1.0], [41.0, 31.0]));
     run(&mut s, "parameters.change", json!({"name":secondary,"expression":"3 mm"}));
-    let mut reopened = Session::new(solidcraft_doc::Document::from_json(&s.doc.to_json()).unwrap());
+    let mut reopened = Session::new(polykrom_doc::Document::from_json(&s.doc.to_json()).unwrap());
     run(&mut reopened, "sketch.edit", json!({"sketch":1}));
     assert!(box_is(&sketch(&reopened), &inside, [4.0, 4.0], [36.0, 26.0]));
     assert!(box_is(&sketch(&reopened), &outside, [-3.0, -3.0], [43.0, 33.0]));
@@ -1796,8 +1796,8 @@ fn offset_driver_format18_offsets_keep_fixed_distances_on_upgrade() {
     doc.params.retain(|p| p.name != param);
     let mut json: Value = serde_json::from_str(&doc.to_json()).unwrap();
     json["format"] = json!("solidcraft/18");
-    let mut reopened = Session::new(solidcraft_doc::Document::from_json(&json.to_string()).unwrap());
-    assert_eq!(reopened.doc.format, solidcraft_doc::format::format_string(solidcraft_doc::format::FORMAT), "upgraded on opening");
+    let mut reopened = Session::new(polykrom_doc::Document::from_json(&json.to_string()).unwrap());
+    assert_eq!(reopened.doc.format, polykrom_doc::format::format_string(polykrom_doc::format::FORMAT), "upgraded on opening");
     run(&mut reopened, "sketch.edit", json!({"sketch":1}));
     let sk = sketch(&reopened);
     assert!((sk.offsets[0].distance - 2.0).abs() < 1e-8);
@@ -1859,7 +1859,7 @@ fn trim_keeps_the_rest_of_a_dimensioned_line_where_it_was() {
     assert!(corner(&s).dist(Vec2::new(40.0, 23.0)) < 1e-6, "the step moved to {:?}", corner(&s));
     let sk = sketch(&s);
     let ends = sk.shape(sk.curve_index(&right).unwrap()).unwrap();
-    assert!(matches!(ends, solidcraft_sketch::Shape::Line { a, b } if close(a.dist(b), 23.0)), "{ends:?}");
+    assert!(matches!(ends, polykrom_sketch::Shape::Line { a, b } if close(a.dist(b), 23.0)), "{ends:?}");
     assert!(matches!(forty(&s)[..], [ConstraintKind::Distance { .. }]), "{:?}", forty(&s));
 
     // Trim the top side right of the step: the corner the 40 measured to goes, and the 40 with it.
@@ -1933,7 +1933,7 @@ fn trim_and_extend_refuse_an_offsets_ends_until_its_association_is_broken() {
     let sk = sketch(&s);
     let sh = sk.shape(sk.curve_index("l5").unwrap()).unwrap();
     assert!(
-        matches!(sh, solidcraft_sketch::Shape::Line { a, b } if a.dist(Vec2::new(-2.0, -2.0)) < 1e-9 && b.dist(Vec2::new(20.0, -2.0)) < 1e-9),
+        matches!(sh, polykrom_sketch::Shape::Line { a, b } if a.dist(Vec2::new(-2.0, -2.0)) < 1e-9 && b.dist(Vec2::new(20.0, -2.0)) < 1e-9),
         "{sh:?}"
     );
 }

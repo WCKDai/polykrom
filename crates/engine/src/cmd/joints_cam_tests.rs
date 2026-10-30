@@ -5,8 +5,8 @@
 //! oscillating follower's roller sits where its arm's circle meets the circle of radius R + r.
 
 use super::*;
-use solidcraft_doc::joints::Coupling;
-use solidcraft_doc::joints::cam::CamProfile;
+use polykrom_doc::joints::Coupling;
+use polykrom_doc::joints::cam::CamProfile;
 
 /// The cam's eccentricity and radius (mm).
 const E: f64 = 10.0;
@@ -382,13 +382,13 @@ fn hostile_cams_are_refused() {
     assert!(s.doc.assembly.links.is_empty());
     // A table edited by hand: NaN leaves the follower where it is, any length reads.
     run(&mut s, "joint.cam", json!({"a": "Cam", "b": "Tappet", "profile": {"sketch": "CamSketch"}}));
-    let before = solidcraft_doc::joints::joint_values(&s.doc.assembly);
+    let before = polykrom_doc::joints::joint_values(&s.doc.assembly);
     for lift in [vec![f64::NAN; 360], vec![1.0, 2.0, 3.0], vec![f64::INFINITY]] {
         let mut d = (*s.doc).clone();
         if let Some(l) = d.assembly.links.first_mut() {
             l.lift = lift;
         }
-        let vals = solidcraft_doc::joints::joint_values(&d.assembly);
+        let vals = polykrom_doc::joints::joint_values(&d.assembly);
         assert!(vals.values().flatten().all(|v| v.is_finite()), "{vals:?}");
         // The follower keeps where it is.
         assert_eq!(vals.get(&joint_id(&s, "Tappet")), d.assembly.joints.iter().find(|j| j.name == "Tappet").map(|j| &j.values), "{before:?}");
@@ -398,7 +398,7 @@ fn hostile_cams_are_refused() {
     if let Some(l) = d.assembly.links.first_mut() {
         (l.coupling, l.ratio, l.offset) = (None, 0.0, 3.0);
     }
-    assert_eq!(solidcraft_doc::joints::joint_values(&d.assembly).get(&joint_id(&s, "Tappet")).and_then(|q| q.first()).copied(), Some(3.0));
+    assert_eq!(polykrom_doc::joints::joint_values(&d.assembly).get(&joint_id(&s, "Tappet")).and_then(|q| q.first()).copied(), Some(3.0));
     // A roller's picked face must turn about an axis parallel to the cam's, a tip given or not.
     run(&mut s, "component.activate", json!({"component": "root"}));
     run(&mut s, "component.create", json!({"name": "Pin"}));
@@ -419,7 +419,7 @@ fn cams_save_and_open_with_their_table() {
     run(&mut s, "joint.cam", json!({"a": "Cam", "b": "Tappet", "profile": {"sketch": "CamSketch"}, "follower": "roller", "radius": 2}));
     run(&mut s, "joint.drive", json!({"joint": "Cam", "value": 30}));
     let text = s.doc.to_json();
-    let back = solidcraft_doc::format::read(&text).unwrap_or_else(|e| panic!("{e}"));
+    let back = polykrom_doc::format::read(&text).unwrap_or_else(|e| panic!("{e}"));
     assert_eq!(back.assembly.links, s.doc.assembly.links);
     assert_eq!(back.assembly.links.first().map(|l| l.lift.len()), Some(360));
     let l = run(&mut s, "joint.list", json!({}));
@@ -430,6 +430,6 @@ fn cams_save_and_open_with_their_table() {
     for l in v["assembly"]["links"].as_array_mut().into_iter().flatten() {
         l.as_object_mut().map(|o| (o.remove("coupling"), o.remove("lift")));
     }
-    let old = solidcraft_doc::format::read(&v.to_string()).unwrap_or_else(|e| panic!("{e}"));
+    let old = polykrom_doc::format::read(&v.to_string()).unwrap_or_else(|e| panic!("{e}"));
     assert!(old.assembly.links.iter().all(|l| l.coupling.is_none() && l.lift.is_empty()));
 }

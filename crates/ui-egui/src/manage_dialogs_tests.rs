@@ -5,8 +5,8 @@ use crate::{
     shell::LayoutMode,
     theme::Tokens,
 };
+use polykrom_engine::Sel;
 use serde_json::json;
-use solidcraft_engine::Sel;
 
 fn fixture() -> Harness {
     let mut h = Harness::new();

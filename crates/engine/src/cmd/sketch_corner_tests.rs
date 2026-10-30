@@ -23,7 +23,7 @@ fn curves(r: &Value) -> Vec<String> {
     r["curves"].as_array().map(|a| a.iter().filter_map(|x| x.as_str().map(str::to_string)).collect()).unwrap_or_default()
 }
 
-fn sk(s: &Session) -> solidcraft_sketch::Sketch {
+fn sk(s: &Session) -> polykrom_sketch::Sketch {
     s.model.state().sketch(s.active_sketch.unwrap()).unwrap().sketch.clone()
 }
 
@@ -138,7 +138,7 @@ fn fully_defined_rectangles_keep_their_size_when_all_corners_are_filleted() {
             let expected = 50.0 * if square { 50.0 } else { height } - 4.0 * (9.0 - std::f64::consts::PI * 9.0 / 4.0);
             assert!((area(&s) - expected).abs() < 1e-5, "center={center}, square={square}: {} != {expected}", area(&s));
             let id = s.active_sketch.unwrap();
-            let saved = solidcraft_doc::Document::from_json(&s.doc.to_json()).unwrap();
+            let saved = polykrom_doc::Document::from_json(&s.doc.to_json()).unwrap();
             assert_eq!(saved.sketch(id).unwrap(), s.doc.sketch(id).unwrap());
             run(&mut s, "edit.undo", json!({}));
             run(&mut s, "edit.redo", json!({}));
@@ -193,9 +193,9 @@ fn a_fillet_keeps_the_dimensions_of_its_corner_on_a_virtual_sharp() {
     // The virtual corner sits where the corner was, and the part keeps its size.
     let k = sk(&s);
     let vc = k.point(k.point_index(&corner).unwrap()).unwrap();
-    assert!(vc.dist(solidcraft_geom::Vec2::new(0.0, 100.0)) < 1e-6, "{vc:?}");
+    assert!(vc.dist(polycore_geom::Vec2::new(0.0, 100.0)) < 1e-6, "{vc:?}");
     let top_end = k.point(k.resolve_point("top.end").unwrap()).unwrap();
-    assert!(top_end.dist(solidcraft_geom::Vec2::new(-80.0, 100.0)) < 1e-6, "{top_end:?}");
+    assert!(top_end.dist(polycore_geom::Vec2::new(-80.0, 100.0)) < 1e-6, "{top_end:?}");
     let (lo, hi) = k.bounds().unwrap();
     assert!((hi.x - lo.x - 80.0).abs() < 1e-6 && (hi.y - lo.y - 100.0).abs() < 1e-6, "{lo:?} {hi:?}");
     // It is drawn with extension lines from both lines' ends to it.
@@ -211,7 +211,7 @@ fn a_fillet_keeps_the_dimensions_of_its_corner_on_a_virtual_sharp() {
     assert!((hi.x - lo.x - 90.0).abs() < 1e-6 && (hi.y - lo.y - 120.0).abs() < 1e-6, "{lo:?} {hi:?}");
     // It is kept in the design file, and undo and redo take it away and bring it back.
     let id = s.active_sketch.unwrap();
-    let doc = solidcraft_doc::Document::from_json(&s.doc.to_json()).unwrap();
+    let doc = polykrom_doc::Document::from_json(&s.doc.to_json()).unwrap();
     assert_eq!(doc.sketch(id).unwrap(), s.doc.sketch(id).unwrap());
     run(&mut s, "edit.undo", json!({}));
     run(&mut s, "edit.undo", json!({}));

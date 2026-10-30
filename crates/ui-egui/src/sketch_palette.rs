@@ -11,8 +11,8 @@
 
 use std::cell::Cell;
 
+use polykrom_engine::Sel;
 use serde_json::{Value, json};
-use solidcraft_engine::Sel;
 
 use crate::SolveApp;
 use crate::theme::Tokens;
@@ -39,13 +39,13 @@ pub const TOGGLES: [(&str, &str); 10] = [
 
 /// Does the sketch hold any geometry of its own: a drawn curve or a 3D curve? Projected curves
 /// and the origin are held in place and do not count.
-pub fn has_geometry(sketch: &solidcraft_engine::sketch::Sketch) -> bool {
+pub fn has_geometry(sketch: &polykrom_engine::sketch::Sketch) -> bool {
     !sketch.curves.is_empty() || !sketch.wires.is_empty()
 }
 
 /// Nothing the user added: no curve, 3D curve, constraint or dimension, pattern, projection,
 /// text or offset, and no point but the fixed origin.
-pub fn is_blank(sketch: &solidcraft_engine::sketch::Sketch) -> bool {
+pub fn is_blank(sketch: &polykrom_engine::sketch::Sketch) -> bool {
     !has_geometry(sketch)
         && sketch.constraints.is_empty()
         && sketch.patterns.is_empty()
@@ -107,7 +107,7 @@ pub fn toggle_construction(app: &mut SolveApp) {
 /// Curves a drawing command just made take the drawing line type.
 pub fn apply_mode(app: &mut SolveApp, id: &str, result: &Value) {
     let m = mode(app);
-    if m == 0 || !solidcraft_engine::find_command(id).is_some_and(|c| c.tab == "SKETCH" && c.panel == "CREATE") {
+    if m == 0 || !polykrom_engine::find_command(id).is_some_and(|c| c.tab == "SKETCH" && c.panel == "CREATE") {
         return;
     }
     let curves: Vec<String> = result["curves"].as_array().into_iter().flatten().filter_map(|c| c.as_str().map(str::to_string)).collect();
@@ -123,7 +123,7 @@ pub fn apply_mode(app: &mut SolveApp, id: &str, result: &Value) {
                 ss.sketch
                     .curve_index(c)
                     .and_then(|i| ss.sketch.curves.get(i))
-                    .is_some_and(|c| matches!(c.kind, solidcraft_engine::sketch::CurveKind::Line { .. }))
+                    .is_some_and(|c| matches!(c.kind, polykrom_engine::sketch::CurveKind::Line { .. }))
             })
             .cloned()
             .collect()
@@ -193,7 +193,7 @@ pub fn set_linetype(app: &mut SolveApp, kind: u8) {
                 ss.sketch
                     .curve_index(id)
                     .and_then(|i| ss.sketch.curves.get(i))
-                    .is_some_and(|c| matches!(c.kind, solidcraft_engine::sketch::CurveKind::Line { .. }))
+                    .is_some_and(|c| matches!(c.kind, polykrom_engine::sketch::CurveKind::Line { .. }))
             })
             .cloned()
             .collect()
@@ -285,7 +285,7 @@ fn section_alias(name: &str, title: &str) {
 /// Count the sketch's independent input coordinates and radii before constraints. The solver
 /// stores remaining DOF but no total: fixed/projected inputs are constants, not free variables.
 /// Arc endpoints already supply their radii through coordinates, as in the solver's layout.
-fn unconstrained_total(sketch: &solidcraft_engine::sketch::Sketch) -> usize {
+fn unconstrained_total(sketch: &polykrom_engine::sketch::Sketch) -> usize {
     let coordinates = sketch.points.iter().filter(|p| !p.fixed && p.link.is_none()).count().saturating_mul(2);
     let radii = sketch
         .curves
@@ -293,7 +293,7 @@ fn unconstrained_total(sketch: &solidcraft_engine::sketch::Sketch) -> usize {
         .filter(|c| {
             !c.fixed
                 && c.link.is_none()
-                && matches!(c.kind, solidcraft_engine::sketch::CurveKind::Circle { .. } | solidcraft_engine::sketch::CurveKind::Ellipse { .. })
+                && matches!(c.kind, polykrom_engine::sketch::CurveKind::Circle { .. } | polykrom_engine::sketch::CurveKind::Ellipse { .. })
         })
         .count();
     coordinates.saturating_add(radii)
@@ -412,7 +412,7 @@ pub fn show(app: &mut SolveApp, ctx: &egui::Context) {
                         let choices: Vec<_> = family
                             .commands
                             .iter()
-                            .filter_map(|id| solidcraft_engine::find_command(id))
+                            .filter_map(|id| polykrom_engine::find_command(id))
                             .map(|spec| crate::ui_kit::ToolChoice {
                                 key: spec.id,
                                 icon: spec.icon,
@@ -842,7 +842,7 @@ mod tests {
             .iter()
             .copied()
             .filter(|id| {
-                let label = solidcraft_engine::find_command(id).unwrap().label;
+                let label = polykrom_engine::find_command(id).unwrap().label;
                 tree.nodes.iter().any(|(_, n)| n.label() == Some(label) && n.toggled() == Some(egui::accesskit::Toggled::True))
             })
             .collect()

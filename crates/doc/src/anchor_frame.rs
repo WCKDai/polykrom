@@ -12,7 +12,7 @@ pub fn state_in_face_anchor_frame<'a>(doc: &Document, state: &'a ModelState, anc
     let mut body = if crate::is_identity(&relative) {
         raw.clone()
     } else {
-        ModelBody::new(raw.name.clone(), solidcraft_kernel::transform_matrix(&raw.body, relative)?, raw.feature)
+        ModelBody::new(raw.name.clone(), polycore::transform_matrix(&raw.body, relative)?, raw.feature)
     };
     body.component = raw.component;
     body.transferred = raw.transferred;

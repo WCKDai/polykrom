@@ -8,8 +8,8 @@
 use std::cell::RefCell;
 
 use egui::{Pos2, Rect, Shape, Stroke, vec2};
+use polykrom_engine::geom::{Vec2, Vec3};
 use serde_json::{Value, json};
-use solidcraft_engine::geom::{Vec2, Vec3};
 
 use crate::SolveApp;
 use crate::theme::Tokens;
@@ -230,7 +230,7 @@ pub fn preview(app: &SolveApp, t: &Tool, painter: &egui::Painter, proj: &Proj) -
         if let Some((h, _)) = hover {
             w.push(h);
         }
-        let poly: Vec<Pos2> = solidcraft_engine::sketch::fit_polyline(&w).into_iter().filter_map(|p| proj.to_screen(p)).collect();
+        let poly: Vec<Pos2> = polykrom_engine::sketch::fit_polyline(&w).into_iter().filter_map(|p| proj.to_screen(p)).collect();
         painter.add(Shape::line(poly, stroke));
     } else {
         painter.add(Shape::line(all, stroke));

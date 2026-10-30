@@ -1,5 +1,5 @@
 [package]
-name = "solidcraft-ui-egui"
+name = "polykrom-ui-egui"
 description = "Polykrom user interface (egui + wgpu): the swappable front end"
 version.workspace = true
 edition.workspace = true
@@ -9,11 +9,11 @@ license.workspace = true
 workspace = true
 
 [dependencies]
-solidcraft-engine = { workspace = true }
+polykrom-engine = { workspace = true }
 egui = { workspace = true }
 egui-wgpu = { workspace = true }
-solidcraft-gpu = { workspace = true }
-solidcraft-space-mouse = { workspace = true, features = ["serde"] }
+polykrom-gpu = { workspace = true }
+polykrom-space-mouse = { workspace = true, features = ["serde"] }
 serde = { workspace = true }
 serde_json = { workspace = true }
 log = { workspace = true }

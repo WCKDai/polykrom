@@ -7,8 +7,8 @@
 //! centre of mass, bounding box, counts) of the body or component a menu asked about; both are
 //! `ui_kit::Window` cards.
 
+use polykrom_engine::doc::metadata::{DESCRIPTION, WELL_KNOWN};
 use serde_json::{Map, Value};
-use solidcraft_engine::doc::metadata::{DESCRIPTION, WELL_KNOWN};
 
 use crate::SolveApp;
 use crate::ui_kit;

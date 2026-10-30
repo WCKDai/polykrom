@@ -9,9 +9,9 @@
 //! solid is built from extruded pieces (panels, and bend zones as annular sectors) joined
 //! together; the flat solid is the outline extruded through the thickness.
 
+use polycore::{self as kernel, Body, EdgeSpec, FaceSpec, SurfSpec};
+use polycore_geom::{Aabb2, LINEAR_TOL, Loop2, Plane, Region2, Ring, Seg2, Vec2, Vec3};
 use serde::{Deserialize, Serialize};
-use solidcraft_geom::{Aabb2, LINEAR_TOL, Loop2, Plane, Region2, Ring, Seg2, Vec2, Vec3};
-use solidcraft_kernel::{self as kernel, Body, EdgeSpec, FaceSpec, SurfSpec};
 
 use crate::expr::{self, Kind, Value};
 use crate::{DocError, Document, IDENTITY, Mat, Result, apply_point, apply_vector, mat_inverse, mat_mul};
@@ -5075,8 +5075,8 @@ mod tests {
         );
         let lobe = |f: fn(Vec2) -> Vec2| Loop2 {
             segs: vec![
-                solidcraft_geom::bezier(&cubic.map(f)).unwrap(),
-                solidcraft_geom::bezier(&quartic.map(f)).unwrap(),
+                polycore_geom::bezier(&cubic.map(f)).unwrap(),
+                polycore_geom::bezier(&quartic.map(f)).unwrap(),
                 Seg2::Line { a: f(b), b: f(a) },
             ],
         };

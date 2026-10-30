@@ -44,7 +44,7 @@ fn slab_with_pleat(width: f64) -> Session {
     s
 }
 
-fn wall(s: &Session) -> solidcraft_kernel::Body {
+fn wall(s: &Session) -> polycore::Body {
     s.model.state().body("Wall").map(|b| b.body.clone()).unwrap()
 }
 
@@ -61,7 +61,7 @@ fn a_round_far_from_the_joined_loft_works() {
         assert_eq!(after.face_count(), before.face_count() + 1, "{width} mm: one round face");
         assert_eq!(after.crossed_faces().unwrap(), before.crossed_faces().unwrap(), "{width} mm");
         // The round lies along the picked edge: the end face's top corner is gone.
-        let m = solidcraft_kernel::measure(&after).unwrap();
+        let m = polycore::measure(&after).unwrap();
         assert!((m.bbox.min.x + 60.0).abs() < 1e-6 && (m.bbox.max.z - 95.0).abs() < 1e-6, "{width} mm: {:?}", m.bbox);
     }
 }

@@ -126,7 +126,7 @@ fn design_export_deduplicates_exact_looks_and_keeps_physical_properties_distinct
 
 #[test]
 fn scalar_export_refuses_pbr_in_every_design_owned_appearance_location() {
-    use solidcraft_doc::{appearance::FaceLook, pbr_appearance::PbrParameters};
+    use polykrom_doc::{appearance::FaceLook, pbr_appearance::PbrParameters};
     let mut look = ScalarLook { name: "Original PBR specimen".into(), color: [180, 120, 70], opacity: 1.0 }.to_look();
     look.pbr = Some(PbrParameters::new(1.0, 0.3, 1.5).unwrap());
     for location in 0..4 {

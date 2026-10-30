@@ -2,9 +2,9 @@
 
 use std::sync::Arc;
 
+use polykrom_doc::render_settings::{RenderSettings, RenderSetup};
 use serde::Deserialize;
 use serde_json::{Value, json};
-use solidcraft_doc::render_settings::{RenderSettings, RenderSetup};
 
 use super::CommandSpec;
 use crate::params::bad;

@@ -1,7 +1,7 @@
 use super::build_scene;
 use crate::{Services, SolveApp};
+use polykrom_engine::{Session, doc, geom::Vec3, kernel};
 use serde_json::json;
-use solidcraft_engine::{Session, doc, geom::Vec3, kernel};
 
 #[test]
 fn placed_step_body_uses_imported_opacity_until_a_design_look_overrides_it() {
@@ -26,7 +26,7 @@ fn placed_step_body_uses_imported_opacity_until_a_design_look_overrides_it() {
     app.ui.ground_shadow = false;
     app.ui.show_origin = false;
     let placed = app.session.world_state().bodies.iter().find(|b| b.name != source).unwrap().name.clone();
-    app.session.selection = vec![solidcraft_engine::Sel::Body { name: placed }];
+    app.session.selection = vec![polykrom_engine::Sel::Body { name: placed }];
     app.start("appearance.assign");
     let crate::dialogs::Kind::Appearance(appearance) = &app.dialog.as_ref().unwrap().kind else { panic!("appearance dialog") };
     assert!((appearance.opacity - 0.4).abs() < 1e-6);
@@ -66,7 +66,7 @@ fn theme_switches_refresh_cached_viewport_colours_without_remeshing() {
     h.app.run("solid.box", json!({"length": 20, "width": 15, "height": 10})).unwrap();
     h.app.viewport.gpu = Some(super::GpuTarget { format: egui_wgpu::wgpu::TextureFormat::Rgba8Unorm, depth: None, samples: 1, tess: false });
     let body = h.app.session.world_state().bodies[0].name.clone();
-    h.app.session.selection = vec![solidcraft_engine::Sel::Body { name: body.clone() }];
+    h.app.session.selection = vec![polykrom_engine::Sel::Body { name: body.clone() }];
     h.frame();
     let revision = h.app.session.revision;
     let mesh = h.app.session.world_state().bodies[0].cached_mesh().unwrap();

@@ -102,7 +102,7 @@ fn read(bytes: &[u8]) -> Result<GltfImport> {
 
 fn meshes(g: &GltfImport) -> &[MeshData] {
     match &g.feature.kind {
-        solidcraft_doc::FeatureKind::MeshImport { meshes, .. } => meshes,
+        polykrom_doc::FeatureKind::MeshImport { meshes, .. } => meshes,
         _ => &[],
     }
 }
@@ -227,7 +227,7 @@ fn scale_and_mirror_are_baked_and_the_tree_kept() {
     assert!(close(volume(&ms[1]), 1000.0), "{}", volume(&ms[1]));
     // Placed, it lies on the other side of the origin.
     let place = &g.plan.places[2].transform;
-    let xs: Vec<f64> = ms[1].positions.as_chunks::<3>().0.iter().map(|p| solidcraft_doc::apply_point(place, Vec3::new(p[0], p[1], p[2])).x).collect();
+    let xs: Vec<f64> = ms[1].positions.as_chunks::<3>().0.iter().map(|p| polykrom_doc::apply_point(place, Vec3::new(p[0], p[1], p[2])).x).collect();
     assert!(
         close(xs.iter().copied().fold(f64::INFINITY, f64::min), -10.0) && close(xs.iter().copied().fold(f64::NEG_INFINITY, f64::max), 0.0),
         "{xs:?}"
@@ -312,7 +312,7 @@ fn gltf_with_external_and_embedded_buffers() {
     let m = f2.cube_mesh("Cube", 0.01);
     f2.roots = vec![f2.node(json!({"mesh": m, "translation": [1.0, 0.0, 0.0]})), f2.node(json!({"mesh": m, "translation": [2.0, 0.0, 0.0]}))];
     let mf = crate::mesh_import_feature(&f2.glb(), "two.glb").unwrap();
-    let solidcraft_doc::FeatureKind::MeshImport { meshes, .. } = &mf.kind else { panic!() };
+    let polykrom_doc::FeatureKind::MeshImport { meshes, .. } = &mf.kind else { panic!() };
     assert_eq!(meshes.len(), 1);
     assert!(close(bounds(&meshes[0]).0[0], 1000.0));
     assert!(crate::is_mesh_path("a.GLB") && crate::is_mesh_path("b.gltf") && is_gltf_path("c.Gltf") && !is_gltf_path("d.obj"));
@@ -369,7 +369,7 @@ fn a_position_naming_a_missing_accessor_is_refused_before_the_gltf_crate() {
     let glb = glb_container(j.to_string().as_bytes(), &f.bin);
     let e = read(&glb).err().map(|e| e.to_string()).unwrap_or_default();
     assert!(e.contains("POSITION names accessor 99, but the file has 2"), "{e}");
-    assert!(!solidcraft_kernel::guarded(), "no guard left open");
+    assert!(!polycore::guarded(), "no guard left open");
 }
 
 #[test]

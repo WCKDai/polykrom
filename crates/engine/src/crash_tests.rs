@@ -15,7 +15,7 @@ fn build() -> Build {
 /// hook and crashes the way `SOLIDCRAFT_CRASH_CHILD` says.
 #[test]
 fn child() {
-    let (Some(dir), Some(mode)) = (solidcraft_geom::env::var_os("CRASH_CHILD_DIR"), solidcraft_geom::env::var("CRASH_CHILD")) else {
+    let (Some(dir), Some(mode)) = (polycore_geom::env::var_os("CRASH_CHILD_DIR"), polycore_geom::env::var("CRASH_CHILD")) else {
         return;
     };
     let fresh = install(PathBuf::from(dir), build());
@@ -131,7 +131,7 @@ fn a_command_panic_is_reported_once_with_the_design_and_the_command() {
     assert!(!bt.iter().any(|f| f.as_str().unwrap().contains("crash::hook")), "the hook's own frames are dropped: {bt:?}");
     assert_eq!(v["recent_commands"][0]["command"], "solid.box");
     // The design from before the command, and the command: together they reproduce the crash.
-    let design = solidcraft_io::read_design(&fs::read(v["design_path"].as_str().unwrap()).unwrap()).unwrap();
+    let design = polykrom_io::read_design(&fs::read(v["design_path"].as_str().unwrap()).unwrap()).unwrap();
     assert_eq!(design.features.len(), 1);
     let replay: Value = serde_json::from_slice(&fs::read(v["replay_path"].as_str().unwrap()).unwrap()).unwrap();
     assert_eq!(replay["commands"], json!([{"command": "diagnostics.crash_test", "params": {"mode": "panic"}}]));
@@ -417,9 +417,9 @@ fn dates_are_formatted_in_utc() {
 fn backtraces_lose_the_panic_machinery_and_the_home_folder() {
     let home = std::env::var("HOME").or_else(|_| std::env::var("USERPROFILE")).unwrap_or_else(|_| "/home/u".into());
     let bt = format!(
-        "   0: std::backtrace::Backtrace::force_capture\n             at /rustc/abc123/library/std/src/backtrace.rs:312:13\n   1: hook\n   1: {{closure#3}}\n   1: <alloc::boxed::Box<F,A> as core::ops::function::Fn<Args>>::call\n   2: std::panicking::rust_panic_with_hook\n   3: core::panicking::panic_fmt\n   4: solidcraft_kernel::fillet::blend\n             at {home}/src/kernel/fillet.rs:10:5\n   5: do_call<F>\n             at /rustc/abc/library/std/src/panicking.rs:1:1\n   5: std::sys::backtrace::__rust_begin_short_backtrace\n   6: main"
+        "   0: std::backtrace::Backtrace::force_capture\n             at /rustc/abc123/library/std/src/backtrace.rs:312:13\n   1: hook\n   1: {{closure#3}}\n   1: <alloc::boxed::Box<F,A> as core::ops::function::Fn<Args>>::call\n   2: std::panicking::rust_panic_with_hook\n   3: core::panicking::panic_fmt\n   4: polycore::fillet::blend\n             at {home}/src/kernel/fillet.rs:10:5\n   5: do_call<F>\n             at /rustc/abc/library/std/src/panicking.rs:1:1\n   5: std::sys::backtrace::__rust_begin_short_backtrace\n   6: main"
     );
-    assert_eq!(frames(&bt), ["solidcraft_kernel::fillet::blend (~/src/kernel/fillet.rs:10:5)"]);
+    assert_eq!(frames(&bt), ["polycore::fillet::blend (~/src/kernel/fillet.rs:10:5)"]);
 }
 
 #[test]

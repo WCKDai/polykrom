@@ -14,7 +14,7 @@ The geometry is constructed directly from circle intersections.
 From the repository root, build the CLI and generate the editable design:
 
 ```sh
-cargo build --release -p solidcraft-cli
+cargo build --release -p polykrom-cli
 target/release/polykrom-cli run examples/chebyshev-motion-trace.json --out target/chebyshev.solidcraft
 ```
 

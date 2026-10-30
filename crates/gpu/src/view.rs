@@ -11,7 +11,7 @@
 
 use std::sync::{Arc, Mutex};
 
-use solidcraft_geom::Vec3;
+use polycore_geom::Vec3;
 use wgpu::util::DeviceExt;
 
 use crate::pbr;
@@ -36,7 +36,7 @@ const UNIFORM_SIZE: u64 = 416;
 /// (the plan's face numbering; faces past the end take the last colour).
 #[derive(Clone)]
 pub struct PlannedBody {
-    pub plan: Arc<solidcraft_geom::tess::TessPlan>,
+    pub plan: Arc<polycore_geom::tess::TessPlan>,
     pub face_colors: Vec<[u8; 4]>,
 }
 
@@ -84,7 +84,7 @@ pub struct SharedTris {
 impl SharedTris {
     /// `mesh`'s triangles with their vertices shared: by position and normal, or by position
     /// alone when every triangle is flat.
-    pub fn new(mesh: &solidcraft_geom::Mesh) -> SharedTris {
+    pub fn new(mesh: &polycore_geom::Mesh) -> SharedTris {
         let corner = |i: u32| Some((mesh.positions.get(i as usize)?.to_f32(), mesh.normals.get(i as usize)?.to_f32()));
         let bits = |v: [f32; 3]| v.map(|x| (x + 0.0).to_bits());
         let flat = mesh.triangles.iter().all(|t| {
@@ -124,9 +124,9 @@ impl SharedTris {
         out
     }
 
-    /// A simplified copy of a mesh ([`solidcraft_geom::simplify::Level`]): its vertices already
+    /// A simplified copy of a mesh ([`polycore_geom::simplify::Level`]): its vertices already
     /// shared, its triangles lit flat (each fragment with its triangle's own normal).
-    pub fn from_level(level: &solidcraft_geom::simplify::Level) -> SharedTris {
+    pub fn from_level(level: &polycore_geom::simplify::Level) -> SharedTris {
         let mut out = SharedTris { flat: true, ..Default::default() };
         out.vertices.reserve_exact(level.positions.len() * SHARED_SIZE);
         let mut lo = [f32::INFINITY; 3];
@@ -293,9 +293,9 @@ pub struct GpuScene {
     /// Whole hovered bodies the model draws from their plans on the GPU: lit again over the
     /// model in the hover colour from the model's own evaluated triangles, so a whole assembly
     /// under the pointer costs a draw per body, not a copy of every triangle on the CPU.
-    pub hover_planned: Vec<Arc<solidcraft_geom::tess::TessPlan>>,
+    pub hover_planned: Vec<Arc<polycore_geom::tess::TessPlan>>,
     /// Whole selected bodies, as `hover_planned`, in the selection colour.
-    pub selected_planned: Vec<Arc<solidcraft_geom::tess::TessPlan>>,
+    pub selected_planned: Vec<Arc<polycore_geom::tess::TessPlan>>,
     /// Whole hovered bodies the model builds on the CPU (no display plan): their triangles in
     /// the model scene's own blocks, drawn again tinted.
     pub hover_blocks: Vec<BlockTris>,
@@ -368,7 +368,7 @@ pub struct BlockBytes {
 }
 
 impl GpuScene {
-    pub fn pbr_tri(&mut self, p: [f32; 3], n: [f32; 3], surface: solidcraft_render::surface::OpaqueSurface) {
+    pub fn pbr_tri(&mut self, p: [f32; 3], n: [f32; 3], surface: polykrom_render::surface::OpaqueSurface) {
         let base = surface.base_color().to_f32();
         let parameters = [surface.metallic() as f32, surface.roughness() as f32, surface.dielectric_ior() as f32];
         for value in p.into_iter().chain(n).chain(base).chain(parameters) {
@@ -544,7 +544,7 @@ pub const ACCESS_SIZE: u32 = 1024;
 impl AccessMap {
     /// The depth map of `meshes` seen along `dir` (`version`: what the GPU uploads it by):
     /// rasterise the triangles seen along `dir` (orthographic), keeping the highest point per pixel.
-    pub fn build(meshes: &[&solidcraft_geom::Mesh], dir: Vec3, version: u64) -> Option<AccessMap> {
+    pub fn build(meshes: &[&polycore_geom::Mesh], dir: Vec3, version: u64) -> Option<AccessMap> {
         let d = dir.normalized()?;
         let u = d.cross(if d.x.abs() < 0.9 { Vec3::X } else { Vec3::Y }).normalized()?;
         let v = d.cross(u);
@@ -616,8 +616,8 @@ impl AccessMap {
 
 /// The shader's surface analysis uniform (see [`Frame::analysis`]) for `mode`; Accessibility
 /// reads its depth map's scale and size from `access`.
-pub fn analysis_uniform(mode: Option<solidcraft_render::AnalysisMode>, access: Option<&AccessMap>) -> [f32; 8] {
-    use solidcraft_render::AnalysisMode as A;
+pub fn analysis_uniform(mode: Option<polykrom_render::AnalysisMode>, access: Option<&AccessMap>) -> [f32; 8] {
+    use polykrom_render::AnalysisMode as A;
     match mode {
         Some(A::Zebra { stripes }) => [1.0, stripes as f32, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0],
         Some(A::Draft { pull, angle }) => [2.0, angle as f32, 0.0, 0.0, pull.x as f32, pull.y as f32, pull.z as f32, 0.0],
@@ -871,8 +871,8 @@ struct Batches {
     planned: Vec<PlannedDraw>,
     instanced: Vec<InstancedDraw>,
     /// Whole highlighted bodies redrawn from `planned` (the scene's own plans are not used).
-    hover_planned: Vec<Arc<solidcraft_geom::tess::TessPlan>>,
-    selected_planned: Vec<Arc<solidcraft_geom::tess::TessPlan>>,
+    hover_planned: Vec<Arc<polycore_geom::tess::TessPlan>>,
+    selected_planned: Vec<Arc<polycore_geom::tess::TessPlan>>,
     /// Whole highlighted bodies redrawn from the scene's blocks, by block key and vertex range.
     hover_blocks: Vec<BlockTris>,
     selected_blocks: Vec<BlockTris>,
@@ -884,7 +884,7 @@ struct Batches {
     instanced_tris: std::collections::HashMap<usize, (Arc<SharedTris>, Arc<SharedGpu>)>,
     /// Evaluated chunks by their plans' addresses, holding the plans so the addresses stay
     /// theirs: a chunk whose plans are unchanged is not evaluated again when the scene is rebuilt.
-    resident: std::collections::HashMap<Vec<usize>, (Vec<Arc<solidcraft_geom::tess::TessPlan>>, Arc<crate::GpuMesh>)>,
+    resident: std::collections::HashMap<Vec<usize>, (Vec<Arc<polycore_geom::tess::TessPlan>>, Arc<crate::GpuMesh>)>,
 }
 
 impl Batches {
@@ -1078,7 +1078,7 @@ impl Batches {
             let mesh = match self.resident.get(&key(chunk)) {
                 Some((_, m)) => m.clone(),
                 None => {
-                    let plans: Vec<&solidcraft_geom::tess::TessPlan> = chunk.iter().map(|b| &*b.plan).collect();
+                    let plans: Vec<&polycore_geom::tess::TessPlan> = chunk.iter().map(|b| &*b.plan).collect();
                     match tess.prepare_many(&plans) {
                         Ok(m) => {
                             tess.record(encoder, &m);
@@ -2294,7 +2294,7 @@ impl Renderer {
         };
         // Whole highlighted bodies: the model's own evaluated plan triangles, drawn again in a
         // highlight colour (the pipeline adds or replaces the vertex colour).
-        let tinted = |pass: &mut wgpu::RenderPass<'static>, p: &wgpu::RenderPipeline, plans: &[Arc<solidcraft_geom::tess::TessPlan>]| {
+        let tinted = |pass: &mut wgpu::RenderPass<'static>, p: &wgpu::RenderPipeline, plans: &[Arc<polycore_geom::tess::TessPlan>]| {
             for plan in plans {
                 let address = Arc::as_ptr(plan) as usize;
                 for d in &m.planned {
@@ -2654,7 +2654,7 @@ pub fn uniform_bytes(cb: &Frame, w: f32, h: f32, linear: bool, reversed: bool) -
 /// The shader's analysis colours (`ana_c`: draft positive, between, negative; reachable,
 /// blocked; curvature flat, middle, tight; alpha 1) and flags (`ana_f.x`: 1 to stripe the bad
 /// faces).
-pub fn analysis_colors(c: &solidcraft_render::AnalysisColors) -> [f32; 36] {
+pub fn analysis_colors(c: &polykrom_render::AnalysisColors) -> [f32; 36] {
     let mut v = [0.0; 36];
     let colors = c.draft.iter().chain(&c.access).chain(&c.curvature).flat_map(|rgb| [rgb[0], rgb[1], rgb[2], 1.0]);
     for (slot, x) in v.iter_mut().zip(colors) {
@@ -2736,7 +2736,7 @@ mod tests {
     #[test]
     fn shared_tris_share_each_vertex_once() {
         use super::{SHARED_SIZE, SharedTris};
-        use solidcraft_geom::{Mesh, Vec3};
+        use polycore_geom::{Mesh, Vec3};
         let p = [Vec3::new(0.0, 0.0, 0.0), Vec3::new(1.0, 0.0, 0.0), Vec3::new(1.0, 1.0, 0.0), Vec3::new(0.0, 1.0, 0.0)];
         // Two triangles of a square, each corner its own vertex (as an STL is read).
         let mut flat = Mesh::default();

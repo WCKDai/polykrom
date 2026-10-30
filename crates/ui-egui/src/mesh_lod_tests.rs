@@ -2,7 +2,7 @@ use super::*;
 
 /// A sphere mesh of about `2 n²` triangles, each corner its own point.
 fn sphere(n: u32) -> Arc<Mesh> {
-    use solidcraft_engine::geom::Vec3;
+    use polykrom_engine::geom::Vec3;
     let at = |i: u32, j: u32| {
         let (t, p) = (std::f64::consts::PI * f64::from(i) / f64::from(n), std::f64::consts::TAU * f64::from(j) / f64::from(2 * n));
         let (st, sp, cp) =

@@ -8,8 +8,8 @@
 //! gathered for display, measuring and export (`world_bodies`). Commands take world coordinates
 //! and the engine maps a new feature's geometry into the active component's frame.
 
+use polycore_geom::{Plane, Vec3};
 use serde::{Deserialize, Serialize};
-use solidcraft_geom::{Plane, Vec3};
 
 use crate::{DocError, Document, FeatureKind, PlaneRef, Result};
 

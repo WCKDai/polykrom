@@ -45,7 +45,7 @@ echo "==> Polykrom $VERSION for macOS ($ARCH)"
 if [ "$SKIP_BUILD" = 0 ]; then
   args=()
   for t in "${TARGETS[@]}"; do args+=(--target "$t"); done
-  (cd "$ROOT" && cargo build --release --locked -p solidcraft -p solidcraft-cli "${args[@]}")
+  (cd "$ROOT" && cargo build --release --locked -p polykrom -p polykrom-cli "${args[@]}")
 fi
 
 rm -rf "$WORK"

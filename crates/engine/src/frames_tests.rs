@@ -1,8 +1,8 @@
 //! Components as frames: what a component holds moves with its occurrence, and picks in the
 //! world land in the component's own frame (user bug #4).
 
+use polycore_geom::Vec3;
 use serde_json::{Value, json};
-use solidcraft_geom::Vec3;
 
 use crate::Session;
 
@@ -190,7 +190,7 @@ fn canvases_move_with_their_component() {
     let root = s.doc.canvases.iter().find(|c| c.name == "Root").unwrap();
     assert!(near(s.doc.canvas_plane(&vals, root).unwrap().origin, Vec3::ZERO));
     // The component survives a save and reopen.
-    let back = solidcraft_doc::Document::from_json(&s.doc.to_json()).unwrap();
+    let back = polykrom_doc::Document::from_json(&s.doc.to_json()).unwrap();
     assert_eq!(back.canvases, s.doc.canvases);
 }
 
@@ -270,7 +270,7 @@ fn root_picks_on_a_moved_component_build_where_it_is_shown() {
     assert!((lid.origin.z - 10.0).abs() < 1e-6 && lid.normal().z.abs() > 1.0 - 1e-9, "{lid:?}");
     let st = s.model.state();
     let axis = st.construct.iter().find(|c| c.name == "FrontEdge").map(|c| c.geom.clone()).unwrap();
-    let solidcraft_doc::construct::ConstructGeom::Axis { origin, dir } = axis else { panic!("{axis:?}") };
+    let polykrom_doc::construct::ConstructGeom::Axis { origin, dir } = axis else { panic!("{axis:?}") };
     assert!(origin.y.abs() < 1e-6 && origin.z.abs() < 1e-6 && dir.x.abs() > 1.0 - 1e-9, "{origin:?} {dir:?}");
     let v0 = volume(&mut s);
     run(&mut s, "solid.hole", json!({"position": [60, 10, 10], "diameter": 4, "depth": 5}));

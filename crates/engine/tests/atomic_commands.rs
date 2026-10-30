@@ -12,8 +12,8 @@
 //! to main run it, and the nightly `property-tests` job uses more seeds. A long local run:
 //! `ATOMIC_SEEDS=0..100`.
 
-use solidcraft_doc::Document;
-use solidcraft_engine::{Session, fuzz};
+use polykrom_doc::Document;
+use polykrom_engine::{Session, fuzz};
 
 fn seeds() -> std::ops::Range<u64> {
     let s = std::env::var("ATOMIC_SEEDS").unwrap_or_else(|_| "0..4".into());
@@ -98,5 +98,5 @@ fn same_commands_same_design() {
 }
 
 fn volume(s: &Session) -> f64 {
-    s.model.state().bodies.iter().filter_map(|b| solidcraft_kernel::measure(&b.body).ok()).map(|m| m.volume).sum()
+    s.model.state().bodies.iter().filter_map(|b| polycore::measure(&b.body).ok()).map(|m| m.volume).sum()
 }

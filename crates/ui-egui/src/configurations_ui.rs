@@ -1,8 +1,8 @@
 //! Manage configuration table. Commands and cell decoding remain in dialogs_motion.
 use super::{cell_value, column_parts, configuration_rules_ui, table, unit_of};
 use crate::{SolveApp, ui_kit};
+use polykrom_engine::doc::DEFAULT_MATERIAL;
 use serde_json::{Value, json};
-use solidcraft_engine::doc::DEFAULT_MATERIAL;
 /// The Configurations table, its rules and errors.
 pub(super) fn configurations_rows(
     app: &mut SolveApp,
@@ -30,7 +30,7 @@ pub(super) fn configurations_rows(
                 && let Some(unit) = app.session.doc.param(n).map(|parameter| parameter.unit.clone()).or_else(|| {
                     kinds.iter().find(|x| x.0 == n).and_then(|x| {
                         unit_of(x.2).map(|unit| {
-                            if x.2 == solidcraft_engine::doc::expr::Kind::Length { app.session.doc.units.clone() } else { unit.to_string() }
+                            if x.2 == polykrom_engine::doc::expr::Kind::Length { app.session.doc.units.clone() } else { unit.to_string() }
                         })
                     })
                 })
@@ -310,7 +310,7 @@ fn column_menu(app: &mut SolveApp, ui: &mut egui::Ui, error: &mut Option<String>
         }
     }
     for selected in &app.session.selection {
-        if let solidcraft_engine::Sel::Face { body, point, .. } = selected {
+        if let polykrom_engine::Sel::Face { body, point, .. } = selected {
             options.push((format!("Selected face on {body} (shared appearance)"), json!({"face_appearance":{"body":body,"point":point}})));
         }
     }
@@ -406,10 +406,10 @@ fn display_cell(kind: &str, value: &str) -> String {
         return String::new();
     }
     if appearance {
-        solidcraft_engine::doc::config::appearance_cell(value)
+        polykrom_engine::doc::config::appearance_cell(value)
             .ok()
             .flatten()
-            .filter(|look| solidcraft_engine::doc::appearance::library(&look.name).as_ref() == Some(look))
+            .filter(|look| polykrom_engine::doc::appearance::library(&look.name).as_ref() == Some(look))
             .map(|look| look.name)
             .unwrap_or_else(|| value.to_owned())
     } else {
@@ -438,7 +438,7 @@ fn value_control(ui: &mut egui::Ui, id: egui::Id, text: &mut String, kind: &str,
             let choices: Vec<_> = if kind == "material" {
                 material_names.iter().filter(|n| *n != DEFAULT_MATERIAL).map(String::as_str).collect()
             } else {
-                solidcraft_engine::doc::appearance::LIBRARY.iter().map(|(name, _, _)| *name).collect()
+                polykrom_engine::doc::appearance::LIBRARY.iter().map(|(name, _, _)| *name).collect()
             };
             for name in choices {
                 if ui_kit::button(ui, name, ui_kit::Button::Normal).clicked() {

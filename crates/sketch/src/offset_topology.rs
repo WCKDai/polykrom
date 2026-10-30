@@ -2,8 +2,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::f64::consts::TAU;
 
+use polycore_geom::{Seg2, Vec2};
 use serde::{Deserialize, Serialize};
-use solidcraft_geom::{Seg2, Vec2};
 
 use crate::{Curve, CurveKind, OffsetChain, Sketch, SketchError};
 type Result<T> = std::result::Result<T, SketchError>;

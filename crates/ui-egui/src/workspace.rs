@@ -1,8 +1,8 @@
 //! Ribbon structure is UI data; command registrations retain their original placements.
 //! Explicit ids override the old placement table and can also share a command across sections.
 
-use solidcraft_engine::CommandSpec;
-use solidcraft_engine::doc::FeatureKind;
+use polykrom_engine::CommandSpec;
+use polykrom_engine::doc::FeatureKind;
 
 pub const TABS: &[&str] = &["MODEL", "SURFACE", "ASSEMBLE", "INSERT", "INSPECT", "MANAGE", "VIEW"];
 
@@ -389,7 +389,7 @@ pub fn layout<'a>(tab: &str, panel: &str, specs: &[&'a CommandSpec]) -> Option<(
 /// unknown command ids follow the old panel's default destination.
 pub fn legacy_destination(tab: &str, panel: &str, id: &str) -> Option<(&'static str, &'static str)> {
     legacy_panel(tab, panel)?;
-    solidcraft_engine::find_command(id).and_then(destination).or_else(|| legacy_panel(tab, panel))
+    polykrom_engine::find_command(id).and_then(destination).or_else(|| legacy_panel(tab, panel))
 }
 
 pub fn legacy_panel(tab: &str, panel: &str) -> Option<(&'static str, &'static str)> {
@@ -431,7 +431,7 @@ pub fn feature_icon(k: &FeatureKind) -> Option<&'static str> {
 /// Selected geometry identifies the active body; without a body selection use the last body
 /// of the active component, matching feature dialogs. Rules on unrelated bodies do not count.
 pub fn sheet_body(app: &crate::SolveApp) -> Option<String> {
-    use solidcraft_engine::Sel;
+    use polykrom_engine::Sel;
     let state = app.session.model.state();
     let selected = app.session.selection.iter().find_map(|s| match s {
         Sel::Body { name } => Some(name.as_str()),
@@ -498,7 +498,7 @@ pub fn sync_context(app: &mut crate::SolveApp) {
 
 pub fn select_command_tab(app: &mut crate::SolveApp, id: &str) {
     sync_context(app);
-    let Some(c) = solidcraft_engine::find_command(id) else { return };
+    let Some(c) = polykrom_engine::find_command(id) else { return };
     // Keep the tab a toolbar click came from when it already lists this shared command.
     if crate::toolbar_custom::panel_lists(&app.ui.tab).iter().any(|(_, cmds, _)| cmds.iter().any(|c| c.id == id)) {
         return;
@@ -545,7 +545,7 @@ pub fn legacy_buttons(tab: &str, panel: &str) -> Vec<&'static str> {
         _ => (&[], 2, tab),
     };
     let mut out = ids.to_vec();
-    for c in solidcraft_engine::command_specs().into_iter().filter(|c| c.tab == source && c.panel == panel) {
+    for c in polykrom_engine::command_specs().into_iter().filter(|c| c.tab == source && c.panel == panel) {
         if !out.contains(&c.id) {
             out.push(c.id);
         }
@@ -561,7 +561,7 @@ mod tests {
 
     #[test]
     fn modify_groups_order_commands_and_keep_unlisted_commands_at_the_end() {
-        let specs = solidcraft_engine::command_specs();
+        let specs = polykrom_engine::command_specs();
         let (commands, _) = layout("MODEL", "MODIFY", &specs).unwrap();
         let grouped = grouped_commands("MODEL", "MODIFY", &commands);
         assert_eq!(grouped.iter().filter_map(|(h, _)| *h).collect::<Vec<_>>(), ["Edges", "Faces", "Bodies", "Specialise"]);
@@ -593,7 +593,7 @@ mod tests {
 
     #[test]
     fn promoted_long_labels_have_compact_ribbon_names() {
-        let specs = solidcraft_engine::command_specs();
+        let specs = polykrom_engine::command_specs();
         let english: std::collections::BTreeMap<String, String> = serde_json::from_str(include_str!("../../../assets/locales/en.json")).unwrap();
         for section in SECTIONS {
             let (commands, count) = layout(section.tab, section.panel, &specs).unwrap();
@@ -608,17 +608,17 @@ mod tests {
             }
         }
         for (id, label) in RIBBON_LABELS {
-            assert!(solidcraft_engine::find_command(id).is_some(), "unknown command {id}");
+            assert!(polykrom_engine::find_command(id).is_some(), "unknown command {id}");
             assert!(label.chars().count() <= 13, "{id}: {label}");
             assert!(english.values().any(|value| value == label), "untranslated ribbon label {label}");
         }
-        assert_eq!(ribbon_button_label(solidcraft_engine::find_command("sketch.create").unwrap()), "New Sketch");
-        assert_eq!(solidcraft_engine::find_command("sketch.create").unwrap().label, "Create Sketch");
+        assert_eq!(ribbon_button_label(polykrom_engine::find_command("sketch.create").unwrap()), "New Sketch");
+        assert_eq!(polykrom_engine::find_command("sketch.create").unwrap().label, "Create Sketch");
     }
 
     #[test]
     fn every_placed_command_is_reachable_and_every_layout_id_exists() {
-        let specs = solidcraft_engine::command_specs();
+        let specs = polykrom_engine::command_specs();
         let lists: Vec<_> = SECTIONS.iter().map(|s| (s, layout(s.tab, s.panel, &specs).unwrap())).collect();
         for c in specs.iter().filter(|c| !c.tab.is_empty()) {
             assert!(lists.iter().any(|(_, (cmds, _))| cmds.iter().any(|x| x.id == c.id)), "lost toolbar command {} ({}/{})", c.id, c.tab, c.panel);
@@ -635,7 +635,7 @@ mod tests {
 
     #[test]
     fn model_defaults_and_shared_commands_follow_the_map() {
-        let specs = solidcraft_engine::command_specs();
+        let specs = polykrom_engine::command_specs();
         for (panel, expected) in [
             ("SKETCH", vec!["sketch.create"]),
             ("CREATE", vec!["solid.extrude", "solid.revolve", "solid.hole"]),
@@ -664,10 +664,10 @@ mod tests {
     /// inventory prints the placement a spec declares (#133).
     #[test]
     fn no_command_is_advertised_at_a_tab_the_ribbon_removed() {
-        for c in solidcraft_engine::command_specs() {
+        for c in polykrom_engine::command_specs() {
             assert!(!matches!(c.tab, "MESH" | "UTILITIES"), "{} declares the removed {} tab", c.id, c.tab);
         }
-        let spec = solidcraft_engine::find_command("file.save_mesh").expect("file.save_mesh is registered");
+        let spec = polykrom_engine::find_command("file.save_mesh").expect("file.save_mesh is registered");
         assert_eq!((spec.tab, spec.panel), ("INSERT", "FILES"), "Save As Mesh declares the panel that shows it");
         assert_eq!(destination(spec), Some(("INSERT", "FILES")));
     }
@@ -708,7 +708,7 @@ mod tests {
     /// fresh document reaches Sheet Metal (to flange a sketch or convert a solid) by its tab.
     #[test]
     fn parameters_and_configurations_are_on_model_and_sheet_metal_and_the_sheet_tab_opens_fresh() {
-        let specs = solidcraft_engine::command_specs();
+        let specs = polykrom_engine::command_specs();
         for tab in ["MODEL", "SHEET METAL", "SKETCH", "MANAGE"] {
             let ids = panel_ids(tab, &specs);
             assert!(ids.contains(&"parameters.change"), "{tab}: Parameters");
@@ -723,7 +723,7 @@ mod tests {
         h.step(&json!({"click":{"handle":"tab:SHEET METAL"}})).unwrap();
         h.frames(2);
         assert_eq!(h.app.ui.tab, "SHEET METAL");
-        let specs = solidcraft_engine::command_specs();
+        let specs = polykrom_engine::command_specs();
         let (create, _) = layout("SHEET METAL", "CREATE", &specs).unwrap();
         assert!(create.iter().any(|c| c.id == "sheet.convert"), "Convert to Sheet Metal is in the Sheet Metal tab's Create panel");
         for id in ["sheet.flange", "parameters.change", "config.table"] {
@@ -782,7 +782,7 @@ mod tests {
     fn parameters_and_configurations_open_separately() {
         use serde_json::json;
         let mut h = crate::scenario::Harness::new();
-        let specs = solidcraft_engine::command_specs();
+        let specs = polykrom_engine::command_specs();
         let (commands, _) = layout("MANAGE", "CONFIGURATIONS", &specs).unwrap();
         assert!(commands.iter().any(|c| c.id == "config.configure"));
         h.step(&json!({"click":{"handle":"tab:MANAGE"}})).unwrap();
@@ -815,7 +815,7 @@ mod tests {
     /// Shared assembly, sheet and plastic commands remain reachable in their ribbon sections.
     #[test]
     fn ribbon_sections_keep_shared_commands_reachable() {
-        let specs = solidcraft_engine::command_specs();
+        let specs = polykrom_engine::command_specs();
         let ids = |tab, panel| layout(tab, panel, &specs).unwrap().0.iter().map(|c| c.id).collect::<Vec<_>>();
         let joints = ids("ASSEMBLE", "JOINTS");
         assert_eq!(joints.first().copied(), Some("joint.create"));
@@ -859,11 +859,11 @@ mod tests {
     #[test]
     fn insert_design_is_on_the_assemble_panel_and_inserts_a_saved_part() {
         use serde_json::json;
-        let specs = solidcraft_engine::command_specs();
+        let specs = polykrom_engine::command_specs();
         assert!(layout("ASSEMBLE", "COMPONENTS", &specs).unwrap().0.iter().any(|c| c.id == "component.insert_design"));
         let mut h = crate::scenario::Harness::new();
         let part = h.dir.join("part1.solidcraft");
-        let mut s = solidcraft_engine::Session::default();
+        let mut s = polykrom_engine::Session::default();
         s.execute("solid.box", &json!({"length": 10, "width": 20, "height": 30})).unwrap();
         s.execute("file.save", &json!({"path": part})).unwrap();
         s.execute("file.export", &json!({"path": h.dir.join("part2.step")})).unwrap();

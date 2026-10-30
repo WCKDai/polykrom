@@ -1,6 +1,6 @@
+use polykrom_engine::Sel;
+use polykrom_ui_egui::scenario::Harness;
 use serde_json::json;
-use solidcraft_engine::Sel;
-use solidcraft_ui_egui::scenario::Harness;
 
 fn setup() -> (Harness, u64) {
     let mut h = Harness::new();

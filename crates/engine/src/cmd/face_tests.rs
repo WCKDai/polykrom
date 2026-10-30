@@ -1,8 +1,8 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 use crate::Session;
+use polycore_geom::Vec3;
+use polykrom_doc::{Document, FeatureKind, PlaneRef};
 use serde_json::{Value, json};
-use solidcraft_doc::{Document, FeatureKind, PlaneRef};
-use solidcraft_geom::Vec3;
 use std::f64::consts::PI;
 
 fn run(s: &mut Session, command: &str, params: Value) -> Value {
@@ -12,7 +12,7 @@ fn check(s: &mut Session, want: f64, hole: bool, height: f64) {
     s.refresh();
     assert!(s.model.results.iter().all(|result| result.error.is_none() && result.warning.is_none()), "{:?}", s.model.results);
     let state = s.model.state();
-    let got: f64 = state.bodies.iter().map(|b| solidcraft_kernel::measure(&b.body).unwrap().volume).sum();
+    let got: f64 = state.bodies.iter().map(|b| polycore::measure(&b.body).unwrap().volume).sum();
     // Legacy linked outlines fit tessellated curves; enforce the existing 1e-4 material envelope.
     assert!((got - want).abs() < want * 1e-4, "{got} vs {want}");
     assert!(state.bodies.iter().any(|b| b.body.contains(Vec3::new(5.0, 5.0, height - 1.0))));
@@ -39,7 +39,7 @@ fn generated_face_profiles_keep_exact_links_live_after_edit_and_reopen() {
         let FeatureKind::Sketch { plane, sketch: profile } = &generated.kind else { panic!("sketch") };
         let PlaneRef::Face { anchor: Some(anchor), .. } = plane else { panic!("the original Box cap remains exact after a hole cut") };
         assert_eq!(anchor.target.origin_feature, base);
-        assert!(matches!(anchor.target.certificate, Some(solidcraft_doc::config::FaceCertificate::Box { axis: 2, high: true })));
+        assert!(matches!(anchor.target.certificate, Some(polykrom_doc::config::FaceCertificate::Box { axis: 2, high: true })));
         assert!(!profile.links.is_empty());
         assert!(profile.links.iter().all(|link| link.auto_face && !link.lost));
         let area = 1200.0 - if hole { 25.0 * PI } else { 0.0 };
@@ -54,12 +54,12 @@ fn generated_face_profiles_keep_exact_links_live_after_edit_and_reopen() {
         let solved = edited.sketch(sketch.0).unwrap().plane;
         assert!((solved.origin.z - 25.0).abs() < 1e-6);
         let before = s.model.state();
-        let before_volume: f64 = before.bodies.iter().map(|body| solidcraft_kernel::measure(&body.body).unwrap().volume).sum();
+        let before_volume: f64 = before.bodies.iter().map(|body| polycore::measure(&body.body).unwrap().volume).sum();
         let before_bounds: Vec<_> = before.bodies.iter().map(|body| (body.name.clone(), body.mesh().bounds())).collect();
         let mut reopened = Session::new(Document::from_json(&s.doc.to_json()).unwrap());
         check(&mut reopened, area * 35.0, hole, 35.0);
         let after = reopened.model.state();
-        let after_volume: f64 = after.bodies.iter().map(|body| solidcraft_kernel::measure(&body.body).unwrap().volume).sum();
+        let after_volume: f64 = after.bodies.iter().map(|body| polycore::measure(&body.body).unwrap().volume).sum();
         assert!((before_volume - after_volume).abs() < 1e-6);
         for (name, bounds) in before_bounds {
             let cold = after.body(&name).unwrap().mesh().bounds();
@@ -121,12 +121,12 @@ fn generated_profiles_and_press_pull_convert_rotated_occurrence_picks_once() {
         if hole {
             assert!(!world.bodies.iter().any(|body| body.body.contains(Vec3::new(50.0, 21.0 - height, 25.0))));
         }
-        let before_volume: f64 = world.bodies.iter().map(|body| solidcraft_kernel::measure(&body.body).unwrap().volume).sum();
+        let before_volume: f64 = world.bodies.iter().map(|body| polycore::measure(&body.body).unwrap().volume).sum();
         let before_bounds: Vec<_> = world.bodies.iter().map(|body| (body.name.clone(), body.mesh().bounds())).collect();
         let reopened = Session::new(Document::from_json(&s.doc.to_json()).unwrap());
         let after = reopened.world_state();
         assert!(after.bodies.iter().any(|body| body.body.contains(occupied)));
-        let v: f64 = after.bodies.iter().map(|body| solidcraft_kernel::measure(&body.body).unwrap().volume).sum();
+        let v: f64 = after.bodies.iter().map(|body| polycore::measure(&body.body).unwrap().volume).sum();
         assert!((v - area * height).abs() < area * height * 1e-4);
         assert!((v - before_volume).abs() < 1e-6);
         for (name, bounds) in before_bounds {
@@ -242,7 +242,7 @@ fn blind_cut_inside_a_cylinder_keeps_only_planes_and_cylinders() {
     assert_eq!(body["faces"], 14, "{m}");
 }
 
-fn face_anchor(s: &Session, sketch: u64) -> solidcraft_doc::FaceAnchor {
+fn face_anchor(s: &Session, sketch: u64) -> polykrom_doc::FaceAnchor {
     let FeatureKind::Sketch { plane: PlaneRef::Face { anchor: Some(anchor), .. }, .. } = &s.doc.feature(sketch).unwrap().kind else {
         panic!("sketch {sketch} has no face anchor")
     };
@@ -296,11 +296,11 @@ fn join_gives_a_face_merged_from_both_operands_its_history_name() {
     // Both boxes' tops share one support: no single construction certificate owns it, but its
     // exact history names it (#491).
     let top = run(&mut s, "sketch.create", json!({"plane":{"face":[10,10,10]}}))["sketch"].as_u64().unwrap();
-    assert_eq!(face_anchor(&s, top).target.certificate, Some(solidcraft_doc::config::FaceCertificate::Lineage));
+    assert_eq!(face_anchor(&s, top).target.certificate, Some(polykrom_doc::config::FaceCertificate::Lineage));
     // An unshared support keeps its box role.
     run(&mut s, "sketch.finish", json!({}));
     let side = run(&mut s, "sketch.create", json!({"plane":{"face":[0,10,5]}}))["sketch"].as_u64().unwrap();
-    assert!(matches!(face_anchor(&s, side).target.certificate, Some(solidcraft_doc::config::FaceCertificate::Box { axis: 0, high: false })));
+    assert!(matches!(face_anchor(&s, side).target.certificate, Some(polykrom_doc::config::FaceCertificate::Box { axis: 0, high: false })));
 }
 
 #[test]
@@ -329,7 +329,7 @@ fn join_covering_a_whole_attached_face_loses_the_attachment_without_moving_it() 
     assert!((s.model.state().sketch(top).unwrap().plane.origin.z - 10.).abs() < 1e-9);
 }
 
-fn certificate_of(s: &Session, sketch: u64) -> Option<solidcraft_doc::config::FaceCertificate> {
+fn certificate_of(s: &Session, sketch: u64) -> Option<polykrom_doc::config::FaceCertificate> {
     let FeatureKind::Sketch { plane: PlaneRef::Face { anchor: Some(anchor), .. }, .. } = &s.doc.feature(sketch).unwrap().kind else {
         return None;
     };
@@ -338,7 +338,7 @@ fn certificate_of(s: &Session, sketch: u64) -> Option<solidcraft_doc::config::Fa
 
 #[test]
 fn cylinder_primitive_caps_take_attachments_that_follow_edits_and_reopen() {
-    use solidcraft_doc::config::FaceCertificate;
+    use polykrom_doc::config::FaceCertificate;
     let mut s = Session::default();
     run(&mut s, "solid.cylinder", json!({"radius":10,"height":40,"name":"Post"}));
     let top = run(&mut s, "sketch.create", json!({"plane":{"face":[2,1,40]}}))["sketch"].as_u64().unwrap();
@@ -377,7 +377,7 @@ fn crossed_cylinder_primitives_keep_their_caps_attachable() {
 
 #[test]
 fn shelled_cylinder_floor_keeps_its_cap_identity() {
-    use solidcraft_doc::config::FaceCertificate;
+    use polykrom_doc::config::FaceCertificate;
     let mut s = Session::default();
     run(&mut s, "solid.cylinder", json!({"radius":10,"height":40}));
     run(&mut s, "solid.shell", json!({"faces":[[2,1,40]],"thickness":2}));

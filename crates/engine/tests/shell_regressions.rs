@@ -13,8 +13,8 @@
 //! - in the overhang: `[7.5 + t, 22.5 − t] × [17.5 − t, 17.5 + o − t] × [35 + t, 42.5 − t]`
 //!
 //! The shell's volume is the solid's volume less those three boxes.
+use polykrom_engine::Session;
 use serde_json::json;
-use solidcraft_engine::Session;
 
 fn run(s: &mut Session, id: &str, p: serde_json::Value) {
     if let Err(e) = s.execute(id, &p) {
@@ -73,7 +73,7 @@ fn shell_saddle_corner_with_an_overhang_thinner_than_the_wall() {
 }
 
 fn volume(s: &Session) -> f64 {
-    s.model.state().bodies.iter().map(|b| solidcraft_kernel::measure(&b.body).map(|m| m.volume).unwrap_or(f64::NAN)).sum()
+    s.model.state().bodies.iter().map(|b| polycore::measure(&b.body).map(|m| m.volume).unwrap_or(f64::NAN)).sum()
 }
 
 fn sound(s: &Session) {

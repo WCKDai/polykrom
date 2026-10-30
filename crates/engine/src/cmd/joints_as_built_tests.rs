@@ -1,8 +1,8 @@
 //! An as-built joint made at an origin on one of its parts follows that origin's face or hole as
 //! the design changes, instead of holding the frame where it was made.
 
+use polycore_geom::Vec3;
 use serde_json::json;
-use solidcraft_geom::Vec3;
 
 use super::tests::{occ, place, run};
 use crate::Session;
@@ -40,8 +40,8 @@ fn an_as_built_joint_at_a_hole_follows_the_hole() {
     }
     // The plate side keeps the hole (found by its face's name); the latch side holds its frame.
     let j = s.doc.assembly.joints.first().cloned();
-    assert!(matches!(j.as_ref().map(|j| &j.a.snap), Some(solidcraft_doc::joints::Snap::CircleCenter { face: Some(_), .. })), "{j:?}");
-    assert!(matches!(j.as_ref().map(|j| &j.b.snap), Some(solidcraft_doc::joints::Snap::Frame { .. })), "{j:?}");
+    assert!(matches!(j.as_ref().map(|j| &j.a.snap), Some(polykrom_doc::joints::Snap::CircleCenter { face: Some(_), .. })), "{j:?}");
+    assert!(matches!(j.as_ref().map(|j| &j.b.snap), Some(polykrom_doc::joints::Snap::Frame { .. })), "{j:?}");
 }
 
 #[test]
@@ -52,7 +52,7 @@ fn an_as_built_joint_at_no_origin_or_one_elsewhere_holds_its_frame() {
     assert!(
         matches!(
             j.as_ref().map(|j| (&j.a.snap, &j.b.snap)),
-            Some((solidcraft_doc::joints::Snap::Frame { .. }, solidcraft_doc::joints::Snap::Frame { .. }))
+            Some((polykrom_doc::joints::Snap::Frame { .. }, polykrom_doc::joints::Snap::Frame { .. }))
         ),
         "{j:?}"
     );

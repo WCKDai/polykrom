@@ -7,7 +7,7 @@
 //!
 //! The resize zones are as wide as Windows' own resize border at the window's scale
 //! ([`resize_border_px`]), corners win where they overlap the edges ([`resize_hit`]). On Windows
-//! the desktop app answers the system's hit test with them (`apps/solidcraft/src/native_frame.rs`),
+//! the desktop app answers the system's hit test with them (`apps/polykrom/src/native_frame.rs`),
 //! so the OS shows its resize cursors and resizes from the first frame; elsewhere egui zones above
 //! everything else start an OS resize ([`resize_zones`]). macOS keeps its traffic lights over the bar
 //! ([`SolveApp::integrated_titlebar`]); the web build has neither.
@@ -204,7 +204,7 @@ pub fn resize_zones(ui: &mut Ui) {
 mod tests {
     use super::*;
     use egui::{Event, Pos2, RawInput, ViewportId};
-    use solidcraft_engine::Session;
+    use polykrom_engine::Session;
 
     /// A headless window `width` pt wide showing the application bar (as the title bar) and the
     /// resize zones.

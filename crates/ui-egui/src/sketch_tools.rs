@@ -8,8 +8,8 @@ use crate::icons::markers::glyph_letter;
 use std::cell::{Cell, RefCell};
 
 use egui::{Pos2, Stroke};
+use polykrom_engine::geom::{Vec2, Vec3};
 use serde_json::{Value, json};
-use solidcraft_engine::geom::{Vec2, Vec3};
 
 use crate::SolveApp;
 use crate::tool_modifiers::{Audit, Binding, Match, ModAction, ModifierCombo, Scope, ToolModifiers, Trigger};
@@ -136,7 +136,7 @@ pub fn trim_drag_to(app: &mut SolveApp, proj: &Proj, pos: Pos2) {
                 .as_array()
                 .into_iter()
                 .flatten()
-                .map(|piece| piece.as_array().into_iter().flatten().filter_map(solidcraft_engine::params::vec2).collect())
+                .map(|piece| piece.as_array().into_iter().flatten().filter_map(polykrom_engine::params::vec2).collect())
                 .collect()
         })
         .unwrap_or_default();
@@ -274,7 +274,7 @@ pub fn start_hook(app: &mut SolveApp, id: &str) -> bool {
         return false;
     }
     // Surface analyses toggle: a second click turns the same one off.
-    use solidcraft_engine::SurfaceAnalysis as A;
+    use polykrom_engine::SurfaceAnalysis as A;
     let same = match (id, app.session.analysis) {
         ("inspect.zebra", Some(A::Zebra { .. })) => Some(true),
         ("inspect.draft", Some(A::Draft { .. })) => Some(true),
@@ -331,7 +331,7 @@ pub fn start_hook(app: &mut SolveApp, id: &str) -> bool {
     app.pick_open_for(&["png", "jpg", "jpeg"], move |app, path| {
         if let Some(path) = path {
             IMAGE.with(|i| *i.borrow_mut() = Some(path));
-            app.last_command = solidcraft_engine::find_command(&command).map(|spec| (spec.id.into(), spec.label.into()));
+            app.last_command = polykrom_engine::find_command(&command).map(|spec| (spec.id.into(), spec.label.into()));
             app.tool = crate::tools::Tool::for_command(&command);
         }
     });
@@ -368,8 +368,8 @@ fn combs(app: &SolveApp, painter: &egui::Painter, proj: &Proj) {
 pub fn refine_snap(
     app: &SolveApp,
     proj: &Proj,
-    sk: &solidcraft_engine::sketch::Sketch,
-    plane: &solidcraft_engine::geom::Plane,
+    sk: &polykrom_engine::sketch::Sketch,
+    plane: &polykrom_engine::geom::Plane,
     lp: Vec2,
 ) -> Option<(Vec2, Option<String>)> {
     crate::inference::clear();
@@ -390,8 +390,8 @@ pub fn refine_snap(
     let mut best: Option<(f64, &'static str, Vec2)> = None;
     let mut mid_of: Option<String> = None;
     for (i, c) in sk.curves.iter().enumerate() {
-        if let solidcraft_engine::sketch::CurveKind::Line { .. } = c.kind
-            && let Some(solidcraft_engine::sketch::Shape::Line { a, b }) = sk.shape(i)
+        if let polykrom_engine::sketch::CurveKind::Line { .. } = c.kind
+            && let Some(polykrom_engine::sketch::Shape::Line { a, b }) = sk.shape(i)
         {
             let m = (a + b) * 0.5;
             let d = m.dist(lp);
@@ -449,7 +449,7 @@ pub fn refine_snap(
     {
         let (dx, dy) = ((lp.x - prev.x).abs(), (lp.y - prev.y).abs());
         // The free coordinate still follows the grid.
-        let step = solidcraft_engine::view::grid_step(app.cam.half_height()).0 / 10.0;
+        let step = polykrom_engine::view::grid_step(app.cam.half_height()).0 / 10.0;
         let g = |v: f64| (v / step).round() * step;
         if dy < tol && dx > tol {
             best = Some((dy, "H", Vec2::new(g(lp.x), prev.y)));
@@ -483,8 +483,8 @@ pub fn refine_snap(
 /// The constraints one glyph stands for. A point that is the midpoint of several lines (their
 /// midpoints meet) shows a single MidPoint glyph, the first constraint's, for all of them;
 /// any other constraint stands for itself.
-pub fn glyph_group(sk: &solidcraft_engine::sketch::Sketch, id: &str) -> Vec<String> {
-    use solidcraft_engine::sketch::ConstraintKind::Midpoint;
+pub fn glyph_group(sk: &polykrom_engine::sketch::Sketch, id: &str) -> Vec<String> {
+    use polykrom_engine::sketch::ConstraintKind::Midpoint;
     match sk.constraints.iter().find(|c| c.id == id).map(|c| (c.kind.clone(), c.driven)) {
         Some((Midpoint { p, .. }, false)) => {
             sk.constraints.iter().filter(|c| !c.driven && matches!(c.kind, Midpoint { p: q, .. } if q == p)).map(|c| c.id.clone()).collect()
@@ -496,8 +496,8 @@ pub fn glyph_group(sk: &solidcraft_engine::sketch::Sketch, id: &str) -> Vec<Stri
 /// What deleting glyph `id` removes: the constraints it stands for, and, for one MidPoint glyph
 /// shared by several lines, their common point once nothing else holds it (it only tied the
 /// midpoints together, so it would be left floating).
-pub fn glyph_deletion(sk: &solidcraft_engine::sketch::Sketch, id: &str) -> Vec<solidcraft_engine::Sel> {
-    use solidcraft_engine::{Sel, sketch::ConstraintKind::Midpoint};
+pub fn glyph_deletion(sk: &polykrom_engine::sketch::Sketch, id: &str) -> Vec<polykrom_engine::Sel> {
+    use polykrom_engine::{Sel, sketch::ConstraintKind::Midpoint};
     let group = glyph_group(sk, id);
     let shared = match sk.constraints.iter().find(|c| c.id == id).map(|c| &c.kind) {
         Some(Midpoint { p, .. }) if group.len() > 1 => Some(*p),
@@ -516,11 +516,11 @@ pub fn glyph_deletion(sk: &solidcraft_engine::sketch::Sketch, id: &str) -> Vec<s
 }
 
 /// [`glyph_deletion`] in the active sketch.
-pub fn active_glyph_deletion(app: &SolveApp, id: &str) -> Vec<solidcraft_engine::Sel> {
+pub fn active_glyph_deletion(app: &SolveApp, id: &str) -> Vec<polykrom_engine::Sel> {
     let st = app.session.world_state();
     match active_sketch(app).and_then(|s| st.sketch(s)) {
         Some(ss) => glyph_deletion(&ss.sketch, id),
-        None => vec![solidcraft_engine::Sel::SketchConstraint { id: id.to_string() }],
+        None => vec![polykrom_engine::Sel::SketchConstraint { id: id.to_string() }],
     }
 }
 
@@ -540,7 +540,7 @@ pub fn delete_glyph(app: &mut SolveApp) -> bool {
     let entities: Vec<String> = active_glyph_deletion(app, &id)
         .into_iter()
         .filter_map(|s| match s {
-            solidcraft_engine::Sel::SketchConstraint { id } | solidcraft_engine::Sel::SketchPoint { id } => Some(id),
+            polykrom_engine::Sel::SketchConstraint { id } | polykrom_engine::Sel::SketchPoint { id } => Some(id),
             _ => None,
         })
         .collect();
@@ -599,7 +599,7 @@ fn mode(id: &str) -> Option<Mode> {
 /// A tool for one of the extra sketch commands.
 pub fn tool_for(id: &str) -> Option<Tool> {
     mode(id)?;
-    let spec = solidcraft_engine::find_command(id)?;
+    let spec = polykrom_engine::find_command(id)?;
     Some(Tool {
         cmd: spec.id,
         kind: Kind::Ext,
@@ -691,8 +691,8 @@ fn sketch_entity(app: &SolveApp, hits: &[Hit]) -> Option<(String, bool)> {
 /// The two editable curves that meet at sketch point `pi`, in curve order, which is the order
 /// the corner commands resolve them in from a `point` parameter. Construction curves are
 /// ignored when more than two meet. Each side must be a line, or an arc for a fillet.
-pub(crate) fn corner_curves(sk: &solidcraft_engine::sketch::Sketch, pi: usize, arcs_ok: bool) -> Option<(usize, usize)> {
-    use solidcraft_engine::sketch::CurveKind;
+pub(crate) fn corner_curves(sk: &polykrom_engine::sketch::Sketch, pi: usize, arcs_ok: bool) -> Option<(usize, usize)> {
+    use polykrom_engine::sketch::CurveKind;
     let candidates =
         sk.curves.iter().enumerate().filter(|(ci, c)| !sk.is_linked_curve(*ci) && c.kind.ends().is_some_and(|(a, b)| a == pi || b == pi));
     let mut curves: Vec<_> = candidates.clone().take(3).collect();
@@ -931,9 +931,9 @@ pub fn on_click(app: &mut SolveApp, tool: &mut Tool, proj: &Proj, pos: Pos2) {
             if cmd == "sketch.edit_text" {
                 let selection = hits.first().and_then(|hit| match hit {
                     Hit::SketchCurve { sketch, id, .. } if Some(*sketch) == active_sketch(app) => {
-                        Some(solidcraft_engine::Sel::SketchCurve { id: id.clone() })
+                        Some(polykrom_engine::Sel::SketchCurve { id: id.clone() })
                     }
-                    Hit::Profile { sketch, index } => Some(solidcraft_engine::Sel::Profile { sketch: *sketch, index: *index }),
+                    Hit::Profile { sketch, index } => Some(polykrom_engine::Sel::Profile { sketch: *sketch, index: *index }),
                     _ => None,
                 });
                 if let Some(id) = selection.as_ref().and_then(|sel| crate::sketch_text::entity_for_selection(app, sel)) {
@@ -1119,7 +1119,7 @@ thread_local! {
 
 /// With Trim active and the cursor over curve `id` of `sketch` (the active sketch): the piece a
 /// click takes away (#3052), which the hover shows in place of the whole curve. `None` with
-/// another tool, or for a curve trim cuts otherwise (`solidcraft_engine::cmd::trim_piece`).
+/// another tool, or for a curve trim cuts otherwise (`polykrom_engine::cmd::trim_piece`).
 pub(crate) fn trim_hover_piece(app: &SolveApp, sketch: u64, id: &str) -> Option<Vec<Vec2>> {
     let tool = app.tool.as_ref().filter(|t| t.cmd == "sketch.trim")?;
     let (at, _) = tool.hover.as_ref()?;
@@ -1131,7 +1131,7 @@ pub(crate) fn trim_hover_piece(app: &SolveApp, sketch: u64, id: &str) -> Option<
         return piece;
     }
     let st = app.session.world_state();
-    let piece = solidcraft_engine::cmd::trim_piece(&st.sketch(sketch)?.sketch, id, *at);
+    let piece = polykrom_engine::cmd::trim_piece(&st.sketch(sketch)?.sketch, id, *at);
     TRIM_PIECE.with(|c| *c.borrow_mut() = Some((key, piece.clone())));
     piece
 }
@@ -1200,7 +1200,7 @@ pub fn preview(app: &SolveApp, t: &Tool, painter: &egui::Painter, proj: &Proj) {
         crate::tools::paint_preview_curve(curve, &ss.plane, painter, proj, stroke, crate::sketch_palette::mode(app));
     }
     // Picked curves highlighted.
-    let mut display_budget = solidcraft_engine::render::SamplingBudget::new(32_768, 65_536);
+    let mut display_budget = polykrom_engine::render::SamplingBudget::new(32_768, 65_536);
     for id in t.picks.iter().filter(|x| *x != "|") {
         if let Some(ci) = ss.sketch.curve_index(id) {
             crate::tools::paint_curve(&ss.sketch, ci, &ss.plane, painter, proj, Stroke::new(3.0, tk.accent.gamma_multiply(0.7)), &mut display_budget);
@@ -1238,7 +1238,7 @@ fn glyphs(app: &SolveApp, painter: &egui::Painter, proj: &Proj, hover: Option<Po
         if c.kind.is_dimension() {
             continue;
         }
-        if let solidcraft_engine::sketch::ConstraintKind::Midpoint { p, .. } = c.kind
+        if let polykrom_engine::sketch::ConstraintKind::Midpoint { p, .. } = c.kind
             && !c.driven
         {
             if midpoints.contains(&p) {
@@ -1248,7 +1248,7 @@ fn glyphs(app: &SolveApp, painter: &egui::Painter, proj: &Proj, hover: Option<Po
         }
         if matches!(
             c.kind,
-            solidcraft_engine::sketch::ConstraintKind::PatternPoint { .. } | solidcraft_engine::sketch::ConstraintKind::PatternRadius { .. }
+            polykrom_engine::sketch::ConstraintKind::PatternPoint { .. } | polykrom_engine::sketch::ConstraintKind::PatternRadius { .. }
         ) && !ss.sketch.patterns.iter().any(|p| p.instances.first().and_then(|i| i.constraints.first()) == Some(&c.id))
         {
             continue;
@@ -1295,7 +1295,7 @@ fn glyphs(app: &SolveApp, painter: &egui::Painter, proj: &Proj, hover: Option<Po
                 (cs, ps)
             },
         );
-        let mut display_budget = solidcraft_engine::render::SamplingBudget::new(32_768, 65_536);
+        let mut display_budget = polykrom_engine::render::SamplingBudget::new(32_768, 65_536);
         for ci in cs {
             crate::tools::paint_curve(&ss.sketch, ci, &ss.plane, painter, proj, Stroke::new(3.0, tk.accent.gamma_multiply(0.7)), &mut display_budget);
         }
@@ -1313,7 +1313,7 @@ fn glyphs(app: &SolveApp, painter: &egui::Painter, proj: &Proj, hover: Option<Po
         // Redundant (already implied by the others, but holding): dimmed, not an error.
         let redundant = !failing && group.iter().all(|g| ss.report.redundant.contains(g));
         let selected = picked.as_deref() == Some(id.as_str())
-            || app.session.selection.iter().any(|s| matches!(s, solidcraft_engine::Sel::SketchConstraint { id: x } if group.contains(x)));
+            || app.session.selection.iter().any(|s| matches!(s, polykrom_engine::Sel::SketchConstraint { id: x } if group.contains(x)));
         let lit = selected || hovered.as_deref() == Some(id.as_str());
         let col = if failing {
             tk.error
@@ -1337,11 +1337,7 @@ fn glyphs(app: &SolveApp, painter: &egui::Painter, proj: &Proj, hover: Option<Po
             egui::StrokeKind::Inside,
         );
         let pattern_icon = ss.sketch.patterns.iter().find(|p| p.instances.first().and_then(|i| i.constraints.first()) == Some(id)).map(|p| {
-            if matches!(p.kind, solidcraft_engine::sketch::SketchPatternKind::Circular { .. }) {
-                "sketch_circ_pattern"
-            } else {
-                "sketch_rect_pattern"
-            }
+            if matches!(p.kind, polykrom_engine::sketch::SketchPatternKind::Circular { .. }) { "sketch_circ_pattern" } else { "sketch_rect_pattern" }
         });
         match pattern_icon.or_else(|| glyph_icon(c.kind.name())) {
             Some(icon) => crate::icons::paint_icon(painter, r.shrink(2.0), icon, f32::from(col.a()) / 255.0),
@@ -1375,8 +1371,8 @@ fn glyphs(app: &SolveApp, painter: &egui::Painter, proj: &Proj, hover: Option<Po
 }
 
 /// The curves and points a constraint ties together.
-fn constraint_entities(k: &solidcraft_engine::sketch::ConstraintKind) -> (Vec<usize>, Vec<usize>) {
-    use solidcraft_engine::sketch::ConstraintKind::*;
+fn constraint_entities(k: &polykrom_engine::sketch::ConstraintKind) -> (Vec<usize>, Vec<usize>) {
+    use polykrom_engine::sketch::ConstraintKind::*;
     match *k {
         Coincident { p, q } | HorizontalPoints { p, q } | VerticalPoints { p, q } => (vec![], vec![p, q]),
         PatternPoint { p, q, center, directions, .. } => {
@@ -1401,8 +1397,8 @@ fn constraint_entities(k: &solidcraft_engine::sketch::ConstraintKind) -> (Vec<us
 
 /// Where a constraint's glyphs go: one per entity (the middle of a curve, with its direction
 /// there; a point, without).
-fn glyph_anchors(sk: &solidcraft_engine::sketch::Sketch, k: &solidcraft_engine::sketch::ConstraintKind) -> Vec<(Vec2, Option<Vec2>)> {
-    use solidcraft_engine::sketch::ConstraintKind::*;
+fn glyph_anchors(sk: &polykrom_engine::sketch::Sketch, k: &polykrom_engine::sketch::ConstraintKind) -> Vec<(Vec2, Option<Vec2>)> {
+    use polykrom_engine::sketch::ConstraintKind::*;
     // Half way along the curve, and the direction there.
     let mid = |c: usize| -> Option<(Vec2, Option<Vec2>)> {
         let poly = sk.polyline(c);

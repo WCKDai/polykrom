@@ -2,8 +2,8 @@
 //! tool runs the matching command. Tools are UI state only; the work is done by commands.
 
 use egui::{Pos2, Stroke};
+use polykrom_engine::geom::Vec2;
 use serde_json::{Value, json};
-use solidcraft_engine::geom::Vec2;
 
 use crate::SolveApp;
 use crate::tool_modifiers::{Audit, Scope, ToolModifiers};
@@ -178,7 +178,7 @@ fn midpoint_at(app: &SolveApp, proj: &Proj, pos: Pos2, radius: f32) -> Option<(V
             return None;
         }
         let l = ss.sketch.curve_index(&id)?;
-        let solidcraft_engine::sketch::Shape::Line { a, b } = ss.sketch.shape(l)? else { return None };
+        let polykrom_engine::sketch::Shape::Line { a, b } = ss.sketch.shape(l)? else { return None };
         let mid = (a + b) * 0.5;
         let screen = proj.to_screen(ss.plane.to_world(mid))?;
         (screen.distance(pos) <= radius).then_some((mid, id))
@@ -287,7 +287,7 @@ pub fn on_click(app: &mut SolveApp, proj: &Proj, pos: Pos2, shift: bool) {
                 let ss = app.session.active_sketch.and_then(|sid| state.sketch(sid))?;
                 let point = ss.sketch.resolve_point(&id)?;
                 ss.sketch.constraints.iter().find_map(|c| match c.kind {
-                    solidcraft_engine::sketch::ConstraintKind::Midpoint { p, l } if !c.driven && p == point => {
+                    polykrom_engine::sketch::ConstraintKind::Midpoint { p, l } if !c.driven && p == point => {
                         ss.sketch.curves.get(l).map(|c| format!("mid:{}", c.id))
                     }
                     _ => None,
@@ -299,10 +299,10 @@ pub fn on_click(app: &mut SolveApp, proj: &Proj, pos: Pos2, shift: bool) {
                     .active_sketch
                     .and_then(|sid| state.sketch(sid))
                     .is_some_and(|ss| {
-                        ss.sketch.curve_index(line).is_some_and(|l| solidcraft_engine::view::sketch_curve_visible(&ss.sketch, l))
+                        ss.sketch.curve_index(line).is_some_and(|l| polykrom_engine::view::sketch_curve_visible(&ss.sketch, l))
                             // A circle/arc and a line still measure their edge-to-edge gap.
                             && tool.picks.first().is_none_or(|first| {
-                                ss.sketch.curve_index(first).is_none_or(|l| matches!(ss.sketch.shape(l), Some(solidcraft_engine::sketch::Shape::Line { .. })))
+                                ss.sketch.curve_index(first).is_none_or(|l| matches!(ss.sketch.shape(l), Some(polykrom_engine::sketch::Shape::Line { .. })))
                             })
                     })
             });
@@ -521,8 +521,8 @@ fn run_shape(app: &mut SolveApp, t: &Tool) -> Result<Vec<String>, String> {
 }
 
 /// Only consume a complete, unambiguous selection; command validation owns geometry.
-pub(crate) fn constraint_preselection(command: &str, selection: &[solidcraft_engine::Sel]) -> Option<Value> {
-    use solidcraft_engine::Sel::{SketchCurve, SketchPoint};
+pub(crate) fn constraint_preselection(command: &str, selection: &[polykrom_engine::Sel]) -> Option<Value> {
+    use polykrom_engine::Sel::{SketchCurve, SketchPoint};
     let selected_ids = |curves_only: bool, minimum: usize| -> Option<Vec<&str>> {
         if !(minimum..=200).contains(&selection.len()) {
             return None;
@@ -547,7 +547,7 @@ pub(crate) fn constraint_preselection(command: &str, selection: &[solidcraft_eng
         ("sketch.constraint.horizontal_vertical", [SketchCurve { id }]) => Some(json!({"line":id})),
         ("sketch.constraint.horizontal_vertical", [SketchPoint { id: a }, SketchPoint { id: b }]) if a != b => Some(json!({"points":[a,b]})),
         ("sketch.constraint.coincident", [a, b]) => {
-            let entity = |s: &solidcraft_engine::Sel| match s {
+            let entity = |s: &polykrom_engine::Sel| match s {
                 SketchPoint { id } | SketchCurve { id } => Some(id.clone()),
                 _ => None,
             };
@@ -578,8 +578,8 @@ pub(crate) fn constraint_preselection(command: &str, selection: &[solidcraft_eng
     }
 }
 
-pub(crate) fn projection_preselection(selection: &[solidcraft_engine::Sel]) -> Option<Vec<Value>> {
-    use solidcraft_engine::Sel;
+pub(crate) fn projection_preselection(selection: &[polykrom_engine::Sel]) -> Option<Vec<Value>> {
+    use polykrom_engine::Sel;
     // The projection command processes at most 1000 references; never consume a subset.
     if selection.is_empty() || selection.len() > 1000 {
         return None;
@@ -605,7 +605,7 @@ pub(crate) fn projection_preselection(selection: &[solidcraft_engine::Sel]) -> O
 /// `x` or `y` when the origin axis `name` is the active sketch's own x or y axis: along it, and
 /// through the sketch's origin.
 fn sketch_axis_of(app: &SolveApp, name: &str) -> Option<&'static str> {
-    use solidcraft_engine::geom::Vec3;
+    use polykrom_engine::geom::Vec3;
     let dir = match name {
         "X" => Vec3::X,
         "Y" => Vec3::Y,
@@ -665,27 +665,27 @@ pub fn finish(app: &mut SolveApp) {
 
 /// Rubber-band preview of the shape being drawn.
 pub(crate) fn paint_preview_curve(
-    mut sketch: solidcraft_engine::sketch::Sketch,
-    plane: &solidcraft_engine::geom::Plane,
+    mut sketch: polykrom_engine::sketch::Sketch,
+    plane: &polykrom_engine::geom::Plane,
     painter: &egui::Painter,
     proj: &Proj,
     stroke: Stroke,
     mode: u8,
 ) {
     for curve in &mut sketch.curves {
-        let line = matches!(curve.kind, solidcraft_engine::sketch::CurveKind::Line { .. });
+        let line = matches!(curve.kind, polykrom_engine::sketch::CurveKind::Line { .. });
         curve.centerline = mode == 2 && line;
         curve.infinite = mode == 3 && line;
         curve.construction |= mode != 0 && !curve.centerline;
     }
-    let mut budget = solidcraft_engine::render::SamplingBudget::new(4096, 65_536);
+    let mut budget = polykrom_engine::render::SamplingBudget::new(4096, 65_536);
     for index in 0..sketch.curves.len() {
         paint_curve(&sketch, index, plane, painter, proj, stroke, &mut budget);
     }
     crate::scenario::publish_count("tool_preview_curves", sketch.curves.len() as f64);
 }
 
-pub(crate) fn paint_sketch_path(points: &[solidcraft_engine::geom::Vec3], mode: u8, painter: &egui::Painter, proj: &Proj, stroke: Stroke) {
+pub(crate) fn paint_sketch_path(points: &[polykrom_engine::geom::Vec3], mode: u8, painter: &egui::Painter, proj: &Proj, stroke: Stroke) {
     if mode == 0 {
         let screen: Vec<_> = points.iter().filter_map(|point| proj.to_screen(*point)).collect();
         if screen.len() >= 2 {
@@ -693,7 +693,7 @@ pub(crate) fn paint_sketch_path(points: &[solidcraft_engine::geom::Vec3], mode: 
         }
         return;
     }
-    let unit = solidcraft_engine::view::grid_step(proj.cam.half_height()).0;
+    let unit = polykrom_engine::view::grid_step(proj.cam.half_height()).0;
     for (a, b) in crate::viewport::sketch_segments(points, mode, unit) {
         if let (Some(a), Some(b)) = (proj.to_screen(a), proj.to_screen(b)) {
             painter.line_segment([a, b], stroke);
@@ -702,13 +702,13 @@ pub(crate) fn paint_sketch_path(points: &[solidcraft_engine::geom::Vec3], mode: 
 }
 
 pub(crate) fn paint_curve(
-    sketch: &solidcraft_engine::sketch::Sketch,
+    sketch: &polykrom_engine::sketch::Sketch,
     index: usize,
-    plane: &solidcraft_engine::geom::Plane,
+    plane: &polykrom_engine::geom::Plane,
     painter: &egui::Painter,
     proj: &Proj,
     stroke: Stroke,
-    budget: &mut solidcraft_engine::render::SamplingBudget,
+    budget: &mut polykrom_engine::render::SamplingBudget,
 ) {
     for part in crate::sketch_display::curve_with_budget(sketch, index, plane, proj, painter.ctx().pixels_per_point(), budget).parts {
         let mode = sketch.curves.get(index).map_or(0, |c| if c.centerline { 2 } else { u8::from(c.construction) });
@@ -724,9 +724,9 @@ pub(crate) fn preview_curve(
     sweep: Option<f64>,
     rho: Option<f64>,
     slot_width: Option<f64>,
-) -> Option<solidcraft_engine::sketch::Sketch> {
-    use solidcraft_engine::sketch::{CurveKind, Sketch};
-    if !hover.is_finite() || t.pts.len() >= solidcraft_engine::sketch::MAX_SPLINE_POINTS || t.pts.iter().any(|p| !p.0.is_finite()) {
+) -> Option<polykrom_engine::sketch::Sketch> {
+    use polykrom_engine::sketch::{CurveKind, Sketch};
+    if !hover.is_finite() || t.pts.len() >= polykrom_engine::sketch::MAX_SPLINE_POINTS || t.pts.iter().any(|p| !p.0.is_finite()) {
         return None;
     }
     let mut sk = Sketch::new();
@@ -945,7 +945,7 @@ pub fn preview(app: &SolveApp, t: &Tool, painter: &egui::Painter, proj: &Proj) {
             let midpoint = target.get("midpoint").and_then(Value::as_str).or_else(|| target.as_str().and_then(|id| id.strip_prefix("mid:")));
             let point = if let Some(id) = midpoint {
                 ss.sketch.curve_index(id).and_then(|l| match ss.sketch.shape(l)? {
-                    solidcraft_engine::sketch::Shape::Line { a, b } => Some((a + b) * 0.5),
+                    polykrom_engine::sketch::Shape::Line { a, b } => Some((a + b) * 0.5),
                     _ => None,
                 })
             } else {

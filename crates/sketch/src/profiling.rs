@@ -310,7 +310,7 @@ pub(crate) fn trial(record: Trial) {
 mod tests {
     use super::*;
     use crate::{Analysis, ConstraintKind, Hold, Sketch, solve_with};
-    use solidcraft_geom::Vec2;
+    use polycore_geom::Vec2;
 
     fn distance(x: f64) -> Sketch {
         let mut sk = Sketch::new();

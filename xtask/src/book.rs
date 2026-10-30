@@ -22,7 +22,7 @@ pub fn run(root: &Path, build: bool) -> Result<(), String> {
     std::fs::copy(root.join("assets/branding/web/source/og.png"), book.join("src/og.png")).map_err(|e| format!("book preview card: {e}"))?;
     let mut c = cargo();
     c.args(["build", "-q", "--release", "-p", "solidcraft-cli"]);
-    crate::run(c, "cargo build -p solidcraft-cli")?;
+    crate::run(c, "cargo build -p polykrom-cli")?;
 
     let out = cli().arg("commands").output().map_err(|e| format!("solidcraft-cli: {e}"))?;
     if !out.status.success() {

@@ -3,10 +3,10 @@ use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 
-use solidcraft_engine::doc::ModelState;
-use solidcraft_engine::geom::{Loop2, Plane, Region2, Vec2, Vec3};
-use solidcraft_engine::render::{PixelCurveView, SampledPath, SamplingBudget, SamplingQuality, sample_segment, sample_segment_unclipped};
-use solidcraft_engine::sketch::Sketch;
+use polykrom_engine::doc::ModelState;
+use polykrom_engine::geom::{Loop2, Plane, Region2, Vec2, Vec3};
+use polykrom_engine::render::{PixelCurveView, SampledPath, SamplingBudget, SamplingQuality, sample_segment, sample_segment_unclipped};
+use polykrom_engine::sketch::Sketch;
 
 use crate::SolveApp;
 use crate::viewport::Proj;
@@ -29,8 +29,8 @@ pub fn pixel_view(proj: &Proj, ppp: f32) -> PixelCurveView {
 /// The pieces a curve is drawn and picked from. An infinite line (#1359) reaches across the whole
 /// view: through the point of its line nearest the view's centre, far past the view each way
 /// (the sampler clips it to the view). Only the display changes: the line keeps its two points.
-fn display_segs(sketch: &Sketch, index: usize, plane: &Plane, proj: &Proj) -> Vec<solidcraft_engine::geom::Seg2> {
-    use solidcraft_engine::geom::Seg2;
+fn display_segs(sketch: &Sketch, index: usize, plane: &Plane, proj: &Proj) -> Vec<polykrom_engine::geom::Seg2> {
+    use polykrom_engine::geom::Seg2;
     let segs = sketch.exact_segs(index).unwrap_or_else(|| sketch.segs(index));
     if !sketch.curves.get(index).is_some_and(|c| c.infinite) {
         return segs;

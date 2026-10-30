@@ -2,9 +2,9 @@
 //! so the edge is found by that name wherever a change of the body takes it, and no other edge
 //! is taken for it when it is split or gone.
 
+use polycore_geom::{Vec2, Vec3};
+use polykrom_sketch::{Link, LinkSource, Shape};
 use serde_json::{Value, json};
-use solidcraft_geom::{Vec2, Vec3};
-use solidcraft_sketch::{Link, LinkSource, Shape};
 
 use crate::Session;
 
@@ -101,7 +101,7 @@ fn a_projected_edge_stays_that_edge_when_the_body_changes_size() {
         assert!(!link(&s).lost, "width {width}");
     }
     // Saved and opened again.
-    let opened = Session::new(solidcraft_doc::Document::from_json(&s.doc.to_json()).unwrap());
+    let opened = Session::new(polykrom_doc::Document::from_json(&s.doc.to_json()).unwrap());
     assert_eq!(stored(&opened).edge_name.as_deref(), Some(name.as_str()));
     assert_line(&opened, 400.0, (0.0, 50.0), "opened");
     // Undo and redo of the change.
@@ -204,8 +204,8 @@ fn an_edge_link_saved_without_a_name_is_found_as_before_and_named_by_the_next_ed
     let removed = links.flatten().filter_map(|l| l.as_object_mut()?.remove("edge_name")).count();
     assert_eq!(removed, 1, "the one projected edge");
     saved["format"] = json!("solidcraft/16");
-    let mut s = Session::new(solidcraft_doc::Document::from_json(&saved.to_string()).unwrap());
-    assert_eq!(s.doc.format, solidcraft_doc::format::format_string(solidcraft_doc::format::FORMAT), "upgraded on opening");
+    let mut s = Session::new(polykrom_doc::Document::from_json(&saved.to_string()).unwrap());
+    assert_eq!(s.doc.format, polykrom_doc::format::format_string(polykrom_doc::format::FORMAT), "upgraded on opening");
     assert_eq!(stored(&s).edge_name, None);
     assert_eq!(trouble(&s), "");
     assert_line(&s, 100.0, (0.0, 50.0), "opened");

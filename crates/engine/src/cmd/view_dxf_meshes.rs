@@ -6,9 +6,9 @@ use std::mem::size_of;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-use solidcraft_doc::{IDENTITY, Mat, ModelBody, mat_inverse, mat_mul};
-use solidcraft_geom::{Aabb3, Mesh, Vec3};
-use solidcraft_kernel::{KernelError, map_with_local_pools};
+use polycore::{KernelError, map_with_local_pools};
+use polycore_geom::{Aabb3, Mesh, Vec3};
+use polykrom_doc::{IDENTITY, Mat, ModelBody, mat_inverse, mat_mul};
 
 use super::{CMD, progress::Stage};
 use crate::params::bad;
@@ -127,7 +127,7 @@ pub(super) fn prepare(s: &Session, tolerance: f64) -> Result<Scene> {
     let bytes = AtomicUsize::new(0);
     let results = map_with_local_pools(&items, WORKERS, |item| {
         progress.check().map_err(|e| KernelError::Failed(e.into()))?;
-        let mut mesh = item.body.body.reference_display_mesh_angular(tolerance, solidcraft_kernel::DISPLAY_ANGLE)?;
+        let mut mesh = item.body.body.reference_display_mesh_angular(tolerance, polycore::DISPLAY_ANGLE)?;
         if mesh.triangles.is_empty() {
             return Err(KernelError::Invalid(format!("{} has no exportable surface", item.body.name)));
         }
@@ -152,7 +152,7 @@ pub(super) fn prepare(s: &Session, tolerance: f64) -> Result<Scene> {
         progress.advance(1).map_err(|e| KernelError::Failed(e.into()))?;
         Ok(Prepared { mesh, visibility, triangles })
     });
-    let mut prepared = results.into_iter().collect::<solidcraft_kernel::Result<Vec<_>>>()?;
+    let mut prepared = results.into_iter().collect::<polycore::Result<Vec<_>>>()?;
     let mut meshes: Vec<Option<Arc<Mesh>>> = vec![None; groups.len()];
     for (item, p) in items.iter().zip(&mut prepared) {
         if let Some(mesh) = p.mesh.take()
@@ -180,7 +180,7 @@ pub(super) fn transformed_bounds(mesh: &Mesh, m: &Mat) -> Aabb3 {
     for x in [b.min.x, b.max.x] {
         for y in [b.min.y, b.max.y] {
             for z in [b.min.z, b.max.z] {
-                out.add(solidcraft_doc::apply_point(m, Vec3::new(x, y, z)));
+                out.add(polykrom_doc::apply_point(m, Vec3::new(x, y, z)));
             }
         }
     }
@@ -192,7 +192,7 @@ mod tests {
     use super::*;
     #[test]
     fn only_proper_rigid_placements_share_geometry() {
-        assert!(rigid(&solidcraft_doc::rigid(Vec3::new(1., 2., 3.), Vec3::ZERO, Vec3::Z, 0.7)));
+        assert!(rigid(&polykrom_doc::rigid(Vec3::new(1., 2., 3.), Vec3::ZERO, Vec3::Z, 0.7)));
         let mut m = IDENTITY;
         m[0][0] = -1.;
         assert!(!rigid(&m));

@@ -1,7 +1,7 @@
 //! CPU rasterizer for headless snapshots: z-buffered, smooth-shaded triangles and depth-tested
 //! lines, rendered at 2× and downsampled for anti-aliasing.
 
-use solidcraft_geom::Vec3;
+use polycore_geom::Vec3;
 
 use crate::Camera;
 use crate::scene::{Rgb, SECTION_CAP, Scene, png};
@@ -360,7 +360,7 @@ mod tests {
     use super::*;
     use crate::StandardView;
     use crate::scene::{SceneLine, SceneMesh};
-    use solidcraft_geom::Mesh;
+    use polycore_geom::Mesh;
     use std::sync::Arc;
 
     /// Lines are cut by the section in 3D: the kept piece ends on the plane.

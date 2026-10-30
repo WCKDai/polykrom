@@ -1,8 +1,8 @@
 //! Loose ends of a sketch's profile curves: the ones that touch nothing (open) and the ones that
 //! touch another curve only by position (untied), and tying the untied ones.
 
+use polykrom_sketch::{ConstraintKind, EndReport, EndTouch, Sketch, loose_ends};
 use serde_json::{Value, json};
-use solidcraft_sketch::{ConstraintKind, EndReport, EndTouch, Sketch, loose_ends};
 
 use super::sketch::{add_c, edit, target_sketch};
 use super::{CommandSpec, in_sketch};

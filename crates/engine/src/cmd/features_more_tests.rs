@@ -32,7 +32,7 @@ fn grouped_face_auto_operation_keeps_implicit_and_explicit_participants() {
             params["operation"] = json!("auto");
             let made = run(&mut actual, "solid.extrude", params);
             let body = actual.model.state().body("Stock").unwrap().body.clone();
-            let volume = solidcraft_kernel::measure(&body).unwrap().volume;
+            let volume = polycore::measure(&body).unwrap().volume;
             assert!(
                 (volume - (1000. + 100. * distance)).abs() < 1e-6,
                 "offset={offset}, distance={distance}, volume={volume}, feature={:?}",
@@ -46,7 +46,7 @@ fn grouped_face_auto_operation_keeps_implicit_and_explicit_participants() {
             let mut single = s.scratch();
             run(&mut grouped, "solid.extrude", json!({"faces":[[32,2,10],[38,8,10]],"face_body":"Stock","distance":-2,"operation":"cut"}));
             run(&mut single, "solid.extrude", json!({"face":[32,2,10],"face_body":"Stock","distance":-2,"operation":"cut"}));
-            let volume = |session: &Session| solidcraft_kernel::measure(&session.model.state().body("Stock").unwrap().body).unwrap().volume;
+            let volume = |session: &Session| polycore::measure(&session.model.state().body("Stock").unwrap().body).unwrap().volume;
             assert!((volume(&grouped) - volume(&single)).abs() < 1e-6);
         }
     }
@@ -89,7 +89,7 @@ fn sketch_on_a_part_in_another_component_joins_and_cuts_it() {
             run(&mut t, "solid.extrude", p);
             let st = t.model.state();
             assert_eq!(st.bodies.len(), 1, "{params} {operation}: no separate body");
-            let got = solidcraft_kernel::measure(&st.body("Stock").unwrap().body).unwrap().volume;
+            let got = polycore::measure(&st.body("Stock").unwrap().body).unwrap().volume;
             assert!((got - volume).abs() < 1e-2, "{params} {operation}: volume {got}, expected {volume}");
         }
     }
@@ -151,7 +151,7 @@ fn every_inward_extrude_into_a_part_in_another_component_cuts_it() {
             }
             let st = t.model.state();
             let names: Vec<_> = st.bodies.iter().map(|b| b.name.to_string()).collect();
-            let got = st.body("Stock").and_then(|b| solidcraft_kernel::measure(&b.body).ok()).map(|m| m.volume);
+            let got = st.body("Stock").and_then(|b| polycore::measure(&b.body).ok()).map(|m| m.volume);
             if names != ["Stock"] || got.is_none_or(|v| (v - volume).abs() > 1e-2) {
                 wrong.push(format!("{params} {operation}: bodies {names:?}, Stock volume {got:?}, expected {volume:.3}"));
             }
@@ -210,12 +210,12 @@ fn separated_profile_cut_preserves_participants_and_removes_only_consumed_bodies
             assert!(state.body("A").is_none());
             for (name, expected) in [("B", 210.), ("C", if explicit { 250. } else { 210. })] {
                 let body = &state.body(name).unwrap().body;
-                assert!((solidcraft_kernel::measure(body).unwrap().volume - expected).abs() < 1e-6);
+                assert!((polycore::measure(body).unwrap().volume - expected).abs() < 1e-6);
                 assert!(body.validity().is_empty());
             }
         };
         check(&s);
-        check(&Session::new(solidcraft_doc::Document::from_json(&s.doc.to_json()).unwrap()));
+        check(&Session::new(polykrom_doc::Document::from_json(&s.doc.to_json()).unwrap()));
         run(&mut s, "edit.undo", json!({}));
         assert_eq!(s.doc.to_json(), before);
         run(&mut s, "edit.redo", json!({}));
@@ -342,7 +342,7 @@ fn exact_cylinder_volume(s: &Session) -> f64 {
 
 #[test]
 fn cylinder_emboss_persists_selection_and_replays_radial_depth() {
-    use solidcraft_geom::Vec3;
+    use polycore_geom::Vec3;
     let mut s = cylinder_badge();
     let before = exact_cylinder_volume(&s);
     run(
@@ -358,10 +358,10 @@ fn cylinder_emboss_persists_selection_and_replays_radial_depth() {
     assert!(mesh.contains(Vec3::new(-10.5 * 0.15_f64.sin(), 10.5 * 0.15_f64.cos(), 7.5)));
     let feature = s.doc.find_feature("Raised Badge").unwrap();
     assert!(
-        matches!(&feature.kind,solidcraft_doc::FeatureKind::Emboss{face:Some(face),..} if face.body=="Sleeve"&&face.at.dist(Vec3::new(0.,10.,7.5))<1e-10)
+        matches!(&feature.kind,polykrom_doc::FeatureKind::Emboss{face:Some(face),..} if face.body=="Sleeve"&&face.at.dist(Vec3::new(0.,10.,7.5))<1e-10)
     );
     let saved = s.doc.to_json();
-    let mut loaded = Session { doc: solidcraft_doc::Document::from_json(&saved).unwrap().into(), ..Default::default() };
+    let mut loaded = Session { doc: polykrom_doc::Document::from_json(&saved).unwrap().into(), ..Default::default() };
     loaded.refresh();
     assert!(loaded.model.results.iter().all(|f| f.error.is_none()), "{:?}", loaded.model.results);
     assert!((exact_cylinder_volume(&loaded) - before - 21.0).abs() < 0.02);
@@ -405,7 +405,7 @@ fn cylinder_small_chord_pick_is_saved_on_the_exact_surface() {
         .unwrap();
     assert!(((pick.x * pick.x + pick.y * pick.y).sqrt() - 0.1).abs() > 1e-7);
     run(&mut s, "solid.emboss", json!({"sketch":"Badge","profiles":"all","face":[pick.x,pick.y,pick.z],"depth":"0.01mm","targets":["Tiny"]}));
-    let solidcraft_doc::FeatureKind::Emboss { face: Some(face), .. } = &s.doc.features.last().unwrap().kind else {
+    let polykrom_doc::FeatureKind::Emboss { face: Some(face), .. } = &s.doc.features.last().unwrap().kind else {
         panic!("missing face");
     };
     assert!(((face.at.x * face.at.x + face.at.y * face.at.y).sqrt() - 0.1).abs() < 1e-12);
@@ -420,7 +420,7 @@ fn cylinder_cross_component_emboss_keeps_source_owner_and_placements() {
         let a = run(&mut s, "component.create", json!({"name":"Source","grounded":false}))["component"].as_u64().unwrap();
         run(&mut s, "solid.cylinder", json!({"radius":10,"height":20,"body_name":"Sleeve"}));
         let source_feature = s.model.state().bodies.first().unwrap().feature;
-        let source_names = solidcraft_doc::naming::face_names(s.model.state().body("Sleeve").unwrap());
+        let source_names = polykrom_doc::naming::face_names(s.model.state().body("Sleeve").unwrap());
         let before = exact_cylinder_volume(&s);
         run(&mut s, "occurrence.move", json!({"occurrence":"Source:1","axis":[0,0,1],"angle":"90 deg","translate":[50,0,0]}));
         let second = run(&mut s, "occurrence.copy", json!({"component":a,"translate":[80,0,0]}))["occurrence"].as_u64().unwrap();
@@ -438,7 +438,7 @@ fn cylinder_cross_component_emboss_keeps_source_owner_and_placements() {
             .world_state()
             .bodies
             .iter()
-            .find(|b| b.body.tessellate_with(0.001, true).unwrap().contains(solidcraft_geom::Vec3::new(40.5 + pick_offset, 0., 7.5)))
+            .find(|b| b.body.tessellate_with(0.001, true).unwrap().contains(polycore_geom::Vec3::new(40.5 + pick_offset, 0., 7.5)))
             .unwrap()
             .name
             .clone();
@@ -447,7 +447,7 @@ fn cylinder_cross_component_emboss_keeps_source_owner_and_placements() {
             "solid.emboss",
             json!({"sketch":"Badge","profiles":"all","face":[40.+pick_offset,0,7.5],"depth":"badge_depth","targets":[target.clone()]}),
         );
-        let solidcraft_doc::FeatureKind::Emboss { face: Some(face), .. } = &s.doc.features.last().unwrap().kind else {
+        let polykrom_doc::FeatureKind::Emboss { face: Some(face), .. } = &s.doc.features.last().unwrap().kind else {
             panic!("missing selection");
         };
         assert_eq!(face.path, if pick_offset == 0. { s.doc.first_path(a) } else { vec![second] });
@@ -462,9 +462,9 @@ fn cylinder_cross_component_emboss_keeps_source_owner_and_placements() {
         assert!((exact_cylinder_volume(&s) - before - 21.).abs() < 0.02);
         let world = s.world_state();
         for x in [39.5, 119.5] {
-            assert!(world.bodies.iter().any(|b| b.body.tessellate_with(0.001, true).unwrap().contains(solidcraft_geom::Vec3::new(x, 0., 7.5))));
+            assert!(world.bodies.iter().any(|b| b.body.tessellate_with(0.001, true).unwrap().contains(polycore_geom::Vec3::new(x, 0., 7.5))));
         }
-        let mut loaded = Session { doc: solidcraft_doc::Document::from_json(&s.doc.to_json()).unwrap().into(), ..Default::default() };
+        let mut loaded = Session { doc: polykrom_doc::Document::from_json(&s.doc.to_json()).unwrap().into(), ..Default::default() };
         loaded.refresh();
         assert!(loaded.model.results.iter().all(|r| r.error.is_none()), "{:?}", loaded.model.results);
         run(&mut loaded, "parameters.change", json!({"name":"badge_depth","expression":"2mm"}));
@@ -488,7 +488,7 @@ fn cylinder_cross_component_emboss_keeps_source_owner_and_placements() {
         assert!((exact_cylinder_volume(&loaded) - before - 69.).abs() < 0.02);
         let mut broken = loaded.doc.as_ref().clone();
         let id = broken.features.last().unwrap().id;
-        let solidcraft_doc::FeatureKind::Emboss { face: Some(face), .. } = &mut broken.feature_mut(id).unwrap().kind else {
+        let polykrom_doc::FeatureKind::Emboss { face: Some(face), .. } = &mut broken.feature_mut(id).unwrap().kind else {
             panic!("missing selection");
         };
         face.path = vec![u64::MAX];
@@ -517,12 +517,12 @@ fn check_active_second_source(auto: bool) {
     run(&mut s, "sketch.finish", json!({}));
     run(&mut s, "solid.emboss", json!({"sketch":"Badge","profiles":"all","face":[80,10,7.5],"depth":1}));
     assert!((exact_cylinder_volume(&s) - before - 21.).abs() < 0.02);
-    let solidcraft_doc::FeatureKind::Emboss { face: Some(face), .. } = &s.doc.features.last().unwrap().kind else {
+    let polykrom_doc::FeatureKind::Emboss { face: Some(face), .. } = &s.doc.features.last().unwrap().kind else {
         panic!("missing selection");
     };
     assert_eq!(face.path, vec![second]);
     assert_eq!(face.author_path, vec![second]);
-    let mut loaded = Session { doc: solidcraft_doc::Document::from_json(&s.doc.to_json()).unwrap().into(), ..Default::default() };
+    let mut loaded = Session { doc: polykrom_doc::Document::from_json(&s.doc.to_json()).unwrap().into(), ..Default::default() };
     loaded.refresh();
     assert!(loaded.model.results.iter().all(|r| r.error.is_none()), "{:?}", loaded.model.results);
     assert!((exact_cylinder_volume(&loaded) - before - 21.).abs() < 0.02);
@@ -610,7 +610,7 @@ fn check_body_offset(auto: bool) {
     assert!((exact_cylinder_volume(&s) - before - 21.).abs() < 0.02);
     assert_eq!(s.doc.body_offsets["Sleeve"], offset);
     assert_eq!(s.doc.body_component("Sleeve", s.model.state().body("Sleeve").unwrap().feature), holder);
-    assert!(s.world_state().body("Sleeve").unwrap().body.tessellate_with(0.001, true).unwrap().contains(solidcraft_geom::Vec3::new(0., 10.5, 7.5)));
+    assert!(s.world_state().body("Sleeve").unwrap().body.tessellate_with(0.001, true).unwrap().contains(polycore_geom::Vec3::new(0., 10.5, 7.5)));
 }
 
 #[test]
@@ -771,14 +771,14 @@ fn loft_cut_through_a_shelled_basin_in_either_order() {
 
 #[test]
 fn cylinder_auto_inference_saves_a_profile_anchor_and_replays_both_depth_signs() {
-    use solidcraft_geom::Vec3;
+    use polycore_geom::Vec3;
     for mode in ["emboss", "deboss"] {
         let mut s = cylinder_badge();
         let before = exact_cylinder_volume(&s);
         let initial = s.doc.to_json();
         run(&mut s, "solid.emboss", json!({"sketch":"Badge","profiles":"all","depth":"badge_depth","mode":mode,"name":"Auto Badge"}));
         let feature = s.doc.find_feature("Auto Badge").unwrap().clone();
-        let solidcraft_doc::FeatureKind::Emboss { face: Some(face), targets, .. } = &feature.kind else {
+        let polykrom_doc::FeatureKind::Emboss { face: Some(face), targets, .. } = &feature.kind else {
             panic!("missing inferred association");
         };
         assert_eq!(targets, &["Sleeve"]);
@@ -799,7 +799,7 @@ fn cylinder_auto_inference_saves_a_profile_anchor_and_replays_both_depth_signs()
         assert_eq!(s.doc.to_json(), initial);
         run(&mut s, "edit.redo", json!({}));
         assert_eq!(s.doc.find_feature("Auto Badge").unwrap().kind, feature.kind);
-        let mut loaded = Session { doc: solidcraft_doc::Document::from_json(&s.doc.to_json()).unwrap().into(), ..Default::default() };
+        let mut loaded = Session { doc: polykrom_doc::Document::from_json(&s.doc.to_json()).unwrap().into(), ..Default::default() };
         loaded.refresh();
         assert!(loaded.model.results.iter().all(|r| r.error.is_none()), "{:?}", loaded.model.results);
         run(
@@ -836,7 +836,7 @@ fn cylinder_auto_inference_ignores_remote_finite_tangent_walls_in_each_body_orde
 
 #[test]
 fn cylinder_auto_inference_retains_selected_holes_and_nested_islands() {
-    use solidcraft_geom::Vec3;
+    use polycore_geom::Vec3;
     for mode in ["emboss", "deboss"] {
         let mut s = cylinder_badge();
         run(&mut s, "sketch.edit", json!({"sketch":"Badge"}));
@@ -869,7 +869,7 @@ fn cylinder_auto_inference_refuses_ambiguity_curves_and_seam_crossing_atomically
     assert!(error.contains("multiple tangent cylinders"), "{error}");
     assert_eq!(s.doc.to_json(), before);
     run(&mut s, "solid.emboss", json!({"sketch":"Badge","depth":1,"targets":["Sleeve"]}));
-    assert!(matches!(&s.doc.features.last().unwrap().kind,solidcraft_doc::FeatureKind::Emboss{face:Some(face),..} if face.body=="Sleeve"));
+    assert!(matches!(&s.doc.features.last().unwrap().kind,polykrom_doc::FeatureKind::Emboss{face:Some(face),..} if face.body=="Sleeve"));
     for circle in [false, true] {
         let mut s = cylinder_badge();
         run(&mut s, "sketch.create", json!({"plane":{"origin":[0,10,0],"x_dir":[-1,0,0],"y_dir":[0,0,1]},"name":"Unsupported"}));
@@ -922,7 +922,7 @@ fn loft_joined_onto_a_box_exports_one_connected_mesh() {
     assert!(rel(v, 24000.0 + loft) < 1e-5, "{v} vs {}", 24000.0 + loft);
     // The exported mesh, its vertices merged, is one connected piece.
     let mesh = s.model.state().body("Box").unwrap().body.tessellate(0.01).unwrap();
-    let (positions, triangles) = solidcraft_io::weld(&mesh.positions, &mesh.triangles, 1e-4);
+    let (positions, triangles) = polykrom_io::weld(&mesh.positions, &mesh.triangles, 1e-4);
     let mut piece: Vec<usize> = (0..positions.len()).collect();
     let root = |piece: &mut Vec<usize>, mut i: usize| {
         while piece[i] != i {
@@ -1005,7 +1005,7 @@ fn cutting_a_text_removes_each_letter_whether_its_letters_stand_apart_or_touch()
             ids.sort();
             ids
         };
-        let counter = |p: &solidcraft_sketch::Profile| ss.profiles.iter().any(|q| q.hole_curves.iter().any(|h| sorted(h) == sorted(&p.outer_curves)));
+        let counter = |p: &polykrom_sketch::Profile| ss.profiles.iter().any(|q| q.hole_curves.iter().any(|h| sorted(h) == sorted(&p.outer_curves)));
         let area: f64 = ss.profiles.iter().filter(|p| !counter(p)).map(|p| p.area).sum();
         run(&mut s, "sketch.finish", json!({}));
         run(&mut s, "solid.extrude", json!({"distance":2,"operation":"cut"}));
@@ -1037,7 +1037,7 @@ fn a_tapered_text_joins_a_block_on_its_face_or_hanging_over_its_edge() {
             ids.sort();
             ids
         };
-        let counter = |p: &solidcraft_sketch::Profile| ss.profiles.iter().any(|q| q.hole_curves.iter().any(|h| sorted(h) == sorted(&p.outer_curves)));
+        let counter = |p: &polykrom_sketch::Profile| ss.profiles.iter().any(|q| q.hole_curves.iter().any(|h| sorted(h) == sorted(&p.outer_curves)));
         let area: f64 = ss.profiles.iter().filter(|p| !counter(p)).map(|p| p.area).sum();
         run(&mut s, "sketch.finish", json!({}));
         let steep = s.execute("solid.extrude", &json!({"distance":2,"operation":"join","taper":"15 deg"})).unwrap_err();
@@ -1111,7 +1111,7 @@ fn a_tapered_foot_under_a_part_joins_as_drawn() {
 /// with the offset and no taper. Two-sided and symmetric tapers are still refused, by name.
 #[test]
 fn a_drafted_extrude_starts_at_an_offset() {
-    use solidcraft_kernel::{FaceSurface, face_surface, measure as measure_body};
+    use polycore::{FaceSurface, face_surface, measure as measure_body};
     // A 30 x 20 profile, 12 mm long, drafted 6 deg, started 4 mm along the normal.
     let (w, d, h, off) = (30.0, 20.0, 12.0, 4.0);
     let part = |p: Value| -> Session {
@@ -1211,11 +1211,11 @@ fn a_drafted_extrude_starts_at_an_offset() {
 /// lies wholly in material, so the cut removes exactly the frustum over its profile.
 #[test]
 fn a_drafted_offset_cut_into_a_body_with_history() {
-    use solidcraft_kernel::{FaceSurface, face_surface, measure as measure_body};
+    use polycore::{FaceSurface, face_surface, measure as measure_body};
     let (w, d, h, off) = (30.0, 20.0, 12.0, 18.0);
     let (ang, t) = (6f64.to_radians(), 6f64.to_radians().tan());
     let frustum = w * d * h + (w + d) * t * h * h + 4.0 / 3.0 * t * t * h * h * h;
-    let unnamed = |b: &solidcraft_kernel::Body| (0..b.face_count()).filter(|i| face_surface(b, *i).is_none()).count();
+    let unnamed = |b: &polycore::Body| (0..b.face_count()).filter(|i| face_surface(b, *i).is_none()).count();
 
     let mut s = Session::default();
     // A 60 x 40 x 30 block, a round boss joined through its far side and out of its top, and a
@@ -1482,7 +1482,7 @@ fn a_line_of_text_cuts_into_a_block_at_any_depth() {
             ids.sort();
             ids
         };
-        let counter = |p: &solidcraft_sketch::Profile| ss.profiles.iter().any(|q| q.hole_curves.iter().any(|h| sorted(h) == sorted(&p.outer_curves)));
+        let counter = |p: &polykrom_sketch::Profile| ss.profiles.iter().any(|q| q.hole_curves.iter().any(|h| sorted(h) == sorted(&p.outer_curves)));
         area = ss.profiles.iter().filter(|p| !counter(p)).map(|p| p.area).sum();
         run(&mut s, "sketch.finish", json!({}));
         run(&mut s, "solid.extrude", json!({"distance":-depth,"operation":"cut"}));
@@ -1502,7 +1502,7 @@ fn a_line_of_text_cuts_into_a_block_at_any_depth() {
 #[test]
 fn fillets_on_tapered_bosses_saved_before_still_find_their_edges() {
     let text = include_str!("../../../../tests/taper/before-1014/two_tapered_bosses_filleted.json");
-    let mut s = Session::new(solidcraft_doc::Document::from_json(text).unwrap());
+    let mut s = Session::new(polykrom_doc::Document::from_json(text).unwrap());
     let volume = run(&mut s, "inspect.measure", json!({}))["total"]["volume_mm3"].as_f64().unwrap();
     for name in ["Extrude2", "Fillet1", "Fillet2"] {
         let id = s.doc.find_feature(name).unwrap().id;
@@ -1764,7 +1764,7 @@ fn fillet_with_a_radius_per_edge() {
     // Saved with the radii, and evaluated the same from the saved design.
     let saved = s.doc.to_json();
     assert!(saved.contains("edge_radii"), "{saved}");
-    let mut again = Session::new(solidcraft_doc::Document::from_json(&saved).unwrap());
+    let mut again = Session::new(polykrom_doc::Document::from_json(&saved).unwrap());
     assert!(rel(volume(&mut again), want) < 1e-4);
     // One radius per edge, and a constant-radius exact fillet only.
     let mut t = Session::default();

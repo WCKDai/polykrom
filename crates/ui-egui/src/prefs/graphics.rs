@@ -27,7 +27,7 @@ pub(super) fn show(app: &mut SolveApp, ui: &mut egui::Ui) {
     });
     ui_kit::text(ui, app.tr("prefs.graphics_presets_note"), ui_kit::Text::Hint("preset"));
     ui_kit::settings_section(ui, "quality", app.tr("prefs.curved_surfaces"), |ui| {
-        use solidcraft_engine::doc::display_quality::DisplayQuality;
+        use polykrom_engine::doc::display_quality::DisplayQuality;
         ui_kit::text(ui, app.tr("ui.display_quality"), ui_kit::Text::Heading("display_quality"));
         let current = DisplayQuality::parse(&app.preferences.display_quality).unwrap_or_default();
         ui.horizontal_wrapped(|ui| {

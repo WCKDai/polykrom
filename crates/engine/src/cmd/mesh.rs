@@ -1,8 +1,8 @@
 //! Parametric reconstruction of imported mechanical mesh bodies.
 
+use polykrom_doc::FeatureKind;
+use polykrom_doc::expr::Kind;
 use serde_json::Value;
-use solidcraft_doc::FeatureKind;
-use solidcraft_doc::expr::Kind;
 
 use super::{
     CommandSpec,

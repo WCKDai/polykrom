@@ -22,7 +22,7 @@ fn sketch() -> Session {
 }
 
 /// The evaluated (solved) sketch.
-fn solved(s: &Session) -> solidcraft_sketch::Sketch {
+fn solved(s: &Session) -> polykrom_sketch::Sketch {
     let id = s.active_sketch.expect("an open sketch");
     s.model.state().sketch(id).map(|ss| ss.sketch.clone()).expect("an evaluated sketch")
 }
@@ -34,7 +34,7 @@ fn radii(s: &Session, arcs: &[String]) -> Vec<f64> {
         .map(|id| {
             let i = sk.curves.iter().position(|c| &c.id == id).expect("arc in sketch");
             match &sk.curves[i].kind {
-                solidcraft_sketch::CurveKind::Arc { c, a, .. } => sk.point(*c).unwrap().dist(sk.point(*a).unwrap()),
+                polykrom_sketch::CurveKind::Arc { c, a, .. } => sk.point(*c).unwrap().dist(sk.point(*a).unwrap()),
                 k => panic!("{id} is not an arc: {k:?}"),
             }
         })

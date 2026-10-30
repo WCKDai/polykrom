@@ -7,11 +7,11 @@ use std::collections::BTreeMap;
 use std::hash::{Hash, Hasher};
 use std::sync::{Arc, OnceLock};
 
+use polycore::{self as kernel, Body, BoolOp};
+use polycore_geom::tess::TessPlan;
+use polycore_geom::{Mesh, Plane, Region2, UnitVec3, Vec2, Vec3, regions_apart};
+use polykrom_sketch::{CurveKind, Profile, SolveReport, find_profiles};
 use serde::{Deserialize, Serialize};
-use solidcraft_geom::tess::TessPlan;
-use solidcraft_geom::{Mesh, Plane, Region2, UnitVec3, Vec2, Vec3, regions_apart};
-use solidcraft_kernel::{self as kernel, Body, BoolOp};
-use solidcraft_sketch::{CurveKind, Profile, SolveReport, find_profiles};
 
 use crate::expr::{self, Kind, Value};
 use crate::lineage::Traced;
@@ -64,7 +64,7 @@ pub struct ModelBody {
     source_key: u64,
     /// [`Body::outline_bounds`] of `body` (with the body it was measured on), worked out once
     /// and shared by clones.
-    outline: Arc<OnceLock<(Body, solidcraft_geom::Aabb3)>>,
+    outline: Arc<OnceLock<(Body, polycore_geom::Aabb3)>>,
 }
 
 impl ModelBody {
@@ -106,7 +106,7 @@ impl ModelBody {
     }
 
     /// A box around the body without meshing it ([`Body::outline_bounds`]), worked out once.
-    pub fn outline_bounds(&self) -> solidcraft_geom::Aabb3 {
+    pub fn outline_bounds(&self) -> polycore_geom::Aabb3 {
         match self.outline.get_or_init(|| (self.body.clone(), self.body.outline_bounds())) {
             (measured, b) if measured.same(&self.body) => *b,
             // The body was replaced in this cell's holder since: measure it again.
@@ -212,7 +212,7 @@ impl ModelBody {
 
     /// The box of [`ModelBody::mesh`] without making a placement's moved copy: the shared mesh's
     /// points, moved.
-    pub fn mesh_bounds(&self) -> solidcraft_geom::Aabb3 {
+    pub fn mesh_bounds(&self) -> polycore_geom::Aabb3 {
         if let Some(mesh) = self.cached_mesh() {
             return mesh.bounds();
         }
@@ -220,7 +220,7 @@ impl ModelBody {
         if crate::is_identity(&m) {
             return mesh.bounds();
         }
-        mesh.positions.iter().fold(solidcraft_geom::Aabb3::EMPTY, |mut b, p| {
+        mesh.positions.iter().fold(polycore_geom::Aabb3::EMPTY, |mut b, p| {
             b.add(crate::apply_point(&m, *p));
             b
         })
@@ -306,11 +306,11 @@ pub struct SolvedSketch {
     pub feature: u64,
     pub name: String,
     pub plane: Plane,
-    pub sketch: solidcraft_sketch::Sketch,
+    pub sketch: polykrom_sketch::Sketch,
     pub report: SolveReport,
     pub profiles: Vec<Profile>,
     /// Open and untied ends of its profile curves (where a profile can fail).
-    pub ends: solidcraft_sketch::EndReport,
+    pub ends: polykrom_sketch::EndReport,
 }
 
 /// A cosmetic thread: on which cylinder, its size, and the threaded part of the axis.
@@ -502,7 +502,7 @@ fn thread_on_impl(
 /// profile, 60° flanks): cut from the shaft (external) or the hole wall (internal), running from
 /// `start` to `end` along the axis. `radius` is the face's own radius; `open` says which ends
 /// of the threaded length are free ends of the face.
-fn thread_groove(t: &ThreadInfo, radius: f64, open: (bool, bool)) -> Result<solidcraft_geom::Mesh> {
+fn thread_groove(t: &ThreadInfo, radius: f64, open: (bool, bool)) -> Result<polycore_geom::Mesh> {
     let (p, d) = (t.pitch, t.major_diameter);
     let h = p * 3f64.sqrt() / 2.0;
     let slope = (std::f64::consts::PI / 6.0).tan();
@@ -625,7 +625,7 @@ fn thread_turn(t: &ThreadInfo, cyl: &kernel::CylinderFace, mb: &ModelBody) -> Re
     let s1 = if open1 { t.end + p } else { t.end };
     let plane = Plane { origin: t.axis_point, x: u, y: *k };
     let ring = [Vec2::new(r, s0), Vec2::new(out, s0), Vec2::new(out, s1), Vec2::new(r, s1)];
-    let region = Region2 { outer: solidcraft_geom::Loop2::polygon(&ring), holes: vec![] };
+    let region = Region2 { outer: polycore_geom::Loop2::polygon(&ring), holes: vec![] };
     let ring = kernel::revolve(&plane, &[region], Vec2::ZERO, Vec2::Y, std::f64::consts::TAU)?
         .into_iter()
         .next()
@@ -1207,7 +1207,7 @@ const QUANTUM: f64 = 1e-6;
 
 /// Put what a solve writes into a sketch on the [`QUANTUM`] grid: positions, radii and the
 /// measured values of driven dimensions.
-fn quantize(sk: &mut solidcraft_sketch::Sketch) {
+fn quantize(sk: &mut polykrom_sketch::Sketch) {
     let q = |v: f64| (v / QUANTUM).round() * QUANTUM;
     for p in &mut sk.points {
         p.pos = Vec2::new(q(p.pos.x), q(p.pos.y));
@@ -1250,7 +1250,7 @@ fn feature_json(f: &Feature, steps: &StepDigests) -> String {
 /// constraints' values. Nothing else: what evaluation derives for its own copy (an offset's
 /// upgraded topology, refreshed links) stays out of the stored sketch. A `solved` that does not
 /// match `stored` entity for entity is not adopted.
-fn adopt_solution(stored: &mut solidcraft_sketch::Sketch, solved: &solidcraft_sketch::Sketch) {
+fn adopt_solution(stored: &mut polykrom_sketch::Sketch, solved: &polykrom_sketch::Sketch) {
     if stored.points.len() != solved.points.len()
         || stored.curves.len() != solved.curves.len()
         || stored.constraints.len() != solved.constraints.len()
@@ -1448,13 +1448,13 @@ impl PlacementReads {
     /// are read through the reader's whole placement).
     fn sketch(&mut self, doc: &Document, id: u64) {
         self.components.insert(doc.feature(id).map(|f| f.component).unwrap_or(0));
-        if doc.sketch(id).is_ok_and(|sk| sk.wires.iter().any(|w| w.space == solidcraft_sketch::WireSpace::World)) {
+        if doc.sketch(id).is_ok_and(|sk| sk.wires.iter().any(|w| w.space == polykrom_sketch::WireSpace::World)) {
             self.components.insert(0);
         }
     }
 
-    fn link(&mut self, doc: &Document, st: Option<&ModelState>, source: &solidcraft_sketch::LinkSource) {
-        use solidcraft_sketch::LinkSource as L;
+    fn link(&mut self, doc: &Document, st: Option<&ModelState>, source: &polykrom_sketch::LinkSource) {
+        use polykrom_sketch::LinkSource as L;
         match source {
             L::Edge { body, .. } | L::Face { body, .. } | L::Body { body } | L::Vertex { body, .. } | L::Iso { body, .. } | L::Spun { body, .. } => {
                 self.body(doc, st, body)
@@ -1722,7 +1722,7 @@ impl Model {
     /// recomputed; the next [`Model::evaluate`] recomputes from the sketch on. Returns `false`,
     /// changing nothing, when the sketch has no evaluated result or a feature before it is
     /// already stale (only a full evaluation brings that up to date).
-    pub fn show_live_sketch(&mut self, feature: u64, sketch: solidcraft_sketch::Sketch, report: SolveReport) -> bool {
+    pub fn show_live_sketch(&mut self, feature: u64, sketch: polykrom_sketch::Sketch, report: SolveReport) -> bool {
         let Some(i) = self.results.iter().position(|r| r.id == feature) else { return false };
         if self.results.iter().take(i).any(|r| r.stale) {
             return false;
@@ -1735,7 +1735,7 @@ impl Model {
             name: last.name.clone(),
             plane: last.plane,
             profiles: find_profiles(&sketch),
-            ends: solidcraft_sketch::loose_ends(&sketch),
+            ends: polykrom_sketch::loose_ends(&sketch),
             sketch,
             report,
         });
@@ -2379,9 +2379,9 @@ pub fn select_profiles(ss: &SolvedSketch, sel: &ProfileSel) -> Result<Vec<Region
         // edges) only counts when the drawn curves alone make no profile. Text is drawn, and
         // its letters keep their counters as holes (the counters are not filled in).
         ProfileSel::All => {
-            let drawn = solidcraft_sketch::find_drawn_profiles(&ss.sketch);
+            let drawn = polykrom_sketch::find_drawn_profiles(&ss.sketch);
             let chosen = if drawn.is_empty() { ps.clone() } else { drawn };
-            solidcraft_sketch::without_text_counters(&ss.sketch, chosen).into_iter().map(|p| p.region).collect()
+            polykrom_sketch::without_text_counters(&ss.sketch, chosen).into_iter().map(|p| p.region).collect()
         }
         ProfileSel::Indices { indices } => {
             // A design file may list a profile more than once; it is still one profile.
@@ -2409,7 +2409,7 @@ pub fn select_profiles(ss: &SolvedSketch, sel: &ProfileSel) -> Result<Vec<Region
             let mut v = Vec::new();
             for p in points {
                 // Innermost profile containing the point.
-                let found = solidcraft_sketch::profile_at_point(ps, *p).and_then(|i| ps.get(i));
+                let found = polykrom_sketch::profile_at_point(ps, *p).and_then(|i| ps.get(i));
                 v.push(found.ok_or_else(|| DocError::Unknown(format!("profile at {:?} in {}", [p.x, p.y], ss.name)))?.region.clone());
             }
             v
@@ -2422,12 +2422,12 @@ pub fn select_profiles(ss: &SolvedSketch, sel: &ProfileSel) -> Result<Vec<Region
 }
 
 /// The error for a profile picked by curves that no longer names exactly one profile.
-pub fn curve_pick_error(e: solidcraft_sketch::CurvePick, ids: &[String], sketch: &str) -> DocError {
+pub fn curve_pick_error(e: polykrom_sketch::CurvePick, ids: &[String], sketch: &str) -> DocError {
     match e {
-        solidcraft_sketch::CurvePick::Missing => DocError::Invalid(format!(
+        polykrom_sketch::CurvePick::Missing => DocError::Invalid(format!(
             "no profile of {sketch} is bounded by exactly the curves {ids:?} (a curve was deleted, or another curve now cuts the region)"
         )),
-        solidcraft_sketch::CurvePick::Ambiguous(n) => DocError::Invalid(format!(
+        polykrom_sketch::CurvePick::Ambiguous(n) => DocError::Invalid(format!(
             "{n} profiles of {sketch} are bounded by exactly the curves {ids:?}; add a curve that tells them apart, or pick by index or point"
         )),
     }
@@ -2967,7 +2967,7 @@ pub fn through_all_distance(st: &ModelState, plane: &Plane, targets: &[String]) 
 /// Sample points inside a region (sketch coordinates).
 fn region_samples(r: &Region2) -> Vec<Vec2> {
     let mut out = vec![r.interior_point()];
-    let solidcraft_geom::Aabb2 { min: lo, max: hi } = r.outer.polyline(1e-2).bounds();
+    let polycore_geom::Aabb2 { min: lo, max: hi } = r.outer.polyline(1e-2).bounds();
     for i in 0..5 {
         for j in 0..5 {
             let p = Vec2::new(lo.x + (hi.x - lo.x) * (0.1 + 0.2 * i as f64), lo.y + (hi.y - lo.y) * (0.1 + 0.2 * j as f64));
@@ -3067,7 +3067,7 @@ impl<'a> Surroundings<'a> {
     fn harmless(&self, plane: &Plane, pieces: &[[Vec2; 3]], margin: f64, lo: f64, hi: f64) -> bool {
         let n = plane.normal();
         let faces: Vec<([Vec3; 3], f64)> = pieces.iter().map(|t| (t.map(|p| plane.to_world(p)), margin)).collect();
-        let mut space = solidcraft_geom::Aabb3::EMPTY;
+        let mut space = polycore_geom::Aabb3::EMPTY;
         for p in faces.iter().flat_map(|(t, _)| t) {
             space.add(*p + n * lo);
             space.add(*p + n * hi);
@@ -3094,8 +3094,8 @@ impl<'a> Surroundings<'a> {
 
 /// The outward normal (away from the profile) at parameter `t` of a segment of a
 /// counterclockwise loop: the tangent turned clockwise.
-fn outward(s: &solidcraft_geom::Seg2, t: f64) -> Option<Vec2> {
-    use solidcraft_geom::Seg2;
+fn outward(s: &polycore_geom::Seg2, t: f64) -> Option<Vec2> {
+    use polycore_geom::Seg2;
     match *s {
         Seg2::Line { a, b } => (b - a).normalized().map(|d| Vec2::new(d.y, -d.x)),
         Seg2::Arc { start, sweep, .. } => Some(Vec2::from_angle(start + sweep * t) * sweep.signum()),
@@ -3108,8 +3108,8 @@ fn outward(s: &solidcraft_geom::Seg2, t: f64) -> Option<Vec2> {
 /// radius. `None` when an edge would turn round (too short for the move), edges in one line
 /// would part, a segment would leave a tangent neighbour behind, or an arc would move at a
 /// sharp corner.
-fn offset_segs(segs: &[solidcraft_geom::Seg2], grow: &[bool], by: f64) -> Option<Vec<solidcraft_geom::Seg2>> {
-    use solidcraft_geom::Seg2;
+fn offset_segs(segs: &[polycore_geom::Seg2], grow: &[bool], by: f64) -> Option<Vec<polycore_geom::Seg2>> {
+    use polycore_geom::Seg2;
     let n = segs.len();
     let tangent = |a: &Seg2, b: &Seg2| a.end_tangent().cross(b.start_tangent()).abs() < 1e-6 && a.end_tangent().dot(b.start_tangent()) > 0.0;
     let step = |g: bool| if g { by } else { 0.0 };
@@ -3168,7 +3168,7 @@ fn offset_segs(segs: &[solidcraft_geom::Seg2], grow: &[bool], by: f64) -> Option
 /// line move together or not at all; arcs move only where both of their ends meet tangent
 /// neighbours that move with them, otherwise the loop is left as it is.
 fn grow_profile_for_coplanar(sur: &Surroundings, r: &Region2, probe: &dyn Fn(Vec2) -> Vec<Vec3>, gains: &dyn Fn(&[[Vec2; 3]]) -> bool) -> Region2 {
-    use solidcraft_geom::Seg2;
+    use polycore_geom::Seg2;
     let delta = (sur.size * 0.005).max(1e-3);
     let lp = r.outer.ccw();
     let segs = &lp.segs;
@@ -3258,7 +3258,7 @@ fn grow_profile_for_coplanar(sur: &Surroundings, r: &Region2, probe: &dyn Fn(Vec
         }
         if !dropped {
             return match offset_segs(segs, &grow, delta) {
-                Some(segs) => Region2 { outer: solidcraft_geom::Loop2 { segs }, holes: r.holes.clone() },
+                Some(segs) => Region2 { outer: polycore_geom::Loop2 { segs }, holes: r.holes.clone() },
                 None => r.clone(),
             };
         }
@@ -3307,7 +3307,7 @@ fn extend_for_coplanar(sur: &Surroundings, plane: &Plane, r: &Region2, lo: f64, 
     };
     // The profile's triangles; curved sides stand off their chords by up to `chord`.
     let chord = (size * 2e-4).max(1e-6);
-    let straight = std::iter::once(&r.outer).chain(&r.holes).flat_map(|l| &l.segs).all(|s| matches!(s, solidcraft_geom::Seg2::Line { .. }));
+    let straight = std::iter::once(&r.outer).chain(&r.holes).flat_map(|l| &l.segs).all(|s| matches!(s, polycore_geom::Seg2::Line { .. }));
     let ok_beyond = |h: f64, dir: f64, step: f64| {
         let sampled = samples.iter().all(|s| {
             let base = plane.to_world(*s);
@@ -3338,7 +3338,7 @@ fn extend_for_coplanar(sur: &Surroundings, plane: &Plane, r: &Region2, lo: f64, 
 /// against the targets' faces, with the same clearance used when extending ends.
 fn trim_embedded_join_ends(sur: &Surroundings, plane: &Plane, r: &Region2, lo: f64, hi: f64) -> (f64, f64) {
     if sur.op != Operation::Join
-        || !std::iter::once(&r.outer).chain(&r.holes).flat_map(|l| &l.segs).all(|s| matches!(s, solidcraft_geom::Seg2::Line { .. }))
+        || !std::iter::once(&r.outer).chain(&r.holes).flat_map(|l| &l.segs).all(|s| matches!(s, polycore_geom::Seg2::Line { .. }))
     {
         return (lo, hi);
     }
@@ -3385,7 +3385,7 @@ fn taper_run_on_fits(st: &ModelState, start: &Plane, dir: Vec3, r: &Region2, dep
     let want = op == Operation::Join;
     // Each loop counterclockwise with the side away from the material: right of the outer loop,
     // left of a hole.
-    let loops: Vec<(solidcraft_geom::Loop2, f64)> = std::iter::once((r.outer.ccw(), 1.0)).chain(r.holes.iter().map(|h| (h.ccw(), -1.0))).collect();
+    let loops: Vec<(polycore_geom::Loop2, f64)> = std::iter::once((r.outer.ccw(), 1.0)).chain(r.holes.iter().map(|h| (h.ccw(), -1.0))).collect();
     let count: usize = loops.iter().map(|(l, _)| l.segs.len()).sum();
     if count > MAX_SEGMENTS {
         return false;
@@ -4154,7 +4154,7 @@ fn hole_tools_and_prisms(
     let seam = std::cell::Cell::new(0.0);
     let disc = |rad: f64| {
         seam.set(seam.get() + 0.613);
-        Region2 { outer: solidcraft_geom::Loop2::circle_from(Vec2::ZERO, rad, seam.get()), holes: vec![] }
+        Region2 { outer: polycore_geom::Loop2::circle_from(Vec2::ZERO, rad, seam.get()), holes: vec![] }
     };
     let cyl = |rad: f64, lo: f64, hi: f64, part: &str| -> Result<(Traced, Option<more::PrimitivePrism>)> {
         let tool = kernel::extrude(&plane, &[disc(rad)], lo, hi)?.pop().ok_or_else(|| DocError::Invalid("hole tool".into()))?;
@@ -4180,7 +4180,7 @@ fn hole_tools_and_prisms(
                 let side = up.any_perp();
                 let rp = Plane::new(*position, side, up).ok_or_else(|| DocError::Invalid("hole axis".into()))?;
                 let pts = [Vec2::new(0.0, top), Vec2::new(r, top), Vec2::new(r, bottom), Vec2::new(0.0, bottom - tip)];
-                let region = Region2 { outer: solidcraft_geom::Loop2::polygon(&pts), holes: vec![] };
+                let region = Region2 { outer: polycore_geom::Loop2::polygon(&pts), holes: vec![] };
                 tools.extend(
                     kernel::revolve(&rp, &[region], Vec2::ZERO, Vec2::Y, std::f64::consts::TAU)?
                         .into_iter()
@@ -4344,7 +4344,7 @@ fn whole_face_tool(
     }
     // An outline of lines and arcs is the face's own: the profile's tool already meets the body
     // exactly, and keeps the names later features attach to (#489).
-    if r.outer.segs.iter().all(|s| matches!(s, solidcraft_geom::Seg2::Line { .. } | solidcraft_geom::Seg2::Arc { .. })) {
+    if r.outer.segs.iter().all(|s| matches!(s, polycore_geom::Seg2::Line { .. } | polycore_geom::Seg2::Arc { .. })) {
         return None;
     }
     let mut candidates = st.bodies.iter().filter(|b| targets.is_empty() || targets.contains(&b.name));
@@ -4384,10 +4384,10 @@ fn whole_face_tool(
             let reach = target.body.size() * 2.0 + (hi - lo);
             let c = r.outer.centroid();
             let p = |x: f64, y: f64| Vec2::new(c.x + x * reach, c.y + y * reach);
-            let line = |a: Vec2, b: Vec2| solidcraft_geom::Seg2::Line { a, b };
+            let line = |a: Vec2, b: Vec2| polycore_geom::Seg2::Line { a, b };
             let corners = [p(-1.0, -1.0), p(1.0, -1.0), p(1.0, 1.0), p(-1.0, 1.0)];
             let segs = (0..4).filter_map(|i| Some(line(*corners.get(i)?, *corners.get((i + 1) % 4)?))).collect();
-            let slab = Region2 { outer: solidcraft_geom::Loop2 { segs }, holes: vec![] };
+            let slab = Region2 { outer: polycore_geom::Loop2 { segs }, holes: vec![] };
             let (l, h) = if up { (lo, hi + reach) } else { (lo - reach, hi) };
             let built = centered_extrude(&ss.plane, &slab, l, h, None).ok()?;
             let [built] = built.as_slice() else { return None };
@@ -4466,7 +4466,7 @@ pub(crate) fn thin_regions(vals: &BTreeMap<String, Value>, ss: &SolvedSketch, th
             Ok(ss.sketch.exact_segs(ci).unwrap_or_else(|| ss.sketch.segs(ci)))
         })
         .collect::<Result<Vec<_>>>()?;
-    solidcraft_sketch::thin_wall_regions(&curves, inside, outside).map_err(|e| DocError::Invalid(format!("thin wall: {e}")))
+    polykrom_sketch::thin_wall_regions(&curves, inside, outside).map_err(|e| DocError::Invalid(format!("thin wall: {e}")))
 }
 
 /// How far apart (mm) profiles must stay for their extruded tools to be cut as one.
@@ -4492,7 +4492,7 @@ fn feature_tools_with_constructor(
             )?;
             let regions = match thin {
                 Some(thin) => thin_regions(vals, &ss, thin)?,
-                None => solidcraft_sketch::merge_regions(&select_profiles(&ss, profiles)?),
+                None => polykrom_sketch::merge_regions(&select_profiles(&ss, profiles)?),
             };
             // From / To Object: where the face or point lies along the normal, measured over the
             // middle of the profiles. The points are in this feature's component frame, so the
@@ -4658,7 +4658,7 @@ fn feature_tools_with_constructor(
             let plain_targets: Vec<String> = crate::plain(targets);
             let exact_planar_cut = *operation == Operation::Cut
                 && ss.sketch.links.len() > 1
-                && ss.sketch.links.iter().all(|link| matches!(&link.source, solidcraft_sketch::LinkSource::Face { .. }))
+                && ss.sketch.links.iter().all(|link| matches!(&link.source, polykrom_sketch::LinkSource::Face { .. }))
                 && st
                     .bodies
                     .iter()
@@ -4670,7 +4670,7 @@ fn feature_tools_with_constructor(
             if *operation == Operation::Join
                 && regions.len() > 1
                 && ss.sketch.links.len() > 1
-                && ss.sketch.links.iter().all(|link| matches!(&link.source, solidcraft_sketch::LinkSource::Face { .. }))
+                && ss.sketch.links.iter().all(|link| matches!(&link.source, polykrom_sketch::LinkSource::Face { .. }))
             {
                 let exact = regions
                     .iter()
@@ -4832,7 +4832,7 @@ fn feature_tools_with_constructor(
                             cap_bindings.as_ref().and_then(|bindings| bindings.get(body_index)).cloned().unwrap_or_else(|| vec![None; curves.len()]);
                         // A cap moved off its designed height (into a Join target, or past a
                         // curved To face) is not the feature's start or end face.
-                        let nominal = |plane: &solidcraft_geom::Plane| {
+                        let nominal = |plane: &polycore_geom::Plane| {
                             let height = (plane.origin - ss.plane.origin).dot(n);
                             let tolerance = 1e-9 * (1.0 + height.abs() + (lo + off).abs() + (hi + off).abs());
                             (height - (lo + off)).abs() <= tolerance || (height - (hi + off)).abs() <= tolerance
@@ -4856,7 +4856,7 @@ fn feature_tools_with_constructor(
                 st.sketch(sketch.0).ok_or_else(|| DocError::Unknown(format!("sketch {sketch} (it must come earlier in the timeline)")))?,
                 f.component,
             )?;
-            let regions = solidcraft_sketch::merge_regions(&select_profiles(&ss, profiles)?);
+            let regions = polykrom_sketch::merge_regions(&select_profiles(&ss, profiles)?);
             let (o, d) = revolve_axis(&ss, axis, &|name| construction_axis_in(Some(doc), st, name, f.component))?;
             // To Object is in this feature's component frame: the model as seen from there.
             let tst = if to.is_some() { state_in_frame(doc, st, f.component) } else { std::borrow::Cow::Borrowed(st) };
@@ -5000,7 +5000,7 @@ fn feature_tools_with_constructor(
             let [a, b] = &sections[..] else { return Err(DocError::Invalid("not supported yet: a point section in a loft of more than two".into())) };
             let (prof, pt) = if a.point.is_some() { (b, a) } else { (a, b) };
             let ss = st.sketch(prof.sketch.0).ok_or_else(|| DocError::Unknown(format!("sketch {}", prof.sketch)))?;
-            let regions = solidcraft_sketch::merge_regions(&select_profiles(ss, &prof.profiles)?);
+            let regions = polykrom_sketch::merge_regions(&select_profiles(ss, &prof.profiles)?);
             let [r] = &regions[..] else { return Err(DocError::Invalid("each loft section must be one profile".into())) };
             refuse_loft_holes(r)?;
             let ps = st.sketch(pt.sketch.0).ok_or_else(|| DocError::Unknown(format!("sketch {}", pt.sketch)))?;
@@ -5037,10 +5037,10 @@ fn feature_tools_with_constructor(
             let plane = Plane { origin: *base, x, y: k };
             let c = Vec2::new(r, 0.0);
             let outer = match section {
-                crate::CoilSection::Circular => solidcraft_geom::Loop2::circle(c, s / 2.0),
+                crate::CoilSection::Circular => polycore_geom::Loop2::circle(c, s / 2.0),
                 crate::CoilSection::Square => {
                     let h = s / 2.0;
-                    solidcraft_geom::Loop2::polygon(&[c + Vec2::new(-h, -h), c + Vec2::new(h, -h), c + Vec2::new(h, h), c + Vec2::new(-h, h)])
+                    polycore_geom::Loop2::polygon(&[c + Vec2::new(-h, -h), c + Vec2::new(h, -h), c + Vec2::new(h, h), c + Vec2::new(-h, h)])
                 }
             };
             let region = Region2 { outer, holes: Vec::new() };
@@ -5056,7 +5056,7 @@ fn feature_tools_with_constructor(
                 let ss = st
                     .sketch(sec.sketch.0)
                     .ok_or_else(|| DocError::Unknown(format!("sketch {} (it must come earlier in the timeline)", sec.sketch)))?;
-                let regions = solidcraft_sketch::merge_regions(&select_profiles(ss, &sec.profiles)?);
+                let regions = polykrom_sketch::merge_regions(&select_profiles(ss, &sec.profiles)?);
                 let [r] = &regions[..] else { return Err(DocError::Invalid("each loft section must be one profile".into())) };
                 secs.push((ss.plane, r.clone()));
                 sketches.push(ss);
@@ -5094,7 +5094,7 @@ fn feature_tools_with_constructor(
             };
             let mapped = path_in_frame(doc, ps, f.component)?;
             let ps = mapped.as_ref();
-            let regions = solidcraft_sketch::merge_regions(&select_profiles(ss, profiles)?);
+            let regions = polykrom_sketch::merge_regions(&select_profiles(ss, profiles)?);
             let start = regions.first().map(|r| ss.plane.to_world(r.centroid())).unwrap_or_default();
             let tool = |r: &Region2, body: Body| crate::lineage::ProfileRoles::swept(Some(ss), Some(r)).tool(body, None);
             let points = path_points(ps, path, start)?;
@@ -5234,14 +5234,14 @@ fn pipe_region(vals: &BTreeMap<String, Value>, r: f64, wall: &Option<crate::Expr
             if !(wt > 0.0 && wt < r) {
                 return Err(DocError::Invalid("the wall must be thinner than the radius".into()));
             }
-            vec![solidcraft_geom::Loop2::circle(Vec2::ZERO, r - wt).reversed()]
+            vec![polycore_geom::Loop2::circle(Vec2::ZERO, r - wt).reversed()]
         }
         None => Vec::new(),
     };
-    Ok(Region2 { outer: solidcraft_geom::Loop2::circle(Vec2::ZERO, r), holes })
+    Ok(Region2 { outer: polycore_geom::Loop2::circle(Vec2::ZERO, r), holes })
 }
 
-fn map_wire(wire: &mut solidcraft_sketch::Wire, matrix: &Mat) {
+fn map_wire(wire: &mut polykrom_sketch::Wire, matrix: &Mat) {
     for point in wire.pts.iter_mut().chain(&mut wire.fit) {
         *point = crate::apply_point(matrix, *point);
     }
@@ -5291,7 +5291,7 @@ fn path_in_frame<'a>(doc: &Document, sketch: &'a SolvedSketch, consumer: u64) ->
     )
     .ok_or_else(|| DocError::Invalid("path sketch frame is invalid".into()))?;
     for wire in &mut mapped.sketch.wires {
-        let matrix = if wire.space == solidcraft_sketch::WireSpace::Component { &relative } else { &inverse };
+        let matrix = if wire.space == polykrom_sketch::WireSpace::Component { &relative } else { &inverse };
         map_wire(wire, matrix);
     }
     Ok(Cow::Owned(mapped))
@@ -5368,7 +5368,7 @@ fn path_segments(ps: &SolvedSketch, ids: &[String], start: Vec3) -> Result<Vec<k
     if let Some(pts) = path_points(ps, ids, start)? {
         return Ok(pts.windows(2).map(|w| kernel::PathSeg::Line { a: w[0], b: w[1] }).collect());
     }
-    let mut segs: Vec<solidcraft_geom::Seg2> = Vec::new();
+    let mut segs: Vec<polycore_geom::Seg2> = Vec::new();
     for id in ids {
         let ci = ps.sketch.curve_index(id).ok_or_else(|| DocError::Unknown(format!("path curve `{id}`")))?;
         segs.extend(ps.sketch.segs(ci));
@@ -5402,12 +5402,12 @@ fn path_segments(ps: &SolvedSketch, ids: &[String], start: Vec3) -> Result<Vec<k
     Ok(segs
         .iter()
         .flat_map(|s| match *s {
-            solidcraft_geom::Seg2::Line { a, b } => vec![kernel::PathSeg::Line { a: w(a), b: w(b) }],
-            solidcraft_geom::Seg2::Arc { center, sweep, .. } => {
+            polycore_geom::Seg2::Line { a, b } => vec![kernel::PathSeg::Line { a: w(a), b: w(b) }],
+            polycore_geom::Seg2::Arc { center, sweep, .. } => {
                 vec![kernel::PathSeg::Arc { a: w(s.start()), center: w(center), axis: n * sweep.signum(), angle: sweep.abs() }]
             }
             // Free-form path curves are followed as polylines.
-            solidcraft_geom::Seg2::Cubic { .. } | solidcraft_geom::Seg2::Conic { .. } | solidcraft_geom::Seg2::Bezier { .. } => {
+            polycore_geom::Seg2::Cubic { .. } | polycore_geom::Seg2::Conic { .. } | polycore_geom::Seg2::Bezier { .. } => {
                 s.polyline(1e-2).windows(2).map(|q| kernel::PathSeg::Line { a: w(q[0]), b: w(q[1]) }).collect()
             }
         })
@@ -6459,7 +6459,7 @@ fn eval_feature(doc: &Document, vals: &BTreeMap<String, Value>, f: &Feature, st:
             }
             sk.validate_periodic_splines()?;
             let profiles = find_profiles(&sk);
-            let ends = solidcraft_sketch::loose_ends(&sk);
+            let ends = polykrom_sketch::loose_ends(&sk);
             st.sketches.retain(|s| s.feature != f.id);
             st.sketches.push(Arc::new(SolvedSketch { feature: f.id, name: f.name.clone(), plane, sketch: sk, report, profiles, ends }));
             Ok(())
@@ -6698,7 +6698,7 @@ fn eval_feature(doc: &Document, vals: &BTreeMap<String, Value>, f: &Feature, st:
                 (None, Some(sid)) => {
                     let ss = st.sketch(sid.0).ok_or_else(|| DocError::Unknown(format!("sketch {sid}")))?;
                     // Each curve's exact segments (lines and arcs split by their own plane and cylinder).
-                    let curves: Vec<Vec<solidcraft_geom::Seg2>> = (0..ss.sketch.curves.len())
+                    let curves: Vec<Vec<polycore_geom::Seg2>> = (0..ss.sketch.curves.len())
                         .filter(|ci| ss.sketch.curves.get(*ci).is_some_and(|c| !c.construction))
                         .map(|ci| ss.sketch.segs(ci))
                         .filter(|segs| !segs.is_empty())
@@ -7147,7 +7147,7 @@ fn eval_feature(doc: &Document, vals: &BTreeMap<String, Value>, f: &Feature, st:
         FeatureKind::FrameMember { .. } => frame_member::evaluate(doc, vals, f, st),
         FeatureKind::BoundingSolid { bodies, margin } => {
             let m = val(vals, margin, Kind::Length)?;
-            let mut bb = solidcraft_geom::Aabb3::EMPTY;
+            let mut bb = polycore_geom::Aabb3::EMPTY;
             for b in st.bodies.iter().filter(|b| bodies.is_empty() || bodies.iter().any(|t| *t == b.name)) {
                 bb = bb.union(&b.mesh().bounds());
             }
@@ -7584,7 +7584,7 @@ pub fn state_in_frame_at<'a>(doc: &Document, st: &'a ModelState, comp: u64, fram
         .collect();
     let sketch_m: Vec<Mat> = st.sketches.iter().map(|s| rel(comp_of_feature(s.feature), None)).collect();
     let world_wires_need_mapping = !crate::is_identity(&inv)
-        && st.sketches.iter().any(|sketch| sketch.sketch.wires.iter().any(|wire| wire.space == solidcraft_sketch::WireSpace::World));
+        && st.sketches.iter().any(|sketch| sketch.sketch.wires.iter().any(|wire| wire.space == polykrom_sketch::WireSpace::World));
     if body_m.iter().chain(&sketch_m).all(crate::is_identity) && !world_wires_need_mapping {
         return Cow::Borrowed(st);
     }
@@ -7609,7 +7609,7 @@ pub fn state_in_frame_at<'a>(doc: &Document, st: &'a ModelState, comp: u64, fram
     }
     for (s, m) in out.sketches.iter_mut().zip(&sketch_m) {
         // Only a sketch the frame moves is copied.
-        let maps_wire = |w: &solidcraft_sketch::Wire| !crate::is_identity(if w.space == solidcraft_sketch::WireSpace::Component { m } else { &inv });
+        let maps_wire = |w: &polykrom_sketch::Wire| !crate::is_identity(if w.space == polykrom_sketch::WireSpace::Component { m } else { &inv });
         if crate::is_identity(m) && !s.sketch.wires.iter().any(maps_wire) {
             continue;
         }
@@ -7620,7 +7620,7 @@ pub fn state_in_frame_at<'a>(doc: &Document, st: &'a ModelState, comp: u64, fram
             s.plane = np;
         }
         for wire in &mut s.sketch.wires {
-            let matrix = if wire.space == solidcraft_sketch::WireSpace::Component { m } else { &inv };
+            let matrix = if wire.space == polykrom_sketch::WireSpace::Component { m } else { &inv };
             map_wire(wire, matrix);
         }
     }
@@ -7774,7 +7774,7 @@ pub fn world_state_reusing(doc: &Document, st: &ModelState, placed_before: &mut 
                     }
                 }
                 for wire in &mut s2.sketch.wires {
-                    if wire.space == solidcraft_sketch::WireSpace::Component {
+                    if wire.space == polykrom_sketch::WireSpace::Component {
                         map_wire(wire, &m);
                     }
                 }
@@ -7995,12 +7995,12 @@ mod coplanar_growth_tests {
 
     fn rect(x0: f64, y0: f64, x1: f64, y1: f64) -> Region2 {
         let p = Vec2::new;
-        Region2 { outer: solidcraft_geom::Loop2::polygon(&[p(x0, y0), p(x1, y0), p(x1, y1), p(x0, y1)]), holes: Vec::new() }
+        Region2 { outer: polycore_geom::Loop2::polygon(&[p(x0, y0), p(x1, y0), p(x1, y1), p(x0, y1)]), holes: Vec::new() }
     }
 
     /// The rectangle `x0` … `x1` by `y0` … `y1` with its corners rounded to `rad`, counterclockwise.
     fn rounded(x0: f64, y0: f64, x1: f64, y1: f64, rad: f64) -> Region2 {
-        use solidcraft_geom::Seg2;
+        use polycore_geom::Seg2;
         let p = Vec2::new;
         let quarter = std::f64::consts::FRAC_PI_2;
         let arc = |cx: f64, cy: f64, k: f64| Seg2::Arc { center: p(cx, cy), radius: rad, start: k * quarter, sweep: quarter };
@@ -8014,7 +8014,7 @@ mod coplanar_growth_tests {
             Seg2::Line { a: p(x0, y1 - rad), b: p(x0, y0 + rad) },
             arc(x0 + rad, y0 + rad, 2.0),
         ];
-        Region2 { outer: solidcraft_geom::Loop2 { segs }, holes: Vec::new() }
+        Region2 { outer: polycore_geom::Loop2 { segs }, holes: Vec::new() }
     }
 
     /// The extrude's growth of `r` (a cut from the plane z = `z`, `lo` … `hi` along +z), as
@@ -8100,7 +8100,7 @@ mod coplanar_growth_tests {
         };
         add(cube(Vec3::new(20.0, 10.0, 4.0)), plate, "Plate");
         add(cube(Vec3::new(20.0, 10.0, 4.2)), other, "Block");
-        let mut sk = solidcraft_sketch::Sketch::new();
+        let mut sk = polykrom_sketch::Sketch::new();
         let pts: Vec<usize> =
             [(2.0, 2.0), (4.0, 2.0), (4.0, 4.0), (2.0, 4.0)].iter().map(|(x, y)| sk.add_point(Vec2::new(*x, *y), None).unwrap()).collect();
         for k in 0..4 {
@@ -8183,7 +8183,7 @@ pub fn sketch_line_plane(st: &ModelState, sketch: u64, line: &str) -> Result<Pla
     let ss = st.sketch(sketch).ok_or_else(|| DocError::Unknown(format!("sketch {sketch}")))?;
     let ci = ss.sketch.curve_index(line).ok_or_else(|| DocError::Unknown(format!("curve `{line}`")))?;
     let (a, b) = match ss.sketch.segs(ci).as_slice() {
-        [solidcraft_geom::Seg2::Line { a, b }] => (*a, *b),
+        [polycore_geom::Seg2::Line { a, b }] => (*a, *b),
         _ => return Err(DocError::Invalid(format!("`{line}` is not a straight line: split by a sketch line"))),
     };
     let (wa, wb) = (ss.plane.to_world(a), ss.plane.to_world(b));

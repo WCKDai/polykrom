@@ -11,9 +11,9 @@
 
 use std::collections::{BTreeMap, BTreeSet, HashSet, VecDeque};
 
-use solidcraft_doc::joints::{self, Joint, JointKind};
-use solidcraft_doc::{Document, IDENTITY, MAX_PLACEMENT_DEPTH, MAX_PLACEMENTS, Mat, ModelState, Occurrence, apply_point, mat_inverse, mat_mul};
-use solidcraft_geom::{Mesh, Vec3};
+use polycore_geom::{Mesh, Vec3};
+use polykrom_doc::joints::{self, Joint, JointKind};
+use polykrom_doc::{Document, IDENTITY, MAX_PLACEMENT_DEPTH, MAX_PLACEMENTS, Mat, ModelState, Occurrence, apply_point, mat_inverse, mat_mul};
 
 use crate::{IoError, Result, SolidMesh, solid_mesh, stl_binary};
 
@@ -273,7 +273,7 @@ fn parts(doc: &Document, st: &ModelState, stem: &str, names: &mut Names, out: &m
             // (placed as the mesh is), and the inertia of the cracked mesh about its own centre,
             // scaled to that volume. An open sheet has none.
             let solid = !b.body.is_surface();
-            let brep = if solid { solidcraft_kernel::measure_mass(&b.body).ok().filter(|m| m.volume > 0.0) } else { None };
+            let brep = if solid { polycore::measure_mass(&b.body).ok().filter(|m| m.volume > 0.0) } else { None };
             match (brep, welded.mass_properties_open().filter(|m| m.volume > 0.0)) {
                 (Some(m), Some(mp)) => {
                     let centroid = doc.model_body_offset(b).map_or(m.centroid, |o| apply_point(o, m.centroid));

@@ -1,6 +1,6 @@
 //! Associative sketch patterns. Editing retains ids at surviving instance indices.
 
-use solidcraft_sketch::{PatternInstance, SketchPattern, SketchPatternKind};
+use polykrom_sketch::{PatternInstance, SketchPattern, SketchPatternKind};
 
 use super::*;
 use crate::cmd::{alignment_param, reversed_param};
@@ -8,7 +8,7 @@ use crate::cmd::{alignment_param, reversed_param};
 pub(super) fn run(s: &mut Session, p: &Value, circular: bool) -> Result<Value> {
     let cmd = if circular { "sketch.pattern.circular" } else { "sketch.pattern.rectangular" };
     let (out, info) = edit(s, p, cmd, true, |sk, doc| {
-        if sk.patterns.len() >= solidcraft_sketch::MAX_CONSTRAINTS {
+        if sk.patterns.len() >= polykrom_sketch::MAX_CONSTRAINTS {
             return Err(bad(cmd, "too many sketch patterns"));
         }
         let old_index = str_(p, "pattern").and_then(|id| sk.patterns.iter().position(|x| x.id == id));
@@ -79,7 +79,7 @@ pub(super) fn run(s: &mut Session, p: &Value, circular: bool) -> Result<Value> {
             match params.get("count") {
                 Some(Value::String(expression)) => {
                     let expression = expression.trim().to_string();
-                    let value = doc.eval(&expression, solidcraft_doc::expr::Kind::Unitless)?;
+                    let value = doc.eval(&expression, polykrom_doc::expr::Kind::Unitless)?;
                     params["count"] = json!(SketchPattern::circular_quantity(value)?);
                     Some(expression)
                 }

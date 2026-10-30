@@ -4,9 +4,9 @@
 //! unlocked; a mesh file one component. Undo takes the whole import away, and designs whose
 //! imports sit loose in a component open and rebuild as they did.
 
+use polycore::{ExportBody, ExportProduct, StepHeader, box_solid, step_export_products};
+use polycore_geom::{Aabb3, Vec3};
 use serde_json::{Value, json};
-use solidcraft_geom::{Aabb3, Vec3};
-use solidcraft_kernel::{ExportBody, ExportProduct, StepHeader, box_solid, step_export_products};
 
 use super::run;
 use crate::*;
@@ -67,20 +67,20 @@ fn rig_file(dir: &std::path::Path) -> String {
 
 /// Where the file itself puts its bodies: their bounding boxes, sorted.
 fn file_boxes(path: &str) -> Vec<[i64; 6]> {
-    let imp = solidcraft_kernel::step_import(&std::fs::read_to_string(path).unwrap()).unwrap();
-    let mut out: Vec<[i64; 6]> = imp.bodies.iter().map(|b| key(solidcraft_kernel::measure(&b.body).unwrap().bbox)).collect();
+    let imp = polycore::step_import(&std::fs::read_to_string(path).unwrap()).unwrap();
+    let mut out: Vec<[i64; 6]> = imp.bodies.iter().map(|b| key(polycore::measure(&b.body).unwrap().bbox)).collect();
     out.sort();
     out
 }
 
-fn key(b: solidcraft_geom::Aabb3) -> [i64; 6] {
+fn key(b: polycore_geom::Aabb3) -> [i64; 6] {
     let r = |v: f64| (v * 1000.0).round() as i64;
     [r(b.min.x), r(b.min.y), r(b.min.z), r(b.max.x), r(b.max.y), r(b.max.z)]
 }
 
 /// Where the design shows its bodies, sorted.
 fn shown_boxes(s: &Session) -> Vec<[i64; 6]> {
-    let mut out: Vec<[i64; 6]> = s.world_state().bodies.iter().map(|b| key(solidcraft_kernel::measure(&b.body).unwrap().bbox)).collect();
+    let mut out: Vec<[i64; 6]> = s.world_state().bodies.iter().map(|b| key(polycore::measure(&b.body).unwrap().bbox)).collect();
     out.sort();
     out
 }
@@ -113,7 +113,7 @@ fn corner_of(s: &Session, occurrence: &str) -> Vec3 {
     let names = s.occurrence_bodies(&path, true).unwrap();
     assert!(!names.is_empty());
     let world = s.world_state();
-    world.bodies.iter().filter(|b| names.contains(&b.name)).fold(Aabb3::EMPTY, |a, b| a.union(&solidcraft_kernel::measure(&b.body).unwrap().bbox)).min
+    world.bodies.iter().filter(|b| names.contains(&b.name)).fold(Aabb3::EMPTY, |a, b| a.union(&polycore::measure(&b.body).unwrap().bbox)).min
 }
 
 fn close(a: Vec3, b: Vec3) -> bool {
@@ -300,8 +300,8 @@ fn undo_takes_the_whole_import_away() {
 fn a_design_with_a_loose_import_rebuilds_unchanged() {
     let dir = temp_dir("loose");
     let path = rig_file(&dir);
-    let sf = solidcraft_io::step_import_feature(&std::fs::read(&path).unwrap(), &path).unwrap();
-    let mut doc = solidcraft_doc::Document::new("Old");
+    let sf = polykrom_io::step_import_feature(&std::fs::read(&path).unwrap(), &path).unwrap();
+    let mut doc = polykrom_doc::Document::new("Old");
     let id = doc.add_feature(sf.kind, Some(&sf.name)).unwrap();
     doc.feature_mut(id).unwrap().body_names = sf.body_names;
     // As a format 21 file (0.12.0) has it.

@@ -55,8 +55,8 @@ fn setup() -> Session {
     s
 }
 
-fn measure(s: &Session, body: &str) -> solidcraft_kernel::BodyMeasure {
-    solidcraft_kernel::measure(&s.world_state().body(body).unwrap().body).unwrap()
+fn measure(s: &Session, body: &str) -> polycore::BodyMeasure {
+    polycore::measure(&s.world_state().body(body).unwrap().body).unwrap()
 }
 
 fn loft(s: &mut Session, body: &str, extra: Value) -> Result<Value, String> {
@@ -94,7 +94,7 @@ fn a_rail_turns_a_loft_into_its_solid_of_revolution_and_stretching_is_an_edit() 
     assert!((m.bbox.max.x - 15.0).abs() < 1e-2, "{:?}", m.bbox);
     assert_eq!(face_names(&mut s, "Plain"), face_names(&mut s, "Vase"));
 
-    let doc = solidcraft_doc::Document::from_json(&s.doc.to_json()).unwrap();
+    let doc = polykrom_doc::Document::from_json(&s.doc.to_json()).unwrap();
     let reopened = Session::new(doc);
     assert!((measure(&reopened, "Vase").volume - m.volume).abs() < 1e-9 * volume);
 

@@ -2,9 +2,9 @@
 //! source mesh and map it into each pose; retain the exact placed B-rep separately in ModelBody.
 use std::sync::{Arc, OnceLock};
 
-use solidcraft_geom::tess::TessPlan;
-use solidcraft_geom::{Mesh, Vec3};
-use solidcraft_kernel::{self as kernel, Body};
+use polycore::{self as kernel, Body};
+use polycore_geom::tess::TessPlan;
+use polycore_geom::{Mesh, Vec3};
 
 use super::ModelBody;
 

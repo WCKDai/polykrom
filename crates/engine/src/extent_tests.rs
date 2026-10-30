@@ -59,7 +59,7 @@ fn extrude_to_a_planar_face_boundary_follows_it_after_reload() {
         run(&mut s, "solid.extrude", json!({"to": to, "to_offset": 2, "operation": "new", "body_name": "Post"}));
         let b = body(&mut s, "Post");
         assert!((b["bbox"]["min"][2].as_f64().unwrap() - 18.0).abs() < 1e-6, "{b}");
-        let doc = solidcraft_doc::Document::from_json(&s.doc.to_json()).unwrap();
+        let doc = polykrom_doc::Document::from_json(&s.doc.to_json()).unwrap();
         let mut cold = Session::new(doc);
         for current in [&mut s, &mut cold] {
             run(current, "parameters.change", json!({"name": "step_height", "expression": "15 mm"}));
@@ -143,13 +143,13 @@ fn revolve_to_a_cylinder_follows_it() {
         }
         let st = s.model.state();
         let (arc, post) = (st.body("Arc").unwrap(), st.body("Post").unwrap());
-        let overlap = solidcraft_kernel::boolean(&arc.body, &post.body, solidcraft_kernel::BoolOp::Intersect)
+        let overlap = polycore::boolean(&arc.body, &post.body, polycore::BoolOp::Intersect)
             .ok()
             .flatten()
-            .map(|b| solidcraft_kernel::measure(&b).map(|m| m.volume).unwrap_or(0.0))
+            .map(|b| polycore::measure(&b).map(|m| m.volume).unwrap_or(0.0))
             .unwrap_or(0.0);
         assert!(overlap < 1e-3, "no overlap: {overlap}");
-        let v = solidcraft_kernel::measure(&arc.body).unwrap().volume;
+        let v = polycore::measure(&arc.body).unwrap().volume;
         let full = PI * (225.0 - 100.0) * 5.0;
         // The post is at a quarter turn one way (three quarters the other): the ring stops
         // short of the post's centre line, within its half-width of it.

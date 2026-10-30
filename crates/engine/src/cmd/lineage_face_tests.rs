@@ -4,9 +4,9 @@
 //! (`FaceCertificate::Lineage`), follow the face through parameter edits and survive a save.
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 use crate::Session;
+use polykrom_doc::FaceAttachmentStatus;
+use polykrom_doc::config::FaceCertificate;
 use serde_json::{Value, json};
-use solidcraft_doc::FaceAttachmentStatus;
-use solidcraft_doc::config::FaceCertificate;
 
 fn run(s: &mut Session, command: &str, params: Value) -> Value {
     s.execute(command, &params).unwrap_or_else(|e| panic!("{command} {params}: {e}"))
@@ -22,7 +22,7 @@ fn status(s: &Session, sketch: &str) -> FaceAttachmentStatus {
     s.placed_document().sketch_face_attachment(id, &s.model)
 }
 
-fn healthy(s: &Session, sketch: &str) -> (solidcraft_geom::Plane, Option<FaceCertificate>) {
+fn healthy(s: &Session, sketch: &str) -> (polycore_geom::Plane, Option<FaceCertificate>) {
     match status(s, sketch) {
         FaceAttachmentStatus::Healthy { plane, target, .. } => (plane, target.certificate),
         other => panic!("{sketch}: {other:?}"),
@@ -34,7 +34,7 @@ fn no_errors(s: &Session) {
 }
 
 fn reopened(s: &Session) -> Session {
-    let mut t = Session::new(solidcraft_doc::Document::from_json(&s.doc.to_json()).unwrap());
+    let mut t = Session::new(polykrom_doc::Document::from_json(&s.doc.to_json()).unwrap());
     t.refresh();
     no_errors(&t);
     t
@@ -107,7 +107,7 @@ fn a_chamfer_face_takes_a_sketch_that_follows_the_chamfer() {
     let n = std::f64::consts::FRAC_1_SQRT_2;
     assert!((plane.normal().x - n).abs() < 1e-9 && (plane.normal().z - n).abs() < 1e-9, "{plane:?}");
     // A bigger chamfer moves the face inward: the sketch goes with it.
-    let height = |p: &solidcraft_geom::Plane| (p.origin - solidcraft_geom::Vec3::new(40., 0., 10.)).dot(p.normal());
+    let height = |p: &polycore_geom::Plane| (p.origin - polycore_geom::Vec3::new(40., 0., 10.)).dot(p.normal());
     assert!((height(&plane) + 3. * n).abs() < 1e-9, "{plane:?}");
     run(&mut s, "parameters.change", json!({"name": "bevel", "expression": "5 mm"}));
     no_errors(&s);
@@ -248,7 +248,7 @@ fn counterbore_floors_and_their_pattern_copies_take_a_sketch() {
 }
 
 /// The middle of the largest triangle of each flat face of the first body.
-fn flat_faces(s: &Session) -> Vec<(usize, solidcraft_geom::Vec3)> {
+fn flat_faces(s: &Session) -> Vec<(usize, polycore_geom::Vec3)> {
     let state = s.model.state();
     let body = &state.bodies[0].body;
     let mesh = body.tessellate(0.01).unwrap();
@@ -383,7 +383,7 @@ fn the_face_a_split_cuts_takes_a_sketch_and_an_offset_plane_that_follow_the_plan
             let feature = s.doc.find_feature(name).map(|f| f.id).unwrap();
             let state = s.model.state();
             match state.construct.iter().find(|c| c.feature == feature).map(|c| &c.geom) {
-                Some(solidcraft_doc::construct::ConstructGeom::Plane(p)) => *p,
+                Some(polykrom_doc::construct::ConstructGeom::Plane(p)) => *p,
                 other => panic!("{tool} {name}: {other:?}"),
             }
         };

@@ -3,8 +3,8 @@
 //! orthonormalised; a scale, shear or mirror is refused with the reason (a mirror is
 //! `solid.mirror`'s, not a placement's).
 
+use polykrom_doc::{IDENTITY, Mat};
 use serde_json::Value;
-use solidcraft_doc::{IDENTITY, Mat};
 
 use crate::Result;
 use crate::params::bad;

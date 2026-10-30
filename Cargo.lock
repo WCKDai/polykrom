@@ -3246,9 +3246,38 @@ dependencies = [
 ]
 
 [[package]]
+name = "polycore"
+version = "0.1.0"
+source = "git+https://github.com/WCKDai/polycore?rev=be450be69896de2b63c2cc5830587321be86fcfc#be450be69896de2b63c2cc5830587321be86fcfc"
+dependencies = [
+ "log",
+ "polycore-geom",
+ "polycore-truck-meshalgo",
+ "polycore-truck-modeling",
+ "polycore-truck-shapeops",
+ "polycore-truck-stepio",
+ "polycore-truck-topology",
+ "rayon",
+ "serde",
+ "serde_json",
+ "spade",
+ "thiserror 2.0.21",
+ "web-time",
+]
+
+[[package]]
+name = "polycore-geom"
+version = "0.1.0"
+source = "git+https://github.com/WCKDai/polycore?rev=be450be69896de2b63c2cc5830587321be86fcfc#be450be69896de2b63c2cc5830587321be86fcfc"
+dependencies = [
+ "serde",
+ "thiserror 2.0.21",
+]
+
+[[package]]
 name = "polycore-matext4cgmath"
 version = "0.1.0"
-source = "git+https://github.com/WCKDai/polycore?rev=d26e7aba5d17969f372f59893af4616476e2fb52#d26e7aba5d17969f372f59893af4616476e2fb52"
+source = "git+https://github.com/WCKDai/polycore?rev=be450be69896de2b63c2cc5830587321be86fcfc#be450be69896de2b63c2cc5830587321be86fcfc"
 dependencies = [
  "cgmath",
  "katexit",
@@ -3258,7 +3287,7 @@ dependencies = [
 [[package]]
 name = "polycore-truck-base"
 version = "0.5.0"
-source = "git+https://github.com/WCKDai/polycore?rev=d26e7aba5d17969f372f59893af4616476e2fb52#d26e7aba5d17969f372f59893af4616476e2fb52"
+source = "git+https://github.com/WCKDai/polycore?rev=be450be69896de2b63c2cc5830587321be86fcfc#be450be69896de2b63c2cc5830587321be86fcfc"
 dependencies = [
  "cgmath",
  "polycore-matext4cgmath",
@@ -3269,7 +3298,7 @@ dependencies = [
 [[package]]
 name = "polycore-truck-derivers"
 version = "0.1.0"
-source = "git+https://github.com/WCKDai/polycore?rev=d26e7aba5d17969f372f59893af4616476e2fb52#d26e7aba5d17969f372f59893af4616476e2fb52"
+source = "git+https://github.com/WCKDai/polycore?rev=be450be69896de2b63c2cc5830587321be86fcfc#be450be69896de2b63c2cc5830587321be86fcfc"
 dependencies = [
  "proc-macro-error",
  "proc-macro2",
@@ -3280,7 +3309,7 @@ dependencies = [
 [[package]]
 name = "polycore-truck-geometry"
 version = "0.5.0"
-source = "git+https://github.com/WCKDai/polycore?rev=d26e7aba5d17969f372f59893af4616476e2fb52#d26e7aba5d17969f372f59893af4616476e2fb52"
+source = "git+https://github.com/WCKDai/polycore?rev=be450be69896de2b63c2cc5830587321be86fcfc#be450be69896de2b63c2cc5830587321be86fcfc"
 dependencies = [
  "polycore-truck-base",
  "polycore-truck-geotrait",
@@ -3291,7 +3320,7 @@ dependencies = [
 [[package]]
 name = "polycore-truck-geotrait"
 version = "0.4.0"
-source = "git+https://github.com/WCKDai/polycore?rev=d26e7aba5d17969f372f59893af4616476e2fb52#d26e7aba5d17969f372f59893af4616476e2fb52"
+source = "git+https://github.com/WCKDai/polycore?rev=be450be69896de2b63c2cc5830587321be86fcfc#be450be69896de2b63c2cc5830587321be86fcfc"
 dependencies = [
  "getrandom 0.2.17",
  "polycore-truck-base",
@@ -3303,7 +3332,7 @@ dependencies = [
 [[package]]
 name = "polycore-truck-meshalgo"
 version = "0.4.0"
-source = "git+https://github.com/WCKDai/polycore?rev=d26e7aba5d17969f372f59893af4616476e2fb52#d26e7aba5d17969f372f59893af4616476e2fb52"
+source = "git+https://github.com/WCKDai/polycore?rev=be450be69896de2b63c2cc5830587321be86fcfc#be450be69896de2b63c2cc5830587321be86fcfc"
 dependencies = [
  "array-macro",
  "derive_more",
@@ -3321,7 +3350,7 @@ dependencies = [
 [[package]]
 name = "polycore-truck-modeling"
 version = "0.6.0"
-source = "git+https://github.com/WCKDai/polycore?rev=d26e7aba5d17969f372f59893af4616476e2fb52#d26e7aba5d17969f372f59893af4616476e2fb52"
+source = "git+https://github.com/WCKDai/polycore?rev=be450be69896de2b63c2cc5830587321be86fcfc#be450be69896de2b63c2cc5830587321be86fcfc"
 dependencies = [
  "derive_more",
  "polycore-truck-base",
@@ -3337,7 +3366,7 @@ dependencies = [
 [[package]]
 name = "polycore-truck-polymesh"
 version = "0.6.0"
-source = "git+https://github.com/WCKDai/polycore?rev=d26e7aba5d17969f372f59893af4616476e2fb52#d26e7aba5d17969f372f59893af4616476e2fb52"
+source = "git+https://github.com/WCKDai/polycore?rev=be450be69896de2b63c2cc5830587321be86fcfc#be450be69896de2b63c2cc5830587321be86fcfc"
 dependencies = [
  "array-macro",
  "bytemuck",
@@ -3352,7 +3381,7 @@ dependencies = [
 [[package]]
 name = "polycore-truck-shapeops"
 version = "0.4.0"
-source = "git+https://github.com/WCKDai/polycore?rev=d26e7aba5d17969f372f59893af4616476e2fb52#d26e7aba5d17969f372f59893af4616476e2fb52"
+source = "git+https://github.com/WCKDai/polycore?rev=be450be69896de2b63c2cc5830587321be86fcfc#be450be69896de2b63c2cc5830587321be86fcfc"
 dependencies = [
  "derive_more",
  "itertools 0.13.0",
@@ -3368,7 +3397,7 @@ dependencies = [
 [[package]]
 name = "polycore-truck-stepio"
 version = "0.3.0"
-source = "git+https://github.com/WCKDai/polycore?rev=d26e7aba5d17969f372f59893af4616476e2fb52#d26e7aba5d17969f372f59893af4616476e2fb52"
+source = "git+https://github.com/WCKDai/polycore?rev=be450be69896de2b63c2cc5830587321be86fcfc#be450be69896de2b63c2cc5830587321be86fcfc"
 dependencies = [
  "chrono",
  "polycore-truck-geometry",
@@ -3380,7 +3409,7 @@ dependencies = [
 [[package]]
 name = "polycore-truck-topology"
 version = "0.6.0"
-source = "git+https://github.com/WCKDai/polycore?rev=d26e7aba5d17969f372f59893af4616476e2fb52#d26e7aba5d17969f372f59893af4616476e2fb52"
+source = "git+https://github.com/WCKDai/polycore?rev=be450be69896de2b63c2cc5830587321be86fcfc#be450be69896de2b63c2cc5830587321be86fcfc"
 dependencies = [
  "parking_lot",
  "polycore-truck-base",
@@ -3390,6 +3419,225 @@ dependencies = [
  "rustc-hash 2.1.3",
  "serde",
  "thiserror 1.0.69",
+]
+
+[[package]]
+name = "polykrom"
+version = "0.21.0-rc.2"
+dependencies = [
+ "block2 0.6.2",
+ "eframe",
+ "egui",
+ "embed-resource",
+ "getrandom 0.3.4",
+ "hidapi",
+ "keyring",
+ "log",
+ "muda",
+ "objc2 0.6.5",
+ "objc2-app-kit 0.3.2",
+ "objc2-foundation 0.3.2",
+ "pollster 0.4.0",
+ "polykrom-3dx-client",
+ "polykrom-engine",
+ "polykrom-space-mouse",
+ "polykrom-ui-egui",
+ "quick-xml",
+ "raw-window-handle",
+ "rfd",
+ "ron",
+ "rustls",
+ "serde_json",
+ "ureq",
+ "windows-sys 0.61.2",
+ "winit",
+]
+
+[[package]]
+name = "polykrom-3dx-client"
+version = "0.21.0-rc.2"
+
+[[package]]
+name = "polykrom-cli"
+version = "0.21.0-rc.2"
+dependencies = [
+ "image",
+ "log",
+ "polykrom-engine",
+ "polykrom-gpu",
+ "polykrom-mcp",
+ "serde_json",
+]
+
+[[package]]
+name = "polykrom-derive"
+version = "0.21.0-rc.2"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.119",
+]
+
+[[package]]
+name = "polykrom-doc"
+version = "0.21.0-rc.2"
+dependencies = [
+ "log",
+ "polycore",
+ "polycore-geom",
+ "polykrom-derive",
+ "polykrom-render",
+ "polykrom-sketch",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "thiserror 2.0.21",
+ "web-time",
+]
+
+[[package]]
+name = "polykrom-engine"
+version = "0.21.0-rc.2"
+dependencies = [
+ "log",
+ "polycore",
+ "polycore-geom",
+ "polykrom-doc",
+ "polykrom-io",
+ "polykrom-render",
+ "polykrom-sketch",
+ "schemars",
+ "serde",
+ "serde_json",
+ "serde_path_to_error",
+ "thiserror 2.0.21",
+ "web-time",
+]
+
+[[package]]
+name = "polykrom-gpu"
+version = "0.21.0-rc.2"
+dependencies = [
+ "log",
+ "naga",
+ "pollster 0.4.0",
+ "polycore",
+ "polycore-geom",
+ "polykrom-engine",
+ "polykrom-render",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.21",
+ "wgpu",
+]
+
+[[package]]
+name = "polykrom-io"
+version = "0.21.0-rc.2"
+dependencies = [
+ "cadmpeg-core",
+ "cadmpeg-ir",
+ "cadmpeg-registry",
+ "chardetng",
+ "encoding_rs",
+ "gltf",
+ "log",
+ "polycore",
+ "polycore-geom",
+ "polykrom-doc",
+ "quick-xml",
+ "rustix 1.1.5",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "thiserror 2.0.21",
+ "zip",
+]
+
+[[package]]
+name = "polykrom-mcp"
+version = "0.21.0-rc.2"
+dependencies = [
+ "polykrom-engine",
+ "polykrom-gpu",
+ "serde_json",
+]
+
+[[package]]
+name = "polykrom-render"
+version = "0.21.0-rc.2"
+dependencies = [
+ "image",
+ "moxcms",
+ "png",
+ "polycore-geom",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "weezl",
+]
+
+[[package]]
+name = "polykrom-sketch"
+version = "0.21.0-rc.2"
+dependencies = [
+ "polycore-geom",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.21",
+ "ttf-parser",
+]
+
+[[package]]
+name = "polykrom-space-mouse"
+version = "0.21.0-rc.2"
+dependencies = [
+ "serde",
+]
+
+[[package]]
+name = "polykrom-ui-egui"
+version = "0.21.0-rc.2"
+dependencies = [
+ "arboard",
+ "egui",
+ "egui-wgpu",
+ "image",
+ "log",
+ "minisign-verify",
+ "nix 0.31.3",
+ "pollster 0.4.0",
+ "polykrom-engine",
+ "polykrom-gpu",
+ "polykrom-space-mouse",
+ "proc-macro2",
+ "semver",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "syn 2.0.119",
+ "tiny-skia",
+ "toml",
+ "ttf-parser",
+ "web-time",
+ "winreg",
+ "zip",
+]
+
+[[package]]
+name = "polykrom-web"
+version = "0.21.0-rc.2"
+dependencies = [
+ "eframe",
+ "egui",
+ "js-sys",
+ "log",
+ "polykrom-engine",
+ "polykrom-ui-egui",
+ "serde_json",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "web-sys",
 ]
 
 [[package]]
@@ -4283,254 +4531,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dd538fb6910ac1099850255cf94a94df6551fbdd602454387d0adb2d1ca6dead"
 dependencies = [
  "serde",
-]
-
-[[package]]
-name = "solidcraft"
-version = "0.21.0-rc.2"
-dependencies = [
- "block2 0.6.2",
- "eframe",
- "egui",
- "embed-resource",
- "getrandom 0.3.4",
- "hidapi",
- "keyring",
- "log",
- "muda",
- "objc2 0.6.5",
- "objc2-app-kit 0.3.2",
- "objc2-foundation 0.3.2",
- "pollster 0.4.0",
- "quick-xml",
- "raw-window-handle",
- "rfd",
- "ron",
- "rustls",
- "serde_json",
- "solidcraft-3dx-client",
- "solidcraft-engine",
- "solidcraft-space-mouse",
- "solidcraft-ui-egui",
- "ureq",
- "windows-sys 0.61.2",
- "winit",
-]
-
-[[package]]
-name = "solidcraft-3dx-client"
-version = "0.21.0-rc.2"
-
-[[package]]
-name = "solidcraft-cli"
-version = "0.21.0-rc.2"
-dependencies = [
- "image",
- "log",
- "serde_json",
- "solidcraft-engine",
- "solidcraft-gpu",
- "solidcraft-mcp",
-]
-
-[[package]]
-name = "solidcraft-derive"
-version = "0.21.0-rc.2"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.119",
-]
-
-[[package]]
-name = "solidcraft-doc"
-version = "0.21.0-rc.2"
-dependencies = [
- "log",
- "serde",
- "serde_json",
- "sha2 0.10.9",
- "solidcraft-derive",
- "solidcraft-geom",
- "solidcraft-kernel",
- "solidcraft-render",
- "solidcraft-sketch",
- "thiserror 2.0.21",
- "web-time",
-]
-
-[[package]]
-name = "solidcraft-engine"
-version = "0.21.0-rc.2"
-dependencies = [
- "log",
- "schemars",
- "serde",
- "serde_json",
- "serde_path_to_error",
- "solidcraft-doc",
- "solidcraft-geom",
- "solidcraft-io",
- "solidcraft-kernel",
- "solidcraft-render",
- "solidcraft-sketch",
- "thiserror 2.0.21",
- "web-time",
-]
-
-[[package]]
-name = "solidcraft-geom"
-version = "0.1.0"
-source = "git+https://github.com/WCKDai/polycore?rev=d26e7aba5d17969f372f59893af4616476e2fb52#d26e7aba5d17969f372f59893af4616476e2fb52"
-dependencies = [
- "serde",
- "thiserror 2.0.21",
-]
-
-[[package]]
-name = "solidcraft-gpu"
-version = "0.21.0-rc.2"
-dependencies = [
- "log",
- "naga",
- "pollster 0.4.0",
- "serde",
- "serde_json",
- "solidcraft-engine",
- "solidcraft-geom",
- "solidcraft-kernel",
- "solidcraft-render",
- "thiserror 2.0.21",
- "wgpu",
-]
-
-[[package]]
-name = "solidcraft-io"
-version = "0.21.0-rc.2"
-dependencies = [
- "cadmpeg-core",
- "cadmpeg-ir",
- "cadmpeg-registry",
- "chardetng",
- "encoding_rs",
- "gltf",
- "log",
- "quick-xml",
- "rustix 1.1.5",
- "serde",
- "serde_json",
- "sha2 0.10.9",
- "solidcraft-doc",
- "solidcraft-geom",
- "solidcraft-kernel",
- "thiserror 2.0.21",
- "zip",
-]
-
-[[package]]
-name = "solidcraft-kernel"
-version = "0.1.0"
-source = "git+https://github.com/WCKDai/polycore?rev=d26e7aba5d17969f372f59893af4616476e2fb52#d26e7aba5d17969f372f59893af4616476e2fb52"
-dependencies = [
- "log",
- "polycore-truck-meshalgo",
- "polycore-truck-modeling",
- "polycore-truck-shapeops",
- "polycore-truck-stepio",
- "polycore-truck-topology",
- "rayon",
- "serde",
- "serde_json",
- "solidcraft-geom",
- "spade",
- "thiserror 2.0.21",
- "web-time",
-]
-
-[[package]]
-name = "solidcraft-mcp"
-version = "0.21.0-rc.2"
-dependencies = [
- "serde_json",
- "solidcraft-engine",
- "solidcraft-gpu",
-]
-
-[[package]]
-name = "solidcraft-render"
-version = "0.21.0-rc.2"
-dependencies = [
- "image",
- "moxcms",
- "png",
- "serde",
- "serde_json",
- "sha2 0.10.9",
- "solidcraft-geom",
- "weezl",
-]
-
-[[package]]
-name = "solidcraft-sketch"
-version = "0.21.0-rc.2"
-dependencies = [
- "serde",
- "serde_json",
- "solidcraft-geom",
- "thiserror 2.0.21",
- "ttf-parser",
-]
-
-[[package]]
-name = "solidcraft-space-mouse"
-version = "0.21.0-rc.2"
-dependencies = [
- "serde",
-]
-
-[[package]]
-name = "solidcraft-ui-egui"
-version = "0.21.0-rc.2"
-dependencies = [
- "arboard",
- "egui",
- "egui-wgpu",
- "image",
- "log",
- "minisign-verify",
- "nix 0.31.3",
- "pollster 0.4.0",
- "proc-macro2",
- "semver",
- "serde",
- "serde_json",
- "sha2 0.10.9",
- "solidcraft-engine",
- "solidcraft-gpu",
- "solidcraft-space-mouse",
- "syn 2.0.119",
- "tiny-skia",
- "toml",
- "ttf-parser",
- "web-time",
- "winreg",
- "zip",
-]
-
-[[package]]
-name = "solidcraft-web"
-version = "0.21.0-rc.2"
-dependencies = [
- "eframe",
- "egui",
- "js-sys",
- "log",
- "serde_json",
- "solidcraft-engine",
- "solidcraft-ui-egui",
- "wasm-bindgen",
- "wasm-bindgen-futures",
- "web-sys",
 ]
 
 [[package]]

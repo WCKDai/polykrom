@@ -3,19 +3,19 @@
 
 use std::sync::Arc;
 
+use polykrom_doc::{FeatureKind, progress::Progress};
 use serde_json::json;
-use solidcraft_doc::{FeatureKind, progress::Progress};
 
 use crate::*;
 
 fn step_file(name: &str, count: usize) -> String {
     let bodies: Vec<_> = (0..count)
         .map(|i| {
-            let at = solidcraft_geom::Vec3::new((i % 32) as f64 * 12.0, (i / 32) as f64 * 12.0, 0.0);
-            solidcraft_kernel::box_solid(at, at + solidcraft_geom::Vec3::new(10.0, 10.0, 10.0)).unwrap()
+            let at = polycore_geom::Vec3::new((i % 32) as f64 * 12.0, (i / 32) as f64 * 12.0, 0.0);
+            polycore::box_solid(at, at + polycore_geom::Vec3::new(10.0, 10.0, 10.0)).unwrap()
         })
         .collect();
-    let text = solidcraft_kernel::step_export(&bodies.iter().collect::<Vec<_>>(), name).unwrap();
+    let text = polycore::step_export(&bodies.iter().collect::<Vec<_>>(), name).unwrap();
     let path = std::env::temp_dir().join(format!("solidcraft-883-{}-{name}.step", std::process::id()));
     std::fs::write(&path, text).unwrap();
     path.to_string_lossy().to_string()
@@ -68,7 +68,7 @@ fn cancelled_import_stops_and_leaves_the_design_alone() {
             progress.cancel();
         })
     };
-    let r = solidcraft_doc::progress::watch(progress.clone(), || s.execute("file.insert_step", &json!({"path": path})));
+    let r = polykrom_doc::progress::watch(progress.clone(), || s.execute("file.insert_step", &json!({"path": path})));
     canceller.join().unwrap();
     let err = r.unwrap_err().to_string();
     assert!(err.contains("cancelled"), "{err}");

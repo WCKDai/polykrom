@@ -3,7 +3,7 @@
 //! measured in the face's plane. The edges are found again by their persistent names, else by
 //! their stored points, so the hole follows them when the part changes.
 
-use solidcraft_geom::{Mesh, Vec3};
+use polycore_geom::{Mesh, Vec3};
 
 use crate::{DocError, ModelBody, ModelState, Result};
 

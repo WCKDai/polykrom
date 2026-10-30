@@ -12,8 +12,8 @@
 
 use std::collections::BTreeMap;
 
-use solidcraft_geom::{Mesh, Plane, Seg2, Vec2, Vec3};
-use solidcraft_sketch::{CurveKind, LinkGeom, LinkKind, LinkSource, Sketch};
+use polycore_geom::{Mesh, Plane, Seg2, Vec2, Vec3};
+use polykrom_sketch::{CurveKind, LinkGeom, LinkKind, LinkSource, Sketch};
 
 use crate::eval::ModelState;
 use crate::expr::Value;
@@ -252,10 +252,10 @@ fn resolve_uncached(
             }
         }
         LinkSource::SketchAxis { name } => {
-            vec![solidcraft_sketch::sketch_axis_geom(name).ok_or_else(|| DocError::Unknown(format!("sketch axis `{name}`")))?]
+            vec![polykrom_sketch::sketch_axis_geom(name).ok_or_else(|| DocError::Unknown(format!("sketch axis `{name}`")))?]
         }
         LinkSource::Text { text, at, height, angle, font, style, .. } if style.path.is_none() => {
-            solidcraft_sketch::text_geometry_styled(font.as_deref(), text, *at, *height, *angle, style, None)?
+            polykrom_sketch::text_geometry_styled(font.as_deref(), text, *at, *height, *angle, style, None)?
         }
         // Its path is a curve of its own sketch: set with the sketch (`Sketch::text_source_geometry`).
         LinkSource::Text { .. } => return Err(DocError::Invalid("a text on a path is set with its sketch".into())),
@@ -408,7 +408,7 @@ fn projection_face_edges(body: &crate::ModelBody, mesh: &Mesh, index: u32, plane
         .body
         .face_sources()
         .and_then(|sources| sources.get(index as usize))
-        .is_some_and(|source| matches!(source, Some(solidcraft_kernel::FaceSource::ShellPlanar { .. })));
+        .is_some_and(|source| matches!(source, Some(polycore::FaceSource::ShellPlanar { .. })));
     if shell_plane { order::raw_face_edges(mesh, index, plane) } else { order::face_edges(mesh, index, plane) }
 }
 
@@ -417,11 +417,11 @@ fn certified_planar_construction(body: &crate::ModelBody, index: usize) -> bool 
         matches!(
             source,
             Some(
-                solidcraft_kernel::FaceSource::ShellPlanar { producer: Some(_), .. }
-                    | solidcraft_kernel::FaceSource::Box { producer: Some(_), .. }
-                    | solidcraft_kernel::FaceSource::CylinderCap { .. }
-                    | solidcraft_kernel::FaceSource::CertifiedExtrudeSide { plane: Some(_), .. }
-                    | solidcraft_kernel::FaceSource::CertifiedExtrudeCap { .. }
+                polycore::FaceSource::ShellPlanar { producer: Some(_), .. }
+                    | polycore::FaceSource::Box { producer: Some(_), .. }
+                    | polycore::FaceSource::CylinderCap { .. }
+                    | polycore::FaceSource::CertifiedExtrudeSide { plane: Some(_), .. }
+                    | polycore::FaceSource::CertifiedExtrudeCap { .. }
             )
         )
     })
@@ -915,7 +915,7 @@ fn as_spline(pts: &[Vec2], tol: f64) -> Option<LinkGeom> {
         if fit.len() < 2 {
             return None;
         }
-        let poly = solidcraft_sketch::spline_polyline(&fit, false, 3);
+        let poly = polykrom_sketch::spline_polyline(&fit, false, 3);
         let ok = pts.iter().all(|q| {
             poly.windows(2)
                 .map(|w| {
