@@ -15,6 +15,12 @@ pub static COMMANDS: &[CommandSpec] = &[
         .noundo()
         .params("bodies?: [names] (default all; an open surface body gives its area with open: true, and no volume, centre of mass or mass); or items: [1-2 selections: {type: face|edge, body, point: [x,y,z] on it} (body_topology gives each face's and edge's point), {type: body, name}] → length/area/volume; diameter, radius, circumference or arc_length/angle_deg of circles, arcs and cylinders; slot sizes; min (distance_mm, from, to), max, center_distance (centre to centre, or from an axis) and angle"),
     CommandSpec::new("document.inspect", "Inspect Design", inspect).icon("inspect").noundo().params("measure?: bool (include body measurements)"),
+    CommandSpec::new("inspect.quality", "Model Quality", quality)
+        .at("SOLID", "INSPECT")
+        .icon("inspect")
+        .noundo()
+        .params("bodies?: [names] (default all); allow_open?: bool (default false); allow_underconstrained?: bool (default false); require_parameters?: bool (default false) \
+                 → a hard model-quality gate: unresolved parameters, failed features, under-constrained sketches, invalid/open bodies, and parametric/material warnings"),
     CommandSpec::new("sketch.inspect", "Inspect Sketch", sketch_inspect).icon("inspect").noundo().params("sketch?: id|name (default active)"),
     CommandSpec::new("model.edges", "List Edges", model_edges).icon("inspect").noundo().params("body: name"),
     CommandSpec::new("model.faces", "List Faces", model_faces).icon("inspect").noundo().params(
@@ -90,6 +96,128 @@ pub fn measure_json(b: &solidcraft_doc::ModelBody) -> Value {
         }),
         Err(e) => json!({"name": b.name, "error": e.to_string()}),
     }
+}
+
+/// A hard, read-only quality gate for a model. It reports facts the engine already knows; it
+/// never changes the design and never calls a model. `pass` means every hard check passed, not
+/// that the geometry is proved correct.
+fn quality(s: &mut Session, p: &Value) -> Result<Value> {
+    let (vals, perr) = s.doc.param_values();
+    let want = string_list(p, "bodies");
+    let allow_open = bool_(p, "allow_open").unwrap_or(false);
+    let allow_under = bool_(p, "allow_underconstrained").unwrap_or(false);
+    let require_params = bool_(p, "require_parameters").unwrap_or(false);
+    let st = s.model.state();
+    let marker = s.doc.marker.unwrap_or(s.doc.features.len());
+    let mut hard: Vec<String> = Vec::new();
+    let mut warnings: Vec<String> = Vec::new();
+    let mut checks: Vec<Value> = Vec::new();
+
+    let unresolved: Vec<&str> = s
+        .doc
+        .params
+        .iter()
+        .filter(|p| perr.contains_key(&p.name) || !vals.get(&p.name).is_some_and(|v| v.v.is_finite()))
+        .map(|p| p.name.as_str())
+        .collect();
+    if unresolved.is_empty() {
+        checks.push(json!({"id": "parameters", "status": "pass", "detail": format!("{} parameter(s) resolve to finite values", s.doc.params.len())}));
+    } else {
+        hard.push(format!("unresolved parameter(s): {}", unresolved.join(", ")));
+        checks.push(json!({"id": "parameters", "status": "fail", "items": unresolved}));
+    }
+    if require_params && s.doc.params.is_empty() {
+        hard.push("require_parameters is set but the design has no user parameters".into());
+    } else if s.doc.params.is_empty() {
+        warnings.push("no user parameters: this model is not driven parametrically".into());
+    }
+
+    let failed: Vec<String> = s
+        .doc
+        .features
+        .iter()
+        .enumerate()
+        .filter_map(|(i, f)| {
+            if i >= marker || f.suppressed {
+                return None;
+            }
+            s.model.result(f.id).and_then(|r| r.error.clone()).map(|e| format!("{}: {e}", f.name))
+        })
+        .collect();
+    if failed.is_empty() {
+        checks.push(json!({"id": "timeline", "status": "pass", "detail": "no active feature errors"}));
+    } else {
+        hard.extend(failed.iter().cloned());
+        checks.push(json!({"id": "timeline", "status": "fail", "items": failed}));
+    }
+
+    let under: Vec<String> =
+        st.sketches.iter().filter(|ss| !ss.report.fully_constrained()).map(|ss| format!("{} (dof {})", ss.name, ss.report.dof)).collect();
+    if under.is_empty() {
+        checks.push(json!({"id": "sketches", "status": "pass", "detail": format!("{} sketch(es) fully constrained", st.sketches.len())}));
+    } else if allow_under {
+        warnings.extend(under.iter().map(|x| format!("under-constrained: {x}")));
+        checks.push(json!({"id": "sketches", "status": "warn", "items": under}));
+    } else {
+        hard.extend(under.iter().map(|x| format!("under-constrained sketch: {x}")));
+        checks.push(json!({"id": "sketches", "status": "fail", "items": under}));
+    }
+
+    let selected: Vec<_> = st.bodies.iter().filter(|b| want.is_empty() || want.contains(&b.name)).collect();
+    let mut body_errors: Vec<String> = Vec::new();
+    let mut open: Vec<String> = Vec::new();
+    let mut no_material: Vec<String> = Vec::new();
+    for b in &selected {
+        match solidcraft_kernel::measure(&b.body) {
+            Ok(_) if b.body.is_surface() => open.push(b.name.clone()),
+            Ok(_) => {}
+            Err(e) => body_errors.push(format!("{}: {e}", b.name)),
+        }
+        if s.doc.body_material(b.definition_name()).is_empty() {
+            no_material.push(b.name.clone());
+        }
+    }
+    if selected.is_empty() {
+        hard.push("the design has no bodies".into());
+        checks.push(json!({"id": "bodies", "status": "fail", "detail": "no bodies"}));
+    } else if body_errors.is_empty() && (open.is_empty() || allow_open) {
+        checks.push(json!({"id": "bodies", "status": "pass", "detail": format!("{} body(ies) measure cleanly", selected.len())}));
+    } else {
+        if !body_errors.is_empty() {
+            hard.extend(body_errors.iter().map(|x| format!("invalid body: {x}")));
+        }
+        if !open.is_empty() {
+            if allow_open {
+                warnings.extend(open.iter().map(|x| format!("open surface body: {x}")));
+            } else {
+                hard.extend(open.iter().map(|x| format!("open surface body: {x}")));
+            }
+        }
+        checks.push(json!({"id": "bodies", "status": if body_errors.is_empty() && allow_open { "warn" } else { "fail" },
+                            "body_errors": body_errors, "open": open}));
+    }
+    if !no_material.is_empty() {
+        warnings.push(format!("no material assigned: {}", no_material.join(", ")));
+    }
+    let suppressed = s.doc.features.iter().filter(|f| f.suppressed).count();
+    if suppressed > 0 {
+        warnings.push(format!("{suppressed} suppressed feature(s); confirm they are intentional"));
+    }
+    if s.doc.units.trim().is_empty() {
+        warnings.push("document units are empty".into());
+    }
+
+    let score = (100_i64 - 25 * hard.len() as i64 - 5 * warnings.len() as i64).clamp(0, 100);
+    let verdict = if hard.is_empty() { "pass" } else { "fail" };
+    Ok(json!({
+        "verdict": verdict,
+        "score": score,
+        "hard_failures": hard,
+        "warnings": warnings,
+        "checks": checks,
+        "counts": {"parameters": s.doc.params.len(), "sketches": st.sketches.len(), "bodies": selected.len()},
+        "note": "A pass covers these structural checks only. It is not a proof of geometric correctness, tolerance, strength or safety.",
+    }))
 }
 
 fn measure(s: &mut Session, p: &Value) -> Result<Value> {
@@ -694,6 +822,10 @@ fn material_list(s: &mut Session, _p: &Value) -> Result<Value> {
     );
     Ok(json!({"materials": built_in.chain(user).collect::<Vec<_>>()}))
 }
+
+#[cfg(test)]
+#[path = "quality_tests.rs"]
+mod quality_tests;
 
 #[cfg(test)]
 #[path = "measure_cache_tests.rs"]
