@@ -1,0 +1,27 @@
+# gitleaks configuration for the eng baseline. Extends the maintained default
+# ruleset; allowlists are path-scoped and must be justified in review.
+title = "eng baseline"
+[extend]
+useDefault = true
+
+# Test fixtures deliberately contain fake credentials. They are never real.
+[[allowlists]]
+description = "eng control fixtures"
+paths = [
+  '''(^|/)tests/fixtures/.*''',
+  '''(^|/)tests/test_eng.py''',
+  '''(^|/)evals/fixtures/.*''',
+  '''(^|/)evals/control-fixture/.*''',
+  '''(^|/)evals/agent/fixture/.*''',
+]
+
+# Polykrom unit tests use fixed token-shaped strings for localhost control-server and
+# WebSocket tests. These exact values are not credentials and appear only in test code.
+[[allowlists]]
+description = "fixed test tokens (Polykrom control-server and WebSocket tests)"
+regexes = [
+  '''0123456789abcdef0123456789abcdef''',
+  '''0123456789abcdef''',
+  '''fedcba9876543210''',
+  '''c29saWRjcmFmdC10ZXN0IQ==''',
+]

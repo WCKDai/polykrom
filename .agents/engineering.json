@@ -1,0 +1,64 @@
+{
+  "schema": "eng-config/v1",
+  "project": "polykrom",
+  "commands": {
+    "fast": [
+      {
+        "name": "fmt",
+        "run": "cargo fmt --all --check",
+        "timeout": 300
+      },
+      {
+        "name": "layers",
+        "run": "cargo xtask layers",
+        "timeout": 300
+      },
+      {
+        "name": "lists",
+        "run": "cargo xtask lists",
+        "timeout": 120
+      },
+      {
+        "name": "assets",
+        "run": "cargo xtask assets",
+        "timeout": 300
+      },
+      {
+        "name": "io-contract-tests",
+        "run": "cargo test -p solidcraft-io --lib",
+        "timeout": 600
+      }
+    ],
+    "full": [
+      {
+        "name": "xtask-ci",
+        "run": "cargo xtask ci",
+        "timeout": 7200
+      }
+    ]
+  },
+  "security": {
+    "required": [
+      "gitleaks",
+      "semgrep"
+    ],
+    "optional": [
+      "osv-scanner",
+      "actionlint"
+    ],
+    "gitleaks_config": ".agents/config/gitleaks.toml",
+    "semgrep_config": ".agents/config/semgrep.yml",
+    "gitleaks_history": false,
+    "timeout": 600
+  },
+  "budgets": {
+    "fast_seconds": 180,
+    "full_seconds": 7200
+  },
+  "parallel": {
+    "max_worktrees": 4
+  },
+  "impact": {
+    "base": "origin/main"
+  }
+}

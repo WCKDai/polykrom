@@ -706,7 +706,9 @@ mod tests {
     #[cfg(windows)]
     fn short_spelling(path: &std::path::Path) -> Option<std::path::PathBuf> {
         use std::os::windows::process::CommandExt;
-        let out = std::process::Command::new("cmd").raw_arg(format!("/d /c for %I in (\"{}\") do @echo %~sI", path.display())).output().ok()?;
+        // nosemgrep: agents.config.eng-rust-command-shell -- Windows 8.3 short-name lookup; the path came from
+        // the local filesystem and Windows file names cannot contain a double quote.
+        let out = std::process::Command::new("cmd").raw_arg(format!("/d /c for %I in (\"{}\") do @echo %~sI", path.display())).output().ok()?; // nosemgrep: agents.config.eng-rust-command-shell
         Some(String::from_utf8_lossy(&out.stdout).trim().to_string()).filter(|s| s.split('\\').any(super::short_name)).map(Into::into)
     }
 
