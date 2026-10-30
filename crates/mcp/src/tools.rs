@@ -261,6 +261,7 @@ pub fn tool_definitions() -> Vec<Value> {
                     "floating": {"type": "boolean", "description": "mjcf: free base that falls onto the floor (default: when nothing is grounded)"},
                     "scene": {"type": "boolean", "description": "mjcf: floor and light (default true)"},
                     "kp": {"type": "number", "description": "mjcf: position actuator gain, N m/rad or N/m (default 1000)"},
+                    "actuated": {"type": "array", "items": {"type": "string"}, "description": "mjcf: joint ids or names to actuate; default rated joints and every joint outside a closed loop"},
                 }),
                 &["path"],
             ),
@@ -685,7 +686,9 @@ fn dispatch(b: &mut dyn Backend, name: &str, a: &Map<String, Value>) -> Result<V
             p["expression"] = parameter_value(a)?;
             exec(b, "parameters.change", p)
         }
-        "export" => exec(b, "file.export", pick(a, &["path", "format", "bodies", "mesh_prefix", "effort", "velocity", "floating", "scene", "kp"])),
+        "export" => {
+            exec(b, "file.export", pick(a, &["path", "format", "bodies", "mesh_prefix", "effort", "velocity", "floating", "scene", "kp", "actuated"]))
+        }
         "crash_reports" => match a.get("id") {
             Some(_) => exec(b, "diagnostics.crash_report", pick(a, &["id"])),
             None => exec(b, "diagnostics.crash_reports", pick(a, &["limit"])),
@@ -768,7 +771,9 @@ fn batch_step(step: &Value) -> Result<(String, Value, Option<String>), String> {
         "inspect_design" => mapped("document.inspect", json!({"measure": a.get("measure").and_then(Value::as_bool).unwrap_or(true)})),
         "undo" => mapped("edit.undo", json!({})),
         "redo" => mapped("edit.redo", json!({})),
-        "export" => mapped("file.export", pick(a, &["path", "format", "bodies", "mesh_prefix", "effort", "velocity", "floating", "scene", "kp"])),
+        "export" => {
+            mapped("file.export", pick(a, &["path", "format", "bodies", "mesh_prefix", "effort", "velocity", "floating", "scene", "kp", "actuated"]))
+        }
         "save" => mapped("file.save", pick(a, &["path", "format"])),
         "open" => mapped("doc.open", pick(a, &["path", "up", "names"])),
         "new_design" => mapped("file.new", pick(a, &["name"])),

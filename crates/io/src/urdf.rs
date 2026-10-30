@@ -33,6 +33,9 @@ pub struct UrdfOptions {
     /// `<limit effort>` (N or N m) and `velocity` (m/s or rad/s); defaults with a warning.
     pub effort: Option<f64>,
     pub velocity: Option<f64>,
+    /// Keep joints that close a loop in the model (MJCF writes them as equalities); URDF, a
+    /// tree format, leaves this false and warns instead.
+    pub record_loops: bool,
 }
 
 /// The URDF, its mesh files (name next to the `.urdf`, bytes) and what was approximated.
@@ -49,6 +52,20 @@ pub struct UrdfPackage {
 pub struct UrdfModel {
     pub links: Vec<Link>,
     pub joints: Vec<UrdfJoint>,
+    /// Joints skipped from the tree because both sides were already placed. URDF warns; MJCF
+    /// writes these as `connect`/`weld` equalities.
+    pub loops: Vec<UrdfLoop>,
+}
+
+/// A joint that closes a kinematic loop: the two links it joins and the anchor point in
+/// `body1`'s frame (mm). `rigid` is a fixed/weld closure.
+#[derive(Clone, Debug)]
+pub struct UrdfLoop {
+    pub name: String,
+    pub body1: usize,
+    pub body2: usize,
+    pub anchor: Vec3,
+    pub rigid: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -310,6 +327,7 @@ fn canonical(doc: &Document, occ: u64) -> Vec<u64> {
 
 /// The tree as it grows.
 struct Tree<'a> {
+    record_loops: bool,
     doc: &'a Document,
     parts: BTreeMap<u64, Part>,
     names: Names,
@@ -395,7 +413,11 @@ impl<'a> Tree<'a> {
                 taken.insert(j.id);
                 let child = if j.a.occurrence == p { j.b.occurrence } else { j.a.occurrence };
                 if self.placed.contains_key(&child) {
-                    self.warnings.push(format!("joint `{}` closes a loop: skipped (URDF is a tree)", j.name));
+                    if self.record_loops {
+                        self.record_loop(j, fa, p, child, &values);
+                    } else {
+                        self.warnings.push(format!("joint `{}` closes a loop: skipped (URDF is a tree)", j.name));
+                    }
                     continue;
                 }
                 if self.attach(j, fa, p, child, values.get(&j.id).map(Vec::as_slice).unwrap_or(&[])).is_some() {
@@ -403,6 +425,26 @@ impl<'a> Tree<'a> {
                 }
             }
         }
+    }
+
+    /// Record a loop-closing joint with its anchor in the parent link's frame.
+    fn record_loop(&mut self, j: &Joint, fa: &Mat, p: u64, child: u64, values: &BTreeMap<u64, Vec<f64>>) {
+        let child_on_b = j.a.occurrence == p;
+        let q = values.get(&j.id).map(Vec::as_slice).unwrap_or(&[]);
+        let m = joints::motion(j.kind, q);
+        let (jf, _) = if child_on_b {
+            let jf = mat_mul(&self.world(p), fa);
+            (jf, mat_mul(&jf, &m))
+        } else {
+            let lf = mat_mul(&self.world(child), fa);
+            (mat_mul(&lf, &m), lf)
+        };
+        let Some((parent_link, parent_frame)) = self.placed.get(&p).copied() else { return };
+        let Some((child_link, _)) = self.placed.get(&child).copied() else { return };
+        let Some(inv) = mat_inverse(&parent_frame) else { return };
+        let anchor = apply_point(&inv, Vec3::new(jf[3][0], jf[3][1], jf[3][2]));
+        let name = self.joint_names.get(&j.id).cloned().unwrap_or_else(|| j.name.clone());
+        self.model.loops.push(UrdfLoop { name, body1: parent_link, body2: child_link, anchor, rigid: matches!(j.kind, JointKind::Rigid) });
     }
 
     /// `child` on joint `j` from `p` (already in the tree): the joint's chain and the child's link.
@@ -559,6 +601,7 @@ pub fn urdf(doc: &Document, st: &ModelState, stem: &str, options: &UrdfOptions) 
         warnings: std::mem::take(&mut out.warnings),
         placed: BTreeMap::from([(0, (0, IDENTITY))]),
         joint_names: BTreeMap::new(),
+        record_loops: options.record_loops,
     };
     let root = tree.parts.get(&0);
     let base_link = Link {
@@ -920,7 +963,7 @@ mod tests {
             color: None,
             inertial: None,
         };
-        let mut model = UrdfModel { links: vec![link("base_link".into(), IDENTITY)], joints: Vec::new() };
+        let mut model = UrdfModel { links: vec![link("base_link".into(), IDENTITY)], joints: Vec::new(), loops: Vec::new() };
         for (k, mut m) in hard_rotations().into_iter().enumerate() {
             m[3] = [k as f64, 2.0, -3.5, 1.0];
             model.links.push(link(format!("l{k}"), m));

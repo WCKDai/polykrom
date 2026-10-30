@@ -44,11 +44,14 @@ pub struct MjcfOptions {
     pub effort: Option<f64>,
     /// The rated torque (N m) of the actuator driving a turning joint, by Polykrom joint id.
     pub torques: BTreeMap<u64, f64>,
+    /// Explicitly actuated Polykrom joint ids. When given, loop followers are passive unless
+    /// listed here (or rated in `torques`).
+    pub actuated: Option<Vec<u64>>,
 }
 
 impl Default for MjcfOptions {
     fn default() -> Self {
-        Self { floating: None, scene: true, kp: None, damping: None, armature: None, effort: None, torques: BTreeMap::new() }
+        Self { floating: None, scene: true, kp: None, damping: None, armature: None, effort: None, torques: BTreeMap::new(), actuated: None }
     }
 }
 
@@ -75,6 +78,18 @@ pub struct MjcfSummary {
     pub actuators: Vec<MjcfActuator>,
     /// The `design` keyframe (the design's pose, actuators holding it) was written.
     pub keyframe: bool,
+    /// Loop closures written as MJCF equalities.
+    pub loops: Vec<MjcfLoop>,
+}
+
+/// A loop closure written as a `connect` or `weld` equality.
+#[derive(Clone, Debug, PartialEq)]
+pub struct MjcfLoop {
+    pub joint: String,
+    pub body1: String,
+    pub body2: String,
+    /// Anchor in `body1`'s frame, millimetres.
+    pub anchor: [f64; 3],
 }
 
 /// A position actuator: its joint, force limit (N m turning, N sliding) and control range
@@ -133,8 +148,12 @@ fn inertial_xml(i: &Inertial) -> String {
 /// prefixes the mesh files.
 pub fn mjcf(doc: &Document, st: &ModelState, stem: &str, options: &MjcfOptions) -> Result<MjcfPackage> {
     let effort = positive(options.effort);
-    let urdf_options =
-        UrdfOptions { mesh_prefix: String::new(), effort: Some(effort.unwrap_or(urdf::DEFAULT_EFFORT)), velocity: Some(urdf::DEFAULT_VELOCITY) };
+    let urdf_options = UrdfOptions {
+        mesh_prefix: String::new(),
+        effort: Some(effort.unwrap_or(urdf::DEFAULT_EFFORT)),
+        velocity: Some(urdf::DEFAULT_VELOCITY),
+        record_loops: true,
+    };
     let pkg = urdf::urdf(doc, st, stem, &urdf_options)?;
     let mut warnings = pkg.warnings;
     let model = pkg.model;
@@ -172,7 +191,7 @@ pub fn mjcf(doc: &Document, st: &ModelState, stem: &str, options: &MjcfOptions) 
         }
     }
     let mut qpos: Vec<f64> = if floating { vec![0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0] } else { Vec::new() };
-    let mut moving: Vec<&UrdfJoint> = Vec::new();
+    let mut moving: Vec<(usize, &UrdfJoint)> = Vec::new();
     let mut stack = vec![Item::Open { link: 0, joint: None, depth: 2 }];
     while let Some(item) = stack.pop() {
         let (l, jk, depth) = match item {
@@ -208,7 +227,7 @@ pub fn mjcf(doc: &Document, st: &ModelState, stem: &str, options: &MjcfOptions) 
                 None => s += " limited=\"false\"/>\n",
             }
             qpos.push(q);
-            moving.push(j);
+            moving.push((jk.unwrap_or(0), j));
         }
         s += &format!("{pad}  {}\n", inertial_xml(&link.inertial.unwrap_or_else(urdf::token)));
         s += &geoms(link, &pad);
@@ -253,12 +272,21 @@ pub fn mjcf(doc: &Document, st: &ModelState, stem: &str, options: &MjcfOptions) 
     // A joint another follows (a gear, rack, screw) is driven; its follower is held to it.
     // MuJoCo measures both from the pose the model loads in (`ref`), where the link already
     // holds, so URDF's offset is already in it: q1 - ref1 = ratio (q2 - ref2).
-    let followers: Vec<&UrdfJoint> = moving.iter().copied().filter(|j| j.mimic.is_some()).collect();
-    if !followers.is_empty() {
+    let followers: Vec<&UrdfJoint> = moving.iter().map(|(_, j)| *j).filter(|j| j.mimic.is_some()).collect();
+    if !followers.is_empty() || !model.loops.is_empty() {
         s += "  <equality>\n";
         for j in &followers {
             if let Some(m) = &j.mimic {
                 s += &format!("    <joint joint1=\"{}\" joint2=\"{}\" polycoef=\"0 {} 0 0 0\"/>\n", attr(&j.name), attr(&m.joint), num(m.multiplier));
+            }
+        }
+        for closure in &model.loops {
+            let (Some(a), Some(b)) = (model.links.get(closure.body1), model.links.get(closure.body2)) else { continue };
+            if closure.rigid {
+                s += &format!("    <weld body1=\"{}\" body2=\"{}\"/>\n", attr(&a.name), attr(&b.name));
+            } else {
+                s +=
+                    &format!("    <connect body1=\"{}\" body2=\"{}\" anchor=\"{}\"/>\n", attr(&a.name), attr(&b.name), triple(closure.anchor * 1e-3));
             }
         }
         s += "  </equality>\n";
@@ -266,7 +294,22 @@ pub fn mjcf(doc: &Document, st: &ModelState, stem: &str, options: &MjcfOptions) 
     let mut ctrl = Vec::new();
     let mut unrated = Vec::new();
     let mut actuators = Vec::new();
-    let driven: Vec<&UrdfJoint> = moving.iter().copied().filter(|j| j.mimic.is_none()).collect();
+    let loop_members = loop_joint_members(&model);
+    let explicit = options.actuated.as_ref();
+    let driven: Vec<&UrdfJoint> = moving
+        .iter()
+        .filter(|(index, j)| {
+            if j.mimic.is_some() {
+                return false;
+            }
+            if let Some(ids) = explicit {
+                return j.source.map(|(id, _)| ids.contains(&id)).unwrap_or(false)
+                    || j.source.is_some_and(|(id, _)| options.torques.contains_key(&id));
+            }
+            j.source.is_some_and(|(id, _)| options.torques.contains_key(&id)) || !loop_members.contains(index)
+        })
+        .map(|(_, j)| *j)
+        .collect();
     let rating = |j: &UrdfJoint| j.source.filter(|_| j.step == Step::Revolute).and_then(|(id, _)| positive(options.torques.get(&id).copied()));
     // Without a gain asked for, each rated servo's is scaled to its rating against the strongest
     // one's, which keeps [`DEFAULT_KP`]: every servo then reaches its force limit at the same error.
@@ -316,8 +359,63 @@ pub fn mjcf(doc: &Document, st: &ModelState, stem: &str, options: &MjcfOptions) 
     }
     s += "</mujoco>\n";
     let mass = model.links.iter().map(|l| l.inertial.unwrap_or_else(urdf::token).mass).sum();
-    let summary = MjcfSummary { joints: moving.len(), free_root: floating, mass, actuators, keyframe: !qpos.is_empty() };
+    let loops = model
+        .loops
+        .iter()
+        .filter_map(|l| {
+            let a = model.links.get(l.body1)?;
+            let b = model.links.get(l.body2)?;
+            Some(MjcfLoop { joint: l.name.clone(), body1: a.name.clone(), body2: b.name.clone(), anchor: [l.anchor.x, l.anchor.y, l.anchor.z] })
+        })
+        .collect();
+    let summary = MjcfSummary { joints: moving.len(), free_root: floating, mass, actuators, keyframe: !qpos.is_empty(), loops };
     Ok(MjcfPackage { xml: s, meshes: pkg.meshes, model, warnings, summary })
+}
+
+/// Every tree joint on a path between a loop's two bodies.
+fn loop_joint_members(model: &UrdfModel) -> std::collections::BTreeSet<usize> {
+    let mut adjacency: Vec<Vec<(usize, usize)>> = vec![Vec::new(); model.links.len()];
+    for (index, j) in model.joints.iter().enumerate() {
+        if let Some(list) = adjacency.get_mut(j.parent) {
+            list.push((j.child, index));
+        }
+        if let Some(list) = adjacency.get_mut(j.child) {
+            list.push((j.parent, index));
+        }
+    }
+    let mut members = std::collections::BTreeSet::new();
+    for closure in &model.loops {
+        let mut prev: Vec<Option<(usize, usize)>> = vec![None; model.links.len()];
+        let mut queue = std::collections::VecDeque::from([closure.body1]);
+        let mut seen = vec![false; model.links.len()];
+        if let Some(s) = seen.get_mut(closure.body1) {
+            *s = true;
+        }
+        while let Some(at) = queue.pop_front() {
+            if at == closure.body2 {
+                break;
+            }
+            for &(next, joint) in adjacency.get(at).map(Vec::as_slice).unwrap_or(&[]) {
+                if seen.get(next).copied().unwrap_or(true) {
+                    continue;
+                }
+                if let Some(v) = seen.get_mut(next) {
+                    *v = true;
+                }
+                if let Some(p) = prev.get_mut(next) {
+                    *p = Some((at, joint));
+                }
+                queue.push_back(next);
+            }
+        }
+        let mut at = closure.body2;
+        while at != closure.body1 {
+            let Some((parent, joint)) = prev.get(at).copied().flatten() else { break };
+            members.insert(joint);
+            at = parent;
+        }
+    }
+    members
 }
 
 /// `from` and the links fixed to it, through fixed joints.
