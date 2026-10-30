@@ -220,12 +220,40 @@ impl ContactGeometry {
         self.pairs.retain(|(_, _, a, b)| keep(a.0, b.0));
     }
 
-    /// Move the pairs of set members `take` picks into a geometry of their own (with the same
-    /// bodies), leaving the rest here.
-    pub(super) fn take_pairs(&mut self, take: impl Fn(u64, u64) -> bool) -> ContactGeometry {
-        let (taken, kept) = std::mem::take(&mut self.pairs).into_iter().partition(|(_, _, a, b)| take(a.0, b.0));
+    /// Move the **body** pairs that touch or pass into each other in `s` (gap at most `touch`)
+    /// into a geometry of their own, leaving the other body pairs of the same set members here.
+    /// A pin in its bore must not hide another body pair between the same two parts (#295).
+    pub(super) fn take_touching(&mut self, s: &Session, touch: f64, work: &mut usize, budget: usize) -> Result<ContactGeometry> {
+        let meshes = self.placed(s)?;
+        let tris: Vec<Vec<[Vec3; 3]>> = meshes.iter().map(|m| m.triangles.iter().filter_map(|t| m.tri(t)).collect()).collect();
+        let boxes: Vec<Aabb3> = meshes.iter().map(Mesh::bounds).collect();
+        let mut trees: Vec<Option<Bvh>> = vec![None; meshes.len()];
+        let mut taken = Vec::new();
+        let mut kept = Vec::new();
+        for pair in std::mem::take(&mut self.pairs) {
+            let (a, b, _, _) = pair;
+            let (Some(ta), Some(tb), Some(ba), Some(bb)) = (tris.get(a), tris.get(b), boxes.get(a), boxes.get(b)) else {
+                return Err(limit_error("invalid contact geometry pair"));
+            };
+            let mut touching = false;
+            if box_distance(ba, bb) <= touch {
+                if trees.get(b).is_some_and(Option::is_none)
+                    && let Some(slot) = trees.get_mut(b)
+                {
+                    *work = work.saturating_add(tb.len());
+                    *slot = Some(Bvh::new(&tb.iter().map(tri_box).collect::<Vec<_>>()));
+                }
+                let Some(Some(tree)) = trees.get(b) else { return Err(limit_error("invalid contact geometry pair")) };
+                touching = mesh_gap(ta, tb, tree, ba, bb, touch, work, budget)?.is_some_and(|(mm, _, _)| mm <= touch);
+            }
+            if touching {
+                taken.push(pair);
+            } else {
+                kept.push(pair);
+            }
+        }
         self.pairs = kept;
-        ContactGeometry { bodies: self.bodies.clone(), pairs: taken, step: self.step }
+        Ok(ContactGeometry { bodies: self.bodies.clone(), pairs: taken, step: self.step })
     }
 
     /// How many mesh points are placed for each check.
@@ -273,6 +301,12 @@ impl ContactGeometry {
 
     pub(super) fn pair_count(&self) -> usize {
         self.member_pairs().len()
+    }
+
+    /// The body pairs checked (a member pair with several bodies has one per pair).
+    #[cfg(test)]
+    pub(super) fn body_pair_count(&self) -> usize {
+        self.pairs.len()
     }
 
     /// The member pairs checked (lower id first).

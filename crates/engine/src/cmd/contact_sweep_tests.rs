@@ -208,3 +208,34 @@ fn initially_overlapping_assembly_can_move_out_for_recovery() {
     assert!((rail_value(&s) - 10.0).abs() < 1e-6);
     assert!(run(&mut s, "contact.check", json!({}))["collisions"].as_array().unwrap().is_empty());
 }
+
+/// A touching body pair (a pin in its bore) must not take the other body pairs of the same two
+/// occurrences with it: a new contact between other bodies of those parts still stops a sweep (#295).
+#[test]
+fn take_touching_keeps_the_other_body_pairs_of_the_same_parts() {
+    let mut s = Session::default();
+    for (name, second) in [("A", [20, 0, 0]), ("B", [20, 20, 0])] {
+        run(&mut s, "component.activate", json!({"component": 0}));
+        run(&mut s, "component.create", json!({"name": name}));
+        for (body, corner) in [("1", [0, 0, 0]), ("2", second)] {
+            run(
+                &mut s,
+                "solid.box",
+                json!({"length": 10, "width": 10, "height": 10, "corner": corner, "operation": "new_body",
+                       "body_name": format!("{name}{body}")}),
+            );
+        }
+    }
+    run(&mut s, "contact.create", json!({"occurrences": ["A", "B"]}));
+    let mut geometry = super::ContactGeometry::new(&s).unwrap();
+    assert_eq!(geometry.body_pair_count(), 4, "two bodies each: four body pairs");
+    let mut work = 0;
+    let resting = geometry.take_touching(&s, 1e-6, &mut work, 1_000_000).unwrap();
+    assert_eq!(resting.body_pair_count(), 1, "only A1/B1 touch at the start");
+    assert_eq!(geometry.body_pair_count(), 3, "the other body pairs stay checked");
+    // Move B so its second body lands on A's second body, keeping A1/B1 apart.
+    // A 9 mm overlap, not exactly coincident faces (which have no volume to measure).
+    run(&mut s, "occurrence.move", json!({"occurrence": "B", "translate": [0, -19, 0]}));
+    let hits = geometry.hits(&s, &mut work, 1_000_000, true).unwrap();
+    assert!(!hits.is_empty(), "the new A2/B2 contact was dropped with the touching pair");
+}
