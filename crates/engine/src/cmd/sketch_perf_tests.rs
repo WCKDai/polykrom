@@ -19,8 +19,8 @@ fn big(n: usize) -> Session {
     let id = s.active_sketch.unwrap();
     let mut doc = (*s.doc).clone();
     let sk = doc.sketch_mut(id).unwrap();
+    use polycore_geom::Vec2;
     use polykrom_sketch::ConstraintKind::*;
-    use solidcraft_geom::Vec2;
     let side = (n as f64).sqrt().ceil() as usize;
     for k in 0..n {
         let (x, y) = ((k % side) as f64 * 30.0, (k / side) as f64 * 30.0);

@@ -48,12 +48,12 @@ fn initial_projection_retains_selected_face_when_closest_point_lands_on_shared_e
     run(&mut s, "solid.box", json!({"length":20,"width":20,"height":10,"body_name":"Target"}));
     let state = s.model.state();
     let body = state.body("Target").unwrap();
-    let source = polykrom_sketch::LinkSource::Face { body: "Target".into(), at: solidcraft_geom::Vec3::new(-0.1, 5., 10.5) };
+    let source = polykrom_sketch::LinkSource::Face { body: "Target".into(), at: polycore_geom::Vec3::new(-0.1, 5., 10.5) };
     let resolved = polykrom_doc::project::resolve(
         &s.doc,
         &std::collections::BTreeMap::new(),
         &state,
-        &solidcraft_geom::Plane::XY,
+        &polycore_geom::Plane::XY,
         polykrom_sketch::LinkKind::Project,
         &source,
     )
@@ -470,7 +470,7 @@ fn sweeps_and_pipes_follow_3d_sketch_curves() {
     // A sweep of a square profile drawn square to the curve at its start.
     let (a, b) = (pts[0], pts[1]);
     let t = (b - a).normalized().unwrap();
-    let x = t.cross(solidcraft_geom::Vec3::Z).normalized().unwrap();
+    let x = t.cross(polycore_geom::Vec3::Z).normalized().unwrap();
     let y = t.cross(x);
     run(&mut s, "sketch.create", json!({"plane": {"origin": [a.x, a.y, a.z], "x_dir": [x.x, x.y, x.z], "y_dir": [y.x, y.y, y.z]}}));
     run(&mut s, "sketch.rectangle.two_point", json!({"p0": [-1, -1], "p1": [1, 1]}));

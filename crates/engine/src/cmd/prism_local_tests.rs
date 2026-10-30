@@ -1,6 +1,6 @@
 //! A cut whose walls lie on the target's, in a target that is a prism along the cut only round
 //! it (a chamfer or a round elsewhere): the 2D route in a column cut round the tool
-//! (`solidcraft_kernel`'s `prism_local`). The B-rep boolean finds no result on these.
+//! (`polycore`'s `prism_local`). The B-rep boolean finds no result on these.
 
 use serde_json::{Value, json};
 use std::f64::consts::PI;

@@ -1,9 +1,9 @@
 //! More sketch constraints (curvature, polygon), constraint glyph anchors and snapping
 //! inference for interactive tools.
 
+use polycore_geom::Vec2;
 use polykrom_sketch::{ConstraintKind, CurveKind, Sketch};
 use serde_json::{Value, json};
-use solidcraft_geom::Vec2;
 
 use super::sketch::{add_c, constraint_result, dof_now, edit, listed, redundancy, residual_of};
 use super::{CommandSpec, in_sketch};

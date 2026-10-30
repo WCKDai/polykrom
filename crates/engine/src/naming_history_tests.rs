@@ -3,8 +3,8 @@
 //! names, or says it could not. It never quietly attaches to another face, which is what finding
 //! names again by sampling geometry could do.
 
+use polycore_geom::Vec3;
 use serde_json::{Value, json};
-use solidcraft_geom::Vec3;
 
 use crate::Session;
 

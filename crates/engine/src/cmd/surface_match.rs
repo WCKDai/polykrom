@@ -3,9 +3,9 @@
 //! requested continuity, while the boundary opposite it keeps its place. The body keeps its name:
 //! a match is a modify, like Trim, Extend and Fair.
 
+use polycore::Continuity;
 use polykrom_doc::{BodyName, FacePick, FeatureKind, Position};
 use serde_json::Value;
-use solidcraft_kernel::Continuity;
 
 use super::CommandSpec;
 use super::features::add_feature;
@@ -33,11 +33,11 @@ fn match_surface(s: &mut Session, p: &Value) -> Result<Value> {
     if s.model.state().body(&target).is_none() {
         return Err(bad(cmd, format!("no body `{target}`")));
     }
-    let faces: Vec<solidcraft_geom::Vec3> = p.get("faces").and_then(Value::as_array).map(|a| a.iter().filter_map(vec3).collect()).unwrap_or_default();
+    let faces: Vec<polycore_geom::Vec3> = p.get("faces").and_then(Value::as_array).map(|a| a.iter().filter_map(vec3).collect()).unwrap_or_default();
     if faces.len() > 64 {
         return Err(bad(cmd, "too many points on the face to rebuild"));
     }
-    let edges: Vec<solidcraft_geom::Vec3> = p.get("edges").and_then(Value::as_array).map(|a| a.iter().filter_map(vec3).collect()).unwrap_or_default();
+    let edges: Vec<polycore_geom::Vec3> = p.get("edges").and_then(Value::as_array).map(|a| a.iter().filter_map(vec3).collect()).unwrap_or_default();
     if edges.is_empty() || edges.len() > 10_000 {
         return Err(bad(cmd, "`edges` must list 1 to 10000 points on the target's edge chain"));
     }
@@ -62,8 +62,8 @@ fn match_surface(s: &mut Session, p: &Value) -> Result<Value> {
 mod tests {
     use super::*;
     use crate::Session;
+    use polycore_geom::Vec3;
     use serde_json::json;
-    use solidcraft_geom::Vec3;
 
     fn run(s: &mut Session, c: &str, p: Value) -> Value {
         s.execute(c, &p).unwrap_or_else(|e| panic!("{c}: {e}"))
@@ -112,7 +112,7 @@ mod tests {
         let st = s.world_state();
         let made = st.body("Skirt").unwrap().body.clone();
         let target = st.body("Boss").unwrap().body.clone();
-        solidcraft_kernel::seam_continuity(&made, &target, &picks(s)).unwrap()
+        polycore::seam_continuity(&made, &target, &picks(s)).unwrap()
     }
 
     /// `surface.match`: a skirt meets a cylinder's wall seam at g2; the body keeps its name, undo

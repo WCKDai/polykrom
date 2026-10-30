@@ -14,9 +14,9 @@
 #![forbid(unsafe_code)]
 
 #[cfg(not(target_arch = "wasm32"))]
-use solidcraft_geom::Mesh;
-use solidcraft_geom::Vec3;
-use solidcraft_geom::tess::{EvalCurve, EvalSurface, TessPlan};
+use polycore_geom::Mesh;
+use polycore_geom::Vec3;
+use polycore_geom::tess::{EvalCurve, EvalSurface, TessPlan};
 use wgpu::util::DeviceExt;
 
 pub mod capture;

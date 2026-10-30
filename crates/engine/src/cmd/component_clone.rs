@@ -10,7 +10,7 @@ use serde_json::{Value, json};
 const CMD: &str = "component.paste_new";
 const MAX_WORK: usize = 10_000;
 
-fn mesh_distance(mesh: &solidcraft_geom::Mesh, point: solidcraft_geom::Vec3) -> f64 {
+fn mesh_distance(mesh: &polycore_geom::Mesh, point: polycore_geom::Vec3) -> f64 {
     mesh.triangles
         .iter()
         .filter_map(|triangle| mesh.tri(triangle))
@@ -33,7 +33,7 @@ fn mesh_distance(mesh: &solidcraft_geom::Mesh, point: solidcraft_geom::Vec3) -> 
         .fold(f64::INFINITY, f64::min)
 }
 
-fn material_probe_matches(a: &solidcraft_geom::Mesh, b: &solidcraft_geom::Mesh, point: solidcraft_geom::Vec3, tol_a: f64, tol_b: f64) -> bool {
+fn material_probe_matches(a: &polycore_geom::Mesh, b: &polycore_geom::Mesh, point: polycore_geom::Vec3, tol_a: f64, tol_b: f64) -> bool {
     if !point.is_finite() || !tol_a.is_finite() || !tol_b.is_finite() || tol_a <= 0. || tol_b <= 0. {
         return false;
     }
@@ -48,7 +48,7 @@ fn material_probe_matches(a: &solidcraft_geom::Mesh, b: &solidcraft_geom::Mesh, 
     let offset = 4. * tol_a.max(tol_b);
     let mut material = false;
     let mut void = false;
-    for axis in [solidcraft_geom::Vec3::X, solidcraft_geom::Vec3::Y, solidcraft_geom::Vec3::Z] {
+    for axis in [polycore_geom::Vec3::X, polycore_geom::Vec3::Y, polycore_geom::Vec3::Z] {
         for sign in [-1., 1.] {
             let q = point + axis * (sign * offset);
             if !q.is_finite() {
@@ -347,8 +347,8 @@ pub(super) fn paste(
         let entered = entry.and_then(|f| s.model.result(f.id)).map(|r| r.state.clone());
         let base = entered.as_ref().and_then(|st| st.body(&body.name)).or_else(|| before.as_ref().and_then(|st| st.body(&body.name))).unwrap_or(body);
         let baseline_component = source.model_body_component(base);
-        let geometry = solidcraft_kernel::transform_matrix(&base.body, offset)?;
-        let step = solidcraft_kernel::step_export(&[&geometry], "Polykrom independent reassigned body")?;
+        let geometry = polycore::transform_matrix(&base.body, offset)?;
+        let step = polycore::step_export(&[&geometry], "Polykrom independent reassigned body")?;
         let new_name = unique(&body.name, &mut used);
         bodies.insert(body.name.clone(), new_name.clone());
         let feature_name = unique(&format!("{} Base", body.name), &mut used);
@@ -676,10 +676,10 @@ pub(super) fn paste(
     for body in state.bodies.iter().filter(|b| selected.contains(&source.model_body_component(b))) {
         let new = bodies.get(&body.name).ok_or_else(|| bad(CMD, format!("body {} has no clone identity", body.name)))?;
         let cloned = copied_bodies.get(new.as_str()).ok_or_else(|| bad(CMD, format!("copy did not reproduce body {}", body.name)))?;
-        let a = solidcraft_kernel::transform_matrix(&body.body, *source.model_body_offset(body).unwrap_or(&polykrom_doc::IDENTITY))?;
-        let b = solidcraft_kernel::transform_matrix(&cloned.body, *scratch.doc.model_body_offset(cloned).unwrap_or(&polykrom_doc::IDENTITY))?;
-        let ma = solidcraft_kernel::measure(&a)?;
-        let mb = solidcraft_kernel::measure(&b)?;
+        let a = polycore::transform_matrix(&body.body, *source.model_body_offset(body).unwrap_or(&polykrom_doc::IDENTITY))?;
+        let b = polycore::transform_matrix(&cloned.body, *scratch.doc.model_body_offset(cloned).unwrap_or(&polykrom_doc::IDENTITY))?;
+        let ma = polycore::measure(&a)?;
+        let mb = polycore::measure(&b)?;
         let tolerance = 1e-5 * (1.0 + (ma.bbox.max - ma.bbox.min).len()) + 64.0 * f64::EPSILON * (ma.bbox.min.len() + ma.bbox.max.len());
         let mut material_matches = true;
         let tol_a = (a.size() * 1e-3).max(1e-3).max(a.size() * 1e-6);
@@ -696,7 +696,7 @@ pub(super) fn paste(
             for y in [0.2, 0.5, 0.8] {
                 for z in [0.2, 0.5, 0.8] {
                     let d = ma.bbox.max - ma.bbox.min;
-                    let p = ma.bbox.min + solidcraft_geom::Vec3::new(d.x * x, d.y * y, d.z * z);
+                    let p = ma.bbox.min + polycore_geom::Vec3::new(d.x * x, d.y * y, d.z * z);
                     let roundoff = 64. * f64::EPSILON * (1. + p.len());
                     material_matches &= material_probe_matches(&mesh_a, &mesh_b, p, tol_a + roundoff, tol_b + roundoff);
                 }
@@ -706,7 +706,7 @@ pub(super) fn paste(
         // chord-volume biases after STEP. Only independently certified current
         // sections may replace that volume comparison; shape mismatches still
         // refuse even when their volumes happen to agree.
-        let volume_matches = match solidcraft_kernel::certified_prism_equivalent(&a, &b)? {
+        let volume_matches = match polycore::certified_prism_equivalent(&a, &b)? {
             Some(same) => same,
             None => (ma.volume - mb.volume).abs() <= 1e-5 * (1.0 + ma.volume.abs()),
         };

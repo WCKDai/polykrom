@@ -54,7 +54,7 @@ struct Inputs {
 
 /// `POLYKROM_SERIAL_EVAL`: evaluate every feature in timeline order on the calling thread.
 fn serial() -> bool {
-    solidcraft_geom::env::var_os("SERIAL_EVAL").is_some_and(|v| !v.is_empty() && v != "0")
+    polycore_geom::env::var_os("SERIAL_EVAL").is_some_and(|v| !v.is_empty() && v != "0")
 }
 
 /// Fewer features than this: a lane's threads cost more than they save.

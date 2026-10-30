@@ -2,9 +2,9 @@
 //! after it is then part of the model again, but it must not be shown while the sketch is edited
 //! (#1167): the history is rolled back, the view of it is not. A body the sketch is built on stays.
 
+use polycore_geom::Vec3;
 use polykrom_sketch::LinkSource;
 use serde_json::{Value, json};
-use solidcraft_geom::Vec3;
 
 use crate::Session;
 

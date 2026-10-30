@@ -2,9 +2,9 @@
 //! points may leave the sketch plane. They are kept as drawn 3D curves (wires with fit points):
 //! drawn and snapped to, movable point by point, and usable as sweep and pipe paths.
 
+use polycore_geom::Vec3;
 use polykrom_sketch::WireSpace;
 use serde_json::{Value, json};
-use solidcraft_geom::Vec3;
 
 use super::sketch::{edit, target_sketch};
 use super::{CommandSpec, in_sketch};

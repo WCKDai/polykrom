@@ -2,13 +2,13 @@
 
 use std::{error::Error, io::Write, path::PathBuf, time::Instant};
 
+use polycore_geom::Vec2;
 use polykrom_sketch::{
     Analysis, ConstraintKind, DrivingValues, Hold, Sketch, SolveReport,
     profiling::{Counters, SolveProfile, Timings, capture},
     solve_after_value_edit, solve_with,
 };
 use serde::Serialize;
-use solidcraft_geom::Vec2;
 
 type Result<T> = std::result::Result<T, Box<dyn Error>>;
 const CASES: [&str; 6] = ["distance-zero", "distance-offset", "x-zero", "linkage", "linkage-edit", "grid"];

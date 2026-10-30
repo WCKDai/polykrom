@@ -3,9 +3,9 @@
 
 use std::f64::consts::{FRAC_PI_2, TAU};
 
+use polycore::{DISPLAY_ANGLE, FaceSurface, face_surface};
+use polycore_geom::{Mesh, Vec3};
 use serde_json::{Value, json};
-use solidcraft_geom::{Mesh, Vec3};
-use solidcraft_kernel::{DISPLAY_ANGLE, FaceSurface, face_surface};
 
 use crate::Session;
 
@@ -113,7 +113,7 @@ fn what_reads_the_display_mesh_of_a_large_sheet_answers_as_before() {
     // Bounds: the sheet's box is set by flat faces, so the rounder bends move nothing.
     let (now, before) = (m.bounds(), coarse.bounds());
     assert!(now.min.dist(before.min) < 1e-9 && now.max.dist(before.max) < 1e-9, "{now:?} {before:?}");
-    let exact = solidcraft_kernel::measure(&b.body).unwrap().bbox;
+    let exact = polycore::measure(&b.body).unwrap().bbox;
     assert!(now.min.dist(exact.min) < 1e-6 && now.max.dist(exact.max) < 1e-6, "{now:?} {exact:?}");
     // The cost: the sheet takes 2212 triangles against the chord mesh's 92 when measured, a factor of
     // 24; what grows is the number of round faces and the facets across each, not the size of the body.

@@ -70,7 +70,7 @@ fn replay(script: &str) -> Session {
 }
 
 fn volume(s: &Session, body: &str) -> f64 {
-    s.model.state().body(body).map(|b| solidcraft_kernel::measure(&b.body).unwrap().volume).unwrap_or(0.0)
+    s.model.state().body(body).map(|b| polycore::measure(&b.body).unwrap().volume).unwrap_or(0.0)
 }
 
 /// #1985: the STEP export of a small enclosure never finished. The export reads its own file
@@ -101,15 +101,15 @@ fn step_export_of_a_flanged_enclosure_finishes_and_reads_back() {
 
 /// The body's STEP text, which reads back without warnings as one closed solid of the same
 /// volume and area, and the number of faces the file holds.
-fn read_back(s: &Session, body: &solidcraft_kernel::Body) -> (String, usize) {
+fn read_back(s: &Session, body: &polycore::Body) -> (String, usize) {
     assert!(s.model.results.iter().all(|r| r.error.is_none()), "{:?}", s.model.results);
-    let text = solidcraft_kernel::step_export(&[body], "Polykrom").unwrap();
-    let imp = solidcraft_kernel::step_import(&text).unwrap();
+    let text = polycore::step_export(&[body], "Polykrom").unwrap();
+    let imp = polycore::step_import(&text).unwrap();
     assert!(imp.warnings.is_empty(), "{:?}", imp.warnings);
     assert_eq!(imp.bodies.len(), 1);
     let back = &imp.bodies[0];
     assert!(back.closed);
-    let (a, b) = (solidcraft_kernel::measure(body).unwrap(), solidcraft_kernel::measure(&back.body).unwrap());
+    let (a, b) = (polycore::measure(body).unwrap(), polycore::measure(&back.body).unwrap());
     assert!((a.volume - b.volume).abs() < 1e-3 * a.volume, "volume {} read back as {}", a.volume, b.volume);
     assert!((a.area - b.area).abs() < 1e-3 * a.area, "area {} read back as {}", a.area, b.area);
     println!("#1985 volume {:.3} / {:.3} mm³; area {:.3} / {:.3} mm²", a.volume, b.volume, a.area, b.area);
@@ -133,10 +133,10 @@ fn shallow_cuts_rebuild_after_inserting_an_earlier_pocket() {
         let actual = volume(&session, "Plate");
         assert!((actual - expected).abs() < 0.02, "{actual} vs {expected}");
         let mesh = body.tessellate(0.001).unwrap();
-        assert!(!mesh.contains(solidcraft_geom::Vec3::new(12.0, 14.0, 9.0)));
-        assert!(mesh.contains(solidcraft_geom::Vec3::new(12.0, 14.0, 8.0)));
-        assert!(!mesh.contains(solidcraft_geom::Vec3::new(20.0, 20.0, 9.5)));
-        assert!(mesh.contains(solidcraft_geom::Vec3::new(20.0, 20.0, 9.0)));
+        assert!(!mesh.contains(polycore_geom::Vec3::new(12.0, 14.0, 9.0)));
+        assert!(mesh.contains(polycore_geom::Vec3::new(12.0, 14.0, 8.0)));
+        assert!(!mesh.contains(polycore_geom::Vec3::new(20.0, 20.0, 9.5)));
+        assert!(mesh.contains(polycore_geom::Vec3::new(20.0, 20.0, 9.0)));
     }
 }
 
@@ -161,7 +161,7 @@ fn eighteen_tabs_join_the_ribs_of_a_chamfered_base() {
         println!("#2059 volume {got:.6} / {expected:.6} mm³; one valid shell, eighteen tabs");
         for k in 0..6 {
             let angle = k as f64 * std::f64::consts::TAU / 6.0;
-            let p = |x: f64, y: f64, z| solidcraft_geom::Vec3::new(x * angle.cos() - y * angle.sin(), x * angle.sin() + y * angle.cos(), z);
+            let p = |x: f64, y: f64, z| polycore_geom::Vec3::new(x * angle.cos() - y * angle.sin(), x * angle.sin() + y * angle.cos(), z);
             for x in [15.5, 25.5, 35.5] {
                 assert!(mesh.contains(p(x, 0.0, 12.0)), "tab {k} at {x}");
                 assert!(!mesh.contains(p(x, 1.2, 12.0)), "tab {k} grew sideways at {x}");
@@ -285,7 +285,7 @@ fn blind_hole_into_a_long_d_profile_bar_stops_short_of_the_round_front() {
     let hole = std::f64::consts::PI * 10.0;
     let removed = bar - volume(&s, "Slat");
     assert!((removed - hole).abs() < 0.05 * hole, "removed {removed} vs {hole}");
-    let faces = s.model.state().body("Slat").map(|b| solidcraft_kernel::measure(&b.body).unwrap().merged.faces);
+    let faces = s.model.state().body("Slat").map(|b| polycore::measure(&b.body).unwrap().merged.faces);
     assert_eq!(faces, Some(8));
 }
 
@@ -313,7 +313,7 @@ fn ribs_flush_with_a_window_change_nothing_away_from_them() {
     let (lid, ribs) = steps.split_at(steps.len() - 4);
     let mut s = Session::default();
     s.run_script(&Value::Array(lid.to_vec())).unwrap();
-    let measure = |s: &Session| s.model.state().body("Lid").map(|b| solidcraft_kernel::measure(&b.body).unwrap()).unwrap();
+    let measure = |s: &Session| s.model.state().body("Lid").map(|b| polycore::measure(&b.body).unwrap()).unwrap();
     let (v0, a0) = (measure(&s).volume, measure(&s).area);
     assert!((v0 - 6703.5222).abs() < 1e-3, "{v0}");
     for (i, rib) in ribs.iter().enumerate() {
@@ -391,7 +391,7 @@ fn press_pull_on_the_enclosure_lid_is_prompt() {
     let mut s = Session::default();
     let script: Value = serde_json::from_str(include_str!("../../../examples/acceptance/sensor_enclosure.json")).unwrap();
     s.run_script(&script).unwrap();
-    let total = |s: &Session| -> f64 { s.model.state().bodies.iter().map(|b| solidcraft_kernel::measure(&b.body).unwrap().volume).sum() };
+    let total = |s: &Session| -> f64 { s.model.state().bodies.iter().map(|b| polycore::measure(&b.body).unwrap().volume).sum() };
     let before = total(&s);
     let start = cpu_and_peak_memory();
     s.execute("solid.press_pull", &json!({"face": [-12.0, 27.4, 23.0], "distance": 5.0})).unwrap();
@@ -605,7 +605,7 @@ fn box_intersect_splits_the_end_off_a_raked_wedge_after_its_end_rounds() {
         let mut s = raked_wedge(lean);
         let whole = volume(&s, "Wedge");
         for (i, x0) in [55.0, 55.02].into_iter().enumerate() {
-            let mut piece = |op: &str| -> (f64, solidcraft_geom::Aabb3) {
+            let mut piece = |op: &str| -> (f64, polycore_geom::Aabb3) {
                 let copy = s.execute("solid.move", &json!({"bodies": ["Wedge"], "translate": [0, 0, 0], "copy": true})).unwrap();
                 let copy = copy["created_bodies"][0].as_str().unwrap().to_string();
                 let cap = format!("Cap{i}{op}");
@@ -618,7 +618,7 @@ fn box_intersect_splits_the_end_off_a_raked_wedge_after_its_end_rounds() {
                 let state = s.model.state();
                 let body = &state.body(&target).unwrap().body;
                 assert!(body.validity().is_empty(), "lean {lean}, x >= {x0}, {op}: {:?}", body.validity());
-                (solidcraft_kernel::measure(body).unwrap().volume, body.tessellate(1e-3).unwrap().bounds())
+                (polycore::measure(body).unwrap().volume, body.tessellate(1e-3).unwrap().bounds())
             };
             let (slice, at) = piece("intersect");
             let (rest, _) = piece("cut");
@@ -675,7 +675,7 @@ fn closed_sweep_redefines_to_a_half_turn_torus_cut() {
     let mesh = body.tessellate(0.02).unwrap();
     let expected = (std::f64::consts::PI * 64.0 - 64.0) * std::f64::consts::TAU * 30.0;
     assert!((mesh.measure().volume - expected).abs() < expected * 0.015);
-    for (point, material) in [(solidcraft_geom::Vec3::new(30.0, 0.0, 0.0), false), (solidcraft_geom::Vec3::new(30.0, 0.0, 7.0), true)] {
+    for (point, material) in [(polycore_geom::Vec3::new(30.0, 0.0, 0.0), false), (polycore_geom::Vec3::new(30.0, 0.0, 7.0), true)] {
         assert_eq!(mesh.contains(point), material, "material at {point:?}");
     }
 }
@@ -707,7 +707,7 @@ fn many_extrusion_profiles_preserve_material_and_body_identity() {
         assert!((volume(&s, "Stock") - expected).abs() < 1e-6);
         let stock = state.body("Stock").unwrap();
         for (point, present) in [([3.0, 3.0, 22.0], operation == "join"), ([3.0, 3.0, 18.0], operation != "cut"), ([7.0, 3.0, 18.0], true)] {
-            assert_eq!(stock.mesh().contains(solidcraft_geom::Vec3::from(point)), present, "{operation}: {point:?}");
+            assert_eq!(stock.mesh().contains(polycore_geom::Vec3::from(point)), present, "{operation}: {point:?}");
         }
         assert!(stock.body.validity().is_empty());
         assert!(s.revision > before);
@@ -740,10 +740,10 @@ fn many_circular_extrusion_profiles_cut_a_curved_target() {
     let stock = state.body("Stock").unwrap();
     assert!(stock.body.validity().is_empty());
     let mesh = stock.mesh();
-    assert!(mesh.contains(solidcraft_geom::Vec3::new(0.0, 0.0, 10.0)));
+    assert!(mesh.contains(polycore_geom::Vec3::new(0.0, 0.0, 10.0)));
     for x in [-9.0, -3.0, 3.0, 9.0] {
         for y in [-9.0, -3.0, 3.0, 9.0] {
-            assert!(!mesh.contains(solidcraft_geom::Vec3::new(x, y, 10.0)), "hole at {x}, {y}");
+            assert!(!mesh.contains(polycore_geom::Vec3::new(x, y, 10.0)), "hole at {x}, {y}");
         }
     }
 }
@@ -803,7 +803,7 @@ fn unsupported_face_groups_are_atomic() {
 
 #[test]
 fn imported_rotated_face_extrusions_preserve_other_operations_and_bodies() {
-    use solidcraft_geom::Vec3;
+    use polycore_geom::Vec3;
     let mut source = Session::default();
     source.execute("solid.box", &json!({"corner":[-16,-16,-3],"length":32,"width":32,"height":1,"body_name":"Other"})).unwrap();
     source.execute("solid.cylinder", &json!({"radius":14,"height":8,"body_name":"Stock"})).unwrap();
@@ -1134,7 +1134,7 @@ fn joined_loft_frames_reference_mesh_covers_each_face_once() {
         let s = replay(script);
         let state = s.model.state();
         let body = &state.body(name).unwrap().body;
-        let per_face = |m: &solidcraft_geom::Mesh| {
+        let per_face = |m: &polycore_geom::Mesh| {
             let mut a = vec![0.0; body.face_count()];
             for (t, f) in m.triangles.iter().zip(&m.tri_face) {
                 let [p0, p1, p2] = t.map(|i| m.positions[i as usize]);
@@ -1340,7 +1340,7 @@ fn spherical_shell_cuts_and_joins_a_block_crossing_its_hollow() {
         run("solid.revolve", json!({"sketch": "Ring", "profiles": [{"point": [0, 30]}], "axis": "l1", "operation": operation, "targets": ["Block"]}));
         // A cut through both spheres leaves two pieces, one each side of the shell.
         let state = s.model.state();
-        let got: f64 = state.bodies.iter().map(|b| solidcraft_kernel::measure(&b.body).unwrap().volume).sum();
+        let got: f64 = state.bodies.iter().map(|b| polycore::measure(&b.body).unwrap().volume).sum();
         println!("#451 {operation} of the block from x = {x0} to {}: {got:.6} mm³ in {} bodies, expected {want:.6}", x0 + length, state.bodies.len());
         assert!((got - want).abs() < 1e-4 * want, "{operation} from x = {x0} to {}: {got} vs {want}", x0 + length);
         assert!(state.bodies.iter().all(|b| b.body.validity().is_empty()));

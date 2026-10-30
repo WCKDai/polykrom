@@ -4,8 +4,8 @@
 
 use std::f64::consts::{PI, TAU};
 
+use polycore_geom::Vec3;
 use serde_json::{Value, json};
-use solidcraft_geom::Vec3;
 
 use crate::Session;
 
@@ -38,7 +38,7 @@ fn hole(s: &Session, r: f64) -> Value {
     let m = b.mesh();
     let n = m.tri_face.iter().map(|f| *f as usize + 1).max().unwrap();
     let f = (0..n)
-        .find(|&f| matches!(solidcraft_kernel::face_surface(&b.body, f), Some(solidcraft_kernel::FaceSurface::Cylinder { radius, .. }) if (radius - r).abs() < 1e-6))
+        .find(|&f| matches!(polycore::face_surface(&b.body, f), Some(polycore::FaceSurface::Cylinder { radius, .. }) if (radius - r).abs() < 1e-6))
         .unwrap_or_else(|| panic!("no hole of radius {r}"));
     let p = m.triangles.iter().zip(&m.tri_face).find(|(_, tf)| **tf as usize == f).and_then(|(t, _)| m.tri(t)).unwrap()[0];
     json!({"type": "face", "body": b.name, "index": f, "point": p})
@@ -306,7 +306,7 @@ fn a_slot_cut_in_a_plate_reports_its_sizes_from_an_end() {
     let m = b.mesh();
     let n = m.tri_face.iter().map(|f| *f as usize + 1).max().unwrap();
     let end = (0..n)
-        .find(|&f| matches!(solidcraft_kernel::face_surface(&b.body, f), Some(solidcraft_kernel::FaceSurface::Cylinder { radius, .. }) if (radius - 4.0).abs() < 1e-6))
+        .find(|&f| matches!(polycore::face_surface(&b.body, f), Some(polycore::FaceSurface::Cylinder { radius, .. }) if (radius - 4.0).abs() < 1e-6))
         .expect("slot end");
     let p = m.triangles.iter().zip(&m.tri_face).find(|(_, tf)| **tf as usize == end).and_then(|(t, _)| m.tri(t)).unwrap()[0];
     let name = body(&s);

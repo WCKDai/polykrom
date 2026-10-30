@@ -132,7 +132,7 @@ The [architecture page](docs/architecture.md) has the layer table. The short ver
      `crates/threedx-client/src/macos.rs` (the 3Dconnexion driver's client API on macOS), and the
      compiler denies it.
    - An unsupported case returns an error ("not supported yet: …"); it never panics.
-   - Every call into truck goes through `solidcraft_kernel::guard`.
+   - Every call into truck goes through `polycore::guard`.
    - Every crash fix comes with a regression test.
 5. **Everything is a command, with a test.** A new feature means a `CommandSpec` in
    `crates/engine/src/cmd/`, engine tests that measure the result (volume, area,
@@ -217,7 +217,7 @@ Check that validation after merging. They are listed in
   `pattern_suppress_tests::enclosure_arc_extinction_keeps_a_real_sharp_inner_lip_after_resize_and_reopen`,
   `pattern_suppress_tests::enclosure_datums_follow_wall_height_and_board_depth_with_material_proofs`,
   `cmd::plastic::tests::enclosure_snap_fit_follows_resized_front_wall`, the `atomic_commands` contract tests
-- `solidcraft-kernel`: `tests::boolean_identity_on_tangent_primitives`, `tspline::tests::hostile_tsplines_never_panic`, and the `boolean_props` property tests
+- `polycore`: `tests::boolean_identity_on_tangent_primitives`, `tspline::tests::hostile_tsplines_never_panic`, and the `boolean_props` property tests
   (these run only in the nightly "Property tests" job: their inputs are random, so main skips them too)
 - `polykrom-ui-egui` scenarios: `acceptance_sensor_enclosure`
 

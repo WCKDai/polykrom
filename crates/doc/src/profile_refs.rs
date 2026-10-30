@@ -363,8 +363,8 @@ pub fn capture_profile_selection(ss: &SolvedSketch, indices: &[usize]) -> Result
 mod tests {
     #![allow(clippy::unwrap_used, clippy::panic)]
     use super::*;
+    use polycore_geom::{Plane, Vec2};
     use polykrom_sketch::{Sketch, find_profiles, solve};
-    use solidcraft_geom::{Plane, Vec2};
 
     fn rounded_source(sketch: &mut Sketch, radius: f64) -> Vec<(String, bool)> {
         let endpoints = [
@@ -463,13 +463,13 @@ mod tests {
             )
             .unwrap();
         model.evaluate(&document);
-        let volume = solidcraft_kernel::measure(&model.state().bodies[0].body).unwrap().volume;
+        let volume = polycore::measure(&model.state().bodies[0].body).unwrap().volume;
         assert!((volume - 2. * 73.2 * 63.2).abs() < 1e-6, "{volume}");
         let reopened = crate::Document::from_json(&document.to_json()).unwrap();
         assert_eq!(reopened, document);
         let mut cold = crate::Model::new();
         cold.evaluate(&reopened);
-        assert!((solidcraft_kernel::measure(&cold.state().bodies[0].body).unwrap().volume - volume).abs() < 1e-6);
+        assert!((polycore::measure(&cold.state().bodies[0].body).unwrap().volume - volume).abs() < 1e-6);
         let crate::FeatureKind::Sketch { sketch, .. } = &mut document.features[0].kind else { panic!("sketch") };
         set_source_radius(sketch, 2.);
         model.evaluate(&document);
@@ -480,7 +480,7 @@ mod tests {
         assert_eq!(active, original_roles);
         let rounded_area = 75.2 * 65.2 - (4. - std::f64::consts::PI) * 0.6 * 0.6;
         assert!((crate::select_profiles(solved, &selection).unwrap()[0].area() - rounded_area).abs() < 1e-7);
-        let volume = solidcraft_kernel::measure(&model.state().bodies[0].body).unwrap().volume;
+        let volume = polycore::measure(&model.state().bodies[0].body).unwrap().volume;
         // Kernel volume integrates the curved display mesh; the analytic region above
         // checks the exact rounded geometry independently of that tessellation.
         assert!((volume - 2. * rounded_area).abs() < 0.002, "{volume}");
@@ -494,7 +494,7 @@ mod tests {
         );
         let reopened = crate::Document::from_json(&document.to_json()).unwrap();
         cold.evaluate(&reopened);
-        assert!((solidcraft_kernel::measure(&cold.state().bodies[0].body).unwrap().volume - volume).abs() < 1e-5);
+        assert!((polycore::measure(&cold.state().bodies[0].body).unwrap().volume - volume).abs() < 1e-5);
     }
 
     #[test]
@@ -626,7 +626,7 @@ mod tests {
             )
             .unwrap();
         model.evaluate(&document);
-        let initial_volume = solidcraft_kernel::measure(&model.state().bodies[0].body).unwrap().volume;
+        let initial_volume = polycore::measure(&model.state().bodies[0].body).unwrap().volume;
         // Kernel measurement integrates the curved mesh. Scale the established
         // periodic-ring tolerance (0.05 mm³ at height3) to this height2 extrusion.
         // Exact profile identity and cold/warm equality below remain strict.
@@ -654,7 +654,7 @@ mod tests {
         assert!(updated_region.contains(ring_point));
         assert!(!updated_region.contains(source_point + normal * 0.5));
         assert!(!updated_region.contains(source_point + normal * 1.75));
-        let updated_volume = solidcraft_kernel::measure(&updated_state.bodies[0].body).unwrap().volume;
+        let updated_volume = polycore::measure(&updated_state.bodies[0].body).unwrap().volume;
         assert!(updated_volume > initial_volume);
         assert!(
             (updated_volume - 2. * updated_region.area()).abs() < volume_tolerance,
@@ -664,7 +664,7 @@ mod tests {
         let reopened_document = crate::Document::from_json(&document.to_json()).unwrap();
         cold.evaluate(&reopened_document);
         assert!(cold.results.iter().all(|result| result.error.is_none()));
-        assert!((solidcraft_kernel::measure(&cold.state().bodies[0].body).unwrap().volume - updated_volume).abs() < 1e-6);
+        assert!((polycore::measure(&cold.state().bodies[0].body).unwrap().volume - updated_volume).abs() < 1e-6);
 
         // A new hole is a semantic boundary change, not the old ring. Whole-source
         // identities include holes and must not silently absorb the new material cutout.

@@ -9,8 +9,8 @@
 
 use std::f64::consts::TAU;
 
+use polycore_geom::{Loop2, Region2, Ring, Seg2, Vec2};
 use serde::{Deserialize, Serialize};
-use solidcraft_geom::{Loop2, Region2, Ring, Seg2, Vec2};
 
 use crate::model::{CurveKind, Sketch};
 use crate::shape::{Shape, intersections_within};
@@ -423,8 +423,8 @@ struct Grid {
 }
 
 impl Grid {
-    fn new(boxes: &[solidcraft_geom::Aabb2]) -> Grid {
-        let all = boxes.iter().fold(solidcraft_geom::Aabb2::EMPTY, |a, b| a.union(b));
+    fn new(boxes: &[polycore_geom::Aabb2]) -> Grid {
+        let all = boxes.iter().fold(polycore_geom::Aabb2::EMPTY, |a, b| a.union(b));
         let (lo, hi) = (all.min, all.max);
         if !(lo.is_finite() && hi.is_finite()) {
             return Grid { lo: Vec2::ZERO, size: 1.0 };
@@ -437,7 +437,7 @@ impl Grid {
         (((p.x - self.lo.x) / self.size).floor() as i64, ((p.y - self.lo.y) / self.size).floor() as i64)
     }
     /// Cells a box covers; None for boxes spanning too many (they are checked against all).
-    fn cells(&self, b: &solidcraft_geom::Aabb2) -> Option<Vec<(i64, i64)>> {
+    fn cells(&self, b: &polycore_geom::Aabb2) -> Option<Vec<(i64, i64)>> {
         let (c0, c1) = (self.cell(b.min), self.cell(b.max));
         if (c1.0 - c0.0 + 1).saturating_mul(c1.1 - c0.1 + 1) > 2048 {
             return None;
@@ -495,7 +495,7 @@ pub fn without_text_counters(sk: &Sketch, profiles: Vec<Profile>) -> Vec<Profile
     }
     // Outer polylines and their boxes, once.
     let polys: Vec<Ring<Vec2>> = profiles.iter().map(|p| p.region.outer.polyline(1e-3)).collect();
-    let boxes: Vec<solidcraft_geom::Aabb2> = polys.iter().map(|pl| pl.bounds()).collect();
+    let boxes: Vec<polycore_geom::Aabb2> = polys.iter().map(|pl| pl.bounds()).collect();
     let areas: Vec<f64> = profiles.iter().map(|p| p.region.outer.signed_area().abs()).collect();
     let keep: Vec<bool> = (0..profiles.len())
         .map(|i| {
@@ -606,14 +606,14 @@ fn find_profiles_bounded(sk: &Sketch, max_edges: usize) -> Vec<Profile> {
         }
     }
     // Bounding boxes, and a uniform grid over them: only shapes sharing a cell can meet.
-    let boxes: Vec<solidcraft_geom::Aabb2> = shapes
+    let boxes: Vec<polycore_geom::Aabb2> = shapes
         .iter()
         .map(|(_, sh)| match *sh {
             Shape::Line { a, b } => {
-                solidcraft_geom::Aabb2 { min: Vec2::new(a.x.min(b.x), a.y.min(b.y)), max: Vec2::new(a.x.max(b.x), a.y.max(b.y)) }.inflated(tol)
+                polycore_geom::Aabb2 { min: Vec2::new(a.x.min(b.x), a.y.min(b.y)), max: Vec2::new(a.x.max(b.x), a.y.max(b.y)) }.inflated(tol)
             }
             Shape::Round { c, r, .. } => {
-                solidcraft_geom::Aabb2 { min: Vec2::new(c.x - r - tol, c.y - r - tol), max: Vec2::new(c.x + r + tol, c.y + r + tol) }
+                polycore_geom::Aabb2 { min: Vec2::new(c.x - r - tol, c.y - r - tol), max: Vec2::new(c.x + r + tol, c.y + r + tol) }
             }
         })
         .collect();
@@ -1011,7 +1011,7 @@ fn find_profiles_bounded(sk: &Sketch, max_edges: usize) -> Vec<Profile> {
     // Nesting: parent = smallest containing loop from another component. Bounding boxes rule
     // out most pairs before the point-in-loop test.
     let areas: Vec<f64> = loops.iter().map(|(l, _, _, _)| l.signed_area().abs()).collect();
-    let boxes: Vec<solidcraft_geom::Aabb2> = loops.iter().map(|(l, _, _, _)| l.polyline(1e-3).bounds()).collect();
+    let boxes: Vec<polycore_geom::Aabb2> = loops.iter().map(|(l, _, _, _)| l.polyline(1e-3).bounds()).collect();
     let inside_box = |j: usize, p: Vec2| boxes.get(j).is_some_and(|b| b.contains(p));
     let mut parent_of: Vec<Option<usize>> = vec![None; loops.len()];
     for (i, (li, _, ci, _)) in loops.iter().enumerate() {

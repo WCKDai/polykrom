@@ -3,8 +3,8 @@
 //! are kept (and reported as redundant) or not added at all; only constraints that conflict
 //! with the sketch are refused.
 
+use polycore_geom::Vec2;
 use serde_json::{Value, json};
-use solidcraft_geom::Vec2;
 
 use crate::Session;
 

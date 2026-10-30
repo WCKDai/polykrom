@@ -15,8 +15,8 @@
 
 use std::collections::BTreeMap;
 
+use polycore_geom::{Loop2, Region2, Seg2, Vec2, Vec3};
 use serde::{Deserialize, Serialize};
-use solidcraft_geom::{Loop2, Region2, Seg2, Vec2, Vec3};
 
 use crate::expr::Kind;
 use crate::{DocError, Expr, Result};

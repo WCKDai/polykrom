@@ -5,8 +5,8 @@
 
 use std::time::Instant;
 
+use polycore_geom::Vec2;
 use polykrom_sketch::{Analysis, Budget, ConstraintKind, Hold, Sketch, SolveReport, solve, solve_with};
-use solidcraft_geom::Vec2;
 
 /// A small deterministic generator for the start offsets.
 struct Lcg(u64);

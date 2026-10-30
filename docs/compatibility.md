@@ -15,7 +15,7 @@ below:
 | The `solidcraft/N` format tag inside designs | Polykrom saves `.polykrom` files, but their contents are SolidCraft's container, so a renamed file still opens in SolidCraft. `.solidcraft` (and the older `.solvecraft`) open in Polykrom and save as `.polykrom` |
 | Settings, preferences, autosave, recovery and thumbnail folders | Moving them needs a one-time migration, like section 4 |
 | Bundle and package IDs (`ai.storyteller.solidcraft`), the MSI UpgradeCode, `SolidCraft.app`, installer folders and registry keys, the agent-chat keychain service | Changing them makes a second, separate install or loses saved keys; until then a Polykrom install replaces a SolidCraft one |
-| `SOLIDCRAFT_*` environment variables | Those read through `solidcraft_geom::env` accept `POLYKROM_*` first; the others keep the old name |
+| `SOLIDCRAFT_*` environment variables | Those read through `polycore_geom::env` accept `POLYKROM_*` first; the others keep the old name |
 | STEP files written by SolidCraft | Recognised as this program's own, like Polykrom's |
 | The updater's release key | Polykrom needs its own key before it can publish updates |
 
@@ -64,7 +64,7 @@ re-tagged on save.
 
 ## 3. `SOLVECRAFT_*` environment variables
 
-Every runtime variable is read through one helper, `solidcraft_geom::env` (`var`, `var_os`):
+Every runtime variable is read through one helper, `polycore_geom::env` (`var`, `var_os`):
 it reads `SOLIDCRAFT_<NAME>` and falls back to `SOLVECRAFT_<NAME>` when the new one is unset.
 The shell entry points do the same: `packaging/linux/AppRun`
 (`SOLIDCRAFT_NO_DESKTOP_INTEGRATION`) and `packaging/env.sh` (`SOLIDCRAFT_VERSION`,

@@ -104,7 +104,7 @@ struct Encoded {
 impl Encoded {
     fn of(model: &SavedModel) -> Result<Self> {
         // What to encode: every body, and the part every placed copy shows.
-        let mut shares: Vec<solidcraft_kernel::DisplayShare> = Vec::new();
+        let mut shares: Vec<polycore::DisplayShare> = Vec::new();
         let mut share_index = std::collections::HashMap::new();
         let mut placed = Vec::with_capacity(model.bodies.len());
         for b in &model.bodies {
@@ -116,8 +116,8 @@ impl Encoded {
                 (part, t)
             }));
         }
-        let bodies: Vec<&solidcraft_kernel::Body> = model.bodies.iter().chain(shares.iter().map(|s| s.original())).collect();
-        let encoded = solidcraft_kernel::map_on_threads(&bodies, 16, |b| solidcraft_kernel::encode_native_body(b).ok());
+        let bodies: Vec<&polycore::Body> = model.bodies.iter().chain(shares.iter().map(|s| s.original())).collect();
+        let encoded = polycore::map_on_threads(&bodies, 16, |b| polycore::encode_native_body(b).ok());
         let mut slices = Vec::new();
         let mut by_digest = std::collections::HashMap::new();
         let mut index = Vec::with_capacity(encoded.len());
@@ -245,7 +245,7 @@ pub(super) fn read_geometry_with<R: Read + Seek>(reader: &mut PackageReader<R>, 
     if end != data.len() {
         return Err(invalid("trailing cached data"));
     }
-    let decoded = solidcraft_kernel::map_on_threads(&parts, 16, |bytes| solidcraft_kernel::decode_native_body(bytes).ok());
+    let decoded = polycore::map_on_threads(&parts, 16, |bytes| polycore::decode_native_body(bytes).ok());
     let unique = decoded.into_iter().map(Option::flatten).collect::<Option<Vec<_>>>().ok_or_else(|| invalid("cached body"))?;
     let body = |v: Option<&Value>| unique.get(count(v)?).ok_or_else(|| invalid("cached body index"));
     let shares = manifest
@@ -254,7 +254,7 @@ pub(super) fn read_geometry_with<R: Read + Seek>(reader: &mut PackageReader<R>, 
         .filter(|s| s.len() <= MAX_UNIQUE)
         .ok_or_else(|| invalid("cached shares"))?
         .iter()
-        .map(|i| Ok(solidcraft_kernel::DisplayShare::new(body(Some(i))?.clone())))
+        .map(|i| Ok(polycore::DisplayShare::new(body(Some(i))?.clone())))
         .collect::<Result<Vec<_>>>()?;
     let table = manifest
         .get("bodies")
@@ -303,7 +303,7 @@ pub(super) fn geometry_preview(document: &[u8], model: &SavedModel) -> Result<De
     };
     let mut work = 1_000_000usize;
     for entry in &world.bodies {
-        let mesh = solidcraft_kernel::native_preview_mesh(&entry.body, detail, &mut work).map_err(invalid)?;
+        let mesh = polycore::native_preview_mesh(&entry.body, detail, &mut work).map_err(invalid)?;
         triangles = triangles.saturating_add(mesh.triangles.len());
         display_bytes = display_bytes.saturating_add(mesh.positions.len().saturating_mul(24)).saturating_add(mesh.triangles.len().saturating_mul(12));
         if triangles > 1_000_000 || display_bytes > 128 << 20 {

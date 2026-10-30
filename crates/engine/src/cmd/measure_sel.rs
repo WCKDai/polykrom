@@ -4,8 +4,8 @@
 //! distance from a round item's centre or axis (see [`super::measure_shape`]) and, where both
 //! have a direction (planar faces, straight edges), the angle.
 
+use polycore_geom::{Mesh, UnitVec3, Vec3};
 use serde_json::{Value, json};
-use solidcraft_geom::{Mesh, UnitVec3, Vec3};
 
 use super::measure_shape::{Shape, Slot, add_round, centre};
 use crate::params::bad;
@@ -104,7 +104,7 @@ fn fit_circle(pts: &[Vec3], tol: f64) -> Option<(Vec3, UnitVec3, f64)> {
 fn edge_round(b: &polykrom_doc::ModelBody, m: &Mesh, index: usize, whole: bool) -> Option<Shape> {
     let pts = m.edges.get(index)?;
     let tol = (m.bounds().diagonal().max(1.0) * 1e-6).max(1e-9);
-    let exact = solidcraft_kernel::edge_circle(&b.body, index).filter(|c| {
+    let exact = polycore::edge_circle(&b.body, index).filter(|c| {
         let ends = [pts.first(), pts.last()].into_iter().flatten().all(|p| p.dist(c.start).min(p.dist(c.end)) <= tol * 10.0);
         let on = pts.iter().all(|p| (p.dist(c.center) - c.radius).abs() <= tol * 10.0);
         ends && on
@@ -199,7 +199,7 @@ fn sketch_curve(ss: &polykrom_doc::SolvedSketch, id: &str) -> Option<Item> {
 /// A profile (closed region of a sketch): its area, and when it is a circle or a slot, its
 /// sizes.
 fn profile(ss: &polykrom_doc::SolvedSketch, index: usize) -> Option<Item> {
-    use solidcraft_geom::{Seg2, Vec2};
+    use polycore_geom::{Seg2, Vec2};
     let pr = ss.profiles.get(index)?;
     let outline: Vec<Vec3> = pr.region.outer.polyline(1e-3).iter().map(|p| ss.plane.to_world(*p)).collect();
     let mut json = json!({"type": "profile", "area_mm2": pr.region.area()});
@@ -260,8 +260,8 @@ fn face_slot(b: &polykrom_doc::ModelBody, m: &Mesh, shape: &Shape, pts: &[Vec3])
             v.extend(tri);
         }
     }
-    let surfaces: Vec<(solidcraft_kernel::FaceSurface, Vec<Vec3>)> =
-        verts.into_iter().enumerate().filter_map(|(i, v)| Some((solidcraft_kernel::face_surface(&b.body, i)?, v))).collect();
+    let surfaces: Vec<(polycore::FaceSurface, Vec<Vec3>)> =
+        verts.into_iter().enumerate().filter_map(|(i, v)| Some((polycore::face_surface(&b.body, i)?, v))).collect();
     super::measure_shape::slot_from_faces(shape, pts, &surfaces)
 }
 
@@ -312,11 +312,11 @@ fn describe(s: &Session, sel: &Sel) -> Option<Item> {
             let planar = normals.first().copied().filter(|n0| normals.iter().all(|n| n.dot(*n0) > 1.0 - 1e-6));
             let mut json = json!({"type": "face", "area_mm2": area, "planar": planar.is_some()});
             let verts: Vec<Vec3> = tris.iter().flat_map(|t| t.iter().copied()).collect();
-            let shape = match solidcraft_kernel::face_surface(&b.body, *index) {
-                Some(solidcraft_kernel::FaceSurface::Cylinder { origin, axis, radius }) => {
+            let shape = match polycore::face_surface(&b.body, *index) {
+                Some(polycore::FaceSurface::Cylinder { origin, axis, radius }) => {
                     super::measure_shape::cylinder(origin, axis, radius, &verts).unwrap_or(Shape::Other)
                 }
-                Some(solidcraft_kernel::FaceSurface::Plane { normal, point }) if planar.is_some() => Shape::Plane { point, normal },
+                Some(polycore::FaceSurface::Plane { normal, point }) if planar.is_some() => Shape::Plane { point, normal },
                 None => match (planar, verts.first()) {
                     (Some(normal), Some(point)) => Shape::Plane { point: *point, normal },
                     _ => Shape::Other,

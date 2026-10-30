@@ -1,8 +1,8 @@
 //! Surface analyses: zebra stripes, draft angle and curvature map shading of the model's faces.
 //! View state only: no geometry changes and no undo step.
 
+use polycore_geom::Vec3;
 use serde_json::{Value, json};
-use solidcraft_geom::Vec3;
 
 use super::CommandSpec;
 use crate::params::{bad, bool_, num, str_, vec3};
@@ -337,7 +337,7 @@ mod tests {
         s.execute("inspect.environment_map", &json!({})).unwrap();
         assert_eq!(s.analysis, Some(SurfaceAnalysis::Environment));
         s.execute("inspect.accessibility", &json!({"direction": [0, 0, -3]})).unwrap();
-        assert_eq!(s.analysis, Some(SurfaceAnalysis::Access { dir: solidcraft_geom::Vec3::new(0.0, 0.0, -1.0) }));
+        assert_eq!(s.analysis, Some(SurfaceAnalysis::Access { dir: polycore_geom::Vec3::new(0.0, 0.0, -1.0) }));
         s.execute("inspect.curvature_map", &json!({"clear": true})).unwrap();
         assert_eq!(s.analysis, None);
         assert_eq!(s.undo.len(), undo, "no undo steps");

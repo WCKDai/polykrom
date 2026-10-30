@@ -4,9 +4,9 @@ use std::cell::Cell;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::sync::Arc;
 
+use polycore_geom::{Aabb3, Bvh, Mesh, Vec3};
 use polykrom_doc::joints;
 use polykrom_doc::{Document, IDENTITY, Mat, apply_point, mat_mul};
-use solidcraft_geom::{Aabb3, Bvh, Mesh, Vec3};
 
 use crate::params::bad;
 use crate::{Result, Session};

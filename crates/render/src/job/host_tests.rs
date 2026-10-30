@@ -1,5 +1,5 @@
 use super::*;
-use solidcraft_geom::{Aabb3, Mesh};
+use polycore_geom::{Aabb3, Mesh};
 
 fn request() -> ImageRequest {
     ImageRequest { camera: Default::default(), width: 16, height: 16, background: [40, 80, 120], transparent_background: false }

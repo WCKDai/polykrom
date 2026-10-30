@@ -7,7 +7,7 @@
 
 use std::collections::HashMap;
 
-use solidcraft_geom::{MAX_BEZIER_DEGREE, Vec2};
+use polycore_geom::{MAX_BEZIER_DEGREE, Vec2};
 
 use crate::sketch2d::{Geom2, MAX_DRAWING_BYTES, MAX_ENTITIES, bulge_arc};
 use crate::{IoError, Result};

@@ -4,7 +4,7 @@
 //! - **Panics** are caught by a hook. One inside a command becomes a report with the design as
 //!   it was before the command and the command itself, so `polykrom-cli run replay.json --in
 //!   design.solidcraft` reproduces it. Panics the third-party kernel raises (and
-//!   `solidcraft_kernel::guard` turns into errors) are reported the same way, marked recovered.
+//!   `polycore::guard` turns into errors) are reported the same way, marked recovered.
 //! - **Crashes no hook sees** (an abort, a stack overflow, a segfault, the process being killed)
 //!   are found at the next start: every running app keeps a small, locked command journal; a
 //!   journal nobody holds any more belongs to an app that died. Its report carries the design
@@ -134,7 +134,7 @@ pub fn default_dir() -> Option<PathBuf> {
     if cfg!(test) {
         return Some(std::env::temp_dir().join(format!("solidcraft-test-crashes-{}", std::process::id())));
     }
-    if let Some(d) = solidcraft_geom::env::var_os("CRASH_DIR").filter(|d| !d.is_empty()) {
+    if let Some(d) = polycore_geom::env::var_os("CRASH_DIR").filter(|d| !d.is_empty()) {
         return Some(PathBuf::from(d));
     }
     crate::recovery::default_dir().and_then(|d| d.parent().map(|p| p.join("crashes")))
@@ -418,7 +418,7 @@ fn hook(info: &std::panic::PanicHookInfo<'_>) -> bool {
     let message = limited(info.payload_as_str().unwrap_or("(not a text message)"), MAX_MESSAGE);
     let location = info.location().map_or_else(|| "(unknown)".to_string(), |l| format!("{}:{}", l.file(), l.line()));
     let sig = signature(&location, &message);
-    let recovered = solidcraft_kernel::guarded();
+    let recovered = polycore::guarded();
     let in_command = IN_COMMAND.with(Cell::get) > 0;
     // Already reported (this run or before): count it, nothing else.
     let repeat = match state.known.lock() {

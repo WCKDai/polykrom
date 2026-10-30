@@ -5,12 +5,12 @@
 
 use std::collections::BTreeMap;
 
+use polycore_geom::{Loop2, Seg2, Vec2};
 use polykrom_doc::expr::Kind;
 use polykrom_doc::frame::{self, Anchor, MemberProfile, Profile, ProfileSpec};
 use polykrom_doc::{FeatureKind, SketchId};
 use polykrom_sketch::Sketch;
 use serde_json::{Value, json};
-use solidcraft_geom::{Loop2, Seg2, Vec2};
 
 use super::features::{add_feature, check_expr, sketch_id};
 use super::sketch::edit;

@@ -3,9 +3,9 @@
 //! units are CSS pixels (1/96 in) unless the root's `width`/`height` carry units with a
 //! `viewBox`; y is flipped so the drawing reads upright in the sketch.
 
+use polycore_geom::Vec2;
 use quick_xml::Reader;
 use quick_xml::events::{BytesStart, Event};
-use solidcraft_geom::Vec2;
 
 use crate::sketch2d::{Geom2, MAX_DRAWING_BYTES, MAX_ENTITIES};
 use crate::{IoError, Result};

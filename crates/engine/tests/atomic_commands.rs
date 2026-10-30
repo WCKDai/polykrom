@@ -98,5 +98,5 @@ fn same_commands_same_design() {
 }
 
 fn volume(s: &Session) -> f64 {
-    s.model.state().bodies.iter().filter_map(|b| solidcraft_kernel::measure(&b.body).ok()).map(|m| m.volume).sum()
+    s.model.state().bodies.iter().filter_map(|b| polycore::measure(&b.body).ok()).map(|m| m.volume).sum()
 }

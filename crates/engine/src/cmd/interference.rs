@@ -7,18 +7,18 @@
 //! against the other's mesh) the pair is clear without a boolean. The pairs left are intersected
 //! exactly and measured, in parallel on desktop (one after another in the browser), the slowest
 //! first, under a time budget: pairs not finished when it runs out are listed as not checked
-//! rather than holding the call. The shared part is measured as `solidcraft_kernel::measure`
+//! rather than holding the call. The shared part is measured as `polycore::measure`
 //! measures it (its mass properties alone).
 
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
+use polycore::Body;
+use polycore::profile::KernelTimes;
+use polycore_geom::mesh_distance::TriangleSet;
+use polycore_geom::{Aabb3, Mesh, Vec3};
 use polykrom_doc::Mat;
 use serde_json::{Value, json};
-use solidcraft_geom::mesh_distance::TriangleSet;
-use solidcraft_geom::{Aabb3, Mesh, Vec3};
-use solidcraft_kernel::Body;
-use solidcraft_kernel::profile::KernelTimes;
 
 use crate::params::{bad, num, str_, string_list};
 use crate::{Result, Session};
@@ -87,7 +87,7 @@ pub(super) fn interference(s: &mut Session, p: &Value) -> Result<Value> {
     // The bodies' display meshes, made once (in parallel) and kept on the bodies: a design open
     // in the app has them already.
     let meshes: Vec<Arc<Mesh>> = {
-        let made = solidcraft_kernel::map_with_local_pools(&bodies, usize::MAX, |b| Ok(b.mesh()));
+        let made = polycore::map_with_local_pools(&bodies, usize::MAX, |b| Ok(b.mesh()));
         made.into_iter().map(|m| m.unwrap_or_default()).collect()
     };
     // Prune by bounding boxes first (sort and sweep), so the cost follows the pairs that can
@@ -120,7 +120,7 @@ pub(super) fn interference(s: &mut Session, p: &Value) -> Result<Value> {
     };
     let sets: Vec<Option<TriangleSet>> = {
         let idx: Vec<usize> = (0..bodies.len()).filter(|&i| used.get(i).copied().unwrap_or(false)).collect();
-        let made = solidcraft_kernel::map_with_local_pools(&idx, usize::MAX, |&i| Ok(meshes.get(i).map(|m| TriangleSet::new(m))));
+        let made = polycore::map_with_local_pools(&idx, usize::MAX, |&i| Ok(meshes.get(i).map(|m| TriangleSet::new(m))));
         let mut out: Vec<Option<TriangleSet>> = std::iter::repeat_with(|| None).take(bodies.len()).collect();
         for (&i, set) in idx.iter().zip(made) {
             if let (Some(slot), Ok(set)) = (out.get_mut(i), set) {
@@ -129,7 +129,7 @@ pub(super) fn interference(s: &mut Session, p: &Value) -> Result<Value> {
         }
         out
     };
-    let need_exact = solidcraft_kernel::map_with_local_pools(&pairs, usize::MAX, |&(i, j)| {
+    let need_exact = polycore::map_with_local_pools(&pairs, usize::MAX, |&(i, j)| {
         let (Some(Some(sa)), Some(Some(sb)), Some(ma), Some(mb)) = (sets.get(i), sets.get(j), meshes.get(i), meshes.get(j)) else {
             return Ok(true);
         };
@@ -239,7 +239,7 @@ pub(super) fn interference(s: &mut Session, p: &Value) -> Result<Value> {
     // already).
     if threads > 0 && boolean_ms + tessellate_ms > 0.0 {
         let share = (waited_ms / (boolean_ms + tessellate_ms)).min(1.0);
-        solidcraft_kernel::profile::credit(KernelTimes { boolean_ms: boolean_ms * share, tessellate_ms: tessellate_ms * share });
+        polycore::profile::credit(KernelTimes { boolean_ms: boolean_ms * share, tessellate_ms: tessellate_ms * share });
     }
     timed.sort_by(|x, y| y.0.total_cmp(&x.0));
     let slowest: Vec<Value> = timed.into_iter().take(SLOWEST).map(|t| t.1).collect();
@@ -263,13 +263,13 @@ fn by_meshes(
     threads: &[polykrom_doc::ThreadInfo],
     meshes: &[Arc<Mesh>],
     pairs: &[(usize, usize)],
-    need_exact: &[solidcraft_kernel::Result<bool>],
+    need_exact: &[polycore::Result<bool>],
     skipped: usize,
     meshes_left: &[&polykrom_doc::ModelBody],
     started: web_time::Instant,
 ) -> Value {
     let checks: Vec<(usize, usize)> = pairs.iter().zip(need_exact).filter(|(_, e)| e.as_ref().map_or(true, |x| *x)).map(|(p, _)| *p).collect();
-    let found = solidcraft_kernel::map_with_local_pools(&checks, usize::MAX, |&(i, j)| {
+    let found = polycore::map_with_local_pools(&checks, usize::MAX, |&(i, j)| {
         let (Some(ma), Some(mb), Some(a), Some(b)) = (meshes.get(i), meshes.get(j), bodies.get(i), bodies.get(j)) else { return Ok(None) };
         let tol = 1e-4 * a.body.size().max(b.body.size()).max(1.0);
         Ok(super::motion::mesh_overlap_counted(ma, mb, tol, &mut 0).map(|d| (a, b, d)))
@@ -399,7 +399,7 @@ fn any_inside(points: &[Vec3], outer: &Mesh) -> bool {
 /// otherwise the intersection measured.
 fn check(job: &Job) -> Done {
     let started = web_time::Instant::now();
-    let ((outcome, note), kernel) = solidcraft_kernel::profile::capture(|| check_pair(&job.a, &job.b, &job.names));
+    let ((outcome, note), kernel) = polycore::profile::capture(|| check_pair(&job.a, &job.b, &job.names));
     Done { outcome, note, ms: started.elapsed().as_secs_f64() * 1000.0, kernel }
 }
 
@@ -407,7 +407,7 @@ fn check_pair(a: &Body, b: &Body, (na, nb): &(String, String)) -> (Outcome, Opti
     let threshold = 1e-9 * a.size().max(1.0).powi(3);
     // A pin a hair off the axis of its hole: the crescent the walls share, which the boolean
     // can't intersect.
-    if let Some(o) = solidcraft_kernel::coaxial_overlap(a, b) {
+    if let Some(o) = polycore::coaxial_overlap(a, b) {
         if o.volume > threshold {
             let hit = json!({"a": na, "b": nb, "volume_mm3": o.volume, "area_mm2": o.area, "center": o.centroid,
                 "bbox": {"min": o.bbox.min, "max": o.bbox.max}, "near_coaxial": {"offset_mm": o.offset, "length_mm": o.length}});
@@ -416,7 +416,7 @@ fn check_pair(a: &Body, b: &Body, (na, nb): &(String, String)) -> (Outcome, Opti
         return (Outcome::Clear, None);
     }
     // A pair whose shared part can't be worked out is reported, not passed as clear.
-    let (shared, report) = solidcraft_kernel::capture_boolean_diagnostics(|| solidcraft_kernel::boolean(a, b, solidcraft_kernel::BoolOp::Intersect));
+    let (shared, report) = polycore::capture_boolean_diagnostics(|| polycore::boolean(a, b, polycore::BoolOp::Intersect));
     let shared = match shared {
         Ok(o) => o,
         Err(e) => return (Outcome::Unchecked(e.to_string()), None),
@@ -438,7 +438,7 @@ fn check_pair(a: &Body, b: &Body, (na, nb): &(String, String)) -> (Outcome, Opti
     // The shared parts measured together: volumes and areas add, the centre is the volumes'.
     let mut measured = Vec::new();
     for o in &pieces {
-        match solidcraft_kernel::measure_mass(o) {
+        match polycore::measure_mass(o) {
             Ok(m) => measured.push(m),
             Err(e) => return (Outcome::Unchecked(e.to_string()), note),
         }
@@ -472,8 +472,7 @@ fn by_pieces(a: &Body, b: &Body) -> std::result::Result<(Vec<Body>, Option<Strin
     let (mut out, mut note) = (Vec::new(), None);
     for x in &la {
         for y in &lb {
-            let (r, report) =
-                solidcraft_kernel::capture_boolean_diagnostics(|| solidcraft_kernel::boolean(x, y, solidcraft_kernel::BoolOp::Intersect));
+            let (r, report) = polycore::capture_boolean_diagnostics(|| polycore::boolean(x, y, polycore::BoolOp::Intersect));
             note = note.or(report.unverified());
             if let Some(o) = r.map_err(|e| e.to_string())? {
                 out.push(o);

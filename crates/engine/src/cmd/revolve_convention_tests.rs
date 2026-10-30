@@ -1,9 +1,9 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use crate::Session;
+use polycore_geom::Vec3;
 use polykrom_doc::{Document, FeatureKind, RevolveConvention};
 use serde_json::{Value, json};
-use solidcraft_geom::Vec3;
 use std::f64::consts::{FRAC_PI_2, PI, SQRT_2};
 
 fn run(s: &mut Session, cmd: &str, p: Value) -> Value {
@@ -28,7 +28,7 @@ fn turn(s: &mut Session, sign: f64, settings: Value) {
 fn check_centered(s: &Session, opposed: bool) {
     let state = s.model.state();
     let expected = 30.0 * PI * if opposed { 2.0 } else { 1.0 };
-    let volume: f64 = state.bodies.iter().map(|mb| solidcraft_kernel::measure(&mb.body).unwrap().volume).sum();
+    let volume: f64 = state.bodies.iter().map(|mb| polycore::measure(&mb.body).unwrap().volume).sum();
     assert!((volume - expected).abs() < 0.03, "{volume} vs {expected}");
     for sign in if opposed { vec![1.0, -1.0] } else { vec![1.0] } {
         let body = &state.bodies.iter().find(|mb| mb.body.contains(Vec3::new(sign * 3.0, 5.0, 0.0))).unwrap().body;
@@ -40,7 +40,7 @@ fn check_centered(s: &Session, opposed: bool) {
         assert!((bounds.max.z - 2.0 * SQRT_2).abs() < 1e-6, "{bounds:?}");
         let inner_x = if sign > 0.0 { bounds.min.x } else { -bounds.max.x };
         assert!((inner_x - SQRT_2).abs() < 1e-6, "{bounds:?}");
-        let centroid = solidcraft_kernel::measure(body).unwrap().centroid;
+        let centroid = polycore::measure(body).unwrap().centroid;
         let radial = (2.0 / 3.0) * (64.0 - 8.0) / (16.0 - 4.0);
         let want_x = radial * (PI / 4.0).sin() / (PI / 4.0);
         assert!((centroid.x - sign * want_x).abs() < 0.005, "{centroid:?}");
@@ -87,7 +87,7 @@ fn two_sided_revolves_use_the_canonical_negative_and_positive_limits() {
         assert!((bounds.max.z - 2.0 * 3.0f64.sqrt()).abs() < 1e-6);
         assert!(body.contains(Vec3::new(3.0, 5.0, 0.0)));
         assert!(!body.contains(Vec3::new(0.0, 5.0, 3.0)));
-        assert!((solidcraft_kernel::measure(body).unwrap().volume - 30.0 * PI).abs() < 0.03);
+        assert!((polycore::measure(body).unwrap().volume - 30.0 * PI).abs() < 0.03);
     }
 }
 
@@ -180,7 +180,7 @@ fn symmetric_revolve_preserves_a_translated_rotated_sketch_frame() {
     assert!(bounds.max.dist(Vec3::new(20.0, 20.0 + 2.0 * SQRT_2, 34.0)) < 1e-4, "{bounds:?}");
     assert!(body.contains(Vec3::new(15.0, 20.0, 33.0)));
     assert!(!body.contains(Vec3::new(15.0, 23.0, 30.0)));
-    assert!((solidcraft_kernel::measure(body).unwrap().volume - 30.0 * PI).abs() < 0.03);
+    assert!((polycore::measure(body).unwrap().volume - 30.0 * PI).abs() < 0.03);
 }
 
 #[test]
@@ -217,7 +217,7 @@ fn centered_coplanar_cut_uses_the_actual_angular_interval() {
     // Removed sector clipped by x>=2: 10∫[-π/4,π/4](16−4sec²θ)/2 dθ.
     // The sector crosses the whole stock at z=0, leaving two disconnected solids.
     let expected = 200.0 - 40.0 * PI;
-    let volumes: Vec<_> = state.bodies.iter().map(|mb| solidcraft_kernel::measure(&mb.body).unwrap().volume).collect();
+    let volumes: Vec<_> = state.bodies.iter().map(|mb| polycore::measure(&mb.body).unwrap().volume).collect();
     let total: f64 = volumes.iter().sum();
     assert!((total - expected).abs() < 0.05, "{volumes:?}: total{total}, expected{expected}");
     assert_eq!(state.bodies.len(), 2);
@@ -241,7 +241,7 @@ fn one_sided_and_full_revolves_keep_the_existing_material() {
                 assert!(body.contains(Vec3::new(3.0 / SQRT_2, 5.0, 3.0 / SQRT_2)));
                 assert_eq!(body.contains(Vec3::new(-3.0 / SQRT_2, 5.0, -3.0 / SQRT_2)), angle == "360 deg");
                 let expected = if angle == "360 deg" { 120.0 * PI } else { 30.0 * PI };
-                assert!((solidcraft_kernel::measure(body).unwrap().volume - expected).abs() < 0.08);
+                assert!((polycore::measure(body).unwrap().volume - expected).abs() < 0.08);
             }
         }
     }
@@ -256,7 +256,7 @@ fn point_targets_use_each_profiles_canonical_axis_for_both_axis_signs() {
             turn(&mut s, sign, json!({"to":[0,5,3]}));
             let state = s.model.state();
             let expected = 30.0 * PI * if opposed { 2.0 } else { 1.0 };
-            let volume: f64 = state.bodies.iter().map(|mb| solidcraft_kernel::measure(&mb.body).unwrap().volume).sum();
+            let volume: f64 = state.bodies.iter().map(|mb| polycore::measure(&mb.body).unwrap().volume).sum();
             assert!((volume - expected).abs() < 0.05, "{volume}");
             assert!(state.bodies.iter().any(|mb| mb.body.contains(Vec3::new(3.0 / SQRT_2, 5.0, 3.0 / SQRT_2))));
             assert!(!state.bodies.iter().any(|mb| mb.body.contains(Vec3::new(3.0 / SQRT_2, 5.0, -3.0 / SQRT_2))));
@@ -299,10 +299,10 @@ fn curved_targets_keep_only_the_material_before_the_post_for_both_axis_signs() {
                 assert!(!arc.contains(Vec3::new(-side * 12.0 * (PI / 6.0).cos(), 6.0, -2.5)));
                 assert!(!arc.contains(Vec3::new(side * 12.0 * (PI / 6.0).cos(), -6.0, -2.5)));
                 let full = PI * (225.0 - 100.0) * 5.0;
-                let angle = solidcraft_kernel::measure(arc).unwrap().volume / full * 360.0;
+                let angle = polycore::measure(arc).unwrap().volume / full * 360.0;
                 assert!(angle > 60.0 && angle < 90.0, "{angle}");
-                let overlap = solidcraft_kernel::boolean(arc, post, solidcraft_kernel::BoolOp::Intersect).unwrap();
-                assert!(overlap.is_none_or(|b| solidcraft_kernel::measure(&b).unwrap().volume < 1e-3));
+                let overlap = polycore::boolean(arc, post, polycore::BoolOp::Intersect).unwrap();
+                assert!(overlap.is_none_or(|b| polycore::measure(&b).unwrap().volume < 1e-3));
             }
         }
     }
@@ -330,7 +330,7 @@ fn construction_axis_revolve_follows_the_axis() {
     assert!(matches!(&turn.kind, FeatureKind::Revolve { axis: polykrom_doc::AxisRef::Construction { name }, .. } if name == "Axis1"));
     let reopened = Document::from_json(&s.doc.to_json()).unwrap();
     assert_eq!(reopened.find_feature("Turn").unwrap().kind, turn.kind);
-    let volume = |s: &Session| solidcraft_kernel::measure(&s.model.state().bodies[0].body).unwrap().volume;
+    let volume = |s: &Session| polycore::measure(&s.model.state().bodies[0].body).unwrap().volume;
     assert!((volume(&s) - 60.0 * PI).abs() < 0.05);
     assert!((volume(&Session::new(reopened)) - 60.0 * PI).abs() < 0.05);
     // Moving the axis 1 mm away from the profile widens the ring: radii 3 to 5 instead of 2 to 4.

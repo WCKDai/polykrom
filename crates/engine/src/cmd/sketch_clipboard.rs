@@ -7,9 +7,9 @@
 
 use std::collections::BTreeMap;
 
+use polycore_geom::{Aabb2, Vec2};
 use polykrom_sketch::{ConstraintKind, CurveKind, LinkKind, LinkSource, Sketch};
 use serde_json::{Value, json};
-use solidcraft_geom::{Aabb2, Vec2};
 
 use super::sketch::{edit, target_sketch};
 use super::{CommandSpec, in_sketch};

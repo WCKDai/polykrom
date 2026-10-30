@@ -11,8 +11,8 @@ use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
+use polycore_geom::Vec3;
 use polykrom_render::{AnalysisMode, Camera, Rgb, SECTION_CAP, Scene};
-use solidcraft_geom::Vec3;
 use wgpu::util::DeviceExt;
 
 use crate::view::{AccessMap, Frame, GpuScene, GpuTarget, Renderer, analysis_colors, analysis_uniform};
@@ -554,8 +554,8 @@ fn background_pipeline(device: &wgpu::Device, samples: u32, depth: wgpu::Texture
 mod tests {
     use super::*;
     use crate::view::TRI_SIZE;
+    use polycore_geom::Mesh;
     use polykrom_render::SceneMesh;
-    use solidcraft_geom::Mesh;
     use std::sync::Arc;
 
     /// One triangle facing the camera.

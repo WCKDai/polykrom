@@ -145,7 +145,7 @@ pub(super) mod native {
         // A wall's thickness, roughly: twice the volume over the area for a thin-walled part. A mesh
         // coarser than that bends a wall with one element through it, too stiff: the stress comes
         // out low, the dangerous way.
-        let wall = solidcraft_kernel::measure(&body.body).ok().map(|m| 2.0 * m.volume / m.area).filter(|t| *t > 0.0 && t.is_finite());
+        let wall = polycore::measure(&body.body).ok().map(|m| 2.0 * m.volume / m.area).filter(|t| *t > 0.0 && t.is_finite());
         let fine = wall.map(|t| 0.75 * t).unwrap_or(f64::INFINITY);
         let size = match num(p, "mesh_size") {
             Some(h) if h > 0.0 && h.is_finite() => h,
@@ -155,7 +155,7 @@ pub(super) mod native {
         let coarse = size > 1.5 * fine;
         let spec = study_spec(cmd, p, e, nu, size)?;
         let budget = Duration::from_secs_f64(num(p, "budget_s").filter(|b| *b > 0.0 && b.is_finite()).unwrap_or(600.0).min(86_400.0));
-        let step = solidcraft_kernel::step_export(&[&body.body], "Polykrom").map_err(|e| bad(cmd, format!("STEP export: {e}")))?;
+        let step = polycore::step_export(&[&body.body], "Polykrom").map_err(|e| bad(cmd, format!("STEP export: {e}")))?;
 
         let dir = scratch(cmd, "analysis")?;
         let result = solve(cmd, &nf, &dir, &step, &spec, size, bool_(p, "refine").unwrap_or(false), budget);

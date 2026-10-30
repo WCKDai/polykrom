@@ -1,8 +1,8 @@
 //! Sketch points placed by parameters: a coordinate typed as an expression fixes the point
 //! where it comes to, and the point follows the parameters without a dimension or a solve.
 
+use polycore_geom::Vec2;
 use serde_json::{Value, json};
-use solidcraft_geom::Vec2;
 
 use crate::Session;
 

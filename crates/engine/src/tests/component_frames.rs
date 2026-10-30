@@ -223,8 +223,8 @@ fn revolve_to_a_cylinder_in_another_moved_component() {
     let world = s.world_state();
     let arc = &world.body("Arc").unwrap().body;
     let post = &world.body("PostBody").unwrap().body;
-    let overlap = solidcraft_kernel::boolean(arc, post, solidcraft_kernel::BoolOp::Intersect).unwrap();
-    assert!(overlap.is_none_or(|b| solidcraft_kernel::measure(&b).unwrap().volume < 1e-3), "the arc runs into the post");
+    let overlap = polycore::boolean(arc, post, polycore::BoolOp::Intersect).unwrap();
+    assert!(overlap.is_none_or(|b| polycore::measure(&b).unwrap().volume < 1e-3), "the arc runs into the post");
     // Past the picked point's angle (29°) on the inner side, where the post leaves room.
     let at = |r: f64, deg: f64| Vec3::new(r * deg.to_radians().cos(), r * deg.to_radians().sin(), -2.5);
     assert!(arc.contains(at(10.2, 35.0)), "the arc is not cut back to the post's surface");

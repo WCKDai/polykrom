@@ -1,9 +1,9 @@
 //! `sketch.create` `flip`: a sketch on a plane seen from its other side (#1586). Without it a
 //! sketch keeps the plane's own side, and older designs open, rebuild and save as before.
 
+use polycore_geom::{Plane, Vec3};
 use polykrom_doc::{FeatureKind, PlaneRef};
 use serde_json::{Value, json};
-use solidcraft_geom::{Plane, Vec3};
 
 use crate::Session;
 

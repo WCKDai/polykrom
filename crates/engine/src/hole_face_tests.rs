@@ -2,8 +2,8 @@
 //! moves the hole moves with it, and when the face no longer reaches the place the hole stays
 //! where it was put and says so instead of sliding to the face's nearest point.
 
+use polycore_geom::Vec3;
 use serde_json::{Value, json};
-use solidcraft_geom::Vec3;
 
 use crate::Session;
 

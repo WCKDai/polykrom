@@ -2,8 +2,8 @@
 //! rocker meeting a stop and a Watt six-bar's output link meeting one, each checked against the
 //! linkage solved with circle intersections and a separating-axis test of the parts' outlines.
 
+use polycore_geom::Vec3;
 use serde_json::{Value, json};
-use solidcraft_geom::Vec3;
 
 use super::{five_bar, four_bar, joint_angle, meet, occ, part, pin, run};
 use crate::Session;

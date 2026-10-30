@@ -2,9 +2,9 @@
 //! while `polykrom-cli snapshot`, MCP screenshots and thumbnails keep [`Palette::DEFAULT`].
 
 use super::*;
+use polycore_geom::Vec2;
 use polykrom_sketch::{LinkGeom, LinkKind, LinkSource};
 use serde_json::json;
-use solidcraft_geom::Vec2;
 
 /// No colour here is one of [`colors`] or an appearance below, and each field has its own.
 const MARK: Palette = Palette {

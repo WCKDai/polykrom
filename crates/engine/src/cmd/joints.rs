@@ -5,11 +5,11 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
+use polycore_geom::{Aabb3, Vec3};
 use polykrom_doc::expr::Kind;
 use polykrom_doc::joints::cam::{self, Cam, CamProfile, Follower};
 use polykrom_doc::joints::{self, Coupling, Joint, JointExprs, JointKind, JointOrigin, MotionLink, NamedOrigin, Size, Snap, XRef};
 use serde_json::{Value, json};
-use solidcraft_geom::{Aabb3, Vec3};
 
 use super::CommandSpec;
 use crate::params::{bad, bool_, num, str_, vec3};

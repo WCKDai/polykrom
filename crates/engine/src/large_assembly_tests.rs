@@ -6,10 +6,10 @@
 //! The test keeps it small. The benchmark times the open phases at any size:
 //! `SOLIDCRAFT_BENCH_PARTS=400 cargo test --release -p polykrom-engine bench_generated_assembly -- --ignored --nocapture`
 
+use polycore_geom::Vec3;
 use polykrom_doc::BodyName;
 use polykrom_doc::{Document, FeatureKind, Operation, mat_inverse, point_expr, rigid};
 use serde_json::json;
-use solidcraft_geom::Vec3;
 
 use crate::Session;
 

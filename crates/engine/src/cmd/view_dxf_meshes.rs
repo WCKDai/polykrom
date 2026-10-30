@@ -6,9 +6,9 @@ use std::mem::size_of;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
+use polycore::{KernelError, map_with_local_pools};
+use polycore_geom::{Aabb3, Mesh, Vec3};
 use polykrom_doc::{IDENTITY, Mat, ModelBody, mat_inverse, mat_mul};
-use solidcraft_geom::{Aabb3, Mesh, Vec3};
-use solidcraft_kernel::{KernelError, map_with_local_pools};
 
 use super::{CMD, progress::Stage};
 use crate::params::bad;
@@ -127,7 +127,7 @@ pub(super) fn prepare(s: &Session, tolerance: f64) -> Result<Scene> {
     let bytes = AtomicUsize::new(0);
     let results = map_with_local_pools(&items, WORKERS, |item| {
         progress.check().map_err(|e| KernelError::Failed(e.into()))?;
-        let mut mesh = item.body.body.reference_display_mesh_angular(tolerance, solidcraft_kernel::DISPLAY_ANGLE)?;
+        let mut mesh = item.body.body.reference_display_mesh_angular(tolerance, polycore::DISPLAY_ANGLE)?;
         if mesh.triangles.is_empty() {
             return Err(KernelError::Invalid(format!("{} has no exportable surface", item.body.name)));
         }
@@ -152,7 +152,7 @@ pub(super) fn prepare(s: &Session, tolerance: f64) -> Result<Scene> {
         progress.advance(1).map_err(|e| KernelError::Failed(e.into()))?;
         Ok(Prepared { mesh, visibility, triangles })
     });
-    let mut prepared = results.into_iter().collect::<solidcraft_kernel::Result<Vec<_>>>()?;
+    let mut prepared = results.into_iter().collect::<polycore::Result<Vec<_>>>()?;
     let mut meshes: Vec<Option<Arc<Mesh>>> = vec![None; groups.len()];
     for (item, p) in items.iter().zip(&mut prepared) {
         if let Some(mesh) = p.mesh.take()

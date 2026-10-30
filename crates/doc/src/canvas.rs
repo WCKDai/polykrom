@@ -1,8 +1,8 @@
 //! Canvases: reference images placed on a plane (Insert Canvas), kept in the design.
 //! The image bytes travel inside the design file (base64), so it reopens without the original.
 
+use polycore_geom::{Plane, Vec2, Vec3};
 use serde::{Deserialize, Serialize};
-use solidcraft_geom::{Plane, Vec2, Vec3};
 
 use crate::PlaneRef;
 

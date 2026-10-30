@@ -19,7 +19,7 @@ fn imports_the_block(bytes: &[u8], file: &str) {
     let polykrom_doc::FeatureKind::Import { file: held, step, .. } = &sf.kind else { panic!("not an Import feature") };
     assert_eq!(held, file);
     assert!(step.contains("MANIFOLD_SOLID_BREP"), "the feature keeps the restated STEP");
-    let v = solidcraft_kernel::measure(&sf.import.bodies[0].body).unwrap().volume;
+    let v = polycore::measure(&sf.import.bodies[0].body).unwrap().volume;
     assert!((v - 6000.0).abs() < 1e-6, "{file}: volume {v}");
     // FreeCAD's object label does not come through cadmpeg; the product is then named after the file.
     let stem = file.rsplit_once('.').unwrap().0;

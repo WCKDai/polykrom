@@ -3,8 +3,8 @@
 //! Text resolve the sketch's plane against the model before the sketch, as evaluation does, and
 //! the links follow when a parameter moves the plane.
 
+use polycore_geom::Vec3;
 use serde_json::{Value, json};
-use solidcraft_geom::Vec3;
 
 use crate::Session;
 

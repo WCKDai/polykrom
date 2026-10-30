@@ -1,9 +1,9 @@
 //! Joint origins found by their face's name: a part jointed to a hole stays on it, on the same
 //! side and turned the same way, as the design's parameters change.
 
+use polycore_geom::Vec3;
 use polykrom_doc::joints::{Snap, XRef};
 use serde_json::{Value, json};
-use solidcraft_geom::Vec3;
 
 use super::tests::{occ, place, run};
 use crate::Session;

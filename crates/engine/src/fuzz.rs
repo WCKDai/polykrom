@@ -6,11 +6,11 @@
 //! and chamfers on random edges, shells, holes and patterns. Every step is checked: the command
 //! succeeds, every body is a sound solid, and the volume moves the right way.
 
+use polycore::fuzz::Rng;
+pub use polycore::fuzz::{BoolCase, boolean_case, boolean_shapes};
+use polycore_geom::Vec3;
 use serde::Serialize;
 use serde_json::{Value, json};
-use solidcraft_geom::Vec3;
-use solidcraft_kernel::fuzz::Rng;
-pub use solidcraft_kernel::fuzz::{BoolCase, boolean_case, boolean_shapes};
 
 use crate::{EngineError, Session};
 
@@ -64,7 +64,7 @@ pub struct Run {
     pub unsupported: Vec<(String, String)>,
     /// Steps whose generated parameters a command refused.
     pub rejected: usize,
-    pub boolean_fallbacks: std::collections::BTreeMap<solidcraft_kernel::BooleanStrategy, usize>,
+    pub boolean_fallbacks: std::collections::BTreeMap<polycore::BooleanStrategy, usize>,
     pub boolean_reports_truncated: bool,
 }
 
@@ -76,7 +76,7 @@ impl Run {
 }
 
 fn total_volume(s: &Session) -> f64 {
-    s.model.state().bodies.iter().filter_map(|b| solidcraft_kernel::measure(&b.body).ok()).map(|m| m.volume).sum()
+    s.model.state().bodies.iter().filter_map(|b| polycore::measure(&b.body).ok()).map(|m| m.volume).sum()
 }
 
 fn classify(e: &EngineError) -> Outcome {
@@ -303,7 +303,7 @@ pub fn golden(seed: u64, max_steps: usize) -> Value {
     let (mut volume, mut area, mut faces, mut edges, mut shells) = (0.0, 0.0, 0, 0, 0);
     let mut measured = true;
     for b in &st.bodies {
-        match solidcraft_kernel::measure(&b.body) {
+        match polycore::measure(&b.body) {
             Ok(m) => {
                 volume += m.volume;
                 area += m.area;
@@ -450,11 +450,11 @@ mod tests {
     use super::*;
 
     #[allow(clippy::expect_used)]
-    fn body_measures(s: &Session) -> Vec<solidcraft_kernel::BodyMeasure> {
-        s.model.state().bodies.iter().map(|b| solidcraft_kernel::measure(&b.body).expect("measure a valid body")).collect()
+    fn body_measures(s: &Session) -> Vec<polycore::BodyMeasure> {
+        s.model.state().bodies.iter().map(|b| polycore::measure(&b.body).expect("measure a valid body")).collect()
     }
 
-    fn seed_measures(seed: u64) -> Vec<solidcraft_kernel::BodyMeasure> {
+    fn seed_measures(seed: u64) -> Vec<polycore::BodyMeasure> {
         let (run, s) = run_session(seed, 8, &mut |_| {});
         assert_eq!(run.outcome.kind, "ok", "seed {seed}: {:?}", run.outcome);
         body_measures(&s)

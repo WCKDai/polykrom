@@ -9,8 +9,8 @@ license.workspace = true
 workspace = true
 
 [dependencies]
-solidcraft-geom = { workspace = true }
-solidcraft-kernel = { workspace = true }
+polycore-geom = { workspace = true }
+polycore = { workspace = true }
 polykrom-doc = { workspace = true }
 thiserror = { workspace = true }
 log = { workspace = true }

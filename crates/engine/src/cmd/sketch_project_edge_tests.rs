@@ -2,9 +2,9 @@
 //! so the edge is found by that name wherever a change of the body takes it, and no other edge
 //! is taken for it when it is split or gone.
 
+use polycore_geom::{Vec2, Vec3};
 use polykrom_sketch::{Link, LinkSource, Shape};
 use serde_json::{Value, json};
-use solidcraft_geom::{Vec2, Vec3};
 
 use crate::Session;
 

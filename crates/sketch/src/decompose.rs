@@ -58,7 +58,7 @@
 use std::collections::btree_map::Entry;
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
-use solidcraft_geom::Vec2;
+use polycore_geom::Vec2;
 
 use crate::loci::{Locus, Reading, Rel, Span, View, crossing, mag, place, side};
 use crate::union_find::{find, union};

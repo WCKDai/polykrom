@@ -10,7 +10,7 @@ fn recorded_assignment_preserves_sample_joined_material_and_timeline() {
     s.run_script(&crate::sample::script()).unwrap();
     let before = s.model.state();
     assert_eq!(before.bodies.len(), 1);
-    let volume = solidcraft_kernel::measure(&before.body("Plate").unwrap().body).unwrap().volume;
+    let volume = polycore::measure(&before.body("Plate").unwrap().body).unwrap().volume;
     let created = run(&mut s, "component.from_bodies", json!({"bodies":["Plate"]}));
     let to = created["components"][0]["component"].as_u64().unwrap();
     let feature = created["components"][0]["feature"].as_u64().unwrap();
@@ -19,7 +19,7 @@ fn recorded_assignment_preserves_sample_joined_material_and_timeline() {
     let body = after.body("Plate").unwrap();
     assert_eq!(body.component, to);
     assert!(body.transferred);
-    assert!((solidcraft_kernel::measure(&body.body).unwrap().volume - volume).abs() < 1e-6);
+    assert!((polycore::measure(&body.body).unwrap().volume - volume).abs() < 1e-6);
     assert!(body.mesh().contains(Vec3::new(40.0, 35.0, 12.0)));
     let index = s.doc.feature_index(feature).unwrap();
     s.doc_mut().marker = Some(index);
@@ -75,7 +75,7 @@ fn historical_join_cut_and_new_destination_modeling_keep_material() {
     run(&mut s, "solid.box", json!({"corner":[2,2,0],"length":2,"width":2,"height":10,"operation":"cut"}));
     let original = s.model.state();
     assert_eq!(original.bodies.len(), 1);
-    let v = solidcraft_kernel::measure(&original.body("Block").unwrap().body).unwrap().volume;
+    let v = polycore::measure(&original.body("Block").unwrap().body).unwrap().volume;
     assert!((v - 1760.0).abs() < 1e-6);
     run(&mut s, "material.assign", json!({"bodies":["Block"],"material":"Brass"}));
     run(&mut s, "appearance.assign", json!({"bodies":["Block"],"color":"#bc8537"}));
@@ -87,7 +87,7 @@ fn historical_join_cut_and_new_destination_modeling_keep_material() {
     run(&mut s, "solid.box", json!({"corner":[18,0,0],"length":2,"width":10,"height":10,"operation":"join"}));
     assert_eq!(s.model.state().bodies.len(), 1);
     assert_eq!(s.model.state().body("Block").unwrap().component, c);
-    let final_volume = solidcraft_kernel::measure(&s.model.state().body("Block").unwrap().body).unwrap().volume;
+    let final_volume = polycore::measure(&s.model.state().body("Block").unwrap().body).unwrap().volume;
     assert!((final_volume - 1960.0).abs() < 1e-6);
     run(&mut s, "component.move_bodies", json!({"component":0,"bodies":["Block"]}));
     assert_eq!(s.model.state().body("Block").unwrap().component, 0);
@@ -95,7 +95,7 @@ fn historical_join_cut_and_new_destination_modeling_keep_material() {
     assert_eq!(s.model.state().body("Block").unwrap().component, c);
     let mut reopened = Session { doc: polykrom_doc::Document::from_json(&s.doc.to_json()).unwrap().into(), ..Session::default() };
     reopened.refresh();
-    assert!((solidcraft_kernel::measure(&reopened.model.state().body("Block").unwrap().body).unwrap().volume - final_volume).abs() < 1e-6);
+    assert!((polycore::measure(&reopened.model.state().body("Block").unwrap().body).unwrap().volume - final_volume).abs() < 1e-6);
 }
 
 #[test]
@@ -207,7 +207,7 @@ fn earlier_selected_cylinder_emboss_keeps_source_frame_after_transfer_and_edit()
     run(&mut s, "sketch.rectangle.two_point", json!({"p0":[-2,5],"p1":[2,10]}));
     run(&mut s, "sketch.finish", json!({}));
     let emboss = run(&mut s, "solid.emboss", json!({"sketch":"Badge","face":[30,10,7.5],"depth":1}))["feature"].as_u64().unwrap();
-    let before = solidcraft_kernel::measure(&s.world_state().body("Sleeve").unwrap().body).unwrap().volume;
+    let before = polycore::measure(&s.world_state().body("Sleeve").unwrap().body).unwrap().volume;
     run(&mut s, "component.activate", json!({"component":0}));
     let destination = run(&mut s, "component.create", json!({"name":"Destination"}));
     let to = destination["component"].as_u64().unwrap();
@@ -218,10 +218,10 @@ fn earlier_selected_cylinder_emboss_keeps_source_frame_after_transfer_and_edit()
     let mut reopened = Session { doc: polykrom_doc::Document::from_json(&s.doc.to_json()).unwrap().into(), ..Session::default() };
     reopened.refresh();
     assert!(reopened.doc.features.iter().all(|feature| reopened.model.result(feature.id).is_some_and(|result| result.error.is_none())));
-    assert!((solidcraft_kernel::measure(&reopened.world_state().body("Sleeve").unwrap().body).unwrap().volume - before).abs() < 1e-5);
+    assert!((polycore::measure(&reopened.world_state().body("Sleeve").unwrap().body).unwrap().volume - before).abs() < 1e-5);
     let depth = reopened.doc.feature(emboss).unwrap().param_names[0].clone();
     run(&mut reopened, "parameters.change", json!({"name":depth,"expression":"2 mm"}));
-    assert!(solidcraft_kernel::measure(&reopened.world_state().body("Sleeve").unwrap().body).unwrap().volume > before);
+    assert!(polycore::measure(&reopened.world_state().body("Sleeve").unwrap().body).unwrap().volume > before);
 }
 
 #[test]

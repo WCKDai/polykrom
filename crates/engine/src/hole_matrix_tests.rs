@@ -15,8 +15,8 @@
 
 use std::f64::consts::PI;
 
+use polycore_geom::Vec3;
 use serde_json::{Value, json};
-use solidcraft_geom::Vec3;
 
 use crate::Session;
 

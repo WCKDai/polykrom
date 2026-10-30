@@ -1,9 +1,9 @@
 use super::*;
+use polycore_geom::Vec3;
 use polykrom_doc::{Document, FeatureKind, MeshData};
-use solidcraft_geom::Vec3;
 
 fn imported_box() -> Session {
-    let body = solidcraft_kernel::box_solid(Vec3::ZERO, Vec3::new(10., 20., 30.)).unwrap();
+    let body = polycore::box_solid(Vec3::ZERO, Vec3::new(10., 20., 30.)).unwrap();
     let mesh = body.tessellate(0.01).unwrap();
     let mut doc = Document::default();
     doc.add_feature(
@@ -140,7 +140,7 @@ fn exported_binary_stl_with_a_bore_reconstructs_analytic_faces() {
     let body = &state.bodies[0].body;
     assert!(!body.is_mesh());
     assert!(body.validity().is_empty());
-    assert_eq!(solidcraft_kernel::measure(body).unwrap().merged.face_types.get("cylinder"), Some(&1));
+    assert_eq!(polycore::measure(body).unwrap().merged.face_types.get("cylinder"), Some(&1));
     assert_eq!(body.faces(0.01).unwrap().len(), 10);
     std::fs::remove_file(path).unwrap();
 }
@@ -157,7 +157,7 @@ fn stl_export_is_closed_where_faces_meet() {
     let state = s.model.state();
     for name in ["BoxFillet", "CylHole"] {
         let body = &state.bodies.iter().find(|b| b.name == name).unwrap().body;
-        let expected = solidcraft_kernel::measure(body).unwrap().volume;
+        let expected = polycore::measure(body).unwrap().volume;
         for format in [polykrom_io::Format::StlBinary, polykrom_io::Format::StlAscii] {
             let bytes = polykrom_io::export(&state, &[name.to_string()], format, name).unwrap();
             let tris = polykrom_io::read_stl(&bytes).unwrap();

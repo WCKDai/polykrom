@@ -369,7 +369,7 @@ fn a_position_naming_a_missing_accessor_is_refused_before_the_gltf_crate() {
     let glb = glb_container(j.to_string().as_bytes(), &f.bin);
     let e = read(&glb).err().map(|e| e.to_string()).unwrap_or_default();
     assert!(e.contains("POSITION names accessor 99, but the file has 2"), "{e}");
-    assert!(!solidcraft_kernel::guarded(), "no guard left open");
+    assert!(!polycore::guarded(), "no guard left open");
 }
 
 #[test]

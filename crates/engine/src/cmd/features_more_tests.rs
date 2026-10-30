@@ -32,7 +32,7 @@ fn grouped_face_auto_operation_keeps_implicit_and_explicit_participants() {
             params["operation"] = json!("auto");
             let made = run(&mut actual, "solid.extrude", params);
             let body = actual.model.state().body("Stock").unwrap().body.clone();
-            let volume = solidcraft_kernel::measure(&body).unwrap().volume;
+            let volume = polycore::measure(&body).unwrap().volume;
             assert!(
                 (volume - (1000. + 100. * distance)).abs() < 1e-6,
                 "offset={offset}, distance={distance}, volume={volume}, feature={:?}",
@@ -46,7 +46,7 @@ fn grouped_face_auto_operation_keeps_implicit_and_explicit_participants() {
             let mut single = s.scratch();
             run(&mut grouped, "solid.extrude", json!({"faces":[[32,2,10],[38,8,10]],"face_body":"Stock","distance":-2,"operation":"cut"}));
             run(&mut single, "solid.extrude", json!({"face":[32,2,10],"face_body":"Stock","distance":-2,"operation":"cut"}));
-            let volume = |session: &Session| solidcraft_kernel::measure(&session.model.state().body("Stock").unwrap().body).unwrap().volume;
+            let volume = |session: &Session| polycore::measure(&session.model.state().body("Stock").unwrap().body).unwrap().volume;
             assert!((volume(&grouped) - volume(&single)).abs() < 1e-6);
         }
     }
@@ -89,7 +89,7 @@ fn sketch_on_a_part_in_another_component_joins_and_cuts_it() {
             run(&mut t, "solid.extrude", p);
             let st = t.model.state();
             assert_eq!(st.bodies.len(), 1, "{params} {operation}: no separate body");
-            let got = solidcraft_kernel::measure(&st.body("Stock").unwrap().body).unwrap().volume;
+            let got = polycore::measure(&st.body("Stock").unwrap().body).unwrap().volume;
             assert!((got - volume).abs() < 1e-2, "{params} {operation}: volume {got}, expected {volume}");
         }
     }
@@ -151,7 +151,7 @@ fn every_inward_extrude_into_a_part_in_another_component_cuts_it() {
             }
             let st = t.model.state();
             let names: Vec<_> = st.bodies.iter().map(|b| b.name.to_string()).collect();
-            let got = st.body("Stock").and_then(|b| solidcraft_kernel::measure(&b.body).ok()).map(|m| m.volume);
+            let got = st.body("Stock").and_then(|b| polycore::measure(&b.body).ok()).map(|m| m.volume);
             if names != ["Stock"] || got.is_none_or(|v| (v - volume).abs() > 1e-2) {
                 wrong.push(format!("{params} {operation}: bodies {names:?}, Stock volume {got:?}, expected {volume:.3}"));
             }
@@ -210,7 +210,7 @@ fn separated_profile_cut_preserves_participants_and_removes_only_consumed_bodies
             assert!(state.body("A").is_none());
             for (name, expected) in [("B", 210.), ("C", if explicit { 250. } else { 210. })] {
                 let body = &state.body(name).unwrap().body;
-                assert!((solidcraft_kernel::measure(body).unwrap().volume - expected).abs() < 1e-6);
+                assert!((polycore::measure(body).unwrap().volume - expected).abs() < 1e-6);
                 assert!(body.validity().is_empty());
             }
         };
@@ -342,7 +342,7 @@ fn exact_cylinder_volume(s: &Session) -> f64 {
 
 #[test]
 fn cylinder_emboss_persists_selection_and_replays_radial_depth() {
-    use solidcraft_geom::Vec3;
+    use polycore_geom::Vec3;
     let mut s = cylinder_badge();
     let before = exact_cylinder_volume(&s);
     run(
@@ -438,7 +438,7 @@ fn cylinder_cross_component_emboss_keeps_source_owner_and_placements() {
             .world_state()
             .bodies
             .iter()
-            .find(|b| b.body.tessellate_with(0.001, true).unwrap().contains(solidcraft_geom::Vec3::new(40.5 + pick_offset, 0., 7.5)))
+            .find(|b| b.body.tessellate_with(0.001, true).unwrap().contains(polycore_geom::Vec3::new(40.5 + pick_offset, 0., 7.5)))
             .unwrap()
             .name
             .clone();
@@ -462,7 +462,7 @@ fn cylinder_cross_component_emboss_keeps_source_owner_and_placements() {
         assert!((exact_cylinder_volume(&s) - before - 21.).abs() < 0.02);
         let world = s.world_state();
         for x in [39.5, 119.5] {
-            assert!(world.bodies.iter().any(|b| b.body.tessellate_with(0.001, true).unwrap().contains(solidcraft_geom::Vec3::new(x, 0., 7.5))));
+            assert!(world.bodies.iter().any(|b| b.body.tessellate_with(0.001, true).unwrap().contains(polycore_geom::Vec3::new(x, 0., 7.5))));
         }
         let mut loaded = Session { doc: polykrom_doc::Document::from_json(&s.doc.to_json()).unwrap().into(), ..Default::default() };
         loaded.refresh();
@@ -610,7 +610,7 @@ fn check_body_offset(auto: bool) {
     assert!((exact_cylinder_volume(&s) - before - 21.).abs() < 0.02);
     assert_eq!(s.doc.body_offsets["Sleeve"], offset);
     assert_eq!(s.doc.body_component("Sleeve", s.model.state().body("Sleeve").unwrap().feature), holder);
-    assert!(s.world_state().body("Sleeve").unwrap().body.tessellate_with(0.001, true).unwrap().contains(solidcraft_geom::Vec3::new(0., 10.5, 7.5)));
+    assert!(s.world_state().body("Sleeve").unwrap().body.tessellate_with(0.001, true).unwrap().contains(polycore_geom::Vec3::new(0., 10.5, 7.5)));
 }
 
 #[test]
@@ -771,7 +771,7 @@ fn loft_cut_through_a_shelled_basin_in_either_order() {
 
 #[test]
 fn cylinder_auto_inference_saves_a_profile_anchor_and_replays_both_depth_signs() {
-    use solidcraft_geom::Vec3;
+    use polycore_geom::Vec3;
     for mode in ["emboss", "deboss"] {
         let mut s = cylinder_badge();
         let before = exact_cylinder_volume(&s);
@@ -836,7 +836,7 @@ fn cylinder_auto_inference_ignores_remote_finite_tangent_walls_in_each_body_orde
 
 #[test]
 fn cylinder_auto_inference_retains_selected_holes_and_nested_islands() {
-    use solidcraft_geom::Vec3;
+    use polycore_geom::Vec3;
     for mode in ["emboss", "deboss"] {
         let mut s = cylinder_badge();
         run(&mut s, "sketch.edit", json!({"sketch":"Badge"}));
@@ -1111,7 +1111,7 @@ fn a_tapered_foot_under_a_part_joins_as_drawn() {
 /// with the offset and no taper. Two-sided and symmetric tapers are still refused, by name.
 #[test]
 fn a_drafted_extrude_starts_at_an_offset() {
-    use solidcraft_kernel::{FaceSurface, face_surface, measure as measure_body};
+    use polycore::{FaceSurface, face_surface, measure as measure_body};
     // A 30 x 20 profile, 12 mm long, drafted 6 deg, started 4 mm along the normal.
     let (w, d, h, off) = (30.0, 20.0, 12.0, 4.0);
     let part = |p: Value| -> Session {
@@ -1211,11 +1211,11 @@ fn a_drafted_extrude_starts_at_an_offset() {
 /// lies wholly in material, so the cut removes exactly the frustum over its profile.
 #[test]
 fn a_drafted_offset_cut_into_a_body_with_history() {
-    use solidcraft_kernel::{FaceSurface, face_surface, measure as measure_body};
+    use polycore::{FaceSurface, face_surface, measure as measure_body};
     let (w, d, h, off) = (30.0, 20.0, 12.0, 18.0);
     let (ang, t) = (6f64.to_radians(), 6f64.to_radians().tan());
     let frustum = w * d * h + (w + d) * t * h * h + 4.0 / 3.0 * t * t * h * h * h;
-    let unnamed = |b: &solidcraft_kernel::Body| (0..b.face_count()).filter(|i| face_surface(b, *i).is_none()).count();
+    let unnamed = |b: &polycore::Body| (0..b.face_count()).filter(|i| face_surface(b, *i).is_none()).count();
 
     let mut s = Session::default();
     // A 60 x 40 x 30 block, a round boss joined through its far side and out of its top, and a

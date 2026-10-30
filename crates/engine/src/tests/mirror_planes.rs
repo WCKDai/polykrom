@@ -9,7 +9,7 @@ use crate::*;
 
 fn min_x(s: &Session, body: &str) -> f64 {
     let b = s.model.state().body(body).map(|b| b.body.clone()).unwrap();
-    solidcraft_kernel::measure(&b).unwrap().bbox.min.x
+    polycore::measure(&b).unwrap().bbox.min.x
 }
 
 #[test]

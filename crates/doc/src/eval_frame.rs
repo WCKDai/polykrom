@@ -4,9 +4,9 @@
 use std::borrow::Cow;
 use std::collections::{BTreeMap, HashSet};
 
+use polycore as kernel;
+use polycore_geom::{Aabb2, Plane, Region2, Ring, Vec2, Vec3};
 use polykrom_sketch::CurveKind;
-use solidcraft_geom::{Aabb2, Plane, Region2, Ring, Vec2, Vec3};
-use solidcraft_kernel as kernel;
 
 use super::{ModelBody, ModelState, SolvedSketch, new_name, path_in_frame, select_profiles, sketch_in_feature_frame, val};
 use crate::expr::{Kind, Value};

@@ -111,7 +111,7 @@ Pull requests skip a few heavy tests (each takes one to twelve minutes); they ru
   `pattern_suppress_tests::enclosure_arc_extinction_keeps_a_real_sharp_inner_lip_after_resize_and_reopen`,
   `pattern_suppress_tests::enclosure_datums_follow_wall_height_and_board_depth_with_material_proofs`,
   `cmd::plastic::tests::enclosure_snap_fit_follows_resized_front_wall`, the `atomic_commands` contract tests
-- `solidcraft-kernel`: `tests::boolean_identity_on_tangent_primitives`,
+- `polycore`: `tests::boolean_identity_on_tangent_primitives`,
   `tspline::tests::hostile_tsplines_never_panic`, and the `boolean_props` property tests
   (these run only in the nightly "Property tests" job: their inputs are random, so main skips them too)
 - `polykrom-ui-egui` scenarios: `acceptance_sensor_enclosure`

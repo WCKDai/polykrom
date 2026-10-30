@@ -1,7 +1,7 @@
 #![allow(clippy::unwrap_used, clippy::panic)]
+use polycore_geom::Vec3;
 use polykrom_doc::{FeatureKind, ProfileSel};
 use serde_json::{Value, json};
-use solidcraft_geom::Vec3;
 
 use crate::Session;
 

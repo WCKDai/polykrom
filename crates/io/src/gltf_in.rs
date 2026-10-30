@@ -22,9 +22,9 @@ use std::hash::{Hash, Hasher};
 
 use gltf::accessor::{DataType, Dimensions};
 use gltf::mesh::Mode;
+use polycore_geom::Vec3;
 use polykrom_doc::appearance::Look;
 use polykrom_doc::{Mat, MeshData, mat_mul};
-use solidcraft_geom::Vec3;
 
 use crate::{IoError, MAX_3MF_BYTES, MeshFeature, Result};
 
@@ -235,7 +235,7 @@ const LOOK_EXTENSIONS: [&str; 5] = ["KHR_texture_transform", "KHR_texture_basisu
 
 /// The checked glTF document.
 fn parse_document(json: &[u8]) -> Result<gltf::Document> {
-    let parsed = solidcraft_kernel::guard("glTF", || {
+    let parsed = polycore::guard("glTF", || {
         let mut root: gltf::json::Root = match gltf::json::deserialize::from_slice(json) {
             Ok(r) => r,
             Err(e) => return Ok(Err(format!("not a glTF file: {e}"))),
@@ -694,7 +694,7 @@ impl<'d> Reader<'d, '_, '_> {
             } else {
                 base.clone()
             };
-            if let Err(e) = solidcraft_kernel::mesh_body(&positions, &triangles) {
+            if let Err(e) = polycore::mesh_body(&positions, &triangles) {
                 self.skipped.push(format!("mesh `{name}`: {e}"));
                 continue;
             }

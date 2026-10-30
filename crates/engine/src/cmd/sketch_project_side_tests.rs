@@ -2,8 +2,8 @@
 //! 5 from a projected line stays on the side it was drawn on wherever a parameter takes the
 //! line, also past the place the point is stored at.
 
+use polycore_geom::Vec2;
 use serde_json::{Value, json};
-use solidcraft_geom::Vec2;
 
 use crate::Session;
 

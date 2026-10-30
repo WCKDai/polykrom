@@ -1,7 +1,7 @@
 # Neutral section geometry (W01a)
 
 W01a, [#2053][issue] / [PR #2085][pr], adds the L0
-[`solidcraft_geom::section`][section-source] representation and structural validation. See the
+[`polycore_geom::section`][section-source] representation and structural validation. See the
 [foundation ledger](drawing-foundations.md) for dependencies and the remaining
 W01 work. This contract is deliberately smaller than the eventual section and
 projection result described in the [Drawing plan][plan].

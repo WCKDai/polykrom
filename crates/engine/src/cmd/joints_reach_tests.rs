@@ -1,8 +1,8 @@
 //! `joint.reach`: inverse kinematics against closed-form answers (planar arms), the nearest pose
 //! out of reach, limits, and a four-bar reached through its rocker.
 
+use polycore_geom::Vec3;
 use serde_json::{Value, json};
-use solidcraft_geom::Vec3;
 
 use super::tests::{four_bar, meet, occ, part, pin, place, run};
 use crate::Session;

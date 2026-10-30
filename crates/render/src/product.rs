@@ -2,7 +2,7 @@
 
 use std::sync::Arc;
 
-use solidcraft_geom::{Aabb3, Mesh};
+use polycore_geom::{Aabb3, Mesh};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct FaceAppearance {

@@ -14,8 +14,8 @@
 
 use std::f64::consts::{PI, TAU};
 
+use polycore_geom::Vec2;
 use polykrom_sketch::{Analysis, Budget, ConstraintKind, CurveKind, Hold, Sketch, conic_rho_from_point};
-use solidcraft_geom::Vec2;
 
 use super::{Ent, Left, counted_solve};
 

@@ -130,7 +130,7 @@ fn strict_face_missing_lineage_never_retargets_and_rolls_back() {
     let look = polykrom_doc::appearance::library("ABS - Red").unwrap();
     s.doc_mut().appearances.faces.push(polykrom_doc::appearance::FaceLook {
         body: body.clone(),
-        point: solidcraft_geom::Vec3::new(5., 5., 10.),
+        point: polycore_geom::Vec3::new(5., 5., 10.),
         name: Some(format!("F{other}:+z")),
         strict_name: true,
         certificate: None,
@@ -150,11 +150,11 @@ fn face_occurrence_pick_uses_definition_identity_and_coordinates() {
     let world = s.world_state();
     let placed = world.bodies.iter().find(|body| body.name != body.definition_name()).unwrap();
     let placed_name = placed.name.clone();
-    let point = polykrom_doc::apply_point(&placed.source_transform, solidcraft_geom::Vec3::new(5., 5., 10.));
+    let point = polykrom_doc::apply_point(&placed.source_transform, polycore_geom::Vec3::new(5., 5., 10.));
     let key = face_column(&mut s, &placed_name, json!(point));
     let Column::FaceAppearance(target) = &s.doc.configs.columns[0] else { panic!() };
     assert_eq!(target.body, body);
-    assert!(target.point.dist(solidcraft_geom::Vec3::new(5., 5., 10.)) < 1e-8);
+    assert!(target.point.dist(polycore_geom::Vec3::new(5., 5., 10.)) < 1e-8);
     run(&mut s, "config.row", json!({"name":"Paint","values":{key:"ABS - Blue"}}));
     run(&mut s, "config.activate", json!({"row":"Paint"}));
     assert!(s.world_state().bodies.iter().all(|body| s.doc.face_colors(body).len() == 1));
@@ -216,7 +216,7 @@ fn hostile_and_uncertified_face_targets_are_rejected() {
         body: body.clone(),
         origin_feature: id,
         name: format!("F{id}:face:0"),
-        point: solidcraft_geom::Vec3::ZERO,
+        point: polycore_geom::Vec3::ZERO,
         certificate: None,
     };
     assert!(s.doc.certify_config_face(&target).is_err());

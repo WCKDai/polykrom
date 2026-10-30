@@ -727,7 +727,7 @@ fn read_document<R: Read + Seek>(reader: &mut PackageReader<R>) -> Result<Docume
 #[cfg(test)]
 mod tests {
     use super::*;
-    use solidcraft_geom::Vec2;
+    use polycore_geom::Vec2;
 
     struct CountingReader {
         source: Cursor<Vec<u8>>,
@@ -821,7 +821,7 @@ mod tests {
 
     /// A saved model of one state holding `bodies` (no document evaluated it: enough for the
     /// container, which stores whatever model it is given).
-    fn saved_model(bodies: Vec<solidcraft_kernel::Body>) -> polykrom_doc::SavedModel {
+    fn saved_model(bodies: Vec<polycore::Body>) -> polykrom_doc::SavedModel {
         let records: Vec<Value> = (0..bodies.len())
             .map(|i| json!({"name": format!("Body{i}"), "feature": 1, "component": 0, "key": "0000000000000001", "names": 0, "body": i}))
             .collect();
@@ -839,7 +839,7 @@ mod tests {
     }
 
     fn native_geometry() -> polykrom_doc::SavedModel {
-        saved_model(vec![solidcraft_kernel::box_solid(solidcraft_geom::Vec3::ZERO, solidcraft_geom::Vec3::new(10., 20., 30.)).unwrap()])
+        saved_model(vec![polycore::box_solid(polycore_geom::Vec3::ZERO, polycore_geom::Vec3::new(10., 20., 30.)).unwrap()])
     }
 
     #[test]
@@ -865,12 +865,12 @@ mod tests {
 
     #[test]
     fn model_cache_stores_repeated_parts_once_and_keeps_placed_copies() {
-        use solidcraft_geom::Vec3;
-        let part = solidcraft_kernel::box_solid(Vec3::ZERO, Vec3::new(10., 20., 30.)).unwrap();
-        let share = solidcraft_kernel::DisplayShare::new(part.clone());
+        use polycore_geom::Vec3;
+        let part = polycore::box_solid(Vec3::ZERO, Vec3::new(10., 20., 30.)).unwrap();
+        let share = polycore::DisplayShare::new(part.clone());
         let mut bodies = vec![part.clone(), part.clone()];
         for x in [50., 90.] {
-            let moved = solidcraft_kernel::transform(&part, Vec3::new(x, 0., 0.), Vec3::ZERO, Vec3::Z, 0.).unwrap();
+            let moved = polycore::transform(&part, Vec3::new(x, 0., 0.), Vec3::ZERO, Vec3::Z, 0.).unwrap();
             let t = [[1., 0., 0., 0.], [0., 1., 0., 0.], [0., 0., 1., 0.], [x, 0., 0., 1.]];
             bodies.push(moved.with_display_share(&share, t));
         }
@@ -887,7 +887,7 @@ mod tests {
         assert_eq!(copies[1].1[3][0], 90.);
         assert!(read.bodies[0].display_share().is_none());
         for (a, b) in model.bodies.iter().zip(&read.bodies) {
-            assert_eq!(solidcraft_kernel::encode_native_body(a).unwrap(), solidcraft_kernel::encode_native_body(b).unwrap());
+            assert_eq!(polycore::encode_native_body(a).unwrap(), polycore::encode_native_body(b).unwrap());
         }
     }
 
@@ -910,7 +910,7 @@ mod tests {
     /// document evaluated it.
     fn timeline_model() -> polykrom_doc::SavedModel {
         let bodies: Vec<_> = (0..40)
-            .map(|i| solidcraft_kernel::box_solid(solidcraft_geom::Vec3::ZERO, solidcraft_geom::Vec3::new(10. + f64::from(i), 20., 30.)).unwrap())
+            .map(|i| polycore::box_solid(polycore_geom::Vec3::ZERO, polycore_geom::Vec3::new(10. + f64::from(i), 20., 30.)).unwrap())
             .collect();
         let records: Vec<Value> = (0..40)
             .map(|i| json!({"name": format!("Body{i}"), "feature": 1 + i / 8, "component": 0, "key": "0000000000000001", "names": 0, "body": i}))
@@ -1006,7 +1006,7 @@ mod tests {
             let (manifest, payload) = native_cache::encode_model(&thin, document, usize::MAX).unwrap();
             (manifest.len(), payload.len())
         };
-        let encoded = |i: usize| solidcraft_kernel::encode_native_body(&model.bodies[i]).unwrap().len();
+        let encoded = |i: usize| polycore::encode_native_body(&model.bodies[i]).unwrap().len();
         // What a state's own bodies add: more than the records of the caches below, so the sizes
         // below pick one set of states each.
         let own = (8..40).step_by(8).map(|s| (s..s + 8).map(encoded).sum::<usize>()).min().unwrap();
@@ -1416,9 +1416,9 @@ mod tests {
     /// A valid STEP cube, padded with a comment to `length` bytes. `noisy` padding barely
     /// compresses; otherwise it is repetitive like the text of a real large export.
     fn padded_step(length: usize, noisy: bool) -> String {
-        use solidcraft_geom::Vec3;
-        let cube = solidcraft_kernel::box_solid(Vec3::ZERO, Vec3::new(10.0, 20.0, 30.0)).unwrap();
-        let step = solidcraft_kernel::step_export(&[&cube], "padded").unwrap();
+        use polycore_geom::Vec3;
+        let cube = polycore::box_solid(Vec3::ZERO, Vec3::new(10.0, 20.0, 30.0)).unwrap();
+        let step = polycore::step_export(&[&cube], "padded").unwrap();
         let (head, tail) = step.split_at(step.find("DATA;").unwrap() + 5);
         let end = length - tail.len() - 2;
         let mut out = String::with_capacity(length);
@@ -1599,14 +1599,14 @@ mod tests {
     #[test]
     #[ignore = "manual IO performance measurement"]
     fn benchmark_step_storage() {
-        use solidcraft_geom::Vec3;
+        use polycore_geom::Vec3;
         let bodies: Vec<_> = (0..512)
             .map(|i| {
                 let corner = Vec3::new((i % 32) as f64 * 12.0, (i / 32) as f64 * 12.0, 0.0);
-                solidcraft_kernel::box_solid(corner, corner + Vec3::new(10.0, 10.0, 10.0)).unwrap()
+                polycore::box_solid(corner, corner + Vec3::new(10.0, 10.0, 10.0)).unwrap()
             })
             .collect();
-        let step = solidcraft_kernel::step_export(&bodies.iter().collect::<Vec<_>>(), "Polykrom storage benchmark").unwrap();
+        let step = polycore::step_export(&bodies.iter().collect::<Vec<_>>(), "Polykrom storage benchmark").unwrap();
         let mut doc = Document::new("Generated STEP benchmark");
         doc.add_feature(FeatureKind::Import { file: "generated.step".into(), step: step.into(), components: Vec::new(), skip: Vec::new() }, None)
             .unwrap();

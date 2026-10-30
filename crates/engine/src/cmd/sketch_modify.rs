@@ -3,10 +3,10 @@
 
 use std::f64::consts::TAU;
 
+use polycore_geom::Vec2;
 use polykrom_doc::ProfileSel;
 use polykrom_sketch::{ConstraintKind, Curve, CurveKind, Shape, Sketch, intersections, intersections_within};
 use serde_json::{Value, json};
-use solidcraft_geom::Vec2;
 
 use super::sketch::{add_c, edit, ids_of, solve_current};
 use super::{CommandSpec, in_sketch};

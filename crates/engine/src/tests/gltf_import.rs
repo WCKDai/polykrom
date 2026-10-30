@@ -65,7 +65,7 @@ fn shown_boxes(s: &Session) -> Vec<[i64; 6]> {
         .bodies
         .iter()
         .map(|b| {
-            let bb = solidcraft_kernel::measure(&b.body).unwrap().bbox;
+            let bb = polycore::measure(&b.body).unwrap().bbox;
             [bb.min.x, bb.min.y, bb.min.z, bb.max.x, bb.max.y, bb.max.z].map(|v| (v * 1000.0).round() as i64)
         })
         .collect();

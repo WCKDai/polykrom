@@ -16,8 +16,8 @@
 
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
+use polycore_geom::{Aabb3, Vec3};
 use serde::{Deserialize, Serialize};
-use solidcraft_geom::{Aabb3, Vec3};
 
 use polykrom_sketch::linalg;
 
@@ -835,11 +835,11 @@ fn round_of(doc: &Document, st: &ModelState, o: &JointOrigin) -> Result<face::Ro
     let cyl = component_bodies(doc, st, comp)
         .into_iter()
         .filter_map(|b| match doc.model_body_offset(b) {
-            Some(m) => solidcraft_kernel::cylinder_face_at(&b.body, apply_point(&mat_inverse(m)?, pick)).map(|c| face::placed(m, c)),
-            None => solidcraft_kernel::cylinder_face_at(&b.body, pick),
+            Some(m) => polycore::cylinder_face_at(&b.body, apply_point(&mat_inverse(m)?, pick)).map(|c| face::placed(m, c)),
+            None => polycore::cylinder_face_at(&b.body, pick),
         })
         .min_by(|a, b| {
-            let off = |c: &solidcraft_kernel::CylinderFace| {
+            let off = |c: &polycore::CylinderFace| {
                 let v = pick - c.axis_point;
                 ((v - c.axis * v.dot(c.axis)).len() - c.radius).abs()
             };
@@ -852,7 +852,7 @@ fn round_of(doc: &Document, st: &ModelState, o: &JointOrigin) -> Result<face::Ro
 }
 
 /// The cylindrical face of a circle-centre snap (component coordinates).
-fn circle_at(doc: &Document, st: &ModelState, o: &JointOrigin) -> Result<solidcraft_kernel::CylinderFace> {
+fn circle_at(doc: &Document, st: &ModelState, o: &JointOrigin) -> Result<polycore::CylinderFace> {
     round_of(doc, st, o).map(|r| r.cylinder)
 }
 

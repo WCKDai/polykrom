@@ -1,8 +1,8 @@
 //! Canvases (reference images on planes) and decals (images on planar faces).
 
+use polycore_geom::Vec2;
 use polykrom_doc::canvas::{Canvas, MAX_CANVAS_BYTES, base64_decode, base64_encode, image_info};
 use serde_json::{Value, json};
-use solidcraft_geom::Vec2;
 
 use super::CommandSpec;
 use crate::params::{bad, bool_, num, str_, vec2};

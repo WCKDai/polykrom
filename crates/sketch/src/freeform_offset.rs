@@ -5,8 +5,8 @@
 //! node limit, interior splits align the curves geometrically instead of requiring
 //! identical parameter speeds; stored nodes and interpolation remain unchanged.
 use crate::{CurveKind, Sketch, SketchError, fit_beziers_mode};
+use polycore_geom::{Seg2, Vec2};
 use serde::{Deserialize, Serialize};
-use solidcraft_geom::{Seg2, Vec2};
 
 pub const OFFSET_TOLERANCE: f64 = 0.002;
 const MAX_PIECES: usize = 256;
@@ -137,7 +137,7 @@ impl H {
         let (points, weights) = match *seg {
             Seg2::Line { a, b } => (vec![a, b], vec![1.0; 2]),
             Seg2::Cubic { p0, p1, p2, p3 } => (vec![p0, p1, p2, p3], vec![1.0; 4]),
-            Seg2::Bezier { n, p } if (1..=solidcraft_geom::MAX_BEZIER_DEGREE as u8).contains(&n) => {
+            Seg2::Bezier { n, p } if (1..=polycore_geom::MAX_BEZIER_DEGREE as u8).contains(&n) => {
                 (p[..=usize::from(n)].to_vec(), vec![1.0; usize::from(n) + 1])
             }
             Seg2::Conic { a, apex, b, w } if w.is_finite() && w > 0.0 => (vec![a, apex, b], vec![1.0, w, 1.0]),

@@ -13,7 +13,7 @@ fn run(s: &mut Session, id: &str, p: Value) -> Value {
 }
 
 fn volume(s: &Session, body: &str) -> f64 {
-    s.model.state().body(body).map(|b| solidcraft_kernel::measure(&b.body).unwrap().volume).unwrap_or(0.0)
+    s.model.state().body(body).map(|b| polycore::measure(&b.body).unwrap().volume).unwrap_or(0.0)
 }
 
 #[test]
@@ -55,12 +55,12 @@ fn enclosure_datums_follow_wall_height_and_board_depth_with_material_proofs() {
         let state = session.world_state();
         let case = state.body("Case").unwrap().mesh();
         let lid = state.body("Lid").unwrap().mesh();
-        assert!(case.contains(solidcraft_geom::Vec3::new(-24.5, -21.5, 7.)));
-        assert!(!case.contains(solidcraft_geom::Vec3::new(-26.5, -21.5, 7.)));
-        assert!(!case.contains(solidcraft_geom::Vec3::new(-10., -35.25, 11.35)));
-        assert!(case.contains(solidcraft_geom::Vec3::new(-10., -35.25, 15.)));
+        assert!(case.contains(polycore_geom::Vec3::new(-24.5, -21.5, 7.)));
+        assert!(!case.contains(polycore_geom::Vec3::new(-26.5, -21.5, 7.)));
+        assert!(!case.contains(polycore_geom::Vec3::new(-10., -35.25, 11.35)));
+        assert!(case.contains(polycore_geom::Vec3::new(-10., -35.25, 15.)));
         assert!(
-            lid.contains(solidcraft_geom::Vec3::new(0., 32.2, 29.)),
+            lid.contains(polycore_geom::Vec3::new(0., 32.2, 29.)),
             "lid bounds {:?}; lip {:?}; probes {:?}",
             lid.bounds(),
             session
@@ -78,11 +78,11 @@ fn enclosure_datums_follow_wall_height_and_board_depth_with_material_proofs() {
                 .unwrap()
                 .sketch
                 .links,
-            (20..35).map(|y| (y, lid.contains(solidcraft_geom::Vec3::new(0., f64::from(y) + 0.2, 29.)))).collect::<Vec<_>>()
+            (20..35).map(|y| (y, lid.contains(polycore_geom::Vec3::new(0., f64::from(y) + 0.2, 29.)))).collect::<Vec<_>>()
         );
-        assert!(!lid.contains(solidcraft_geom::Vec3::new(0., 32.9, 29.)));
-        assert!(!lid.contains(solidcraft_geom::Vec3::new(-33.5, -28.5, 32.)));
-        assert!(lid.contains(solidcraft_geom::Vec3::new(-31.5, -28.5, 32.)));
+        assert!(!lid.contains(polycore_geom::Vec3::new(0., 32.9, 29.)));
+        assert!(!lid.contains(polycore_geom::Vec3::new(-33.5, -28.5, 32.)));
+        assert!(lid.contains(polycore_geom::Vec3::new(-31.5, -28.5, 32.)));
     };
     assert_material(&s);
     let reopened = Session::new(polykrom_doc::Document::from_json(&s.doc.to_json()).unwrap());
@@ -92,9 +92,9 @@ fn enclosure_datums_follow_wall_height_and_board_depth_with_material_proofs() {
 
 #[test]
 fn enclosure_arc_extinction_keeps_a_real_sharp_inner_lip_after_resize_and_reopen() {
+    use polycore_geom::{Vec2, Vec3};
     use polykrom_doc::FeatureKind;
     use polykrom_sketch::CurveKind;
-    use solidcraft_geom::{Vec2, Vec3};
 
     let mut s = Session::default();
     let script: Value = serde_json::from_str(include_str!("../../../examples/acceptance/sensor_enclosure.json")).unwrap();
@@ -142,7 +142,7 @@ fn enclosure_arc_extinction_keeps_a_real_sharp_inner_lip_after_resize_and_reopen
         let regions = polykrom_doc::select_profiles(solved, profiles).unwrap();
         assert_eq!(regions.len(), 1);
         assert!((regions[0].area() - 332.570619298295).abs() < 1e-7, "area {}", regions[0].area());
-        let ring = solidcraft_kernel::extrude(&solved.plane, &regions, 0., 2.).unwrap();
+        let ring = polycore::extrude(&solved.plane, &regions, 0., 2.).unwrap();
         assert_eq!(ring.len(), 1);
         let precise_ring = ring[0].tessellate(1e-6).unwrap();
         let bounds = precise_ring.bounds();
@@ -160,14 +160,14 @@ fn enclosure_arc_extinction_keeps_a_real_sharp_inner_lip_after_resize_and_reopen
             .segs
             .iter()
             .map(|segment| match segment {
-                solidcraft_geom::Seg2::Arc { radius, sweep, .. } => radius.abs() * sweep.abs(),
-                solidcraft_geom::Seg2::Line { .. } => 0.,
+                polycore_geom::Seg2::Arc { radius, sweep, .. } => radius.abs() * sweep.abs(),
+                polycore_geom::Seg2::Line { .. } => 0.,
                 other => panic!("unexpected ring boundary {other:?}"),
             })
             .sum::<f64>();
         assert!((arc_perimeter - std::f64::consts::TAU * 0.8).abs() < 1e-8);
         assert_eq!(regions[0].holes.len(), 1);
-        assert!(regions[0].holes[0].segs.iter().all(|segment| matches!(segment, solidcraft_geom::Seg2::Line { .. })));
+        assert!(regions[0].holes[0].segs.iter().all(|segment| matches!(segment, polycore_geom::Seg2::Line { .. })));
         // Body::tessellate floors the requested sag tolerance at size * 1e-6.
         // Only the outer arcs incur chord error: their tolerance-wide boundary
         // strip bounds the volume error without changing CAD or export tolerances.

@@ -193,9 +193,9 @@ fn a_fillet_keeps_the_dimensions_of_its_corner_on_a_virtual_sharp() {
     // The virtual corner sits where the corner was, and the part keeps its size.
     let k = sk(&s);
     let vc = k.point(k.point_index(&corner).unwrap()).unwrap();
-    assert!(vc.dist(solidcraft_geom::Vec2::new(0.0, 100.0)) < 1e-6, "{vc:?}");
+    assert!(vc.dist(polycore_geom::Vec2::new(0.0, 100.0)) < 1e-6, "{vc:?}");
     let top_end = k.point(k.resolve_point("top.end").unwrap()).unwrap();
-    assert!(top_end.dist(solidcraft_geom::Vec2::new(-80.0, 100.0)) < 1e-6, "{top_end:?}");
+    assert!(top_end.dist(polycore_geom::Vec2::new(-80.0, 100.0)) < 1e-6, "{top_end:?}");
     let (lo, hi) = k.bounds().unwrap();
     assert!((hi.x - lo.x - 80.0).abs() < 1e-6 && (hi.y - lo.y - 100.0).abs() < 1e-6, "{lo:?} {hi:?}");
     // It is drawn with extension lines from both lines' ends to it.

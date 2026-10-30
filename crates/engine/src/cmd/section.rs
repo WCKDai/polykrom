@@ -1,8 +1,8 @@
 //! Section Analysis: a view-only cut through the model by a plane (what is on the plane's
 //! positive side is hidden). It changes no geometry and is not an undo step.
 
+use polycore_geom::{Plane, Vec3};
 use serde_json::{Value, json};
-use solidcraft_geom::{Plane, Vec3};
 
 use super::CommandSpec;
 use crate::params::{bad, bool_, expr, vec3};

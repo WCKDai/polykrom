@@ -2,8 +2,8 @@
 //! inserted design) mirrors each body where it is shown. Before, it mirrored the component's own
 //! geometry and put the copy in the active component, so the copy lost the placement.
 
+use polycore_geom::Vec3;
 use serde_json::{Value, json};
-use solidcraft_geom::Vec3;
 
 use super::run;
 use crate::*;

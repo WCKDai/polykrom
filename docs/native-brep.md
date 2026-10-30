@@ -1,6 +1,6 @@
 # Native B-rep, schema 3
 
-This is Polykrom's geometry data model in `solidcraft_geom::brep`. It has no
+This is Polykrom's geometry data model in `polycore_geom::brep`. It has no
 modelling-backend dependency. It is the body encoding of a design's model cache
 ([the container format](design-container.md#model-cache)); it is not a STEP
 replacement for external interchange. The container reader, binary codec and

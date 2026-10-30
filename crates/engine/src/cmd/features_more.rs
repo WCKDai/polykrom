@@ -1,11 +1,11 @@
 //! Rib, Web, Emboss, Replace Face, Align and Remove.
 
+use polycore_geom::Vec3;
 use polykrom_doc::FeatureKind;
 use polykrom_doc::expr::Kind;
 use polykrom_doc::{BodyName, SketchId};
 use polykrom_doc::{Dir, FacePick, Position};
 use serde_json::Value;
-use solidcraft_geom::Vec3;
 
 use super::CommandSpec;
 use super::features::{
@@ -214,19 +214,19 @@ fn emboss(s: &mut Session, p: &Value) -> Result<Value> {
         let (selected, index) = candidates.first().copied().ok_or_else(|| bad(cmd, "no target face"))?;
         let name = selected.definition_name();
         let body = &selected.body;
-        match solidcraft_kernel::face_surface(body, index) {
-            Some(solidcraft_kernel::FaceSurface::Plane { .. }) => {
+        match polycore::face_surface(body, index) {
+            Some(polycore::FaceSurface::Plane { .. }) => {
                 targets = vec![name.to_owned()];
                 None
             }
-            Some(solidcraft_kernel::FaceSurface::Cylinder { .. }) => {
+            Some(polycore::FaceSurface::Cylinder { .. }) => {
                 if targets.len() > 1 {
                     return Err(bad(cmd, "cylinder emboss needs one selected target body"));
                 }
                 // Viewport picks lie on tessellated chords. Keep their axial and
                 // angular position, and certify their distance before storing an
                 // exact surface anchor for later replay.
-                let at = solidcraft_kernel::cylinder_emboss_anchor(body, index, at).map_err(|e| bad(cmd, e.to_string()))?;
+                let at = polycore::cylinder_emboss_anchor(body, index, at).map_err(|e| bad(cmd, e.to_string()))?;
                 let face = emboss_selection(s, selected, at)?;
                 check_emboss_positions(s, sketch, selected, &face)?;
                 targets = vec![name.to_owned()];
@@ -317,21 +317,21 @@ fn infer_emboss_selection(
         if faces > 50_000 {
             return Err(bad(cmd, "cylinder target search exceeds face work limit"));
         }
-        if !solidcraft_kernel::has_cylinder_emboss_wall(&raw.body).map_err(|e| bad(cmd, e.to_string()))? {
+        if !polycore::has_cylinder_emboss_wall(&raw.body).map_err(|e| bad(cmd, e.to_string()))? {
             continue;
         }
         let mut face = emboss_selection(s, selected, Vec3::ZERO)?;
         let body_frame = face.body_frame(&placed, raw).map_err(|e| bad(cmd, e.to_string()))?;
         let inverse = polykrom_doc::mat_inverse(&body_frame).ok_or_else(|| bad(cmd, "invalid cylinder body frame"))?;
         let displayed = world.sketch(sketch).ok_or_else(|| bad(cmd, "the profile sketch is not displayed"))?;
-        let plane = solidcraft_geom::Plane::new(
+        let plane = polycore_geom::Plane::new(
             polykrom_doc::apply_point(&inverse, displayed.plane.origin),
             polykrom_doc::apply_vector(&inverse, displayed.plane.x),
             polykrom_doc::apply_vector(&inverse, displayed.plane.y),
         )
         .ok_or_else(|| bad(cmd, "invalid cylinder sketch frame"))?;
         if let Some((_, at)) =
-            solidcraft_kernel::infer_cylinder_emboss(&raw.body, &plane, &regions, if deboss { -d } else { d }).map_err(|e| bad(cmd, e.to_string()))?
+            polycore::infer_cylinder_emboss(&raw.body, &plane, &regions, if deboss { -d } else { d }).map_err(|e| bad(cmd, e.to_string()))?
         {
             face.sketch_frame(&placed, s.active_component, sketch_owner, raw).map_err(|e| bad(cmd, e.to_string()))?;
             check_emboss_positions(s, sketch, selected, &face)?;
@@ -364,7 +364,7 @@ fn replace_face(s: &mut Session, p: &Value) -> Result<Value> {
     let target = match p.get("target_face").and_then(vec3) {
         Some(tp) => {
             let n = super::face::face_normal(s, tp).ok_or_else(|| bad(cmd, "the target face must be planar"))?;
-            let plane = solidcraft_geom::Plane::from_normal(tp, n).ok_or_else(|| bad(cmd, "the target face's plane"))?;
+            let plane = polycore_geom::Plane::from_normal(tp, n).ok_or_else(|| bad(cmd, "the target face's plane"))?;
             polykrom_doc::PlaneRef::Custom { plane }
         }
         None => plane_param(s, p.get("target"), cmd)?,

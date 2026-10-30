@@ -26,7 +26,7 @@ pub fn default_dir() -> Option<PathBuf> {
     if cfg!(test) {
         return Some(polykrom_io::vfs::temp_dir().join(format!("solidcraft-test-recovery-{}", std::process::id())));
     }
-    if let Some(d) = solidcraft_geom::env::var_os("RECOVERY_DIR").filter(|d| !d.is_empty()) {
+    if let Some(d) = polycore_geom::env::var_os("RECOVERY_DIR").filter(|d| !d.is_empty()) {
         return Some(long_names(Path::new(&d)));
     }
     let env = |k: &str| std::env::var_os(k).filter(|d| !d.is_empty()).map(PathBuf::from);

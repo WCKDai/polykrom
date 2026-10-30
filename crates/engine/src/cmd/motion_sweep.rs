@@ -6,9 +6,9 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 
+use polycore_geom::Vec3;
 use polykrom_doc::Document;
 use serde_json::{Value, json};
-use solidcraft_geom::Vec3;
 
 use super::analysis::checked_pairs;
 use super::contact_sweep::{ContactGeometry, Gap};

@@ -73,7 +73,7 @@ fn shell_saddle_corner_with_an_overhang_thinner_than_the_wall() {
 }
 
 fn volume(s: &Session) -> f64 {
-    s.model.state().bodies.iter().map(|b| solidcraft_kernel::measure(&b.body).map(|m| m.volume).unwrap_or(f64::NAN)).sum()
+    s.model.state().bodies.iter().map(|b| polycore::measure(&b.body).map(|m| m.volume).unwrap_or(f64::NAN)).sum()
 }
 
 fn sound(s: &Session) {

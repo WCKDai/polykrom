@@ -4,11 +4,11 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 
+use polycore_geom::Vec3;
 use polykrom_doc::joints::{self, JointOrigin, Snap};
 use polykrom_doc::motion::{MotionTrace, TraceMotion};
 use polykrom_doc::{IDENTITY, apply_point};
 use serde_json::{Value, json};
-use solidcraft_geom::Vec3;
 
 use crate::params::{bad, bool_};
 use crate::{Result, Session};

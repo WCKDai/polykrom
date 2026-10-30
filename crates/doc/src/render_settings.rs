@@ -2,9 +2,9 @@
 
 use std::collections::BTreeMap;
 
+use polycore_geom::Vec3;
 use polykrom_render::{BackendId, Camera, RenderFormat, RenderLimits, RenderMode, UpAxis};
 use serde::{Deserialize, Serialize};
-use solidcraft_geom::Vec3;
 
 use crate::{DocError, Result};
 

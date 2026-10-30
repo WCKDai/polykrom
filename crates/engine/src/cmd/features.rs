@@ -1,5 +1,6 @@
 //! Solid feature commands: extrude, revolve, fillet, chamfer, primitives, combine, move.
 
+use polycore_geom::Vec3;
 use polykrom_doc::{
     AxisRef, Direction, Expr, Extent, FeatureKind, Operation, PointExpr, ProfileSel, RailFit, SweepOrientation, SweepRail, ThinSide, ThinWall,
     expr::Kind, point_expr,
@@ -7,7 +8,6 @@ use polykrom_doc::{
 use polykrom_doc::{BodyName, FeatureName, SketchId};
 use polykrom_doc::{Dir, FacePick, Position};
 use serde_json::{Value, json};
-use solidcraft_geom::Vec3;
 
 use super::{CommandSpec, not_in_sketch};
 use crate::params::{bad, bool_, expr, req_expr, str_, string_list, vec2, vec3};
@@ -831,7 +831,7 @@ fn thin_param(s: &Session, p: &Value, sketch: u64, cmd: &str) -> Result<ThinWall
 }
 
 /// The regions of a thin wall in its (solved) sketch, with the current parameter values.
-fn thin_regions(s: &Session, ss: &polykrom_doc::SolvedSketch, thin: &ThinWall) -> std::result::Result<Vec<solidcraft_geom::Region2>, String> {
+fn thin_regions(s: &Session, ss: &polykrom_doc::SolvedSketch, thin: &ThinWall) -> std::result::Result<Vec<polycore_geom::Region2>, String> {
     let length = |e: &str| s.doc.eval(&s.doc.with_design_unit(e, Kind::Length), Kind::Length).map_err(|e| e.to_string());
     let t = length(&thin.thickness)?;
     let (inside, outside) = match thin.side {
@@ -840,7 +840,7 @@ fn thin_regions(s: &Session, ss: &polykrom_doc::SolvedSketch, thin: &ThinWall) -
         ThinSide::Outside => (0.0, t),
         ThinSide::TwoSides => (t, length(thin.thickness2.as_deref().unwrap_or("0"))?),
     };
-    let curves: Vec<Vec<solidcraft_geom::Seg2>> = thin
+    let curves: Vec<Vec<polycore_geom::Seg2>> = thin
         .curves
         .iter()
         .filter_map(|id| ss.sketch.curve_index(id))
@@ -1109,7 +1109,7 @@ fn edge_points(s: &Session, p: &Value, cmd: &str) -> Result<Vec<Vec3>> {
     // of the body the feature names, or of any body: a pick far from every edge would round
     // whichever edge is nearest (#783). Each body's edges are worked out once.
     let named = str_(p, "body").filter(|n| st.body(n).is_some());
-    let mut candidates: Option<Vec<(f64, Vec<solidcraft_kernel::EdgeInfo>)>> = None;
+    let mut candidates: Option<Vec<(f64, Vec<polycore::EdgeInfo>)>> = None;
     let mut out = Vec::new();
     for e in a {
         let pt = match edge_ref_form(e).map_err(|why| bad(cmd, why))? {
@@ -1670,7 +1670,7 @@ pub(super) fn origin_plane_alias(name: &str) -> Option<&'static str> {
 /// A construction plane may not take an origin plane's name (`XY`, `Top`...): a plane
 /// parameter could then mean either.
 pub(super) fn check_plane_name(name: &str, cmd: &str) -> Result<()> {
-    if solidcraft_geom::Plane::named(name.trim()).is_some() {
+    if polycore_geom::Plane::named(name.trim()).is_some() {
         return Err(bad(
             cmd,
             format!("`{}` is reserved for an origin plane (XY, XZ, YZ, Top, Front, Right); give the construction plane another name", name.trim()),
@@ -1692,7 +1692,7 @@ pub(super) fn plane_param(s: &Session, v: Option<&Value>, cmd: &str) -> Result<p
         None => Err(bad(cmd, format!("no plane `{r}` (a plane is {WANT})"))),
     };
     match v {
-        Some(Value::String(n)) if solidcraft_geom::Plane::named(n.trim()).is_some() => {
+        Some(Value::String(n)) if polycore_geom::Plane::named(n.trim()).is_some() => {
             if let Some(f) = s.doc.find_feature(n.trim())
                 && matches!(f.kind, FeatureKind::ConstructionPlane { .. })
             {
@@ -1723,8 +1723,8 @@ pub(super) fn plane_param(s: &Session, v: Option<&Value>, cmd: &str) -> Result<p
             let at = |e: &str| s.doc.eval(e, Kind::Length).unwrap_or(0.0);
             let here = Vec3::new(at(&origin[0]), at(&origin[1]), at(&origin[2]));
             let pl = match (o.get("x_dir").and_then(vec3), o.get("y_dir").and_then(vec3), o.get("normal").and_then(vec3)) {
-                (Some(x), Some(y), _) => solidcraft_geom::Plane::new(here, x, y),
-                (_, _, Some(n)) => solidcraft_geom::Plane::from_normal(here, n),
+                (Some(x), Some(y), _) => polycore_geom::Plane::new(here, x, y),
+                (_, _, Some(n)) => polycore_geom::Plane::from_normal(here, n),
                 _ => None,
             };
             let plane = pl.ok_or_else(|| bad(cmd, "plane needs x_dir and y_dir, or normal"))?;
@@ -2252,7 +2252,7 @@ pub(super) fn sweep_options(s: &Session, p: &Value, cmd: &str) -> Result<(SweepO
         Some(_) => {
             let t = expr(p, "twist").ok_or_else(|| bad(cmd, "`twist` must be an angle or an expression"))?;
             let v = s.doc.eval(&t, Kind::Angle).map_err(|e| bad(cmd, format!("twist: {e}")))?;
-            if !(v.is_finite() && v.abs() <= solidcraft_kernel::SweepControl::MAX_TWIST) {
+            if !(v.is_finite() && v.abs() <= polycore::SweepControl::MAX_TWIST) {
                 return Err(bad(cmd, "`twist` must be within four turns (1440 deg)"));
             }
             Some(t)
@@ -2263,7 +2263,7 @@ pub(super) fn sweep_options(s: &Session, p: &Value, cmd: &str) -> Result<(SweepO
         Some(_) => {
             let k = expr(p, "scale").ok_or_else(|| bad(cmd, "`scale` must be a number or an expression"))?;
             let v = s.doc.eval(&k, Kind::Unitless).map_err(|e| bad(cmd, format!("scale: {e}")))?;
-            let range = solidcraft_kernel::SweepControl::MIN_SCALE..=solidcraft_kernel::SweepControl::MAX_SCALE;
+            let range = polycore::SweepControl::MIN_SCALE..=polycore::SweepControl::MAX_SCALE;
             if !(v.is_finite() && range.contains(&v)) {
                 return Err(bad(cmd, "`scale` (the end scale) must be between 0.01 and 100"));
             }
@@ -2565,8 +2565,8 @@ mod corner_tests {
         let ball = default.world_state().body("B").unwrap().body.clone();
         let same = rolling.world_state().body("B").unwrap().body.clone();
         // `corner: rolling` is the default: the same body, to the last bit of its area.
-        assert_eq!(solidcraft_kernel::measure(&ball).unwrap().area, solidcraft_kernel::measure(&same).unwrap().area);
-        assert!(solidcraft_kernel::measure(&ball).unwrap().volume > 7000.0);
+        assert_eq!(polycore::measure(&ball).unwrap().area, polycore::measure(&same).unwrap().area);
+        assert!(polycore::measure(&ball).unwrap().volume > 7000.0);
         // `corner: g2`: accepted, and refused with a clear message until the patch sews in.
         let mut s = Session::default();
         run(&mut s, "solid.box", &json!({"length": 20, "width": 20, "height": 20, "body_name": "B"}));

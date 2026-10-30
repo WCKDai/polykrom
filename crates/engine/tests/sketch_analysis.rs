@@ -2,10 +2,10 @@
 
 use std::sync::Arc;
 
+use polycore_geom::Vec2;
 use polykrom_engine::Session;
 use polykrom_sketch::{Analysis, ConstraintKind, Sketch, profiling::capture};
 use serde_json::json;
-use solidcraft_geom::Vec2;
 
 fn session(horizontal: bool) -> (Session, u64, String) {
     let mut s = Session::default();

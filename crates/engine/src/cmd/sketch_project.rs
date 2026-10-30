@@ -3,11 +3,11 @@
 //! (fixed, drawn purple, updated when the upstream geometry changes). Break Link turns them into
 //! normal geometry.
 
+use polycore_geom::{Plane, Vec3};
 use polykrom_doc::project::resolve;
 use polykrom_doc::{Document, FeatureKind};
 use polykrom_sketch::{ConstraintKind, LinkKind, LinkSource, Sketch};
 use serde_json::{Value, json};
-use solidcraft_geom::{Plane, Vec3};
 
 use super::{CommandSpec, in_sketch};
 use crate::params::{bad, bool_, str_, vec3};
@@ -447,7 +447,7 @@ pub(super) fn snap_points(s: &mut Session, p: &Value, cmd: &str) -> Result<Value
             let (c, xy) = t.rsplit_once(':')?;
             let n: Vec<f64> = xy.split(',').filter_map(|x| x.trim().parse().ok()).collect();
             match n[..] {
-                [x, y] if x.is_finite() && y.is_finite() => Some((c.to_string(), solidcraft_geom::Vec2::new(x, y))),
+                [x, y] if x.is_finite() && y.is_finite() => Some((c.to_string(), polycore_geom::Vec2::new(x, y))),
                 _ => None,
             }
         });

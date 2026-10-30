@@ -14,7 +14,7 @@
 
 use std::f64::consts::{PI, TAU};
 
-use solidcraft_geom::{Loop2, Region2, Seg2, Vec2};
+use polycore_geom::{Loop2, Region2, Seg2, Vec2};
 
 use crate::model::{CurveKind, Result, Sketch, SketchError};
 use crate::profiles::{find_profiles, merge_regions};

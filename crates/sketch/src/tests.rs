@@ -1,6 +1,6 @@
 use std::f64::consts::{FRAC_PI_2, PI};
 
-use solidcraft_geom::{Seg2, Vec2};
+use polycore_geom::{Seg2, Vec2};
 
 use crate::*;
 
@@ -629,13 +629,10 @@ fn curves_lying_on_one_another_do_not_chain_past_the_tolerance() {
 
 #[test]
 fn merging_adjacent_regions() {
-    let a =
-        solidcraft_geom::Region2 { outer: solidcraft_geom::Loop2::polygon(&[v(0.0, 0.0), v(10.0, 0.0), v(10.0, 10.0), v(0.0, 10.0)]), holes: vec![] };
-    let b = solidcraft_geom::Region2 {
-        outer: solidcraft_geom::Loop2::polygon(&[v(10.0, 0.0), v(20.0, 0.0), v(20.0, 10.0), v(10.0, 10.0)]),
-        holes: vec![],
-    };
-    let c = solidcraft_geom::Region2 { outer: solidcraft_geom::Loop2::polygon(&[v(50.0, 0.0), v(60.0, 0.0), v(60.0, 10.0)]), holes: vec![] };
+    let a = polycore_geom::Region2 { outer: polycore_geom::Loop2::polygon(&[v(0.0, 0.0), v(10.0, 0.0), v(10.0, 10.0), v(0.0, 10.0)]), holes: vec![] };
+    let b =
+        polycore_geom::Region2 { outer: polycore_geom::Loop2::polygon(&[v(10.0, 0.0), v(20.0, 0.0), v(20.0, 10.0), v(10.0, 10.0)]), holes: vec![] };
+    let c = polycore_geom::Region2 { outer: polycore_geom::Loop2::polygon(&[v(50.0, 0.0), v(60.0, 0.0), v(60.0, 10.0)]), holes: vec![] };
     let m = merge_regions(&[a, b, c]);
     assert_eq!(m.len(), 2);
     let mut areas: Vec<f64> = m.iter().map(|r| r.area()).collect();
@@ -838,7 +835,7 @@ fn long_connected_chain_solves() {
 /// cut in two by a line through it (each side gets an exact sub-curve ending on the line).
 #[test]
 fn exact_profiles_for_high_degree_and_cut_free_form_curves() {
-    use solidcraft_geom::Seg2;
+    use polycore_geom::Seg2;
     let exact_loop = |p: &Profile| p.region.outer.segs.iter().all(|s| !matches!(s, Seg2::Line { .. }) || s.length() > 1.0);
     let closed = |p: &Profile| p.region.outer.joints().all(|(a, b)| a.end().dist(b.start()) < 1e-9);
     // Degree 5 over six points, closed by a line.

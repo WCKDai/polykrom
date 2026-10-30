@@ -1,8 +1,8 @@
 //! An as-built joint made at an origin on one of its parts follows that origin's face or hole as
 //! the design changes, instead of holding the frame where it was made.
 
+use polycore_geom::Vec3;
 use serde_json::json;
-use solidcraft_geom::Vec3;
 
 use super::tests::{occ, place, run};
 use crate::Session;

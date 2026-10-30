@@ -12,7 +12,7 @@ everything a person reads: the UI, messages, docs, MCP descriptions, packaging n
 second rename stage, the internals keep SolidCraft's names: crates `solidcraft-*`, binaries
 `solidcraft` and `polykrom-cli` (with `polykrom` and `polykrom-cli` aliases), the
 `solidcraft/N` format tag inside designs, settings and recovery folders and the bundle IDs.
-Variables read through `solidcraft_geom::env` are `POLYKROM_*`, with `SOLIDCRAFT_*` and
+Variables read through `polycore_geom::env` are `POLYKROM_*`, with `SOLIDCRAFT_*` and
 `SOLVECRAFT_*` fallbacks; read new ones that way. Designs are saved as `.polykrom`
 (`polykrom_io::DESIGN_EXT`); `.solidcraft` and `.solvecraft` still open (`DESIGN_EXTS`). The rest are still `SOLIDCRAFT_*`. Don't rename those internals piecemeal; `docs/compatibility.md` lists
 them. Credit SolidCraft wherever its work is described.
@@ -46,7 +46,7 @@ People trust Polykrom with their designs; a crash loses their work. **This outra
 - **Input-derived numbers are hostile** (command parameters, design files, control-channel
   input): `get()` not `[i]`, finite checks, caps on sizes and loop counts.
 - **Third-party kernel calls are guarded:** everything that calls `truck` goes through
-  `solidcraft_kernel::guard`, which turns a panic into `KernelError::Internal`.
+  `polycore::guard`, which turns a panic into `KernelError::Internal`.
 - **Last-resort guard:** `Session::execute` runs every command under `catch_unwind`; an escaped
   panic restores the design and reports `EngineError::Internal`.
 - **Crash reports:** the desktop app writes every panic and every unclean exit to a local crash folder,
