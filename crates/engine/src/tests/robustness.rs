@@ -201,7 +201,7 @@ fn samples_build_without_panics() {
 }
 
 fn total_volume(s: &Session) -> f64 {
-    s.model.state().bodies.iter().map(|b| solidcraft_kernel::measure(&b.body).map(|m| m.volume).unwrap_or(0.0)).sum()
+    s.model.state().bodies.iter().map(|b| polycore::measure(&b.body).map(|m| m.volume).unwrap_or(0.0)).sum()
 }
 
 /// Volume of a box L×W×H with its vertical edges rounded (R) and its bottom loop filleted
@@ -571,7 +571,7 @@ fn seed_33_display_plan_and_measure_agree() {
     let s = script(r.script());
     for b in &s.model.state().bodies {
         let planned = b.body.display_plan(2e-4).unwrap().evaluate().measure().volume;
-        let measured = solidcraft_kernel::measure(&b.body).unwrap().volume;
+        let measured = polycore::measure(&b.body).unwrap().volume;
         assert!((planned - measured).abs() < 2e-5 * measured, "{}: planned {planned}, measured {measured}", b.name);
     }
 }

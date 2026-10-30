@@ -2,7 +2,7 @@
 //! construction, measured, kept on its side of the line through edits, and refused on other
 //! kinds of curve.
 
-use solidcraft_geom::Vec2;
+use polycore_geom::Vec2;
 
 use crate::tests::v;
 use crate::*;

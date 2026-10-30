@@ -1,7 +1,7 @@
+use polycore::Continuity;
+use polycore_geom::{Plane, Vec2, Vec3};
 use polykrom_sketch::Sketch;
 use serde::{Deserialize, Serialize};
-use solidcraft_geom::{Plane, Vec2, Vec3};
-use solidcraft_kernel::Continuity;
 
 use crate::construct::{AxisDef, GeoRef, PointDef};
 use crate::expr::{self, Expr, Kind};
@@ -1316,8 +1316,8 @@ pub enum FeatureKind {
         points: Vec<Position>,
         /// How fast a patch on edges leaves its G1/G2 edges, a multiple of the loop's own speed.
         /// A patch saved without it keeps the speed it was filled with
-        /// (`solidcraft_geom::fill_general::LEGACY_FILL_SPEED`); new ones save
-        /// `solidcraft_geom::fill_general::FILL_SPEED`, which rises fair to the loop.
+        /// (`polycore_geom::fill_general::LEGACY_FILL_SPEED`); new ones save
+        /// `polycore_geom::fill_general::FILL_SPEED`, which rises fair to the loop.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         speed: Option<f64>,
     },
@@ -1643,7 +1643,7 @@ pub enum FeatureKind {
         step: std::sync::Arc<str>,
         /// The file's product/assembly tree, kept for components.
         #[serde(default, skip_serializing_if = "Vec::is_empty")]
-        components: Vec<solidcraft_kernel::StepNode>,
+        components: Vec<polycore::StepNode>,
         /// The file's bodies (by index) this feature does not build: later instances of a part
         /// the file places more than once, shown by the other occurrences of that part's
         /// component (#1386). Empty in designs from before format 22: every body is built.
@@ -1782,9 +1782,9 @@ impl FilletStyle {
 
     /// The spline of a [`FilletStyle::Spline`] with its control radii `values` (the first is
     /// the feature's `radius`).
-    pub fn spline(knots: &[f64], values: Vec<f64>) -> solidcraft_kernel::RadiusSpline {
+    pub fn spline(knots: &[f64], values: Vec<f64>) -> polycore::RadiusSpline {
         let degree = knots.len().saturating_sub(values.len() + 1);
-        solidcraft_kernel::RadiusSpline { degree, knots: knots.to_vec(), radii: values }
+        polycore::RadiusSpline { degree, knots: knots.to_vec(), radii: values }
     }
 }
 
@@ -2630,7 +2630,7 @@ impl Visibility {
 pub struct NamedView {
     #[serde(default)]
     pub name: String,
-    pub target: solidcraft_geom::Vec3,
+    pub target: polycore_geom::Vec3,
     pub yaw: f64,
     pub pitch: f64,
     pub distance: f64,
@@ -2940,13 +2940,10 @@ impl Document {
         let mut st = state.clone();
         for b in &mut st.bodies {
             let c = self.body_color(b);
-            let faces: Vec<solidcraft_kernel::FacePaint> = self
-                .face_colors(b)
-                .into_iter()
-                .map(|(face, l)| solidcraft_kernel::FacePaint { face, color: l.rgb(), opacity: l.opacity as f32 })
-                .collect();
+            let faces: Vec<polycore::FacePaint> =
+                self.face_colors(b).into_iter().map(|(face, l)| polycore::FacePaint { face, color: l.rgb(), opacity: l.opacity as f32 }).collect();
             let opacity = self.model_body_opacity(b) as f32;
-            let paint = solidcraft_kernel::Paint { opacity, faces };
+            let paint = polycore::Paint { opacity, faces };
             if c != b.body.color() || b.body.paint() != Some(&paint) {
                 b.body = b.body.clone().with_color(c).with_paint(Some(paint));
             }

@@ -1,6 +1,6 @@
 use super::*;
 use crate::{Camera, ProductMesh, StandardView};
-use solidcraft_geom::{Aabb3, Mesh};
+use polycore_geom::{Aabb3, Mesh};
 
 fn request() -> ImageRequest {
     let mut camera = Camera { distance: 50.0, ..Default::default() };

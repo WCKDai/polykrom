@@ -552,7 +552,7 @@ fn hold_edges(s: &Session, body: &str, mut params: Value) -> (Value, usize) {
         return (params, 0);
     }
     let points: Vec<Value> = params["edges"].as_array().cloned().unwrap_or_default();
-    let at: Vec<solidcraft_geom::Vec3> = points.iter().filter_map(crate::params::vec3).collect();
+    let at: Vec<polycore_geom::Vec3> = points.iter().filter_map(crate::params::vec3).collect();
     let names = polykrom_doc::naming::edge_names_at(b, &at);
     // The faces and edges the origins name; an edge on such a face changes the face (and its
     // name, which can list its neighbours), so the origin may no longer be found.

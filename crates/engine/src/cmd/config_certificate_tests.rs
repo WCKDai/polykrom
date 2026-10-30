@@ -1,10 +1,10 @@
 use crate::Session;
+use polycore_geom::Vec3;
 use polykrom_doc::{
     FeatureKind,
     config::{Column, FaceCertificate},
 };
 use serde_json::{Value, json};
-use solidcraft_geom::Vec3;
 
 fn run(session: &mut Session, command: &str, params: Value) -> Value {
     session.execute(command, &params).unwrap_or_else(|error| panic!("{command} {params}: {error}"))
@@ -86,8 +86,8 @@ fn imported(session: &mut Session, step: String, name: &str) -> u64 {
 #[test]
 fn legacy_v9_imported_emboss_anchor_and_ordinary_face_paint_replay_without_renaming() {
     let mut s = Session::default();
-    let cylinder = solidcraft_kernel::cylinder(Vec3::ZERO, Vec3::Z, 10., 20.).unwrap();
-    let step = solidcraft_kernel::step_export(&[&cylinder], "legacy anchored cylinder").unwrap();
+    let cylinder = polycore::cylinder(Vec3::ZERO, Vec3::Z, 10., 20.).unwrap();
+    let step = polycore::step_export(&[&cylinder], "legacy anchored cylinder").unwrap();
     let source = imported(&mut s, step, "Sleeve");
     run(&mut s, "material.assign", json!({"bodies":["Sleeve"],"material":"Steel"}));
     let before_volume = s.model.state().body("Sleeve").unwrap().body.tessellate_with(1e-4, true).unwrap().measure().volume;
@@ -246,8 +246,8 @@ fn certified_side_transfer_preserves_geometry_and_unsupported_taper_refuses_atom
 
 #[test]
 fn certified_import_payload_binding_roundtrip_clone_and_replacement_refusal() {
-    let geometry = solidcraft_kernel::cylinder(Vec3::ZERO, Vec3::Z, 10., 10.).unwrap();
-    let step = solidcraft_kernel::step_export(&[&geometry], "certificate fixture").unwrap();
+    let geometry = polycore::cylinder(Vec3::ZERO, Vec3::Z, 10., 10.).unwrap();
+    let step = polycore::step_export(&[&geometry], "certificate fixture").unwrap();
     let mut s = Session::default();
     let part = run(&mut s, "component.create", json!({"name":"ImportedPart"}))["component"].as_u64().unwrap();
     let source = imported(&mut s, step.clone(), "Imported");

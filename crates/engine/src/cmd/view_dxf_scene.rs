@@ -6,9 +6,9 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Instant;
 
+use polycore_geom::{Aabb3, Mesh, Vec3};
 use polykrom_doc::apply_point;
 use polykrom_render::Camera;
-use solidcraft_geom::{Aabb3, Mesh, Vec3};
 
 use super::super::meshes::{Placement, Scene, WORKERS, claim, transformed_bounds};
 use super::super::progress::Stage;
@@ -23,7 +23,7 @@ const MAX_VIEW_NODES: usize = 256 * 1024 * 1024 / std::mem::size_of::<Aabb3>();
 const WORK: usize = 200_000_000;
 
 fn parallel<T: Sync, R: Send>(items: &[T], f: impl Fn(&T) -> Result<R, &'static str> + Sync) -> Result<Vec<R>, &'static str> {
-    solidcraft_kernel::map_on_threads(items, WORKERS, f).into_iter().map(|r| r.ok_or("export worker failed")?).collect()
+    polycore::map_on_threads(items, WORKERS, f).into_iter().map(|r| r.ok_or("export worker failed")?).collect()
 }
 
 struct Node {
@@ -617,7 +617,7 @@ mod tests {
     }
 
     fn canonical(lines: Vec<Line>) -> Vec<([i64; 2], [i64; 2], bool)> {
-        let k = |p: solidcraft_geom::Vec2| [(p.x * 1e6).round() as i64, (p.y * 1e6).round() as i64];
+        let k = |p: polycore_geom::Vec2| [(p.x * 1e6).round() as i64, (p.y * 1e6).round() as i64];
         let mut result = lines
             .into_iter()
             .map(|l| {

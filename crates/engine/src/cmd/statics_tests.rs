@@ -2,8 +2,8 @@
 //! slider, a centre of mass's distance to the edges of the feet's polygon. Every body is a box,
 //! so masses and centres are exact; tolerances are 1e-9 N·m / N / mm, or rounding of a hand sum.
 
+use polycore_geom::Vec2;
 use serde_json::{Value, json};
-use solidcraft_geom::Vec2;
 
 use crate::Session;
 

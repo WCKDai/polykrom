@@ -8,9 +8,9 @@
 
 use std::collections::BTreeMap;
 
+use polycore::{self as kernel, FaceSurface};
+use polycore_geom::{Plane, Vec2, Vec3};
 use serde::{Deserialize, Serialize};
-use solidcraft_geom::{Plane, Vec2, Vec3};
-use solidcraft_kernel::{self as kernel, FaceSurface};
 
 use crate::eval::{ModelBody, ModelState};
 use crate::expr::{Kind, Value};

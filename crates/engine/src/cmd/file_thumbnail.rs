@@ -1,7 +1,7 @@
 //! A portable picture from warm display meshes only; never evaluate on save.
 use crate::Session;
+use polycore_geom::Aabb3;
 use polykrom_render::{Camera, Rgb, Scene, SceneMesh, StandardView};
-use solidcraft_geom::Aabb3;
 
 pub(super) fn saved(s: &Session) -> Option<Vec<u8>> {
     let (scene, camera) = scene(s)?;

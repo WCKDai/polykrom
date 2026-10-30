@@ -2,9 +2,9 @@
 //! across the whole view, a boundary along its whole line, never trimmed, filleted or in a
 //! profile.
 
+use polycore_geom::Vec2;
 use polykrom_sketch::{CurveKind, Sketch};
 use serde_json::{Value, json};
-use solidcraft_geom::Vec2;
 
 use crate::Session;
 

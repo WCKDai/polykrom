@@ -11,7 +11,7 @@ fn cube20(s: &mut Session, name: &str) {
 }
 
 fn volume(body: &polykrom_doc::ModelBody) -> f64 {
-    solidcraft_kernel::measure(&body.body).unwrap().volume
+    polycore::measure(&body.body).unwrap().volume
 }
 
 #[test]

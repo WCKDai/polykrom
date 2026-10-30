@@ -26,14 +26,14 @@ CommandSpec::new("view.normal_to", "Normal to Selection", normal_to)
         .enabled(|s| normal_target(s).map(|_| ()).ok_or_else(|| "select a planar face or plane".into()))
         .params("camera?: Camera (default: current session camera or home view) → camera; Look At the first selected planar face or plane, centered on the picked point; repeat while aligned to flip the side; preserves scale and projection")];
 
-fn normal_target(s: &Session) -> Option<(solidcraft_geom::Vec3, solidcraft_geom::Vec3)> {
+fn normal_target(s: &Session) -> Option<(polycore_geom::Vec3, polycore_geom::Vec3)> {
     let state = s.world_state();
     s.selection.iter().find_map(|selection| match selection {
         Sel::Face { body, index, point } if point.is_finite() => {
             let plane = state.body(body)?.body.planar_face(*index)?;
             Some((*point, plane.normal()))
         }
-        Sel::Plane { name } => solidcraft_geom::Plane::named(name).map(|plane| (plane.origin, plane.normal())),
+        Sel::Plane { name } => polycore_geom::Plane::named(name).map(|plane| (plane.origin, plane.normal())),
         _ => None,
     })
 }
@@ -135,7 +135,7 @@ fn navigate(_s: &mut Session, p: &Value) -> Result<Value> {
                 .map(|d| if d == 90.0 { (1.0, 0.0) } else { d.to_radians().sin_cos() })
                 .ok_or_else(|| bad(cmd, "degrees must be a number above 0 and at most 180"))?,
         };
-        let turn = |toward: solidcraft_geom::Vec3| cam.looking_from(b * cos + toward * sin);
+        let turn = |toward: polycore_geom::Vec3| cam.looking_from(b * cos + toward * sin);
         match p.get("action").and_then(Value::as_str) {
             Some("left") => cam = turn(-r),
             Some("right") => cam = turn(r),
@@ -176,7 +176,7 @@ fn continuous(mut cam: Camera, p: &Value) -> Result<Value> {
             }
             let orbit = |cam: &mut Camera| {
                 if free_orbit {
-                    cam.rotate_in_view(solidcraft_geom::Vec3::new(-delta.y * 0.008, -delta.x * 0.008, 0.0));
+                    cam.rotate_in_view(polycore_geom::Vec3::new(-delta.y * 0.008, -delta.x * 0.008, 0.0));
                 } else {
                     cam.orbit(delta.x, delta.y);
                 }
@@ -227,8 +227,8 @@ pub(crate) fn square_heading(yaw: f64) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use polycore_geom::Vec3;
     use polykrom_render::UpAxis;
-    use solidcraft_geom::Vec3;
 
     #[test]
     fn look_at_planes_uses_the_first_supported_selection_and_flips_on_repeat() {

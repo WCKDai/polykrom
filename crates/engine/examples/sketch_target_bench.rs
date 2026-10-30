@@ -2,9 +2,9 @@
 #[path = "../tests/support/four_bar.rs"]
 mod four_bar;
 use four_bar::Result;
+use polycore_geom::Vec2;
 use polykrom_sketch::profiling::capture;
 use serde_json::json;
-use solidcraft_geom::Vec2;
 use std::{io::Write, time::Instant};
 
 fn main() -> Result<()> {

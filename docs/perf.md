@@ -240,9 +240,9 @@ Cross-part scheduling, parallel B-rep reconstruction and later display meshes re
 Reproduce after compiling, without other builds running:
 
 ```sh
-cargo test -p solidcraft-kernel --profile ci benchmark_independent_step_solids --no-run
+cargo test -p polycore --profile ci benchmark_independent_step_solids --no-run
 SOLIDCRAFT_STEP_BENCH_COUNT=512 SOLIDCRAFT_STEP_BENCH_KIND=cylinder \
-  cargo test -p solidcraft-kernel --profile ci benchmark_independent_step_solids \
+  cargo test -p polycore --profile ci benchmark_independent_step_solids \
   -- --ignored --nocapture --test-threads=1
 ```
 

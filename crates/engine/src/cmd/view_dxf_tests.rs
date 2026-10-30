@@ -1,6 +1,6 @@
 use super::*;
+use polycore_geom::{Vec2, Vec3};
 use polykrom_render::StandardView;
-use solidcraft_geom::{Vec2, Vec3};
 
 fn run(s: &mut Session, id: &str, p: Value) -> Value {
     s.execute(id, &p).unwrap()
@@ -32,7 +32,7 @@ fn view_dxf_cancellation_at_each_stage_preserves_the_destination_and_document() 
         cancelled: AtomicBool,
         reached: AtomicBool,
     }
-    impl solidcraft_kernel::watch::Watch for CancelAt {
+    impl polycore::watch::Watch for CancelAt {
         fn cancelled(&self) -> bool {
             self.cancelled.load(Ordering::Relaxed)
         }
@@ -52,9 +52,8 @@ fn view_dxf_cancellation_at_each_stage_preserves_the_destination_and_document() 
     for stage in ["dxf_meshes", "dxf_index", "dxf_projection", "dxf_occlusion", "dxf_write"] {
         std::fs::write(&path, b"previous drawing").unwrap();
         let watch = Arc::new(CancelAt { stage, cancelled: AtomicBool::new(false), reached: AtomicBool::new(false) });
-        let result = solidcraft_kernel::watch::watching(watch.clone(), || {
-            s.execute(CMD, &json!({"camera":camera(StandardView::Top),"path":path.to_string_lossy()}))
-        });
+        let result =
+            polycore::watch::watching(watch.clone(), || s.execute(CMD, &json!({"camera":camera(StandardView::Top),"path":path.to_string_lossy()})));
         assert!(result.unwrap_err().to_string().contains("cancelled"), "{stage}");
         assert!(watch.reached.load(Ordering::Relaxed), "{stage}");
         assert_eq!(std::fs::read(&path).unwrap(), b"previous drawing", "{stage}");

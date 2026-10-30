@@ -2,9 +2,9 @@
 #![allow(clippy::unwrap_used, clippy::panic)]
 
 use crate::Session;
+use polycore_geom::Vec3;
 use polykrom_doc::{Document, FeatureKind};
 use serde_json::{Value, json};
-use solidcraft_geom::Vec3;
 
 fn run(s: &mut Session, command: &str, params: Value) -> Value {
     s.execute(command, &params).unwrap_or_else(|error| panic!("{command}: {error}"))
@@ -25,11 +25,11 @@ fn check_wall(s: &Session, count: usize) {
     let state = s.model.state();
     assert_eq!(state.bodies.len(), count);
     let wall = state.body("Wall").unwrap();
-    let measure = solidcraft_kernel::measure(&wall.body).unwrap();
+    let measure = polycore::measure(&wall.body).unwrap();
     assert!((measure.volume - 30_000.0).abs() < 1e-6, "{measure:?}");
     assert!(measure.bbox.max.dist(Vec3::new(50.0, 30.0, 20.0)) < 1e-9);
     assert!(wall.body.contains(Vec3::new(49.0, 15.0, 10.0)));
-    let cap = solidcraft_kernel::measure(&state.body("Cap").unwrap().body).unwrap();
+    let cap = polycore::measure(&state.body("Cap").unwrap().body).unwrap();
     assert!((cap.volume - 6000.0).abs() < 1e-6);
     assert!(cap.bbox.max.dist(Vec3::new(40.0, 30.0, 25.0)) < 1e-9);
 }
@@ -68,7 +68,7 @@ fn face_join_respects_explicit_targets_and_participants() {
             run(&mut s, "solid.extrude", params);
             let state = s.model.state();
             assert_eq!(state.bodies.len(), 1, "{key}");
-            assert!((solidcraft_kernel::measure(&state.body("Wall").unwrap().body).unwrap().volume - 36_000.0).abs() < 1e-6);
+            assert!((polycore::measure(&state.body("Wall").unwrap().body).unwrap().volume - 36_000.0).abs() < 1e-6);
         }
     }
 }
@@ -117,8 +117,8 @@ fn face_join_of_a_step_import_keeps_all_32_neighbours_unchanged() {
         let after = s.model.state();
         assert!(body.body.same(&after.body(&body.name).unwrap().body), "{}", body.name);
         let cold = reopened.model.state();
-        let original = solidcraft_kernel::measure(&body.body).unwrap();
-        let restored = solidcraft_kernel::measure(&cold.body(&body.name).unwrap().body).unwrap();
+        let original = polycore::measure(&body.body).unwrap();
+        let restored = polycore::measure(&cold.body(&body.name).unwrap().body).unwrap();
         assert!((original.volume - restored.volume).abs() < 1e-9, "{}", body.name);
         assert!(original.bbox.min.dist(restored.bbox.min) < 1e-9 && original.bbox.max.dist(restored.bbox.max) < 1e-9);
     }
@@ -153,7 +153,7 @@ fn join_of_a_profile_sketched_on_a_face_leaves_a_neighbour_it_lies_on() {
         let result = run(&mut s, "solid.extrude", params);
         assert!(s.model.results.iter().all(|r| r.error.is_none()), "{:?}", s.model.results);
         let state = s.model.state();
-        let volume = |name: &str| solidcraft_kernel::measure(&state.body(name).unwrap().body).unwrap().volume;
+        let volume = |name: &str| polycore::measure(&state.body(name).unwrap().body).unwrap().volume;
         if targets.is_some() {
             assert_eq!(state.bodies.len(), 1);
             assert!((volume("Bracket") - (24_000.0 + 6000.0 + 300.0)).abs() < 1e-6, "{}", volume("Bracket"));

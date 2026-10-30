@@ -30,8 +30,8 @@ fn setup() -> Session {
     s
 }
 
-fn measure(s: &Session, body: &str) -> solidcraft_kernel::BodyMeasure {
-    solidcraft_kernel::measure(&s.world_state().body(body).unwrap().body).unwrap()
+fn measure(s: &Session, body: &str) -> polycore::BodyMeasure {
+    polycore::measure(&s.world_state().body(body).unwrap().body).unwrap()
 }
 
 fn sweep(s: &mut Session, sketch: &str, body: &str, extra: Value) -> Result<Value, String> {

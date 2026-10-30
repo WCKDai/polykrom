@@ -1,9 +1,9 @@
 //! Sketch commands: create/edit/finish sketches, draw curves, constraints and dimensions.
 
+use polycore_geom::{Plane, Vec2, Vec3};
 use polykrom_doc::{FeatureKind, PlaneRef, expr::Kind};
 use polykrom_sketch::{Analysis, Budget, ConstraintKind, CurveKind, Hold, PointExprs, Sketch, SolveReport, solve, solve_with};
 use serde_json::{Value, json};
-use solidcraft_geom::{Plane, Vec2, Vec3};
 
 use super::{CommandSpec, in_sketch};
 use crate::params::{bad, bool_, expr, num, req_vec2, str_, string_list, vec2, vec3};
@@ -663,7 +663,7 @@ pub(super) fn plane_ref(s: &Session, p: &Value, cmd: &str) -> Result<PlaneRef> {
 }
 
 /// Does triangle set of face `fi` contain point `p` (within `tol` of the face plane)?
-pub(super) fn face_contains(m: &solidcraft_geom::Mesh, fi: usize, p: Vec3, tol: f64) -> bool {
+pub(super) fn face_contains(m: &polycore_geom::Mesh, fi: usize, p: Vec3, tol: f64) -> bool {
     m.triangles.iter().zip(&m.tri_face).filter(|(_, f)| **f as usize == fi).any(|(t, _)| {
         let Some([a, b, c]) = m.tri(t) else { return false };
         let n = (b - a).cross(c - a);
@@ -2650,7 +2650,7 @@ fn diameter_about(sk: &Sketch, l: usize, ty: &str) -> bool {
 
 fn arc_len(sk: &Sketch, c: usize) -> Option<f64> {
     match sk.segs(c).first()? {
-        solidcraft_geom::Seg2::Arc { radius, sweep, .. } if matches!(sk.curves.get(c)?.kind, CurveKind::Arc { .. }) => Some(radius * sweep),
+        polycore_geom::Seg2::Arc { radius, sweep, .. } if matches!(sk.curves.get(c)?.kind, CurveKind::Arc { .. }) => Some(radius * sweep),
         _ => None,
     }
 }

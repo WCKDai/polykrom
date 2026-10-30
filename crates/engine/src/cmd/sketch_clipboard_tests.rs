@@ -1,6 +1,6 @@
+use polycore_geom::Vec2;
 use polykrom_sketch::{ConstraintKind, CurveKind, LinkKind, Sketch};
 use serde_json::{Value, json};
-use solidcraft_geom::Vec2;
 
 use crate::{Sel, Session};
 

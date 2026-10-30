@@ -3,7 +3,7 @@
 //! bytes, dropped and repeated runs, appended garbage and, for text formats, dropped and
 //! repeated lines and numbers that lie (`nan`, `inf`, `1e400`, …). Each mutated file must give an
 //! error or a result, never a panic, within a time budget and the reader's own caps. A panic a
-//! reader catches itself (`solidcraft_kernel::guard`) counts too: the browser build aborts on any
+//! reader catches itself (`polycore::guard`) counts too: the browser build aborts on any
 //! panic, so a caught one on the desktop is a crash there.
 //!
 //! The mutations come from a fixed seed (xorshift), so a failure names a case that reproduces.
@@ -271,7 +271,7 @@ pub(crate) fn survives(what: &str, inputs: &[Vec<u8>], cap: usize, mut read: imp
 #[cfg(test)]
 mod tests {
     use super::*;
-    use solidcraft_geom::{Mesh, Vec2, Vec3};
+    use polycore_geom::{Mesh, Vec2, Vec3};
 
     fn cube() -> Mesh {
         let positions = (0..8).map(|i| Vec3::new(f64::from(i & 1) * 10.0, f64::from((i >> 1) & 1) * 10.0, f64::from((i >> 2) & 1) * 10.0)).collect();

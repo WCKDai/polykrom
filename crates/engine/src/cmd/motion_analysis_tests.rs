@@ -1,8 +1,8 @@
 //! `motion.plot` against the analytic motion of a four-bar and a slider-crank, and
 //! `motion.interference` on two blocks pushed through each other at a known step.
 
+use polycore_geom::Vec3;
 use serde_json::{Value, json};
-use solidcraft_geom::Vec3;
 
 use super::{four_bar, occ, part, pin, rocker_pin, run, slider_crank};
 use crate::Session;

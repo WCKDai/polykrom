@@ -1,5 +1,5 @@
+use polycore_geom::{Aabb3, Vec3};
 use serde::{Deserialize, Serialize};
-use solidcraft_geom::{Aabb3, Vec3};
 
 /// Column-major 4×4 matrix.
 #[derive(Clone, Copy, Debug, PartialEq)]

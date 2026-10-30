@@ -17,7 +17,7 @@ name = "solve_profile"
 required-features = ["solver-profiling"]
 
 [dependencies]
-solidcraft-geom = { workspace = true }
+polycore-geom = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }
 ttf-parser = { workspace = true }

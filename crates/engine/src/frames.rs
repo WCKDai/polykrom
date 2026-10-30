@@ -9,9 +9,9 @@
 //! Nothing changes while every placement is the identity (the common case, and every design
 //! without moved components).
 
+use polycore_geom::Vec3;
 use polykrom_doc::{Mat, apply_point, apply_vector, is_identity, map_point_expr, mat_inverse};
 use serde_json::{Map, Value};
-use solidcraft_geom::Vec3;
 
 use crate::Session;
 

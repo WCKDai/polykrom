@@ -1,6 +1,6 @@
+use polycore_geom::Vec2;
 use polykrom_sketch::{ConstraintKind, CurveKind};
 use serde_json::{Value, json};
-use solidcraft_geom::Vec2;
 
 use crate::Session;
 
@@ -1212,7 +1212,7 @@ fn periodic_closed_offset_chain_break_drag_reopen_and_material_volume() {
     run(&mut s, "sketch.finish", json!({}));
     run(&mut s, "solid.extrude", json!({"sketch":sketch_id,"profiles":[selected.0],"distance":3,"operation":"new"}));
     let state = s.world_state();
-    let volume = solidcraft_kernel::measure(&state.bodies.last().unwrap().body).unwrap().volume;
+    let volume = polycore::measure(&state.bodies.last().unwrap().body).unwrap().volume;
     assert!((volume - expected).abs() < 0.05, "{volume} vs {expected}");
 }
 
@@ -1332,21 +1332,21 @@ fn periodic_offset_extrusion_survives_post_extrude_span_changes_and_cold_reopen(
         let body = &state.bodies[0].body;
         for (distance, material) in [(1.25, true), (0.5, false), (1.75, false)] {
             let point = ellipse + normal * distance;
-            assert_eq!(body.contains(solidcraft_geom::Vec3::new(point.x, point.y, 1.5)), material);
+            assert_eq!(body.contains(polycore_geom::Vec3::new(point.x, point.y, 1.5)), material);
         }
         // Repeat at the exact major-axis seam as a physical material control.
         for (distance, material) in [(1.25, true), (0.5, false), (1.75, false)] {
             let point = centre + u * (major + distance);
             assert_eq!(ring.region.contains(point), material);
-            assert_eq!(body.contains(solidcraft_geom::Vec3::new(point.x, point.y, 1.5)), material);
+            assert_eq!(body.contains(polycore_geom::Vec3::new(point.x, point.y, 1.5)), material);
         }
-        let volume = solidcraft_kernel::measure(body).unwrap().volume;
+        let volume = polycore::measure(body).unwrap().volume;
         assert!((volume - expected).abs() < 0.05, "{major}: {volume} vs independent {expected}");
         let mut cold = Session { doc: polykrom_doc::format::read(&s.doc.to_json()).unwrap().into(), ..Default::default() };
         cold.refresh();
         let cold_state = cold.world_state();
         assert_eq!(cold_state.bodies.len(), 1);
-        let cold_volume = solidcraft_kernel::measure(&cold_state.bodies[0].body).unwrap().volume;
+        let cold_volume = polycore::measure(&cold_state.bodies[0].body).unwrap().volume;
         assert!((cold_volume - volume).abs() < 1e-8);
         let edited = s.doc.to_json();
         run(&mut s, "edit.undo", json!({}));

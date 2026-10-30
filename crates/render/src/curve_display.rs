@@ -1,6 +1,6 @@
 //! Pixel-bounded display paths. CAD segments remain untouched; positive homogeneous
 //! control hulls bound perspective projection, including looping and rational curves.
-use solidcraft_geom::{Plane, Seg2, Vec2, Vec3};
+use polycore_geom::{Plane, Seg2, Vec2, Vec3};
 
 use crate::Mat4;
 
@@ -115,7 +115,7 @@ fn controls(segment: &Seg2, plane: &Plane) -> Option<(Vec<Vec<H>>, H)> {
         Seg2::Line { a, b } => vec![vec![h(a, 1.0), h(b, 1.0)]],
         Seg2::Cubic { p0, p1, p2, p3 } => vec![vec![h(p0, 1.0), h(p1, 1.0), h(p2, 1.0), h(p3, 1.0)]],
         Seg2::Conic { a, apex, b, w } if w > 0.0 => vec![vec![h(a, 1.0), h(apex, w), h(b, 1.0)]],
-        Seg2::Bezier { n, p } if (1..=solidcraft_geom::MAX_BEZIER_DEGREE as u8).contains(&n) => {
+        Seg2::Bezier { n, p } if (1..=polycore_geom::MAX_BEZIER_DEGREE as u8).contains(&n) => {
             vec![p[..=n as usize].iter().map(|p| h(*p, 1.0)).collect()]
         }
         Seg2::Arc { center, radius, start, sweep }

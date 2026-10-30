@@ -53,7 +53,7 @@ fn clear(_: &mut Session, p: &Value) -> Result<Value> {
 }
 
 fn crash_test_enabled(_: &Session) -> std::result::Result<(), String> {
-    if solidcraft_geom::env::var_os("CRASH_TEST").is_some() { Ok(()) } else { Err("set SOLIDCRAFT_CRASH_TEST to use the crash test".into()) }
+    if polycore_geom::env::var_os("CRASH_TEST").is_some() { Ok(()) } else { Err("set SOLIDCRAFT_CRASH_TEST to use the crash test".into()) }
 }
 
 // The one deliberate panic: it proves the crash reports work, and runs only when asked for with
@@ -64,9 +64,7 @@ fn crash_test(_: &mut Session, p: &Value) -> Result<Value> {
     match str_(p, "mode") {
         Some("panic") => std::panic::panic_any(String::from("crash test: an internal error in a command")),
         Some("kernel") => {
-            solidcraft_kernel::guard("crash test", || -> solidcraft_kernel::Result<()> {
-                std::panic::panic_any(String::from("an internal error in the kernel"))
-            })?;
+            polycore::guard("crash test", || -> polycore::Result<()> { std::panic::panic_any(String::from("an internal error in the kernel")) })?;
             Err(EngineError::Other("crash test: the kernel error was not caught".into()))
         }
         Some("abort") => std::process::abort(),

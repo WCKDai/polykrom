@@ -6,8 +6,8 @@
 //! Linked points are fixed and linked circles keep their radius, so the solver treats them as
 //! constants; they still bound profiles and take constraints and dimensions like any curve.
 
+use polycore_geom::{Aabb2, Vec2, Vec3};
 use serde::{Deserialize, Serialize};
-use solidcraft_geom::{Aabb2, Vec2, Vec3};
 
 use crate::model::{Curve, CurveKind, Result, Sketch, SketchError, in_range, radius_in_range};
 
@@ -256,7 +256,7 @@ impl LinkGeom {
                 (!*periodic || (!*control && *degree == 3 && crate::periodic_beziers(pts).is_ok()))
                     && (2..=crate::curves::MAX_SPLINE_POINTS).contains(&pts.len())
                     && pts.iter().all(ok)
-                    && (1..=solidcraft_geom::MAX_BEZIER_DEGREE as u8).contains(degree)
+                    && (1..=polycore_geom::MAX_BEZIER_DEGREE as u8).contains(degree)
             }
         }
     }

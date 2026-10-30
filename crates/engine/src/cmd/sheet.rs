@@ -1,13 +1,13 @@
 //! Sheet metal: rules, Flange (base, edge, contour), Hem, Unfold/Refold, Convert to Sheet Metal,
 //! the flat pattern (outline, bend lines, bend table) and its DXF export.
 
+use polycore_geom::{Aabb2, Ring, Vec2, Vec3};
 use polykrom_doc::expr::Kind;
 use polykrom_doc::sheet::{self, SheetBody, SheetRule};
 use polykrom_doc::{BodyName, SketchId};
 use polykrom_doc::{FacePick, Position};
 use polykrom_doc::{FeatureKind, FlangeEdge};
 use serde_json::{Value, json};
-use solidcraft_geom::{Aabb2, Ring, Vec2, Vec3};
 
 use super::CommandSpec;
 use super::features::{add_feature, check_expr, feature_sketch, profiles, sketch_id};
@@ -299,7 +299,7 @@ fn fold(s: &mut Session, p: &Value) -> Result<Value> {
             let ss = st.sketch(sk).ok_or_else(|| bad(cmd, "no such sketch"))?;
             let ci = ss.sketch.curve_index(&c).ok_or_else(|| bad(cmd, format!("no curve `{c}` in the sketch")))?;
             let (a, b) = match ss.sketch.segs(ci).as_slice() {
-                [solidcraft_geom::Seg2::Line { a, b }] => (ss.plane.to_world(*a), ss.plane.to_world(*b)),
+                [polycore_geom::Seg2::Line { a, b }] => (ss.plane.to_world(*a), ss.plane.to_world(*b)),
                 _ => return Err(bad(cmd, "the fold line must be a sketch line")),
             };
             (Some(sk), Some(c), a, b)
@@ -461,8 +461,8 @@ fn sheet_of(s: &Session, p: &Value, cmd: &str) -> Result<SheetBody> {
 }
 
 /// The centre and radius of a loop that is one whole circle (often two semicircles).
-fn loop_circle(lp: &solidcraft_geom::Loop2) -> Option<(Vec2, f64)> {
-    use solidcraft_geom::Seg2;
+fn loop_circle(lp: &polycore_geom::Loop2) -> Option<(Vec2, f64)> {
+    use polycore_geom::Seg2;
     let Some(Seg2::Arc { center, radius, sweep, .. }) = lp.segs.first() else { return None };
     let total: f64 = lp.segs.iter().filter_map(|s| if let Seg2::Arc { sweep, .. } = s { Some(*sweep) } else { None }).sum();
     let circular = lp.segs.iter().all(
@@ -473,8 +473,8 @@ fn loop_circle(lp: &solidcraft_geom::Loop2) -> Option<(Vec2, f64)> {
 
 /// A loop's exact shape for the flat pattern JSON: a circle, or its lines and arcs (other
 /// curves as point lists at the flat pattern's 0.001 mm tolerance).
-fn loop_shape(lp: &solidcraft_geom::Loop2) -> Value {
-    use solidcraft_geom::Seg2;
+fn loop_shape(lp: &polycore_geom::Loop2) -> Value {
+    use polycore_geom::Seg2;
     let pt = |v: Vec2| json!([v.x, v.y]);
     if let Some((center, radius)) = loop_circle(lp) {
         return json!({"circle": {"center": pt(center), "radius": radius}});
@@ -670,7 +670,7 @@ pub fn flat_dxf(sh: &SheetBody, o: &DxfOptions) -> Result<String> {
         .iter()
         .enumerate()
         .map(|(j, r)| {
-            let probe = r.outer.segs.first().map(solidcraft_geom::Seg2::mid);
+            let probe = r.outer.segs.first().map(polycore_geom::Seg2::mid);
             probe.is_some_and(|p| regions.iter().enumerate().any(|(i, other)| i != j && other.outer.contains(p)))
         })
         .collect();
@@ -682,7 +682,7 @@ pub fn flat_dxf(sh: &SheetBody, o: &DxfOptions) -> Result<String> {
         Pocket,
         Outline,
     }
-    let mut loops: Vec<(Pass, &solidcraft_geom::Loop2, String)> = Vec::new();
+    let mut loops: Vec<(Pass, &polycore_geom::Loop2, String)> = Vec::new();
     for (j, r) in regions.iter().enumerate() {
         for (k, lp) in std::iter::once(&r.outer).chain(&r.holes).enumerate() {
             let (pass, layer) = if k == 0 && !nested.get(j).copied().unwrap_or(false) {
@@ -722,7 +722,7 @@ pub fn flat_dxf(sh: &SheetBody, o: &DxfOptions) -> Result<String> {
         let h = match o.curves {
             DxfCurves::Arcs if !h.is_line_arc() => {
                 fitted = h
-                    .fit_arcs(solidcraft_kernel::PLANAR_FIT_TOL)
+                    .fit_arcs(polycore::PLANAR_FIT_TOL)
                     .ok_or_else(|| EngineError::Other("a flat-pattern curve could not be written as arcs".into()))?;
                 &fitted
             }

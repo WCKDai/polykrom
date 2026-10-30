@@ -67,7 +67,7 @@ pub(crate) struct MeasureCache(std::collections::HashMap<u64, Value>);
 const MAX_MEASURED: usize = 20_000;
 
 pub fn measure_json(b: &polykrom_doc::ModelBody) -> Value {
-    match solidcraft_kernel::measure(&b.body) {
+    match polycore::measure(&b.body) {
         // An open sheet encloses nothing: its area, box and counts, and no volume, centre of mass
         // or mass (what the divergence theorem gives an open shell means nothing, and is often
         // negative).
@@ -168,7 +168,7 @@ fn quality(s: &mut Session, p: &Value) -> Result<Value> {
     let mut open: Vec<String> = Vec::new();
     let mut no_material: Vec<String> = Vec::new();
     for b in &selected {
-        match solidcraft_kernel::measure(&b.body) {
+        match polycore::measure(&b.body) {
             Ok(_) if b.body.is_surface() => open.push(b.name.clone()),
             Ok(_) => {}
             Err(e) => body_errors.push(format!("{}: {e}", b.name)),
@@ -234,7 +234,7 @@ fn measure(s: &mut Session, p: &Value) -> Result<Value> {
         selected.iter().map(|b| b.geometry_key().and_then(|k| cache.as_ref()?.0.get(&k).cloned())).collect()
     };
     let todo: Vec<&&polykrom_doc::ModelBody> = selected.iter().zip(&known).filter(|(_, k)| k.is_none()).map(|(b, _)| b).collect();
-    let mut fresh = solidcraft_kernel::map_on_threads(&todo, 16, |b| measure_json(b)).into_iter();
+    let mut fresh = polycore::map_on_threads(&todo, 16, |b| measure_json(b)).into_iter();
     let mut bodies: Vec<Value> = Vec::with_capacity(selected.len());
     for (b, k) in selected.iter().zip(known) {
         let v = match k {
@@ -493,9 +493,7 @@ fn model_faces(s: &mut Session, p: &Value) -> Result<Value> {
             if let (Some(Some(name)), Some(o)) = (sheet_names.get(f.index), v.as_object_mut()) {
                 o.insert("sheet_face".into(), json!(name));
             }
-            if let (Some(solidcraft_kernel::FaceSurface::Cylinder { origin, axis, radius }), Some(o)) =
-                (spot.and_then(|x| x.surface), v.as_object_mut())
-            {
+            if let (Some(polycore::FaceSurface::Cylinder { origin, axis, radius }), Some(o)) = (spot.and_then(|x| x.surface), v.as_object_mut()) {
                 o.insert("cylinder".into(), json!({"origin": origin, "axis": axis, "radius": radius}));
             }
             v
@@ -604,7 +602,7 @@ fn appearance(s: &mut Session, p: &Value) -> Result<Value> {
         return Err(bad(cmd, "`bodies` must list existing bodies"));
     }
     // Faces: a point on each, on the named body or the nearest one.
-    let mut faces: Vec<(String, solidcraft_geom::Vec3)> = Vec::new();
+    let mut faces: Vec<(String, polycore_geom::Vec3)> = Vec::new();
     if let Some(list) = p.get("faces") {
         let list = list.as_array().filter(|a| a.len() <= 10_000).ok_or_else(|| bad(cmd, "`faces` must list points [x, y, z]"))?;
         for v in list {
@@ -633,7 +631,7 @@ fn appearance(s: &mut Session, p: &Value) -> Result<Value> {
         return Err(bad(cmd, "give `bodies`, `faces` or `components`"));
     }
     // Persistent names of the picked faces.
-    let st_names: Vec<(String, solidcraft_geom::Vec3, Option<String>)> = faces
+    let st_names: Vec<(String, polycore_geom::Vec3, Option<String>)> = faces
         .iter()
         .map(|(b, pt)| {
             let n = st
@@ -701,9 +699,9 @@ fn appearance(s: &mut Session, p: &Value) -> Result<Value> {
     }))
 }
 
-fn dist_to(b: &polykrom_doc::ModelBody, p: solidcraft_geom::Vec3) -> f64 {
+fn dist_to(b: &polykrom_doc::ModelBody, p: polycore_geom::Vec3) -> f64 {
     let bb = b.mesh().bounds();
-    let c = solidcraft_geom::Vec3::new(p.x.clamp(bb.min.x, bb.max.x), p.y.clamp(bb.min.y, bb.max.y), p.z.clamp(bb.min.z, bb.max.z));
+    let c = polycore_geom::Vec3::new(p.x.clamp(bb.min.x, bb.max.x), p.y.clamp(bb.min.y, bb.max.y), p.z.clamp(bb.min.z, bb.max.z));
     c.dist(p)
 }
 

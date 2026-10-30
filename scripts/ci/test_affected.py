@@ -102,7 +102,7 @@ class RealWorkspace(unittest.TestCase):
         self.assertFalse(full)
         self.assertIn("polykrom-render", pk)
         self.assertGreater(len(pk), 1)
-        self.assertNotIn("solidcraft-kernel", pk)
+        self.assertNotIn("polycore", pk)
 
     def test_cargo_lock_selects_full(self):
         self.assertEqual(affected.select(self.meta, ["Cargo.lock"]), (True, []))
@@ -114,7 +114,7 @@ class RealWorkspace(unittest.TestCase):
         full, pk = affected.select(self.meta, ["tests/robustness/goldens.json"])
         self.assertFalse(full)
         self.assertIn("polykrom-engine", pk)
-        self.assertNotIn("solidcraft-kernel", pk)
+        self.assertNotIn("polycore", pk)
         self.assertNotIn("polykrom-render", pk)
 
     def test_oracle_cases_select_the_cli_and_xtask_not_the_kernel(self):
@@ -122,7 +122,7 @@ class RealWorkspace(unittest.TestCase):
         self.assertFalse(full)
         self.assertIn("polykrom-cli", pk)
         self.assertIn("xtask", pk)
-        self.assertNotIn("solidcraft-kernel", pk)
+        self.assertNotIn("polycore", pk)
 
     def test_embedded_root_files_select_their_crate(self):
         for path, pkg in [("ATTRIBUTION.md", "polykrom-ui-egui"), ("LICENSE-MIT", "polykrom-engine"),
@@ -131,7 +131,7 @@ class RealWorkspace(unittest.TestCase):
             full, pk = affected.select(self.meta, [path])
             self.assertFalse(full, path)
             self.assertIn(pkg, pk, path)
-            self.assertNotIn("solidcraft-kernel", pk, path)
+            self.assertNotIn("polycore", pk, path)
 
     def test_unmapped_test_data_selects_full(self):
         self.assertEqual(affected.select(self.meta, ["tests/tools/x.json"]), (True, []))
@@ -148,7 +148,7 @@ class RealWorkspace(unittest.TestCase):
         self.assertFalse(full)
         self.assertIn("polykrom-ui-egui", pk)
         self.assertIn("polykrom", pk)
-        self.assertNotIn("solidcraft-kernel", pk)
+        self.assertNotIn("polycore", pk)
         self.assertNotIn("polykrom-engine", pk)
 
     def test_vendor_readme_alone_selects_nothing(self):
@@ -159,7 +159,7 @@ class RealWorkspace(unittest.TestCase):
         self.assertFalse(full)
         self.assertIn("polykrom-ui-egui", pk)
         self.assertIn("xtask", pk)
-        self.assertNotIn("solidcraft-kernel", pk)
+        self.assertNotIn("polycore", pk)
         self.assertNotIn("polykrom-engine", pk)
 
 

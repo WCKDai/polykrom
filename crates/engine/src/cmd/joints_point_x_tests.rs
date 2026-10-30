@@ -1,8 +1,8 @@
 //! A point joint origin keeps the x it is given: two origins given at one point with the same z
 //! and x meet as they are, whichever way their parts are turned.
 
+use polycore_geom::Vec3;
 use serde_json::json;
-use solidcraft_geom::Vec3;
 
 use super::tests::{occ, place, run};
 use crate::Session;

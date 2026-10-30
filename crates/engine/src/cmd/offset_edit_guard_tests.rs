@@ -1,8 +1,8 @@
 #![allow(clippy::unwrap_used, clippy::panic)]
+use polycore_geom::Vec2;
 use polykrom_doc::{Document, FeatureKind, ProfileSel};
 use polykrom_sketch::{CurveKind, Sketch};
 use serde_json::{Value, json};
-use solidcraft_geom::Vec2;
 
 use crate::{Session, Snapshot};
 

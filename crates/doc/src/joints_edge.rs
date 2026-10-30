@@ -8,7 +8,7 @@
 //! corner x and y run along the two edges, away from the corner into the face, in the order that
 //! makes the frame right-handed.
 
-use solidcraft_geom::Vec3;
+use polycore_geom::Vec3;
 
 use super::{Snap, component_bodies, frame};
 use crate::{DocError, Document, Mat, ModelBody, ModelState, Result};

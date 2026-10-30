@@ -1109,7 +1109,7 @@ fn label_rectangle(s: &mut Session) {
 }
 
 fn contains(s: &Session, p: [f64; 3]) -> bool {
-    s.model.state().bodies.first().is_some_and(|b| b.body.contains(solidcraft_geom::Vec3::new(p[0], p[1], p[2])))
+    s.model.state().bodies.first().is_some_and(|b| b.body.contains(polycore_geom::Vec3::new(p[0], p[1], p[2])))
 }
 
 /// The LINE entities a DXF draws on `layer` (group codes and values alternate, a line each).
@@ -1650,18 +1650,18 @@ fn a_converted_trays_corners_are_closed_and_relieved_as_a_flanged_trays_are() {
         // corners R + T in from the sharps, 92 and 52 apart.
         if shape == "round" {
             let dxf = run(&mut s, "sheet.export_dxf", json!({}))["dxf"].as_str().unwrap_or_default().to_string();
-            let arcs: Vec<(solidcraft_geom::Vec2, f64)> = polykrom_io::read_dxf(&dxf)
+            let arcs: Vec<(polycore_geom::Vec2, f64)> = polykrom_io::read_dxf(&dxf)
                 .unwrap_or_default()
                 .iter()
                 .filter_map(|g| if let polykrom_io::Geom2::Arc { c, a, .. } = g { Some((*c, a.dist(*c))) } else { None })
                 .collect();
             assert_eq!(arcs.len(), 4, "{arcs:?}");
-            let lo = solidcraft_geom::Vec2::new(
+            let lo = polycore_geom::Vec2::new(
                 arcs.iter().map(|(c, _)| c.x).fold(f64::MAX, f64::min),
                 arcs.iter().map(|(c, _)| c.y).fold(f64::MAX, f64::min),
             );
             for (x, y) in [(0.0, 0.0), (92.0, 0.0), (92.0, 52.0), (0.0, 52.0)] {
-                let at = lo + solidcraft_geom::Vec2::new(x, y);
+                let at = lo + polycore_geom::Vec2::new(x, y);
                 assert!(arcs.iter().any(|(c, r)| c.dist(at) < 1e-6 && (r - 4.0).abs() < 1e-6), "({x}, {y}): {arcs:?}");
             }
         }

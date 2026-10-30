@@ -3,7 +3,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use solidcraft_geom::{Aabb3, Mesh, Plane, Vec3};
+use polycore_geom::{Aabb3, Mesh, Plane, Vec3};
 
 use crate::{DocError, Result};
 
@@ -239,8 +239,8 @@ mod tests {
 
     #[test]
     fn family_line_normalization_preserves_corners_arcs_branches_and_retracing() {
+        use polycore_geom::Vec2;
         use polykrom_sketch::LinkGeom;
-        use solidcraft_geom::Vec2;
         let line = |a, b| LinkGeom::Line(Vec2::new(a, 0.), Vec2::new(b, 0.));
         assert_eq!(super::super::merge_family_lines(vec![line(0., 1.), line(2., 1.)]).unwrap(), vec![line(0., 2.)]);
         for geometry in [
@@ -321,8 +321,8 @@ mod tests {
 
     #[test]
     fn rounded_boundary_arc_sweeps_survive_individual_edge_reversal() {
+        use polycore_geom::{Seg2, Vec2};
         use polykrom_sketch::LinkGeom;
-        use solidcraft_geom::{Seg2, Vec2};
         let mut mesh = Mesh::default();
         for (extent, radius) in [(10.0, 3.0), (8.0, 1.0)] {
             for k in 0..4 {

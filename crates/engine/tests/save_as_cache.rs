@@ -41,7 +41,7 @@ fn a_filename_rename_preserves_opted_in_warm_assembly_caches() {
         let bytes = save(&mut session, label);
         let geometry = polykrom_io::read_design_geometry(&bytes).expect("warm geometry survives the rename");
         assert_eq!(geometry.bodies.len(), 1);
-        assert!((solidcraft_kernel::measure(&geometry.bodies[0].body).unwrap().volume - 24.0).abs() < 1e-9);
+        assert!((polycore::measure(&geometry.bodies[0].body).unwrap().volume - 24.0).abs() < 1e-9);
         assert!(polykrom_io::read_design_preview(&bytes).is_some(), "warm display meshes survive the rename");
         warm(&session);
     }

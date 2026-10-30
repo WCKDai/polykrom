@@ -19,9 +19,9 @@ use std::collections::{BTreeMap, HashMap};
 use std::fmt::Write as _;
 use std::io::{Cursor, Read, Write};
 
+use polycore_geom::Vec3;
 use quick_xml::Reader;
 use quick_xml::events::{BytesStart, Event};
-use solidcraft_geom::Vec3;
 
 use crate::{IoError, Result};
 

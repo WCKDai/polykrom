@@ -26,7 +26,7 @@ fn rounded_offset(radius: f64) -> (Session, u64, String, String) {
 fn volume(session: &Session, feature: u64) -> f64 {
     let state = session.model.state();
     let body = state.bodies.iter().find(|body| body.feature == feature).unwrap();
-    solidcraft_kernel::measure(&body.body).unwrap().volume
+    polycore::measure(&body.body).unwrap().volume
 }
 
 fn healthy(session: &Session) {

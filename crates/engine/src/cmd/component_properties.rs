@@ -1,7 +1,7 @@
 //! Physical properties of an assembly placement, with original body material assignments.
+use polycore_geom::{Aabb3, Vec3};
 use polykrom_doc::{Document, Mat};
 use serde_json::{Value, json};
-use solidcraft_geom::{Aabb3, Vec3};
 
 use crate::params::bad;
 use crate::{Result, Session};
@@ -117,8 +117,8 @@ fn properties(s: &Session, doc: &Document, selected: &[u64], descendants: bool, 
         placement_count += 1;
         for body in state.bodies.iter().filter(|b| doc.model_body_component(b) == component) {
             let transform: Mat = doc.model_body_offset(body).map(|offset| polykrom_doc::mat_mul(&transform, offset)).unwrap_or(transform);
-            let placed = solidcraft_kernel::transform_matrix(&body.body, transform)?;
-            let measured = solidcraft_kernel::measure(&placed)?;
+            let placed = polycore::transform_matrix(&body.body, transform)?;
+            let measured = polycore::measure(&placed)?;
             let density = doc.density(&body.name);
             let body_mass = measured.volume * density / 1000.0;
             volume += measured.volume;

@@ -32,8 +32,8 @@ impl Class {
     }
 }
 
-/// The layering table. Names are package names without the `polykrom-` prefix (or the
-/// `solidcraft-` prefix PolyCore's crates still have, #304).
+/// The layering table. Names are package names without the `polykrom-` prefix (PolyCore's:
+/// `polycore` is `kernel`, `polycore-geom` is `geom`; see [`short_name`]).
 pub const TABLE: &[(&str, Class)] = &[
     ("geom", Class::Layer(0)),
     // 3D mouse descriptors and reports (no workspace dependencies; the apps read the device)
@@ -80,7 +80,11 @@ pub const UI_CRATES: &[&str] = &["egui", "eframe", "egui-wgpu", "wgpu", "winit",
 pub const UI_MIN_LAYER: u8 = 5;
 
 pub fn short_name(pkg: &str) -> &str {
-    pkg.strip_prefix("polykrom-").or_else(|| pkg.strip_prefix("solidcraft-")).unwrap_or(pkg)
+    // PolyCore's packages (#304): `polycore` is the kernel, `polycore-geom` the geometry crate.
+    match pkg {
+        "polycore" => "kernel",
+        _ => pkg.strip_prefix("polykrom-").or_else(|| pkg.strip_prefix("polycore-")).or_else(|| pkg.strip_prefix("solidcraft-")).unwrap_or(pkg),
+    }
 }
 
 pub fn classify(pkg: &str) -> Option<Class> {
@@ -245,8 +249,8 @@ mod tests {
     #[test]
     fn clean_downward_graph_passes() {
         let g = [
-            c("solidcraft-geom", &[("kurbo", Normal, false)]),
-            c("polykrom-doc", &[("solidcraft-geom", Normal, true)]),
+            c("polycore-geom", &[("kurbo", Normal, false)]),
+            c("polykrom-doc", &[("polycore-geom", Normal, true)]),
             c("polykrom-engine", &[("polykrom-doc", Normal, true), ("solidcraft-testkit", Dev, true)]),
             c("polykrom-ui-egui", &[("polykrom-engine", Normal, true), ("egui", Normal, false)]),
             c("polykrom-cli", &[("polykrom-ui-egui", Normal, true)]),
@@ -262,7 +266,7 @@ mod tests {
 
     #[test]
     fn sideways_dependency_flagged() {
-        let v = check(&[c("solidcraft-kernel", &[("polykrom-sketch", Normal, true)])]);
+        let v = check(&[c("polycore", &[("polykrom-sketch", Normal, true)])]);
         assert!(matches!(v[..], [Violation::Upward { from: 1, to: 1, .. }]));
     }
 
@@ -273,7 +277,7 @@ mod tests {
 
     #[test]
     fn upward_dev_dependency_flagged() {
-        let v = check(&[c("solidcraft-geom", &[("polykrom-doc", Dev, true)])]);
+        let v = check(&[c("polycore-geom", &[("polykrom-doc", Dev, true)])]);
         assert!(matches!(v[..], [Violation::Upward { kind: Dev, .. }]));
     }
 
@@ -314,10 +318,10 @@ mod tests {
         let meta: Value = serde_json::from_str(
             r#"{"packages":[
                 {"name":"polykrom-doc","dependencies":[
-                    {"name":"solidcraft-geom","kind":null,"path":"/x/crates/geom"},
+                    {"name":"polycore-geom","kind":null,"path":"/x/crates/geom"},
                     {"name":"serde","kind":null},
                     {"name":"proptest","kind":"dev"}]},
-                {"name":"solidcraft-geom","dependencies":[]}
+                {"name":"polycore-geom","dependencies":[]}
             ]}"#,
         )
         .unwrap();

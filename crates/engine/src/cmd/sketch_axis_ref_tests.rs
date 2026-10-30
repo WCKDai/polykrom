@@ -2,9 +2,9 @@
 //! axis becomes one linked construction line on it, shared by every constraint on that axis,
 //! reported in `created`, and left out of profiles. A real curve with that id wins.
 
+use polycore_geom::{Vec2, Vec3};
 use polykrom_sketch::{CurveKind, LinkSource, Sketch};
 use serde_json::{Value, json};
-use solidcraft_geom::{Vec2, Vec3};
 
 use crate::Session;
 

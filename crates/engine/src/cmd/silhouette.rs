@@ -1,7 +1,7 @@
 //! A tightly framed, view-aligned union of the projected body meshes.
 
+use polycore_geom::Vec3;
 use serde_json::{Value, json};
-use solidcraft_geom::Vec3;
 
 use super::CommandSpec;
 use crate::params::bad;

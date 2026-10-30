@@ -1,7 +1,7 @@
 //! Certificates are producer identities, never a nearest-surface selection.
 use crate::{DocError, Document, FeatureKind, ModelBody, Result, SolvedSketch};
+use polycore_geom::Seg2;
 use serde::{Deserialize, Serialize};
-use solidcraft_geom::Seg2;
 
 fn valid_signature(outer: &[String], holes: &[Vec<String>]) -> bool {
     let valid = |ids: &[String]| {
@@ -68,11 +68,11 @@ pub(crate) fn cap_key(outer: &[String], holes: &[Vec<String>]) -> String {
     }
     format!("{:x}", hash.finalize())
 }
-fn exact_region_signature(curves: &ExactSketchCurves, region: &solidcraft_geom::Region2) -> Option<solidcraft_kernel::CapSignature> {
+fn exact_region_signature(curves: &ExactSketchCurves, region: &polycore_geom::Region2) -> Option<polycore::CapSignature> {
     if region.outer.segs.len() + region.holes.iter().map(|hole| hole.segs.len()).sum::<usize>() > 4096 || region.holes.len() > 128 {
         return None;
     }
-    let signature = |outline: &solidcraft_geom::Loop2| {
+    let signature = |outline: &polycore_geom::Loop2| {
         let mut ids = outline.segs.iter().map(|segment| curves.find(segment)).collect::<Option<Vec<_>>>()?;
         ids.sort();
         ids.dedup();
@@ -85,9 +85,9 @@ fn exact_region_signature(curves: &ExactSketchCurves, region: &solidcraft_geom::
 }
 
 /// Charge all source-curve comparisons before matching; over-budget tools stay usable but uncertified.
-type CapBindings = Vec<Vec<Option<solidcraft_kernel::CapSignature>>>;
-pub(crate) fn extrude_cap_bindings(sketch: &SolvedSketch, bodies: &[solidcraft_kernel::Body], budget: usize) -> Option<CapBindings> {
-    use solidcraft_kernel::FaceSource;
+type CapBindings = Vec<Vec<Option<polycore::CapSignature>>>;
+pub(crate) fn extrude_cap_bindings(sketch: &SolvedSketch, bodies: &[polycore::Body], budget: usize) -> Option<CapBindings> {
+    use polycore::FaceSource;
     if sketch.sketch.curves.len() > 2000 {
         return None;
     }
@@ -116,7 +116,7 @@ pub(crate) fn extrude_cap_bindings(sketch: &SolvedSketch, bodies: &[solidcraft_k
     let mut counts = std::collections::BTreeMap::new();
     let mut bindings = Vec::with_capacity(bodies.len());
     for body in bodies {
-        let mut cached: Option<(&solidcraft_geom::Region2, Option<solidcraft_kernel::CapSignature>)> = None;
+        let mut cached: Option<(&polycore_geom::Region2, Option<polycore::CapSignature>)> = None;
         let mut values = Vec::new();
         for source in body.face_sources().into_iter().flatten() {
             let signature = if let Some(FaceSource::ExtrudeCap { region, high, .. }) = source {
@@ -155,8 +155,8 @@ pub(crate) fn extrude_cap_bindings(sketch: &SolvedSketch, bodies: &[solidcraft_k
 /// whole profile (a rectangle's four lines), so a sketch attached to a solid cap keeps its face
 /// when the extrude is made thin, and the other way round. Several regions (walls apart, or one
 /// meeting itself) are left uncertified: they keep their history names.
-pub(crate) fn thin_extrude_cap_bindings(curves: &[String], regions: usize, bodies: &[solidcraft_kernel::Body]) -> CapBindings {
-    use solidcraft_kernel::FaceSource;
+pub(crate) fn thin_extrude_cap_bindings(curves: &[String], regions: usize, bodies: &[polycore::Body]) -> CapBindings {
+    use polycore::FaceSource;
     let mut outer = curves.to_vec();
     outer.sort();
     outer.dedup();
@@ -336,8 +336,8 @@ pub(crate) fn cylinder_cap_role(high: bool) -> &'static str {
     if high { "top" } else { "bottom" }
 }
 
-pub(crate) fn flat_source_certificate(source: &solidcraft_kernel::FaceSource) -> Option<(u64, FaceCertificate)> {
-    use solidcraft_kernel::FaceSource;
+pub(crate) fn flat_source_certificate(source: &polycore::FaceSource) -> Option<(u64, FaceCertificate)> {
+    use polycore::FaceSource;
     match source {
         FaceSource::Box { producer: Some(producer), axis, high, .. } => Some((*producer, FaceCertificate::Box { axis: *axis, high: *high })),
         FaceSource::CylinderCap { producer, high, .. } => Some((*producer, FaceCertificate::CylinderCap { high: *high })),
@@ -354,8 +354,8 @@ pub(crate) fn flat_source_certificate(source: &solidcraft_kernel::FaceSource) ->
     }
 }
 
-pub(crate) fn flat_source_matches(certificate: &FaceCertificate, source: &solidcraft_kernel::FaceSource, producer: u64) -> bool {
-    use solidcraft_kernel::FaceSource;
+pub(crate) fn flat_source_matches(certificate: &FaceCertificate, source: &polycore::FaceSource, producer: u64) -> bool {
+    use polycore::FaceSource;
     match (certificate, source) {
         (FaceCertificate::Box { axis, high }, FaceSource::Box { producer: Some(current), axis: current_axis, high: current_high, .. }) => {
             producer == *current && axis == current_axis && high == current_high
@@ -529,7 +529,7 @@ fn exact_segment_contains(original: &Seg2, generated: &Seg2) -> bool {
         (Seg2::Line { a, b }, Seg2::Line { a: c, b: d }) => {
             let direction = *b - *a;
             let scale = direction.len().max((*d - *c).len()).max(1.);
-            let interval = |point: solidcraft_geom::Vec2| {
+            let interval = |point: polycore_geom::Vec2| {
                 let t = (point - *a).dot(direction) / direction.len2();
                 (-1e-10..=1. + 1e-10).contains(&t)
             };
@@ -565,19 +565,19 @@ fn exact_segment_contains(original: &Seg2, generated: &Seg2) -> bool {
 }
 
 impl Document {
-    pub fn configuration_face_target(&self, body: &ModelBody, index: usize, point: solidcraft_geom::Vec3) -> Result<crate::config::ConfigFaceTarget> {
+    pub fn configuration_face_target(&self, body: &ModelBody, index: usize, point: polycore_geom::Vec3) -> Result<crate::config::ConfigFaceTarget> {
         let names = crate::naming::face_names(body);
         let mut name = names
             .get(index)
             .map(|name| crate::naming::strip_piece(name).to_string())
             .ok_or_else(|| DocError::Unknown("face source name missing".into()))?;
         let origin = match body.body.face_sources().and_then(|sources| sources.get(index)).and_then(Option::as_ref) {
-            Some(solidcraft_kernel::FaceSource::Imported { producer: Some(producer), .. })
-            | Some(solidcraft_kernel::FaceSource::CertifiedExtrudeSide { producer, .. })
-            | Some(solidcraft_kernel::FaceSource::CertifiedExtrudeCap { producer, .. })
-            | Some(solidcraft_kernel::FaceSource::ShellPlanar { producer: Some(producer), .. })
-            | Some(solidcraft_kernel::FaceSource::Box { producer: Some(producer), .. })
-            | Some(solidcraft_kernel::FaceSource::CylinderCap { producer, .. }) => *producer,
+            Some(polycore::FaceSource::Imported { producer: Some(producer), .. })
+            | Some(polycore::FaceSource::CertifiedExtrudeSide { producer, .. })
+            | Some(polycore::FaceSource::CertifiedExtrudeCap { producer, .. })
+            | Some(polycore::FaceSource::ShellPlanar { producer: Some(producer), .. })
+            | Some(polycore::FaceSource::Box { producer: Some(producer), .. })
+            | Some(polycore::FaceSource::CylinderCap { producer, .. }) => *producer,
             _ => name
                 .strip_prefix('F')
                 .and_then(|name| name.split_once(':'))
@@ -605,7 +605,7 @@ impl Document {
         let Some(source) = body.body.face_sources().and_then(|sources| sources.get(index)).and_then(Option::as_ref) else {
             return Ok(None);
         };
-        if let solidcraft_kernel::FaceSource::ShellPlanar { producer: Some(producer), source, inner, .. } = source {
+        if let polycore::FaceSource::ShellPlanar { producer: Some(producer), source, inner, .. } = source {
             if !self.feature(*producer).is_some_and(|feature| matches!(feature.kind, FeatureKind::Shell { .. })) {
                 return Err(DocError::Invalid("shell source producer missing".into()));
             }
@@ -618,7 +618,7 @@ impl Document {
             certificate.validate()?;
             return Ok(Some(certificate));
         }
-        if let solidcraft_kernel::FaceSource::Imported { item, face, payload_sha256: Some(digest), producer: Some(producer) } = source {
+        if let polycore::FaceSource::Imported { item, face, payload_sha256: Some(digest), producer: Some(producer) } = source {
             if !self.feature(*producer).is_some_and(|feature| matches!(feature.kind, FeatureKind::Import { .. })) {
                 return Err(DocError::Invalid("import source producer missing".into()));
             }
@@ -627,7 +627,7 @@ impl Document {
             return Ok(Some(certificate));
         }
         let certificate = match source {
-            solidcraft_kernel::FaceSource::CertifiedExtrudeSide { producer, sketch, curve, .. } => {
+            polycore::FaceSource::CertifiedExtrudeSide { producer, sketch, curve, .. } => {
                 if !self.feature(*producer).is_some_and(|feature| matches!(feature.kind, FeatureKind::Extrude { .. })) {
                     return Err(DocError::Invalid("side source producer missing".into()));
                 }
@@ -638,21 +638,21 @@ impl Document {
         certificate.validate()?;
         Ok(Some(certificate))
     }
-    pub fn strong_face_target(&self, body: &ModelBody, index: usize, point: solidcraft_geom::Vec3) -> Result<crate::config::ConfigFaceTarget> {
+    pub fn strong_face_target(&self, body: &ModelBody, index: usize, point: polycore_geom::Vec3) -> Result<crate::config::ConfigFaceTarget> {
         let mut target = self.configuration_face_target(body, index, point)?;
         match body.body.face_sources().and_then(|sources| sources.get(index)).and_then(Option::as_ref) {
-            Some(solidcraft_kernel::FaceSource::Box { producer: Some(producer), axis, high, .. }) => {
+            Some(polycore::FaceSource::Box { producer: Some(producer), axis, high, .. }) => {
                 target.origin_feature = *producer;
                 let axis_name = ["x", "y", "z"].get(*axis as usize).ok_or_else(|| DocError::Invalid("invalid box face axis".into()))?;
                 target.name = format!("F{producer}:{}{axis_name}", if *high { "+" } else { "-" });
                 target.certificate = Some(FaceCertificate::Box { axis: *axis, high: *high });
             }
-            Some(solidcraft_kernel::FaceSource::CylinderCap { producer, high, .. }) => {
+            Some(polycore::FaceSource::CylinderCap { producer, high, .. }) => {
                 target.origin_feature = *producer;
                 target.name = format!("F{producer}:{}", cylinder_cap_role(*high));
                 target.certificate = Some(FaceCertificate::CylinderCap { high: *high });
             }
-            Some(solidcraft_kernel::FaceSource::CertifiedExtrudeCap { producer, sketch, high, outer, holes, .. }) => {
+            Some(polycore::FaceSource::CertifiedExtrudeCap { producer, sketch, high, outer, holes, .. }) => {
                 target.origin_feature = *producer;
                 target.name = format!("F{producer}:cap:{}:{}", if *high { "high" } else { "low" }, cap_key(outer, holes));
                 target.certificate = Some(FaceCertificate::ExtrudeCap { sketch: *sketch, high: *high, outer: outer.clone(), holes: holes.clone() });
@@ -671,27 +671,27 @@ impl Document {
 /// is), projected onto it. A face that moves along its normal keeps the frame where it was;
 /// one that moves within its plane (a Move feature) keeps it too, as a sketch on a face does
 /// in the definition's coordinates.
-pub fn lineage_frame(body: &ModelBody, plane: &solidcraft_geom::Plane) -> Option<solidcraft_geom::Plane> {
-    use solidcraft_geom::Vec3;
+pub fn lineage_frame(body: &ModelBody, plane: &polycore_geom::Plane) -> Option<polycore_geom::Plane> {
+    use polycore_geom::Vec3;
     let n = plane.normal();
     let m = &body.source_transform;
     let origin = crate::apply_point(m, Vec3::ZERO);
     let axis = [Vec3::X, Vec3::Y, Vec3::Z].into_iter().filter_map(|a| crate::apply_vector(m, a).normalized()).find(|a| a.dot(n).abs() < 0.6)?;
     let x = axis - n * axis.dot(n);
     let origin = origin - n * (origin - plane.origin).dot(n);
-    solidcraft_geom::Plane::new(origin, x, n.cross(x))
+    polycore_geom::Plane::new(origin, x, n.cross(x))
 }
 
 /// Whether Split Face split `body`'s faces on `plane` (a split line lies on it).
-fn split_on_purpose(body: &ModelBody, plane: &solidcraft_geom::Plane) -> bool {
+fn split_on_purpose(body: &ModelBody, plane: &polycore_geom::Plane) -> bool {
     let tolerance = 1e-6 * (1. + body.body.size());
     let on_plane =
-        |line: &Vec<solidcraft_geom::Vec3>| !line.is_empty() && line.iter().all(|p| (*p - plane.origin).dot(plane.normal()).abs() <= tolerance);
+        |line: &Vec<polycore_geom::Vec3>| !line.is_empty() && line.iter().all(|p| (*p - plane.origin).dot(plane.normal()).abs() <= tolerance);
     body.body.split_lines().is_some_and(|lines| lines.iter().any(on_plane))
 }
 
 /// Whether two exact planes are one oriented plane (pieces of one face).
-fn same_oriented_plane(a: &solidcraft_geom::Plane, b: &solidcraft_geom::Plane, scale: f64) -> bool {
+fn same_oriented_plane(a: &polycore_geom::Plane, b: &polycore_geom::Plane, scale: f64) -> bool {
     a.normal().dot(b.normal()) >= 1. - 1e-8 && (b.origin - a.origin).dot(a.normal()).abs() <= 1e-7 * (1. + scale)
 }
 
@@ -699,7 +699,7 @@ impl Document {
     /// The exact plane an anchor on face `index` of `body` is measured in: the construction
     /// certificate's plane, or for a [`FaceCertificate::Lineage`] face its current exact plane in
     /// the [`lineage_frame`].
-    pub fn anchor_face_plane(&self, body: &ModelBody, index: usize, certificate: Option<&FaceCertificate>) -> Option<solidcraft_geom::Plane> {
+    pub fn anchor_face_plane(&self, body: &ModelBody, index: usize, certificate: Option<&FaceCertificate>) -> Option<polycore_geom::Plane> {
         match certificate {
             Some(FaceCertificate::Lineage) => body.body.planar_face(index).and_then(|plane| lineage_frame(body, &plane)),
             _ => body.body.face_plane(index),
@@ -711,12 +711,7 @@ impl Document {
     /// the design and finds this face (with its other pieces, all on one oriented plane). Where
     /// the face's pieces no longer share a plane (Offset Face moved one of them), the piece by
     /// its own name: the face's name qualified by the faces around it (`F2:top#[F2:side:l4,…]`).
-    pub(crate) fn lineage_face_target(
-        &self,
-        body: &ModelBody,
-        index: usize,
-        point: solidcraft_geom::Vec3,
-    ) -> Option<crate::config::ConfigFaceTarget> {
+    pub(crate) fn lineage_face_target(&self, body: &ModelBody, index: usize, point: polycore_geom::Vec3) -> Option<crate::config::ConfigFaceTarget> {
         let names = crate::naming::names(body);
         if !names.verified(index) {
             return None;
@@ -866,7 +861,7 @@ mod tests {
         SolvedSketch {
             feature: 1,
             name: "sources".into(),
-            plane: solidcraft_geom::Plane::XY,
+            plane: polycore_geom::Plane::XY,
             sketch,
             report,
             profiles: Vec::new(),
@@ -901,7 +896,7 @@ mod tests {
 
     #[test]
     fn prepared_sources_keep_exact_identity_and_reject_ambiguity() {
-        use solidcraft_geom::Vec2;
+        use polycore_geom::Vec2;
         let mut sketch = polykrom_sketch::Sketch::new();
         sketch.add_line(Vec2::ZERO, Vec2::new(10., 0.), None, None, Some("line")).unwrap();
         sketch.add_circle(Vec2::new(20., 0.), 2., None, Some("circle")).unwrap();
@@ -926,7 +921,7 @@ mod tests {
 
     #[test]
     fn a_curve_drawn_over_a_projected_boundary_is_the_source() {
-        use solidcraft_geom::Vec2;
+        use polycore_geom::Vec2;
         // A face sketch's live boundary, with a profile edge traced over it (issue #489).
         let mut sketch = polykrom_sketch::Sketch::new();
         let projected = sketch.add_line(Vec2::ZERO, Vec2::new(10., 0.), None, None, Some("edge")).unwrap();
@@ -950,7 +945,7 @@ mod tests {
     #[test]
     #[ignore = "manual optimized certification microbenchmark; no timing assertion"]
     fn benchmark_prepared_extrude_sources() {
-        use solidcraft_geom::Vec2;
+        use polycore_geom::Vec2;
         let mut sketch = polykrom_sketch::Sketch::new();
         for i in 0..1000 {
             let y = i as f64;
@@ -1003,7 +998,7 @@ mod tests {
     #[test]
     fn analytic_arc_interval_refuses_unsampled_gaps_and_accepts_wrap_reversal() {
         let radians = |degrees: f64| degrees.to_radians();
-        let arc = |start, sweep| Seg2::Arc { center: solidcraft_geom::Vec2::default(), radius: 10., start: radians(start), sweep: radians(sweep) };
+        let arc = |start, sweep| Seg2::Arc { center: polycore_geom::Vec2::default(), radius: 10., start: radians(start), sweep: radians(sweep) };
         assert!(!exact_segment_contains(&arc(10., 350.), &arc(20., 360.)), "five point probes missed the missing ten-degree gap");
         assert!(!exact_segment_contains(&arc(10., 350.), &arc(20., -360.)));
         assert!(exact_segment_contains(&arc(350., 40.), &arc(355., 20.)));

@@ -9,7 +9,7 @@ license.workspace = true
 workspace = true
 
 [dependencies]
-solidcraft-geom = { workspace = true }
+polycore-geom = { workspace = true }
 serde = { workspace = true }
 image = { workspace = true, features = ["jpeg"] }
 moxcms = { workspace = true }

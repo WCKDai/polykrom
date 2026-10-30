@@ -2,8 +2,8 @@
 //! ties only part of a placement, several between two parts add up, they start from where the
 //! parts are, and they keep holding as the parts change size.
 
+use polycore_geom::Vec3;
 use serde_json::{Value, json};
-use solidcraft_geom::Vec3;
 
 use super::tests::{occ, place, run};
 use crate::Session;

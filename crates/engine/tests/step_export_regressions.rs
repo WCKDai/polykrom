@@ -1,9 +1,9 @@
 //! STEP export regressions found by round-tripping the robustness designs: a body the app built
 //! must export, and read back as the same solid.
 
+use polycore::{measure, step_export, step_import};
 use polykrom_engine::Session;
 use serde_json::{Value, json};
-use solidcraft_kernel::{measure, step_export, step_import};
 
 fn run(s: &mut Session, script: Value) {
     for c in script.as_array().into_iter().flatten() {

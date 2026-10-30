@@ -5,8 +5,8 @@
 
 use std::collections::BTreeMap;
 
+use polycore_geom::Vec3;
 use serde::{Deserialize, Serialize};
-use solidcraft_geom::Vec3;
 
 use crate::Document;
 

@@ -9,11 +9,11 @@
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 
+use polycore_geom::Vec3;
 use polykrom_doc::joints::{Joint, JointKind, JointOrigin, Snap};
 use polykrom_doc::kernel::{StepImport, StepNode};
 use polykrom_doc::{FeatureKind, IDENTITY, Mat};
 use serde_json::{Value, json};
-use solidcraft_geom::Vec3;
 
 use crate::{EngineError, Result, Session};
 

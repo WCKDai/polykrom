@@ -2,7 +2,7 @@
 
 use std::f64::consts::TAU;
 
-use solidcraft_geom::{Seg2, Vec2};
+use polycore_geom::{Seg2, Vec2};
 
 use crate::model::{CurveKind, Sketch};
 

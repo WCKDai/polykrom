@@ -1,7 +1,7 @@
 //! Stored parameters and stable entity ids for editing an existing sketch pattern.
 
+use polycore_geom::Vec2;
 use serde::{Deserialize, Serialize};
-use solidcraft_geom::Vec2;
 
 use crate::{CurveKind, Sketch, SketchError};
 

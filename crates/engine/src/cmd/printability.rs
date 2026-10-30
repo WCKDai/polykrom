@@ -5,8 +5,8 @@
 //! choose an orientation and say what a print costs before slicing it. Thin walls and bridges
 //! are not judged yet; the reply says so.
 
+use polycore_geom::Vec3;
 use serde_json::{Value, json};
-use solidcraft_geom::Vec3;
 
 use super::CommandSpec;
 use crate::params::{bad, num, string_list, vec3};

@@ -4,7 +4,7 @@ use std::sync::{Arc, Mutex};
 pub(super) const CANCELLED: &str = "DXF export cancelled";
 
 pub(super) struct Stage {
-    watch: Option<Arc<dyn solidcraft_kernel::watch::Watch>>,
+    watch: Option<Arc<dyn polycore::watch::Watch>>,
     name: &'static str,
     total: usize,
     done: Mutex<usize>,
@@ -12,7 +12,7 @@ pub(super) struct Stage {
 
 impl Stage {
     pub fn new(name: &'static str, total: usize) -> Self {
-        let stage = Self { watch: solidcraft_kernel::watch::current(), name, total: total.max(1), done: Mutex::new(0) };
+        let stage = Self { watch: polycore::watch::current(), name, total: total.max(1), done: Mutex::new(0) };
         if let Some(watch) = &stage.watch {
             watch.progress(name, 0, stage.total);
         }

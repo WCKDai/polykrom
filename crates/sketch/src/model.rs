@@ -1,5 +1,5 @@
+use polycore_geom::{Aabb2, Seg2, Vec2, Vec3};
 use serde::{Deserialize, Serialize};
-use solidcraft_geom::{Aabb2, Seg2, Vec2, Vec3};
 
 use crate::union_find::{find, union};
 
@@ -1320,7 +1320,7 @@ impl Sketch {
                 _ => Vec::new(),
             },
             CurveKind::Circle { c, r } => match self.point(c) {
-                Some(c) => solidcraft_geom::Loop2::circle(c, r).segs,
+                Some(c) => polycore_geom::Loop2::circle(c, r).segs,
                 None => Vec::new(),
             },
             CurveKind::Arc { c, a, b } => match (self.point(c), self.point(a), self.point(b)) {
@@ -1367,10 +1367,10 @@ impl Sketch {
                     crate::curves::fit_beziers_mode(&p, *periodic).ok()?.into_iter().map(|[p0, p1, p2, p3]| Seg2::Cubic { p0, p1, p2, p3 }).collect(),
                 )
             }
-            CurveKind::Spline { pts, control: true, degree, .. } if (*degree as usize) <= solidcraft_geom::MAX_BEZIER_DEGREE => {
+            CurveKind::Spline { pts, control: true, degree, .. } if (*degree as usize) <= polycore_geom::MAX_BEZIER_DEGREE => {
                 let p: Vec<Vec2> = pts.iter().map(pt).collect::<Option<_>>()?;
                 let k = (*degree as usize).min(p.len().saturating_sub(1)).max(1);
-                Some(crate::curves::bspline_beziers(&p, k).iter().filter_map(|c| solidcraft_geom::bezier(c)).collect())
+                Some(crate::curves::bspline_beziers(&p, k).iter().filter_map(|c| polycore_geom::bezier(c)).collect())
             }
             _ => None,
         }
@@ -1379,7 +1379,7 @@ impl Sketch {
     /// The exact [`Seg2`] pieces of a curve of any kind, in the curve's own direction of travel:
     /// lines, circles and arcs from their analytic form, free-form curves through
     /// [`Sketch::exact_segs`]. Empty for a curve with no exact pieces (a spline above
-    /// `solidcraft_geom::MAX_BEZIER_DEGREE`).
+    /// `polycore_geom::MAX_BEZIER_DEGREE`).
     pub fn exact_pieces(&self, ci: usize) -> Vec<Seg2> {
         match self.exact_segs(ci) {
             Some(segs) => segs,
@@ -1436,11 +1436,8 @@ impl Sketch {
                 "e"
             }
             CurveKind::Spline { pts, control, degree, periodic } => {
-                if pts.len() < 2 || pts.len() > crate::curves::MAX_SPLINE_POINTS || !(1..=solidcraft_geom::MAX_BEZIER_DEGREE as u8).contains(degree) {
-                    return Err(SketchError::Invalid(format!(
-                        "a spline needs 2 to 500 points and degree 1 to {}",
-                        solidcraft_geom::MAX_BEZIER_DEGREE
-                    )));
+                if pts.len() < 2 || pts.len() > crate::curves::MAX_SPLINE_POINTS || !(1..=polycore_geom::MAX_BEZIER_DEGREE as u8).contains(degree) {
+                    return Err(SketchError::Invalid(format!("a spline needs 2 to 500 points and degree 1 to {}", polycore_geom::MAX_BEZIER_DEGREE)));
                 }
                 if *periodic {
                     if *control || *degree != 3 {

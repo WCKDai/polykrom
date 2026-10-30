@@ -1,6 +1,6 @@
 //! Analytic cursor oracle plus feasibility checks on every accepted continuation step.
+use polycore_geom::Vec2;
 use polykrom_sketch::{ConstraintKind, Sketch, move_line_towards, move_point_towards, solve};
-use solidcraft_geom::Vec2;
 
 fn linkage() -> (Sketch, usize, usize) {
     let mut sk = Sketch::new();

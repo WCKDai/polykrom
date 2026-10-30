@@ -1,7 +1,7 @@
 //! A joint origin on a face or a hole keeps its turn about z as the geometry tilts.
 
+use polycore_geom::Vec3;
 use serde_json::{Value, json};
-use solidcraft_geom::Vec3;
 
 use super::tests::{occ, run};
 use crate::Session;

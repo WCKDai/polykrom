@@ -182,15 +182,15 @@ fn attachment(s: &Session, sketch: &str) -> polykrom_doc::FaceAttachmentStatus {
     s.placed_document().sketch_face_attachment(id, &s.model)
 }
 
-fn attached(s: &Session, sketch: &str) -> (solidcraft_geom::Plane, Option<polykrom_doc::config::FaceCertificate>) {
+fn attached(s: &Session, sketch: &str) -> (polycore_geom::Plane, Option<polykrom_doc::config::FaceCertificate>) {
     match attachment(s, sketch) {
         polykrom_doc::FaceAttachmentStatus::Healthy { plane, target, .. } => (plane, target.certificate),
         other => panic!("{sketch}: {other:?}"),
     }
 }
 
-fn same_plane(a: &solidcraft_geom::Plane, b: &solidcraft_geom::Plane) {
-    let near = |p: solidcraft_geom::Vec3, q: solidcraft_geom::Vec3| (p - q).len() < 1e-9;
+fn same_plane(a: &polycore_geom::Plane, b: &polycore_geom::Plane) {
+    let near = |p: polycore_geom::Vec3, q: polycore_geom::Vec3| (p - q).len() < 1e-9;
     assert!(near(a.origin, b.origin) && near(a.x, b.x) && near(a.y, b.y), "{a:?} != {b:?}");
 }
 

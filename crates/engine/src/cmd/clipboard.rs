@@ -42,7 +42,7 @@ fn copy(s: &mut Session, p: &Value) -> Result<Value> {
 fn explicit_planes(p: &mut PlaneRef) {
     match p {
         PlaneRef::Origin { name } => {
-            if let Some(plane) = solidcraft_geom::Plane::named(name) {
+            if let Some(plane) = polycore_geom::Plane::named(name) {
                 *p = PlaneRef::Custom { plane };
             }
         }
@@ -527,7 +527,7 @@ mod tests {
         let def = run(&mut s, "timeline.inspect", json!({"feature": spring}));
         assert_eq!(def["definition"]["targets"], json!(["Plate (copy)"]), "{def}");
         let st = s.world_state();
-        let v = |name: &str| solidcraft_kernel::measure(&st.body(name).unwrap().body).unwrap().volume;
+        let v = |name: &str| polycore::measure(&st.body(name).unwrap().body).unwrap().volume;
         // A spring on the wrong plate is hundreds of mm³ off. The two plates are measured apart
         // (one moved 50 mm), which the boolean and the measure each round in their own way:
         // a few 1e-6 mm³ on 5000.

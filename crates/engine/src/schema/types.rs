@@ -4,12 +4,12 @@
 
 use std::borrow::Cow;
 
+use polycore_geom::{Vec2, Vec3};
 use polykrom_doc::{Expr, Operation, ThinSide};
 use schemars::{JsonSchema, Schema, SchemaGenerator, json_schema};
 use serde::de::Error as _;
 use serde::{Deserialize, Deserializer};
 use serde_json::{Value, json};
-use solidcraft_geom::{Vec2, Vec3};
 
 use super::check::whole;
 use crate::params;

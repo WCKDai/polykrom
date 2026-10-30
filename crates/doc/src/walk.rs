@@ -5,7 +5,7 @@
 //! traits here carry the walks through the types the fields have: options, lists, arrays, planes
 //! and construction definitions.
 
-pub(crate) use solidcraft_geom::Vec3;
+pub(crate) use polycore_geom::Vec3;
 
 pub(crate) use crate::ProfileSel;
 use crate::construct::{AxisDef, GeoRef, PointDef};
@@ -47,9 +47,9 @@ impl Walk for std::collections::BTreeMap<String, String> {}
 impl Walk for crate::frame::Anchor {}
 impl Walk for polykrom_sketch::Sketch {}
 impl Walk for polykrom_sketch::PatternAlignment {}
-impl Walk for solidcraft_kernel::StepNode {}
+impl Walk for polycore::StepNode {}
 impl Walk for crate::document::Operation {}
-impl Walk for solidcraft_kernel::Continuity {}
+impl Walk for polycore::Continuity {}
 impl Walk for crate::document::Direction {}
 impl Walk for crate::document::FilletFit {}
 impl Walk for crate::document::FilletCorner {}

@@ -27,9 +27,9 @@ name = "sketch_target_bench"
 required-features = ["solver-profiling"]
 
 [dependencies]
-solidcraft-geom = { workspace = true }
+polycore-geom = { workspace = true }
 polykrom-sketch = { workspace = true }
-solidcraft-kernel = { workspace = true }
+polycore = { workspace = true }
 polykrom-doc = { workspace = true }
 polykrom-io = { workspace = true }
 polykrom-render = { workspace = true }

@@ -1,8 +1,8 @@
 //! A new joint given no angle keeps the part's turn about the joint's axis: two faces that
 //! already meet stay as they are instead of the part spinning a half turn about their normal.
 
+use polycore_geom::Vec3;
 use serde_json::json;
-use solidcraft_geom::Vec3;
 
 use super::tests::{occ, place, run};
 use crate::Session;

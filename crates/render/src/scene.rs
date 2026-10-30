@@ -4,7 +4,7 @@
 
 use std::sync::Arc;
 
-use solidcraft_geom::{Mesh, Vec3};
+use polycore_geom::{Mesh, Vec3};
 
 use crate::SceneAnalysis;
 

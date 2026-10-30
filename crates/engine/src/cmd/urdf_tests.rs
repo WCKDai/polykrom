@@ -105,13 +105,13 @@ fn temp(tag: &str) -> PathBuf {
 /// Volume (m³) of an STL whose triangles share their corners (`None`: not closed).
 fn stl_volume(bytes: &[u8]) -> Option<f64> {
     let mut index: std::collections::HashMap<[u32; 3], u32> = std::collections::HashMap::new();
-    let mut mesh = solidcraft_geom::Mesh::default();
+    let mut mesh = polycore_geom::Mesh::default();
     for t in polykrom_io::read_stl(bytes).ok()? {
         let mut tri = [0u32; 3];
         for (k, p) in t.iter().enumerate() {
             let n = mesh.positions.len() as u32;
             tri[k] = *index.entry(p.map(f32::to_bits)).or_insert_with(|| {
-                mesh.positions.push(solidcraft_geom::Vec3::new(p[0] as f64, p[1] as f64, p[2] as f64));
+                mesh.positions.push(polycore_geom::Vec3::new(p[0] as f64, p[1] as f64, p[2] as f64));
                 n
             });
         }
@@ -373,7 +373,7 @@ fn urdf_inertial_is_mass_weighted() {
     }
     assert!(i.inertia[0][1].abs() < 1e-15);
     // The centre of mass is the cube's centre, in the link frame.
-    assert!(i.com.dist(polykrom_doc::apply_point(&l.mesh_origin, solidcraft_geom::Vec3::new(105.0, 5.0, 5.0))) < 1e-9, "{:?}", i.com);
+    assert!(i.com.dist(polykrom_doc::apply_point(&l.mesh_origin, polycore_geom::Vec3::new(105.0, 5.0, 5.0))) < 1e-9, "{:?}", i.com);
 }
 
 #[test]

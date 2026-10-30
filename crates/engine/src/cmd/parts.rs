@@ -27,8 +27,8 @@
 //! mass its `mass_kg`, which its body weighs (`rated_material`). A rating the maker does not
 //! publish is null.
 
+use polycore_geom::Vec3;
 use serde_json::{Value, json};
-use solidcraft_geom::Vec3;
 
 use polykrom_doc::joints::{JointOrigin, NamedOrigin, Snap};
 
@@ -1548,14 +1548,14 @@ mod tests {
     }
 
     /// The bounds of the parts named `prefix…` (an actuator with its horn or rotor).
-    fn bbox(s: &Session, prefix: &str) -> (solidcraft_geom::Vec3, solidcraft_geom::Vec3) {
+    fn bbox(s: &Session, prefix: &str) -> (polycore_geom::Vec3, polycore_geom::Vec3) {
         let st = s.world_state();
         let comps: Vec<u64> = s.doc.components.iter().filter(|c| c.name.starts_with(prefix)).map(|c| c.id).collect();
         let b = st
             .bodies
             .iter()
             .filter(|b| comps.contains(&s.doc.model_body_component(b)))
-            .fold(solidcraft_geom::Aabb3::EMPTY, |a, b| a.union(&b.mesh().bounds()));
+            .fold(polycore_geom::Aabb3::EMPTY, |a, b| a.union(&b.mesh().bounds()));
         (b.min, b.max)
     }
 
@@ -1745,10 +1745,7 @@ mod tests {
                 let o = s.doc.assembly.origins.iter().find(|o| o.name == format!("{name} output")).map(|o| o.origin.clone());
                 let m = o.and_then(|o| polykrom_doc::joints::resolve_origin(&s.doc, &s.model.state(), &o).ok());
                 let m = m.unwrap_or_else(|| panic!("{size}: the output origin does not resolve"));
-                assert!(
-                    solidcraft_geom::Vec3::new(m[3][0], m[3][1], m[3][2]).dist(solidcraft_geom::Vec3::new(0.0, 0.0, top)) < 1e-6,
-                    "{size}: {m:?}"
-                );
+                assert!(polycore_geom::Vec3::new(m[3][0], m[3][1], m[3][2]).dist(polycore_geom::Vec3::new(0.0, 0.0, top)) < 1e-6, "{size}: {m:?}");
                 assert!((m[2][2] - 1.0).abs() < 1e-9, "{size}: {m:?}");
             }
         }
@@ -1820,8 +1817,8 @@ mod tests {
         let (lo, _) = bbox(&s, "Servo STS3215");
         assert!((lo.z - 4.0).abs() < 1e-6, "the case's back on the bracket: {lo:?}");
         for (i, (x, y)) in holes.iter().enumerate() {
-            let p = polykrom_doc::apply_point(&t, solidcraft_geom::Vec3::new(*x, *y, 0.0));
-            assert!(p.dist(solidcraft_geom::Vec3::new(40.0 + x, 40.0 + y, 4.0)) < 1e-6, "hole {i}: {p:?}");
+            let p = polykrom_doc::apply_point(&t, polycore_geom::Vec3::new(*x, *y, 0.0));
+            assert!(p.dist(polycore_geom::Vec3::new(40.0 + x, 40.0 + y, 4.0)) < 1e-6, "hole {i}: {p:?}");
             // An M2 x 8 from under the bracket, its head on the bottom face: 4 mm into the servo.
             let at = json!([40.0 + x + 1.2, 40.0 + y, 0]);
             let sc =
@@ -1870,7 +1867,7 @@ mod tests {
             run(&mut s, "occurrence.ground", json!({"occurrence": r["occurrence"], "grounded": true}));
             let j = run(&mut s, "joint.as_built", json!({"type": "revolute", "a": r["occurrence"], "b": out, "at": r["output"]}));
             run(&mut s, "joint.drive", json!({"joint": j["joint"], "value": 90}));
-            let edge = polykrom_doc::apply_point(&polykrom_doc::joints::occurrence_world(&s.doc, out), solidcraft_geom::Vec3::new(d / 2.0, 0.0, z1));
+            let edge = polykrom_doc::apply_point(&polykrom_doc::joints::occurrence_world(&s.doc, out), polycore_geom::Vec3::new(d / 2.0, 0.0, z1));
             assert!(edge.x.abs() < 1e-6 && (edge.y.abs() - d / 2.0).abs() < 1e-6 && (edge.z - z1).abs() < 1e-6, "{size}: {edge:?}");
             let case_at = polykrom_doc::joints::occurrence_world(&s.doc, r["occurrence"].as_u64().unwrap_or(0));
             assert_eq!(case_at, polykrom_doc::IDENTITY, "{size}: the case stays");
@@ -1919,12 +1916,12 @@ mod tests {
         // MJCF export limits the joint's actuator to the servo's stall torque.
         let torque = super::rated_torques(&s.doc).get(&j["joint"].as_u64().unwrap_or(0)).copied();
         assert!(torque.is_some_and(|t| (t - 19.5 * 0.098_066_5).abs() < 1e-12), "{torque:?}");
-        let link = |s: &Session, p: solidcraft_geom::Vec3| {
+        let link = |s: &Session, p: polycore_geom::Vec3| {
             let o = s.doc.find_component("Link").and_then(|c| s.doc.occurrence_of(c)).map(|o| o.id).unwrap_or(0);
             polykrom_doc::apply_point(&polykrom_doc::joints::occurrence_world(&s.doc, o), p)
         };
         // The link has not moved: its hole's bottom end already sits on the horn's top.
-        let tip = solidcraft_geom::Vec3::new(54.0, 0.0, top);
+        let tip = polycore_geom::Vec3::new(54.0, 0.0, top);
         assert!(link(&s, tip).dist(tip) < 1e-6, "{:?}", link(&s, tip));
         // Screwed to the horn: an M3 x 6 through the link, 3 mm into a horn hole.
         let at = json!([bc / 2.0 + 1.7, 0, top + 3.0]);
@@ -1944,7 +1941,7 @@ mod tests {
         let c = ((lo.x + hi.x) / 2.0, (lo.y + hi.y) / 2.0);
         assert!(c.0.abs() < 1e-6 && (c.1.abs() - bc / 2.0).abs() < 1e-6 && c.1.signum() == p.y.signum(), "the screw went round with the link: {c:?}");
         let horn = polykrom_doc::joints::occurrence_world(&s.doc, r["output_part"].as_u64().unwrap_or(0));
-        let hole = polykrom_doc::apply_point(&horn, solidcraft_geom::Vec3::new(bc / 2.0, 0.0, top));
+        let hole = polykrom_doc::apply_point(&horn, polycore_geom::Vec3::new(bc / 2.0, 0.0, top));
         assert!(hole.x.abs() < 1e-6 && (hole.y - c.1).abs() < 1e-6, "the horn went round with the link: {hole:?}");
         let (lo, hi) = bbox(&s, "Servo STS3215");
         assert!(lo.z.abs() < 1e-6 && (hi.z - top).abs() < 1e-6, "the servo stays: {lo:?} {hi:?}");
@@ -1963,8 +1960,8 @@ mod tests {
         assert!((lo.z - (5.0 - 11.0)).abs() < 1e-6 && (hi.z - (5.0 + 27.5)).abs() < 1e-6, "{lo:?} {hi:?}");
         assert!(((lo.x + hi.x) / 2.0 - 60.0).abs() < 0.1 && ((lo.y + hi.y) / 2.0 - 60.0).abs() < 0.1, "{lo:?} {hi:?}");
         let t = polykrom_doc::joints::occurrence_world(&s.doc, r["occurrence"].as_u64().unwrap_or(0));
-        let p = polykrom_doc::apply_point(&t, solidcraft_geom::Vec3::new(42.5, 0.0, 0.0));
-        assert!(p.dist(solidcraft_geom::Vec3::new(102.5, 60.0, 5.0)) < 1e-6, "{p:?}");
+        let p = polykrom_doc::apply_point(&t, polycore_geom::Vec3::new(42.5, 0.0, 0.0));
+        assert!(p.dist(polycore_geom::Vec3::new(102.5, 60.0, 5.0)) < 1e-6, "{p:?}");
     }
 
     /// Actuators come in their makers' case colours: black servos and motors, the blue SG90.
@@ -2274,8 +2271,8 @@ mod tests {
                     assert!(s.model.state().threads.iter().any(|t| t.designation == "M8" && (t.pitch - 1.25).abs() < 1e-9), "{family} {units}");
                 }
                 if family == "dowel_pin" {
-                    assert!(b.0.dist(solidcraft_geom::Vec3::new(10., 46., 56.)) < 1e-6, "{b:?}");
-                    assert!(b.1.dist(solidcraft_geom::Vec3::new(40., 54., 64.)) < 1e-6, "{b:?}");
+                    assert!(b.0.dist(polycore_geom::Vec3::new(10., 46., 56.)) < 1e-6, "{b:?}");
+                    assert!(b.1.dist(polycore_geom::Vec3::new(40., 54., 64.)) < 1e-6, "{b:?}");
                 }
                 bounds.push(b);
             }

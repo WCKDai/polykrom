@@ -290,7 +290,7 @@ fn redefine_keeps_allocator_above_component_and_occurrence_ids() {
     assert!(
         matches!(&s.doc.features[combine_index + 1].kind, polykrom_doc::FeatureKind::BodyTransfer { bodies, to, .. } if bodies == &["Base"] && *to == destination)
     );
-    assert!((solidcraft_kernel::measure(&s.world_state().body("Base").unwrap().body).unwrap().volume - 6000.0).abs() < 1e-6);
+    assert!((polycore::measure(&s.world_state().body("Base").unwrap().body).unwrap().volume - 6000.0).abs() < 1e-6);
     assert_eq!(s.world_state().bodies.len(), 1);
     run(&mut s, "timeline.rollback", json!({"position":combine_index + 1}));
     assert_eq!(s.world_state().body("Base").unwrap().component, 0, "the result transfers only AFTER Combine");
@@ -300,7 +300,7 @@ fn redefine_keeps_allocator_above_component_and_occurrence_ids() {
     run(&mut s, "edit.redo", json!({}));
     let reopened = Session::new(polykrom_doc::Document::from_json(&s.doc.to_json()).unwrap());
     assert_eq!(reopened.world_state().body("Base").unwrap().component, destination);
-    assert!((solidcraft_kernel::measure(&reopened.world_state().body("Base").unwrap().body).unwrap().volume - 6000.0).abs() < 1e-6);
+    assert!((polycore::measure(&reopened.world_state().body("Base").unwrap().body).unwrap().volume - 6000.0).abs() < 1e-6);
     let max_id =
         s.doc.components.iter().map(|c| c.id).chain(s.doc.occurrences.iter().map(|o| o.id)).chain(s.doc.features.iter().map(|f| f.id)).max().unwrap();
     assert!(s.doc.next_id > max_id);

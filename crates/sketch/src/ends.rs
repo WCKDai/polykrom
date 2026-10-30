@@ -9,7 +9,7 @@
 //! An end is tied when it is shared with another curve's end, joined to one by coincident
 //! constraints, or held on a curve (point on curve, midpoint).
 
-use solidcraft_geom::{Aabb2, Seg2, Vec2};
+use polycore_geom::{Aabb2, Seg2, Vec2};
 
 use crate::model::{ConstraintKind, CurveKind, Sketch};
 use crate::union_find::{find, union};

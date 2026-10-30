@@ -2,10 +2,10 @@
 
 use std::collections::HashMap;
 
+use polycore_geom::Vec2;
 use polykrom_io::{Geom2, MAX_DRAWING_BYTES};
 use polykrom_sketch::{CurveKind, LinkKind, LinkSource, Sketch};
 use serde_json::{Value, json};
-use solidcraft_geom::Vec2;
 
 use super::CommandSpec;
 use super::sketch::{edit, ids_of};

@@ -6,8 +6,8 @@
 //! The default font is embedded (Liberation Sans, SIL OFL 1.1; see `assets/fonts/liberation-sans/OFL.txt` and
 //! ATTRIBUTION.md); [`crate::fonts`] finds others by file path or installed family name.
 
+use polycore_geom::{Ring, Vec2};
 use serde::{Deserialize, Serialize};
-use solidcraft_geom::{Ring, Vec2};
 
 use crate::fonts::font_data_styled;
 use crate::link::{LinkGeom, LinkKind, LinkSource, MAX_LINK_ENTITIES};

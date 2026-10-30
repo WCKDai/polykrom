@@ -1,6 +1,6 @@
 use crate::Session;
+use polycore_geom::Vec3;
 use serde_json::{Value, json};
-use solidcraft_geom::Vec3;
 
 fn run(s: &mut Session, command: &str, params: Value) -> Value {
     s.execute(command, &params).unwrap_or_else(|error| panic!("{command} {params}: {error}"))
@@ -479,7 +479,11 @@ fn rounded_enclosure_shell_side_and_floor_attach_through_width_wall_and_reopen()
         assert!(state.sketch(floor).unwrap().plane.normal().dot(Vec3::Z) > 0.999);
         let mesh = state.body("Case").unwrap().body.tessellate_with(1e-4, true).unwrap();
         let case = &state.body("Case").unwrap().body;
-        let corners: Vec<_> = (0..case.face_count()).filter(|i| matches!(solidcraft_kernel::face_surface(case, *i), Some(solidcraft_kernel::FaceSurface::Cylinder { radius, .. }) if (radius - 6.).abs() < 1e-6)).collect();
+        let corners: Vec<_> = (0..case.face_count())
+            .filter(
+                |i| matches!(polycore::face_surface(case, *i), Some(polycore::FaceSurface::Cylinder { radius, .. }) if (radius - 6.).abs() < 1e-6),
+            )
+            .collect();
         assert_eq!(corners.len(), 4, "later port/boss features must not subdivide untouched outer corners");
         for index in corners {
             let points: Vec<_> = mesh
@@ -496,7 +500,7 @@ fn rounded_enclosure_shell_side_and_floor_attach_through_width_wall_and_reopen()
         assert!(!mesh.contains(Vec3::new(49., 0., 12.)), "USB must remain open after resize/reopen");
         assert!(mesh.contains(Vec3::new(49., 15., 12.)), "adjacent right wall remains solid");
         assert!(mesh.contains(Vec3::new(-49., 0., 12.)), "opposite wall must stay solid");
-        let seed = state.sketch(floor).unwrap().plane.to_world(solidcraft_geom::Vec2::new(40., 20.)) + Vec3::Z * 6.;
+        let seed = state.sketch(floor).unwrap().plane.to_world(polycore_geom::Vec2::new(40., 20.)) + Vec3::Z * 6.;
         assert!(mesh.contains(seed), "seed boss starts on current floor");
         for shift in [Vec3::ZERO, Vec3::new(-80., 0., 0.), Vec3::new(0., -40., 0.), Vec3::new(-80., -40., 0.)] {
             assert!(mesh.contains(seed + shift), "each patterned boss must survive resize/reopen at {:?}", seed + shift);
@@ -523,7 +527,7 @@ fn offset_rectangle_pocket_has_one_logical_outer_wall_and_closed_face_projection
     run(&mut s, "sketch.finish", json!({}));
     run(&mut s, "solid.extrude", json!({"sketch":control_sketch,"distance":10,"operation":"new","body_name":"Control"}));
     let untouched = s.model.state().body("Control").unwrap().body.clone();
-    let before_control = solidcraft_kernel::step_export(&[&untouched], "control snapshot").unwrap();
+    let before_control = polycore::step_export(&[&untouched], "control snapshot").unwrap();
     let pick = top_pick(&s, "Stock");
     let pocket = run(&mut s, "sketch.create", json!({"plane":pick}))["sketch"].as_u64().unwrap();
     let side = {
@@ -539,7 +543,7 @@ fn offset_rectangle_pocket_has_one_logical_outer_wall_and_closed_face_projection
     run(&mut s, "solid.extrude", json!({"sketch":pocket,"profiles":[{"curves":inner}],"distance":-9,"operation":"cut"}));
     let control = s.model.state().body("Control").unwrap().body.clone();
     assert!(control.same(&untouched), "a separate body crossing the cutter end plane remains the exact same solid");
-    assert_eq!(solidcraft_kernel::step_export(&[&control], "control snapshot").unwrap(), before_control);
+    assert_eq!(polycore::step_export(&[&control], "control snapshot").unwrap(), before_control);
     let state = s.model.state();
     let body = state.body("Stock").unwrap();
     let display = body.body.display_mesh(0.01).unwrap();

@@ -1,7 +1,7 @@
 //! Joint origins on an edge of a face (its middle, or a corner) follow the face as it changes size.
 
+use polycore_geom::Vec3;
 use serde_json::json;
-use solidcraft_geom::Vec3;
 
 use super::tests::{place, run};
 use crate::Session;

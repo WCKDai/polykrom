@@ -1,9 +1,9 @@
 //! `sketch.trim.path`: dragging across curves trims each piece the path crosses, as clicking it
 //! with `sketch.trim` would, in one undo step.
 
+use polycore_geom::Vec2;
 use polykrom_sketch::Shape;
 use serde_json::{Value, json};
-use solidcraft_geom::Vec2;
 
 use crate::Session;
 

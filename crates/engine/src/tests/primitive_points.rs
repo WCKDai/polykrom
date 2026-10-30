@@ -9,7 +9,7 @@ use crate::*;
 
 fn bbox(s: &Session, body: &str) -> ([f64; 3], [f64; 3]) {
     let b = s.model.state().body(body).map(|b| b.body.clone()).unwrap();
-    let m = solidcraft_kernel::measure(&b).unwrap();
+    let m = polycore::measure(&b).unwrap();
     ([m.bbox.min.x, m.bbox.min.y, m.bbox.min.z], [m.bbox.max.x, m.bbox.max.y, m.bbox.max.z])
 }
 

@@ -4,8 +4,8 @@
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
+use polycore_geom::{Mesh, Plane, Vec2, Vec3};
 use polykrom_sketch::LinkSource;
-use solidcraft_geom::{Mesh, Plane, Vec2, Vec3};
 
 use crate::eval::ModelState;
 

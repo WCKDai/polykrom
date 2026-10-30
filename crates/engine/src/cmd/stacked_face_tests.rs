@@ -40,7 +40,7 @@ fn two_extrudes(circle: bool, full: bool, on_face: bool, operation: &str) -> Ses
     s
 }
 
-fn healthy(s: &Session, sketch: &str) -> solidcraft_geom::Plane {
+fn healthy(s: &Session, sketch: &str) -> polycore_geom::Plane {
     let id = s.doc.find_feature(sketch).map(|f| f.id).unwrap();
     match s.placed_document().sketch_face_attachment(id, &s.model) {
         FaceAttachmentStatus::Healthy { plane, .. } => plane,
@@ -115,7 +115,7 @@ fn three_stacked_extrudes_follow_an_edit_of_the_first() {
     for (name, z) in [("S2", 25.), ("S3", 35.), ("S4", 45.)] {
         assert!((healthy(&s, name).origin.z - z).abs() < 1e-9, "{name} after edit");
     }
-    let volume: f64 = s.model.state().bodies.iter().map(|b| solidcraft_kernel::measure(&b.body).unwrap().volume).sum();
+    let volume: f64 = s.model.state().bodies.iter().map(|b| polycore::measure(&b.body).unwrap().volume).sum();
     assert!((volume - 40. * 40. * 45.).abs() < 1e-6, "{volume}");
 
     // Saved and reopened, every attachment still resolves.

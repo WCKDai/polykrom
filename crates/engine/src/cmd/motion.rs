@@ -2,12 +2,12 @@
 
 use std::collections::BTreeSet;
 
+use polycore::Body;
+use polycore_geom::{Aabb3, Vec3};
 use polykrom_doc::Mat;
 use polykrom_doc::joints::{self, JointKind};
 use polykrom_doc::motion::{ContactSet, ExplodedView, MotionStudy, StudyKey};
 use serde_json::{Value, json};
-use solidcraft_geom::{Aabb3, Vec3};
-use solidcraft_kernel::Body;
 
 use super::CommandSpec;
 use super::joints::{cannot_move, effective_values, joint_id, occurrence_id, place_holding, value};
@@ -143,7 +143,7 @@ fn placed(s: &Session) -> Vec<(Vec<u64>, Body)> {
             // offset from its authoring frame. Contact and explode centres must use that
             // same offset as display and physical properties.
             let frame = s.doc.model_body_offset(b).map(|offset| polykrom_doc::mat_mul(&m, offset)).unwrap_or(m);
-            if let Ok(t) = solidcraft_kernel::transform_matrix(&b.body, frame) {
+            if let Ok(t) = polycore::transform_matrix(&b.body, frame) {
                 out.push((path.clone(), t));
             }
         }
@@ -192,12 +192,12 @@ fn overlap(a: &Body, b: &Body) -> Option<f64> {
     mesh_overlap(&ma, &mb, 1e-4 * a.size().max(b.size()).max(1.0))
 }
 
-fn mesh_overlap(ma: &solidcraft_geom::Mesh, mb: &solidcraft_geom::Mesh, tol: f64) -> Option<f64> {
+fn mesh_overlap(ma: &polycore_geom::Mesh, mb: &polycore_geom::Mesh, tol: f64) -> Option<f64> {
     mesh_overlap_counted(ma, mb, tol, &mut 0)
 }
 
 /// [`mesh_overlap`], adding the triangles it tests to `work` (what contact budgets limit).
-pub(super) fn mesh_overlap_counted(ma: &solidcraft_geom::Mesh, mb: &solidcraft_geom::Mesh, tol: f64, work: &mut usize) -> Option<f64> {
+pub(super) fn mesh_overlap_counted(ma: &polycore_geom::Mesh, mb: &polycore_geom::Mesh, tol: f64, work: &mut usize) -> Option<f64> {
     let (ba, bb) = (ma.bounds(), mb.bounds());
     if ba.max.x < bb.min.x + tol
         || bb.max.x < ba.min.x + tol
@@ -215,7 +215,7 @@ pub(super) fn mesh_overlap_counted(ma: &solidcraft_geom::Mesh, mb: &solidcraft_g
 }
 
 /// The triangle tree a contact check asks about `m`.
-pub(super) fn tree_of(m: &solidcraft_geom::Mesh) -> TriTree {
+pub(super) fn tree_of(m: &polycore_geom::Mesh) -> TriTree {
     TriTree::new(tris(m))
 }
 
@@ -224,16 +224,16 @@ pub(super) fn tree_of(m: &solidcraft_geom::Mesh) -> TriTree {
 /// world) and asked of the other's tree. A rigid move keeps every distance, so the depth is the
 /// one the placed meshes give, without building a tree per sample.
 pub(super) fn overlap_framed(
-    (ma, ta, fa): (&solidcraft_geom::Mesh, &TriTree, &Mat),
-    (mb, tb, fb): (&solidcraft_geom::Mesh, &TriTree, &Mat),
+    (ma, ta, fa): (&polycore_geom::Mesh, &TriTree, &Mat),
+    (mb, tb, fb): (&polycore_geom::Mesh, &TriTree, &Mat),
     tol: f64,
     work: &mut usize,
 ) -> Option<f64> {
     let (ia, ib) = (polykrom_doc::mat_inverse(fa)?, polykrom_doc::mat_inverse(fb)?);
-    let moved = |m: &solidcraft_geom::Mesh, to: &Mat| solidcraft_geom::Mesh {
+    let moved = |m: &polycore_geom::Mesh, to: &Mat| polycore_geom::Mesh {
         positions: m.positions.iter().map(|p| polykrom_doc::apply_point(to, *p)).collect(),
         triangles: m.triangles.clone(),
-        ..solidcraft_geom::Mesh::default()
+        ..polycore_geom::Mesh::default()
     };
     let (a_in_b, b_in_a) = (moved(ma, &polykrom_doc::mat_mul(&ib, fa)), moved(mb, &polykrom_doc::mat_mul(&ia, fb)));
     *work += ma.positions.len() + mb.positions.len();
@@ -252,7 +252,7 @@ pub(super) fn overlap_framed(
     (depth > tol).then_some(depth)
 }
 
-fn tris(m: &solidcraft_geom::Mesh) -> Vec<[Vec3; 3]> {
+fn tris(m: &polycore_geom::Mesh) -> Vec<[Vec3; 3]> {
     m.triangles.iter().filter_map(|t| m.tri(t)).collect()
 }
 
@@ -262,7 +262,7 @@ fn surface_distance(p: Vec3, tb: &TriTree, work: &mut usize) -> f64 {
 }
 
 /// The deepest any sample point of `a` lies inside `b` (0 if none); `bx` is b's box.
-fn deepest(a: &solidcraft_geom::Mesh, tb: &TriTree, bx: Aabb3, tol: f64, work: &mut usize) -> f64 {
+fn deepest(a: &polycore_geom::Mesh, tb: &TriTree, bx: Aabb3, tol: f64, work: &mut usize) -> f64 {
     let mut pts: Vec<Vec3> = a.positions.clone();
     let mut edges: Vec<(Vec3, Vec3)> = Vec::new();
     for [p, q, r] in tris(a) {

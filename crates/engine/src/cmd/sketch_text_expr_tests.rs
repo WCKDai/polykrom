@@ -1,9 +1,9 @@
 //! A sketch text's height, place and angle can be expressions of the design's parameters: the
 //! text keeps the expression, follows the parameters, and a number typed instead replaces it.
 
+use polycore_geom::Vec2;
 use polykrom_sketch::LinkSource;
 use serde_json::{Value, json};
-use solidcraft_geom::Vec2;
 
 use crate::Session;
 

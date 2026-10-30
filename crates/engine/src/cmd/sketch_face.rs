@@ -1,9 +1,9 @@
 //! Exact planar face capture for sketch attachment. World labels are lookup keys only.
 use crate::params::{bad, vec3};
 use crate::{Result, Session};
+use polycore_geom::Plane;
 use polykrom_doc::{EmbossFace, PlaneRef, apply_point, apply_vector, mat_inverse, mat_mul};
 use serde_json::Value;
-use solidcraft_geom::Plane;
 
 pub(in crate::cmd) fn is_face(p: &Value) -> bool {
     p.get("plane").and_then(|plane| plane.get("face")).is_some()

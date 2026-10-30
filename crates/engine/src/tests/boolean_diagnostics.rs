@@ -1,5 +1,5 @@
 use super::*;
-use solidcraft_kernel::BooleanStrategy;
+use polycore::BooleanStrategy;
 
 #[test]
 fn boolean_retry_warning_and_details_survive_cache_undo_and_reopen() {

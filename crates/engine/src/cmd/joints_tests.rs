@@ -1,7 +1,7 @@
 use std::f64::consts::FRAC_PI_2;
 
+use polycore_geom::Vec3;
 use serde_json::{Value, json};
-use solidcraft_geom::Vec3;
 
 use crate::Session;
 
@@ -342,7 +342,7 @@ fn interference_checks_designs_with_more_than_200_bodies() {
 /// pair finds (touching boxes count), and reports how many it left out past its limit.
 #[test]
 fn interference_box_sweep_matches_every_pair_check() {
-    use solidcraft_geom::Aabb3;
+    use polycore_geom::Aabb3;
     let cube = |x: f64, y: f64, z: f64, e: f64| Aabb3 { min: Vec3::new(x, y, z), max: Vec3::new(x + e, y + e, z + e) };
     // A deterministic scatter: overlapping, touching, and apart in only one axis.
     let boxes: Vec<Aabb3> = (0..60)

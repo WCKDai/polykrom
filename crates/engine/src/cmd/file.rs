@@ -111,7 +111,7 @@ fn read_step(path: &str, names: polykrom_io::StepNames) -> Result<polykrom_io::S
 /// SolidWorks is listed as Y up: its STEP and IGES writers are well known to keep that program's
 /// Y-up front view, and its name is in FILE_NAME (originating system, preprocessor version) and
 /// often FILE_DESCRIPTION. Programs we aren't sure of stay unknown, so the file is only offered.
-fn exporter_up(import: &solidcraft_kernel::StepImport) -> Option<(&'static str, &'static str)> {
+fn exporter_up(import: &polycore::StepImport) -> Option<(&'static str, &'static str)> {
     for own in ["Polykrom", "SolidCraft"] {
         if import.system.trim().starts_with(own) {
             return Some(("z", own));
@@ -123,7 +123,7 @@ fn exporter_up(import: &solidcraft_kernel::StepImport) -> Option<(&'static str, 
 
 /// A quarter turn about X through the origin: a file's Y up becomes Z up.
 fn quarter_turn_x() -> polykrom_doc::Mat {
-    polykrom_doc::rigid(solidcraft_geom::Vec3::ZERO, solidcraft_geom::Vec3::ZERO, solidcraft_geom::Vec3::X, std::f64::consts::FRAC_PI_2)
+    polykrom_doc::rigid(polycore_geom::Vec3::ZERO, polycore_geom::Vec3::ZERO, polycore_geom::Vec3::X, std::f64::consts::FRAC_PI_2)
 }
 
 /// Add an Import feature for a STEP file to the session's design, in a new component named

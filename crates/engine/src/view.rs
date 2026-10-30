@@ -4,9 +4,9 @@
 
 use std::sync::Arc;
 
+use polycore_geom::{Aabb3, Plane, Vec3};
 use polykrom_render::{AnalysisColors, Camera, Rgb, Scene, SceneAnalysis, SceneLine, SceneMesh};
 use polykrom_sketch::Sketch;
-use solidcraft_geom::{Aabb3, Plane, Vec3};
 
 use crate::{Sel, Session};
 
@@ -114,7 +114,7 @@ pub fn visible_bounds(s: &Session, sketches: bool) -> Aabb3 {
 }
 
 /// [`visible_bounds`] without meshing anything: a body not meshed yet counts with its outline
-/// ([`solidcraft_kernel::Body::outline_bounds`]), which a face curving out past all of its edges
+/// ([`polycore::Body::outline_bounds`]), which a face curving out past all of its edges
 /// can exceed. Frames a design whose bodies are still being meshed.
 pub fn unmeshed_bounds(s: &Session, sketches: bool) -> Aabb3 {
     bounds_by(s, sketches, |body| body.cached_mesh().map(|m| m.bounds()).unwrap_or_else(|| body.outline_bounds()))
@@ -129,7 +129,7 @@ fn bounds_by(s: &Session, sketches: bool, of: impl Fn(&polykrom_doc::ModelBody) 
     for ss in st.sketches.iter().filter(|x| sketch_drawn(s, x.feature, sketches)) {
         // All four corners: on a tilted plane two opposite ones don't span the rectangle.
         if let Some((lo, hi)) = ss.sketch.bounds() {
-            for p in [lo, hi, solidcraft_geom::Vec2::new(lo.x, hi.y), solidcraft_geom::Vec2::new(hi.x, lo.y)] {
+            for p in [lo, hi, polycore_geom::Vec2::new(lo.x, hi.y), polycore_geom::Vec2::new(hi.x, lo.y)] {
                 b.add(ss.plane.to_world(p));
             }
         }
@@ -544,7 +544,7 @@ fn build_scene(
 
 /// Where the plane through `o` with normal `n` cuts a mesh: one segment per crossed triangle,
 /// nudged a hair to the kept side (so the clip leaves them drawn).
-pub fn section_segments(m: &solidcraft_geom::Mesh, o: Vec3, n: Vec3) -> Vec<(Vec3, Vec3)> {
+pub fn section_segments(m: &polycore_geom::Mesh, o: Vec3, n: Vec3) -> Vec<(Vec3, Vec3)> {
     let eps = section_nudge(m);
     let mut out = Vec::new();
     for t in &m.triangles {
@@ -554,12 +554,12 @@ pub fn section_segments(m: &solidcraft_geom::Mesh, o: Vec3, n: Vec3) -> Vec<(Vec
 }
 
 /// How far [`section_segments`] nudges the cut to the kept side.
-fn section_nudge(m: &solidcraft_geom::Mesh) -> f64 {
+fn section_nudge(m: &polycore_geom::Mesh) -> f64 {
     1e-4 * (1.0 + m.bounds().diagonal())
 }
 
 /// The segment where the plane through `o` with normal `n` crosses triangle `t`, if it does.
-fn cut_triangle(m: &solidcraft_geom::Mesh, t: &[u32; 3], o: Vec3, n: Vec3, eps: f64, out: &mut Vec<(Vec3, Vec3)>) {
+fn cut_triangle(m: &polycore_geom::Mesh, t: &[u32; 3], o: Vec3, n: Vec3, eps: f64, out: &mut Vec<(Vec3, Vec3)>) {
     let Some(p) = m.tri(t) else { return };
     let d = p.map(|q| n.dot(q - o));
     let mut pts = Vec::with_capacity(2);
@@ -592,7 +592,7 @@ pub struct SectionIndex {
 const SECTION_SLABS: usize = 4096;
 
 impl SectionIndex {
-    pub fn new(m: &solidcraft_geom::Mesh, normal: Vec3) -> SectionIndex {
+    pub fn new(m: &polycore_geom::Mesh, normal: Vec3) -> SectionIndex {
         let heights: Vec<Option<(f64, f64)>> = m
             .triangles
             .iter()
@@ -628,7 +628,7 @@ impl SectionIndex {
 
     /// [`section_segments`] of `m` (the mesh this index was made from) at the plane through
     /// `o` with this index's normal.
-    pub fn segments(&self, m: &solidcraft_geom::Mesh, o: Vec3) -> Vec<(Vec3, Vec3)> {
+    pub fn segments(&self, m: &polycore_geom::Mesh, o: Vec3) -> Vec<(Vec3, Vec3)> {
         let mut out = Vec::new();
         let at = self.normal.dot(o);
         if self.slabs.is_empty() || !at.is_finite() || at < self.start {

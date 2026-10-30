@@ -3,10 +3,10 @@
 
 use std::cell::Cell;
 
+use polycore as kernel;
+use polycore_geom::{Plane, Vec2, Vec3};
 use polykrom_sketch::{CurveKind, Sketch};
 use serde_json::json;
-use solidcraft_geom::{Plane, Vec2, Vec3};
-use solidcraft_kernel as kernel;
 
 use crate::*;
 

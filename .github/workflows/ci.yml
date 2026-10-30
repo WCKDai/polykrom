@@ -475,7 +475,7 @@ jobs:
           if [ "$EVENT_NAME" != pull_request ]; then
             # The boolean property tests draw new random inputs every run; they run only in the
             # nightly property-tests job, so a known kernel bug cannot turn main red at random.
-            base='not (package(solidcraft-kernel) & binary(boolean_props))'
+            base='not (package(polycore) & binary(boolean_props))'
           elif [ "$GOLDENS" = true ]; then
             # A pull request that can change a robustness golden (tests/robustness/goldens.json)
             # also checks every seed but the slow ones, in the same run so they share its cores.

@@ -1,6 +1,6 @@
 use crate::Session;
+use polycore_geom::Vec3;
 use serde_json::{Value, json};
-use solidcraft_geom::Vec3;
 
 fn run(s: &mut Session, command: &str, p: Value) -> Value {
     s.execute(command, &p).unwrap()

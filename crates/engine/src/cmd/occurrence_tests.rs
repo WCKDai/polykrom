@@ -481,14 +481,14 @@ fn instance_styles_follow_source_identity_after_collision_rename_and_pending_mov
         assert!((measured["bodies"][0]["mass_g"].as_f64().unwrap() - 0.068).abs() < 1e-8);
     }
     let definition = s.model.state();
-    assert_eq!(solidcraft_kernel::measure(&definition.body("Shared Renamed").unwrap().body).unwrap().bbox.min, crate::geom::Vec3::ZERO);
+    assert_eq!(polycore::measure(&definition.body("Shared Renamed").unwrap().body).unwrap().bbox.min, crate::geom::Vec3::ZERO);
     let painted = s.doc.painted(&world);
     let secondname = s.occurrence_bodies(&[second], false).unwrap()[0].clone();
     let body = painted.body(&secondname).unwrap();
     assert_eq!(body.body.color(), Some([1.0, 0.0, 0.0]));
     assert!(body.body.paint().unwrap().faces.iter().any(|f| f.color == [0.0, 1.0, 0.0]));
     let bytes = polykrom_io::export(&painted, &[secondname], polykrom_io::Format::Step, "InstanceStyles").unwrap();
-    let imported = solidcraft_kernel::step_import(&String::from_utf8(bytes).unwrap()).unwrap();
+    let imported = polycore::step_import(&String::from_utf8(bytes).unwrap()).unwrap();
     assert_eq!(imported.bodies.len(), 1);
     assert_eq!(imported.bodies[0].body.color(), Some([1.0, 0.0, 0.0]));
     assert!(imported.bodies[0].body.paint().unwrap().faces.iter().any(|f| f.color == [0.0, 1.0, 0.0]));
@@ -685,7 +685,7 @@ fn a_stood_up_nested_step_part_is_cut_and_joined_from_its_face() {
     run(&mut src, "occurrence.move", json!({"occurrence": carrier, "translate": [12, 7, 5], "axis": [0, 0, 1], "angle": "30 deg"}));
     run(&mut src, "occurrence.move", json!({"occurrence": nested, "translate": [3, 11, 2], "axis": [0, 1, 0], "angle": "20 deg"}));
     // The middle of the top face, in the file's frame: the imported root's.
-    let top = polykrom_doc::apply_point(&src.doc.component_transform(part), solidcraft_geom::Vec3::new(20.0, 12.0, 10.0));
+    let top = polykrom_doc::apply_point(&src.doc.component_transform(part), polycore_geom::Vec3::new(20.0, 12.0, 10.0));
     run(&mut src, "file.export", json!({"path": path, "format": "step"}));
 
     let mut s = Session::default();
@@ -777,7 +777,7 @@ fn matrix_move_orthonormalises_rounding_and_refuses_what_is_not_rigid() {
 /// turned component cut from a root plate) removes 10 x 10 x 5 of it, not 10 x 10 x 10.
 #[test]
 fn combine_across_a_turned_occurrence_meets_the_tool_where_it_is_shown() {
-    let volume = |s: &Session, name: &str| s.model.state().body(name).map(|b| solidcraft_kernel::measure(&b.body).unwrap().volume).unwrap_or(0.0);
+    let volume = |s: &Session, name: &str| s.model.state().body(name).map(|b| polycore::measure(&b.body).unwrap().volume).unwrap_or(0.0);
     let turned = |s: &mut Session, body: Value| {
         created(s, "Part");
         run(s, "solid.box", body);
@@ -819,7 +819,7 @@ fn a_cut_into_every_body_keeps_its_place_when_the_joint_turns() {
 }
 
 fn cut_into_a_jointed_part(targets: Value) -> Session {
-    let volume = |s: &Session, name: &str| s.model.state().body(name).map(|b| solidcraft_kernel::measure(&b.body).unwrap().volume).unwrap_or(0.0);
+    let volume = |s: &Session, name: &str| s.model.state().body(name).map(|b| polycore::measure(&b.body).unwrap().volume).unwrap_or(0.0);
     let mut s = Session::default();
     created(&mut s, "Arm");
     run(&mut s, "solid.box", json!({"length": 40, "width": 10, "height": 10, "body_name": "Bar"}));
@@ -866,7 +866,7 @@ fn a_mirror_in_a_jointed_part_is_not_evaluated_again_when_the_joint_turns() {
     let picked = |f: &polykrom_doc::Feature| matches!(&f.kind, polykrom_doc::FeatureKind::Mirror { placements, .. } if !placements.is_empty());
     assert!(s.doc.features.last().is_some_and(picked), "the mirror keeps where the lug was picked");
     let copy = s.model.state().bodies.last().map(|b| b.name.clone()).unwrap();
-    let centre = |s: &Session| s.model.state().body(&copy).map(|b| solidcraft_kernel::measure(&b.body).unwrap().centroid).unwrap();
+    let centre = |s: &Session| s.model.state().body(&copy).map(|b| polycore::measure(&b.body).unwrap().centroid).unwrap();
     let before = centre(&s);
     for angle in [30.0, 90.0] {
         run(&mut s, "joint.drive", json!({"joint": "Pivot", "value": angle}));
@@ -882,7 +882,7 @@ fn a_mirror_in_a_jointed_part_is_not_evaluated_again_when_the_joint_turns() {
 /// far where it is shown.
 #[test]
 fn joins_into_a_moved_occurrence_meet_the_tool_where_it_is_shown() {
-    let volume = |s: &Session, name: &str| s.model.state().body(name).map(|b| solidcraft_kernel::measure(&b.body).unwrap().volume).unwrap_or(0.0);
+    let volume = |s: &Session, name: &str| s.model.state().body(name).map(|b| polycore::measure(&b.body).unwrap().volume).unwrap_or(0.0);
     let mut s = Session::default();
     created(&mut s, "Part");
     run(&mut s, "solid.box", json!({"length": 10, "width": 10, "height": 10, "body_name": "A"}));

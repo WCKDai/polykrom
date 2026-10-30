@@ -1,9 +1,9 @@
 //! More sketch creation tools: midpoint line, tangent arc, tangent circles, center-point and
 //! arc slots.
 
+use polycore_geom::Vec2;
 use polykrom_sketch::{ConstraintKind, CurveKind, LinkKind, LinkSource, Shape, Sketch, TextAlign, TextExprs, TextStyle};
 use serde_json::{Value, json};
-use solidcraft_geom::Vec2;
 
 /// The style parameters of `sketch.text` and `sketch.edit_text`.
 macro_rules! text_style_doc {
@@ -511,7 +511,7 @@ fn blend(s: &mut Session, p: &Value) -> Result<Value> {
             let da = joint_derivatives(sk, ca, pa, order, true, "a", cmd)?;
             let db = joint_derivatives(sk, cb, pb, order, false, "b", cmd)?;
             let mut pts: Vec<usize> = Vec::with_capacity(2 * order + 2);
-            let cps = solidcraft_geom::hermite_bezier(qa, qb, &da, &db)
+            let cps = polycore_geom::hermite_bezier(qa, qb, &da, &db)
                 .ok_or_else(|| bad(cmd, "the blend curve could not be built from the derivatives of `a` and `b`"))?;
             for (i, q) in cps.iter().enumerate() {
                 pts.push(if i == 0 {
@@ -1022,9 +1022,9 @@ pub(super) fn solve_new_only(sk: &mut Sketch, first_new: usize) {
 
 #[cfg(test)]
 mod blend_tests {
+    use polycore_geom::{Seg2, Vec2};
     use polykrom_sketch::CurveKind;
     use serde_json::{Value, json};
-    use solidcraft_geom::{Seg2, Vec2};
 
     use crate::Session;
 
@@ -1348,7 +1348,7 @@ mod blend_tests {
         let d = flat.add_curve(CurveKind::Spline { pts: vec![q0, q1], control: true, degree: 1, periodic: false }, None).unwrap();
         let e = super::joint_derivatives(&flat, d, q0, 2, true, "a", "sketch.blend_curve").unwrap_err().to_string();
         assert!(e.contains("no tangent"), "{e}");
-        assert!(solidcraft_geom::hermite_bezier(Vec2::ZERO, Vec2::X, &[Vec2::Y; 5], &[Vec2::Y; 5]).is_none(), "no order above g4");
+        assert!(polycore_geom::hermite_bezier(Vec2::ZERO, Vec2::X, &[Vec2::Y; 5], &[Vec2::Y; 5]).is_none(), "no order above g4");
     }
 
     #[test]

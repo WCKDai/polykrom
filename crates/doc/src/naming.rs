@@ -17,7 +17,7 @@
 
 use std::sync::{Arc, OnceLock};
 
-use solidcraft_geom::{Aabb3, Mesh, Seg2, Vec2, Vec3};
+use polycore_geom::{Aabb3, Mesh, Seg2, Vec2, Vec3};
 
 use crate::history_names::Names;
 use crate::lineage::Lineage;
@@ -314,7 +314,7 @@ pub(crate) fn warm_names<'a>(bodies: impl Iterator<Item = &'a ModelBody>) {
         [body] => {
             let _ = names(body);
         }
-        _ => solidcraft_kernel::for_each_on_threads(&bodies, 16, |b| {
+        _ => polycore::for_each_on_threads(&bodies, 16, |b| {
             let _ = names(b);
         }),
     }
@@ -893,7 +893,7 @@ pub fn face_name_at_body(body: &ModelBody, point: Vec3) -> Option<String> {
 /// most of its faces lie on, face by face: the same geometry, so a point well inside a face lies
 /// on the face it was written from (and on a face of another solid only where two touch). Of
 /// solids that hold as many (two alike in one place), the one the file names it after.
-pub fn carried_face_names(part: &ModelState, imported: &[solidcraft_kernel::ImportedBody]) -> Vec<Vec<String>> {
+pub fn carried_face_names(part: &ModelState, imported: &[polycore::ImportedBody]) -> Vec<Vec<String>> {
     let solids: Vec<&ModelBody> = part.bodies.iter().filter(|b| !b.body.is_mesh()).collect();
     let indices: Vec<OnceLock<Option<FaceIndex>>> = solids.iter().map(|_| OnceLock::new()).collect();
     imported
@@ -934,7 +934,7 @@ pub fn carried_face_names(part: &ModelState, imported: &[solidcraft_kernel::Impo
 #[derive(Clone, Copy, Debug)]
 pub struct FaceSpot {
     pub point: Vec3,
-    pub surface: Option<solidcraft_kernel::FaceSurface>,
+    pub surface: Option<polycore::FaceSurface>,
 }
 
 /// The incentre and inradius of the roomiest triangle (greatest inradius) of each face of a mesh,
@@ -970,7 +970,7 @@ fn roomiest(m: &Mesh, only: Option<usize>) -> Vec<Option<(f64, Vec3)>> {
 /// of a curved face lies inside it by its sag), as far as that stays well inside the triangle.
 fn spot(b: &ModelBody, index: usize, roomiest: Option<(f64, Vec3)>) -> Option<FaceSpot> {
     let (radius, centre) = roomiest?;
-    let surface = solidcraft_kernel::face_surface(&b.body, index);
+    let surface = polycore::face_surface(&b.body, index);
     let point = surface.and_then(|s| s.nearest(centre)).filter(|q| q.dist(centre) <= radius * 0.5).unwrap_or(centre);
     Some(FaceSpot { point, surface })
 }
@@ -1026,7 +1026,7 @@ mod tests {
     }
 
     fn lookup_bodies() -> ModelState {
-        let body = solidcraft_kernel::box_solid(Vec3::ZERO, Vec3::new(4., 2., 1.)).unwrap();
+        let body = polycore::box_solid(Vec3::ZERO, Vec3::new(4., 2., 1.)).unwrap();
         let mut st = ModelState::default();
         st.bodies = (0..13).map(|i| ModelBody::new(format!("Part{i}"), body.clone(), i + 1)).collect();
         st
@@ -1149,7 +1149,7 @@ mod tests {
 
     #[test]
     fn merged_face_votes_collectively_for_pieces_of_one_source() {
-        let body = ModelBody::new("Input".into(), solidcraft_kernel::box_solid(Vec3::ZERO, Vec3::new(4., 1., 1.)).unwrap(), 1);
+        let body = ModelBody::new("Input".into(), polycore::box_solid(Vec3::ZERO, Vec3::new(4., 1., 1.)).unwrap(), 1);
         let mut mesh = Mesh::default();
         let mut points = Vec::new();
         for i in 0..3u32 {
@@ -1174,9 +1174,9 @@ mod tests {
     #[test]
     fn a_long_run_of_overlapping_bodies_names_on_a_small_stack() {
         let run = || {
-            let block = solidcraft_kernel::box_solid(Vec3::ZERO, Vec3::new(4., 2., 1.)).unwrap();
+            let block = polycore::box_solid(Vec3::ZERO, Vec3::new(4., 2., 1.)).unwrap();
             // A lineage its body does not match (another face count): named from geometry.
-            let other = solidcraft_kernel::cylinder(Vec3::ZERO, Vec3::Z, 1.0, 1.0).unwrap();
+            let other = polycore::cylinder(Vec3::ZERO, Vec3::Z, 1.0, 1.0).unwrap();
             let mut doc = crate::Document::default();
             let kind = FeatureKind::Combine { target: "Anchor".into(), tools: Vec::new(), operation: crate::Operation::Join, keep_tools: false };
             let id = doc.add_feature(kind, None).unwrap();
@@ -1217,7 +1217,7 @@ mod tests {
     #[test]
     fn a_long_run_of_moves_and_edits_names_on_a_small_stack() {
         let run = || {
-            let block = solidcraft_kernel::box_solid(Vec3::ZERO, Vec3::new(4., 2., 1.)).unwrap();
+            let block = polycore::box_solid(Vec3::ZERO, Vec3::new(4., 2., 1.)).unwrap();
             let mut doc = crate::Document::default();
             let kind = FeatureKind::Combine { target: "B".into(), tools: Vec::new(), operation: crate::Operation::Join, keep_tools: false };
             let id = doc.add_feature(kind, None).unwrap();

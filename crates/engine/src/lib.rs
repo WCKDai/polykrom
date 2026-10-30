@@ -29,19 +29,19 @@ pub mod view;
 
 use std::sync::Arc;
 
+use polycore_geom::Vec3;
 use polykrom_doc::{Document, Model, ModelState};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use solidcraft_geom::Vec3;
 
 pub use cmd::{CommandInfo, CommandSpec, auto_operation, command_specs, extrude_reach, find_command};
+pub use polycore as kernel;
+pub use polycore_geom as geom;
 pub use polykrom_doc as doc;
 pub use polykrom_doc::Visibility;
 pub use polykrom_io as io;
 pub use polykrom_render as render;
 pub use polykrom_sketch as sketch;
-pub use solidcraft_geom as geom;
-pub use solidcraft_kernel as kernel;
 
 /// Longest accepted request line on the JSON-lines channels (MCP over stdio and the control
 /// server over loopback), so both refuse runaway input at the same size.
@@ -72,8 +72,8 @@ impl From<polykrom_sketch::SketchError> for EngineError {
         EngineError::Other(e.to_string())
     }
 }
-impl From<solidcraft_kernel::KernelError> for EngineError {
-    fn from(e: solidcraft_kernel::KernelError) -> Self {
+impl From<polycore::KernelError> for EngineError {
+    fn from(e: polycore::KernelError) -> Self {
         EngineError::Other(e.to_string())
     }
 }
@@ -428,7 +428,7 @@ impl Session {
         let visibility = std::mem::take(&mut doc.visibility);
         let doc = Arc::new(doc);
         let adopted = saved
-            .filter(|_| solidcraft_geom::env::var_os("NO_MODEL_CACHE").is_none())
+            .filter(|_| polycore_geom::env::var_os("NO_MODEL_CACHE").is_none())
             .and_then(|saved| Model::adopt(&doc, saved).map_err(|e| log::info!("the saved model is not used: {e}")).ok());
         let model = adopted.unwrap_or_else(|| {
             let mut model = Model::new();
@@ -641,7 +641,7 @@ impl Session {
                 for sketch in w.sketches.iter_mut().filter(|sk| self.doc.feature(sk.feature).is_some_and(|f| f.component == self.active_component)) {
                     let sketch = Arc::make_mut(sketch);
                     let plane = sketch.plane;
-                    if let Some(mapped) = solidcraft_geom::Plane::new(
+                    if let Some(mapped) = polycore_geom::Plane::new(
                         polykrom_doc::apply_point(&delta, plane.origin),
                         polykrom_doc::apply_vector(&delta, plane.x),
                         polykrom_doc::apply_vector(&delta, plane.y),

@@ -79,7 +79,7 @@ mod tests {
     #![allow(clippy::unwrap_used)]
     use super::*;
     use crate::joints::{JointKind, JointOrigin, Snap};
-    use solidcraft_geom::Vec3;
+    use polycore_geom::Vec3;
 
     fn joint(kind: JointKind) -> Joint {
         let at = |occurrence| JointOrigin { occurrence, snap: Snap::Point { point: Vec3::ZERO, z: None, x: None } };

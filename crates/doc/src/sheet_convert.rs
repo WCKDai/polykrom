@@ -50,8 +50,8 @@
 use std::collections::BTreeMap;
 use std::f64::consts::{FRAC_PI_2, PI, TAU};
 
-use solidcraft_geom::{Loop2, Mesh, Plane, Region2, Ring, Seg2, UnitVec3, Vec2, Vec3};
-use solidcraft_kernel::{Body, FaceSurface, face_surface};
+use polycore::{Body, FaceSurface, face_surface};
+use polycore_geom::{Loop2, Mesh, Plane, Region2, Ring, Seg2, UnitVec3, Vec2, Vec3};
 
 use super::{FlatWork, ReliefOverride, RuleValues, SheetBody, SheetFlange, base_flange, polys_cross, signed_area, snap};
 use crate::{DocError, ModelBody, Result, apply_point, mat_inverse};

@@ -150,7 +150,7 @@ mod tests {
         let n = DisplayQuality::Normal;
         assert_eq!(n.chord(200.0), 0.2);
         assert_eq!(n.chord(0.5), 1e-3);
-        assert!((n.angle() - solidcraft_kernel::DISPLAY_ANGLE).abs() < 1e-12);
+        assert!((n.angle() - polycore::DISPLAY_ANGLE).abs() < 1e-12);
         for w in DisplayQuality::ALL.windows(2) {
             assert!(w[1].chord(100.0) < w[0].chord(100.0) && w[1].angle() < w[0].angle());
         }
@@ -164,8 +164,8 @@ mod tests {
     /// closer to the surface, and the reference mesh the model reads never changes.
     #[test]
     fn each_level_has_its_own_plan_and_the_reference_mesh_stays() {
-        use solidcraft_geom::Vec3;
-        let body = solidcraft_kernel::cylinder(Vec3::ZERO, Vec3::Z, 20.0, 50.0).unwrap();
+        use polycore_geom::Vec3;
+        let body = polycore::cylinder(Vec3::ZERO, Vec3::Z, 20.0, 50.0).unwrap();
         let mb = crate::ModelBody::new("Body1".into(), body, 1);
         let reference = mb.mesh();
         let mut last = 0;
@@ -187,7 +187,7 @@ mod tests {
         }
         assert!(std::sync::Arc::ptr_eq(&reference, &mb.mesh()));
         assert_eq!(mb.display_plan_at(DisplayQuality::Normal).unwrap().vertex_count(), {
-            let plan = mb.body.display_plan_angular((mb.body.size() * 1e-3).max(1e-3), solidcraft_kernel::DISPLAY_ANGLE).unwrap();
+            let plan = mb.body.display_plan_angular((mb.body.size() * 1e-3).max(1e-3), polycore::DISPLAY_ANGLE).unwrap();
             plan.vertex_count()
         });
     }

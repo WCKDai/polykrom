@@ -2,8 +2,8 @@
 //! motion studies (joint values keyed along a timeline) and exploded views (occurrence moves
 //! shown without changing the design).
 
+use polycore_geom::Vec3;
 use serde::{Deserialize, Serialize};
-use solidcraft_geom::Vec3;
 
 /// The motion retained by an associative trace. Joint bounds keep their expressions, in
 /// command units (degrees or millimetres); studies are referenced by their stable identity.

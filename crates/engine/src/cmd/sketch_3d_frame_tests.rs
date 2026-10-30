@@ -1,7 +1,7 @@
 use crate::Session;
+use polycore_geom::Vec3;
 use polykrom_sketch::WireSpace;
 use serde_json::{Value, json};
-use solidcraft_geom::Vec3;
 
 fn run(s: &mut Session, cmd: &str, params: Value) -> Value {
     s.execute(cmd, &params).unwrap_or_else(|e| panic!("{cmd}: {e}"))
@@ -183,7 +183,7 @@ fn wire_frame_pipe_component_and_world_paths_have_analytic_volume_and_position()
         let body = world.bodies.last().unwrap();
         // Property measurement uses fine adaptive tessellation; the viewport mesh alone
         // undershoots a small circular profile by about 0.64% at its display chord tolerance.
-        let measure = solidcraft_kernel::measure(&body.body).unwrap();
+        let measure = polycore::measure(&body.body).unwrap();
         assert!((measure.volume - 40.0 * std::f64::consts::PI).abs() < 0.05, "{}", measure.volume);
         let bounds = body.mesh().bounds();
         near((bounds.min + bounds.max) / 2.0, Vec3::new(17.0, 32.0, 50.0));
@@ -244,7 +244,7 @@ fn wire_frame_cross_owner_sweep_follows_world_path_edit_undo_and_reopen() {
     let check = |s: &Session, length: f64| {
         let world = s.world_state();
         let body = world.bodies.last().unwrap();
-        let measure = solidcraft_kernel::measure(&body.body).unwrap();
+        let measure = polycore::measure(&body.body).unwrap();
         assert!((measure.volume - 4.0 * std::f64::consts::PI * length).abs() < 0.05, "{}", measure.volume);
         near(measure.centroid, Vec3::new(17.0, 32.0, 45.0 + length / 2.0));
     };
@@ -287,7 +287,7 @@ fn wire_frame_three_owner_sweep_profile_move_invalidates_warm_cache() {
         let state = session.world_state();
         let body = state.bodies.last().unwrap();
         assert_eq!(body.component, consumer["component"].as_u64().unwrap());
-        let result = solidcraft_kernel::measure(&body.body).unwrap();
+        let result = polycore::measure(&body.body).unwrap();
         assert!((result.volume - 40.0 * std::f64::consts::PI).abs() < 0.05, "{}", result.volume);
         near(result.centroid, Vec3::new(x, 7.0, 10.0));
         result

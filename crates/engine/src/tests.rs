@@ -113,10 +113,10 @@ fn join_extrude_from_a_chamfered_top_face() {
             assert!((solved.plane.origin.z - height).abs() < 1e-8);
             assert!(solved.sketch.links.iter().all(|link| link.auto_face && !link.lost));
             let body = &state.bodies[0];
-            assert!(body.body.contains(solidcraft_geom::Vec3::new(0., 0., height + 4.)));
-            assert!(!body.body.contains(solidcraft_geom::Vec3::new(0., 0., height + 6.)));
-            assert!(body.body.contains(solidcraft_geom::Vec3::new(10. - bevel - 0.5, 0., height + 4.)));
-            assert!(!body.body.contains(solidcraft_geom::Vec3::new(10. - bevel + 0.5, 0., height + 4.)));
+            assert!(body.body.contains(polycore_geom::Vec3::new(0., 0., height + 4.)));
+            assert!(!body.body.contains(polycore_geom::Vec3::new(0., 0., height + 6.)));
+            assert!(body.body.contains(polycore_geom::Vec3::new(10. - bevel - 0.5, 0., height + 4.)));
+            assert!(!body.body.contains(polycore_geom::Vec3::new(10. - bevel + 0.5, 0., height + 4.)));
         }
     }
 }
@@ -1032,7 +1032,7 @@ fn sample_edges_chain_and_faces() {
     let chain = m.tangent_chain(e, 2f64.to_radians());
     // The plate's top outline: 4 lines and 4 corner arcs (a boolean may leave an edge twice,
     // once per face; count distinct ones).
-    let mut mids: Vec<solidcraft_geom::Vec3> = Vec::new();
+    let mut mids: Vec<polycore_geom::Vec3> = Vec::new();
     for i in &chain {
         let p = &m.edges[*i];
         let mid = p[p.len() / 2];
@@ -1261,7 +1261,7 @@ fn step_insert_shell_and_errors() {
 }
 
 fn body_volume(st: &polykrom_doc::ModelState) -> f64 {
-    st.bodies.iter().map(|b| solidcraft_kernel::measure(&b.body).unwrap().volume).sum()
+    st.bodies.iter().map(|b| polycore::measure(&b.body).unwrap().volume).sum()
 }
 
 /// Deleting an inserted assembly frees its body names without leaving assembly ownership behind.
@@ -1413,7 +1413,7 @@ fn twisted_ruled_faces_are_meshed_to_the_chord_tolerance() {
     run(&mut s, "solid.loft", json!({"sections": [{"sketch": "Bottom"}, {"sketch": "Top"}], "operation": "new"}));
     let st = s.model.state();
     let body = &st.bodies.first().unwrap().body;
-    let exact = solidcraft_kernel::measure(body).unwrap().volume;
+    let exact = polycore::measure(body).unwrap().volume;
     let mesh = body.tessellate(0.05).unwrap();
     let volume: f64 = mesh
         .triangles
@@ -1461,7 +1461,7 @@ fn a_hole_position_of_expressions_follows_the_parameters() {
     run(&mut s, "solid.hole", json!({"position": [80, 10, 4], "clearance": "M5", "name": "Fixed"}));
     let centre_y = |s: &Session| {
         let st = s.model.state();
-        solidcraft_kernel::measure(&st.body("Plate").unwrap().body).unwrap().centroid.y
+        polycore::measure(&st.body("Plate").unwrap().body).unwrap().centroid.y
     };
     let hole = |s: &Session, name: &str| -> Value {
         let saved: Value = serde_json::from_str(&s.doc.to_json()).unwrap();
@@ -2004,15 +2004,15 @@ fn rolling_back_and_forward_leaves_no_projection_warnings() {
 }
 
 /// Export STEP, validate the file, read it back: no warnings, same volume, area and faces.
-fn step_round_trip(s: &mut Session, tag: &str) -> solidcraft_kernel::StepImport {
+fn step_round_trip(s: &mut Session, tag: &str) -> polycore::StepImport {
     let p = std::env::temp_dir().join(format!("solidcraft-steprt-{tag}-{}.step", std::process::id()));
     run(s, "file.export", json!({"path": p.to_string_lossy()}));
     let text = std::fs::read_to_string(&p).unwrap();
     let _ = std::fs::remove_file(&p);
-    solidcraft_kernel::step_validate(&text).unwrap();
-    assert_eq!(solidcraft_kernel::step_orientation_errors(&text).unwrap(), Vec::<String>::new());
+    polycore::step_validate(&text).unwrap();
+    assert_eq!(polycore::step_orientation_errors(&text).unwrap(), Vec::<String>::new());
     assert!(text.contains("AP242_MANAGED_MODEL_BASED_3D_ENGINEERING_MIM_LF"));
-    let imp = solidcraft_kernel::step_import(&text).unwrap();
+    let imp = polycore::step_import(&text).unwrap();
     assert!(imp.warnings.is_empty(), "{:?}", imp.warnings);
     imp
 }
@@ -2026,7 +2026,7 @@ fn sample_plate_step_round_trip() {
     assert_eq!(imp.bodies.len(), st.bodies.len());
     for (a, b) in st.bodies.iter().zip(&imp.bodies) {
         assert_eq!(a.name, b.name);
-        let (ma, mb) = (solidcraft_kernel::measure(&a.body).unwrap(), solidcraft_kernel::measure(&b.body).unwrap());
+        let (ma, mb) = (polycore::measure(&a.body).unwrap(), polycore::measure(&b.body).unwrap());
         assert!(rel(mb.volume, ma.volume) < 1e-4, "{} vs {}", mb.volume, ma.volume);
         assert!(rel(mb.area, ma.area) < 1e-4, "{} vs {}", mb.area, ma.area);
         assert!(b.file_faces <= a.body.face_count() && b.file_faces >= ma.merged.faces.min(a.body.face_count()));
@@ -2053,7 +2053,7 @@ fn material_and_appearance_colours_export_to_step() {
         (None, None) => true,
         _ => false,
     };
-    let check = |imp: &solidcraft_kernel::StepImport| {
+    let check = |imp: &polycore::StepImport| {
         for (name, c) in want {
             let b = imp.bodies.iter().find(|b| b.name == name).unwrap_or_else(|| panic!("no body {name}"));
             assert!(same(b.body.color(), c), "{name}: {:?} vs {c:?}", b.body.color());
@@ -2106,7 +2106,7 @@ fn iges_export_and_open() {
     run(&mut s, "solid.box", json!({"length": 40, "width": 30, "height": 5, "body_name": "Plate"}));
     run(&mut s, "solid.cylinder", json!({"radius": 4, "height": 20, "base": [10, 10, 5], "body_name": "Pin"}));
     run(&mut s, "appearance.assign", json!({"bodies": ["Pin"], "color": "#ff0000"}));
-    let want: Vec<f64> = s.world_state().bodies.iter().map(|b| solidcraft_kernel::measure(&b.body).unwrap().volume).collect();
+    let want: Vec<f64> = s.world_state().bodies.iter().map(|b| polycore::measure(&b.body).unwrap().volume).collect();
     let p = std::env::temp_dir().join(format!("solidcraft-iges-{}.igs", std::process::id()));
     run(&mut s, "file.export", json!({"path": p.to_string_lossy()}));
     let mut s2 = Session::default();
@@ -2116,7 +2116,7 @@ fn iges_export_and_open() {
     let names: Vec<&str> = st.bodies.iter().map(|b| b.name.as_str()).collect();
     assert_eq!(names, ["Plate", "Pin"]);
     for (b, v) in st.bodies.iter().zip(&want) {
-        assert!(rel(solidcraft_kernel::measure(&b.body).unwrap().volume, *v) < 1e-4);
+        assert!(rel(polycore::measure(&b.body).unwrap().volume, *v) < 1e-4);
     }
     assert_eq!(st.bodies[1].body.color(), Some([1.0, 0.0, 0.0]));
 }
@@ -2130,8 +2130,7 @@ fn split_body_by_a_face() {
     run(&mut s, "solid.cylinder", json!({"radius": 4, "height": 40, "base": [5, 10, -5], "body_name": "Tool"}));
     run(&mut s, "solid.split_body", json!({"body": "Block", "tool": {"body": "Tool", "point": [9, 10, 10]}}));
     let st = s.world_state();
-    let mut v: Vec<f64> =
-        st.bodies.iter().filter(|b| b.name.starts_with("Block")).map(|b| solidcraft_kernel::measure(&b.body).unwrap().volume).collect();
+    let mut v: Vec<f64> = st.bodies.iter().filter(|b| b.name.starts_with("Block")).map(|b| polycore::measure(&b.body).unwrap().volume).collect();
     v.sort_by(f64::total_cmp);
     let core = PI * 16.0 * 30.0;
     assert!(v.len() == 2 && rel(v[0], core) < 1e-3 && rel(v[1], 6000.0 - core) < 1e-3, "{v:?}");
@@ -2151,8 +2150,7 @@ fn split_body_by_a_sketch_line() {
     run(&mut s, "sketch.finish", json!({}));
     let volumes = |s: &Session| {
         let st = s.world_state();
-        let mut v: Vec<f64> =
-            st.bodies.iter().filter(|b| b.name.starts_with("Block")).map(|b| solidcraft_kernel::measure(&b.body).unwrap().volume).collect();
+        let mut v: Vec<f64> = st.bodies.iter().filter(|b| b.name.starts_with("Block")).map(|b| polycore::measure(&b.body).unwrap().volume).collect();
         v.sort_by(f64::total_cmp);
         v
     };
@@ -2187,12 +2185,12 @@ fn chord_and_variable_fillets() {
     run(&mut s, "solid.box", json!({"length": 10, "width": 20, "height": 30, "body_name": "B"}));
     run(&mut s, "solid.fillet", json!({"edges": [[10, 10, 30]], "radius": 4, "type": "chord"}));
     let r = 4.0 / 2f64.sqrt();
-    let v = solidcraft_kernel::measure(&s.world_state().body("B").unwrap().body).unwrap().volume;
+    let v = polycore::measure(&s.world_state().body("B").unwrap().body).unwrap().volume;
     assert!(rel(v, 6000.0 - (1.0 - PI / 4.0) * r * r * 20.0) < 1e-4, "{v}");
     let mut s = Session::default();
     run(&mut s, "solid.box", json!({"length": 10, "width": 20, "height": 30, "body_name": "B"}));
     run(&mut s, "solid.fillet", json!({"edges": [[10, 10, 30]], "radius": 2, "type": "variable", "radius2": 5, "start": [10, 0, 30]}));
-    let v = solidcraft_kernel::measure(&s.world_state().body("B").unwrap().body).unwrap().volume;
+    let v = polycore::measure(&s.world_state().body("B").unwrap().body).unwrap().volume;
     let removed = (1.0 - PI / 4.0) * 20.0 * (4.0 + 10.0 + 25.0) / 3.0;
     assert!(rel(v, 6000.0 - removed) < 1e-4, "{v}");
     assert!(s.execute("solid.fillet", &json!({"edges": [[10, 10, 30]], "radius": 2, "type": "variable"})).is_err());
@@ -2200,7 +2198,7 @@ fn chord_and_variable_fillets() {
     let mut s = Session::default();
     run(&mut s, "solid.box", json!({"length": 10, "width": 20, "height": 30, "body_name": "B"}));
     run(&mut s, "solid.fillet", json!({"edges": [[10, 10, 30]], "radius": 4, "type": "variable", "radius2": 0, "start": [10, 0, 30]}));
-    let v = solidcraft_kernel::measure(&s.world_state().body("B").unwrap().body).unwrap().volume;
+    let v = polycore::measure(&s.world_state().body("B").unwrap().body).unwrap().volume;
     assert!(rel(v, 6000.0 - (1.0 - PI / 4.0) * 20.0 * 16.0 / 3.0) < 1e-4, "{v}");
     // A radius through a middle point (a user parameter), straight between: 2 → 4 → 2.
     let mut s = Session::default();
@@ -2211,7 +2209,7 @@ fn chord_and_variable_fillets() {
         "solid.fillet",
         json!({"edges": [[10, 10, 30]], "radius": 2, "type": "variable", "radius2": 2, "start": [10, 0, 30], "mid": [[0.5, "waist"]]}),
     );
-    let vol = |s: &Session| solidcraft_kernel::measure(&s.world_state().body("B").unwrap().body).unwrap().volume;
+    let vol = |s: &Session| polycore::measure(&s.world_state().body("B").unwrap().body).unwrap().volume;
     let removed = 2.0 * (1.0 - PI / 4.0) * 10.0 * (4.0 + 8.0 + 16.0) / 3.0;
     assert!(rel(vol(&s), 6000.0 - removed) < 1e-4, "{}", vol(&s));
     // The middle radius follows its parameter.
@@ -2235,21 +2233,17 @@ fn components_export_as_step_assembly() {
     run(&mut s, "component.create", json!({"name": "Pin"}));
     run(&mut s, "solid.cylinder", json!({"radius": 2, "height": 10, "base": [5, 5, 5]}));
     run(&mut s, "occurrence.copy", json!({"component": "Pin", "translate": [20, 0, 0]}));
-    let want: f64 = s.world_state().bodies.iter().map(|b| solidcraft_kernel::measure(&b.body).unwrap().volume).sum();
+    let want: f64 = s.world_state().bodies.iter().map(|b| polycore::measure(&b.body).unwrap().volume).sum();
     let imp = step_round_trip(&mut s, "asm");
     assert_eq!(imp.bodies.len(), 3, "{:?}", imp.bodies.iter().map(|b| &b.name).collect::<Vec<_>>());
-    let got: f64 = imp.bodies.iter().map(|b| solidcraft_kernel::measure(&b.body).unwrap().volume).sum();
+    let got: f64 = imp.bodies.iter().map(|b| polycore::measure(&b.body).unwrap().volume).sum();
     assert!(rel(got, want) < 1e-4, "{got} vs {want}");
     let root = &imp.tree[0];
     assert_eq!(root.children.len(), 2);
     assert!(root.children.iter().all(|c| c.name == "Pin"));
     // The second pin sits 20 mm along X from the first.
-    let xs: Vec<f64> = imp
-        .bodies
-        .iter()
-        .filter(|b| b.path.last().is_some_and(|p| p == "Pin"))
-        .map(|b| solidcraft_kernel::measure(&b.body).unwrap().centroid.x)
-        .collect();
+    let xs: Vec<f64> =
+        imp.bodies.iter().filter(|b| b.path.last().is_some_and(|p| p == "Pin")).map(|b| polycore::measure(&b.body).unwrap().centroid.x).collect();
     assert_eq!(xs.len(), 2);
     assert!(((xs[0] - xs[1]).abs() - 20.0).abs() < 1e-6, "{xs:?}");
 }
@@ -2341,7 +2335,7 @@ fn cached_evaluation_matches_from_scratch() {
             st.bodies
                 .iter()
                 .map(|b| {
-                    let m = solidcraft_kernel::measure(&b.body).unwrap();
+                    let m = polycore::measure(&b.body).unwrap();
                     // Volume and area to 1e-9: two evaluations from scratch differ in the last
                     // bits too (the kernel's tessellation is not bit-for-bit repeatable).
                     (b.name.clone(), b.feature, (m.volume * 1e6).round(), (m.area * 1e6).round(), m.faces, m.edges, m.vertices, m.merged.faces)
@@ -2358,9 +2352,8 @@ fn cached_evaluation_matches_from_scratch() {
     let mut b = polykrom_doc::Model::new();
     b.no_cache = true;
     b.evaluate(&s.doc);
-    let vols = |m: &polykrom_doc::Model| {
-        m.state().bodies.iter().map(|x| (solidcraft_kernel::measure(&x.body).unwrap().volume * 1e6).round()).collect::<Vec<_>>()
-    };
+    let vols =
+        |m: &polykrom_doc::Model| m.state().bodies.iter().map(|x| (polycore::measure(&x.body).unwrap().volume * 1e6).round()).collect::<Vec<_>>();
     assert_eq!(vols(&a), vols(&b));
     same(&s, "built");
     let hits = |s: &Session| s.model.cache.lock().map(|c| c.hits).unwrap_or(0);
@@ -3179,7 +3172,7 @@ fn combine_keep_tools_and_new_component() {
     assert!(st.body("B").is_some(), "the tool is kept");
     let a = st.body("A").unwrap();
     assert_eq!(s.doc.body_component("A", a.feature), comp);
-    assert!(rel(solidcraft_kernel::measure(&a.body).unwrap().volume, 4000.0) < 1e-9);
+    assert!(rel(polycore::measure(&a.body).unwrap().volume, 4000.0) < 1e-9);
 }
 
 /// Align with snap points: a box's vertex onto another's face centre, an edge midpoint onto a
@@ -4133,7 +4126,7 @@ fn renaming_a_targeted_threaded_body_evaluates_nothing() {
     run(&mut s, "solid.box", json!({"length": 4, "width": 20, "height": 4, "corner": [2, -10, 16], "operation": "cut", "targets": ["Shaft"]}));
     let looks = |st: &polykrom_doc::ModelState| {
         let mut bodies: Vec<(String, u64)> =
-            st.bodies.iter().map(|b| (b.name.clone(), (solidcraft_kernel::measure(&b.body).unwrap().volume * 1e6).round() as u64)).collect();
+            st.bodies.iter().map(|b| (b.name.clone(), (polycore::measure(&b.body).unwrap().volume * 1e6).round() as u64)).collect();
         bodies.sort();
         (bodies, st.threads.iter().map(|t| t.body.clone()).collect::<Vec<_>>())
     };

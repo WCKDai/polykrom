@@ -55,7 +55,7 @@ pub fn bind_with_fallback(first: u16, tries: u16) -> Result<std::net::TcpListene
 
 /// The folder of the token files: `<data folder>/control` (`SOLIDCRAFT_CONTROL_DIR` replaces it).
 fn control_dir() -> Option<PathBuf> {
-    match solidcraft_geom::env::var_os("CONTROL_DIR").filter(|d| !d.is_empty()) {
+    match polycore_geom::env::var_os("CONTROL_DIR").filter(|d| !d.is_empty()) {
         Some(d) => Some(PathBuf::from(d)),
         None => Some(crate::recovery::data_dir()?.join("control")),
     }
@@ -101,7 +101,7 @@ pub fn remove_current_port(port: u16) {
 /// A token set on purpose with `SOLIDCRAFT_CONTROL_TOKEN` (test harnesses, sandboxed packages
 /// whose data folder the client can't see), if it is long enough.
 pub fn env_token() -> Option<String> {
-    solidcraft_geom::env::var("CONTROL_TOKEN").map(|t| t.trim().to_string()).filter(|t| t.len() >= MIN_TOKEN_LEN)
+    polycore_geom::env::var("CONTROL_TOKEN").map(|t| t.trim().to_string()).filter(|t| t.len() >= MIN_TOKEN_LEN)
 }
 
 /// The token a client sends to the app on `port`: `explicit` (`--token`), else

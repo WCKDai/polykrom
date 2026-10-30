@@ -3,8 +3,8 @@
 //! sketch's own geometry. Round items report their diameter and radius, and a pair with a
 //! round item measures from its centre or axis, with the closest and farthest distances too.
 
+use polycore_geom::{UnitVec3, Vec3};
 use serde_json::{Value, json};
-use solidcraft_geom::{UnitVec3, Vec3};
 
 use std::f64::consts::{PI, TAU};
 
@@ -267,9 +267,9 @@ impl Slot {
 /// sides. `arcs` are (centre, radius, swept angle) with pieces of one end already merged,
 /// `lines` the straight pieces (2D, in the sketch plane).
 pub(crate) fn slot_outline(
-    arcs: &[(solidcraft_geom::Vec2, f64, f64)],
-    lines: &[(solidcraft_geom::Vec2, solidcraft_geom::Vec2)],
-) -> Option<(solidcraft_geom::Vec2, solidcraft_geom::Vec2, f64)> {
+    arcs: &[(polycore_geom::Vec2, f64, f64)],
+    lines: &[(polycore_geom::Vec2, polycore_geom::Vec2)],
+) -> Option<(polycore_geom::Vec2, polycore_geom::Vec2, f64)> {
     let [(c1, r1, s1), (c2, r2, s2)] = arcs else { return None };
     let tol = 1e-6 * (1.0 + r1.abs() + c1.dist(*c2));
     if (r1 - r2).abs() > tol || (s1.abs() - PI).abs() > 1e-4 || (s2.abs() - PI).abs() > 1e-4 || c1.dist(*c2) <= tol || lines.is_empty() {
@@ -277,7 +277,7 @@ pub(crate) fn slot_outline(
     }
     let along = (*c2 - *c1).normalized()?;
     // Every straight piece runs along the slot, `r` to one side of the centre line.
-    let side = |p: solidcraft_geom::Vec2| (p - *c1).cross(along);
+    let side = |p: polycore_geom::Vec2| (p - *c1).cross(along);
     let ok = lines.iter().all(|(a, b)| {
         let d = *b - *a;
         d.cross(along).abs() <= tol * (1.0 + d.len()) && (side(*a).abs() - r1).abs() <= tol && (side(*b).abs() - r1).abs() <= tol
@@ -289,8 +289,8 @@ pub(crate) fn slot_outline(
 /// A slot cut or boss on a solid, found from one of its half-cylinder ends: another half
 /// cylinder of the same radius on a parallel axis, bulging the other way, and two planes along
 /// the slot `r` either side of its centre line. `faces` gives each face's surface and points.
-pub(crate) fn slot_from_faces(picked: &Shape, picked_pts: &[Vec3], faces: &[(solidcraft_kernel::FaceSurface, Vec<Vec3>)]) -> Option<Slot> {
-    use solidcraft_kernel::FaceSurface;
+pub(crate) fn slot_from_faces(picked: &Shape, picked_pts: &[Vec3], faces: &[(polycore::FaceSurface, Vec<Vec3>)]) -> Option<Slot> {
+    use polycore::FaceSurface;
     let Shape::Round { center, axis, radius, angle, planar: false, .. } = *picked else { return None };
     if (angle - PI).abs() > 0.3 {
         return None;
@@ -338,7 +338,7 @@ pub(crate) fn slot_from_faces(picked: &Shape, picked_pts: &[Vec3], faces: &[(sol
 #[cfg(test)]
 mod tests {
     use super::*;
-    use solidcraft_geom::Vec2;
+    use polycore_geom::Vec2;
 
     fn circle(c: Vec3, r: f64) -> Shape {
         Shape::Round { center: c, axis: UnitVec3::Z, radius: r, angle: TAU, planar: true, lo: 0.0, hi: 0.0 }

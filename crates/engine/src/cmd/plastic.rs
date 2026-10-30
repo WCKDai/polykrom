@@ -1,12 +1,12 @@
 //! Plastic (enclosure) features: Boss, Lip / Groove, Snap Fit and Rest, and plastic rules.
 
+use polycore_geom::Vec3;
 use polykrom_doc::BodyName;
 use polykrom_doc::FeatureKind;
 use polykrom_doc::expr::Kind;
 use polykrom_doc::plastic::PlasticRule;
 use polykrom_doc::{Dir, FacePick, Position};
 use serde_json::{Value, json};
-use solidcraft_geom::Vec3;
 
 use super::CommandSpec;
 use super::features::{add_feature, check_expr};
@@ -269,7 +269,7 @@ fn snap_fit(s: &mut Session, p: &Value) -> Result<Value> {
 
 #[cfg(test)]
 mod tests {
-    use solidcraft_geom::Vec3;
+    use polycore_geom::Vec3;
     use std::f64::consts::PI;
 
     use serde_json::{Value, json};
@@ -345,9 +345,9 @@ mod tests {
                 for groove in [false, true] {
                     let mut s = Session::default();
                     let plane = if tilted {
-                        solidcraft_geom::Plane::new(Vec3::new(7., -3., 5.), Vec3::new(1., -1., 0.), Vec3::new(1., 1., -2.)).unwrap()
+                        polycore_geom::Plane::new(Vec3::new(7., -3., 5.), Vec3::new(1., -1., 0.), Vec3::new(1., 1., -2.)).unwrap()
                     } else {
-                        solidcraft_geom::Plane::XY
+                        polycore_geom::Plane::XY
                     };
                     if obround {
                         run(&mut s, "sketch.create", json!({"plane": plane, "name": "Rim"}));
@@ -373,7 +373,7 @@ mod tests {
                     let check = |s: &Session| {
                         let st = s.model.state();
                         let body = &st.body("Case").unwrap().body;
-                        let m = solidcraft_kernel::measure(body).unwrap();
+                        let m = polycore::measure(body).unwrap();
                         assert!(
                             (m.volume - want).abs() < 0.1,
                             "obround={obround} tilted={tilted} outside={outside} groove={groove}: {} vs {want}",
@@ -478,7 +478,7 @@ mod tests {
             let after = &session.model.result(feature.id).unwrap().state;
             let old = before.body("Case").unwrap();
             let body = after.body("Case").unwrap();
-            let added = solidcraft_kernel::measure(&body.body).unwrap().volume - solidcraft_kernel::measure(&old.body).unwrap().volume;
+            let added = polycore::measure(&body.body).unwrap().volume - polycore::measure(&old.body).unwrap().volume;
             // Rectangular arm + triangular catch; the small attachment overlap lies inside the wall.
             assert!((added - (8. * 1.2 + 0.8 * 1.5 / 2.) * 6.).abs() < 0.05, "{added}");
             let mesh = body.mesh();

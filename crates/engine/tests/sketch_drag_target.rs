@@ -2,8 +2,8 @@
 #[path = "support/four_bar.rs"]
 mod four_bar;
 
+use polycore_geom::Vec2;
 use serde_json::json;
-use solidcraft_geom::Vec2;
 
 fn drag(s: &mut polykrom_engine::Session, target: Vec2) {
     let from = four_bar::point(s, "crank.end").unwrap();

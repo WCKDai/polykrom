@@ -1,7 +1,7 @@
 //! 2D drawing exchange for sketches: DXF (ASCII, read and write) and SVG (read). Readers produce
 //! plain 2D geometry in millimetres; the engine turns it into sketch curves.
 
-use solidcraft_geom::Vec2;
+use polycore_geom::Vec2;
 
 /// One imported 2D entity (millimetres, y up).
 #[derive(Clone, Debug, PartialEq)]

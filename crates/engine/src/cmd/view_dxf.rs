@@ -10,10 +10,10 @@ mod projection;
 #[path = "view_dxf_sketch.rs"]
 pub(super) mod sketch;
 
+use polycore_geom::Vec2;
 use polykrom_io::{DxfEntity, DxfLayer, DxfLinetype, DxfShape};
 use polykrom_render::Camera;
 use serde_json::{Value, json};
-use solidcraft_geom::Vec2;
 
 use super::CommandSpec;
 use crate::params::{bad, str_};

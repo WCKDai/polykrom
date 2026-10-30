@@ -3,9 +3,9 @@
 //! belong to their feature's component unless moved; occurrences place components (instances
 //! share contents, "paste new" copies them) and can be grounded and moved.
 
+use polycore_geom::Vec3;
 use polykrom_doc::{FeatureKind, Mat, Occurrence};
 use serde_json::{Value, json};
-use solidcraft_geom::Vec3;
 
 use super::CommandSpec;
 use crate::params::{bad, bool_, str_, string_list, vec3};

@@ -2,8 +2,8 @@
 //! a line and a circle or arc measures the gap to the edge (or how far the edge reaches past a
 //! line that cuts it), drives it, follows its parameter, and survives undo and reopening.
 
+use polycore_geom::Vec2;
 use serde_json::{Value, json};
-use solidcraft_geom::Vec2;
 
 use crate::Session;
 

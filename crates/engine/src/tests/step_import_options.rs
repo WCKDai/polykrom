@@ -1,9 +1,9 @@
 //! STEP files written by other CAD systems: Y up (`up`) and the names of the bodies (`names`)
 //! on `file.insert_step` and `doc.open`.
 
+use polycore::{ExportBody, ExportProduct, StepHeader, box_solid, step_export_products};
+use polycore_geom::Vec3;
 use serde_json::{Value, json};
-use solidcraft_geom::Vec3;
-use solidcraft_kernel::{ExportBody, ExportProduct, StepHeader, box_solid, step_export_products};
 
 use super::run;
 use crate::*;

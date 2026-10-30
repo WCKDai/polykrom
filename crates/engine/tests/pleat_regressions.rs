@@ -12,7 +12,7 @@ fn replay(script: &str) -> Session {
 }
 
 fn volume(s: &Session, body: &str) -> f64 {
-    s.model.state().body(body).map(|b| solidcraft_kernel::measure(&b.body).unwrap().volume).unwrap_or(0.0)
+    s.model.state().body(body).map(|b| polycore::measure(&b.body).unwrap().volume).unwrap_or(0.0)
 }
 
 /// #1669: an Extrude Cut whose profile stops 0.25 mm short of the far face of a 3.75 mm wall

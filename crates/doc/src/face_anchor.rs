@@ -2,9 +2,9 @@
 //! fallback is an extrude cap whose sketch loop changed (`Document::anchored_face_indices`).
 use crate::config::ConfigFaceTarget;
 use crate::{DocError, Document, EmbossFace, FeatureKind, Model, ModelBody, ModelState, PlaneRef, Result};
+use polycore_geom::Plane;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use solidcraft_geom::Plane;
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -231,8 +231,8 @@ impl Document {
             Err(error) => error,
         };
         let Some(crate::config::FaceCertificate::ExtrudeCap { sketch, high, outer, holes }) = &target.certificate else { return Err(error) };
-        let exact = |source: &Option<solidcraft_kernel::FaceSource>| {
-            matches!(source, Some(solidcraft_kernel::FaceSource::CertifiedExtrudeCap { producer, sketch: from, high: end, outer: around, holes: inside, .. })
+        let exact = |source: &Option<polycore::FaceSource>| {
+            matches!(source, Some(polycore::FaceSource::CertifiedExtrudeCap { producer, sketch: from, high: end, outer: around, holes: inside, .. })
                 if *producer == target.origin_feature && from == sketch && end == high && around == outer && inside == holes)
         };
         if state.bodies.iter().any(|other| other.body.face_sources().is_some_and(|sources| sources.iter().any(exact))) {
@@ -247,7 +247,7 @@ impl Document {
         // The producer's caps at that end, grouped by the loop each was made from.
         let mut caps: std::collections::BTreeMap<&Vec<String>, Vec<usize>> = std::collections::BTreeMap::new();
         for (index, source) in body.body.face_sources().into_iter().flatten().enumerate() {
-            if let Some(solidcraft_kernel::FaceSource::CertifiedExtrudeCap { producer, sketch: from, high: end, outer: around, .. }) = source
+            if let Some(polycore::FaceSource::CertifiedExtrudeCap { producer, sketch: from, high: end, outer: around, .. }) = source
                 && *producer == target.origin_feature
                 && from == sketch
                 && end == high
@@ -446,7 +446,7 @@ pub fn validate_face_anchors_json(value: &Value) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use solidcraft_geom::Vec3;
+    use polycore_geom::Vec3;
     fn fixture() -> (Document, ModelBody, usize, Plane) {
         let mut doc = Document::default();
         let kind: FeatureKind =
@@ -454,7 +454,7 @@ mod tests {
         let id = doc.add_feature(kind, Some("Base")).unwrap();
         let body = ModelBody::new(
             "Base".into(),
-            solidcraft_kernel::box_solid(Vec3::default(), Vec3::new(10., 10., 10.)).unwrap().with_box_certificate(id).unwrap(),
+            polycore::box_solid(Vec3::default(), Vec3::new(10., 10., 10.)).unwrap().with_box_certificate(id).unwrap(),
             id,
         );
         let index = body
@@ -462,7 +462,7 @@ mod tests {
             .face_sources()
             .unwrap()
             .iter()
-            .position(|source| matches!(source, Some(solidcraft_kernel::FaceSource::Box { axis: 2, high: true, .. })))
+            .position(|source| matches!(source, Some(polycore::FaceSource::Box { axis: 2, high: true, .. })))
             .unwrap();
         let canonical = body.body.face_plane(index).unwrap();
         let picked = Plane::new(canonical.origin + canonical.x * 2. + canonical.y * 3., canonical.y, -canonical.x).unwrap();
@@ -485,10 +485,7 @@ mod tests {
         assert!((initial.x - picked.x).len() < 1e-9);
         state.bodies[0] = ModelBody::new(
             "Base".into(),
-            solidcraft_kernel::box_solid(Vec3::default(), Vec3::new(10., 10., 20.))
-                .unwrap()
-                .with_box_certificate(anchor.target.origin_feature)
-                .unwrap(),
+            polycore::box_solid(Vec3::default(), Vec3::new(10., 10., 20.)).unwrap().with_box_certificate(anchor.target.origin_feature).unwrap(),
             anchor.target.origin_feature,
         );
         let changed = doc.resolve_face_anchor(&anchor, 0, &state).unwrap();
@@ -496,18 +493,13 @@ mod tests {
         assert!((changed.origin.x - initial.origin.x).abs() < 1e-9);
         state.bodies[0] = ModelBody::new(
             "Control".into(),
-            solidcraft_kernel::box_solid(Vec3::default(), Vec3::new(10., 10., 30.))
-                .unwrap()
-                .with_box_certificate(anchor.target.origin_feature)
-                .unwrap(),
+            polycore::box_solid(Vec3::default(), Vec3::new(10., 10., 30.)).unwrap().with_box_certificate(anchor.target.origin_feature).unwrap(),
             anchor.target.origin_feature,
         );
         assert!(doc.resolve_face_anchor(&anchor, 0, &state).is_err());
         state.bodies[0].name = "Base".into();
-        state.bodies[0].body = solidcraft_kernel::box_solid(Vec3::default(), Vec3::new(10., 10., 30.))
-            .unwrap()
-            .with_box_certificate(anchor.target.origin_feature + 1)
-            .unwrap();
+        state.bodies[0].body =
+            polycore::box_solid(Vec3::default(), Vec3::new(10., 10., 30.)).unwrap().with_box_certificate(anchor.target.origin_feature + 1).unwrap();
         assert!(doc.resolve_face_anchor(&anchor, 0, &state).is_err(), "reused name cannot replace the producer");
     }
     #[test]
@@ -535,7 +527,7 @@ mod tests {
     }
     #[test]
     fn extrude_cap_profile_reordering_never_retargets_an_ordinal_body() {
-        use solidcraft_geom::Vec2;
+        use polycore_geom::Vec2;
         let mut sketch = polykrom_sketch::Sketch::new();
         for offset in [0., 30.] {
             let points: Vec<_> = [(0., 0.), (10., 0.), (10., 10.), (0., 10.)]
@@ -568,7 +560,7 @@ mod tests {
         assert_eq!(state.bodies.len(), 2);
         let solved = state.sketch(source).unwrap();
         let regions = crate::select_profiles(solved, &crate::ProfileSel::All).unwrap();
-        let raw = solidcraft_kernel::extrude(&solved.plane, &regions, 0., 10.).unwrap();
+        let raw = polycore::extrude(&solved.plane, &regions, 0., 10.).unwrap();
         assert!(
             crate::config::extrude_cap_bindings(solved, &raw, 0).is_none(),
             "exhausted certification work must leave the complete producer uncertified"
@@ -585,7 +577,7 @@ mod tests {
             .face_sources()
             .unwrap()
             .iter()
-            .position(|source| matches!(source, Some(solidcraft_kernel::FaceSource::CertifiedExtrudeCap { high: true, .. })))
+            .position(|source| matches!(source, Some(polycore::FaceSource::CertifiedExtrudeCap { high: true, .. })))
             .unwrap();
         let picked = body.body.face_plane(index).unwrap();
         let anchor = doc.capture_face_anchor(body, index, &picked, &[], 0, &[]).unwrap();
@@ -628,7 +620,7 @@ mod tests {
     }
     #[test]
     fn warm_root_body_offset_edit_matches_cold_attached_sketch_and_downstream_bounds() {
-        use solidcraft_geom::Vec2;
+        use polycore_geom::Vec2;
         let (mut doc, _, _, _) = fixture();
         let mut warm = Model::new();
         warm.evaluate(&doc);
@@ -639,7 +631,7 @@ mod tests {
             .face_sources()
             .unwrap()
             .iter()
-            .position(|source| matches!(source, Some(solidcraft_kernel::FaceSource::Box { axis: 2, high: true, .. })))
+            .position(|source| matches!(source, Some(polycore::FaceSource::Box { axis: 2, high: true, .. })))
             .unwrap();
         let picked = body.body.face_plane(index).unwrap();
         let anchor = doc.capture_face_anchor(body, index, &picked, &[], 0, &[]).unwrap();

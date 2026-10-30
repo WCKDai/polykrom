@@ -3,7 +3,7 @@
 //! out, so every answer is the one a scan of all triangles gives; `work` counts the triangles
 //! actually tested, which is what the contact budgets limit.
 
-use solidcraft_geom::{Aabb3, Vec3};
+use polycore_geom::{Aabb3, Vec3};
 
 /// Triangles per leaf.
 const LEAF: usize = 8;

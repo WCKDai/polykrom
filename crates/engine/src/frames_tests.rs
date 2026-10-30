@@ -1,8 +1,8 @@
 //! Components as frames: what a component holds moves with its occurrence, and picks in the
 //! world land in the component's own frame (user bug #4).
 
+use polycore_geom::Vec3;
 use serde_json::{Value, json};
-use solidcraft_geom::Vec3;
 
 use crate::Session;
 

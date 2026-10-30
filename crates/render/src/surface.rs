@@ -3,7 +3,7 @@
 
 use std::f64::consts::PI;
 
-use solidcraft_geom::Vec3;
+use polycore_geom::Vec3;
 
 /// Lowest admitted perceptual roughness. Perfect delta mirrors need another integrator.
 pub const MIN_ROUGHNESS: f64 = 0.045;
