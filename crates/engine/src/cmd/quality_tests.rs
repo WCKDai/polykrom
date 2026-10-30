@@ -20,7 +20,7 @@ fn constrained_box() -> Session {
     let lines: Vec<String> = r["curves"].as_array().unwrap().iter().map(|v| v.as_str().unwrap().to_string()).collect();
     let sketch = s.doc.sketch(s.active_sketch.unwrap()).unwrap();
     let start = match sketch.curves[0].kind {
-        solidcraft_sketch::CurveKind::Line { a, .. } => sketch.points[a].id.clone(),
+        polykrom_sketch::CurveKind::Line { a, .. } => sketch.points[a].id.clone(),
         _ => panic!("rectangle has a line"),
     };
     run(&mut s, "sketch.constraint.coincident", json!({"a": start, "b": "origin"}));

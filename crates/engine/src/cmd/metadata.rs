@@ -1,11 +1,11 @@
 //! Design properties (#1015): `document.metadata` reads the design's `metadata` object, and
 //! `document.metadata.set` and `document.metadata.remove` change it, each in one undo step. The
-//! keys Polykrom reads, and the checks a change gets, are `solidcraft_doc::metadata`'s; keys
+//! keys Polykrom reads, and the checks a change gets, are `polykrom_doc::metadata`'s; keys
 //! other tools wrote are kept as they are. The UI's Design Properties dialog, scripts and MCP
 //! agents all go through these commands.
 
+use polykrom_doc::metadata::{MAX_KEYS, WELL_KNOWN};
 use serde_json::{Map, Value, json};
-use solidcraft_doc::metadata::{MAX_KEYS, WELL_KNOWN};
 
 use super::CommandSpec;
 use crate::params::{bad, str_};
@@ -176,7 +176,7 @@ mod tests {
             "org.printfarm": {"slicer_profile": "PETG-0.2"},
             "future_key": ["kept"],
         });
-        let mut design: Value = serde_json::from_str(&solidcraft_doc::Document::new("Foreign").to_json()).unwrap();
+        let mut design: Value = serde_json::from_str(&polykrom_doc::Document::new("Foreign").to_json()).unwrap();
         design["metadata"] = foreign.clone();
         let plain = dir.join("foreign.json");
         std::fs::write(&plain, serde_json::to_string_pretty(&design).unwrap()).unwrap();
@@ -206,17 +206,17 @@ mod tests {
     fn a_design_without_properties_saves_as_before() {
         let mut s = Session::default();
         run(&mut s, "solid.box", json!({"length": 10, "width": 10, "height": 10}));
-        let before = solidcraft_io::write_design(&s.doc);
+        let before = polykrom_io::write_design(&s.doc);
         run(&mut s, "document.metadata.set", json!({"key": "author", "value": "Jane"}));
         run(&mut s, "document.metadata.remove", json!({"key": "author"}));
-        assert_eq!(solidcraft_io::write_design(&s.doc), before, "byte for byte");
+        assert_eq!(polykrom_io::write_design(&s.doc), before, "byte for byte");
         assert!(!String::from_utf8_lossy(&before).contains("\"metadata\""));
     }
 
     #[test]
     fn exports_carry_the_properties_and_never_other_tools_keys() {
         // `file.export` hands the design's properties to the writers; the mapping itself is
-        // tested in solidcraft-io.
+        // tested in polykrom-io.
         let dir = scratch("export");
         let mut s = Session::default();
         run(&mut s, "solid.box", json!({"length": 10, "width": 10, "height": 10}));
@@ -238,7 +238,7 @@ mod tests {
         assert!(step.contains("('Jane Doe'),('ACME')"), "{}", &step[..400]);
         let iges = String::from_utf8(text(&mut s, "part.igs")).unwrap();
         assert!(iges.contains("8HJane Doe") && iges.contains("4HACME"), "{}", &iges[..600]);
-        // 3MF model metadata is checked where it is written (solidcraft-io); here: it exports.
+        // 3MF model metadata is checked where it is written (polykrom-io); here: it exports.
         assert!(!text(&mut s, "part.3mf").is_empty());
         for out in [step.as_bytes(), iges.as_bytes()] {
             let found = |needle: &str| out.windows(needle.len()).any(|w| w == needle.as_bytes());

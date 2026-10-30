@@ -1,7 +1,7 @@
 //! Per-document, transient render ownership. Captured scenes remain immutable when CAD edits
 //! continue; callers get the captured revision and must never present it as a newer scene.
 
-use solidcraft_render::{
+use polykrom_render::{
     ExecutorDescriptor,
     job::{CpuHost, ErrorCode, JobError, JobHandle, JobId, JobStatus, Phase, RenderFrame},
 };
@@ -80,8 +80,8 @@ impl Jobs {
     pub(crate) fn start(
         &mut self,
         revision: u64,
-        scene: solidcraft_render::ProductScene,
-        request: solidcraft_render::job::ImageRequest,
+        scene: polykrom_render::ProductScene,
+        request: polykrom_render::job::ImageRequest,
         replace: bool,
     ) -> Result<JobStatus, JobError> {
         self.collect()?;
@@ -161,15 +161,15 @@ impl crate::Session {
         if let Some(d) = &descriptor {
             backend.executors.push(d.clone());
         }
-        solidcraft_render::resolve_request(
+        polykrom_render::resolve_request(
             &[backend],
-            &solidcraft_render::RenderRequest {
+            &polykrom_render::RenderRequest {
                 backend: None,
-                mode: solidcraft_render::RenderMode::Preview,
-                operation: solidcraft_render::RenderOperation::Image,
+                mode: polykrom_render::RenderMode::Preview,
+                operation: polykrom_render::RenderOperation::Image,
                 width: 1,
                 height: 1,
-                format: Some(solidcraft_render::RenderFormat::Png),
+                format: Some(polykrom_render::RenderFormat::Png),
                 features: Vec::new(),
                 policy: Default::default(),
             },

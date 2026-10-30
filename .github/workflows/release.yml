@@ -95,7 +95,7 @@ jobs:
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           key: release-icons
-      - run: cargo build --release --locked -p solidcraft-cli
+      - run: cargo build --release --locked -p polykrom-cli
       - run: |
           . packaging/env.sh
           make_icons target/release/polykrom-cli icons

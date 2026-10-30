@@ -51,7 +51,7 @@ fn named<'a>(faces: &'a [(Option<String>, Vec3, Option<f64>)], name: &str) -> Ve
 
 /// The point on the face with this name, as a command taking a face name finds it.
 fn point(s: &Session, name: &str) -> Vec3 {
-    solidcraft_doc::naming::named_face_point(&s.model.state(), None, name).unwrap_or_else(|e| panic!("{name}: {e}"))
+    polykrom_doc::naming::named_face_point(&s.model.state(), None, name).unwrap_or_else(|e| panic!("{name}: {e}"))
 }
 
 #[test]
@@ -109,6 +109,6 @@ fn a_flanges_sheet_names_hold_when_another_flange_goes() {
     assert!((after.x - 319.0).abs() < 1e-3 && (after.z - before.z).abs() < 16.0, "{before:?} {after:?}");
     // The names of the flanges that went are gone; asking for one says so.
     let gone = format!("sheet:Body1:F{fb}.0:top");
-    assert!(solidcraft_doc::naming::named_face_point(&s.model.state(), None, &gone).is_err());
-    assert!(solidcraft_doc::naming::named_face_point(&s.model.state(), Some("Body2"), &right).is_err());
+    assert!(polykrom_doc::naming::named_face_point(&s.model.state(), None, &gone).is_err());
+    assert!(polykrom_doc::naming::named_face_point(&s.model.state(), Some("Body2"), &right).is_err());
 }

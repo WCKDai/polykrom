@@ -13,8 +13,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
+use polykrom_doc::{DesignLink, Document, FeatureKind, ModelBody, ModelState};
 use serde_json::{Value, json};
-use solidcraft_doc::{DesignLink, Document, FeatureKind, ModelBody, ModelState};
 use solidcraft_geom::Vec3;
 
 use super::{absolute, component_key, resolve, session_bodies, stored};
@@ -44,7 +44,7 @@ fn same_solid(a: &solidcraft_kernel::Body, b: &solidcraft_kernel::Body) -> Resul
 }
 
 /// Whether two bodies are the same solid, each moved by its offset.
-fn same_shape(a: &ModelBody, a_offset: &solidcraft_doc::Mat, b: &ModelBody, b_offset: &solidcraft_doc::Mat) -> Result<bool> {
+fn same_shape(a: &ModelBody, a_offset: &polykrom_doc::Mat, b: &ModelBody, b_offset: &polykrom_doc::Mat) -> Result<bool> {
     if a.body.same(&b.body) && a_offset == b_offset {
         return Ok(true);
     }
@@ -92,7 +92,7 @@ fn unmatched(a: &[&ModelBody], b: &[&ModelBody]) -> Result<Option<String>> {
 
 /// Remove the parameters nothing in `doc` uses any more, directly or through other parameters.
 fn prune_params(doc: &mut Document) {
-    use solidcraft_doc::expr::references;
+    use polykrom_doc::expr::references;
     while !doc.params.is_empty() {
         let mut used: BTreeSet<String> = BTreeSet::new();
         for f in &doc.features {
@@ -130,7 +130,7 @@ fn keep_component_looks(doc: &mut Document, owners: &BTreeMap<String, u64>, comp
 
 /// What the bodies `new` call the face or edge that `old` calls `name`, found where it is.
 fn renamed(old: &ModelState, new: &[&ModelBody], name: &str, near: Vec3) -> Option<String> {
-    use solidcraft_doc::{appearance::face_index_at, naming};
+    use polykrom_doc::{appearance::face_index_at, naming};
     if let Some((p, _)) = naming::point_on_face(old, name, near) {
         return new.iter().find_map(|b| face_index_at(b, p).and_then(|i| naming::face_names(b).get(i).cloned()));
     }
@@ -141,7 +141,7 @@ fn renamed(old: &ModelState, new: &[&ModelBody], name: &str, near: Vec3) -> Opti
 /// Joints on the placements `own` name faces of features that are gone: give them the names of
 /// the same faces of the linked bodies (Import feature `import`).
 fn rename_joint_faces(s: &mut Session, old: &ModelState, import: u64, own: &BTreeSet<u64>) {
-    use solidcraft_doc::joints::{Coupling, JointOrigin, Size, Snap, cam::CamProfile};
+    use polykrom_doc::joints::{Coupling, JointOrigin, Size, Snap, cam::CamProfile};
     let state = s.model.state();
     let linked: Vec<&ModelBody> = state.bodies.iter().filter(|b| b.feature == import).collect();
     let rename = |name: &mut String, near: Vec3| {
@@ -385,7 +385,7 @@ fn part_design(s: &Session, sc: &Scope, stem: &str, cmd: &str) -> Result<(Sessio
     if built.bodies.len() != bodies.len() {
         return Err(bad(cmd, format!("{name} builds {} bodies on its own instead of {}", built.bodies.len(), bodies.len())));
     }
-    let identity = solidcraft_doc::IDENTITY;
+    let identity = polykrom_doc::IDENTITY;
     for b in bodies {
         let (Some(was), Some(now)) = (state.body(b), built.body(b)) else {
             return Err(bad(cmd, format!("{name} does not build body {b} on its own")));
@@ -447,14 +447,14 @@ fn clear_history(s: &mut Session, sc: &Scope) {
 /// The design as it was before a swap, to check the swap against.
 struct Before {
     world: std::sync::Arc<ModelState>,
-    placements: BTreeMap<u64, solidcraft_doc::Mat>,
+    placements: BTreeMap<u64, polykrom_doc::Mat>,
     errors: BTreeMap<u64, bool>,
     joint_errors: BTreeSet<String>,
 }
 
 impl Before {
     fn take(s: &Session) -> Before {
-        let sol = solidcraft_doc::joints::solve(&s.doc, &s.model.state());
+        let sol = polykrom_doc::joints::solve(&s.doc, &s.model.state());
         Before {
             world: s.world_state(),
             placements: s.doc.occurrences.iter().map(|o| (o.id, o.transform)).collect(),
@@ -482,7 +482,7 @@ impl Before {
                 o.transform = *t;
             }
         }
-        let world = if moved.is_empty() { s.world_state() } else { std::sync::Arc::new(solidcraft_doc::world_state(&placed, &s.model.state())) };
+        let world = if moved.is_empty() { s.world_state() } else { std::sync::Arc::new(polykrom_doc::world_state(&placed, &s.model.state())) };
         let (was, now): (Vec<&ModelBody>, Vec<&ModelBody>) = (self.world.bodies.iter().collect(), world.bodies.iter().collect());
         if let Some(what) = unmatched(&was, &now)? {
             return Err(bad(cmd, format!("{what} would look different without the history of {name}")));
@@ -491,7 +491,7 @@ impl Before {
         if !moved.is_empty() {
             warnings.push(format!("the joints now place {}: nothing in their chain is grounded", moved.join(", ")));
         }
-        let sol = solidcraft_doc::joints::solve(&s.doc, &s.model.state());
+        let sol = polykrom_doc::joints::solve(&s.doc, &s.model.state());
         warnings.extend(
             sol.errors
                 .iter()
@@ -556,8 +556,8 @@ pub(super) fn extract(s: &mut Session, p: &Value) -> Result<Value> {
     let given = str_(p, "path").filter(|x| !x.trim().is_empty() && x.len() < 4096).ok_or_else(|| bad(CMD, "`path` is required"))?;
     let file = absolute(Path::new(given));
     // A design file by any of its names (#96): .polykrom, or the older .solidcraft and .solvecraft.
-    if !file.extension().and_then(|e| e.to_str()).is_some_and(|e| solidcraft_io::DESIGN_EXTS.iter().any(|x| e.eq_ignore_ascii_case(x))) {
-        return Err(bad(CMD, format!("the new design must be a .{} file", solidcraft_io::DESIGN_EXT)));
+    if !file.extension().and_then(|e| e.to_str()).is_some_and(|e| polykrom_io::DESIGN_EXTS.iter().any(|x| e.eq_ignore_ascii_case(x))) {
+        return Err(bad(CMD, format!("the new design must be a .{} file", polykrom_io::DESIGN_EXT)));
     }
     if s.path.as_deref().is_some_and(|own| absolute(Path::new(own)) == file) {
         return Err(bad(CMD, "choose another file than this design's own"));
@@ -794,7 +794,7 @@ mod tests {
         assert_eq!(out["copies"], json!([]), "{out}");
 
         // This design: Plate holds one linked Import feature, its subcomponent and joint are gone
-        let plate_features: Vec<&solidcraft_doc::Feature> = s.doc.features.iter().filter(|f| f.component == plate).collect();
+        let plate_features: Vec<&polykrom_doc::Feature> = s.doc.features.iter().filter(|f| f.component == plate).collect();
         assert_eq!(plate_features.len(), 1);
         assert!(matches!(plate_features[0].kind, FeatureKind::Import { .. }));
         assert_eq!(s.doc.links.get(&plate).map(|l| l.feature), Some(plate_features[0].id));
@@ -983,8 +983,8 @@ mod tests {
             let st = s.model.state();
             let body = st.bodies.iter().find(|b| s.doc.model_body_component(b) == copy && b.name.starts_with("PlateBody")).unwrap();
             let m = solidcraft_kernel::measure(&body.body).unwrap();
-            let w = solidcraft_doc::joints::occurrence_world(&s.doc, copy_occ);
-            solidcraft_doc::apply_point(&w, Vec3::new((m.bbox.min.x + m.bbox.max.x) / 2.0, (m.bbox.min.y + m.bbox.max.y) / 2.0, m.bbox.max.z))
+            let w = polykrom_doc::joints::occurrence_world(&s.doc, copy_occ);
+            polykrom_doc::apply_point(&w, Vec3::new((m.bbox.min.x + m.bbox.max.x) / 2.0, (m.bbox.min.y + m.bbox.max.y) / 2.0, m.bbox.max.z))
         };
         run(
             &mut s,

@@ -3,8 +3,8 @@
 
 use super::build_scene;
 use crate::{Services, SolveApp};
+use polykrom_engine::Session;
 use serde_json::json;
-use solidcraft_engine::Session;
 
 /// `Kept` and `Gone` blocks, a sketch `Edited` made after both, and `Gone` deleted after it.
 fn app() -> SolveApp {

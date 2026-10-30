@@ -396,7 +396,7 @@ The menu gallery includes normal, hovered, open, disabled, checked/unchecked,
 swatch and danger rows, a submenu and rename. Radial geometry tests measure the
 actual side endpoints at both radii and sample all four rounded corners. Optional
 CPU-rendered menu evidence can be produced without a window with
-`SOLIDCRAFT_MENU_EVIDENCE=/tmp/menus cargo test -p solidcraft-ui-egui --lib menu_board_in_both_themes`.
+`SOLIDCRAFT_MENU_EVIDENCE=/tmp/menus cargo test -p polykrom-ui-egui --lib menu_board_in_both_themes`.
 Desktop interaction and visual acceptance still require a reviewer capture.
 
 Command search uses the ribbon field itself (`sc_sbox_text`); `ribbon:search`,
@@ -412,7 +412,7 @@ rule. Ranking, command mode and keyboard routing remain with the caller.
 
 Generate CPU-rendered evidence of all five search states and the actual ribbon's
 closed/opening/open/closing transition in both themes with
-`SOLIDCRAFT_SEARCH_EVIDENCE=/tmp/search cargo test -p solidcraft-ui-egui --lib command_search`.
+`SOLIDCRAFT_SEARCH_EVIDENCE=/tmp/search cargo test -p polykrom-ui-egui --lib command_search`.
 
 ### Compact workspace composition
 

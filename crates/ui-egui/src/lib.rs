@@ -1,6 +1,6 @@
 //! The Polykrom egui front end.
 //!
-//! A thin shell over [`solidcraft_engine::Session`]: panels read engine state and act through
+//! A thin shell over [`polykrom_engine::Session`]: panels read engine state and act through
 //! commands ([`SolveApp::run`]). Nothing here owns design data. The layout follows the familiar
 //! parametric-CAD desktop: application bar, a toolbar of workspace tabs and panels, the browser
 //! on the left, the 3D viewport with an axis view and navigation bar, the command dialog on the
@@ -137,7 +137,7 @@ mod status_tests {
             );
         }
         assert_eq!(super::friendly_error("edit.undo", "nothing to undo"), "Undo: nothing to undo");
-        let mut app = super::SolveApp::new(solidcraft_engine::Session::default(), Default::default());
+        let mut app = super::SolveApp::new(polykrom_engine::Session::default(), Default::default());
         app.run("solid.box", serde_json::json!({"length": 5, "width": 5, "height": 5})).unwrap();
         assert_eq!(app.session.log.last().map(String::as_str), Some("Box done"));
         let _ = app.run("edit.redo", serde_json::json!({}));
@@ -263,10 +263,10 @@ pub mod workspace;
 
 use std::sync::mpsc::Receiver;
 
+use polykrom_engine::Session;
+use polykrom_engine::render::{Camera, CameraAnim, StandardView};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
-use solidcraft_engine::Session;
-use solidcraft_engine::render::{Camera, CameraAnim, StandardView};
 
 pub use control::{ControlRequest, ControlResponse};
 
@@ -303,7 +303,7 @@ pub struct UiState {
     /// A soft shadow on the ground under the model (seen from above).
     pub ground_shadow: bool,
     /// The world's up axis (Z or Y; #3): the camera, axis view, home view and ground follow it.
-    pub up_axis: solidcraft_engine::render::UpAxis,
+    pub up_axis: polykrom_engine::render::UpAxis,
     /// Sketches whose closed profiles are not shaded.
     pub hidden_profiles: Vec<u64>,
     /// Finished sketches whose dimensions are shown.
@@ -470,7 +470,7 @@ pub struct SolveApp {
     /// Autosave into the recovery folder (the desktop app turns it on).
     pub autosave: Option<recovery_ui::Autosaves>,
     /// Designs left by crashed apps, offered for recovery.
-    pub recoverable: Vec<solidcraft_engine::recovery::Entry>,
+    pub recoverable: Vec<polykrom_engine::recovery::Entry>,
     /// The bodies of a just-opened Y-up file, offered to be stood up (`stand_up`).
     pub stand_up: Option<Vec<String>>,
     /// The placement of the component that file came in as: the offer turns it.
@@ -525,7 +525,7 @@ pub struct SolveApp {
     shot_token: u64,
     styled: bool,
     fitted: bool,
-    pending_fit: Option<(Camera, solidcraft_engine::geom::Aabb3, bool)>,
+    pending_fit: Option<(Camera, polykrom_engine::geom::Aabb3, bool)>,
     /// The sheet metal flat pattern's own pan and zoom.
     pub flat_view: dialogs_sheet::FlatView,
     /// The start page.
@@ -553,9 +553,9 @@ pub struct SolveApp {
 impl SolveApp {
     pub fn new(mut session: Session, services: Services) -> Self {
         #[cfg(test)]
-        let image_host = Some(solidcraft_engine::render::job::CpuHost::cooperative());
+        let image_host = Some(polykrom_engine::render::job::CpuHost::cooperative());
         #[cfg(not(test))]
-        let image_host = solidcraft_engine::render::job::CpuHost::for_platform().map_err(|e| log::error!("render image host: {e}")).ok();
+        let image_host = polykrom_engine::render::job::CpuHost::for_platform().map_err(|e| log::error!("render image host: {e}")).ok();
         if let Err(e) = session.set_render_job_host(image_host.clone()) {
             log::error!("render image host: {e}");
         }
@@ -851,7 +851,7 @@ impl SolveApp {
                     self.cancel_view_animation();
                     self.cam = to;
                 } else if v.get("fit").and_then(Value::as_bool).unwrap_or(false) {
-                    let bounds = solidcraft_engine::view::bounds(&self.session);
+                    let bounds = polykrom_engine::view::bounds(&self.session);
                     self.animate_to(self.fitted(to));
                     self.pending_fit = Some((to, bounds, true));
                 } else {
@@ -956,7 +956,7 @@ impl SolveApp {
         // A disabled command starts nothing, however it was reached. The toolbar greys its
         // button, but a shortcut, the command palette and the control channel all land here.
         // Its reason goes to the status line, so the refusal is never silent.
-        if let Some(info) = solidcraft_engine::find_command(id).map(|c| c.info(&self.session))
+        if let Some(info) = polykrom_engine::find_command(id).map(|c| c.info(&self.session))
             && let Some(why) = info.disabled_reason
         {
             let label = self.tr_label(info.label).to_string();
@@ -967,7 +967,7 @@ impl SolveApp {
         // Move a selected assembly placement the same way as its Browser menu, retaining
         // the exact instance path and the grounding/rigid-group restrictions.
         if id == "solid.move"
-            && let [solidcraft_engine::Sel::Occurrence { path }] = self.session.selection.as_slice()
+            && let [polykrom_engine::Sel::Occurrence { path }] = self.session.selection.as_slice()
         {
             let target = context_menu::Target::Occurrence { path: path.clone() };
             if let Some(item) = context_menu::items(self, &target).into_iter().find(|item| item.id == "ui.moveOccurrence") {
@@ -1022,7 +1022,7 @@ impl SolveApp {
             // inserted the way Insert STEP or Insert Mesh would (#1240).
             self.pick_open(|app, path| {
                 let Some(path) = path else { return };
-                if solidcraft_engine::io::is_design_path(&path) {
+                if polykrom_engine::io::is_design_path(&path) {
                     if app.run("component.insert_design", json!({ "path": path })).is_ok() {
                         app.fit_view();
                     }
@@ -1047,7 +1047,7 @@ impl SolveApp {
         if !sketch_tools::start_hook(self, id) {
             return;
         }
-        if solidcraft_engine::find_command(id).is_some_and(|c| c.info(&self.session).enabled) {
+        if polykrom_engine::find_command(id).is_some_and(|c| c.info(&self.session).enabled) {
             self.preferences.sketch_variants.remember(id);
         }
         if id == "parameters.change" {
@@ -1072,10 +1072,10 @@ impl SolveApp {
         }
         // Press Pull: edges get a fillet, faces and profiles an extrude.
         if id == "solid.press_pull" {
-            let edges = self.session.selection.iter().any(|s| matches!(s, solidcraft_engine::Sel::Edge { .. }));
+            let edges = self.session.selection.iter().any(|s| matches!(s, polykrom_engine::Sel::Edge { .. }));
             return self.start(if edges { "solid.fillet" } else { "solid.extrude" });
         }
-        if let Some(spec) = solidcraft_engine::find_command(id)
+        if let Some(spec) = polykrom_engine::find_command(id)
             && (tools::Tool::for_command(id).is_some() || dialogs::Dialog::for_command(self, id).is_some())
             && id != "sketch.create"
         {
@@ -1108,8 +1108,7 @@ impl SolveApp {
                     | "sketch.constraint.tangent"
                     | "sketch.constraint.concentric"
                     | "sketch.constraint.collinear"
-            ) && let [solidcraft_engine::Sel::SketchCurve { id: a }, solidcraft_engine::Sel::SketchCurve { id: b }] =
-                self.session.selection.as_slice()
+            ) && let [polykrom_engine::Sel::SketchCurve { id: a }, polykrom_engine::Sel::SketchCurve { id: b }] = self.session.selection.as_slice()
                 && a != b
             {
                 let params = json!({ "a": a, "b": b });
@@ -1125,7 +1124,7 @@ impl SolveApp {
                     .selection
                     .iter()
                     .filter_map(|s| match s {
-                        solidcraft_engine::Sel::SketchCurve { id } | solidcraft_engine::Sel::SketchPoint { id } => Some(id.clone()),
+                        polykrom_engine::Sel::SketchCurve { id } | polykrom_engine::Sel::SketchPoint { id } => Some(id.clone()),
                         _ => None,
                     })
                     .take(2)
@@ -1155,7 +1154,7 @@ impl SolveApp {
     /// Edit a feature: sketches open in sketch mode; other features roll the
     /// timeline back to just before themselves and reopen their dialog, filled in.
     pub fn edit_feature(&mut self, id: u64) {
-        use solidcraft_engine::doc::FeatureKind;
+        use polykrom_engine::doc::FeatureKind;
         let Some(f) = self.session.doc.feature(id) else { return };
         if matches!(f.kind, FeatureKind::Sketch { .. }) {
             self.edit_sketch(id);
@@ -1186,7 +1185,7 @@ impl SolveApp {
     /// it, and remember the marker so Finish Sketch puts it back. Editing the sketch that is already open does nothing; editing another one
     /// finishes the current sketch first, so edit sessions never nest.
     pub fn edit_sketch(&mut self, id: u64) {
-        if let solidcraft_engine::doc::FaceAttachmentStatus::Lost { message, .. } =
+        if let polykrom_engine::doc::FaceAttachmentStatus::Lost { message, .. } =
             self.session.placed_document().sketch_face_attachment(id, &self.session.model)
         {
             browser::redefine_sketch(self, id);
@@ -1248,7 +1247,7 @@ impl SolveApp {
     }
 
     /// Everything shown as selected: the selection plus the open dialog's inputs.
-    pub fn highlighted(&self) -> Vec<solidcraft_engine::Sel> {
+    pub fn highlighted(&self) -> Vec<polykrom_engine::Sel> {
         let mut v = self.session.selection.clone();
         if let Some(d) = &self.dialog {
             v.extend(d.highlighted(&self.session));
@@ -1309,7 +1308,7 @@ impl SolveApp {
     /// Insert a STEP file's bodies (an Import base feature) or a mesh file's meshes into the
     /// current design.
     pub fn insert_path(&mut self, path: &str) {
-        let cmd = if solidcraft_engine::io::is_mesh_path(path) { "file.insert_mesh" } else { "file.insert_step" };
+        let cmd = if polykrom_engine::io::is_mesh_path(path) { "file.insert_mesh" } else { "file.insert_step" };
         let before: Vec<String> = self.session.world_state().bodies.iter().map(|b| b.name.clone()).collect();
         if let Ok(r) = self.run(cmd, json!({ "path": path })) {
             self.fit_view();
@@ -1324,7 +1323,7 @@ impl SolveApp {
     /// A dropped file: a STEP or mesh file (3MF, STL, OBJ, glTF) joins a design that has features, anything else
     /// opens.
     pub fn drop_path(&mut self, path: &str) {
-        let import = solidcraft_engine::io::is_step_path(path) || solidcraft_engine::io::is_mesh_path(path);
+        let import = polykrom_engine::io::is_step_path(path) || polykrom_engine::io::is_mesh_path(path);
         if import && !self.session.doc.features.is_empty() {
             self.insert_path_async(path);
         } else {
@@ -1335,7 +1334,7 @@ impl SolveApp {
     /// Frame the model at once (programmatic use; the toolbar animates).
     /// Make `up` the world's up axis: the camera turns to the same standard view in that world
     /// (home) and frames the model.
-    pub fn set_up_axis(&mut self, up: solidcraft_engine::render::UpAxis) {
+    pub fn set_up_axis(&mut self, up: polykrom_engine::render::UpAxis) {
         self.ui.up_axis = up;
         self.cam_anim = None;
         self.cam.up = up;
@@ -1350,7 +1349,7 @@ impl SolveApp {
         }
         if render_workspace::active(self) {
             self.cancel_view_animation();
-            match solidcraft_engine::product_scene::extract(&self.session) {
+            match polykrom_engine::product_scene::extract(&self.session) {
                 Ok(scene) if !scene.bounds.is_empty() => self.cam.fit(&scene.bounds),
                 Err(e) => self.set_status(e.to_string(), true),
                 _ => {}
@@ -1365,7 +1364,7 @@ impl SolveApp {
     }
 
     /// Frame `bounds` at once, keeping the view direction (programmatic use).
-    pub fn fit_bounds(&mut self, bounds: solidcraft_engine::geom::Aabb3) {
+    pub fn fit_bounds(&mut self, bounds: polykrom_engine::geom::Aabb3) {
         self.cancel_view_animation();
         self.viewport.orbit_free = None;
         self.pending_fit = Some((self.cam, bounds, false));
@@ -1376,7 +1375,7 @@ impl SolveApp {
     pub fn fitted(&self, mut cam: Camera) -> Camera {
         let b = viewport::view_bounds(self);
         if b.is_empty() {
-            cam.target = solidcraft_engine::geom::Vec3::ZERO;
+            cam.target = polykrom_engine::geom::Vec3::ZERO;
             cam.distance = 150.0;
         } else {
             cam = self.fitted_bounds(cam, &b);
@@ -1384,7 +1383,7 @@ impl SolveApp {
         cam
     }
 
-    fn fitted_bounds(&self, mut cam: Camera, bounds: &solidcraft_engine::geom::Aabb3) -> Camera {
+    fn fitted_bounds(&self, mut cam: Camera, bounds: &polykrom_engine::geom::Aabb3) -> Camera {
         if let Some(layout) = &self.viewport.layout {
             return viewport_layout::fit_bounds(cam, bounds, layout, self.perspective_view()).unwrap_or(cam);
         }
@@ -1971,7 +1970,7 @@ fn window_hidden(ctx: &egui::Context) -> bool {
 
 /// A command's name as people see it (its label), for the status bar.
 pub fn command_label(id: &str) -> &str {
-    solidcraft_engine::find_command(id).map_or(id, |c| c.label)
+    polykrom_engine::find_command(id).map_or(id, |c| c.label)
 }
 
 /// An engine error with the command's label instead of its id: "Shell: offset must be …".

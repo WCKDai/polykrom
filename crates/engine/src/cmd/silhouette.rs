@@ -153,7 +153,7 @@ fn camera(p: &Value) -> Result<Camera> {
         return Err(bad(CMD, "give `view` or `camera`, not both"));
     }
     let camera = if let Some(value) = p.get("camera") {
-        let named: solidcraft_doc::NamedView = serde_json::from_value(value.clone()).map_err(|e| bad(CMD, format!("bad camera: {e}")))?;
+        let named: polykrom_doc::NamedView = serde_json::from_value(value.clone()).map_err(|e| bad(CMD, format!("bad camera: {e}")))?;
         Camera { target: named.target, yaw: named.yaw, pitch: named.pitch, distance: named.distance, fov: named.fov, ..Default::default() }
     } else {
         let name = match p.get("view") {

@@ -38,9 +38,9 @@ New designs are saved as `.solidcraft`. Files with the old extension still open 
 | Path in | Where |
 |---|---|
 | Extension → design format | `crates/io/src/lib.rs` (`LEGACY_DESIGN_EXT`, format detection) |
-| Open dialog filters (desktop) | `apps/solidcraft/src/main.rs` (`services`) |
-| Drag-drop, recent files, `doc.open`, MCP `open`, CLI `eval`/`run` | go through the same format detection in `solidcraft_io` |
-| Browser file picker | `apps/solidcraft-web/src/files.rs` (`accept`) |
+| Open dialog filters (desktop) | `apps/polykrom/src/main.rs` (`services`) |
+| Drag-drop, recent files, `doc.open`, MCP `open`, CLI `eval`/`run` | go through the same format detection in `polykrom_io` |
+| Browser file picker | `apps/polykrom-web/src/files.rs` (`accept`) |
 | Windows | `assets/platforms/windows/solidcraft.wxs`: the `.solvecraft` extension on the design ProgId and in `SupportedTypes` |
 | macOS | `assets/platforms/macos/Info.plist.in`: `solvecraft` in the design document type's extensions |
 | Linux / FreeBSD / Flatpak | `assets/platforms/linux/ai.storyteller.solidcraft.mime.xml`: `*.solvecraft` glob and the `application/x-solvecraft` alias |
@@ -85,30 +85,30 @@ does, it is **copied** to the new location; the old folder is never deleted or c
 window and UI state that eframe kept under `ai.storyteller.solvecraft` is copied the same way.
 Autosaves copied from the old folder (`<id>.solvecraft`) are listed and recovered like new ones.
 The preferences key in eframe's storage is `solidcraft.prefs`; `solvecraft.prefs` is read when
-it is missing (desktop and browser, `solidcraft_ui_egui::prefs::stored`). The browser app also
+it is missing (desktop and browser, `polykrom_ui_egui::prefs::stored`). The browser app also
 reads files and the autosave it kept under the old names in local storage and OPFS
-(`apps/solidcraft-web/src/files.rs`). A 3DxWare profile the driver made for the old executable
-name is read until it makes a new one (`apps/solidcraft/src/space_mouse.rs`).
+(`apps/polykrom-web/src/files.rs`). A 3DxWare profile the driver made for the old executable
+name is read until it makes a new one (`apps/polykrom/src/space_mouse.rs`).
 In the Flatpak sandbox these folders live under `~/.var/app/<app id>/data`; for data kept under
 the app id of releases before 0.8, see [Linux app ID](#linux-app-id).
 The thumbnail cache is not migrated; it is rebuilt. The copy helper is
-`solidcraft_io::adopt_legacy_dir`, used by the desktop app (`adopt_legacy_settings`) and
-`solidcraft_engine::recovery::default_dir`. Tests: `legacy_dir` (copy once, never overwrite,
+`polykrom_io::adopt_legacy_dir`, used by the desktop app (`adopt_legacy_settings`) and
+`polykrom_engine::recovery::default_dir`. Tests: `legacy_dir` (copy once, never overwrite,
 old folder intact), `first_launch_adopts_the_previous_release_settings`,
 `autosave_from_a_legacy_folder_is_listed_and_loads`, `recovery_dirs_and_their_legacy_names`,
 `stored_prefs_fall_back_to_the_legacy_key`.
 
 ## 5. `solvecraft-cli` alias
 
-A tiny `solvecraft-cli` binary (`apps/solidcraft-cli/src/alias.rs`) ships in every package for
+A tiny `solvecraft-cli` binary (`apps/polykrom-cli/src/alias.rs`) ships in every package for
 at least one release (since 0.5.0). It prints a one-line deprecation note to stderr and runs the
 `solidcraft-cli` next to it with the same arguments, stdin/stdout and exit code, so scripts
-and MCP client configs that call `solvecraft-cli` keep working. Test: `apps/solidcraft-cli/tests/legacy_alias.rs` (forwards `--version` and the exit status;
+and MCP client configs that call `solvecraft-cli` keep working. Test: `apps/polykrom-cli/tests/legacy_alias.rs` (forwards `--version` and the exit status;
 the note goes to stderr only, so stdout stays clean for MCP).
 
 Since #98 the programs are `polykrom` and `polykrom-cli`, and every package also ships
-`solidcraft` and `solidcraft-cli` as aliases built the same way (`apps/solidcraft/src/solidcraft.rs`,
-`apps/solidcraft-cli/src/solidcraft.rs`). They forward without a note, because MCP clients
+`solidcraft` and `solidcraft-cli` as aliases built the same way (`apps/polykrom/src/solidcraft.rs`,
+`apps/polykrom-cli/src/solidcraft.rs`). They forward without a note, because MCP clients
 registered with `solidcraft-cli mcp` show anything on stderr as an error. `solvecraft-cli` now
 forwards to `polykrom-cli`. Launchers, file associations, Start-menu entries, App Paths and the
 Flatpak and Snap commands point at `polykrom`. Test: `legacy_alias.rs` covers both CLI aliases.
@@ -154,7 +154,7 @@ everywhere (Flatpak, deb, rpm, AppImage, Snap, FreeBSD, Nix). The shims:
 | End-of-life rebase in the Flatpak repository | `packaging/flatpak-site.sh` | Each release's Pages deploy keeps the old `app/ai.storyteller.solvecraft/<arch>/stable` refs (mirrored from the previous deploy) and marks them once with `flatpak build-commit-from --end-of-life-rebase=ai.storyteller.solvecraft=ai.storyteller.solidcraft`. `flatpak update` then says the old app is end-of-life and offers to replace it with the new one; accepting installs `ai.storyteller.solidcraft`, uninstalls the old app, and Flatpak moves `~/.var/app/ai.storyteller.solvecraft` to the new id's folder (leaving a symlink at the old path) on the first launch, so settings and autosaves come along unchanged. |
 | AppStream `<replaces>` / `<provides>` | `assets/platforms/linux/ai.storyteller.solidcraft.metainfo.xml.in` | Software centres treat the new id as the successor of the old one and of `ai.storyteller.solvecraft.desktop`. |
 | `X-Flatpak-RenamedFrom` | `assets/platforms/linux/ai.storyteller.solidcraft.desktop` | Desktops that honour it (GNOME Shell) keep favourites and pinned launchers pointing at the renamed entry. |
-| Read-only access to the old Flatpak data folder | `--filesystem=~/.var/app/ai.storyteller.solvecraft:ro` in `packaging/linux/flatpak/ai.storyteller.solidcraft.bundle.yml`; `solidcraft_io::legacy_flatpak_path`, used by `adopt_legacy_settings` and `recovery::default_dir` | When the new app was installed next to the old one (for example from a `.flatpak` bundle, which has no update feed) instead of through the rebase, its first launch copies settings and autosaves from the old app's folder, as in section 4. The old folder is not changed. |
+| Read-only access to the old Flatpak data folder | `--filesystem=~/.var/app/ai.storyteller.solvecraft:ro` in `packaging/linux/flatpak/ai.storyteller.solidcraft.bundle.yml`; `polykrom_io::legacy_flatpak_path`, used by `adopt_legacy_settings` and `recovery::default_dir` | When the new app was installed next to the old one (for example from a `.flatpak` bundle, which has no update feed) instead of through the rebase, its first launch copies settings and autosaves from the old app's folder, as in section 4. The old folder is not changed. |
 | The old window `app_id` as eframe's legacy storage key | `adopt_legacy_settings` (`LEGACY_APP_ID`) | Window state that releases before the settings rename kept under `~/.local/share/ai.storyteller.solvecraft` is still copied (section 4). |
 | Old AppImage menu entries | `packaging/linux/AppRun` | An AppImage's first run removes the `ai.storyteller.solvecraft.desktop` entry and icons that an AppImage up to 0.7 installed in `~/.local/share`, so the menu doesn't show the app twice. |
 

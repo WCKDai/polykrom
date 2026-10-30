@@ -125,7 +125,7 @@ fn curvature_comb(s: &mut Session, p: &Value) -> Result<Value> {
             let at = vec3(v).ok_or_else(|| bad(cmd, "`faces` must list points [x,y,z]"))?;
             let (bi, f) = face_at(&st, at).ok_or_else(|| bad(cmd, "no face there"))?;
             let m = st.bodies.get(bi).map(|b| b.mesh()).ok_or_else(|| bad(cmd, "that face's body is not evaluated"))?;
-            for (k, w) in solidcraft_doc::iso_grid(&m, f, at, count).iter().enumerate() {
+            for (k, w) in polykrom_doc::iso_grid(&m, f, at, count).iter().enumerate() {
                 combs.push((format!("face@{},{},{}#{k}", at.x, at.y, at.z), teeth_3d(w)));
             }
         }
@@ -162,7 +162,7 @@ fn min_of(teeth: &[(Vec3, f64, Vec3)]) -> Option<(f64, Vec3)> {
 }
 
 /// The face of a body at `at` (nearest triangle): (body index, face index).
-fn face_at(st: &solidcraft_doc::ModelState, at: Vec3) -> Option<(usize, u32)> {
+fn face_at(st: &polykrom_doc::ModelState, at: Vec3) -> Option<(usize, u32)> {
     let mut best: Option<(f64, usize, u32)> = None;
     for (bi, b) in st.bodies.iter().enumerate() {
         let m = b.mesh();
@@ -309,7 +309,7 @@ fn isocurves(s: &mut Session, p: &Value) -> Result<Value> {
         let at = vec3(v).ok_or_else(|| bad(cmd, "`faces` must list points [x,y,z]"))?;
         let (bi, f) = face_at(&st, at).ok_or_else(|| bad(cmd, "no face there"))?;
         let m = st.bodies.get(bi).map(|b| b.mesh()).ok_or_else(|| bad(cmd, "body"))?;
-        for w in solidcraft_doc::iso_grid(&m, f, at, count) {
+        for w in polykrom_doc::iso_grid(&m, f, at, count) {
             out.push(w.iter().map(|q| [q.x, q.y, q.z]).collect::<Vec<_>>());
         }
     }

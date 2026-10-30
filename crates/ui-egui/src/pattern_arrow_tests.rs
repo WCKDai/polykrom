@@ -48,8 +48,8 @@ fn a_sketch_pattern_drags_its_second_spacing_square_to_the_first() {
     let (after, after2) = spacings(&h);
     assert_eq!(after, spacing);
     assert_ne!(after2, spacing2);
-    let grown = h.app.session.doc.eval(&after2, solidcraft_engine::doc::expr::Kind::Length).unwrap();
-    let was = h.app.session.doc.eval(&spacing2, solidcraft_engine::doc::expr::Kind::Length).unwrap();
+    let grown = h.app.session.doc.eval(&after2, polykrom_engine::doc::expr::Kind::Length).unwrap();
+    let was = h.app.session.doc.eval(&spacing2, polykrom_engine::doc::expr::Kind::Length).unwrap();
     assert!(grown > was, "Spacing 2 {spacing2} -> {after2}");
 }
 

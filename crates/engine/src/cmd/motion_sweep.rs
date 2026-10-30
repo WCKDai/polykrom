@@ -6,8 +6,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 
+use polykrom_doc::Document;
 use serde_json::{Value, json};
-use solidcraft_doc::Document;
 use solidcraft_geom::Vec3;
 
 use super::analysis::checked_pairs;

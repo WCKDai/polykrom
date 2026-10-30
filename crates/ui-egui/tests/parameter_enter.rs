@@ -1,7 +1,7 @@
 //! Enter submits only the focused Parameters editor row.
 use egui::{Event, Key, Modifiers};
+use polykrom_ui_egui::scenario::Harness;
 use serde_json::json;
-use solidcraft_ui_egui::scenario::Harness;
 
 fn open() -> Harness {
     let mut h = Harness::new();

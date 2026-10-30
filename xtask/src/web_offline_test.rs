@@ -80,9 +80,9 @@ const CONNECTIONS_PER_SERVER: usize = 6;
 
 /// Exercise the real browser build's command bridge, using the same Chrome harness as the offline test.
 pub fn run_api(site: &str) -> Result<(), String> {
-    let site = std::fs::canonicalize(site).map_err(|e| format!("{site}: {e}; build apps/solidcraft-web with trunk first"))?;
+    let site = std::fs::canonicalize(site).map_err(|e| format!("{site}: {e}; build apps/polykrom-web with trunk first"))?;
     if !site.join("index.html").is_file() {
-        return Err(format!("{}: index.html missing; build apps/solidcraft-web with trunk first", site.display()));
+        return Err(format!("{}: index.html missing; build apps/polykrom-web with trunk first", site.display()));
     }
     let chrome = find_chrome().ok_or("web-api-test: Chrome not found (set CHROME to its executable)")?;
     let work = TempDir::new()?;
@@ -512,9 +512,9 @@ fn mark(html: &str, build: &str) -> Result<String, String> {
 
 /// The service worker registration from the web app's index.html (so the stand-in uses it).
 fn registration_script(root: &Path) -> Result<String, String> {
-    let path = root.join("apps/solidcraft-web/index.html");
+    let path = root.join("apps/polykrom-web/index.html");
     let html = std::fs::read_to_string(&path).map_err(|e| format!("{}: {e}", path.display()))?;
-    let at = html.find("serviceWorker").ok_or("apps/solidcraft-web/index.html doesn't register the service worker")?;
+    let at = html.find("serviceWorker").ok_or("apps/polykrom-web/index.html doesn't register the service worker")?;
     let start = html.get(..at).and_then(|h| h.rfind("<script>")).ok_or("index.html: no <script> around the registration")?;
     let end = html.get(at..).and_then(|h| h.find("</script>")).map(|e| at + e + "</script>".len()).ok_or("index.html: unclosed <script>")?;
     html.get(start..end).map(str::to_string).ok_or_else(|| "index.html: bad registration script".into())

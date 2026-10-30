@@ -1,11 +1,11 @@
 //! Reviewable sketch-plane rebinding. Saved lost planes are repair guides, never model geometry.
 
 use egui::RichText;
+use polykrom_engine::Sel;
+use polykrom_engine::doc::face_anchor::plane_face_anchor;
+use polykrom_engine::doc::{EmbossFace, FaceAttachmentStatus, FeatureKind, mat_inverse};
+use polykrom_engine::geom::{Plane, Vec3};
 use serde_json::{Value, json};
-use solidcraft_engine::Sel;
-use solidcraft_engine::doc::face_anchor::plane_face_anchor;
-use solidcraft_engine::doc::{EmbossFace, FaceAttachmentStatus, FeatureKind, mat_inverse};
-use solidcraft_engine::geom::{Plane, Vec3};
 
 use crate::SolveApp;
 use crate::theme::Tokens;
@@ -152,7 +152,7 @@ pub fn panel(app: &mut SolveApp, ctx: &egui::Context) {
     let drag_bounds = crate::shell::tool_drag_rect(app, viewport);
     let anchor = crate::frame::offset_anchor(docked, moved, drag_bounds, side);
     let frame = ui_kit::Panel::feature_frame(ctx, app.ui.layout, side);
-    let spec = solidcraft_engine::find_command("sketch.redefine");
+    let spec = polykrom_engine::find_command("sketch.redefine");
     let command = spec.as_ref().map_or("", |s| crate::i18n::tr_label(s.label));
     let title = crate::i18n::format("sketch_panel.redefine_title", &[("command", command), ("name", name)]);
     let panel = ui_kit::Panel::new(&title, egui::Id::new("sc_redefine"), anchor, drag_bounds, side, frame);
@@ -330,7 +330,7 @@ pub fn panel(app: &mut SolveApp, ctx: &egui::Context) {
 
 /// Only a lost reference's explicit saved author frame supplies a guide. It is
 /// absent from ModelState, selection, snapping and all downstream evaluation.
-pub fn lost_guide(app: &SolveApp) -> Option<(Plane, &solidcraft_engine::sketch::Sketch)> {
+pub fn lost_guide(app: &SolveApp) -> Option<(Plane, &polykrom_engine::sketch::Sketch)> {
     let sketch = app.tree.redefine?;
     let FaceAttachmentStatus::Lost { repair_plane: Some(plane), .. } = attachment(app, sketch) else { return None };
     let FeatureKind::Sketch { sketch, .. } = &app.session.doc.feature(sketch)?.kind else { return None };
@@ -347,7 +347,7 @@ pub fn guide_lines(app: &SolveApp) -> Vec<Vec<Vec3>> {
 
 pub fn display_guide_lines(app: &SolveApp, proj: &crate::viewport::Proj) -> Vec<Vec<Vec3>> {
     let Some((plane, sketch)) = lost_guide(app) else { return Vec::new() };
-    let mut budget = solidcraft_engine::render::SamplingBudget::new(65_536, 262_144);
+    let mut budget = polykrom_engine::render::SamplingBudget::new(65_536, 262_144);
     (0..sketch.curves.len())
         .flat_map(|index| crate::sketch_display::curve_with_budget(sketch, index, &plane, proj, app.viewport.pixels_per_point(), &mut budget).parts)
         .collect()

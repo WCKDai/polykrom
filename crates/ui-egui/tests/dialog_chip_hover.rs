@@ -1,6 +1,6 @@
 //! Hovering a dialog's Select chip doesn't change its size or the panel's (#1335).
+use polykrom_ui_egui::scenario::{Harness, handle_at};
 use serde_json::json;
-use solidcraft_ui_egui::scenario::{Harness, handle_at};
 
 #[test]
 fn hovering_the_select_chip_keeps_its_size() {

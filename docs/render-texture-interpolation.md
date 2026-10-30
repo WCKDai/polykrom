@@ -1,7 +1,7 @@
 # Perspective UV differential reference
 
 The independent L1 helper in #1346 supports the first wood consumer #1345.
-`solidcraft_render::texture_interpolation::PerspectiveUv` accepts three unwrapped
+`polykrom_render::texture_interpolation::PerspectiveUv` accepts three unwrapped
 vertex UVs and positive reciprocal clip-w values. `evaluate` takes the existing
 rasterizer's screen barycentric weights and their x/y derivatives. It returns UV
 and analytic perspective-correct derivatives without changing raster coverage,

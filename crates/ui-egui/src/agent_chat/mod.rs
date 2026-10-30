@@ -231,7 +231,7 @@ pub enum Item {
     /// A message's changes, merged into one undo step; `doc`: the design right after it.
     Changes {
         steps: usize,
-        doc: Arc<solidcraft_engine::doc::Document>,
+        doc: Arc<polykrom_engine::doc::Document>,
         undone: bool,
     },
     Notice {
@@ -243,7 +243,7 @@ pub enum Item {
 /// The message being answered: what undo and the limits need.
 struct Turn {
     /// The design and the undo depth before it.
-    start_doc: Arc<solidcraft_engine::doc::Document>,
+    start_doc: Arc<polykrom_engine::doc::Document>,
     start_undo: usize,
     /// Requests that ran commands, and requests of any kind.
     changes: u32,
@@ -721,7 +721,7 @@ fn solidcraft_tool(title: &str) -> bool {
 /// name for it (an older install, or a PATH that only has that one).
 #[cfg(not(target_arch = "wasm32"))]
 fn find_cli() -> Option<std::path::PathBuf> {
-    if let Some(p) = solidcraft_engine::geom::env::var("CLI").map(std::path::PathBuf::from).filter(|p| p.is_file()) {
+    if let Some(p) = polykrom_engine::geom::env::var("CLI").map(std::path::PathBuf::from).filter(|p| p.is_file()) {
         return Some(p);
     }
     let beside = std::env::current_exe().ok().and_then(|e| e.parent().map(std::path::Path::to_path_buf));
@@ -737,7 +737,7 @@ fn find_cli() -> Option<std::path::PathBuf> {
 /// The agent's working folder: an empty folder of Polykrom's own, so an agent's own file tools
 /// (where it has them) see nothing of the user's.
 fn working_dir() -> std::path::PathBuf {
-    let d = solidcraft_engine::recovery::data_dir()
+    let d = polykrom_engine::recovery::data_dir()
         .map(|d| d.join("agent-chat").join("work"))
         .unwrap_or_else(|| std::env::temp_dir().join("solidcraft-agent-chat"));
     #[cfg(not(target_arch = "wasm32"))]
@@ -1293,12 +1293,7 @@ fn end_turn(app: &mut SolveApp) {
 
 /// Merge the undo steps made since `start_doc` (at depth `start_undo`) into one, labelled `label`;
 /// how many steps it took in (0: none were made, or the history no longer reaches that far).
-fn merge_undo(
-    undo: &mut Vec<solidcraft_engine::Snapshot>,
-    start_doc: &Arc<solidcraft_engine::doc::Document>,
-    start_undo: usize,
-    label: &str,
-) -> usize {
+fn merge_undo(undo: &mut Vec<polykrom_engine::Snapshot>, start_doc: &Arc<polykrom_engine::doc::Document>, start_undo: usize, label: &str) -> usize {
     // The first change of the turn saved the design as it was when the turn began. When the
     // history is full its oldest steps go, so look for it at or below where it was put.
     let Some(first) = (0..undo.len().min(start_undo + 1)).rev().find(|&i| undo.get(i).is_some_and(|s| Arc::ptr_eq(&s.doc, start_doc))) else {

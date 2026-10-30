@@ -8,7 +8,7 @@ use std::time::Duration;
 
 use crate::SolveApp;
 
-pub use solidcraft_space_mouse::{AxisCalibration, Calibration};
+pub use polykrom_space_mouse::{AxisCalibration, Calibration};
 
 /// What a 3Dconnexion device reports at full deflection, in raw units, on every axis.
 pub const FULL_SCALE: i16 = 350;
@@ -50,9 +50,9 @@ pub struct Input {
     /// This frame's reading, before calibration.
     pub raw: Axes,
     /// The guided calibration while its window is open, and the device it is for.
-    pub calibrating: Option<(String, solidcraft_space_mouse::Wizard)>,
+    pub calibrating: Option<(String, polykrom_space_mouse::Wizard)>,
     /// Drops readings that have stopped changing close to the dead zone.
-    pub settle: solidcraft_space_mouse::Settle,
+    pub settle: polykrom_space_mouse::Settle,
     /// The buttons down as of the last frame, one bit each (bit N for button N + 1).
     pub buttons: u32,
     /// Every button pressed since the app started, so Preferences can list the ones the device has.
@@ -153,13 +153,13 @@ pub fn button_jobs(app: &SolveApp, device: &str) -> std::collections::BTreeMap<u
     app.preferences.space_mouse_buttons.get(device).cloned().unwrap_or_else(|| default_button_jobs(device))
 }
 
-/// The printed keys' jobs on a device we have measured (`solidcraft_space_mouse::buttons`), from
+/// The printed keys' jobs on a device we have measured (`polykrom_space_mouse::buttons`), from
 /// its key (`hid 046d:c62b`, `web 046d:c62b`). Only a key with vendor and product ids gets them,
 /// which in practice is a raw HID device: the `spacenavd` and `3dxware` keys carry no ids, and
 /// spacenavd numbers its buttons from 0, not 1 as the table here does. Keys with no job here (Roll,
 /// the rotation lock) start empty.
 pub fn default_button_jobs(device: &str) -> std::collections::BTreeMap<u8, ButtonJob> {
-    use solidcraft_space_mouse::buttons::{Action, defaults};
+    use polykrom_space_mouse::buttons::{Action, defaults};
     let ids = device.split_once(' ').and_then(|(_, ids)| ids.split_once(':'));
     let table = ids.and_then(|(vendor, product)| Some((u16::from_str_radix(vendor, 16).ok()?, u16::from_str_radix(product, 16).ok()?)));
     let Some(table) = table.and_then(|(vendor, product)| defaults(vendor, product)) else { return Default::default() };
@@ -311,7 +311,7 @@ fn run_button_job(app: &mut SolveApp, job: &ButtonJob, modifiers: egui::Modifier
         }
         ButtonJob::Key(_) => {}
         ButtonJob::Command(id) => {
-            if solidcraft_engine::find_command(id).is_some_and(|c| c.info(&app.session).enabled) {
+            if polykrom_engine::find_command(id).is_some_and(|c| c.info(&app.session).enabled) {
                 app.start(id);
             }
         }
@@ -569,7 +569,7 @@ pub fn navigate_frame(app: &mut SolveApp, ctx: &egui::Context, mapping: DriverMa
     // A hand leaning on a cap, holding it just past the dead zone, doesn't creep the view. A
     // trackball's slow roll is steady and meant, and a device without a calibration is read as it reports.
     let axes: Axes = match calibration {
-        Some(calibration) if calibration.kind == solidcraft_space_mouse::Kind::ReturnToCenter => {
+        Some(calibration) if calibration.kind == polykrom_space_mouse::Kind::ReturnToCenter => {
             app.space_mouse.settle.filter(axes.into(), seconds).into()
         }
         _ => axes,
@@ -609,8 +609,8 @@ fn normalized(value: i16) -> f64 {
 mod tests {
     use super::*;
     use crate::Services;
-    use solidcraft_engine::Session;
-    use solidcraft_engine::render::Camera;
+    use polykrom_engine::Session;
+    use polykrom_engine::render::Camera;
 
     /// The camera math the page applies the motion with (`navigation::device`): `sketch` keeps
     /// the orientation, as editing a sketch does.
@@ -640,7 +640,7 @@ mod tests {
     /// same readings as a kept value end the step.
     #[test]
     fn the_calibration_window_is_told_whether_the_reading_is_fresh() {
-        use solidcraft_space_mouse::{Kind, Stage, Wizard};
+        use polykrom_space_mouse::{Kind, Stage, Wizard};
         for (retained, step_done) in [(false, false), (true, true)] {
             let mut app = app();
             app.space_mouse.device = Some("hid 046d:c62b".into());
@@ -1157,8 +1157,8 @@ mod tests {
     fn only_a_calibrated_cap_settles() {
         let axes = std::array::from_fn(|source| AxisCalibration { source, reversed: false, rest: 0, dead_zone: 0, full: [350; 2] });
         let calibration = |kind| Calibration { dead_zone_share: 0.0, kind, axes };
-        assert!(!still_moving_after_a_steady_lean(Some(calibration(solidcraft_space_mouse::Kind::ReturnToCenter))), "a leaning hand on a cap");
-        assert!(still_moving_after_a_steady_lean(Some(calibration(solidcraft_space_mouse::Kind::Trackball))), "a slow steady roll");
+        assert!(!still_moving_after_a_steady_lean(Some(calibration(polykrom_space_mouse::Kind::ReturnToCenter))), "a leaning hand on a cap");
+        assert!(still_moving_after_a_steady_lean(Some(calibration(polykrom_space_mouse::Kind::Trackball))), "a slow steady roll");
         assert!(still_moving_after_a_steady_lean(None), "a device read as it reports");
     }
 
@@ -1170,7 +1170,7 @@ mod tests {
         let axes = std::array::from_fn(|source| AxisCalibration { source, reversed: false, rest: 0, dead_zone: 0, full: [350; 2] });
         app.preferences
             .space_mouse_calibrations
-            .insert("hid 046d:c62b".into(), Calibration { dead_zone_share: 0.0, kind: solidcraft_space_mouse::Kind::ReturnToCenter, axes });
+            .insert("hid 046d:c62b".into(), Calibration { dead_zone_share: 0.0, kind: polykrom_space_mouse::Kind::ReturnToCenter, axes });
         let lean = Axes { translation: [60, 0, 0], rotation: [0; 3] };
         for _ in 0..30 {
             frame(&mut app, &ctx, DriverMapping::default(), lean, 0.02);
@@ -1349,9 +1349,9 @@ mod tests {
 
     /// A homemade device that sends push forward/back as its fifth axis, the other way round, at
     /// ten times 3Dconnexion's range.
-    fn homemade() -> solidcraft_space_mouse::Calibration {
-        let axis = |source, reversed| solidcraft_space_mouse::AxisCalibration { source, reversed, rest: 0, dead_zone: 0, full: [3500; 2] };
-        solidcraft_space_mouse::Calibration {
+    fn homemade() -> polykrom_space_mouse::Calibration {
+        let axis = |source, reversed| polykrom_space_mouse::AxisCalibration { source, reversed, rest: 0, dead_zone: 0, full: [3500; 2] };
+        polykrom_space_mouse::Calibration {
             dead_zone_share: 0.0,
             kind: Default::default(),
             axes: [axis(0, false), axis(4, true), axis(2, false), axis(3, false), axis(1, false), axis(5, false)],
@@ -1387,8 +1387,8 @@ mod tests {
         crate::space_mouse_calibration::start(&mut app);
         // It asks what kind of device it is first.
         let Some((_, wizard)) = &mut app.space_mouse.calibrating else { panic!("calibration didn't start") };
-        assert_eq!(wizard.stage(), solidcraft_space_mouse::Stage::Choose);
-        wizard.choose(solidcraft_space_mouse::Kind::ReturnToCenter);
+        assert_eq!(wizard.stage(), polykrom_space_mouse::Stage::Choose);
+        wizard.choose(polykrom_space_mouse::Kind::ReturnToCenter);
         let before = app.cam;
         assert!(!frame(&mut app, &ctx, DriverMapping::default(), PUSH, 0.02));
         assert_eq!(app.cam, before);
@@ -1614,7 +1614,7 @@ mod tests {
         app.preferences.space_mouse_axis_source = [0, 2, 1, 3, 4, 5];
         crate::space_mouse_calibration::start(&mut app);
         // The calibration asks what kind of device it is first.
-        app.space_mouse.calibrating.as_mut().unwrap().1.choose(solidcraft_space_mouse::Kind::ReturnToCenter);
+        app.space_mouse.calibrating.as_mut().unwrap().1.choose(polykrom_space_mouse::Kind::ReturnToCenter);
         let feed = |app: &mut SolveApp, axes: Axes, seconds: f64| {
             for _ in 0..(seconds / 0.02).round() as usize {
                 frame(app, &ctx, DriverMapping::default(), axes, 0.02);
@@ -1623,7 +1623,7 @@ mod tests {
         feed(&mut app, Axes::default(), 1.6);
         // And a hand resting on the cap, before the steps.
         feed(&mut app, Axes::default(), 2.6);
-        for step in solidcraft_space_mouse::STEPS {
+        for step in polykrom_space_mouse::STEPS {
             let mut raw = [0_i16; 6];
             raw[step.axis] = if step.positive { 300 } else { -300 };
             feed(&mut app, raw.into(), 0.5);

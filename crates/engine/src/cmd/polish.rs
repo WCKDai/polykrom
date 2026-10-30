@@ -10,8 +10,8 @@
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
+use polykrom_doc::ModelBody;
 use serde_json::{Value, json};
-use solidcraft_doc::ModelBody;
 use solidcraft_geom::compare::closest_on_triangle;
 use solidcraft_geom::{Aabb3, Bvh, Mesh, MeshIndex, Vec3};
 
@@ -688,8 +688,8 @@ fn body_report(b: &ModelBody, m: &Mesh, others: &[&Near], printed: bool, sharp: 
     }
     // Fixes pick edges where they are shown, as an agent sees them; a command run on its own maps
     // them into the body's own frame (crate::frames). Placements of one part share `own`.
-    let to_own = solidcraft_doc::mat_inverse(&b.source_transform).unwrap_or(solidcraft_doc::IDENTITY);
-    let own = |p: Vec3| solidcraft_doc::apply_point(&to_own, p);
+    let to_own = polykrom_doc::mat_inverse(&b.source_transform).unwrap_or(polykrom_doc::IDENTITY);
+    let own = |p: Vec3| polykrom_doc::apply_point(&to_own, p);
     let mut groups: BTreeMap<(&'static str, i64), Vec<(Vec3, f64, Vec3)>> = BTreeMap::new();
     // The chamfer size a faceted body already uses most, to keep to it.
     let usual = bevel_family.iter().max_by(|a, b| a.1.cmp(&b.1).then(b.0.total_cmp(&a.0))).map(|(c, _)| *c);
@@ -715,7 +715,7 @@ fn body_report(b: &ModelBody, m: &Mesh, others: &[&Near], printed: bool, sharp: 
         let d = if w(e.faces[0]).min(w(e.faces[1])) > 2.5 { 0.5 } else { 0.3 };
         groups.entry(("chamfer", (d * 1000.0) as i64)).or_default().push((e.mid, e.length, own(e.mid)));
     }
-    let names = if exposed.is_empty() { Vec::new() } else { solidcraft_doc::naming::edge_names(b) };
+    let names = if exposed.is_empty() { Vec::new() } else { polykrom_doc::naming::edge_names(b) };
     let mut longest = exposed.clone();
     longest.sort_by(|x, y| y.length.total_cmp(&x.length).then(x.index.cmp(&y.index)));
     let listed: Vec<Value> = longest

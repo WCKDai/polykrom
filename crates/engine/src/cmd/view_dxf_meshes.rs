@@ -6,7 +6,7 @@ use std::mem::size_of;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-use solidcraft_doc::{IDENTITY, Mat, ModelBody, mat_inverse, mat_mul};
+use polykrom_doc::{IDENTITY, Mat, ModelBody, mat_inverse, mat_mul};
 use solidcraft_geom::{Aabb3, Mesh, Vec3};
 use solidcraft_kernel::{KernelError, map_with_local_pools};
 
@@ -180,7 +180,7 @@ pub(super) fn transformed_bounds(mesh: &Mesh, m: &Mat) -> Aabb3 {
     for x in [b.min.x, b.max.x] {
         for y in [b.min.y, b.max.y] {
             for z in [b.min.z, b.max.z] {
-                out.add(solidcraft_doc::apply_point(m, Vec3::new(x, y, z)));
+                out.add(polykrom_doc::apply_point(m, Vec3::new(x, y, z)));
             }
         }
     }
@@ -192,7 +192,7 @@ mod tests {
     use super::*;
     #[test]
     fn only_proper_rigid_placements_share_geometry() {
-        assert!(rigid(&solidcraft_doc::rigid(Vec3::new(1., 2., 3.), Vec3::ZERO, Vec3::Z, 0.7)));
+        assert!(rigid(&polykrom_doc::rigid(Vec3::new(1., 2., 3.), Vec3::ZERO, Vec3::Z, 0.7)));
         let mut m = IDENTITY;
         m[0][0] = -1.;
         assert!(!rigid(&m));

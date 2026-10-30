@@ -4,10 +4,10 @@
 //! configuration material cells. The design keeps them, so they are saved and undone like
 //! features.
 
+use polykrom_doc::appearance::{Look, library};
+use polykrom_doc::config::Column;
+use polykrom_doc::{DEFAULT_MATERIAL, MATERIALS, UserMaterial, valid_density};
 use serde_json::{Value, json};
-use solidcraft_doc::appearance::{Look, library};
-use solidcraft_doc::config::Column;
-use solidcraft_doc::{DEFAULT_MATERIAL, MATERIALS, UserMaterial, valid_density};
 
 use super::CommandSpec;
 use super::inspect::{color_param, look_json};

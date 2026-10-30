@@ -1,4 +1,4 @@
-//! The GPU viewport in egui: the viewport's pipelines ([`solidcraft_gpu::view`]) drawn in an
+//! The GPU viewport in egui: the viewport's pipelines ([`polykrom_gpu::view`]) drawn in an
 //! `egui_wgpu` paint callback. Everything that draws lives in the GPU crate, so headless pictures
 //! (`polykrom-cli snapshot`, MCP screenshots, `ui.render`) use the same pipelines; this is the
 //! glue that hands them egui's device and render pass.
@@ -7,7 +7,7 @@
 use std::sync::{Arc, Mutex};
 
 use egui_wgpu::wgpu;
-pub use solidcraft_gpu::view::{
+pub use polykrom_gpu::view::{
     AccessMap, BlockBytes, BlockTris, Frame, GpuImage, GpuScene, GpuTarget, INSTANCE_SIZE, InstanceLook, InstancedMesh, LINE_SIZE, LOD_PX, PBR_SIZE,
     PlannedBody, Renderer, SHARED_SIZE, SceneBlock, SceneSlot, SharedTris, TRI_SIZE, level_for, placement_scale, supersampled_size,
 };
@@ -20,7 +20,7 @@ pub struct ViewportCallback(pub Frame);
 /// section cap does not hide the inside of cut bodies. Without `gpu_meshing` (safe mode) bodies
 /// are meshed on the CPU. When the two targets differ, the scene is drawn offscreen and blitted.
 pub fn install(rs: &egui_wgpu::RenderState, scene: GpuTarget, window: GpuTarget, gpu_meshing: bool) -> GpuTarget {
-    let tess = if gpu_meshing { solidcraft_gpu::view::tessellation(&rs.adapter, &rs.device, &rs.queue, solidcraft_gpu::SHADER) } else { None };
+    let tess = if gpu_meshing { polykrom_gpu::view::tessellation(&rs.adapter, &rs.device, &rs.queue, polykrom_gpu::SHADER) } else { None };
     let scene = GpuTarget { tess: tess.is_some(), ..scene };
     let window = GpuTarget { tess: tess.is_some(), ..window };
     let res = Renderer::with_window_target(&rs.device, scene, window, tess);
@@ -34,7 +34,7 @@ pub fn install(rs: &egui_wgpu::RenderState, scene: GpuTarget, window: GpuTarget,
 /// rasterizer draws them.
 #[cfg(not(target_arch = "wasm32"))]
 pub fn install_picture_renderer(rs: &egui_wgpu::RenderState) {
-    match solidcraft_gpu::capture::Capturer::new(&rs.adapter, rs.device.clone(), rs.queue.clone()) {
+    match polykrom_gpu::capture::Capturer::new(&rs.adapter, rs.device.clone(), rs.queue.clone()) {
         Ok(capturer) => install_capturer(capturer.watching(rs.device_lost.flag())),
         Err(e) => {
             log::warn!("pictures of the model are drawn by the CPU rasterizer: the GPU cannot draw them: {e}");
@@ -46,23 +46,23 @@ pub fn install_picture_renderer(rs: &egui_wgpu::RenderState) {
 /// Draw this process's headless pictures with `capturer`; once its device is lost (the graphics
 /// driver was reset, #4172) the CPU rasterizer draws them, so saving still writes a thumbnail.
 #[cfg(not(target_arch = "wasm32"))]
-fn install_capturer(capturer: solidcraft_gpu::capture::Capturer) {
+fn install_capturer(capturer: polykrom_gpu::capture::Capturer) {
     let capturer = std::sync::Arc::new(capturer);
-    solidcraft_engine::capture::install(std::sync::Arc::new(move |scene, cam, w, h| picture(&capturer, scene, cam, w, h)));
+    polykrom_engine::capture::install(std::sync::Arc::new(move |scene, cam, w, h| picture(&capturer, scene, cam, w, h)));
 }
 
 /// `scene` drawn by `capturer`, or by the CPU rasterizer once its device is lost.
 #[cfg(not(target_arch = "wasm32"))]
 fn picture(
-    capturer: &solidcraft_gpu::capture::Capturer,
-    scene: &solidcraft_engine::render::Scene,
-    cam: &solidcraft_engine::render::Camera,
+    capturer: &polykrom_gpu::capture::Capturer,
+    scene: &polykrom_engine::render::Scene,
+    cam: &polykrom_engine::render::Camera,
     w: u32,
     h: u32,
-) -> Result<solidcraft_engine::capture::Picture, String> {
+) -> Result<polykrom_engine::capture::Picture, String> {
     match capturer.rgba(scene, cam, w, h) {
-        Ok(rgba) => Ok(solidcraft_engine::capture::Picture { rgba, renderer: capturer.renderer() }),
-        Err(solidcraft_gpu::GpuError::DeviceLost) => Ok(cpu_picture(scene, cam, w, h)),
+        Ok(rgba) => Ok(polykrom_engine::capture::Picture { rgba, renderer: capturer.renderer() }),
+        Err(polykrom_gpu::GpuError::DeviceLost) => Ok(cpu_picture(scene, cam, w, h)),
         Err(e) => Err(e.to_string()),
     }
 }
@@ -71,17 +71,12 @@ fn picture(
 /// picture says so. The app uses it when its device cannot draw pictures; the web app always
 /// does, since a browser cannot wait for the GPU to hand a picture back.
 pub fn install_cpu_picture_renderer() {
-    solidcraft_engine::capture::install(std::sync::Arc::new(|scene, cam, w, h| Ok(cpu_picture(scene, cam, w, h))));
+    polykrom_engine::capture::install(std::sync::Arc::new(|scene, cam, w, h| Ok(cpu_picture(scene, cam, w, h))));
 }
 
-fn cpu_picture(
-    scene: &solidcraft_engine::render::Scene,
-    cam: &solidcraft_engine::render::Camera,
-    w: u32,
-    h: u32,
-) -> solidcraft_engine::capture::Picture {
-    let canvas = solidcraft_engine::render::render(scene, cam, w as usize, h as usize);
-    solidcraft_engine::capture::Picture { rgba: canvas.rgba, renderer: "cpu" }
+fn cpu_picture(scene: &polykrom_engine::render::Scene, cam: &polykrom_engine::render::Camera, w: u32, h: u32) -> polykrom_engine::capture::Picture {
+    let canvas = polykrom_engine::render::render(scene, cam, w as usize, h as usize);
+    polykrom_engine::capture::Picture { rgba: canvas.rgba, renderer: "cpu" }
 }
 
 #[cfg(test)]
@@ -90,16 +85,14 @@ mod test_support {
     /// the reason printed, on a machine without a GPU adapter, and the test skips.
     #[cfg(not(target_arch = "wasm32"))]
     pub(crate) fn test_picture_renderer() -> bool {
-        match solidcraft_gpu::capture::shared() {
+        match polykrom_gpu::capture::shared() {
             Ok(c) => {
-                solidcraft_engine::capture::install(std::sync::Arc::new(move |scene, cam, w, h| {
-                    c.rgba(scene, cam, w, h)
-                        .map(|rgba| solidcraft_engine::capture::Picture { rgba, renderer: c.renderer() })
-                        .map_err(|e| e.to_string())
+                polykrom_engine::capture::install(std::sync::Arc::new(move |scene, cam, w, h| {
+                    c.rgba(scene, cam, w, h).map(|rgba| polykrom_engine::capture::Picture { rgba, renderer: c.renderer() }).map_err(|e| e.to_string())
                 }));
                 true
             }
-            Err(e @ solidcraft_gpu::GpuError::NoAdapter(_)) if std::env::var_os("SOLIDCRAFT_REQUIRE_GPU").is_none() => {
+            Err(e @ polykrom_gpu::GpuError::NoAdapter(_)) if std::env::var_os("SOLIDCRAFT_REQUIRE_GPU").is_none() => {
                 eprintln!("skipping: {e}");
                 false
             }
@@ -134,11 +127,11 @@ impl egui_wgpu::CallbackTrait for ViewportCallback {
 
 /// The shader's analysis colours and flags for the theme's colours.
 pub fn analysis_colors(c: &crate::theme::AnalysisColors) -> [f32; 36] {
-    solidcraft_gpu::view::analysis_colors(c)
+    polykrom_gpu::view::analysis_colors(c)
 }
 
 /// The backends the offscreen tests start, chosen once per test process as the app chooses them
-/// (`apps/solidcraft/src/startup.rs`, `choose_backends`): what `WGPU_BACKEND` names; on Windows one
+/// (`apps/polykrom/src/startup.rs`, `choose_backends`): what `WGPU_BACKEND` names; on Windows one
 /// backend, the first of D3D12, Vulkan and OpenGL with a hardware adapter (else D3D12); elsewhere
 /// wgpu's default. wgpu's default on Windows starts Vulkan, D3D12 and OpenGL together, and tests
 /// starting them side by side hung or crashed the test process inside the Vulkan driver.
@@ -173,7 +166,7 @@ pub(crate) fn offscreen_device() -> Option<(wgpu::Adapter, wgpu::Device, wgpu::Q
     let instance = wgpu::Instance::new(desc);
     let adapter = pollster::block_on(instance.request_adapter(&Default::default())).ok()?;
     let (device, queue) = pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor {
-        required_features: solidcraft_gpu::depth_features(&adapter),
+        required_features: polykrom_gpu::depth_features(&adapter),
         required_limits: wgpu::Limits::downlevel_defaults().using_resolution(adapter.limits()),
         ..Default::default()
     }))
@@ -186,7 +179,7 @@ pub(crate) fn offscreen_device() -> Option<(wgpu::Adapter, wgpu::Device, wgpu::Q
 #[cfg(all(test, not(target_arch = "wasm32")))]
 pub(crate) fn offscreen_tessellates(shader: &str) -> Option<bool> {
     let (adapter, device, queue) = offscreen_device()?;
-    Some(solidcraft_gpu::view::tessellation(&adapter, &device, &queue, shader).is_some())
+    Some(polykrom_gpu::view::tessellation(&adapter, &device, &queue, shader).is_some())
 }
 
 /// Render `scene` offscreen on a device of its own, through the viewport's real resources and
@@ -285,8 +278,8 @@ fn offscreen(
     let (adapter, device, queue) = offscreen_device()?;
     eprintln!("offscreen adapter: {:?}", adapter.get_info().backend);
     let format = if srgb { wgpu::TextureFormat::Rgba8UnormSrgb } else { wgpu::TextureFormat::Rgba8Unorm };
-    let depth = solidcraft_gpu::depth_format(&device, true);
-    let compute = tess.and_then(|shader| solidcraft_gpu::view::tessellation(&adapter, &device, &queue, shader));
+    let depth = polykrom_gpu::depth_format(&device, true);
+    let compute = tess.and_then(|shader| polykrom_gpu::view::tessellation(&adapter, &device, &queue, shader));
     let target = GpuTarget { format, depth: Some(depth), samples: 1, tess: compute.is_some() };
     let mut resources = egui_wgpu::CallbackResources::default();
     resources.insert(Renderer::new(&device, target, compute));
@@ -418,8 +411,8 @@ mod tests {
             return;
         };
         let lost = egui_wgpu::DeviceLost::watch(&device);
-        let capturer = solidcraft_gpu::capture::Capturer::new(&adapter, device.clone(), queue.clone()).unwrap().watching(lost.flag());
-        let (scene, cam) = (solidcraft_engine::render::Scene::default(), solidcraft_engine::render::Camera::default());
+        let capturer = polykrom_gpu::capture::Capturer::new(&adapter, device.clone(), queue.clone()).unwrap().watching(lost.flag());
+        let (scene, cam) = (polykrom_engine::render::Scene::default(), polykrom_engine::render::Camera::default());
         assert_ne!(super::picture(&capturer, &scene, &cam, 16, 16).unwrap().renderer, "cpu");
         assert!(!lost.probe(&queue), "a working device isn't lost");
 

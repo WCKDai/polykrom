@@ -1,7 +1,7 @@
 use super::*;
+use polykrom_sketch::{LinkGeom, LinkKind, LinkSource};
 use serde_json::json;
 use solidcraft_geom::Vec2;
-use solidcraft_sketch::{LinkGeom, LinkKind, LinkSource};
 
 fn line(sk: &mut Sketch, y: f64) -> usize {
     sk.add_line(Vec2::new(0., y), Vec2::new(2., y), None, None, None).unwrap()

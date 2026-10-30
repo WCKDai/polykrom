@@ -35,15 +35,15 @@ IGNORED_PREFIXES = ("docs/", "packaging/", ".github/", "scripts/claim/", "script
 IGNORED_FILES = ("vendor/README.md",)
 # Root files that a crate embeds (include_str!), so they are not ignorable documentation.
 EMBEDDED = {
-    "ATTRIBUTION.md": "solidcraft-ui-egui",
-    "LICENSE-MIT": "solidcraft-engine",
-    "LICENSE-APACHE": "solidcraft-engine",
-    "NOTICE": "solidcraft-engine",
-    "THIRD-PARTY-LICENSES.txt": "solidcraft-engine",
+    "ATTRIBUTION.md": "polykrom-ui-egui",
+    "LICENSE-MIT": "polykrom-engine",
+    "LICENSE-APACHE": "polykrom-engine",
+    "NOTICE": "polykrom-engine",
+    "THIRD-PARTY-LICENSES.txt": "polykrom-engine",
 }
 # Folders that only some packages read: the UI embeds the catalogs and xtask checks them; the MCP
 # server's tests read the agent skills.
-EMBEDDED_PREFIXES = {"assets/locales/": ("solidcraft-ui-egui", "xtask"), "skills/": ("solidcraft-mcp",)}
+EMBEDDED_PREFIXES = {"assets/locales/": ("polykrom-ui-egui", "xtask"), "skills/": ("polykrom-mcp",)}
 # Test data and the package directories whose tests (or xtask) read it. Any other folder under
 # tests/ selects the full workspace.
 TEST_DATA = {
@@ -51,8 +51,8 @@ TEST_DATA = {
     "tests/hole_matrix/": ("crates/engine/",),
     "tests/projection/": ("crates/engine/",),
     "tests/taper/": ("crates/engine/",),
-    "tests/oracle/": ("apps/solidcraft-cli/", "xtask/"),
-    "tests/action_matrix/": ("apps/solidcraft-cli/", "crates/engine/", "xtask/"),
+    "tests/oracle/": ("apps/polykrom-cli/", "xtask/"),
+    "tests/action_matrix/": ("apps/polykrom-cli/", "crates/engine/", "xtask/"),
 }
 # Vendored crates (vendor/<crate>/, a [patch] of a crates.io dependency) and the dependency names
 # through which workspace packages reach them. egui-wgpu comes directly or through eframe. The

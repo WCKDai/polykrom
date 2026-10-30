@@ -4,8 +4,8 @@
 
 use std::collections::BTreeMap;
 
+use polykrom_doc::{FeatureKind, PlaneRef};
 use serde_json::{Value, json};
-use solidcraft_doc::{FeatureKind, PlaneRef};
 
 use super::CommandSpec;
 use crate::params::{bad, string_list, vec3};
@@ -32,7 +32,7 @@ fn copy(s: &mut Session, p: &Value) -> Result<Value> {
         ids.push(s.doc.find_feature(k).map(|f| f.id).ok_or_else(|| bad(cmd, format!("no feature `{k}`")))?);
     }
     // Keep timeline order so sketches come before the features that use them.
-    let copied: Vec<solidcraft_doc::Feature> = s.doc.features.iter().filter(|f| ids.contains(&f.id)).cloned().collect();
+    let copied: Vec<polykrom_doc::Feature> = s.doc.features.iter().filter(|f| ids.contains(&f.id)).cloned().collect();
     let names: Vec<String> = copied.iter().map(|f| f.name.clone()).collect();
     s.clipboard = copied;
     Ok(json!({"copied": names}))
@@ -67,7 +67,7 @@ fn paste(s: &mut Session, p: &Value) -> Result<Value> {
     let mut used: std::collections::BTreeSet<String> = s.model.state().bodies.iter().map(|body| body.name.clone()).collect();
     let mut notices = Vec::new();
     let author_path = s.active_occurrence_path.clone().unwrap_or_else(|| s.doc.first_path(comp));
-    solidcraft_doc::EmbossFace::component_frame(&s.placed_document(), comp, &author_path)?;
+    polykrom_doc::EmbossFace::component_frame(&s.placed_document(), comp, &author_path)?;
     let mut names: BTreeMap<String, String> = BTreeMap::new();
     let mut made = Vec::new();
     for f in feats {
@@ -95,7 +95,7 @@ fn paste(s: &mut Session, p: &Value) -> Result<Value> {
             if let FeatureKind::Sketch { sketch, .. } = &mut kind {
                 for link in &mut sketch.links {
                     if link.auto_face {
-                        if let solidcraft_sketch::LinkSource::Face { body, .. } = &mut link.source
+                        if let polykrom_sketch::LinkSource::Face { body, .. } = &mut link.source
                             && let Some(mapped) = bodies.get(body)
                         {
                             *body = mapped.clone();
@@ -145,7 +145,7 @@ fn paste(s: &mut Session, p: &Value) -> Result<Value> {
             if let FeatureKind::Sketch { plane, .. } | FeatureKind::ConstructionPlane { plane } = &mut kind {
                 explicit_planes(plane);
             }
-            let mut m = solidcraft_doc::IDENTITY;
+            let mut m = polykrom_doc::IDENTITY;
             m[3][0] = t.x;
             m[3][1] = t.y;
             m[3][2] = t.z;
@@ -154,7 +154,7 @@ fn paste(s: &mut Session, p: &Value) -> Result<Value> {
         // A cylinder Emboss finds its face only by the persistent name recorded when it was made
         // (#1035): the copy keeps that name, pointed at the pasted features and bodies.
         let face_names: Vec<String> = if matches!(kind, FeatureKind::Emboss { face: Some(_), .. }) {
-            f.face_names.iter().map(|n| solidcraft_doc::remap_topology(n, &sketches, &bodies)).collect()
+            f.face_names.iter().map(|n| polykrom_doc::remap_topology(n, &sketches, &bodies)).collect()
         } else {
             Vec::new()
         };
@@ -243,7 +243,7 @@ mod tests {
         let first = s.doc.find_feature("First").unwrap().id;
         let second = s.doc.find_feature("Second").unwrap().id;
         assert_eq!(folder.features, vec![first, pasted, second]);
-        assert!(solidcraft_doc::Document::from_json(&s.doc.to_json()).is_ok(), "pasting inside a folder must leave a reopenable design");
+        assert!(polykrom_doc::Document::from_json(&s.doc.to_json()).is_ok(), "pasting inside a folder must leave a reopenable design");
     }
 
     /// A STEP file of three boxes at x = 0, 30 and 60. With `shared` the three solids carry one

@@ -2,9 +2,9 @@
 //! turns to it from where it was, never round to the far side (#1586).
 
 use crate::scenario::Harness;
+use polykrom_engine::doc::{FeatureKind, PlaneRef};
+use polykrom_engine::geom::{Plane, Vec3};
 use serde_json::json;
-use solidcraft_engine::doc::{FeatureKind, PlaneRef};
-use solidcraft_engine::geom::{Plane, Vec3};
 
 fn sketch_from(yaw: f64, pitch: f64, name: &str) -> (Harness, Vec3, Plane) {
     let mut h = Harness::new();
@@ -77,7 +77,7 @@ fn a_construction_plane_seen_from_below_gets_a_sketch_facing_down() {
     h.app.run("construct.plane.offset", json!({"base":"XY","offset":"5 mm","name":"P"})).unwrap();
     h.app.cam.yaw = -0.6;
     h.app.cam.pitch = -0.5;
-    h.app.session.selection = vec![solidcraft_engine::Sel::Plane { name: "P".into() }];
+    h.app.session.selection = vec![polykrom_engine::Sel::Plane { name: "P".into() }];
     h.step(&json!({"key":"L"})).unwrap();
     h.settle();
     let sketch = h.app.session.active_sketch.expect("a sketch on P");

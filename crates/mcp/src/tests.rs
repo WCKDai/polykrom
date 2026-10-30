@@ -14,14 +14,14 @@ fn server() -> Server {
 /// tests install the same one. `false`, with the reason printed, on a machine without a GPU
 /// adapter: the screenshots are then left out of the test.
 fn renders() -> bool {
-    match solidcraft_gpu::capture::shared() {
+    match polykrom_gpu::capture::shared() {
         Ok(c) => {
-            solidcraft_engine::capture::install(std::sync::Arc::new(move |scene, cam, w, h| {
-                c.rgba(scene, cam, w, h).map(|rgba| solidcraft_engine::capture::Picture { rgba, renderer: c.renderer() }).map_err(|e| e.to_string())
+            polykrom_engine::capture::install(std::sync::Arc::new(move |scene, cam, w, h| {
+                c.rgba(scene, cam, w, h).map(|rgba| polykrom_engine::capture::Picture { rgba, renderer: c.renderer() }).map_err(|e| e.to_string())
             }));
             true
         }
-        Err(e @ solidcraft_gpu::GpuError::NoAdapter(_)) if std::env::var_os("SOLIDCRAFT_REQUIRE_GPU").is_none() => {
+        Err(e @ polykrom_gpu::GpuError::NoAdapter(_)) if std::env::var_os("SOLIDCRAFT_REQUIRE_GPU").is_none() => {
             eprintln!("screenshots left out: {e}");
             false
         }
@@ -52,7 +52,7 @@ fn tool(s: &mut Server, name: &str, args: Value) -> Value {
 #[test]
 fn whitespace_does_not_bypass_mcp_request_limit() {
     let mut s = server();
-    let request = format!("{}{}", " ".repeat(solidcraft_engine::MAX_LINE), r#"{"jsonrpc":"2.0","id":1,"method":"ping"}"#);
+    let request = format!("{}{}", " ".repeat(polykrom_engine::MAX_LINE), r#"{"jsonrpc":"2.0","id":1,"method":"ping"}"#);
     let reply: Value = serde_json::from_str(&s.handle_line(&request).expect("size error")).unwrap();
     assert_eq!(reply["error"]["code"], -32600, "{reply}");
     assert!(reply["result"].is_null(), "oversized request must not execute: {reply}");
@@ -61,7 +61,7 @@ fn whitespace_does_not_bypass_mcp_request_limit() {
 /// The transport must discard an oversized line in bounded space and resume on the next one.
 #[test]
 fn oversized_mcp_stdio_line_does_not_poison_the_next_request() {
-    let mut bytes = vec![b'X'; solidcraft_engine::MAX_LINE + 1];
+    let mut bytes = vec![b'X'; polykrom_engine::MAX_LINE + 1];
     bytes.extend_from_slice(b"\n{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"ping\"}\n");
     let input = std::io::BufReader::with_capacity(64, std::io::Cursor::new(bytes));
     let mut output = Vec::new();
@@ -752,7 +752,7 @@ fn list_commands_filter_by_a_command_id_matches_ids() {
 #[test]
 fn legacy_design_files_and_resource_uris() {
     let mut s = server();
-    let saved = String::from_utf8(solidcraft_engine::io::write_design(&solidcraft_engine::doc::Document::default())).unwrap();
+    let saved = String::from_utf8(polykrom_engine::io::write_design(&polykrom_engine::doc::Document::default())).unwrap();
     assert!(saved.contains("\"solidcraft/"), "{saved}");
     let legacy = saved.replace("\"solidcraft/", "\"solvecraft/");
     let path = std::env::temp_dir().join(format!("solidcraft-mcp-legacy-{}.solvecraft", std::process::id()));
@@ -768,7 +768,7 @@ fn legacy_design_files_and_resource_uris() {
 /// design is open there, without its hidden files. The working folder doesn't count at all.
 #[test]
 fn the_default_folders_are_the_designs_the_recovery_folder_and_the_scratch_folder() {
-    let base = solidcraft_engine::io::vfs::temp_dir().join(format!("solidcraft-mcp-defaults-{}", std::process::id()));
+    let base = polykrom_engine::io::vfs::temp_dir().join(format!("solidcraft-mcp-defaults-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&base);
     let (proj, other, recovery) = (base.join("proj"), base.join("other"), base.join("recovery"));
     std::fs::create_dir_all(&proj).unwrap();
@@ -781,7 +781,7 @@ fn the_default_folders_are_the_designs_the_recovery_folder_and_the_scratch_folde
     assert!(scope.roots().contains(&std::fs::canonicalize(&recovery).unwrap()), "{scope:?}");
     assert!(scope.roots().contains(&std::fs::canonicalize(crate::scratch_dir().unwrap()).unwrap()), "{scope:?}");
 
-    let mut session = solidcraft_engine::Session::default();
+    let mut session = polykrom_engine::Session::default();
     session.execute("solid.box", &json!({"length": 10, "width": 10, "height": 10})).unwrap();
     session.execute("file.save_as", &json!({"path": at(&proj, "part.solidcraft")})).unwrap();
     let mut s = Server::new(Box::new(Headless::new(session))).with_path_scope(Some(scope));
@@ -815,8 +815,8 @@ fn the_default_folders_are_the_designs_the_recovery_folder_and_the_scratch_folde
 /// symlink that leads out, is refused with a clear error and nothing is written.
 #[test]
 fn tool_calls_stay_inside_the_agents_folders() {
-    use solidcraft_engine::io::vfs::PathScope;
-    let base = solidcraft_engine::io::vfs::temp_dir().join(format!("solidcraft-mcp-scope-{}", std::process::id()));
+    use polykrom_engine::io::vfs::PathScope;
+    let base = polykrom_engine::io::vfs::temp_dir().join(format!("solidcraft-mcp-scope-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&base);
     let (root, out) = (base.join("root"), base.join("out"));
     std::fs::create_dir_all(&root).unwrap();
@@ -868,7 +868,7 @@ fn short_spelling(path: &std::path::Path) -> Option<std::path::PathBuf> {
     // nosemgrep: agents.config.eng-rust-command-shell -- test-only duplicate of the Windows short-name lookup.
     let out = std::process::Command::new("cmd").raw_arg(format!("/d /c for %I in (\"{}\") do @echo %~sI", path.display())).output().ok()?;
     Some(String::from_utf8_lossy(&out.stdout).trim().to_string())
-        .filter(|s| solidcraft_engine::io::vfs::windows_refusal(s).is_some_and(|why| why.contains("8.3")))
+        .filter(|s| polykrom_engine::io::vfs::windows_refusal(s).is_some_and(|why| why.contains("8.3")))
         .map(Into::into)
 }
 
@@ -880,7 +880,7 @@ fn short_spelling(path: &std::path::Path) -> Option<std::path::PathBuf> {
 #[cfg(windows)]
 #[test]
 fn the_servers_own_folders_work_when_the_temporary_folder_has_a_short_name() {
-    let base = solidcraft_engine::io::vfs::temp_dir().join(format!("solidcraft-mcp-short-names-{}", std::process::id()));
+    let base = polykrom_engine::io::vfs::temp_dir().join(format!("solidcraft-mcp-short-names-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&base);
     let (temp, recovery) = (base.join("temporary"), base.join("recovery folder"));
     std::fs::create_dir_all(&temp).unwrap();
@@ -910,7 +910,7 @@ fn short_names_child() {
     if std::env::var_os("SOLIDCRAFT_MCP_SHORT_NAMES_CHILD").is_none() {
         return;
     }
-    use solidcraft_engine::io::vfs::windows_refusal;
+    use polykrom_engine::io::vfs::windows_refusal;
     let temp = std::env::temp_dir();
     assert!(windows_refusal(&temp.to_string_lossy()).is_some_and(|why| why.contains("8.3")), "{}", temp.display());
     let mut s = Server::new(Box::new(Headless::default())).with_path_scope(Some(crate::agent_scope([])));
@@ -933,7 +933,7 @@ fn short_names_child() {
 fn a_bridged_request_carries_the_agents_folders() {
     use std::io::{BufRead, BufReader, Write};
 
-    use solidcraft_engine::io::vfs::{PathScope, scoped};
+    use polykrom_engine::io::vfs::{PathScope, scoped};
     let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
     let addr = listener.local_addr().unwrap().to_string();
     let echo = std::thread::spawn(move || {
@@ -1601,7 +1601,7 @@ fn batch_does_not_resend_after_a_transport_error() {
 /// A batch longer than one control line goes step by step instead of being refused unrun.
 #[test]
 fn batch_too_large_for_one_control_line_goes_per_step() {
-    let big = "x".repeat(solidcraft_engine::MAX_LINE);
+    let big = "x".repeat(polykrom_engine::MAX_LINE);
     let (b, body, is_error) = recorded_batch(Ok(json!({})), json!({"commands": [{"command": "a.one", "params": {"text": big}}]}));
     assert!(!is_error, "{body}");
     assert!(!methods(&b).contains(&"engine.batch"), "{:?}", methods(&b));
@@ -2123,7 +2123,7 @@ fn describe_command_and_strict_parameter_checking() {
     assert!(d["output"]["properties"].get("created_bodies").is_some(), "{d}");
 
     let mut headless = Headless::default();
-    headless.session.param_check = solidcraft_engine::schema::ParamCheck::Strict;
+    headless.session.param_check = polykrom_engine::schema::ParamCheck::Strict;
     let mut s = Server::new(Box::new(headless));
     call(&mut s, 1, "initialize", json!({"protocolVersion": PROTOCOL_VERSION, "capabilities": {}, "clientInfo": {"name": "t", "version": "1"}}));
     let r = raw_tool(&mut s, "execute", json!({"command": "solid.box", "params": {"length": 5, "width": 5, "height": 5, "operaton": "cut"}}));

@@ -56,7 +56,7 @@ macro_rules! dialog_descriptors {
                 }
             }
 
-            pub(crate) fn simple_restore(feature: &solidcraft_engine::doc::FeatureKind) -> Option<Self> {
+            pub(crate) fn simple_restore(feature: &polykrom_engine::doc::FeatureKind) -> Option<Self> {
                 Some(match feature {
                     $( $feature => Self::$variant { $($field: $restore,)* }, )*
                     _ => return None,

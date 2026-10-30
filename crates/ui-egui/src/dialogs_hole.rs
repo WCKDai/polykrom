@@ -5,7 +5,7 @@
 //! Hovering a field, or typing in it, lights its dimension.
 
 use egui::{Color32, Pos2, Rect, Shape, Stroke, pos2, vec2};
-use solidcraft_engine::doc::expr::Kind as ValueKind;
+use polykrom_engine::doc::expr::Kind as ValueKind;
 
 use crate::dialogs::{HoleOpts, Kind};
 use crate::theme::Tokens;

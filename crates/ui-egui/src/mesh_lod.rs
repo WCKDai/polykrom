@@ -1,5 +1,5 @@
 //! Levels of detail for large meshes drawn as instances: coarser copies of a shared mesh
-//! ([`solidcraft_engine::geom::simplify`]), made once per mesh off the window thread, so a
+//! ([`polykrom_engine::geom::simplify`]), made once per mesh off the window thread, so a
 //! placement small on screen is drawn from far fewer triangles ([`crate::gpu::LOD_PX`] decides
 //! which). Until a mesh's levels are made it is drawn in full; when they are, the scene is built
 //! again with them ([`MeshLods::generation`]).
@@ -9,7 +9,7 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex};
 
-use solidcraft_engine::geom::Mesh;
+use polykrom_engine::geom::Mesh;
 
 use crate::gpu::SharedTris;
 
@@ -97,7 +97,7 @@ impl MeshLods {
 fn make(mesh: &Mesh) -> Vec<(Arc<SharedTris>, f32)> {
     let n = mesh.triangles.len();
     let targets: Vec<usize> = [4, 16, 64].into_iter().map(|d| n / d).filter(|t| *t >= MIN_LEVEL).collect();
-    solidcraft_engine::geom::simplify::levels(&mesh.positions, &mesh.triangles, &targets)
+    polykrom_engine::geom::simplify::levels(&mesh.positions, &mesh.triangles, &targets)
         .iter()
         .map(|l| (Arc::new(SharedTris::from_level(l)), l.error as f32))
         .collect()

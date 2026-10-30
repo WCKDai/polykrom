@@ -1,10 +1,10 @@
 //! Temporary visual review: rasterise the app's actual egui meshes without WindowServer.
 use egui::{ColorImage, TextureId, pos2, vec2};
-use serde_json::json;
-use solidcraft_ui_egui::{
+use polykrom_ui_egui::{
     dialogs::Kind,
     scenario::{self, Harness},
 };
+use serde_json::json;
 use std::collections::HashMap;
 
 fn paint(h: &mut Harness, textures: &mut HashMap<TextureId, ColorImage>, events: Vec<egui::Event>) -> egui::FullOutput {
@@ -132,13 +132,13 @@ fn capture() {
             } else {
                 h.app.run("solid.box", json!({"length":10,"width":10,"height":10})).unwrap();
                 h.app.run("appearance.assign", json!({"bodies":["Body1"],"color":"#ccd0d6","appearance":"Aluminum - Satin","opacity":1.0})).unwrap();
-                h.app.session.selection = vec![solidcraft_engine::Sel::Body { name: "Body1".into() }];
+                h.app.session.selection = vec![polykrom_engine::Sel::Body { name: "Body1".into() }];
                 let path = format!("{root}/review-library.json");
                 h.app.run("library.export", json!({"path":path,"overwrite":true})).unwrap();
                 h.app.start("appearance.assign");
                 let Kind::Appearance(k) = &mut h.app.dialog.as_mut().unwrap().kind else { panic!() };
                 k.local.path = path.clone();
-                k.local.catalog = Some(solidcraft_engine::io::catalog::Catalog::read(&path).unwrap());
+                k.local.catalog = Some(polykrom_engine::io::catalog::Catalog::read(&path).unwrap());
                 k.local.selected = k.local.catalog.as_ref().and_then(|c| c.entries.first()).map(|e| e.id.clone());
                 k.note = Some("Appearance applied".into());
                 if mode == "pbr" {
@@ -147,7 +147,7 @@ fn capture() {
                 }
             }
             h.ctx = egui::Context::default();
-            solidcraft_ui_egui::fonts::setup_fonts(&h.ctx);
+            polykrom_ui_egui::fonts::setup_fonts(&h.ctx);
             let mut textures = HashMap::new();
             for _ in 0..6 {
                 paint(&mut h, &mut textures, vec![]);

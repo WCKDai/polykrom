@@ -26,7 +26,7 @@ fn directional(_: &mut Session, params: &Value) -> Result<Value> {
         .ok_or_else(|| bad(cmd, "direction: expected exactly three numeric components"))?;
     let component = |i| direction.get(i).and_then(Value::as_f64).ok_or_else(|| bad(cmd, "direction: expected numeric components"));
     let direction = [component(0)?, component(1)?, component(2)?];
-    let card = solidcraft_doc::physical_material::admit_card(value).map_err(|e| bad(cmd, e.to_string()))?;
+    let card = polykrom_doc::physical_material::admit_card(value).map_err(|e| bad(cmd, e.to_string()))?;
     let response = card.directional_modulus(direction).map_err(|e| bad(cmd, e.to_string()))?;
     serde_json::to_value(response).map_err(|e| bad(cmd, e.to_string()))
 }
@@ -37,7 +37,7 @@ fn validate(_: &mut Session, params: &Value) -> Result<Value> {
         .filter(|o| o.len() == 1 && o.contains_key("card"))
         .ok_or_else(|| bad("material.properties.validate", "expected {card: ...}"))?;
     let card = object.get("card").ok_or_else(|| bad("material.properties.validate", "missing card"))?;
-    let result = solidcraft_doc::physical_material::validate_card(card).map_err(|e| bad("material.properties.validate", e.to_string()))?;
+    let result = polykrom_doc::physical_material::validate_card(card).map_err(|e| bad("material.properties.validate", e.to_string()))?;
     Ok(json!({"valid":true,"validation":result}))
 }
 

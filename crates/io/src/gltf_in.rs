@@ -22,8 +22,8 @@ use std::hash::{Hash, Hasher};
 
 use gltf::accessor::{DataType, Dimensions};
 use gltf::mesh::Mode;
-use solidcraft_doc::appearance::Look;
-use solidcraft_doc::{Mat, MeshData, mat_mul};
+use polykrom_doc::appearance::Look;
+use polykrom_doc::{Mat, MeshData, mat_mul};
 use solidcraft_geom::Vec3;
 
 use crate::{IoError, MAX_3MF_BYTES, MeshFeature, Result};
@@ -91,14 +91,14 @@ impl GltfImport {
         let mut world: Vec<Option<Mat>> = vec![None; self.plan.slots.len()];
         for p in &self.plan.places {
             let parent = match p.parent {
-                None => Some(solidcraft_doc::IDENTITY),
+                None => Some(polykrom_doc::IDENTITY),
                 Some(q) => world.get(q).copied().flatten(),
             };
             if let (Some(parent), Some(slot @ None)) = (parent, world.get_mut(p.slot)) {
                 *slot = Some(mat_mul(&parent, &p.transform));
             }
         }
-        if let solidcraft_doc::FeatureKind::MeshImport { meshes, .. } = &mut self.feature.kind {
+        if let polykrom_doc::FeatureKind::MeshImport { meshes, .. } = &mut self.feature.kind {
             for (m, slot) in meshes.iter_mut().zip(&self.plan.bodies) {
                 let Some(frame) = slot.and_then(|s| world.get(s).copied().flatten()) else { continue };
                 m.positions = m
@@ -107,7 +107,7 @@ impl GltfImport {
                     .0
                     .iter()
                     .flat_map(|p| {
-                        let q = solidcraft_doc::apply_point(&frame, Vec3::new(p[0], p[1], p[2]));
+                        let q = polykrom_doc::apply_point(&frame, Vec3::new(p[0], p[1], p[2]));
                         [q.x, q.y, q.z]
                     })
                     .collect();
@@ -192,7 +192,7 @@ pub fn read_gltf(bytes: &[u8], file: &str, load: Loader<'_>) -> Result<GltfImpor
     let file_name = std::path::Path::new(file).file_name().map(|s| s.to_string_lossy().to_string()).unwrap_or_else(|| file.to_string());
     let body_names = reader.meshes.iter().map(|m| m.name.clone()).collect();
     Ok(GltfImport {
-        feature: MeshFeature { name, body_names, kind: solidcraft_doc::FeatureKind::MeshImport { file: file_name, meshes: reader.meshes }, warnings },
+        feature: MeshFeature { name, body_names, kind: polykrom_doc::FeatureKind::MeshImport { file: file_name, meshes: reader.meshes }, warnings },
         plan: reader.plan,
         looks: reader.looks,
     })
@@ -676,7 +676,7 @@ impl<'d> Reader<'d, '_, '_> {
             };
             let Some(group) = groups.get_mut(at) else { continue };
             let offset = u32::try_from(group.1.len()).map_err(|_| IoError::Invalid("glTF mesh too large".into()))?;
-            group.1.extend(tris.0.iter().map(|p| solidcraft_doc::apply_point(bake, *p)));
+            group.1.extend(tris.0.iter().map(|p| polykrom_doc::apply_point(bake, *p)));
             group.2.extend(tris.1.iter().map(|t| {
                 let t = t.map(|i| i + offset);
                 if flip { [t[0], t[2], t[1]] } else { t }
@@ -857,9 +857,7 @@ fn look_of(m: &gltf::Material<'_>) -> Look {
     let name = m.name().map(clean_name).filter(|n| !n.is_empty()).unwrap_or_else(|| "glTF material".into());
     let finite = |v: f32, d: f64| if v.is_finite() { f64::from(v).clamp(0.0, 1.0) } else { d };
     let pbr = (opacity >= 1.0)
-        .then(|| {
-            solidcraft_doc::pbr_appearance::PbrParameters::new(finite(pbr.metallic_factor(), 1.0), finite(pbr.roughness_factor(), 1.0), 1.5).ok()
-        })
+        .then(|| polykrom_doc::pbr_appearance::PbrParameters::new(finite(pbr.metallic_factor(), 1.0), finite(pbr.roughness_factor(), 1.0), 1.5).ok())
         .flatten();
     Look { name, color, opacity, pbr }
 }

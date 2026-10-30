@@ -187,13 +187,7 @@ fn the_pictures_cost_a_bounded_amount_to_draw_per_frame() {
     let calibration = Calibration {
         dead_zone_share: 0.0,
         kind: Kind::ReturnToCenter,
-        axes: std::array::from_fn(|source| solidcraft_space_mouse::AxisCalibration {
-            source,
-            reversed: false,
-            rest: 0,
-            dead_zone: 0,
-            full: [350; 2],
-        }),
+        axes: std::array::from_fn(|source| polykrom_space_mouse::AxisCalibration { source, reversed: false, rest: 0, dead_zone: 0, full: [350; 2] }),
     };
     let cost = |draw_it: &mut dyn FnMut(&mut egui::Ui)| {
         let mut output = ctx.run_ui(
@@ -212,7 +206,7 @@ fn the_pictures_cost_a_bounded_amount_to_draw_per_frame() {
     let cap = cost(&mut |ui| live(ui, &calibration, [60, -40, 100, 10, -20, 30]));
     let ball = Calibration { kind: Kind::Trackball, ..calibration };
     let rolling = cost(&mut |ui| live(ui, &ball, [60, -40, 100, 10, -20, 30]));
-    let demo_cost = cost(&mut |ui| demo(ui, solidcraft_space_mouse::STEPS[0], Kind::ReturnToCenter));
+    let demo_cost = cost(&mut |ui| demo(ui, polykrom_space_mouse::STEPS[0], Kind::ReturnToCenter));
     eprintln!("PICTURE COST cap (shapes, vertices) {cap:?} trackball {rolling:?} demo {demo_cost:?}");
     for (name, (shapes, vertices)) in [("cap", cap), ("trackball", rolling), ("demo", demo_cost)] {
         assert!(shapes <= CEILING_SHAPES && vertices <= CEILING_VERTICES, "{name}: {shapes} shapes, {vertices} vertices");

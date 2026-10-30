@@ -1,7 +1,7 @@
 //! Helpers to read hostile JSON parameters.
 
+use polykrom_doc::Expr;
 use serde_json::Value;
-use solidcraft_doc::Expr;
 use solidcraft_geom::{Vec2, Vec3};
 
 use crate::{EngineError, Result};

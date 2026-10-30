@@ -80,13 +80,13 @@ fn join_extrude_from_a_chamfered_top_face() {
     run(&mut s, "solid.chamfer", json!({"edges": [[10, 0, 20]], "distance": "bevel"}));
     let base = volume(&mut s);
     let id = run(&mut s, "sketch.create", json!({"plane": {"face": [0, 0, 20]}}))["sketch"].as_u64().unwrap();
-    let solidcraft_doc::FeatureKind::Sketch { plane: solidcraft_doc::PlaneRef::Face { anchor: Some(anchor), .. }, sketch } =
+    let polykrom_doc::FeatureKind::Sketch { plane: polykrom_doc::PlaneRef::Face { anchor: Some(anchor), .. }, sketch } =
         &s.doc.feature(id).unwrap().kind
     else {
         panic!("the chamfered cap retains its exact original construction support");
     };
     assert_eq!(anchor.target.origin_feature, source);
-    assert!(matches!(anchor.target.certificate, Some(solidcraft_doc::config::FaceCertificate::ExtrudeCap { high: true, .. })));
+    assert!(matches!(anchor.target.certificate, Some(polykrom_doc::config::FaceCertificate::ExtrudeCap { high: true, .. })));
     assert!(!sketch.links.is_empty());
     assert!(sketch.links.iter().all(|link| link.auto_face && !link.lost));
     // The default linked cap outline is radius8; no explicit fixed plane or
@@ -99,7 +99,7 @@ fn join_extrude_from_a_chamfered_top_face() {
         run(&mut s, "parameters.change", json!({"name":"height","expression":format!("{height} mm")}));
         run(&mut s, "parameters.change", json!({"name":"bevel","expression":format!("{bevel} mm")}));
         let expected = PI * (100. * height - (10. * bevel * bevel - bevel * bevel * bevel / 3.) + (10. - bevel) * (10. - bevel) * 5.);
-        let loaded = solidcraft_doc::Document::from_json(&s.doc.to_json()).unwrap();
+        let loaded = polykrom_doc::Document::from_json(&s.doc.to_json()).unwrap();
         let mut cold = Session::new(loaded);
         let warm_volume = volume(&mut s);
         let cold_volume = volume(&mut cold);
@@ -439,7 +439,7 @@ fn box_fillet_cut_part() {
     let l: Vec<String> = r["curves"].as_array().unwrap().iter().map(|v| v.as_str().unwrap().to_string()).collect();
     let corner = s.doc.sketch(s.active_sketch.unwrap()).unwrap().curves[0].clone();
     let start = match corner.kind {
-        solidcraft_sketch::CurveKind::Line { a, .. } => s.doc.sketch(s.active_sketch.unwrap()).unwrap().points[a].id.clone(),
+        polykrom_sketch::CurveKind::Line { a, .. } => s.doc.sketch(s.active_sketch.unwrap()).unwrap().points[a].id.clone(),
         _ => panic!(),
     };
     run(&mut s, "sketch.constraint.coincident", json!({"a": start, "b": "origin"}));
@@ -1260,7 +1260,7 @@ fn step_insert_shell_and_errors() {
     assert_eq!(*d.doc, *before);
 }
 
-fn body_volume(st: &solidcraft_doc::ModelState) -> f64 {
+fn body_volume(st: &polykrom_doc::ModelState) -> f64 {
     st.bodies.iter().map(|b| solidcraft_kernel::measure(&b.body).unwrap().volume).sum()
 }
 
@@ -1282,7 +1282,7 @@ fn step_insert_delete_removes_assembly_and_undo_restores_it() {
     let kept = s.doc_mut().add_component(Some("Kept"), 0).unwrap();
     let kept_occurrence = s.doc.occurrence_of(kept).unwrap().clone();
     run(&mut s, "file.insert_step", json!({"path": path.to_string_lossy(), "name": "Imported"}));
-    let reopened = solidcraft_doc::Document::from_json(&s.doc.to_json()).unwrap();
+    let reopened = polykrom_doc::Document::from_json(&s.doc.to_json()).unwrap();
     assert!(reopened.find_feature("Imported").unwrap().inserted, "the insert keeps its mark through save");
     run(&mut s, "solid.mirror", json!({"bodies": ["Part"], "plane": {"origin": [0, 30, 0], "normal": [0, 1, 0]}}));
     assert!(s.model.state().body("Part (3)").is_some());
@@ -1766,12 +1766,12 @@ fn holes_at_sketch_points_threads_and_components() {
     assert_eq!(r["components"].as_array().map(|a| a.len()), Some(1));
     // Saved and loaded with the components.
     let text = s.doc.to_json();
-    let back = solidcraft_doc::Document::from_json(&text).unwrap();
+    let back = polykrom_doc::Document::from_json(&text).unwrap();
     assert_eq!(back.components.len(), 2);
     let assigned = r["components"][0]["component"].as_u64().unwrap();
     let transfer = r["components"][0]["feature"].as_u64().unwrap();
     assert!(
-        matches!(&back.feature(transfer).unwrap().kind, solidcraft_doc::FeatureKind::BodyTransfer { bodies, to, .. } if bodies == &["Shaft"] && *to == assigned)
+        matches!(&back.feature(transfer).unwrap().kind, polykrom_doc::FeatureKind::BodyTransfer { bodies, to, .. } if bodies == &["Shaft"] && *to == assigned)
     );
     let reopened = Session::new(back);
     assert_eq!(reopened.model.state().body("Shaft").unwrap().component, assigned);
@@ -1943,11 +1943,11 @@ fn components_occurrences_and_world_placement() {
     assert_eq!(s.world_state().body("Base").unwrap().component, 0);
     run(&mut s, "timeline.roll_to", json!({}));
     // Saved and loaded; older designs get occurrences.
-    let back = solidcraft_doc::Document::from_json(&s.doc.to_json()).unwrap();
+    let back = polykrom_doc::Document::from_json(&s.doc.to_json()).unwrap();
     assert_eq!(back.occurrences.len(), s.doc.occurrences.len());
     let mut old: serde_json::Value = serde_json::from_str(&s.doc.to_json()).unwrap();
     old.as_object_mut().unwrap().remove("occurrences");
-    let migrated = solidcraft_doc::Document::from_json(&old.to_string()).unwrap();
+    let migrated = polykrom_doc::Document::from_json(&old.to_string()).unwrap();
     assert_eq!(migrated.occurrences.len(), migrated.components.len());
 }
 
@@ -1984,7 +1984,7 @@ fn feature_inputs_are_parameters() {
     assert!(rel(volume(&mut s), 24.0 * 12.0 * 25.4) < 1e-9);
     assert!(s.execute("parameters.import", &json!({"text": "name,expression\nw,1/"})).is_err());
     // Saved and reloaded, the names stay.
-    let back = solidcraft_doc::Document::from_json(&s.doc.to_json()).unwrap();
+    let back = polykrom_doc::Document::from_json(&s.doc.to_json()).unwrap();
     assert_eq!(back.features[0].param_names, s.doc.features[0].param_names);
 }
 
@@ -2047,8 +2047,7 @@ fn material_and_appearance_colours_export_to_step() {
     run(&mut s, "appearance.assign", json!({"bodies": ["RedAbs"], "color": "#d01c1c"}));
     assert!(s.execute("appearance.assign", &json!({"bodies": ["RedAbs"], "color": "#12"})).is_err());
     let rgb = |c: [u8; 3]| c.map(|x| x as f32 / 255.0);
-    let want =
-        [("BrassBox", Some(rgb(solidcraft_doc::material_color("Brass").unwrap()))), ("RedAbs", Some(rgb([0xd0, 0x1c, 0x1c]))), ("Plain", None)];
+    let want = [("BrassBox", Some(rgb(polykrom_doc::material_color("Brass").unwrap()))), ("RedAbs", Some(rgb([0xd0, 0x1c, 0x1c]))), ("Plain", None)];
     let same = |a: Option<[f32; 3]>, b: Option<[f32; 3]>| match (a, b) {
         (Some(a), Some(b)) => a.iter().zip(b).all(|(x, y)| (x - y).abs() < 1e-3),
         (None, None) => true,
@@ -2313,7 +2312,7 @@ fn appearances_by_face_body_and_component() {
     assert_eq!(look(&mut s, "Shell")["appearance"]["name"], "Brass");
     // Saved and opened again.
     run(&mut s, "appearance.assign", json!({"faces": [[5, 5, 10]], "color": "#00ff00"}));
-    let back = solidcraft_doc::Document::from_json(&s.doc.to_json()).unwrap();
+    let back = polykrom_doc::Document::from_json(&s.doc.to_json()).unwrap();
     assert_eq!(back.appearances, s.doc.appearances);
     assert!(s.execute("appearance.assign", &json!({"bodies": ["Shell"], "appearance": "Unobtainium"})).is_err());
     assert!(s.execute("appearance.assign", &json!({"color": "#ffffff"})).is_err(), "no target");
@@ -2333,12 +2332,12 @@ fn cached_evaluation_matches_from_scratch() {
     );
     run(&mut s, "solid.box", json!({"corner": [-50, 0, 0], "length": 10, "width": 10, "height": 10, "body_name": "Side"}));
     let same = |s: &Session, what: &str| {
-        let mut fresh = solidcraft_doc::Model::new();
+        let mut fresh = polykrom_doc::Model::new();
         fresh.no_cache = true;
         fresh.evaluate(&s.doc);
-        let errs = |m: &solidcraft_doc::Model| m.results.iter().map(|r| (r.id, r.error.clone(), r.skipped)).collect::<Vec<_>>();
+        let errs = |m: &polykrom_doc::Model| m.results.iter().map(|r| (r.id, r.error.clone(), r.skipped)).collect::<Vec<_>>();
         assert_eq!(errs(&s.model), errs(&fresh), "{what}: feature results");
-        let shape = |st: &solidcraft_doc::ModelState| {
+        let shape = |st: &polykrom_doc::ModelState| {
             st.bodies
                 .iter()
                 .map(|b| {
@@ -2353,13 +2352,13 @@ fn cached_evaluation_matches_from_scratch() {
         assert_eq!(s.model.state().sketches.len(), fresh.state().sketches.len(), "{what}: sketches");
     };
     // Two evaluations from scratch agree to the same precision.
-    let mut a = solidcraft_doc::Model::new();
+    let mut a = polykrom_doc::Model::new();
     a.no_cache = true;
     a.evaluate(&s.doc);
-    let mut b = solidcraft_doc::Model::new();
+    let mut b = polykrom_doc::Model::new();
     b.no_cache = true;
     b.evaluate(&s.doc);
-    let vols = |m: &solidcraft_doc::Model| {
+    let vols = |m: &polykrom_doc::Model| {
         m.state().bodies.iter().map(|x| (solidcraft_kernel::measure(&x.body).unwrap().volume * 1e6).round()).collect::<Vec<_>>()
     };
     assert_eq!(vols(&a), vols(&b));
@@ -2565,14 +2564,14 @@ mod naming {
         run(&mut s, "edit.undo", json!({}));
         assert_eq!(attached(&s), Some(10.));
         assert!((top(&mut s) - 15.).abs() < 1e-6);
-        let reopened = solidcraft_doc::Document::from_json(&s.doc.to_json()).unwrap();
-        let mut model = solidcraft_doc::Model::new();
+        let reopened = polykrom_doc::Document::from_json(&s.doc.to_json()).unwrap();
+        let mut model = polykrom_doc::Model::new();
         model.evaluate(&reopened);
         assert_eq!(model.state().sketch(reopened.find_feature("Top").unwrap().id).unwrap().plane.origin.z, 10.);
         assert!((model.state().bodies[0].mesh().bounds().max.z - 15.).abs() < 1e-6);
         // A historical format-10 attachment uses its saved generic face name and no strong anchor.
         let mut old = (*s.doc).clone();
-        let solidcraft_doc::FeatureKind::Sketch { plane: solidcraft_doc::PlaneRef::Face { anchor, name, .. }, sketch } =
+        let polykrom_doc::FeatureKind::Sketch { plane: polykrom_doc::PlaneRef::Face { anchor, name, .. }, sketch } =
             &mut old.features.iter_mut().find(|f| f.name == "Top").unwrap().kind
         else {
             panic!("fixture must contain a face sketch");
@@ -2585,7 +2584,7 @@ mod naming {
             }
         }
         old.format = "solidcraft/10".into();
-        let mut legacy = Session::new(solidcraft_doc::Document::from_json(&old.to_json()).unwrap());
+        let mut legacy = Session::new(polykrom_doc::Document::from_json(&old.to_json()).unwrap());
         assert_eq!(attached(&legacy), Some(10.));
         assert!((top(&mut legacy) - 15.).abs() < 1e-6);
         // An upstream join that trims the certified face: the attachment stays on what is left
@@ -2600,10 +2599,10 @@ mod naming {
         }
         assert_eq!(attached(&legacy), Some(10.), "historical weak naming retains its saved geometry behavior");
         assert!((top(&mut legacy) - 20.).abs() < 1e-6);
-        let legacy_reopened = Session::new(solidcraft_doc::Document::from_json(&legacy.doc.to_json()).unwrap());
+        let legacy_reopened = Session::new(polykrom_doc::Document::from_json(&legacy.doc.to_json()).unwrap());
         assert_eq!(attached(&legacy_reopened), Some(10.));
         assert!((legacy_reopened.model.state().bodies[0].mesh().bounds().max.z - 20.).abs() < 1e-6);
-        let solidcraft_doc::FeatureKind::Sketch { plane: solidcraft_doc::PlaneRef::Face { anchor, .. }, .. } =
+        let polykrom_doc::FeatureKind::Sketch { plane: polykrom_doc::PlaneRef::Face { anchor, .. }, .. } =
             &legacy_reopened.doc.find_feature("Top").unwrap().kind
         else {
             panic!("saved historical face reference must remain present");
@@ -3974,7 +3973,7 @@ fn pattern_copies_added_after_a_rename_keep_their_numbers() {
     assert_eq!(names(&s), ["X", "Second", "X (3)"]);
     run(&mut s, "edit.redo", json!({}));
     assert_eq!(names(&s), ["X", "Second", "X (3)", "X (4)", "X (5)"]);
-    let reopened = Session::new(solidcraft_doc::Document::from_json(&s.doc.to_json()).unwrap());
+    let reopened = Session::new(polykrom_doc::Document::from_json(&s.doc.to_json()).unwrap());
     assert_eq!(names(&reopened), ["X", "Second", "X (3)", "X (4)", "X (5)"]);
     run(&mut s, "timeline.edit", json!({"feature": "Pat", "set": {"pattern": {"count1": "2"}}}));
     assert_eq!(names(&s), ["X", "Second"]);
@@ -4001,7 +4000,7 @@ fn a_side_drawn_in_two_collinear_pieces_extrudes_into_one_face() {
     let st = s.model.state();
     let body = st.body("Body1").unwrap();
     let edge = format!("F2:side:{}|F2:top", pieces[1]);
-    let (at, _) = solidcraft_doc::naming::find_edge(body, &edge, geom::Vec3::new(15.0, 0.0, 5.0)).unwrap();
+    let (at, _) = polykrom_doc::naming::find_edge(body, &edge, geom::Vec3::new(15.0, 0.0, 5.0)).unwrap();
     assert!(at.y.abs() < 1e-9 && (at.z - 5.0).abs() < 1e-9, "{edge} at {at:?}");
     // A sketch attaches to the joined side as to any side.
     assert_eq!(run(&mut s, "sketch.create", json!({"plane": {"face": [15, 0, 2.5]}}))["attachment"], "exact_face");
@@ -4098,8 +4097,8 @@ fn renaming_a_body_later_features_change_evaluates_nothing() {
         json!({"features": ["Hole1"], "dir1": [1, 0, 0], "count1": 3, "spacing1": 25, "dir2": [0, 1, 0], "count2": 2, "spacing2": 25}),
     );
     run(&mut s, "solid.chamfer", json!({"edges": [[40, 0, 10], [80, 25, 10]], "distance": 1}));
-    let looks = |st: &solidcraft_doc::ModelState| {
-        st.bodies.iter().map(|b| (b.name.clone(), (*solidcraft_doc::naming::face_names(b)).clone())).collect::<Vec<_>>()
+    let looks = |st: &polykrom_doc::ModelState| {
+        st.bodies.iter().map(|b| (b.name.clone(), (*polykrom_doc::naming::face_names(b)).clone())).collect::<Vec<_>>()
     };
     let before = looks(&s.model.state());
     let v = body_volume(&s.model.state());
@@ -4132,7 +4131,7 @@ fn renaming_a_targeted_threaded_body_evaluates_nothing() {
     run(&mut s, "solid.thread", json!({"face": [4, 0, 10], "length": 12}));
     run(&mut s, "component.activate", json!({"component": "root"}));
     run(&mut s, "solid.box", json!({"length": 4, "width": 20, "height": 4, "corner": [2, -10, 16], "operation": "cut", "targets": ["Shaft"]}));
-    let looks = |st: &solidcraft_doc::ModelState| {
+    let looks = |st: &polykrom_doc::ModelState| {
         let mut bodies: Vec<(String, u64)> =
             st.bodies.iter().map(|b| (b.name.clone(), (solidcraft_kernel::measure(&b.body).unwrap().volume * 1e6).round() as u64)).collect();
         bodies.sort();
@@ -4271,7 +4270,7 @@ fn creating_a_component_recomputes_nothing() {
         .doc
         .features
         .iter()
-        .any(|f| matches!(&f.kind, solidcraft_doc::FeatureKind::Sketch { plane: solidcraft_doc::PlaneRef::Face { anchor: None, .. }, .. }));
+        .any(|f| matches!(&f.kind, polykrom_doc::FeatureKind::Sketch { plane: polykrom_doc::PlaneRef::Face { anchor: None, .. }, .. }));
     assert!(legacy_face, "the face extrude's sketch is on a legacy face plane");
     for name in ["First", "Second"] {
         run(&mut s, "component.create", json!({"name": name}));

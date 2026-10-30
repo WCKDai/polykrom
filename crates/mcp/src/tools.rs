@@ -3,9 +3,9 @@
 
 use std::sync::atomic::{AtomicU64, Ordering};
 
+use polykrom_engine::io::vfs;
+use polykrom_engine::timing;
 use serde_json::{Map, Value, json};
-use solidcraft_engine::io::vfs;
-use solidcraft_engine::timing;
 
 use crate::backend::{Backend, STILL_RUNNING};
 
@@ -520,7 +520,7 @@ fn command_error(command: &str, error: String) -> String {
         return error;
     }
     let words: Vec<_> = id.split(|c: char| !c.is_ascii_alphanumeric()).filter(|s| !s.is_empty()).collect();
-    let mut closest: Vec<_> = solidcraft_engine::command_specs()
+    let mut closest: Vec<_> = polykrom_engine::command_specs()
         .into_iter()
         .filter_map(|spec| {
             let candidate = normalize(spec.id);
@@ -536,7 +536,7 @@ fn command_error(command: &str, error: String) -> String {
         .collect();
     closest.sort_unstable();
     // What the guess most likely meant comes before what it is spelled like.
-    let specs: Vec<&'static str> = solidcraft_engine::command_specs().into_iter().map(|spec| spec.id).collect();
+    let specs: Vec<&'static str> = polykrom_engine::command_specs().into_iter().map(|spec| spec.id).collect();
     let mut ids: Vec<&str> = meant(id, &specs);
     for (_, _, _, c) in &closest {
         if !ids.contains(c) {
@@ -1047,7 +1047,7 @@ fn batch(b: &mut dyn Backend, a: &Map<String, Value>) -> Value {
         o.insert("timings".into(), Value::Bool(true));
         o.insert("profile".into(), Value::Bool(profile));
     }
-    if params.to_string().len() + 64 * 1024 <= solidcraft_engine::MAX_LINE {
+    if params.to_string().len() + 64 * 1024 <= polykrom_engine::MAX_LINE {
         match b.call("engine.batch", params) {
             Ok(mut r) => {
                 if let Some(failed) = r.get_mut("failed")

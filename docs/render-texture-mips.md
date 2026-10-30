@@ -1,7 +1,7 @@
 # Opaque CPU mip reference
 
 The numerical follow-up #1332 reuses the reference sampler in #1327 through
-`solidcraft_render::texture_sampling::mips`. It adds no installed renderer,
+`polykrom_render::texture_sampling::mips`. It adds no installed renderer,
 resource storage, normalization, file decoder, worker, cache or GPU capability.
 The visible wood consumer remains separate work.
 

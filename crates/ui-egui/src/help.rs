@@ -13,7 +13,7 @@ pub const BUILD_DATE: &str = env!("SOLIDCRAFT_BUILD_DATE");
 /// The user and developer guide (docs/book, published by .github/workflows/pages.yml).
 pub const DOCS_URL: &str = "https://github.com/wckdboy/polykrom/tree/main/docs";
 const ATTRIBUTION: &str = include_str!("../../../ATTRIBUTION.md");
-use solidcraft_engine::licences::{LICENSE_APACHE, LICENSE_MIT, NOTICE, THIRD_PARTY};
+use polykrom_engine::licences::{LICENSE_APACHE, LICENSE_MIT, NOTICE, THIRD_PARTY};
 
 #[derive(Default)]
 pub struct HelpState {
@@ -139,7 +139,7 @@ fn about(app: &mut SolveApp, ctx: &egui::Context) {
                     }
                     ui_kit::section(ui, "third_party", crate::i18n::tr("help.third_party"), false, |ui| {
                         if ui_kit::button(ui, crate::i18n::tr_label("Copy all licences"), ui_kit::Button::Normal).clicked() {
-                            ctx.copy_text(solidcraft_engine::licences::all());
+                            ctx.copy_text(polykrom_engine::licences::all());
                         }
                         ui_kit::text_lines(ui, "sc_third_party", THIRD_PARTY);
                     });
@@ -159,7 +159,7 @@ mod tests {
     fn about_knows_its_build_and_diagnostics_say_where_it_runs() {
         assert!(!COMMIT.is_empty() && BUILD_DATE.len() == 10, "{COMMIT} {BUILD_DATE}");
         assert!(ATTRIBUTION.contains("ATTRIBUTION") || ATTRIBUTION.contains("Attribution"));
-        let app = SolveApp::new(solidcraft_engine::Session::default(), Default::default());
+        let app = SolveApp::new(polykrom_engine::Session::default(), Default::default());
         let d = diagnostics(&app);
         assert!(d.contains(VERSION) && d.contains(std::env::consts::OS) && d.contains("Renderer: CPU"), "{d}");
     }

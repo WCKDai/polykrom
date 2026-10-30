@@ -3,10 +3,10 @@
 
 use std::f64::consts::TAU;
 
+use polykrom_doc::ProfileSel;
+use polykrom_sketch::{ConstraintKind, Curve, CurveKind, Shape, Sketch, intersections, intersections_within};
 use serde_json::{Value, json};
-use solidcraft_doc::ProfileSel;
 use solidcraft_geom::Vec2;
-use solidcraft_sketch::{ConstraintKind, Curve, CurveKind, Shape, Sketch, intersections, intersections_within};
 
 use super::sketch::{add_c, edit, ids_of, solve_current};
 use super::{CommandSpec, in_sketch};
@@ -683,8 +683,8 @@ fn extend(s: &mut Session, p: &Value) -> Result<Value> {
         }
         pin(sk, end, oi)?;
         let before = sk.points.iter().map(|p| p.pos).collect::<Vec<_>>();
-        let hold = solidcraft_sketch::Hold { points: (0..sk.points.len()).filter(|i| *i != end).collect(), radii: (0..sk.curves.len()).collect() };
-        if !solidcraft_sketch::solve_with(sk, &hold, None, solidcraft_sketch::Analysis::StatusOnly, None).ok()
+        let hold = polykrom_sketch::Hold { points: (0..sk.points.len()).filter(|i| *i != end).collect(), radii: (0..sk.curves.len()).collect() };
+        if !polykrom_sketch::solve_with(sk, &hold, None, polykrom_sketch::Analysis::StatusOnly, None).ok()
             || sk.point(end).is_none_or(|point| point.dist(q) > TOL)
             || sk.points.iter().enumerate().any(|(i, point)| i != end && point.pos.dist(before[i]) > TOL)
         {
@@ -961,7 +961,7 @@ fn fillet(s: &mut Session, p: &Value) -> Result<Value> {
         None => vec![p.clone()],
     };
     let (out, info) = edit(s, p, cmd, false, |sk, doc| {
-        let r = doc.eval(&r_expr, solidcraft_doc::expr::Kind::Length).map_err(|e| bad(cmd, format!("radius: {e}")))?;
+        let r = doc.eval(&r_expr, polykrom_doc::expr::Kind::Length).map_err(|e| bad(cmd, format!("radius: {e}")))?;
         if !(r > 1e-9 && r < 1e8) {
             return Err(bad(cmd, "radius must be positive"));
         }
@@ -1349,7 +1349,7 @@ fn offset_side(sk: &mut Sketch, cmd: &str, order: &[(usize, bool)], sources: &[(
             .map(|topology| topology.roles.clone())
             .ok_or_else(|| bad(cmd, "new offset association is missing"))?;
         for (source, role) in sources.iter().zip(&roles) {
-            if role.kind == solidcraft_sketch::OffsetRoleKind::Line {
+            if role.kind == polykrom_sketch::OffsetRoleKind::Line {
                 let a = sk.curve_index(&source.0).ok_or_else(|| bad(cmd, "offset source line vanished"))?;
                 let b = sk.curve_index(&role.output).ok_or_else(|| bad(cmd, "offset output line vanished"))?;
                 cons.push(add_c(sk, ConstraintKind::Parallel { a, b })?);
@@ -1448,7 +1448,7 @@ fn offset_side(sk: &mut Sketch, cmd: &str, order: &[(usize, bool)], sources: &[(
     }
     let outputs = ids_of(sk, &made);
     if pieces.iter().all(|p| !matches!(p, Piece::Free(_))) {
-        sk.offsets.push(solidcraft_sketch::OffsetChain { sources: sources.to_vec(), outputs: outputs.clone(), distance: d, closed, topology: None });
+        sk.offsets.push(polykrom_sketch::OffsetChain { sources: sources.to_vec(), outputs: outputs.clone(), distance: d, closed, topology: None });
         sk.refresh_offsets()?;
     }
     Ok(Side { distance: d, curves: outputs, constraints: cons, association: None, param: None })
@@ -1461,9 +1461,9 @@ fn offset_length(s: &Session, p: &Value, key: &str, positive: bool) -> Result<(f
         Some(v) => format!("{v} mm"),
         None => expr(p, key).ok_or_else(|| bad(cmd, format!("`{key}` must be a length expression")))?.into_string(),
     };
-    let expression = s.doc.with_design_unit(&expression, solidcraft_doc::expr::Kind::Length);
-    let value = s.doc.eval(&expression, solidcraft_doc::expr::Kind::Length)?;
-    if !value.is_finite() || value.abs() <= 1e-9 || value.abs() > solidcraft_sketch::MAX_COORD || (positive && value < 0.0) {
+    let expression = s.doc.with_design_unit(&expression, polykrom_doc::expr::Kind::Length);
+    let value = s.doc.eval(&expression, polykrom_doc::expr::Kind::Length)?;
+    if !value.is_finite() || value.abs() <= 1e-9 || value.abs() > polykrom_sketch::MAX_COORD || (positive && value < 0.0) {
         return Err(bad(cmd, format!("`{key}` must be a {}length within the sketch bounds", if positive { "positive " } else { "finite nonzero " })));
     }
     Ok((value, expression))
@@ -1517,7 +1517,7 @@ fn offset_group(sk: &mut Sketch, ids: &[String], eligible: &std::collections::Ha
             }
             let ci = sk.add_circle(cc, nr, Some(c), None)?;
             let outputs = ids_of(sk, &[ci]);
-            sk.offsets.push(solidcraft_sketch::OffsetChain {
+            sk.offsets.push(polykrom_sketch::OffsetChain {
                 sources: vec![(source.clone(), true)],
                 outputs: outputs.clone(),
                 distance: r - nr,
@@ -1783,7 +1783,7 @@ fn break_offset(s: &mut Session, p: &Value) -> Result<Value> {
 
 /// A broken logical boundary becomes ordinary geometry. Keep downstream features
 /// on that exact current boundary while other associations retain their full roles.
-fn freeze_offset_profiles(doc: &mut solidcraft_doc::Document, sketch: u64, boundary: &Sketch, association: &str) -> Result<()> {
+fn freeze_offset_profiles(doc: &mut polykrom_doc::Document, sketch: u64, boundary: &Sketch, association: &str) -> Result<()> {
     let cmd = "sketch.offset.break";
     let mut groups = std::collections::BTreeMap::new();
     let mut work = 0usize;
@@ -1894,8 +1894,8 @@ fn copy_through(
     keep: &dyn Fn(Vec2) -> bool,
     scale_r: f64,
 ) -> Result<(Vec<usize>, Vec<(usize, usize)>)> {
-    if sk.curves.len().saturating_add(cs.len()) > solidcraft_sketch::MAX_CURVES {
-        return Err(solidcraft_sketch::SketchError::TooLarge.into());
+    if sk.curves.len().saturating_add(cs.len()) > polykrom_sketch::MAX_CURVES {
+        return Err(polykrom_sketch::SketchError::TooLarge.into());
     }
     let pts = involved_points(sk, cs, ps);
     let mut map: Vec<(usize, usize)> = Vec::new();

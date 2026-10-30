@@ -536,7 +536,7 @@ mod tests {
     #[test]
     fn extrude_cap_profile_reordering_never_retargets_an_ordinal_body() {
         use solidcraft_geom::Vec2;
-        let mut sketch = solidcraft_sketch::Sketch::new();
+        let mut sketch = polykrom_sketch::Sketch::new();
         for offset in [0., 30.] {
             let points: Vec<_> = [(0., 0.), (10., 0.), (10., 10.), (0., 10.)]
                 .iter()
@@ -612,7 +612,7 @@ mod tests {
                         base: Box::new(PlaneRef::Face { plane: picked, at: picked.origin, name: None, anchor: None }),
                         distance: "2".into(),
                     },
-                    sketch: solidcraft_sketch::Sketch::new(),
+                    sketch: polykrom_sketch::Sketch::new(),
                 },
                 None,
             )
@@ -644,7 +644,7 @@ mod tests {
         let picked = body.body.face_plane(index).unwrap();
         let anchor = doc.capture_face_anchor(body, index, &picked, &[], 0, &[]).unwrap();
         let source_name = body.name.clone();
-        let mut sketch = solidcraft_sketch::Sketch::new();
+        let mut sketch = polykrom_sketch::Sketch::new();
         let points: Vec<_> =
             [(2., 2.), (4., 2.), (4., 4.), (2., 4.)].iter().map(|(x, y)| sketch.add_point(Vec2::new(*x, *y), None).unwrap()).collect();
         for edge in 0..4 {

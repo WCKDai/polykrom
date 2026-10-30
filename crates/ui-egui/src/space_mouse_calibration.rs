@@ -1,14 +1,14 @@
 //! The 3D mouse calibration window, opened from Preferences › Navigation. It asks what kind of
 //! device it is (Return to Center, or a trackball), then asks the user to leave it still and
 //! to move it along each axis both ways, moving on by itself after each
-//! (`solidcraft_space_mouse::Wizard`), and saves what it found for the device it started with.
+//! (`polykrom_space_mouse::Wizard`), and saves what it found for the device it started with.
 //! The window closes with Preferences, and when another device (or none) is read instead.
 
-use solidcraft_space_mouse::{Calibration, Kind, Problem, Stage, Wizard};
+use polykrom_space_mouse::{Calibration, Kind, Problem, Stage, Wizard};
 
 use crate::SolveApp;
 
-/// What each of `solidcraft_space_mouse::STEPS` asks for, in order.
+/// What each of `polykrom_space_mouse::STEPS` asks for, in order.
 const STEP_PROMPTS: [&str; 12] = [
     "ui.3d_mouse_step_slide_right",
     "ui.3d_mouse_step_slide_left",
@@ -48,7 +48,7 @@ pub(crate) fn dead_zone_slider(ui: &mut egui::Ui, share: &mut f32) -> egui::Resp
     crate::ui_kit::slider(
         ui,
         share,
-        0.0..=solidcraft_space_mouse::MAX_DEAD_ZONE_SHARE,
+        0.0..=polykrom_space_mouse::MAX_DEAD_ZONE_SHARE,
         crate::ui_kit::Slider { step: Some(0.01), format: |v| format!("{:.0} %", v * 100.0), ..Default::default() },
     )
 }
@@ -224,7 +224,7 @@ pub fn show(app: &mut SolveApp, ctx: &egui::Context) {
                     crate::ui_kit::text(ui, &counter, crate::ui_kit::Text::Note("space_mouse_counter"));
                     // Each step shows the motion it asks for; once calibrated, the device's picture follows it.
                     let step = match stage {
-                        Stage::Step(index) => solidcraft_space_mouse::STEPS.get(index).copied(),
+                        Stage::Step(index) => polykrom_space_mouse::STEPS.get(index).copied(),
                         _ => None,
                     };
                     match (step, result) {

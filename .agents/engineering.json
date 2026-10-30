@@ -25,7 +25,7 @@
       },
       {
         "name": "io-contract-tests",
-        "run": "cargo test -p solidcraft-io --lib",
+        "run": "cargo test -p polykrom-io --lib",
         "timeout": 600
       }
     ],

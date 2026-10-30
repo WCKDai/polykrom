@@ -1,9 +1,9 @@
 //! Dragging sketch geometry in the viewport: live frames re-solve the sketch only, letting go
 //! brings the model up to date in the drag's one undo step, and the grab stays on the geometry.
 
+use polykrom_engine::Sel;
+use polykrom_engine::geom::Vec2;
 use serde_json::{Value, json};
-use solidcraft_engine::Sel;
-use solidcraft_engine::geom::Vec2;
 
 use crate::scenario::Harness;
 use crate::test_support::play;
@@ -46,7 +46,7 @@ fn text_move_drag_is_one_editable_unit_and_escape_restores_the_gesture() {
         } else {
             assert_eq!(h.app.session.undo.len(), undo + 1);
             let sk = h.app.session.doc.sketch(1).unwrap();
-            let solidcraft_engine::sketch::LinkSource::Text { at, .. } = &sk.links[0].source else { panic!() };
+            let polykrom_engine::sketch::LinkSource::Text { at, .. } = &sk.links[0].source else { panic!() };
             assert!(at.dist(Vec2::new(3.0, 2.0)) < 0.02, "{at:?}");
             run(&mut h, "edit.undo", json!({}));
             assert_eq!(h.app.session.doc.to_json(), before);
@@ -244,11 +244,11 @@ fn associated_spline_offset_hides_fit_nodes_and_follows_a_source_drag_live() {
     let derived_points = original.curves[derived].kind.point_ids();
     assert!(derived_points.len() > 100, "exercise the crowded generated fit nodes");
     for &i in &source_points {
-        assert!(solidcraft_engine::view::sketch_point_visible(&original, i));
+        assert!(polykrom_engine::view::sketch_point_visible(&original, i));
     }
     let snaps = crate::dialogs::SnapPoints::of(&original);
     for &i in &derived_points {
-        assert!(!solidcraft_engine::view::sketch_point_visible(&original, i));
+        assert!(!polykrom_engine::view::sketch_point_visible(&original, i));
         assert!(!snaps.takes(&original.points[i]));
     }
     let p = original.points[derived_points[32]].pos;
@@ -287,7 +287,7 @@ fn associated_spline_offset_hides_fit_nodes_and_follows_a_source_drag_live() {
         assert_eq!(sk.freeform_offsets[0].distance, 2.0);
         sk.validate_freeform_offsets().unwrap();
         let points = sk.curves[derived].kind.point_ids();
-        assert!(points.iter().all(|i| !solidcraft_engine::view::sketch_point_visible(sk, *i)));
+        assert!(points.iter().all(|i| !polykrom_engine::view::sketch_point_visible(sk, *i)));
         for piece in sk.exact_segs(derived).unwrap() {
             for t in [0.0, 0.25, 0.5, 0.75, 1.0] {
                 let p = piece.point_at(t);
@@ -305,11 +305,11 @@ fn associated_spline_offset_hides_fit_nodes_and_follows_a_source_drag_live() {
     run(&mut h, "sketch.offset.break", json!({"curve":output}));
     let state = h.app.session.world_state();
     let sk = &state.sketch(sid).unwrap().sketch;
-    assert!(sk.curves[derived].kind.point_ids().iter().all(|i| solidcraft_engine::view::sketch_point_visible(sk, *i)));
+    assert!(sk.curves[derived].kind.point_ids().iter().all(|i| polykrom_engine::view::sketch_point_visible(sk, *i)));
     run(&mut h, "edit.undo", json!({}));
     let state = h.app.session.world_state();
     let sk = &state.sketch(sid).unwrap().sketch;
-    assert!(sk.curves[derived].kind.point_ids().iter().all(|i| !solidcraft_engine::view::sketch_point_visible(sk, *i)));
+    assert!(sk.curves[derived].kind.point_ids().iter().all(|i| !polykrom_engine::view::sketch_point_visible(sk, *i)));
 }
 
 #[test]

@@ -1,8 +1,8 @@
 //! #1669: a window cut through a battery case's wall and a lofted pleat joined into it, mirrored
 //! to the case's far end, and the same features built directly there.
 
+use polykrom_engine::Session;
 use serde_json::{Value, json};
-use solidcraft_engine::Session;
 
 fn replay(script: &str) -> Session {
     let mut s = Session::default();

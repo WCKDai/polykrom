@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Start the web app image and check that it serves the app the way browsers need it.
 #
-# Usage: packaging/docker/smoke-test.sh [IMAGE]     (default: solidcraft-web:test)
+# Usage: packaging/docker/smoke-test.sh [IMAGE]     (default: polykrom-web:test)
 #
 # Runs the container read-only (as compose.yaml does) and checks the page, the service worker
 # and the wasm: their status, types and caching (nginx.conf).

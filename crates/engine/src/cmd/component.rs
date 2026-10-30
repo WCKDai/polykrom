@@ -1,10 +1,10 @@
-//! Components and occurrences: the design as a tree (see `solidcraft_doc` assembly docs).
+//! Components and occurrences: the design as a tree (see `polykrom_doc` assembly docs).
 //! New sketches and features go into the active component, authored in its frame; bodies
 //! belong to their feature's component unless moved; occurrences place components (instances
 //! share contents, "paste new" copies them) and can be grounded and moved.
 
+use polykrom_doc::{FeatureKind, Mat, Occurrence};
 use serde_json::{Value, json};
-use solidcraft_doc::{FeatureKind, Mat, Occurrence};
 use solidcraft_geom::Vec3;
 
 use super::CommandSpec;
@@ -86,7 +86,7 @@ fn occurrence(s: &Session, p: &Value, cmd: &str) -> Result<u64> {
         return Ok(o.id);
     }
     // A component's name stands for its placement when it has exactly one (`Fork` for `Fork:1`).
-    let placed: Vec<&solidcraft_doc::Occurrence> =
+    let placed: Vec<&polykrom_doc::Occurrence> =
         s.doc.find_component(&kk).map(|c| s.doc.occurrences.iter().filter(|o| o.component == c).collect()).unwrap_or_default();
     match placed.as_slice() {
         [one] => Ok(one.id),
@@ -99,7 +99,7 @@ fn occurrence(s: &Session, p: &Value, cmd: &str) -> Result<u64> {
 }
 
 fn translation(t: Vec3) -> Mat {
-    solidcraft_doc::rigid(t, Vec3::ZERO, Vec3::Z, 0.0)
+    polykrom_doc::rigid(t, Vec3::ZERO, Vec3::Z, 0.0)
 }
 
 fn move_vector(p: &Value, key: &str, default: Vec3, coordinate: bool, cmd: &str) -> Result<Vec3> {
@@ -212,7 +212,7 @@ fn list(s: &mut Session, p: &Value) -> Result<Value> {
             return json!(o);
         }
         let mut v = json!({"id": o.id, "name": o.name, "parent": o.parent, "grounded": o.grounded});
-        if o.transform.iter().flatten().zip(solidcraft_doc::IDENTITY.iter().flatten()).any(|(a, b)| (a - b).abs() > 1e-12) {
+        if o.transform.iter().flatten().zip(polykrom_doc::IDENTITY.iter().flatten()).any(|(a, b)| (a - b).abs() > 1e-12) {
             v["transform"] = json!(o.transform);
         }
         v
@@ -275,7 +275,7 @@ fn delete(s: &mut Session, p: &Value) -> Result<Value> {
     }
     let worked = super::edit::working_features(s);
     let removed = s.doc_mut().remove_component_tree(id).map_err(|e| match e {
-        solidcraft_doc::DocError::Invalid(msg) => bad(cmd, msg),
+        polykrom_doc::DocError::Invalid(msg) => bad(cmd, msg),
         e => e.into(),
     })?;
     let gone = removed.components;
@@ -365,7 +365,7 @@ pub(super) fn copy_occurrence(s: &mut Session, p: &Value) -> Result<Value> {
     let parent = if p.get("parent").is_some() { component(s, p, "parent", cmd)? } else { src.parent };
     let t = move_vector(p, "translate", Vec3::ZERO, true, cmd)?;
     let base = s.pending_moves.get(&src.id).unwrap_or(&src.transform);
-    let m = solidcraft_doc::mat_mul(&translation(t), base);
+    let m = polykrom_doc::mat_mul(&translation(t), base);
     if !valid_position(&m) {
         return Err(bad(cmd, "copy transform exceeds supported numeric range"));
     }
@@ -394,8 +394,8 @@ fn paste_new(s: &mut Session, p: &Value) -> Result<Value> {
         s.doc.occurrence_of(comp).cloned()
     };
     let t = move_vector(p, "translate", Vec3::ZERO, true, cmd)?;
-    let base = occ.as_ref().map(|o| s.pending_moves.get(&o.id).copied().unwrap_or(o.transform)).unwrap_or(solidcraft_doc::IDENTITY);
-    let transform = solidcraft_doc::mat_mul(&translation(t), &base);
+    let base = occ.as_ref().map(|o| s.pending_moves.get(&o.id).copied().unwrap_or(o.transform)).unwrap_or(polykrom_doc::IDENTITY);
+    let transform = polykrom_doc::mat_mul(&translation(t), &base);
     if !valid_position(&transform) {
         return Err(bad(cmd, "copy transform exceeds supported numeric range"));
     }
@@ -461,7 +461,7 @@ fn move_occurrence(s: &mut Session, p: &Value) -> Result<Value> {
         let t = move_vector(p, "translate", Vec3::ZERO, true, cmd)?;
         let axis = move_vector(p, "axis", Vec3::Z, false, cmd)?;
         let angle = match p.get("angle") {
-            Some(Value::String(e)) => s.doc.eval(e, solidcraft_doc::expr::Kind::Angle).map_err(|e| bad(cmd, e.to_string()))?,
+            Some(Value::String(e)) => s.doc.eval(e, polykrom_doc::expr::Kind::Angle).map_err(|e| bad(cmd, e.to_string()))?,
             None => 0.0,
             Some(value) => value.as_f64().ok_or_else(|| bad(cmd, "angle must be a number or angle expression"))?,
         };
@@ -472,7 +472,7 @@ fn move_occurrence(s: &mut Session, p: &Value) -> Result<Value> {
             return Err(bad(cmd, "rotation axis must have a finite nonzero length"));
         }
         let origin = move_vector(p, "origin", Vec3::ZERO, true, cmd)?;
-        solidcraft_doc::rigid(t, origin, axis, angle)
+        polykrom_doc::rigid(t, origin, axis, angle)
     };
     let space = match p.get("space") {
         None => "local",
@@ -485,8 +485,8 @@ fn move_occurrence(s: &mut Session, p: &Value) -> Result<Value> {
     let path = if p.get("path").is_some() || space == "world" { Some(occurrence_path(s, p, id, cmd)?) } else { None };
     let delta = if space == "world" {
         let placement = s.occurrence_placement(path.as_deref().unwrap_or(&[]))?;
-        let inverse = solidcraft_doc::mat_inverse(&placement.parent_world).ok_or_else(|| bad(cmd, "parent frame is singular"))?;
-        solidcraft_doc::mat_mul(&solidcraft_doc::mat_mul(&inverse, &delta), &placement.parent_world)
+        let inverse = polykrom_doc::mat_inverse(&placement.parent_world).ok_or_else(|| bad(cmd, "parent frame is singular"))?;
+        polykrom_doc::mat_mul(&polykrom_doc::mat_mul(&inverse, &delta), &placement.parent_world)
     } else {
         delta
     };
@@ -497,7 +497,7 @@ fn move_occurrence(s: &mut Session, p: &Value) -> Result<Value> {
             || base[1][3].abs() > 1e-12
             || base[2][3].abs() > 1e-12
             || (base[3][3] - 1.0).abs() > 1e-12
-            || solidcraft_doc::mat_inverse(&base).is_none()
+            || polykrom_doc::mat_inverse(&base).is_none()
         {
             return Err(bad(cmd, "base_transform must be finite, affine and invertible"));
         }
@@ -505,7 +505,7 @@ fn move_occurrence(s: &mut Session, p: &Value) -> Result<Value> {
     } else {
         s.pending_moves.get(&id).copied().unwrap_or(o.transform)
     };
-    let next = solidcraft_doc::mat_mul(&delta, &cur);
+    let next = polykrom_doc::mat_mul(&delta, &cur);
     if !valid_position(&next) {
         return Err(bad(cmd, "move transform exceeds supported numeric range"));
     }
@@ -575,10 +575,10 @@ pub fn to_active_frame(s: &Session, kind: &mut FeatureKind) {
         return;
     }
     let m = s.active_component_frame();
-    if solidcraft_doc::is_identity(&m) {
+    if polykrom_doc::is_identity(&m) {
         return;
     }
-    if let Some(inv) = solidcraft_doc::mat_inverse(&m) {
+    if let Some(inv) = polykrom_doc::mat_inverse(&m) {
         kind.transform_geometry(&inv);
     }
 }

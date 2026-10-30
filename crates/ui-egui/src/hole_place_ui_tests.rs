@@ -5,10 +5,10 @@
 //! Both off, picks behave as before. Either way the dialog shows the hole's sizes beside a
 //! section of it.
 
+use polykrom_engine::Sel;
+use polykrom_engine::doc::FeatureKind;
+use polykrom_engine::geom::Vec3;
 use serde_json::json;
-use solidcraft_engine::Sel;
-use solidcraft_engine::doc::FeatureKind;
-use solidcraft_engine::geom::Vec3;
 
 use crate::dialogs::Kind;
 use crate::scenario::{Harness, handle_at, rect_of};

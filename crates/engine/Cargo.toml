@@ -1,5 +1,5 @@
 [package]
-name = "solidcraft-engine"
+name = "polykrom-engine"
 description = "Polykrom engine: the session, the command registry (everything is a command), undo/redo and selection"
 version.workspace = true
 edition.workspace = true
@@ -12,7 +12,7 @@ workspace = true
 # Turns on the parameter-contract audit recorder (`SOLIDCRAFT_PARAM_AUDIT`, see
 # `src/schema/record.rs`), for checking a new contract against the whole test suite.
 param-audit = []
-solver-profiling = ["solidcraft-sketch/solver-profiling"]
+solver-profiling = ["polykrom-sketch/solver-profiling"]
 
 [[example]]
 name = "sketch_analysis_bench"
@@ -28,11 +28,11 @@ required-features = ["solver-profiling"]
 
 [dependencies]
 solidcraft-geom = { workspace = true }
-solidcraft-sketch = { workspace = true }
+polykrom-sketch = { workspace = true }
 solidcraft-kernel = { workspace = true }
-solidcraft-doc = { workspace = true }
-solidcraft-io = { workspace = true }
-solidcraft-render = { workspace = true }
+polykrom-doc = { workspace = true }
+polykrom-io = { workspace = true }
+polykrom-render = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 schemars = { workspace = true }
@@ -43,4 +43,4 @@ web-time = { workspace = true }
 
 [dev-dependencies]
 # Normal CI exercises profiling assertions without enabling the production feature.
-solidcraft-sketch = { workspace = true, features = ["solver-profiling"] }
+polykrom-sketch = { workspace = true, features = ["solver-profiling"] }

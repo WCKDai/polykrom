@@ -8,12 +8,12 @@
 //! part changes; Edit Feature picks the edges again where they are now.
 
 use egui::{Color32, Pos2, Stroke, vec2};
+use polykrom_engine::doc::HoleReference;
+use polykrom_engine::doc::expr::Kind as ValueKind;
+use polykrom_engine::doc::hole_reference::{ReferenceFrame, on_reference_face, reference_frame};
+use polykrom_engine::geom::Vec3;
+use polykrom_engine::{Sel, Session};
 use serde_json::{Value, json};
-use solidcraft_engine::doc::HoleReference;
-use solidcraft_engine::doc::expr::Kind as ValueKind;
-use solidcraft_engine::doc::hole_reference::{ReferenceFrame, on_reference_face, reference_frame};
-use solidcraft_engine::geom::Vec3;
-use solidcraft_engine::{Sel, Session};
 
 use crate::SolveApp;
 use crate::dialogs::{Dialog, Kind};
@@ -92,7 +92,7 @@ fn vec3(v: &Value) -> Option<Vec3> {
 
 /// The way the hole drills at `at`: as it was made (editing), else into the face there.
 fn direction(s: &Session, d: &Dialog, at: Vec3) -> Option<Vec3> {
-    d.extra.get("direction").and_then(vec3).or_else(|| solidcraft_engine::doc::hole_direction_at(&s.world_state(), at))
+    d.extra.get("direction").and_then(vec3).or_else(|| polykrom_engine::doc::hole_direction_at(&s.world_state(), at))
 }
 
 /// The face's frame at the place for the picked edges (and which reference inputs they are), found

@@ -2,7 +2,7 @@
 //! dimension line (or arc) with arrowheads, and the value centred on it; radius and diameter
 //! leaders with R / Ø, angles as an arc between the two lines, arc lengths with the arc mark,
 //! driven (reference) dimensions in parentheses in a muted colour. The geometry comes from
-//! `solidcraft_sketch::dim_layout`.
+//! `polykrom_sketch::dim_layout`.
 //!
 //! A click selects a dimension (Delete removes it), a drag moves its text (and so the offset of
 //! its dimension line), a double-click edits its value in place with parameter completion.
@@ -14,10 +14,10 @@ use std::cell::RefCell;
 use std::sync::Arc;
 
 use egui::{FontId, Pos2, Rect, Shape, Stroke, vec2};
+use polykrom_engine::Sel;
+use polykrom_engine::geom::Vec2;
+use polykrom_engine::sketch::{ConstraintKind, DimFrame, chain_centres, default_text, dim_frame, dim_layout_reaching, dim_reach};
 use serde_json::json;
-use solidcraft_engine::Sel;
-use solidcraft_engine::geom::Vec2;
-use solidcraft_engine::sketch::{ConstraintKind, DimFrame, chain_centres, default_text, dim_frame, dim_layout_reaching, dim_reach};
 
 use crate::SolveApp;
 use crate::theme::Tokens;
@@ -69,17 +69,17 @@ struct Live {
 /// document also makes the editor's identity check safe across document replacements.
 #[derive(Clone, Debug)]
 struct DimensionDraft {
-    baseline: Arc<solidcraft_engine::doc::Document>,
+    baseline: Arc<polykrom_engine::doc::Document>,
     sketch: u64,
     component: u64,
     path: Option<Vec<u64>>,
-    pending: std::collections::BTreeMap<u64, solidcraft_engine::doc::Mat>,
+    pending: std::collections::BTreeMap<u64, polykrom_engine::doc::Mat>,
     entities: Vec<String>,
     /// Where the text goes (None: the dimension's default place).
     at: Option<Vec2>,
     checked_expr: String,
-    preview_doc: Arc<solidcraft_engine::doc::Document>,
-    preview: Arc<solidcraft_engine::doc::ModelState>,
+    preview_doc: Arc<polykrom_engine::doc::Document>,
+    preview: Arc<polykrom_engine::doc::ModelState>,
     error: Option<String>,
     /// A dimension that would over-constrain the sketch, placed as a driven (reference) one:
     /// it has no parameter and no value to edit (#320).
@@ -102,7 +102,7 @@ impl DimensionDraft {
         }
         params
     }
-    fn evaluate(&self, app: &SolveApp, expr: &str) -> Result<solidcraft_engine::Session, String> {
+    fn evaluate(&self, app: &SolveApp, expr: &str) -> Result<polykrom_engine::Session, String> {
         let mut scratch = app.session.scratch();
         let result = scratch.execute("sketch.dimension", &self.params(expr)).map_err(|e| shown_error("sketch.dimension", &e.to_string()))?;
         let param = result.get("param").and_then(serde_json::Value::as_str).ok_or("The dimension value is unavailable")?;
@@ -281,11 +281,11 @@ fn draft_of(app: &SolveApp, sketch: u64, entities: &[String], at: Option<Vec2>, 
 /// Cache inference at a stationary pointer, including incomplete/unsupported picks.
 #[derive(Clone)]
 struct Placement {
-    baseline: Arc<solidcraft_engine::doc::Document>,
+    baseline: Arc<polykrom_engine::doc::Document>,
     sketch: Option<u64>,
     component: u64,
     path: Option<Vec<u64>>,
-    pending: std::collections::BTreeMap<u64, solidcraft_engine::doc::Mat>,
+    pending: std::collections::BTreeMap<u64, polykrom_engine::doc::Mat>,
     entities: Vec<String>,
     at: Vec2,
     draft: Option<(String, DimensionDraft)>,
@@ -517,7 +517,7 @@ pub fn show(app: &mut SolveApp, ui: &egui::Ui, painter: &egui::Painter, proj: &P
     let mut constraints = sk.constraints.iter().map(|c| (ss, c, false)).collect::<Vec<_>>();
     if let (Some(source), Some((param, _))) = (draft_sketch, draft.as_ref()) {
         // A driven draft is keyed by its constraint id (it has no parameter).
-        let ours = |c: &&solidcraft_engine::sketch::Constraint| c.param.as_deref() == Some(param.as_str()) || (c.driven && c.id == *param);
+        let ours = |c: &&polykrom_engine::sketch::Constraint| c.param.as_deref() == Some(param.as_str()) || (c.driven && c.id == *param);
         constraints.extend(source.sketch.constraints.iter().filter(ours).map(|c| (source, c, true)));
     }
     for (source, c, is_draft) in constraints {
@@ -600,7 +600,7 @@ pub fn show(app: &mut SolveApp, ui: &egui::Ui, painter: &egui::Painter, proj: &P
 }
 
 /// A point a dimension measures (for the shape it belongs to).
-fn first_point(sk: &solidcraft_engine::sketch::Sketch, k: &ConstraintKind) -> Option<usize> {
+fn first_point(sk: &polykrom_engine::sketch::Sketch, k: &ConstraintKind) -> Option<usize> {
     use ConstraintKind::*;
     match *k {
         Length { l, .. } => sk.curves.get(l).and_then(|c| c.kind.point_ids().first().copied()),
@@ -787,9 +787,9 @@ fn edit_box(app: &mut SolveApp, ctx: &egui::Context) {
                     .session
                     .doc
                     .param(&e.param)
-                    .and_then(|p| solidcraft_engine::doc::expr::unit_info(&p.unit))
+                    .and_then(|p| polykrom_engine::doc::expr::unit_info(&p.unit))
                     .map(|(k, _)| k)
-                    .unwrap_or(solidcraft_engine::doc::expr::Kind::Unitless);
+                    .unwrap_or(polykrom_engine::doc::expr::Kind::Unitless);
                 let expression = app.session.doc.with_design_unit(&e.expr, kind);
                 app.run("parameters.change", json!({"name": e.param, "expression": expression})).map_err(|err| shown_error("parameters.change", &err))
             };
@@ -828,7 +828,7 @@ pub fn editing() -> bool {
 
 /// The open draft: its expression, the dimension it adds and the sketch it previews (tests).
 #[cfg(test)]
-pub fn draft_preview() -> Option<(String, solidcraft_engine::sketch::Constraint, solidcraft_engine::sketch::Sketch)> {
+pub fn draft_preview() -> Option<(String, polykrom_engine::sketch::Constraint, polykrom_engine::sketch::Sketch)> {
     EDIT.with(|edit| {
         let edit = edit.borrow();
         let e = edit.as_ref()?;
@@ -841,7 +841,7 @@ pub fn draft_preview() -> Option<(String, solidcraft_engine::sketch::Constraint,
 
 /// A place-first draft, including a driven dimension, for creation tests.
 #[cfg(test)]
-pub fn placement_dimension_preview(app: &SolveApp) -> Option<solidcraft_engine::sketch::Constraint> {
+pub fn placement_dimension_preview(app: &SolveApp) -> Option<polykrom_engine::sketch::Constraint> {
     let (id, draft) = placement_preview(app)?;
     draft
         .preview

@@ -356,7 +356,7 @@ const ELEMENTS: &[Element] = &[
         ui.add_space(Tokens::get().space_6);
         CommandSearch::sheet(ui, ui.available_width(), 1.0, false, |ui| {
             CommandSearch::heading(ui, "search.commands", 1);
-            let c = solidcraft_engine::find_command("solid.fillet").unwrap();
+            let c = polykrom_engine::find_command("solid.fillet").unwrap();
             let mut row = MenuItem::new(c.id, c.label, c.icon);
             row.highlighted = true;
             row.shortcut = "F";
@@ -1924,7 +1924,7 @@ fn file_view_application_evidence_in_both_themes_and_widths() {
             crate::home::install(&mut app.home, &ctx, &fixture, Some(preview));
             app.preferences.theme = if dark { "dark" } else { "light" }.into();
             app.ui.dark = dark;
-            app.recoverable.push(solidcraft_engine::recovery::Entry {
+            app.recoverable.push(polykrom_engine::recovery::Entry {
                 id: "public-evidence".into(),
                 path: Some("enclosure-lid.solidcraft".into()),
                 name: "Enclosure lid".into(),

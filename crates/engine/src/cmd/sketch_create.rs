@@ -1,9 +1,9 @@
 //! More sketch creation tools: midpoint line, tangent arc, tangent circles, center-point and
 //! arc slots.
 
+use polykrom_sketch::{ConstraintKind, CurveKind, LinkKind, LinkSource, Shape, Sketch, TextAlign, TextExprs, TextStyle};
 use serde_json::{Value, json};
 use solidcraft_geom::Vec2;
-use solidcraft_sketch::{ConstraintKind, CurveKind, LinkKind, LinkSource, Shape, Sketch, TextAlign, TextExprs, TextStyle};
 
 /// The style parameters of `sketch.text` and `sketch.edit_text`.
 macro_rules! text_style_doc {
@@ -166,8 +166,8 @@ const AT_MUST: &str = "`at` must be the baseline start [x, y], each a number or 
 /// it names a parameter, so that the text follows it; one that names none is the number it comes
 /// to. Returns the value (mm or radians) and the expression kept. Anything else is refused with
 /// `must`.
-pub(super) fn text_number(doc: &solidcraft_doc::Document, v: &Value, cmd: &str, key: &str, must: &str, angle: bool) -> Result<(f64, Option<String>)> {
-    use solidcraft_doc::expr::{self, Kind};
+pub(super) fn text_number(doc: &polykrom_doc::Document, v: &Value, cmd: &str, key: &str, must: &str, angle: bool) -> Result<(f64, Option<String>)> {
+    use polykrom_doc::expr::{self, Kind};
     let kind = if angle { Kind::Angle } else { Kind::Length };
     match v {
         Value::Number(n) => {
@@ -196,7 +196,7 @@ type TextValues = (String, Vec2, f64, f64, Option<String>, TextStyle, TextExprs)
 /// A text's source from a command's parameters: what is given replaces what `old` has (the
 /// defaults, for a new text); what is left out stays, an expression with its number. A number
 /// replaces an expression. An input that is not understood is refused, not ignored.
-fn text_source(doc: &solidcraft_doc::Document, p: &Value, cmd: &str, old: Option<TextValues>) -> Result<LinkSource> {
+fn text_source(doc: &polykrom_doc::Document, p: &Value, cmd: &str, old: Option<TextValues>) -> Result<LinkSource> {
     let (t0, mut at, mut height, mut angle, f0, s0, mut exprs) =
         old.unwrap_or((String::new(), Vec2::ZERO, 5.0, 0.0, None, TextStyle::default(), TextExprs::default()));
     let text = match p.get("text") {
@@ -207,7 +207,7 @@ fn text_source(doc: &solidcraft_doc::Document, p: &Value, cmd: &str, old: Option
     if text.trim().is_empty() {
         return Err(bad(cmd, "`text` must not be empty"));
     }
-    if text.chars().count() > solidcraft_sketch::MAX_TEXT_CHARS {
+    if text.chars().count() > polykrom_sketch::MAX_TEXT_CHARS {
         return Err(bad(cmd, "text too long"));
     }
     match p.get("at") {
@@ -240,7 +240,7 @@ fn text_source(doc: &solidcraft_doc::Document, p: &Value, cmd: &str, old: Option
     let style = text_style(p, cmd, s0)?;
     // An unknown font, an unreadable file or a style the font lacks is an error now, not a lost
     // link later; so is a font file outside an agent's folders (the font reader asks `vfs`).
-    solidcraft_sketch::font_data_styled(font.as_deref(), style.bold, style.italic).map_err(|e| bad(cmd, e.to_string()))?;
+    polykrom_sketch::font_data_styled(font.as_deref(), style.bold, style.italic).map_err(|e| bad(cmd, e.to_string()))?;
     Ok(LinkSource::Text { text, at, height, angle, font, style, exprs })
 }
 
@@ -331,7 +331,7 @@ pub(super) fn move_text(sk: &mut Sketch, link: &str, translate: Vec2, rotation: 
         exprs.angle = None;
     }
     let (at, angle) = (moved, angle + rotation);
-    let geom = solidcraft_sketch::text_geometry_styled(font.as_deref(), &text, at, height, angle, &style, None)?;
+    let geom = polykrom_sketch::text_geometry_styled(font.as_deref(), &text, at, height, angle, &style, None)?;
     let source = LinkSource::Text { text, at, height, angle, font, style, exprs };
     let link = if copy {
         sk.add_link(LinkKind::Text, source, &geom)?
@@ -367,7 +367,7 @@ fn edit_text(s: &mut Session, p: &Value) -> Result<Value> {
 fn edit_text_live(s: &mut Session, p: &Value) -> Result<(Value, Option<crate::LiveEdit>)> {
     let cmd = "sketch.edit_text";
     let id = s.active_sketch.ok_or_else(|| bad(cmd, "no sketch is being edited"))?;
-    let (out, report) = super::sketch::edit_solved(s, id, false, solidcraft_sketch::Analysis::Full, |sk, doc| {
+    let (out, report) = super::sketch::edit_solved(s, id, false, polykrom_sketch::Analysis::Full, |sk, doc| {
         Ok((apply_text_edits(sk, doc, p)?, super::sketch::Left::Unsolved))
     })?;
     Ok((out, report.map(|report| crate::LiveEdit { sketch: id, report })))
@@ -375,7 +375,7 @@ fn edit_text_live(s: &mut Session, p: &Value) -> Result<(Value, Option<crate::Li
 
 /// `sketch.edit_text`'s change: one text's (`link` or `entity`), or each of `edits` in turn.
 /// One command, so the features after the sketch are rebuilt once for all of them.
-fn apply_text_edits(sk: &mut Sketch, doc: &solidcraft_doc::Document, p: &Value) -> Result<Value> {
+fn apply_text_edits(sk: &mut Sketch, doc: &polykrom_doc::Document, p: &Value) -> Result<Value> {
     let cmd = "sketch.edit_text";
     match p.get("edits") {
         None | Some(Value::Null) => apply_text_edit(sk, doc, p),
@@ -392,7 +392,7 @@ fn apply_text_edits(sk: &mut Sketch, doc: &solidcraft_doc::Document, p: &Value) 
 
 /// `sketch.edit_text`'s change to its sketch: the text source's new values and its outlines
 /// regenerated from them.
-fn apply_text_edit(sk: &mut Sketch, doc: &solidcraft_doc::Document, p: &Value) -> Result<Value> {
+fn apply_text_edit(sk: &mut Sketch, doc: &polykrom_doc::Document, p: &Value) -> Result<Value> {
     let cmd = "sketch.edit_text";
     let l = match (str_(p, "link"), str_(p, "entity")) {
         (Some(l), _) => l.to_string(),
@@ -613,9 +613,9 @@ fn ellipse(s: &mut Session, p: &Value) -> Result<Value> {
     Ok(result(out, info))
 }
 
-fn point_list(sk: &mut Sketch, doc: &solidcraft_doc::Document, p: &Value, cmd: &str) -> Result<Vec<usize>> {
+fn point_list(sk: &mut Sketch, doc: &polykrom_doc::Document, p: &Value, cmd: &str) -> Result<Vec<usize>> {
     let list = p.get("points").and_then(Value::as_array).ok_or_else(|| bad(cmd, "`points` must be a list"))?;
-    if list.len() < 2 || list.len() > solidcraft_sketch::MAX_SPLINE_POINTS {
+    if list.len() < 2 || list.len() > polykrom_sketch::MAX_SPLINE_POINTS {
         return Err(bad(cmd, "a spline needs 2 to 500 points"));
     }
     let mut out = Vec::new();
@@ -743,9 +743,9 @@ fn leaving_dir(sk: &Sketch, ci: usize, pi: usize) -> Option<Vec2> {
         CurveKind::Spline { ref pts, control, periodic, .. } => {
             let q: Vec<Vec2> = pts.iter().filter_map(|i| sk.point(*i)).collect();
             if pts.last() == Some(&pi) {
-                solidcraft_sketch::spline_end_tangent_mode(&q, control, periodic, true)
+                polykrom_sketch::spline_end_tangent_mode(&q, control, periodic, true)
             } else if pts.first() == Some(&pi) {
-                solidcraft_sketch::spline_end_tangent_mode(&q, control, periodic, false).map(|t| -t)
+                polykrom_sketch::spline_end_tangent_mode(&q, control, periodic, false).map(|t| -t)
             } else {
                 None
             }
@@ -845,7 +845,7 @@ fn tangent_centre(sk: &Sketch, a: usize, b: usize, r: f64, near: Vec2) -> Option
     let mut best: Option<Vec2> = None;
     for x in centre_paths(&sa, r) {
         for y in centre_paths(&sb, r) {
-            for q in solidcraft_sketch::intersections_within(&x, &y, 1e-9 * (1.0 + r)) {
+            for q in polykrom_sketch::intersections_within(&x, &y, 1e-9 * (1.0 + r)) {
                 if q.x.is_finite() && q.y.is_finite() && best.is_none_or(|b| q.dist(near) < b.dist(near)) {
                     best = Some(q);
                 }
@@ -869,7 +869,7 @@ fn tangent_circle(s: &mut Session, p: &Value, cmd: &str, n: usize, radius: Optio
     let (out, info) = edit(s, p, cmd, true, |sk, doc| {
         let cs = tangent_curves(sk, p, cmd, n)?;
         let r0 = match &radius {
-            Some(e) => doc.eval(e, solidcraft_doc::expr::Kind::Length).map_err(|e| bad(cmd, format!("radius: {e}")))?,
+            Some(e) => doc.eval(e, polykrom_doc::expr::Kind::Length).map_err(|e| bad(cmd, format!("radius: {e}")))?,
             None => guess_radius(sk, &cs, near),
         };
         if !(r0 > 1e-9 && r0 < 1e8) {
@@ -1008,7 +1008,7 @@ pub(super) fn solve_new_only(sk: &mut Sketch, first_new: usize) {
             p.fixed = true;
         }
     }
-    if solidcraft_sketch::solve(&mut trial).ok() {
+    if polykrom_sketch::solve(&mut trial).ok() {
         for (p, t) in sk.points.iter_mut().zip(&trial.points).skip(first_new) {
             p.pos = t.pos;
         }
@@ -1022,9 +1022,9 @@ pub(super) fn solve_new_only(sk: &mut Sketch, first_new: usize) {
 
 #[cfg(test)]
 mod blend_tests {
+    use polykrom_sketch::CurveKind;
     use serde_json::{Value, json};
     use solidcraft_geom::{Seg2, Vec2};
-    use solidcraft_sketch::CurveKind;
 
     use crate::Session;
 
@@ -1045,7 +1045,7 @@ mod blend_tests {
         s
     }
 
-    fn sketch(s: &Session) -> solidcraft_sketch::Sketch {
+    fn sketch(s: &Session) -> polykrom_sketch::Sketch {
         let id = s.active_sketch.unwrap();
         s.model.state().sketch(id).unwrap().sketch.clone()
     }
@@ -1205,10 +1205,10 @@ mod blend_tests {
                 let curve = |x: f64| piece.point_at(x.clamp(0.0, 1.0));
                 let line_f = |x: f64| Vec2::new(6.0 * x, 0.0);
                 let cubic_f = |x: f64| Seg2::Cubic { p0: bctrl[0], p1: bctrl[1], p2: bctrl[2], p3: bctrl[3] }.point_at(x);
-                let k0 = solidcraft_sketch::end_curvature(&curve, false);
-                let ka = solidcraft_sketch::end_curvature(&line_f, true);
-                let k1 = solidcraft_sketch::end_curvature(&curve, true);
-                let kb = solidcraft_sketch::end_curvature(&cubic_f, false);
+                let k0 = polykrom_sketch::end_curvature(&curve, false);
+                let ka = polykrom_sketch::end_curvature(&line_f, true);
+                let k1 = polykrom_sketch::end_curvature(&curve, true);
+                let kb = polykrom_sketch::end_curvature(&cubic_f, false);
                 assert!(k0.dist(ka) < 1e-3, "g{order} curvature at a: {k0:?} vs {ka:?}");
                 assert!(k1.dist(kb) < 1e-3, "g{order} curvature at b: {k1:?} vs {kb:?}");
             }
@@ -1336,13 +1336,13 @@ mod blend_tests {
         assert!(e.contains("ends must differ"), "{e}");
         // The helper behind the command refuses a corrupt (non-finite) reference and a reference
         // with no tangent at all, never guessing at them.
-        let mut broken = solidcraft_sketch::Sketch::new();
+        let mut broken = polykrom_sketch::Sketch::new();
         let p0 = broken.add_point(Vec2::new(1.0, 1.0), None).unwrap();
         let p1 = broken.add_point(Vec2::ZERO, None).unwrap();
         let l = broken.add_curve(CurveKind::Spline { pts: vec![p1, p0], control: true, degree: 1, periodic: false }, None).unwrap();
         broken.points[p0].pos = Vec2::new(f64::NAN, 4.0);
         assert!(super::joint_derivatives(&broken, l, p1, 2, true, "a", "sketch.blend_curve").is_err(), "non-finite geometry");
-        let mut flat = solidcraft_sketch::Sketch::new();
+        let mut flat = polykrom_sketch::Sketch::new();
         let q0 = flat.add_point(Vec2::new(3.0, 3.0), None).unwrap();
         let q1 = flat.add_point(Vec2::new(3.0, 3.0), None).unwrap();
         let d = flat.add_curve(CurveKind::Spline { pts: vec![q0, q1], control: true, degree: 1, periodic: false }, None).unwrap();

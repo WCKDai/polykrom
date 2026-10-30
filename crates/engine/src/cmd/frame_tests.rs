@@ -373,7 +373,7 @@ fn members_undo_and_survive_save_and_reopen() {
     let before = bodies(&mut s);
     assert_eq!(before.len(), 4);
     assert_eq!(before[0].0, "Rail");
-    let mut reopened = Session::new(solidcraft_doc::Document::from_json(&s.doc.to_json()).unwrap());
+    let mut reopened = Session::new(polykrom_doc::Document::from_json(&s.doc.to_json()).unwrap());
     let after = bodies(&mut reopened);
     assert_eq!(before.len(), after.len());
     for (b, a) in before.iter().zip(&after) {
@@ -396,7 +396,7 @@ fn sketch_lines(s: &Session, name: &str) -> Vec<(String, [f64; 2], [f64; 2])> {
     sk.curves
         .iter()
         .filter_map(|c| match c.kind {
-            solidcraft_sketch::CurveKind::Line { a, b } => {
+            polykrom_sketch::CurveKind::Line { a, b } => {
                 let (p, q) = (sk.points[a].pos, sk.points[b].pos);
                 Some((c.id.clone(), [p.x, p.y], [q.x, q.y]))
             }
@@ -493,7 +493,7 @@ fn a_renamed_member_keeps_its_name_through_line_edits() {
         assert_eq!(before.get(name), Some(bb), "{name}: {before:?} → {after:?}");
     }
     // It survives saving and reopening.
-    let mut reopened = Session::new(solidcraft_doc::Document::from_json(&s.doc.to_json()).unwrap());
+    let mut reopened = Session::new(polykrom_doc::Document::from_json(&s.doc.to_json()).unwrap());
     assert_eq!(boxes(&mut reopened), after);
 }
 
@@ -571,7 +571,7 @@ fn profile_dimensions_follow_parameters() {
     assert!(rel(total_volume(&mut s), square(2.0)) < 1e-9, "{}", total_volume(&mut s));
     // A parameter that makes the profile not fit fails the feature, naming the dimension.
     let err = s.execute("parameters.change", &json!({"name": "T", "expression": "25 mm"})).err().map(|e| e.to_string()).unwrap_or_default();
-    let fid = s.doc.features.iter().find(|f| matches!(f.kind, solidcraft_doc::FeatureKind::FrameMember { .. })).unwrap().id;
+    let fid = s.doc.features.iter().find(|f| matches!(f.kind, polykrom_doc::FeatureKind::FrameMember { .. })).unwrap().id;
     let failing = s.model.result(fid).and_then(|r| r.error.clone()).unwrap_or_default();
     assert!(err.contains("wall") || failing.contains("wall"), "{err} / {failing}");
 }

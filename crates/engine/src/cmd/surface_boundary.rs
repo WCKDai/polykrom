@@ -4,8 +4,8 @@
 //! builds the face; this is the command's parameters and its checks, so that what it cannot hold
 //! is refused before anything is built.
 
+use polykrom_doc::{BodyName, FeatureKind, NetworkCurve, Operation, Position, SketchId};
 use serde_json::Value;
-use solidcraft_doc::{BodyName, FeatureKind, NetworkCurve, Operation, Position, SketchId};
 use solidcraft_kernel::Continuity;
 
 use super::CommandSpec;
@@ -14,7 +14,7 @@ use crate::params::{bad, str_, string_list, vec3};
 use crate::{Result, Session};
 
 /// The stations a boundary carries by default (the patch's resolution along the loop).
-const DEFAULT_SAMPLES: usize = solidcraft_doc::BOUNDARY_SAMPLES;
+const DEFAULT_SAMPLES: usize = polykrom_doc::BOUNDARY_SAMPLES;
 /// The fewest stations a patch can hold the widest continuity pair with: a G3 side needs four rows
 /// at each of two opposite sides, so eight.
 const MIN_SAMPLES: usize = 8;

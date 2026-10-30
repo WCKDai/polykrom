@@ -45,7 +45,7 @@ pub use obj::read_obj;
 pub use threemf::{MAX_3MF_BYTES, MeshObject, model_xml, model_xml_with, read_3mf, weld, write_3mf, write_3mf_with};
 pub use urdf::{UrdfOptions, UrdfPackage, urdf};
 
-use solidcraft_doc::{Document, Metadata, ModelState};
+use polykrom_doc::{Document, Metadata, ModelState};
 use solidcraft_geom::{Mesh, Vec3};
 
 /// Design file extension: Polykrom saves `.polykrom`.
@@ -80,7 +80,7 @@ pub enum IoError {
     #[error(transparent)]
     Kernel(#[from] solidcraft_kernel::KernelError),
     #[error(transparent)]
-    Doc(#[from] solidcraft_doc::DocError),
+    Doc(#[from] polykrom_doc::DocError),
 }
 
 pub type Result<T> = std::result::Result<T, IoError>;
@@ -166,7 +166,7 @@ fn body_name(b: &solidcraft_kernel::ImportedBody, names: StepNames) -> String {
 pub struct StepFeature {
     /// Timeline name: the root product's name, else the file name.
     pub name: String,
-    pub kind: solidcraft_doc::FeatureKind,
+    pub kind: polykrom_doc::FeatureKind,
     /// Body names from the file, as [`StepNames`] chose them (automatic by default).
     pub body_names: Vec<String>,
     pub warnings: Vec<String>,
@@ -242,7 +242,7 @@ pub fn step_import_feature_named(bytes: &[u8], file: &str, names: StepNames) -> 
     Ok(StepFeature {
         name,
         body_names,
-        kind: solidcraft_doc::FeatureKind::Import { file: file_name, step: text.into(), components: imp.tree.clone(), skip: Vec::new() },
+        kind: polykrom_doc::FeatureKind::Import { file: file_name, step: text.into(), components: imp.tree.clone(), skip: Vec::new() },
         warnings: iges_warnings.into_iter().chain(imp.warnings.iter().cloned()).collect(),
         import: imp,
     })
@@ -260,7 +260,7 @@ pub fn is_mesh_path(path: &str) -> bool {
 pub struct MeshFeature {
     /// Timeline name: the only mesh's name, else the file name.
     pub name: String,
-    pub kind: solidcraft_doc::FeatureKind,
+    pub kind: polykrom_doc::FeatureKind,
     pub body_names: Vec<String>,
     pub warnings: Vec<String>,
 }
@@ -299,7 +299,7 @@ pub fn mesh_import_feature(bytes: &[u8], file: &str) -> Result<MeshFeature> {
     let mut meshes = Vec::with_capacity(objects.len());
     for o in &objects {
         solidcraft_kernel::mesh_body(&o.positions, &o.triangles).map_err(|e| IoError::Invalid(format!("mesh `{}`: {e}", o.name)))?;
-        meshes.push(solidcraft_doc::MeshData {
+        meshes.push(polykrom_doc::MeshData {
             name: o.name.clone(),
             positions: o.positions.iter().flat_map(|p| [p.x, p.y, p.z]).collect(),
             triangles: o.triangles.iter().flatten().copied().collect(),
@@ -314,7 +314,7 @@ pub fn mesh_import_feature(bytes: &[u8], file: &str) -> Result<MeshFeature> {
     Ok(MeshFeature {
         name,
         body_names: objects.iter().map(|o| o.name.clone()).collect(),
-        kind: solidcraft_doc::FeatureKind::MeshImport { file: file_name, meshes },
+        kind: polykrom_doc::FeatureKind::MeshImport { file: file_name, meshes },
         warnings,
     })
 }
@@ -592,7 +592,7 @@ fn threemf_metadata(meta: &Metadata) -> Vec<(&'static str, &str)> {
 /// STEP and IGES headers (author, organization; STEP also the description) and 3MF model
 /// metadata (project as the title, author as the designer, description, licence).
 pub fn export_with_metadata(state: &ModelState, bodies: &[String], format: Format, name: &str, meta: &Metadata) -> Result<Vec<u8>> {
-    let sel: Vec<&solidcraft_doc::ModelBody> = state.bodies.iter().filter(|b| bodies.is_empty() || bodies.contains(&b.name)).collect();
+    let sel: Vec<&polykrom_doc::ModelBody> = state.bodies.iter().filter(|b| bodies.is_empty() || bodies.contains(&b.name)).collect();
     if sel.is_empty() {
         return Err(IoError::Empty);
     }
@@ -636,7 +636,7 @@ pub fn export_with_metadata(state: &ModelState, bodies: &[String], format: Forma
 
 /// A body as a 3MF mesh: welded watertight (T-junctions split), coloured, and with `tagged`
 /// each triangle keeps the B-rep face it came from.
-fn mesh_object(b: &solidcraft_doc::ModelBody, tagged: bool) -> Result<MeshObject> {
+fn mesh_object(b: &polykrom_doc::ModelBody, tagged: bool) -> Result<MeshObject> {
     let m = export_mesh(&b.body)?;
     let eps = weld_eps(&b.body);
     // Faces with colours of their own tag their triangles.
@@ -684,7 +684,7 @@ pub fn step_assembly(doc: &Document, local: &ModelState, name: &str) -> Result<V
         .bodies
         .iter()
         .map(|b| match doc.model_body_offset(b) {
-            Some(offset) if !solidcraft_doc::is_identity(offset) => solidcraft_kernel::transform_matrix(&b.body, *offset).map(Some),
+            Some(offset) if !polykrom_doc::is_identity(offset) => solidcraft_kernel::transform_matrix(&b.body, *offset).map(Some),
             _ => Ok(None),
         })
         .collect::<std::result::Result<_, _>>()?;
@@ -788,7 +788,7 @@ pub const MAX_STL_TRIANGLES: usize = 20_000_000;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use solidcraft_doc::{FeatureKind, Model, Operation, point_expr};
+    use polykrom_doc::{FeatureKind, Model, Operation, point_expr};
     use solidcraft_geom::Vec3;
 
     fn model() -> (Document, Model) {
@@ -835,7 +835,7 @@ mod tests {
 
     fn mesh_volume(bytes: &[u8]) -> f64 {
         let f = mesh_import_feature(bytes, "x.stl").unwrap();
-        let solidcraft_doc::FeatureKind::MeshImport { meshes, .. } = f.kind else { panic!() };
+        let polykrom_doc::FeatureKind::MeshImport { meshes, .. } = f.kind else { panic!() };
         let m = &meshes[0];
         let pos: Vec<Vec3> = m.positions.chunks(3).map(|c| Vec3::new(c[0], c[1], c[2])).collect();
         let tris: Vec<[u32; 3]> = m.triangles.chunks(3).map(|c| [c[0], c[1], c[2]]).collect();
@@ -1089,7 +1089,7 @@ mod tests {
         .unwrap();
         doc.add_feature(
             FeatureKind::Fillet {
-                edges: vec![solidcraft_doc::Position(Vec3::new(0.0, 0.0, 5.0))],
+                edges: vec![polykrom_doc::Position(Vec3::new(0.0, 0.0, 5.0))],
                 radius: "4".into(),
                 body: None,
                 style: Default::default(),
@@ -1103,7 +1103,7 @@ mod tests {
         doc.add_feature(
             FeatureKind::Cylinder {
                 base: point_expr(Vec3::new(80.0, 0.0, 0.0)),
-                axis: solidcraft_doc::Dir(Vec3::Z),
+                axis: polykrom_doc::Dir(Vec3::Z),
                 radius: "6".into(),
                 height: "15".into(),
                 operation: Operation::NewBody,
@@ -1175,7 +1175,7 @@ mod tests {
         .unwrap();
         doc.add_feature(
             FeatureKind::Fillet {
-                edges: vec![solidcraft_doc::Position(Vec3::new(0.1, -0.3, 5.0 + 1.0 / 3.0))],
+                edges: vec![polykrom_doc::Position(Vec3::new(0.1, -0.3, 5.0 + 1.0 / 3.0))],
                 radius: "4".into(),
                 body: None,
                 style: Default::default(),

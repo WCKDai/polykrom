@@ -278,7 +278,7 @@ fn polish_apply_keeps_a_full_undo_history_but_its_oldest_step() {
     for i in 0..200 {
         run(&mut s, "parameters.add", json!({"name": format!("p{i}"), "expression": "1 mm"}));
     }
-    let before: Vec<std::sync::Arc<solidcraft_doc::Document>> = s.undo.iter().map(|u| u.doc.clone()).collect();
+    let before: Vec<std::sync::Arc<polykrom_doc::Document>> = s.undo.iter().map(|u| u.doc.clone()).collect();
     let r = run(&mut s, "polish.apply", json!({}));
     assert!(r["applied"].as_array().is_some_and(|a| a.len() >= 2), "{r}");
     assert_eq!(s.undo.len(), before.len());

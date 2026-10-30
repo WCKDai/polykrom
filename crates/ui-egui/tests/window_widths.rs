@@ -1,10 +1,10 @@
 //! Every command dialog and shared window stays within its content-width limits: started
 //! through the control channel (the toolbar's way) and measured as drawn.
 
+use polykrom_ui_egui::frame::{DIALOG_MAX_W, DIALOG_MIN_W};
 use serde_json::json;
-use solidcraft_ui_egui::frame::{DIALOG_MAX_W, DIALOG_MIN_W};
 
-use solidcraft_ui_egui::scenario::Harness;
+use polykrom_ui_egui::scenario::Harness;
 
 /// Widths of the windows on screen (their areas in the middle layer).
 fn window_widths(h: &Harness) -> Vec<(egui::Id, f32)> {
@@ -21,7 +21,7 @@ fn window_widths(h: &Harness) -> Vec<(egui::Id, f32)> {
 fn kit_table_limit(id: egui::Id) -> Option<f32> {
     // The accepted Preferences board has a page list and one control/preview pair at 880 pt.
     if id == egui::Id::new("sc_prefs") {
-        return Some(solidcraft_ui_egui::theme::Tokens::get().form_card_width * 10.0 / 3.0);
+        return Some(polykrom_ui_egui::theme::Tokens::get().form_card_width * 10.0 / 3.0);
     }
     [
         egui::Id::new("sc_bom"),
@@ -33,7 +33,7 @@ fn kit_table_limit(id: egui::Id) -> Option<f32> {
         egui::Id::new(("sc_dialog", "EDIT MOTION STUDY")),
     ]
     .contains(&id)
-    .then(|| solidcraft_ui_egui::theme::Tokens::get().form_card_width * 3.0)
+    .then(|| polykrom_ui_egui::theme::Tokens::get().form_card_width * 3.0)
 }
 
 fn fresh() -> Harness {
@@ -49,7 +49,7 @@ fn command_dialogs_shrink_to_their_content_within_limits() {
     let mut bad = Vec::new();
     // The frame border and shadow add a little to the content limits.
     let slack = 4.0;
-    for spec in solidcraft_engine::command_specs() {
+    for spec in polykrom_engine::command_specs() {
         h.call("ui.start", json!({"command": spec.id}));
         h.frames(4);
         for (layer, w) in window_widths(&h) {
@@ -57,7 +57,7 @@ fn command_dialogs_shrink_to_their_content_within_limits() {
             let limit = kit_table_limit(layer).unwrap_or(if h.app.dialog.is_some() {
                 DIALOG_MAX_W
             } else {
-                solidcraft_ui_egui::theme::Tokens::get().form_card_width * 3.0
+                polykrom_ui_egui::theme::Tokens::get().form_card_width * 3.0
             });
             if w > limit + slack {
                 bad.push(format!("{} ({layer:?}): {w} px", spec.id));
@@ -108,14 +108,14 @@ fn floating_windows_stay_within_limits() {
     h.app.keymap.open = true;
     h.app.help.about = true;
     h.app.ui.palette_open = true;
-    solidcraft_ui_egui::params_dialog::open(&mut h.app);
-    solidcraft_ui_egui::design_properties::open(&mut h.app);
+    polykrom_ui_egui::params_dialog::open(&mut h.app);
+    polykrom_ui_egui::design_properties::open(&mut h.app);
     h.frames(6);
     let ws = window_widths(&h);
     // Keyboard Shortcuts is a page of Preferences (one window, #36).
     assert!(ws.len() >= 3, "windows on screen: {ws:?}");
     for (layer, w) in ws {
-        let limit = kit_table_limit(layer).unwrap_or(solidcraft_ui_egui::theme::Tokens::get().form_card_width * 3.0);
+        let limit = kit_table_limit(layer).unwrap_or(polykrom_ui_egui::theme::Tokens::get().form_card_width * 3.0);
         assert!(w <= limit + 4.0, "{layer:?} is {w} px wide");
     }
 }

@@ -21,11 +21,11 @@ fn new_sketch() -> Session {
     s
 }
 
-fn sketch(s: &Session) -> solidcraft_sketch::Sketch {
+fn sketch(s: &Session) -> polykrom_sketch::Sketch {
     s.model.state().sketch(s.active_sketch.unwrap()).unwrap().sketch.clone()
 }
 
-fn report(s: &Session) -> solidcraft_sketch::SolveReport {
+fn report(s: &Session) -> polykrom_sketch::SolveReport {
     s.model.state().sketch(s.active_sketch.unwrap()).unwrap().report.clone()
 }
 
@@ -40,10 +40,10 @@ fn quadrants(c: [f64; 2], w: f64) -> [([f64; 2], [f64; 2]); 4] {
     [([x - w, y - w], [x, y]), ([x, y - w], [x + w, y]), ([x, y], [x + w, y + w]), ([x - w, y], [x, y + w])]
 }
 
-fn horizontal_vertical(sk: &solidcraft_sketch::Sketch) -> usize {
+fn horizontal_vertical(sk: &polykrom_sketch::Sketch) -> usize {
     sk.constraints
         .iter()
-        .filter(|c| matches!(c.kind, solidcraft_sketch::ConstraintKind::Horizontal { .. } | solidcraft_sketch::ConstraintKind::Vertical { .. }))
+        .filter(|c| matches!(c.kind, polykrom_sketch::ConstraintKind::Horizontal { .. } | polykrom_sketch::ConstraintKind::Vertical { .. }))
         .count()
 }
 
@@ -178,7 +178,7 @@ fn redundant_equal_dimensions() {
     assert!(report(&s).ok());
     let len = |id: &str| {
         let c = sk.curve_index(id).unwrap();
-        let solidcraft_sketch::CurveKind::Line { a, b } = sk.curves[c].kind else { panic!() };
+        let polykrom_sketch::CurveKind::Line { a, b } = sk.curves[c].kind else { panic!() };
         sk.points[a].pos.dist(sk.points[b].pos)
     };
     assert!((len("l6") - 14.0).abs() < 1e-7 && (len("l4") - 14.0).abs() < 1e-7);
@@ -228,7 +228,7 @@ fn dragging_the_shared_corner_moves_every_rectangle() {
     let near: usize = sk.points.iter().filter(|p| p.pos.dist(to) < 1e-6).count();
     assert!(near >= 4, "{near} corners at the dragged spot");
     for l in &sk.curves {
-        let solidcraft_sketch::CurveKind::Line { a, b } = l.kind else { continue };
+        let polykrom_sketch::CurveKind::Line { a, b } = l.kind else { continue };
         let d = sk.points[b].pos - sk.points[a].pos;
         assert!(d.x.abs() < 1e-7 || d.y.abs() < 1e-7, "{} is no longer axis-aligned: {d:?}", l.id);
     }

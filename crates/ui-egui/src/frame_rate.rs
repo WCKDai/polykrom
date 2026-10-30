@@ -111,7 +111,7 @@ mod tests {
     /// next one only after the idle gap (to show 0 FPS), and the idle frame asks for none.
     #[test]
     fn the_readout_asks_for_no_frames_of_its_own() {
-        let mut app = crate::SolveApp::new(solidcraft_engine::Session::default(), crate::Services::default());
+        let mut app = crate::SolveApp::new(polykrom_engine::Session::default(), crate::Services::default());
         app.preferences.show_frame_rate = true;
         let ctx = crate::fonts::test_context();
         let mut frame = |time: f64| {

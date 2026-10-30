@@ -4,10 +4,10 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 
+use polykrom_doc::joints::{self, JointOrigin, Snap};
+use polykrom_doc::motion::{MotionTrace, TraceMotion};
+use polykrom_doc::{IDENTITY, apply_point};
 use serde_json::{Value, json};
-use solidcraft_doc::joints::{self, JointOrigin, Snap};
-use solidcraft_doc::motion::{MotionTrace, TraceMotion};
-use solidcraft_doc::{IDENTITY, apply_point};
 use solidcraft_geom::Vec3;
 
 use crate::params::{bad, bool_};
@@ -56,7 +56,7 @@ pub(super) fn source(s: &Session, p: &Value, cmd: &str) -> Result<MotionTrace> {
             // different nested instance; convert its world pick to that canonical frame.
             let id = occurrence.last().copied().unwrap_or(0);
             let placed = placed_world(s, &occurrence)?;
-            let inverse = solidcraft_doc::mat_inverse(&placed).ok_or_else(|| bad(cmd, "invalid occurrence placement"))?;
+            let inverse = polykrom_doc::mat_inverse(&placed).ok_or_else(|| bad(cmd, "invalid occurrence placement"))?;
             let canonical = joints::occurrence_world(&s.doc, id);
             for key in ["face", "circle", "edge", "point"] {
                 if let Some(at) = reference.get(key).and_then(crate::params::vec3) {
@@ -118,7 +118,7 @@ fn local(s: &Session, t: &MotionTrace) -> Result<Vec3> {
     Ok(p)
 }
 
-fn placed_world(s: &Session, path: &[u64]) -> Result<solidcraft_doc::Mat> {
+fn placed_world(s: &Session, path: &[u64]) -> Result<polykrom_doc::Mat> {
     s.doc.path_placement(path).map(|(_, world)| world).ok_or_else(|| bad(CMD, "the trace occurrence path is missing"))
 }
 
@@ -353,7 +353,7 @@ pub(crate) fn refresh(s: &mut Session) {
                     if let Ok(sk) = s.doc_mut().sketch_mut(t.sketch)
                         && let Some(wire) = sk.wires.iter_mut().find(|w| w.id == t.wire)
                     {
-                        wire.pts = solidcraft_sketch::fit_polyline(&points);
+                        wire.pts = polykrom_sketch::fit_polyline(&points);
                         wire.fit = points;
                         changed = true;
                     }

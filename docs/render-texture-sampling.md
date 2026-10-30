@@ -1,6 +1,6 @@
 # CPU texture reference sampler
 
-`solidcraft_render::texture_sampling` supplies the independent numerical unit in
+`polykrom_render::texture_sampling` supplies the independent numerical unit in
 #1327. It does not install a texture consumer or close the wood rendering work.
 
 Construct `TextureView::new(rgba, [width, height])` from immutable normalized float

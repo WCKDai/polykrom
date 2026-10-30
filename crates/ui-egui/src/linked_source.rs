@@ -10,7 +10,7 @@ use crate::SolveApp;
 pub(crate) fn start_selected(app: &mut SolveApp) {
     let mut components = app.tree.picked_components.clone();
     for selection in &app.session.selection {
-        if let solidcraft_engine::Sel::Occurrence { path } = selection
+        if let polykrom_engine::Sel::Occurrence { path } = selection
             && let Ok(placement) = app.session.occurrence_placement(path)
         {
             components.push(placement.component);
@@ -36,7 +36,7 @@ pub(crate) fn start(app: &mut SolveApp, component: u64) {
         return;
     }
     let document = app.session.doc.clone();
-    app.pick_open_for(&solidcraft_engine::io::DESIGN_EXTS, move |app, path| {
+    app.pick_open_for(&polykrom_engine::io::DESIGN_EXTS, move |app, path| {
         let Some(path) = path else { return };
         // A host or programmatic caller can replace/edit a design while a native picker is
         // pending. Never apply that old component id to a different design or newer revision.
@@ -64,7 +64,7 @@ pub(crate) fn extract(app: &mut SolveApp, component: u64) {
     }
     let Some(name) = app.session.doc.components.iter().find(|c| c.id == component).map(|c| c.name.clone()) else { return };
     let document = app.session.doc.clone();
-    let ext = solidcraft_engine::io::DESIGN_EXT;
+    let ext = polykrom_engine::io::DESIGN_EXT;
     app.pick_save(&format!("{name}.{ext}"), &[ext], move |app, path| {
         let Some(mut path) = path else { return };
         if !Arc::ptr_eq(&document, &app.session.doc) {
@@ -107,7 +107,7 @@ fn report(app: &mut SolveApp, result: &serde_json::Value, done: &str) {
 #[derive(Clone, Debug)]
 pub struct Copies {
     linked: u64,
-    document: Arc<solidcraft_engine::doc::Document>,
+    document: Arc<polykrom_engine::doc::Document>,
     copies: Vec<(u64, String)>,
 }
 
@@ -150,7 +150,7 @@ pub fn show_copies(app: &mut SolveApp, ctx: &egui::Context) {
 mod tests {
     use super::*;
     use crate::context_menu::{self, Target};
-    use solidcraft_engine::Session;
+    use polykrom_engine::Session;
     use std::path::PathBuf;
 
     fn fixture(name: &str) -> (SolveApp, u64, u64, PathBuf, PathBuf) {
@@ -175,7 +175,7 @@ mod tests {
 
     fn answer(app: &mut SolveApp, path: Option<String>) {
         app.services.pick_open = Some(Box::new(move |extensions| {
-            assert_eq!(extensions, &solidcraft_engine::io::DESIGN_EXTS);
+            assert_eq!(extensions, &polykrom_engine::io::DESIGN_EXTS);
             let result = path.clone();
             Box::pin(async move { result })
         }));
@@ -240,7 +240,7 @@ mod tests {
         app.start("component.relink");
         assert!(!app.file_picker_busy());
         assert!(app.status.as_ref().is_some_and(|(s, _, error)| s.contains("Select one linked") && *error));
-        app.session.selection = vec![solidcraft_engine::Sel::Occurrence { path: vec![occurrence] }];
+        app.session.selection = vec![polykrom_engine::Sel::Occurrence { path: vec![occurrence] }];
         app.start("component.relink");
         assert!(app.file_picker_busy());
         crate::file_picker::tick(&mut app, &egui::Context::default());

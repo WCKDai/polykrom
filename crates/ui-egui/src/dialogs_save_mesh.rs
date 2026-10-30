@@ -12,8 +12,8 @@ use crate::ui_kit::choice_row;
 use std::collections::HashMap;
 
 use egui::{Color32, Sense, vec2};
+use polykrom_engine::slicers::{self, Slicer};
 use serde_json::{Value, json};
-use solidcraft_engine::slicers::{self, Slicer};
 
 use crate::SolveApp;
 use crate::dialogs::{Kind, form_row};

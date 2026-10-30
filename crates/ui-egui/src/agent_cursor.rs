@@ -24,9 +24,9 @@ use std::sync::mpsc::Sender;
 #[cfg(test)]
 use egui::vec2;
 use egui::{Pos2, Stroke, pos2};
+use polykrom_engine::geom::{Vec2, Vec3};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
-use solidcraft_engine::geom::{Vec2, Vec3};
 
 use crate::SolveApp;
 use crate::control::ControlResponse;
@@ -155,7 +155,7 @@ pub struct AgentCursor {
     /// Click ripples: where and when.
     ripples: Vec<(Pos2, f64)>,
     /// The view before a followed sketch (restored when it finishes).
-    saved_view: Option<solidcraft_engine::render::Camera>,
+    saved_view: Option<polykrom_engine::render::Camera>,
 }
 
 impl AgentCursor {
@@ -234,7 +234,7 @@ const NOT_PLACES: [&str; 14] =
 
 /// A command's toolbar button, or its panel when the button sits in a drop-down.
 fn button(command: &str) -> Option<Pos2> {
-    let spec = solidcraft_engine::find_command(command)?;
+    let spec = polykrom_engine::find_command(command)?;
     crate::scenario::handle_at(&format!("toolbar:{}", spec.id))
         .or_else(|| crate::workspace::destination(spec).and_then(|(t, p)| crate::scenario::handle_at(&format!("panel:{t}:{p}"))))
 }
@@ -266,7 +266,7 @@ pub fn batch_stops(steps: &[Value]) -> Vec<Pos2> {
 /// The places a command's parameters pick, in the world: [x, y, z] points (faces, edges,
 /// vertices, positions), active-sketch [x, y] points, and a new sketch's plane.
 pub fn picks(app: &SolveApp, command: &str, params: &Value) -> Vec<Vec3> {
-    let id = solidcraft_engine::find_command(command).map_or(command, |c| c.id);
+    let id = polykrom_engine::find_command(command).map_or(command, |c| c.id);
     let mut out = Vec::new();
     if id == "sketch.create"
         && let Some(n) = params.get("plane").and_then(Value::as_str)
@@ -429,7 +429,7 @@ fn finish(app: &mut SolveApp, ctx: &egui::Context) {
     let mut params = job.params;
     params["animate"] = json!(false);
     let cmd = params.get("command").or(params.get("id")).and_then(Value::as_str).unwrap_or_default().to_string();
-    let id = solidcraft_engine::find_command(&cmd).map_or(cmd.clone(), |c| c.id.to_string());
+    let id = polykrom_engine::find_command(&cmd).map_or(cmd.clone(), |c| c.id.to_string());
     let follow = app.ui.agent_cursor.follow_camera;
     if follow && id == "sketch.create" {
         app.agent.saved_view = Some(app.cam);
@@ -474,7 +474,7 @@ pub fn paint(app: &SolveApp, ctx: &egui::Context) {
 mod tests {
     use super::*;
     use crate::Services;
-    use solidcraft_engine::Session;
+    use polykrom_engine::Session;
 
     fn app() -> SolveApp {
         let mut s = Session::default();

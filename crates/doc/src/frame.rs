@@ -262,7 +262,7 @@ impl crate::walk::Walk for ProfileSpec {
 pub use crate::eval::frame_member::{member_line_ids, member_names};
 
 /// Where a frame member's cross-section comes from.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, solidcraft_derive::Walk)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, polykrom_derive::Walk)]
 #[serde(tag = "source", rename_all = "snake_case")]
 pub enum MemberProfile {
     /// A built-in profile, from its dimensions.

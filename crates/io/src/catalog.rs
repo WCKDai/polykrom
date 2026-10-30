@@ -1,8 +1,8 @@
 //! Portable scalar libraries; no renderer, network, external resources or design links.
 use crate::{IoError, Result};
+use polykrom_doc::{Document, UserMaterial, appearance::Look, valid_density};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use solidcraft_doc::{Document, UserMaterial, appearance::Look, valid_density};
 use std::collections::BTreeMap;
 
 pub const FORMAT: &str = "solidcraft-library/1";

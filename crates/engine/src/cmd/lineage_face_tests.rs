@@ -4,9 +4,9 @@
 //! (`FaceCertificate::Lineage`), follow the face through parameter edits and survive a save.
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 use crate::Session;
+use polykrom_doc::FaceAttachmentStatus;
+use polykrom_doc::config::FaceCertificate;
 use serde_json::{Value, json};
-use solidcraft_doc::FaceAttachmentStatus;
-use solidcraft_doc::config::FaceCertificate;
 
 fn run(s: &mut Session, command: &str, params: Value) -> Value {
     s.execute(command, &params).unwrap_or_else(|e| panic!("{command} {params}: {e}"))
@@ -34,7 +34,7 @@ fn no_errors(s: &Session) {
 }
 
 fn reopened(s: &Session) -> Session {
-    let mut t = Session::new(solidcraft_doc::Document::from_json(&s.doc.to_json()).unwrap());
+    let mut t = Session::new(polykrom_doc::Document::from_json(&s.doc.to_json()).unwrap());
     t.refresh();
     no_errors(&t);
     t
@@ -383,7 +383,7 @@ fn the_face_a_split_cuts_takes_a_sketch_and_an_offset_plane_that_follow_the_plan
             let feature = s.doc.find_feature(name).map(|f| f.id).unwrap();
             let state = s.model.state();
             match state.construct.iter().find(|c| c.feature == feature).map(|c| &c.geom) {
-                Some(solidcraft_doc::construct::ConstructGeom::Plane(p)) => *p,
+                Some(polykrom_doc::construct::ConstructGeom::Plane(p)) => *p,
                 other => panic!("{tool} {name}: {other:?}"),
             }
         };

@@ -1,5 +1,5 @@
+use polykrom_engine::Session;
 use serde_json::json;
-use solidcraft_engine::Session;
 
 use super::*;
 use crate::Services;
@@ -181,7 +181,7 @@ fn as_built_animation_drives_the_new_shared_id_and_handles_exhaustion() {
     app.session.doc_mut().next_id = u64::MAX;
     let cmds = preview_commands(&app, &d).unwrap();
     let result = app.session.scratch().execute(&cmds[0].0, &cmds[0].1);
-    assert!(result.is_err() && !matches!(result, Err(solidcraft_engine::EngineError::Internal(..))), "{result:?}");
+    assert!(result.is_err() && !matches!(result, Err(polykrom_engine::EngineError::Internal(..))), "{result:?}");
 
     // A programmatic document can also contain the largest possible joint id. The old
     // preview added one to that id without checking, before the engine's panic guard.
@@ -191,7 +191,7 @@ fn as_built_animation_drives_the_new_shared_id_and_handles_exhaustion() {
     let cmds = preview_commands(&app, &d).unwrap();
     assert_eq!(cmds.len(), 1, "an exhausted preview must not invent a drive target");
     let result = app.session.scratch().execute(&cmds[0].0, &cmds[0].1);
-    assert!(result.is_err() && !matches!(result, Err(solidcraft_engine::EngineError::Internal(..))), "{result:?}");
+    assert!(result.is_err() && !matches!(result, Err(polykrom_engine::EngineError::Internal(..))), "{result:?}");
 }
 
 /// As-built joints and rigid groups take components from body picks; New Component makes one
@@ -525,7 +525,7 @@ fn joint_origins_follow_their_component() {
     let at = |app: &SolveApp| {
         let v = origins_world(&app.session);
         let (_, m) = v.iter().find(|(n, _)| n == "Top of B").unwrap();
-        solidcraft_engine::doc::apply_point(m, Vec3::ZERO)
+        polykrom_engine::doc::apply_point(m, Vec3::ZERO)
     };
     assert!(at(&app).dist(Vec3::new(40.0, 10.0, 10.0)) < 1e-6, "{:?}", at(&app));
     let b = occ(&app, "B");
@@ -736,7 +736,7 @@ fn motion_trace_keeps_the_picked_point_path() {
     let start = app.session.scratch().execute("motion.trace", &p).unwrap()["points"][0].clone();
     let (_, _, seen, put) = trace::placement(&app.session, &d.inputs).unwrap();
     let drawn = {
-        use solidcraft_engine::doc::{apply_point, mat_inverse};
+        use polykrom_engine::doc::{apply_point, mat_inverse};
         apply_point(&seen, apply_point(&mat_inverse(&put).unwrap(), at(&json!({"point": start}))))
     };
     assert!(drawn.dist(shown) < 1e-6, "{drawn:?} wants {shown:?}");
@@ -748,7 +748,7 @@ fn motion_trace_keeps_the_picked_point_path() {
         .doc
         .features
         .iter()
-        .find(|f| f.component == component && matches!(f.kind, solidcraft_engine::doc::FeatureKind::Box { .. }))
+        .find(|f| f.component == component && matches!(f.kind, polykrom_engine::doc::FeatureKind::Box { .. }))
         .unwrap()
         .param_names[2]
         .clone();

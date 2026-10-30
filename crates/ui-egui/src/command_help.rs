@@ -61,7 +61,7 @@ mod tests {
     #[test]
     fn every_documented_id_is_a_real_command() {
         for id in DOCUMENTED {
-            assert!(solidcraft_engine::find_command(id).is_some(), "{id} is not a command");
+            assert!(polykrom_engine::find_command(id).is_some(), "{id} is not a command");
         }
         assert!(DOCUMENTED.is_sorted());
     }
@@ -73,7 +73,7 @@ mod tests {
         assert_eq!(english, wanted);
         for key in &english {
             let id = key.trim_start_matches("help.");
-            assert!(solidcraft_engine::find_command(id).is_some(), "{key} names no command");
+            assert!(polykrom_engine::find_command(id).is_some(), "{key} names no command");
         }
     }
 

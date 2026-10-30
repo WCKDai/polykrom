@@ -70,7 +70,7 @@ fn scaled_sweep_is_a_frustum() {
     let a = measure(&s, "Cone").area;
     assert!((a - lateral).abs() < 2e-3 * lateral, "sheet {a} vs {lateral}");
     // The options are saved with the feature and evaluate the same when reopened.
-    let doc = solidcraft_doc::Document::from_json(&s.doc.to_json()).unwrap();
+    let doc = polykrom_doc::Document::from_json(&s.doc.to_json()).unwrap();
     let reopened = Session::new(doc);
     let again = measure(&reopened, "Frustum");
     assert!((again.volume - m.volume).abs() < 1e-9 * volume);

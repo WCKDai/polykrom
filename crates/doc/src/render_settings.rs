@@ -2,9 +2,9 @@
 
 use std::collections::BTreeMap;
 
+use polykrom_render::{BackendId, Camera, RenderFormat, RenderLimits, RenderMode, UpAxis};
 use serde::{Deserialize, Serialize};
 use solidcraft_geom::Vec3;
-use solidcraft_render::{BackendId, Camera, RenderFormat, RenderLimits, RenderMode, UpAxis};
 
 use crate::{DocError, Result};
 
@@ -50,7 +50,7 @@ impl Default for RenderSetup {
     fn default() -> Self {
         // The built-in descriptor owns the canonical default backend identifier.
         Self {
-            backend: solidcraft_render::builtin_backend().id,
+            backend: polykrom_render::builtin_backend().id,
             mode: RenderMode::Preview,
             camera: Camera::default(),
             width: 1024,
@@ -190,7 +190,7 @@ mod tests {
             exposure_ev: 2.5,
             mode: RenderMode::Final,
             format: RenderFormat::Exr,
-            camera: Camera { up: solidcraft_render::UpAxis::Y, ..Default::default() },
+            camera: Camera { up: polykrom_render::UpAxis::Y, ..Default::default() },
             ..Default::default()
         };
         Arc::make_mut(&mut loaded.render).setups.insert("Studio".into(), setup);

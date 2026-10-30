@@ -406,14 +406,12 @@ impl<'a> ExactSketchCurves<'a> {
             if curve.construction
                 || !matches!(
                     curve.kind,
-                    solidcraft_sketch::CurveKind::Line { .. }
-                        | solidcraft_sketch::CurveKind::Arc { .. }
-                        | solidcraft_sketch::CurveKind::Circle { .. }
+                    polykrom_sketch::CurveKind::Line { .. } | polykrom_sketch::CurveKind::Arc { .. } | polykrom_sketch::CurveKind::Circle { .. }
                 )
             {
                 continue;
             }
-            let originals = if let solidcraft_sketch::CurveKind::Circle { c, r } = curve.kind {
+            let originals = if let polykrom_sketch::CurveKind::Circle { c, r } = curve.kind {
                 sketch
                     .sketch
                     .point(c)
@@ -863,8 +861,8 @@ mod tests {
     use super::*;
     use serde_json::json;
 
-    fn solved(mut sketch: solidcraft_sketch::Sketch) -> SolvedSketch {
-        let report = solidcraft_sketch::solve(&mut sketch);
+    fn solved(mut sketch: polykrom_sketch::Sketch) -> SolvedSketch {
+        let report = polykrom_sketch::solve(&mut sketch);
         SolvedSketch {
             feature: 1,
             name: "sources".into(),
@@ -904,7 +902,7 @@ mod tests {
     #[test]
     fn prepared_sources_keep_exact_identity_and_reject_ambiguity() {
         use solidcraft_geom::Vec2;
-        let mut sketch = solidcraft_sketch::Sketch::new();
+        let mut sketch = polykrom_sketch::Sketch::new();
         sketch.add_line(Vec2::ZERO, Vec2::new(10., 0.), None, None, Some("line")).unwrap();
         sketch.add_circle(Vec2::new(20., 0.), 2., None, Some("circle")).unwrap();
         let construction = sketch.add_line(Vec2::ZERO, Vec2::new(10., 0.), None, None, Some("construction")).unwrap();
@@ -921,7 +919,7 @@ mod tests {
         // A prepared pass borrows one immutable evaluated sketch, so an upstream edit
         // necessarily prepares fresh sources rather than retaining stale coordinates.
         let mut moved = sketch.clone();
-        moved.sketch = solidcraft_sketch::Sketch::new();
+        moved.sketch = polykrom_sketch::Sketch::new();
         moved.sketch.add_line(Vec2::new(0., 1.), Vec2::new(10., 1.), None, None, Some("line")).unwrap();
         assert_eq!(ExactSketchCurves::new(&moved).find(&partial), None);
     }
@@ -930,7 +928,7 @@ mod tests {
     fn a_curve_drawn_over_a_projected_boundary_is_the_source() {
         use solidcraft_geom::Vec2;
         // A face sketch's live boundary, with a profile edge traced over it (issue #489).
-        let mut sketch = solidcraft_sketch::Sketch::new();
+        let mut sketch = polykrom_sketch::Sketch::new();
         let projected = sketch.add_line(Vec2::ZERO, Vec2::new(10., 0.), None, None, Some("edge")).unwrap();
         sketch.curves[projected].link = Some("boundary".into());
         let sketch = solved(sketch);
@@ -953,7 +951,7 @@ mod tests {
     #[ignore = "manual optimized certification microbenchmark; no timing assertion"]
     fn benchmark_prepared_extrude_sources() {
         use solidcraft_geom::Vec2;
-        let mut sketch = solidcraft_sketch::Sketch::new();
+        let mut sketch = polykrom_sketch::Sketch::new();
         for i in 0..1000 {
             let y = i as f64;
             sketch.add_line(Vec2::new(0., y), Vec2::new(10., y), None, None, None).unwrap();

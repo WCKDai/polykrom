@@ -1,12 +1,12 @@
 //! Sheet metal: rules, Flange (base, edge, contour), Hem, Unfold/Refold, Convert to Sheet Metal,
 //! the flat pattern (outline, bend lines, bend table) and its DXF export.
 
+use polykrom_doc::expr::Kind;
+use polykrom_doc::sheet::{self, SheetBody, SheetRule};
+use polykrom_doc::{BodyName, SketchId};
+use polykrom_doc::{FacePick, Position};
+use polykrom_doc::{FeatureKind, FlangeEdge};
 use serde_json::{Value, json};
-use solidcraft_doc::expr::Kind;
-use solidcraft_doc::sheet::{self, SheetBody, SheetRule};
-use solidcraft_doc::{BodyName, SketchId};
-use solidcraft_doc::{FacePick, Position};
-use solidcraft_doc::{FeatureKind, FlangeEdge};
 use solidcraft_geom::{Aabb2, Ring, Vec2, Vec3};
 
 use super::CommandSpec;
@@ -112,7 +112,7 @@ fn flange_edges(s: &Session, p: &Value, cmd: &str) -> Result<Vec<FlangeEdge>> {
             return Err(bad(cmd, format!("edges[{i}]: unknown key `{k}` (an edge takes point, angle and height)")));
         }
         let point = o.get("point").and_then(vec3).ok_or_else(|| bad(cmd, format!("edges[{i}]: `point` must be [x, y, z]")))?;
-        let own = |k: &str, kind: Kind| -> Result<Option<solidcraft_doc::Expr>> {
+        let own = |k: &str, kind: Kind| -> Result<Option<polykrom_doc::Expr>> {
             if o.get(k).is_none_or(Value::is_null) {
                 return Ok(None);
             }
@@ -214,7 +214,7 @@ fn flange(s: &mut Session, p: &Value) -> Result<Value> {
             let corner_relief_shape = match p.get("corner_relief_shape").filter(|v| !v.is_null()) {
                 Some(v) => Some(
                     v.as_str()
-                        .and_then(solidcraft_doc::sheet::ReliefShape::parse)
+                        .and_then(polykrom_doc::sheet::ReliefShape::parse)
                         .map(|shape| shape.name().to_string())
                         .ok_or_else(|| bad(cmd, "`corner_relief_shape` must be notch, round, rectangular or tear"))?,
                 ),
@@ -411,7 +411,7 @@ fn rules(s: &mut Session, p: &Value) -> Result<Value> {
         }
     }
     if let Some(shape) = p.get("corner_relief_shape").filter(|v| !v.is_null()) {
-        let shape = shape.as_str().and_then(solidcraft_doc::sheet::ReliefShape::parse);
+        let shape = shape.as_str().and_then(polykrom_doc::sheet::ReliefShape::parse);
         rule.corner_relief_shape = shape.ok_or_else(|| bad(cmd, "`corner_relief_shape` must be notch, round, rectangular or tear"))?.name().into();
     }
     let (vals, _) = s.doc.param_values();
@@ -595,8 +595,8 @@ pub struct DxfOptions {
 /// The layer of a role: its AutoCAD colour index (1 red, 2 yellow, 3 green, 4 cyan, 5 blue,
 /// 6 magenta, 7 white or black, 8 grey) and, for the bend lines, a dashed line. The pocket layers
 /// and PERFORATION are green.
-fn dxf_layer(name: &str) -> solidcraft_io::DxfLayer {
-    use solidcraft_io::DxfLayer;
+fn dxf_layer(name: &str) -> polykrom_io::DxfLayer {
+    use polykrom_io::DxfLayer;
     match name {
         "OUTLINE" => DxfLayer::new(name, 7),
         "CUT" => DxfLayer::new(name, 4),
@@ -619,7 +619,7 @@ fn compact(v: f64) -> String {
 /// The note beside a bend line, `B1 UP 90%%d R2.5` (number, direction, angle, inner radius): as
 /// high as `height`, centred half a height beside the middle of the line, parallel to it and
 /// readable from below or from the right. (`%%d` is AutoCAD's degree sign.)
-fn bend_note(b: &solidcraft_doc::sheet::BendInfo, height: f64) -> solidcraft_io::DxfShape {
+fn bend_note(b: &polykrom_doc::sheet::BendInfo, height: f64) -> polykrom_io::DxfShape {
     let along = (b.end - b.start).normalized().unwrap_or(Vec2::X);
     let mut angle = along.angle().to_degrees();
     if angle > 90.0 + 1e-9 {
@@ -628,7 +628,7 @@ fn bend_note(b: &solidcraft_doc::sheet::BendInfo, height: f64) -> solidcraft_io:
         angle += 180.0;
     }
     let beside = Vec2::from_angle(angle.to_radians()).perp();
-    solidcraft_io::DxfShape::Text {
+    polykrom_io::DxfShape::Text {
         at: (b.start + b.end) * 0.5 + beside * (height * 0.5),
         height,
         angle_deg: angle,
@@ -642,11 +642,11 @@ fn bend_note(b: &solidcraft_doc::sheet::BendInfo, height: f64) -> solidcraft_io:
 /// per pocket depth and PERFORATION. Inner contours are written before the outline, so a program
 /// that follows the file's order cuts inside-out. Free-form curves as `o.curves` says.
 pub fn flat_dxf(sh: &SheetBody, o: &DxfOptions) -> Result<String> {
-    use solidcraft_io::{DxfEntity, DxfShape};
+    use polykrom_io::{DxfEntity, DxfShape};
     let regions = sh.flat_regions()?;
     let pockets = sh.machining()?;
     let letters = sh.letters();
-    let pocket_layer = |p: &solidcraft_doc::sheet::SheetPocket| {
+    let pocket_layer = |p: &polykrom_doc::sheet::SheetPocket| {
         let side = if p.z0 == 0.0 {
             "BOTTOM"
         } else if p.z1 == sh.t {
@@ -729,7 +729,7 @@ pub fn flat_dxf(sh: &SheetBody, o: &DxfOptions) -> Result<String> {
             _ => h,
         };
         // A whole ellipse is one ELLIPSE; every other segment is an entity of its own.
-        entities.extend(solidcraft_io::loop_shapes(h).into_iter().map(|shape| DxfEntity { layer: layer.clone(), shape }));
+        entities.extend(polykrom_io::loop_shapes(h).into_iter().map(|shape| DxfEntity { layer: layer.clone(), shape }));
     }
     for b in sh.bends() {
         entities.push(DxfEntity { layer: if b.up { "BEND_UP" } else { "BEND_DOWN" }.into(), shape: DxfShape::Line(b.start, b.end) });
@@ -744,7 +744,7 @@ pub fn flat_dxf(sh: &SheetBody, o: &DxfOptions) -> Result<String> {
     let mut names: std::collections::BTreeSet<String> = ["OUTLINE", "CUT", "BEND_UP", "BEND_DOWN"].map(String::from).into();
     names.extend(entities.iter().map(|e| e.layer.clone()));
     let layers: Vec<_> = names.iter().map(|name| dxf_layer(name)).collect();
-    Ok(solidcraft_io::write_dxf_drawing(&layers, &entities))
+    Ok(polykrom_io::write_dxf_drawing(&layers, &entities))
 }
 
 /// What a `sheet.export_dxf` call asks for; a value it cannot use is refused.
@@ -832,7 +832,7 @@ fn export_dxf(s: &mut Session, p: &Value) -> Result<Value> {
         for (i, (sh, text)) in sheets.iter().zip(&texts).enumerate() {
             let bends = sh.bends().len();
             if let Some(file) = paths.as_ref().and_then(|paths| paths.get(i)) {
-                solidcraft_io::vfs::write(file, text.as_bytes()).map_err(|e| EngineError::Other(format!("{file}: {e}")))?;
+                polykrom_io::vfs::write(file, text.as_bytes()).map_err(|e| EngineError::Other(format!("{file}: {e}")))?;
                 files.push(json!({"body": sh.body, "path": file, "bends": bends}));
             } else {
                 files.push(json!({"body": sh.body, "dxf": text, "bends": bends}));
@@ -844,7 +844,7 @@ fn export_dxf(s: &mut Session, p: &Value) -> Result<Value> {
     sh.flat_matches_body()?;
     let text = flat_dxf(&sh, &options)?;
     if let Some(path) = path {
-        solidcraft_io::vfs::write(path, text.as_bytes()).map_err(|e| EngineError::Other(format!("{path}: {e}")))?;
+        polykrom_io::vfs::write(path, text.as_bytes()).map_err(|e| EngineError::Other(format!("{path}: {e}")))?;
         return Ok(json!({"path": path, "bends": sh.bends().len()}));
     }
     Ok(json!({"dxf": text, "bends": sh.bends().len()}))
@@ -889,7 +889,7 @@ fn export_bend_table(s: &mut Session, p: &Value) -> Result<Value> {
         csv
     };
     if let Some(path) = str_(p, "path").filter(|x| !x.trim().is_empty()) {
-        solidcraft_io::vfs::write(path, text.as_bytes()).map_err(|e| EngineError::Other(format!("{path}: {e}")))?;
+        polykrom_io::vfs::write(path, text.as_bytes()).map_err(|e| EngineError::Other(format!("{path}: {e}")))?;
         return Ok(json!({"path": path, "format": format, "bends": sh.bends().len()}));
     }
     Ok(json!({"format": format, "text": text, "bends": sh.bends().len()}))

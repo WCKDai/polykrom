@@ -1,5 +1,5 @@
 [package]
-name = "solidcraft-3dx-client"
+name = "polykrom-3dx-client"
 description = "Polykrom: a client of the 3Dconnexion driver on macOS (3DxWare), loaded at run time"
 version.workspace = true
 edition.workspace = true

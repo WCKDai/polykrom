@@ -1,11 +1,11 @@
 //! Independent copies of a component definition graph, assembled and evaluated atomically.
-use solidcraft_doc::BodyName;
+use polykrom_doc::BodyName;
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::params::bad;
 use crate::{Result, Sel, Session};
+use polykrom_doc::{Document, Feature, FeatureKind, Mat, Occurrence};
 use serde_json::{Value, json};
-use solidcraft_doc::{Document, Feature, FeatureKind, Mat, Occurrence};
 
 const CMD: &str = "component.paste_new";
 const MAX_WORK: usize = 10_000;
@@ -328,7 +328,7 @@ pub(super) fn paste(
         if body.body.is_mesh() {
             return Err(bad(CMD, "Paste New of a reassigned mesh body is not supported yet"));
         }
-        let offset = source.model_body_offset(body).copied().unwrap_or(solidcraft_doc::IDENTITY);
+        let offset = source.model_body_offset(body).copied().unwrap_or(polykrom_doc::IDENTITY);
         // An external transfer establishes the local baseline in this graph.
         // Freeze AFTER that boundary, then replay it as an identity ownership event.
         let entry = feats.iter().find(|f| {
@@ -385,7 +385,7 @@ pub(super) fn paste(
                     && let Some(p) = source_parameters.get(name.as_str())
                     && p.model
                 {
-                    if scratch.doc.params.len() >= solidcraft_doc::MAX_PARAMS {
+                    if scratch.doc.params.len() >= polykrom_doc::MAX_PARAMS {
                         return Err(bad(CMD, "too many copied parameters"));
                     }
                     let new = scratch.doc_mut().new_model_param(&p.expr, &p.unit);
@@ -401,7 +401,7 @@ pub(super) fn paste(
         if let Some(p) = source_parameters.get(old.as_str())
             && p.model
         {
-            let expr = solidcraft_doc::clone_expression(&p.expr, &parameters);
+            let expr = polykrom_doc::clone_expression(&p.expr, &parameters);
             if let Some(p) = scratch.doc_mut().params.iter_mut().find(|p| p.name == *new) {
                 p.expr = expr;
                 p.comment = source_parameters.get(old.as_str()).map(|p| p.comment.clone()).unwrap_or_default();
@@ -427,7 +427,7 @@ pub(super) fn paste(
                 *from = *mapped;
             } else {
                 *from = *to;
-                *transform = solidcraft_doc::IDENTITY;
+                *transform = polykrom_doc::IDENTITY;
             }
         }
         if let FeatureKind::Emboss { face: Some(face), .. } = &mut f.kind
@@ -504,15 +504,15 @@ pub(super) fn paste(
                     return Err(bad(CMD, "cannot copy strict face paint through uncertified foreign re-export"));
                 }
                 if let Some(name) = &face.name {
-                    face.point = solidcraft_doc::naming::point_on_face(&state, name, face.point)
+                    face.point = polykrom_doc::naming::point_on_face(&state, name, face.point)
                         .map(|(point, _)| point)
                         .ok_or_else(|| bad(CMD, "source frozen face appearance lost its identity"))?;
                 }
                 let source_body = state.body(&face.body).ok_or_else(|| bad(CMD, "source frozen face appearance lost its body"))?;
-                face.point = solidcraft_doc::apply_point(source.model_body_offset(source_body).unwrap_or(&solidcraft_doc::IDENTITY), face.point);
+                face.point = polykrom_doc::apply_point(source.model_body_offset(source_body).unwrap_or(&polykrom_doc::IDENTITY), face.point);
                 face.name = None;
             } else if let Some(name) = &mut face.name {
-                *name = solidcraft_doc::remap_topology(name, &features, &bodies);
+                *name = polykrom_doc::remap_topology(name, &features, &bodies);
             }
             face.body = new.clone();
             if let Some(certificate) = &mut face.certificate {
@@ -522,7 +522,7 @@ pub(super) fn paste(
         }
     }
     // Typed configuration and assembly helpers preserve original targets.
-    scratch.doc_mut().configs.clone_targets(&solidcraft_doc::config::ConfigCloneMaps {
+    scratch.doc_mut().configs.clone_targets(&polykrom_doc::config::ConfigCloneMaps {
         features: features.clone(),
         components: components.clone(),
         bodies: bodies.clone(),
@@ -538,7 +538,7 @@ pub(super) fn paste(
             notices.push(format!("{} retains external selected occurrence path {:?}", feature.name, face.path));
         }
         if let FeatureKind::Sketch { sketch, .. } = &feature.kind {
-            use solidcraft_sketch::LinkSource as L;
+            use polykrom_sketch::LinkSource as L;
             let mut pending: Vec<_> = sketch.links.iter().map(|l| &l.source).collect();
             let mut work = 0;
             while let Some(link) = pending.pop() {
@@ -601,7 +601,7 @@ pub(super) fn paste(
             }
         }
         for expression in feature.kind.expressions() {
-            for name in solidcraft_doc::expr::references(expression) {
+            for name in polykrom_doc::expr::references(expression) {
                 reference_work += 1;
                 if reference_work > 100_000 {
                     return Err(bad(CMD, "expression references exceed copy work limit"));
@@ -628,8 +628,8 @@ pub(super) fn paste(
         if bodies.iter().any(|(old, new)| frozen.contains(old) && *new == face.body) {
             let body = resolved.body(&face.body).ok_or_else(|| bad(CMD, "missing frozen face body"))?;
             let face_index =
-                solidcraft_doc::appearance::face_index_at(body, face.point).ok_or_else(|| bad(CMD, "cannot reproduce frozen face appearance"))?;
-            let name = solidcraft_doc::naming::face_names(body).get(face_index).cloned().ok_or_else(|| bad(CMD, "missing frozen face identity"))?;
+                polykrom_doc::appearance::face_index_at(body, face.point).ok_or_else(|| bad(CMD, "cannot reproduce frozen face appearance"))?;
+            let name = polykrom_doc::naming::face_names(body).get(face_index).cloned().ok_or_else(|| bad(CMD, "missing frozen face identity"))?;
             face_updates.push((index, name));
         }
     }
@@ -676,8 +676,8 @@ pub(super) fn paste(
     for body in state.bodies.iter().filter(|b| selected.contains(&source.model_body_component(b))) {
         let new = bodies.get(&body.name).ok_or_else(|| bad(CMD, format!("body {} has no clone identity", body.name)))?;
         let cloned = copied_bodies.get(new.as_str()).ok_or_else(|| bad(CMD, format!("copy did not reproduce body {}", body.name)))?;
-        let a = solidcraft_kernel::transform_matrix(&body.body, *source.model_body_offset(body).unwrap_or(&solidcraft_doc::IDENTITY))?;
-        let b = solidcraft_kernel::transform_matrix(&cloned.body, *scratch.doc.model_body_offset(cloned).unwrap_or(&solidcraft_doc::IDENTITY))?;
+        let a = solidcraft_kernel::transform_matrix(&body.body, *source.model_body_offset(body).unwrap_or(&polykrom_doc::IDENTITY))?;
+        let b = solidcraft_kernel::transform_matrix(&cloned.body, *scratch.doc.model_body_offset(cloned).unwrap_or(&polykrom_doc::IDENTITY))?;
         let ma = solidcraft_kernel::measure(&a)?;
         let mb = solidcraft_kernel::measure(&b)?;
         let tolerance = 1e-5 * (1.0 + (ma.bbox.max - ma.bbox.min).len()) + 64.0 * f64::EPSILON * (ma.bbox.min.len() + ma.bbox.max.len());

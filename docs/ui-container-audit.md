@@ -42,7 +42,7 @@ windows use the shared composition, including its header and fixed outer frame.
 | Render settings | `render_workspace` | Panel host; existing right dock retained |
 | Preferences, managers, About, update/install/recovery/crash/issue prompts | `Window`, `Confirm` | System windows and modal sheets retain modality; these are not workspace sidebars |
 | BOM, Messages, mouse gestures, 3D mouse calibration | respective modules → `Window::show_body` | Shared header, tokenised frame and bounded body; native egui title bars/resize highlights and legacy report/width helpers removed |
-| Web stored-files and web recovery windows | `apps/solidcraft-web` → `Window::show_body` | Same shared composition; recovery requires an explicit choice and cannot be dismissed through the header |
+| Web stored-files and web recovery windows | `apps/polykrom-web` → `Window::show_body` | Same shared composition; recovery requires an explicit choice and cannot be dismissed through the header |
 | File/workspace/document/Help/context/overflow menus, radial menu, Select Other and inline rename | respective owners → `Menu` / container popup | Anchored transient hosts; never consume workspace dock space |
 | Search, completions, colour and library popovers | `shortcut_box`, kit fields/choice/colour/table | Anchored popup containers; editor focus and completion semantics retained |
 | Dimension values, canvas placement values, canvas feedback and History resize seam | `dim_view`, `sketch_dims`, `canvas`, `timeline_left` | Model/control-anchored overlays; retain their coordinates rather than becoming docks |

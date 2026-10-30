@@ -10,8 +10,8 @@
 use std::collections::VecDeque;
 
 use egui::{Align2, Color32, FontId, Stroke, pos2, vec2};
+use polykrom_engine::geom::Vec3;
 use serde_json::Value;
-use solidcraft_engine::geom::Vec3;
 
 use crate::SolveApp;
 use crate::i18n::tr;
@@ -65,7 +65,7 @@ pub struct Feed {
 
 /// Note a command the agent ran, and keep what an inspection found to draw on the model.
 pub fn record(app: &mut SolveApp, id: &str, result: &Result<Value, String>) {
-    let label = solidcraft_engine::command_specs().into_iter().find(|s| s.id == id).map_or(id.to_string(), |s| tr(s.label).to_string());
+    let label = polykrom_engine::command_specs().into_iter().find(|s| s.id == id).map_or(id.to_string(), |s| tr(s.label).to_string());
     let (outcome, ok) = match result {
         Ok(v) => (outcome(id, v), true),
         Err(e) => (tr("ui.agent_outcome_failed").replace("{error}", e.lines().next().unwrap_or(e)), false),

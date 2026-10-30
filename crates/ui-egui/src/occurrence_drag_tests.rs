@@ -1,6 +1,6 @@
 //! A left-button drag on a free part repositions it (#2804).
+use polykrom_engine::geom::Vec3;
 use serde_json::{Value, json};
-use solidcraft_engine::geom::Vec3;
 
 use crate::scenario::Harness;
 

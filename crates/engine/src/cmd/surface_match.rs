@@ -3,8 +3,8 @@
 //! requested continuity, while the boundary opposite it keeps its place. The body keeps its name:
 //! a match is a modify, like Trim, Extend and Fair.
 
+use polykrom_doc::{BodyName, FacePick, FeatureKind, Position};
 use serde_json::Value;
-use solidcraft_doc::{BodyName, FacePick, FeatureKind, Position};
 use solidcraft_kernel::Continuity;
 
 use super::CommandSpec;
@@ -141,7 +141,7 @@ mod tests {
         assert!(seam(&s).0 > 0.5, "undo restores the original skirt");
         run(&mut s, "edit.redo", json!({}));
         assert!(seam(&s).1 < 0.05, "redo matches it again");
-        let cold = Session::new(solidcraft_doc::Document::from_json(&s.doc.to_json()).unwrap());
+        let cold = Session::new(polykrom_doc::Document::from_json(&s.doc.to_json()).unwrap());
         assert!(seam(&cold).1 < 0.05, "a reopened design matches the same");
         // Refusals: an unknown body, no target, no picks on the target, a word that is no order,
         // and a body that is not a surface.

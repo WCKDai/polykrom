@@ -1,5 +1,5 @@
 use super::*;
-use solidcraft_io::catalog::{Definition, Entry, FORMAT, ScalarLook, ScalarMaterial};
+use polykrom_io::catalog::{Definition, Entry, FORMAT, ScalarLook, ScalarMaterial};
 use std::sync::{
     Arc,
     atomic::{AtomicU64, Ordering},
@@ -10,7 +10,7 @@ impl File {
     fn new() -> Self {
         static NEXT: AtomicU64 = AtomicU64::new(0);
         Self(
-            solidcraft_io::vfs::temp_dir()
+            polykrom_io::vfs::temp_dir()
                 .join(format!("solidcraft-catalog-{}-{}.json", std::process::id(), NEXT.fetch_add(1, Ordering::Relaxed)))
                 .to_string_lossy()
                 .into_owned(),
@@ -74,7 +74,7 @@ fn catalog_export_obeys_file_scope_in_new_file_and_overwrite_modes() {
     let mut s = session();
     let before = s.doc.clone();
     let undo = s.undo.len();
-    solidcraft_io::vfs::scoped(Some(solidcraft_io::vfs::PathScope::new([root.clone()])), || {
+    polykrom_io::vfs::scoped(Some(polykrom_io::vfs::PathScope::new([root.clone()])), || {
         for path in [outside.join("new.json"), root.join("../outside/traversal.json"), sentinel.clone()] {
             for overwrite in [false, true] {
                 let error = s.execute("library.export", &json!({"path":path,"overwrite":overwrite})).unwrap_err();
@@ -107,12 +107,12 @@ fn catalog_appearance_copy_keeps_mass_and_survives_undo_and_cold_reopen_without_
     assert_eq!(s.undo.len(), undo + 1);
     assert_eq!(s.doc.appearances.bodies["Body1"].name, "Warm oak colour");
     assert_eq!(s.execute("component.properties", &json!({})).unwrap()["total"]["mass_g"].as_f64().unwrap(), before);
-    let saved = solidcraft_io::write_design(&s.doc);
+    let saved = polykrom_io::write_design(&s.doc);
     std::fs::remove_file(&file.0).unwrap();
     s.execute("edit.undo", &json!({})).unwrap();
     assert!(s.doc.appearances.bodies.is_empty());
     s.execute("edit.redo", &json!({})).unwrap();
-    let reopened = Session::new(solidcraft_io::read_design(&saved).unwrap());
+    let reopened = Session::new(polykrom_io::read_design(&saved).unwrap());
     assert_eq!(reopened.doc.appearances, s.doc.appearances);
     assert_eq!(reopened.doc.format, original_format, "scalar library adds no document schema");
 }
@@ -129,9 +129,9 @@ fn catalog_physical_copy_preserves_exact_look_label_and_is_one_transaction() {
     assert_eq!(s.doc.user_materials[0].appearance.as_ref().unwrap().name, "Timber tint");
     let mass = s.execute("component.properties", &json!({})).unwrap()["total"]["mass_g"].as_f64().unwrap();
     assert!((mass - 0.7).abs() < 1e-8);
-    let saved = solidcraft_io::write_design(&s.doc);
+    let saved = polykrom_io::write_design(&s.doc);
     std::fs::remove_file(&file.0).unwrap();
-    let mut reopened = Session::new(solidcraft_io::read_design(&saved).unwrap());
+    let mut reopened = Session::new(polykrom_io::read_design(&saved).unwrap());
     let actual = reopened.execute("component.properties", &json!({})).unwrap()["total"]["mass_g"].as_f64().unwrap();
     assert!((actual - 0.7).abs() < 1e-8);
     s.execute("edit.undo", &json!({})).unwrap();

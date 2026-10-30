@@ -14,7 +14,7 @@ second rename stage, the internals keep SolidCraft's names: crates `solidcraft-*
 `solidcraft/N` format tag inside designs, settings and recovery folders and the bundle IDs.
 Variables read through `solidcraft_geom::env` are `POLYKROM_*`, with `SOLIDCRAFT_*` and
 `SOLVECRAFT_*` fallbacks; read new ones that way. Designs are saved as `.polykrom`
-(`solidcraft_io::DESIGN_EXT`); `.solidcraft` and `.solvecraft` still open (`DESIGN_EXTS`). The rest are still `SOLIDCRAFT_*`. Don't rename those internals piecemeal; `docs/compatibility.md` lists
+(`polykrom_io::DESIGN_EXT`); `.solidcraft` and `.solvecraft` still open (`DESIGN_EXTS`). The rest are still `SOLIDCRAFT_*`. Don't rename those internals piecemeal; `docs/compatibility.md` lists
 them. Credit SolidCraft wherever its work is described.
 
 ## Start every session here
@@ -34,12 +34,12 @@ People trust Polykrom with their designs; a crash loses their work. **This outra
   `crates/threedx-client` (which deny it instead), have no safe API: the macOS-only
   `crates/threedx-client/src/macos.rs` (loads the 3Dconnexion driver's client framework at run time
   and calls through its function pointers), two functions in
-  `apps/solidcraft/src/open_documents.rs` (macOS hands Finder files only to an Objective-C
-  method), the Windows-only `apps/solidcraft/src/native_crash.rs` (the exception filter that
+  `apps/polykrom/src/open_documents.rs` (macOS hands Finder files only to an Objective-C
+  method), the Windows-only `apps/polykrom/src/native_crash.rs` (the exception filter that
   records crashes inside native code such as graphics drivers), the Windows-only
-  `apps/solidcraft/src/native_frame.rs` (the window procedure that answers the resize-border hit
+  `apps/polykrom/src/native_frame.rs` (the window procedure that answers the resize-border hit
   test of the window without OS decorations) and the Windows-only
-  `apps/solidcraft/src/space_mouse/windows_hid.rs` (asks Plug and Play which HID interfaces are 3D
+  `apps/polykrom/src/space_mouse/windows_hid.rs` (asks Plug and Play which HID interfaces are 3D
   mice, so no other device is sent anything).
 - **Errors are `Result<T, E>`** through the crate's error type and `?`. An unfinished feature
   returns an error ("not supported yet: …"); it never panics.
@@ -50,7 +50,7 @@ People trust Polykrom with their designs; a crash loses their work. **This outra
 - **Last-resort guard:** `Session::execute` runs every command under `catch_unwind`; an escaped
   panic restores the design and reports `EngineError::Internal`.
 - **Crash reports:** the desktop app writes every panic and every unclean exit to a local crash folder,
-  with the design and the commands that reproduce it (`solidcraft_engine::crash`, docs/crash-reports.md).
+  with the design and the commands that reproduce it (`polykrom_engine::crash`, docs/crash-reports.md).
   When someone says the app crashed, look there first: `polykrom-cli crashes`, `crashes show <id>`,
   `crashes replay <id>` (or the `diagnostics.crash_reports` command / MCP `crash_reports` tool).
 - **Prove it:** every crash fix lands with a regression test (see `hostile_params_never_panic`); a
@@ -108,8 +108,8 @@ People trust Polykrom with their designs; a crash loses their work. **This outra
 - **Application code is Rust only.** Units are millimetres and radians internally; Z is up.
   Local asset authoring, lint and review tools use Python 3.11+ as documented in
   `assets/AGENTS.md`; Python is not an application runtime dependency. The application exception is
-  JavaScript the browser requires: the service worker `apps/solidcraft-web/sw.js` (browsers only
-  run service workers as JavaScript) and the small inline scripts in `apps/solidcraft-web/index.html`.
+  JavaScript the browser requires: the service worker `apps/polykrom-web/sw.js` (browsers only
+  run service workers as JavaScript) and the small inline scripts in `apps/polykrom-web/index.html`.
   Keep them minimal; `cargo xtask web-offline-test` covers the service worker.
 - **Quality gates** before every commit: `cargo xtask ci` (fmt, clippy -D warnings, tests,
   assets, layers). Commit after every feature arc that builds.
@@ -188,7 +188,7 @@ version bumps solely from commit prefixes, overwrite published versions, or push
 before the draft is verified.
 
 ## Running and looking at the app
-- `cargo run --release -p solidcraft -- --sample --control PORT` (sample design + control channel).
+- `cargo run --release -p polykrom -- --sample --control PORT` (sample design + control channel).
   Pick a free port. Without a display, run it under `Xvfb :99` with `DISPLAY=:99`.
 - Drive it with JSON lines on `127.0.0.1:PORT` (see `docs/control-protocol.md`). The first
   request on a connection carries the launch's token as `"token"`: read it from
@@ -204,7 +204,7 @@ before the draft is verified.
 - Reference tests: `cargo xtask oracle` replays `tests/oracle/*/recipe.json` and compares with
   each case's `expected.json` (analytic or FreeCAD values; writes `docs/oracle.md`). Expected
   values never come from a commercial CAD product.
-- Build with `CARGO_TARGET_DIR=<repo>/target`. Windows: `cargo xwin build --release --target x86_64-pc-windows-msvc -p solidcraft`.
+- Build with `CARGO_TARGET_DIR=<repo>/target`. Windows: `cargo xwin build --release --target x86_64-pc-windows-msvc -p polykrom`.
 
 ## Roadmap
 `ROADMAP.md` (committed) tracks status, milestones and estimates. Update it whenever a

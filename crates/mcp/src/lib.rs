@@ -20,7 +20,7 @@ pub use tools::{call_tool, tool_definitions};
 
 use std::path::PathBuf;
 
-use solidcraft_engine::io::vfs::{self, PathScope};
+use polykrom_engine::io::vfs::{self, PathScope};
 
 /// The folders `polykrom-cli mcp` lets its agent read, write and delete in by default: the
 /// app's own recovery folder, this server's private scratch folder (screenshots), and each
@@ -29,7 +29,7 @@ use solidcraft_engine::io::vfs::{self, PathScope};
 /// folder and anything above it never count by themselves, so `~/.ssh`, `~/.bashrc` and other
 /// dotfiles are out of reach unless a folder holding them is allowed on purpose.
 pub fn agent_scope(allowed: impl IntoIterator<Item = PathBuf>) -> PathScope {
-    agent_scope_with(solidcraft_engine::recovery::default_dir(), allowed)
+    agent_scope_with(polykrom_engine::recovery::default_dir(), allowed)
 }
 
 /// [`agent_scope`] with the recovery folder given (tests).

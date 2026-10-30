@@ -5,8 +5,8 @@
 
 use std::f64::consts::PI;
 
+use polykrom_doc::FeatureKind;
 use serde_json::{Value, json};
-use solidcraft_doc::FeatureKind;
 use solidcraft_geom::Vec3;
 
 use crate::{EngineError, Session};
@@ -36,7 +36,7 @@ fn bore_at(s: &Session, x: f64, y: f64, top: f64) {
 }
 
 /// The last feature's position and reference edges.
-fn hole(s: &Session) -> (Vec3, Vec<solidcraft_doc::HoleReference>) {
+fn hole(s: &Session) -> (Vec3, Vec<polykrom_doc::HoleReference>) {
     match &s.doc.features.last().map(|f| &f.kind) {
         Some(FeatureKind::Hole { position, references, .. }) => (position.0, references.clone()),
         other => panic!("the last feature is not a hole: {other:?}"),
@@ -99,7 +99,7 @@ fn a_hole_follows_its_edges_when_the_box_grows() {
     run(&mut s, "parameters.change", json!({"name": "len", "expression": "30 mm"}));
     bore_at(&s, 20.0, 45.0, 10.0);
     // Saved and reopened, the hole keeps its references and its place.
-    let mut t = Session::new(solidcraft_doc::Document::from_json(&s.doc.to_json()).unwrap());
+    let mut t = Session::new(polykrom_doc::Document::from_json(&s.doc.to_json()).unwrap());
     t.refresh();
     bore_at(&t, 20.0, 45.0, 10.0);
     assert_eq!(hole(&t).1, hole(&s).1);

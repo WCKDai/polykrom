@@ -16,7 +16,7 @@ fn run(s: &mut Session, id: &str, p: Value) -> Value {
 }
 
 fn temp(tag: &str) -> PathBuf {
-    let d = solidcraft_io::vfs::temp_dir().join(format!("solidcraft-mjcf-{tag}-{}", std::process::id()));
+    let d = polykrom_io::vfs::temp_dir().join(format!("solidcraft-mjcf-{tag}-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&d);
     let _ = std::fs::create_dir_all(&d);
     d

@@ -1,6 +1,6 @@
 use crate::test_support::run_all;
+use polykrom_engine::Session;
 use serde_json::json;
-use solidcraft_engine::Session;
 
 use super::*;
 use crate::Services;
@@ -386,7 +386,7 @@ fn rules_dialog_picks_the_corner_relief_shape() {
         // The rounds in the base of the tray, and the shape the open dialog shows.
         let rounds = |app: &SolveApp| {
             let state = app.session.model.state();
-            state.sheets.last().map(|s| s.base.outer.segs.iter().filter(|g| matches!(g, solidcraft_engine::geom::Seg2::Arc { .. })).count())
+            state.sheets.last().map(|s| s.base.outer.segs.iter().filter(|g| matches!(g, polykrom_engine::geom::Seg2::Arc { .. })).count())
         };
         let shown = |app: &SolveApp| match app.dialog.as_ref().map(|d| &d.kind) {
             Some(Kind::Sheet(Sm::Rules { relief, .. })) => Some(*relief),
@@ -535,7 +535,7 @@ fn flange_dialog_picks_a_corner_relief_of_its_own() {
                 .state()
                 .sheets
                 .last()
-                .map(|s| s.base.outer.segs.iter().filter(|g| matches!(g, solidcraft_engine::geom::Seg2::Arc { .. })).count())
+                .map(|s| s.base.outer.segs.iter().filter(|g| matches!(g, polykrom_engine::geom::Seg2::Arc { .. })).count())
         };
         assert_eq!(arcs(&h.app), Some(1), "the round is cut at the one corner the two flanges make");
         // Edit Feature shows both again; Rule and an empty size take the feature back to the rule's relief.
@@ -683,7 +683,7 @@ fn flat_app(preset: &str, mode: crate::shell::LayoutMode) -> SolveApp {
 
 /// Same view in the flat plane: the Design viewport may anchor a zoom on the model's surface
 /// (a little out of the plane), the flat view anchors on its plane.
-fn same_view(a: &solidcraft_engine::render::Camera, b: &solidcraft_engine::render::Camera) -> bool {
+fn same_view(a: &polykrom_engine::render::Camera, b: &polykrom_engine::render::Camera) -> bool {
     (a.target.x - b.target.x).abs() < 1e-3
         && (a.target.y - b.target.y).abs() < 1e-3
         && (a.distance - b.distance).abs() < 1e-9

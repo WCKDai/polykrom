@@ -30,7 +30,7 @@
 use serde_json::{Value, json};
 use solidcraft_geom::Vec3;
 
-use solidcraft_doc::joints::{JointOrigin, NamedOrigin, Snap};
+use polykrom_doc::joints::{JointOrigin, NamedOrigin, Snap};
 
 use super::CommandSpec;
 use crate::params::{bad, num, str_, vec3};
@@ -121,11 +121,11 @@ pub const RATINGS_KEY: &str = "app.polykrom.part";
 /// whose ratings give `stall_torque_nm` (servos, BLDC motors) or `holding_torque_nm`
 /// (steppers), picked by the joint itself or holding the part the joint picks (a horn nested in
 /// a servo). The MJCF export limits the joint's actuator to it.
-pub fn rated_torques(doc: &solidcraft_doc::Document) -> std::collections::BTreeMap<u64, f64> {
+pub fn rated_torques(doc: &polykrom_doc::Document) -> std::collections::BTreeMap<u64, f64> {
     let rated = |component: u64| rated_torque(ratings_of(doc, component)?);
     let at = |occ: u64| {
         let mut cur = doc.occurrences.iter().find(|o| o.id == occ);
-        for _ in 0..solidcraft_doc::MAX_PLACEMENT_DEPTH {
+        for _ in 0..polykrom_doc::MAX_PLACEMENT_DEPTH {
             let o = cur?;
             if let Some(t) = rated(o.component) {
                 return Some(t);
@@ -137,7 +137,7 @@ pub fn rated_torques(doc: &solidcraft_doc::Document) -> std::collections::BTreeM
     doc.assembly.joints.iter().filter_map(|j| Some((j.id, at(j.a.occurrence).or_else(|| at(j.b.occurrence))?))).collect()
 }
 
-fn ratings_of(doc: &solidcraft_doc::Document, component: u64) -> Option<&Value> {
+fn ratings_of(doc: &polykrom_doc::Document, component: u64) -> Option<&Value> {
     doc.components.iter().find(|c| c.id == component)?.metadata.get(RATINGS_KEY)
 }
 
@@ -147,7 +147,7 @@ fn rated_torque(r: &Value) -> Option<f64> {
 
 /// A library actuator's rated torque (N m, as `rated_torques` reads it) and its output axis
 /// (point, unit direction) in its component's frame; `None` for a part without both.
-pub fn rated_output(doc: &solidcraft_doc::Document, component: u64) -> Option<(f64, Vec3, Vec3)> {
+pub fn rated_output(doc: &polykrom_doc::Document, component: u64) -> Option<(f64, Vec3, Vec3)> {
     let r = ratings_of(doc, component)?;
     let axis = r.get("output_axis")?;
     let at = |k: &str| {
@@ -1046,7 +1046,7 @@ fn identity(family: &str, size: &str, sh: &Shape) -> (String, String) {
 /// Give a standard part its part number and description; a field someone changed since the last
 /// size (`was`) is theirs and stays.
 fn set_identity(s: &mut Session, comp: u64, now: (String, String), was: Option<(String, String)>) {
-    use solidcraft_doc::metadata::{DESCRIPTION, PART_NUMBER};
+    use polykrom_doc::metadata::{DESCRIPTION, PART_NUMBER};
     let Some(c) = s.doc.components.iter().find(|c| c.id == comp) else { return };
     let mut m = c.metadata.clone();
     for (k, new, old) in [(PART_NUMBER, now.0, was.as_ref().map(|w| w.0.as_str())), (DESCRIPTION, now.1, was.as_ref().map(|w| w.1.as_str()))] {
@@ -1130,21 +1130,21 @@ fn rated_material(s: &mut Session, comp: u64, size: &str, kg: f64, look: &str) -
         .bodies
         .iter()
         .filter(|b| comps.contains(&Some(s.doc.model_body_component(b))))
-        .filter_map(|b| solidcraft_doc::kernel::measure(&b.body).ok())
+        .filter_map(|b| polykrom_doc::kernel::measure(&b.body).ok())
         .map(|m| m.volume)
         .sum();
     // g/cm³ from kg and mm³.
     let density = kg * 1e6 / volume;
-    if !solidcraft_doc::valid_density(density) || s.doc.user_materials.len() >= 1000 {
+    if !polykrom_doc::valid_density(density) || s.doc.user_materials.len() >= 1000 {
         return None;
     }
-    let appearance = solidcraft_doc::appearance::material_look(look).map(|mut l| {
+    let appearance = polykrom_doc::appearance::material_look(look).map(|mut l| {
         if let Some(c) = case_color(size) {
             l.color = c;
         }
         l
     });
-    s.doc_mut().user_materials.push(solidcraft_doc::UserMaterial { name: name.clone(), density, appearance });
+    s.doc_mut().user_materials.push(polykrom_doc::UserMaterial { name: name.clone(), density, appearance });
     Some(name)
 }
 
@@ -1259,7 +1259,7 @@ fn insert(s: &mut Session, p: &Value) -> Result<Value> {
     let (comp, occ) = (c["component"].as_u64().unwrap_or(0), c["occurrence"].as_u64().unwrap_or(0));
     build(s, &sh)?;
     finish(s, comp, &name, &[]);
-    s.doc_mut().parts.insert(comp, solidcraft_doc::StandardPart { family: family.clone(), size: size.clone(), length: shape_len(&sh) });
+    s.doc_mut().parts.insert(comp, polykrom_doc::StandardPart { family: family.clone(), size: size.clone(), length: shape_len(&sh) });
     set_identity(s, comp, identity(&family, &size, &sh), None);
     let output = output_part(s, comp, &name, &sh)?;
     fit_out(s, comp, &sh);
@@ -1286,12 +1286,8 @@ fn insert(s: &mut Session, p: &Value) -> Result<Value> {
     } else if let Some(pt) = p.get("point").and_then(vec3) {
         // Placed at a point, its +z along `direction`.
         let dir = p.get("direction").and_then(vec3).and_then(|d| d.normalized()).unwrap_or(Vec3::Z);
-        let m = solidcraft_doc::rigid(
-            Vec3::ZERO,
-            Vec3::ZERO,
-            Vec3::Z.cross(dir).normalized().unwrap_or(Vec3::X),
-            Vec3::Z.dot(dir).clamp(-1.0, 1.0).acos(),
-        );
+        let m =
+            polykrom_doc::rigid(Vec3::ZERO, Vec3::ZERO, Vec3::Z.cross(dir).normalized().unwrap_or(Vec3::X), Vec3::Z.dot(dir).clamp(-1.0, 1.0).acos());
         let mut m = m;
         m[3] = [pt.x, pt.y, pt.z, 1.0];
         if let Some(o) = s.doc_mut().occurrences.iter_mut().find(|o| o.id == occ) {
@@ -1353,21 +1349,21 @@ fn named_after(name: &str, base: &str) -> bool {
 fn hole_wall(s: &Session, a: Vec3) -> Option<Vec3> {
     let st = s.model.state();
     let dirs = [Vec3::Z * -1.0, Vec3::Z, Vec3::X, Vec3::X * -1.0, Vec3::Y, Vec3::Y * -1.0];
-    let places: Vec<(&_, solidcraft_doc::Mat)> = st
+    let places: Vec<(&_, polykrom_doc::Mat)> = st
         .bodies
         .iter()
         .flat_map(|b| {
             let comp = s.doc.model_body_component(b);
-            let ts: Vec<solidcraft_doc::Mat> = if comp == 0 {
-                vec![solidcraft_doc::IDENTITY]
+            let ts: Vec<polykrom_doc::Mat> = if comp == 0 {
+                vec![polykrom_doc::IDENTITY]
             } else {
-                s.doc.occurrences.iter().filter(|o| o.component == comp).map(|o| solidcraft_doc::joints::occurrence_world(&s.doc, o.id)).collect()
+                s.doc.occurrences.iter().filter(|o| o.component == comp).map(|o| polykrom_doc::joints::occurrence_world(&s.doc, o.id)).collect()
             };
-            ts.into_iter().filter_map(move |t| solidcraft_doc::mat_inverse(&t).map(|inv| (b, inv)))
+            ts.into_iter().filter_map(move |t| polykrom_doc::mat_inverse(&t).map(|inv| (b, inv)))
         })
         // Only parts within reach of the farthest step: a probe meshes the body it tries (#160).
         .filter(|(b, inv)| {
-            let q = solidcraft_doc::apply_point(inv, a);
+            let q = polykrom_doc::apply_point(inv, a);
             let bb = b.mesh().bounds();
             let reach = 2.5;
             (bb.min.x - reach..=bb.max.x + reach).contains(&q.x)
@@ -1379,8 +1375,8 @@ fn hole_wall(s: &Session, a: Vec3) -> Option<Vec3> {
         for (b, inv) in &places {
             for d in dirs {
                 let q = a + d * step;
-                let local = solidcraft_doc::apply_point(inv, q);
-                if let Some(c) = solidcraft_doc::kernel::cylinder_face_at(&b.body, local) {
+                let local = polykrom_doc::apply_point(inv, q);
+                if let Some(c) = polykrom_doc::kernel::cylinder_face_at(&b.body, local) {
                     let v = local - c.axis_point;
                     let along = v.dot(c.axis);
                     let on_wall = ((v - c.axis * along).len() - c.radius).abs() < 1e-3 && along > c.start && along < c.end;
@@ -1405,9 +1401,9 @@ fn hole_host(s: &Session, a: Vec3) -> Option<u64> {
         let comp = s.doc.model_body_component(b);
         let occs: Vec<u64> = if comp == 0 { vec![0] } else { s.doc.occurrences.iter().filter(|o| o.component == comp).map(|o| o.id).collect() };
         for occ in occs {
-            let t = if occ == 0 { solidcraft_doc::IDENTITY } else { solidcraft_doc::joints::occurrence_world(&s.doc, occ) };
-            let Some(inv) = solidcraft_doc::mat_inverse(&t) else { continue };
-            let q = solidcraft_doc::apply_point(&inv, a);
+            let t = if occ == 0 { polykrom_doc::IDENTITY } else { polykrom_doc::joints::occurrence_world(&s.doc, occ) };
+            let Some(inv) = polykrom_doc::mat_inverse(&t) else { continue };
+            let q = polykrom_doc::apply_point(&inv, a);
             let bb = b.mesh().bounds();
             let outside = (q.x - q.x.clamp(bb.min.x, bb.max.x)).abs()
                 + (q.y - q.y.clamp(bb.min.y, bb.max.y)).abs()
@@ -1415,8 +1411,8 @@ fn hole_host(s: &Session, a: Vec3) -> Option<u64> {
             if outside > 1e-3 {
                 continue;
             }
-            let wall = solidcraft_doc::kernel::cylinder_face_at(&b.body, q).map(|c| (c.internal, c.off(q))).filter(|(_, off)| *off < 1e-3);
-            let end = solidcraft_doc::kernel::cylinder_end_at(&b.body, q).map(|c| {
+            let wall = polykrom_doc::kernel::cylinder_face_at(&b.body, q).map(|c| (c.internal, c.off(q))).filter(|(_, off)| *off < 1e-3);
+            let end = polykrom_doc::kernel::cylinder_end_at(&b.body, q).map(|c| {
                 let v = q - c.axis_point;
                 (c.internal, (v - c.axis * v.dot(c.axis)).len())
             });
@@ -1504,7 +1500,7 @@ fn resize(s: &mut Session, p: &Value) -> Result<Value> {
             }
         }
     }
-    s.doc_mut().parts.insert(comp, solidcraft_doc::StandardPart { family: part.family.clone(), size: size.clone(), length: shape_len(&sh) });
+    s.doc_mut().parts.insert(comp, polykrom_doc::StandardPart { family: part.family.clone(), size: size.clone(), length: shape_len(&sh) });
     if let Some(c) = s.doc_mut().components.iter_mut().find(|c| c.id == comp) {
         c.name = name.clone();
     }
@@ -1747,7 +1743,7 @@ mod tests {
                 // The output origin: on the z axis at the horn's or flange's top, z out of it.
                 assert_eq!(r["output"], format!("{name} output"), "{r}");
                 let o = s.doc.assembly.origins.iter().find(|o| o.name == format!("{name} output")).map(|o| o.origin.clone());
-                let m = o.and_then(|o| solidcraft_doc::joints::resolve_origin(&s.doc, &s.model.state(), &o).ok());
+                let m = o.and_then(|o| polykrom_doc::joints::resolve_origin(&s.doc, &s.model.state(), &o).ok());
                 let m = m.unwrap_or_else(|| panic!("{size}: the output origin does not resolve"));
                 assert!(
                     solidcraft_geom::Vec3::new(m[3][0], m[3][1], m[3][2]).dist(solidcraft_geom::Vec3::new(0.0, 0.0, top)) < 1e-6,
@@ -1820,11 +1816,11 @@ mod tests {
         }
         let r = run(&mut s, "parts.insert", json!({"family": "servo", "size": "STS3215", "at": [44, 40, 4]}));
         assert!(r["joint"].is_number(), "{r}");
-        let t = solidcraft_doc::joints::occurrence_world(&s.doc, r["occurrence"].as_u64().unwrap_or(0));
+        let t = polykrom_doc::joints::occurrence_world(&s.doc, r["occurrence"].as_u64().unwrap_or(0));
         let (lo, _) = bbox(&s, "Servo STS3215");
         assert!((lo.z - 4.0).abs() < 1e-6, "the case's back on the bracket: {lo:?}");
         for (i, (x, y)) in holes.iter().enumerate() {
-            let p = solidcraft_doc::apply_point(&t, solidcraft_geom::Vec3::new(*x, *y, 0.0));
+            let p = polykrom_doc::apply_point(&t, solidcraft_geom::Vec3::new(*x, *y, 0.0));
             assert!(p.dist(solidcraft_geom::Vec3::new(40.0 + x, 40.0 + y, 4.0)) < 1e-6, "hole {i}: {p:?}");
             // An M2 x 8 from under the bracket, its head on the bottom face: 4 mm into the servo.
             let at = json!([40.0 + x + 1.2, 40.0 + y, 0]);
@@ -1874,11 +1870,10 @@ mod tests {
             run(&mut s, "occurrence.ground", json!({"occurrence": r["occurrence"], "grounded": true}));
             let j = run(&mut s, "joint.as_built", json!({"type": "revolute", "a": r["occurrence"], "b": out, "at": r["output"]}));
             run(&mut s, "joint.drive", json!({"joint": j["joint"], "value": 90}));
-            let edge =
-                solidcraft_doc::apply_point(&solidcraft_doc::joints::occurrence_world(&s.doc, out), solidcraft_geom::Vec3::new(d / 2.0, 0.0, z1));
+            let edge = polykrom_doc::apply_point(&polykrom_doc::joints::occurrence_world(&s.doc, out), solidcraft_geom::Vec3::new(d / 2.0, 0.0, z1));
             assert!(edge.x.abs() < 1e-6 && (edge.y.abs() - d / 2.0).abs() < 1e-6 && (edge.z - z1).abs() < 1e-6, "{size}: {edge:?}");
-            let case_at = solidcraft_doc::joints::occurrence_world(&s.doc, r["occurrence"].as_u64().unwrap_or(0));
-            assert_eq!(case_at, solidcraft_doc::IDENTITY, "{size}: the case stays");
+            let case_at = polykrom_doc::joints::occurrence_world(&s.doc, r["occurrence"].as_u64().unwrap_or(0));
+            assert_eq!(case_at, polykrom_doc::IDENTITY, "{size}: the case stays");
         }
         // Resized, the horn is rebuilt for the new size and the output origin moves to its top.
         let mut s = Session::default();
@@ -1888,14 +1883,14 @@ mod tests {
         run(&mut s, "parts.resize", json!({"component": r["component"], "size": "XL430-W250-T"}));
         let joint = s.doc.assembly.joints.iter().find(|x| Some(x.id) == j["joint"].as_u64()).cloned().unwrap_or_else(|| panic!("{j}"));
         for end in [&joint.a, &joint.b] {
-            let at = solidcraft_doc::joints::resolve_origin(&s.doc, &s.model.state(), end).unwrap_or_else(|e| panic!("{e}"));
+            let at = polykrom_doc::joints::resolve_origin(&s.doc, &s.model.state(), end).unwrap_or_else(|e| panic!("{e}"));
             assert!((at[3][2] - 36.0).abs() < 1e-9, "{:?} at {at:?}", end.snap);
         }
         let (lo, hi) = bbox(&s, "Servo XL430-W250-T horn");
         assert!((hi.z - 36.0).abs() < 1e-6 && (lo.z - 34.0).abs() < 1e-6 && (hi.x - 10.25).abs() < 0.03, "{lo:?} {hi:?}");
         assert_eq!(s.doc.occurrences.iter().filter(|o| o.parent == r["component"].as_u64().unwrap_or(0)).count(), 1, "one horn");
         let o = s.doc.assembly.origins.iter().find(|o| Some(o.name.as_str()) == r["output"].as_str()).map(|o| o.origin.clone());
-        let m = o.and_then(|o| solidcraft_doc::joints::resolve_origin(&s.doc, &s.model.state(), &o).ok()).unwrap_or_else(|| panic!("output"));
+        let m = o.and_then(|o| polykrom_doc::joints::resolve_origin(&s.doc, &s.model.state(), &o).ok()).unwrap_or_else(|| panic!("output"));
         assert!((m[3][2] - 36.0).abs() < 1e-9, "{m:?}");
     }
 
@@ -1926,7 +1921,7 @@ mod tests {
         assert!(torque.is_some_and(|t| (t - 19.5 * 0.098_066_5).abs() < 1e-12), "{torque:?}");
         let link = |s: &Session, p: solidcraft_geom::Vec3| {
             let o = s.doc.find_component("Link").and_then(|c| s.doc.occurrence_of(c)).map(|o| o.id).unwrap_or(0);
-            solidcraft_doc::apply_point(&solidcraft_doc::joints::occurrence_world(&s.doc, o), p)
+            polykrom_doc::apply_point(&polykrom_doc::joints::occurrence_world(&s.doc, o), p)
         };
         // The link has not moved: its hole's bottom end already sits on the horn's top.
         let tip = solidcraft_geom::Vec3::new(54.0, 0.0, top);
@@ -1948,8 +1943,8 @@ mod tests {
         let (lo, hi) = bbox(&s, "Horn screw");
         let c = ((lo.x + hi.x) / 2.0, (lo.y + hi.y) / 2.0);
         assert!(c.0.abs() < 1e-6 && (c.1.abs() - bc / 2.0).abs() < 1e-6 && c.1.signum() == p.y.signum(), "the screw went round with the link: {c:?}");
-        let horn = solidcraft_doc::joints::occurrence_world(&s.doc, r["output_part"].as_u64().unwrap_or(0));
-        let hole = solidcraft_doc::apply_point(&horn, solidcraft_geom::Vec3::new(bc / 2.0, 0.0, top));
+        let horn = polykrom_doc::joints::occurrence_world(&s.doc, r["output_part"].as_u64().unwrap_or(0));
+        let hole = polykrom_doc::apply_point(&horn, solidcraft_geom::Vec3::new(bc / 2.0, 0.0, top));
         assert!(hole.x.abs() < 1e-6 && (hole.y - c.1).abs() < 1e-6, "the horn went round with the link: {hole:?}");
         let (lo, hi) = bbox(&s, "Servo STS3215");
         assert!(lo.z.abs() < 1e-6 && (hi.z - top).abs() < 1e-6, "the servo stays: {lo:?} {hi:?}");
@@ -1967,8 +1962,8 @@ mod tests {
         let (lo, hi) = bbox(&s, "BLDC AK80-6");
         assert!((lo.z - (5.0 - 11.0)).abs() < 1e-6 && (hi.z - (5.0 + 27.5)).abs() < 1e-6, "{lo:?} {hi:?}");
         assert!(((lo.x + hi.x) / 2.0 - 60.0).abs() < 0.1 && ((lo.y + hi.y) / 2.0 - 60.0).abs() < 0.1, "{lo:?} {hi:?}");
-        let t = solidcraft_doc::joints::occurrence_world(&s.doc, r["occurrence"].as_u64().unwrap_or(0));
-        let p = solidcraft_doc::apply_point(&t, solidcraft_geom::Vec3::new(42.5, 0.0, 0.0));
+        let t = polykrom_doc::joints::occurrence_world(&s.doc, r["occurrence"].as_u64().unwrap_or(0));
+        let p = polykrom_doc::apply_point(&t, solidcraft_geom::Vec3::new(42.5, 0.0, 0.0));
         assert!(p.dist(solidcraft_geom::Vec3::new(102.5, 60.0, 5.0)) < 1e-6, "{p:?}");
     }
 
@@ -2093,16 +2088,16 @@ mod tests {
         let rebased = s.model.rebased;
         run(&mut s, "parts.resize", json!({"component": screws[0], "length": 8}));
         assert!(s.model.rebased > rebased, "nothing rebased");
-        let mut full = solidcraft_doc::Model::default();
+        let mut full = polykrom_doc::Model::default();
         full.no_cache = true;
         full.evaluate(&s.doc);
         let (now, fresh) = (s.model.state(), full.state());
         assert_eq!(now.bodies.len(), fresh.bodies.len());
         for (a, b) in now.bodies.iter().zip(&fresh.bodies) {
             assert_eq!((&a.name, a.component), (&b.name, b.component));
-            let volume = |m: &solidcraft_doc::ModelBody| crate::kernel::measure(&m.body).map(|m| m.volume).unwrap_or(f64::NAN);
+            let volume = |m: &polykrom_doc::ModelBody| crate::kernel::measure(&m.body).map(|m| m.volume).unwrap_or(f64::NAN);
             assert!((volume(a) - volume(b)).abs() < 1e-9, "{}: {} vs {}", a.name, volume(a), volume(b));
-            assert_eq!(solidcraft_doc::naming::face_names(a), solidcraft_doc::naming::face_names(b), "{}", a.name);
+            assert_eq!(polykrom_doc::naming::face_names(a), polykrom_doc::naming::face_names(b), "{}", a.name);
         }
         assert_eq!(now.threads, fresh.threads);
     }

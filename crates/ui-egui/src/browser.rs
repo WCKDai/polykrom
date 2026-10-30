@@ -32,9 +32,9 @@ use crate::icons::glyphs::badge;
 use std::collections::BTreeSet;
 
 use egui::{Color32, FontId, Pos2, Rect, Sense, Stroke, pos2, vec2};
+use polykrom_engine::Sel;
+use polykrom_engine::doc::FeatureKind;
 use serde_json::{Value, json};
-use solidcraft_engine::Sel;
-use solidcraft_engine::doc::FeatureKind;
 
 use crate::context_menu::{Item, Target};
 use crate::theme::Tokens;
@@ -93,7 +93,7 @@ pub struct TreeState {
     pub canvas_panel: Option<CanvasPanel>,
     /// A Section Analysis hidden with its eye in the Analysis folder: its plane (origin,
     /// normal), so the eye can bring it back (#822).
-    pub hidden_section: Option<(solidcraft_engine::geom::Vec3, solidcraft_engine::geom::Vec3)>,
+    pub hidden_section: Option<(polykrom_engine::geom::Vec3, polykrom_engine::geom::Vec3)>,
     /// What the Section Analysis dialog's OK last made, for Edit to start from.
     pub section_dialog: Option<crate::dialogs::SectionDraft>,
     /// The Analysis folder hidden with its own eye, and the Section Analysis hidden with its
@@ -118,13 +118,13 @@ pub struct OccMove {
     /// Exact assembly placement used for world-space movement and the pivot.
     pub path: Vec<u64>,
     /// Effective local placement at dialog opening, including its pre-existing pending move.
-    pub baseline: Option<solidcraft_engine::doc::Mat>,
+    pub baseline: Option<polykrom_engine::doc::Mat>,
     pub had_pending: bool,
     /// Distances along X, Y, Z (mm) and turns about X, Y, Z (degrees) from where it was.
     pub translate: [f64; 3],
     pub angles: [f64; 3],
     /// The occurrence's origin when the move began: what it turns about.
-    pub pivot: Option<solidcraft_engine::geom::Vec3>,
+    pub pivot: Option<polykrom_engine::geom::Vec3>,
     /// The values when the current triad drag began.
     drag0: Option<([f64; 3], [f64; 3])>,
 }
@@ -140,12 +140,12 @@ impl OccMove {
 // ---------------------------------------------------------------------------------------------
 
 /// Is a sketch shown itself (its eye)? A hidden Sketches folder or component still keeps it out
-/// of the viewport (`solidcraft_engine::view::sketch_drawn`).
+/// of the viewport (`polykrom_engine::view::sketch_drawn`).
 pub fn sketch_visible(app: &SolveApp, id: u64) -> bool {
     if app.session.visibility.hidden_sketches.contains(&id) {
         return false;
     }
-    app.session.visibility.shown_sketches.contains(&id) || !solidcraft_engine::view::sketch_consumed(&app.session, id)
+    app.session.visibility.shown_sketches.contains(&id) || !polykrom_engine::view::sketch_consumed(&app.session, id)
 }
 
 pub fn set_sketch_visible(app: &mut SolveApp, id: u64, on: bool) {
@@ -163,7 +163,7 @@ pub fn redefine_sketch(app: &mut SolveApp, id: u64) {
     app.tree.redefine_draft = Some(crate::sketch_attachment_ui::Draft::new(app, id));
 }
 
-fn find_group(app: &SolveApp, id: u64) -> Option<&solidcraft_engine::doc::BrowserGroup> {
+fn find_group(app: &SolveApp, id: u64) -> Option<&polykrom_engine::doc::BrowserGroup> {
     app.session.doc.browser_groups.iter().find(|g| g.id == id)
 }
 
@@ -689,7 +689,7 @@ impl Lit {
 
     /// The mark of a placement row: a faint bar when a lit body is placed in it or below it, or
     /// a lit sketch or plane belongs to its component or one inside it.
-    fn placement(&self, doc: &solidcraft_engine::doc::Document, path: &[u64], component: u64) -> Mark {
+    fn placement(&self, doc: &polykrom_engine::doc::Document, path: &[u64], component: u64) -> Mark {
         let below = self.paths.iter().any(|p| p.starts_with(path)) || self.components.iter().any(|c| doc.component_within(*c, component));
         if below { Mark::Branch } else { Mark::None }
     }
@@ -906,7 +906,7 @@ fn prepare_model(app: &mut SolveApp) {
     }
 }
 
-fn model_placement(app: &mut SolveApp, path: &[u64]) -> Option<std::sync::Arc<solidcraft_engine::occurrences::OccurrencePlacement>> {
+fn model_placement(app: &mut SolveApp, path: &[u64]) -> Option<std::sync::Arc<polykrom_engine::occurrences::OccurrencePlacement>> {
     prepare_model(app);
     app.tree.model.as_mut()?.placement(&app.session, path)
 }
@@ -1322,7 +1322,7 @@ fn origin_rows(app: &mut SolveApp, ui: &mut egui::Ui, depth: usize, acts: &Actio
         let sel = match icon {
             "plane" => Some(Sel::Plane { name: k.into() }),
             "axis" => Some(Sel::Axis { name: k.into() }),
-            _ => Some(Sel::Vertex { body: String::new(), point: solidcraft_engine::geom::Vec3::ZERO }),
+            _ => Some(Sel::Vertex { body: String::new(), point: polykrom_engine::geom::Vec3::ZERO }),
         };
         let (selected, mark) = lit_row(lit(&thing));
         let r = draw_row(
@@ -1655,7 +1655,7 @@ fn pick_from_browser(app: &mut SolveApp, x: Sel) {
         return;
     }
     let hit = match &x {
-        Sel::Plane { name } => crate::viewport::Hit::Plane { name: name.clone(), point: solidcraft_engine::geom::Vec3::ZERO },
+        Sel::Plane { name } => crate::viewport::Hit::Plane { name: name.clone(), point: polykrom_engine::geom::Vec3::ZERO },
         Sel::Axis { name } => crate::viewport::Hit::Axis { name: name.clone() },
         // The origin point goes only into a dialog input that takes it.
         Sel::Vertex { body, point } if body.is_empty() && app.dialog.is_some() => crate::viewport::Hit::Vertex { body: String::new(), point: *point },
@@ -1728,7 +1728,7 @@ fn entries(app: &SolveApp, comp: u64, folder: &str) -> Vec<Entry> {
             .map(|f| {
                 let active = app.session.active_sketch == Some(f.id);
                 let lost = app.session.model.result(f.id).is_some_and(|result| result.error.is_some())
-                    && matches!(doc.sketch_face_attachment(f.id, &app.session.model), solidcraft_engine::doc::FaceAttachmentStatus::Lost { .. });
+                    && matches!(doc.sketch_face_attachment(f.id, &app.session.model), polykrom_engine::doc::FaceAttachmentStatus::Lost { .. });
                 Entry {
                     key: f.id.to_string(),
                     row_key: format!("s:{}", f.id),
@@ -1771,9 +1771,9 @@ fn entries(app: &SolveApp, comp: u64, folder: &str) -> Vec<Entry> {
 }
 
 /// A folder's groups (with their items) and the items in no group, in browser order.
-fn arrange(app: &SolveApp, comp: u64, folder: &str, all: Vec<Entry>) -> (Vec<(solidcraft_engine::doc::BrowserGroup, Vec<Entry>)>, Vec<Entry>) {
+fn arrange(app: &SolveApp, comp: u64, folder: &str, all: Vec<Entry>) -> (Vec<(polykrom_engine::doc::BrowserGroup, Vec<Entry>)>, Vec<Entry>) {
     let doc = &app.session.doc;
-    let groups: Vec<solidcraft_engine::doc::BrowserGroup> =
+    let groups: Vec<polykrom_engine::doc::BrowserGroup> =
         doc.browser_groups.iter().filter(|g| g.component == comp && g.folder == folder).cloned().collect();
     let mut rest: Vec<Option<Entry>> = all.into_iter().map(Some).collect();
     let mut take = |key: &str| rest.iter_mut().find(|e| e.as_ref().is_some_and(|e| e.key == key)).and_then(Option::take);
@@ -2167,7 +2167,7 @@ pub(crate) fn revert_occurrence_dialog(app: &mut SolveApp, m: &OccMove) {
 /// The pending move: turned about X, then Y, then Z through the starting origin, then moved.
 pub fn apply_occurrence_move(app: &mut SolveApp, m: &OccMove) {
     use crate::gizmo;
-    use solidcraft_engine::geom::Vec3;
+    use polykrom_engine::geom::Vec3;
     let a = m.angles.map(f64::to_radians);
     let r = gizmo::mul(&gizmo::mul(&gizmo::rotation(Vec3::Z, a[2]), &gizmo::rotation(Vec3::Y, a[1])), &gizmo::rotation(Vec3::X, a[0]));
     let (axis, angle) = gizmo::axis_angle(&r);
@@ -2186,7 +2186,7 @@ pub fn apply_occurrence_move(app: &mut SolveApp, m: &OccMove) {
 /// The shared move triad at the occurrence's origin: arrows and squares move it, rings turn it.
 pub(crate) fn occurrence_triad_model(app: &SolveApp) -> Option<crate::gizmo::Triad> {
     let movement = app.tree.occurrence_move.as_ref()?;
-    let center = movement.pivot? + solidcraft_engine::geom::Vec3::new(movement.translate[0], movement.translate[1], movement.translate[2]);
+    let center = movement.pivot? + polykrom_engine::geom::Vec3::new(movement.translate[0], movement.translate[1], movement.translate[2]);
     Some(crate::gizmo::Triad { center, translate: true, rotate: true })
 }
 
@@ -2222,8 +2222,8 @@ pub(crate) fn occurrence_triad(app: &mut SolveApp, ui: &mut egui::Ui, painter: &
 /// Dimensions of finished sketches whose dimensions are shown (Show Dimensions), drawn over the
 /// viewport like the sketch being edited draws its own (`crate::dim_view`), but not editable.
 pub fn dims_overlay(app: &SolveApp, ctx: &egui::Context) {
-    use solidcraft_engine::geom::Vec2;
-    use solidcraft_engine::sketch::{DimFrame, chain_centres, default_text, dim_frame, dim_layout_reaching, dim_reach};
+    use polykrom_engine::geom::Vec2;
+    use polykrom_engine::sketch::{DimFrame, chain_centres, default_text, dim_frame, dim_layout_reaching, dim_reach};
     let Some(rect) = app.viewport.rect else { return };
     if app.ui.shown_dims.is_empty() {
         return;
@@ -2236,7 +2236,7 @@ pub fn dims_overlay(app: &SolveApp, ctx: &egui::Context) {
         .ui
         .shown_dims
         .iter()
-        .filter(|id| app.session.active_sketch != Some(**id) && solidcraft_engine::view::sketch_drawn(&app.session, **id, app.ui.show_sketches))
+        .filter(|id| app.session.active_sketch != Some(**id) && polykrom_engine::view::sketch_drawn(&app.session, **id, app.ui.show_sketches))
     {
         let Some(ss) = st.sketch(*id) else { continue };
         let sk = &ss.sketch;
@@ -2330,11 +2330,11 @@ pub fn answer_capture(app: &mut SolveApp, action: &str) -> Result<(), String> {
 }
 
 /// Where an occurrence's origin is now (with its pending move).
-pub(crate) fn occurrence_origin(app: &SolveApp, occurrence: u64) -> Option<solidcraft_engine::geom::Vec3> {
+pub(crate) fn occurrence_origin(app: &SolveApp, occurrence: u64) -> Option<polykrom_engine::geom::Vec3> {
     let o = app.session.doc.occurrences.iter().find(|o| o.id == occurrence)?;
     let parent = app.session.doc.component_transform(o.parent);
     let own = app.session.pending_moves.get(&occurrence).copied().unwrap_or(o.transform);
-    Some(solidcraft_engine::doc::apply_point(&solidcraft_engine::doc::mat_mul(&parent, &own), solidcraft_engine::geom::Vec3::ZERO))
+    Some(polykrom_engine::doc::apply_point(&polykrom_engine::doc::mat_mul(&parent, &own), polykrom_engine::geom::Vec3::ZERO))
 }
 
 /// The names the Bodies folder lists at the top level, for tests.

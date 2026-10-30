@@ -23,7 +23,7 @@ fn bounds_z(h: &Harness) -> (f64, f64) {
 
 fn volume(h: &Harness) -> f64 {
     let st = h.app.session.world_state();
-    st.bodies.iter().map(|b| solidcraft_engine::doc::kernel::measure(&b.body).unwrap().volume).sum()
+    st.bodies.iter().map(|b| polykrom_engine::doc::kernel::measure(&b.body).unwrap().volume).sum()
 }
 
 /// A sketch on XY extruded from the top view goes up, and from the bottom view goes down.

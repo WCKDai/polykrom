@@ -7,7 +7,7 @@ fn colors() -> Colors {
 }
 
 fn fixture() -> Session {
-    let mut s = Session::new(solidcraft_engine::doc::Document::new("Preview drag"));
+    let mut s = Session::new(polykrom_engine::doc::Document::new("Preview drag"));
     s.execute("sketch.create", &json!({"plane":"XY", "name":"Profile"})).unwrap();
     s.execute("sketch.rectangle.two_point", &json!({"p0":[0,0], "p1":[10,10]})).unwrap();
     s.execute("sketch.finish", &json!({})).unwrap();
@@ -62,7 +62,7 @@ fn edited_new_body_extrude_keeps_moving_during_a_drag() {
 
 #[test]
 fn face_offset_keeps_moving_during_a_drag() {
-    let mut s = Session::new(solidcraft_engine::doc::Document::new("Face offset drag"));
+    let mut s = Session::new(polykrom_engine::doc::Document::new("Face offset drag"));
     s.execute("solid.box", &json!({"length":10,"width":10,"height":10})).unwrap();
     check_drag(&s, |distance| vec![("solid.offset_face".into(), json!({"faces":[[5,5,10]],"distance":distance}))], 10.0);
 }
@@ -156,7 +156,7 @@ fn distance_results_reject_other_setups_and_obsolete_errors() {
 /// computes, as a distance does; before, every one was dropped until the radius held still.
 #[test]
 fn fillet_preview_keeps_moving_while_its_radius_changes() {
-    let mut s = Session::new(solidcraft_engine::doc::Document::new("Fillet drag"));
+    let mut s = Session::new(polykrom_engine::doc::Document::new("Fillet drag"));
     s.execute("solid.box", &json!({"length":10,"width":10,"height":10})).unwrap();
     let fillet = |radius: i32| vec![("solid.fillet".into(), json!({"edges":[[5,0,10]],"radius":f64::from(radius) / 4.0}))];
     let mut pv = PreviewState::default();

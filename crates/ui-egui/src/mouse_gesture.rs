@@ -155,7 +155,7 @@ pub(crate) fn label_of(id: &str) -> Option<String> {
     if let Some((_, label, _)) = ACTIONS.iter().find(|(i, _, _)| *i == id) {
         return Some((*label).to_string());
     }
-    solidcraft_engine::find_command(id).map(|spec| short(spec.label).to_string())
+    polykrom_engine::find_command(id).map(|spec| short(spec.label).to_string())
 }
 
 /// The tool `id` as a menu item (its state follows the design), or none for an unknown id.
@@ -169,7 +169,7 @@ pub(crate) fn item(app: &SolveApp, id: &str) -> Option<Item> {
         "undo" => Some(cmd(app, "edit.undo", "Undo").on(!app.session.undo.is_empty())),
         _ => match ACTIONS.iter().find(|(i, _, _)| *i == id) {
             Some((i, label, icon)) => Some(act(i, label, icon)),
-            None => solidcraft_engine::find_command(id).map(|spec| cmd(app, spec.id, short(spec.label))),
+            None => polykrom_engine::find_command(id).map(|spec| cmd(app, spec.id, short(spec.label))),
         },
     }
 }
@@ -179,7 +179,7 @@ pub(crate) fn item(app: &SolveApp, id: &str) -> Option<Item> {
 pub(crate) fn catalog() -> Vec<(String, String)> {
     let mut v: Vec<(String, String)> = SPECIALS.iter().map(|(i, l)| ((*i).to_string(), (*l).to_string())).collect();
     v.extend(ACTIONS.iter().map(|(i, l, _)| ((*i).to_string(), (*l).to_string())));
-    for spec in solidcraft_engine::command_specs() {
+    for spec in polykrom_engine::command_specs() {
         if !spec.tab.is_empty() && spec.planned.is_none() && !v.iter().any(|(i, _)| i == spec.id) {
             v.push((spec.id.to_string(), short(spec.label).to_string()));
         }
@@ -734,7 +734,7 @@ mod tests {
     use egui::pos2;
 
     fn app() -> SolveApp {
-        SolveApp::new(solidcraft_engine::Session::default(), Default::default())
+        SolveApp::new(polykrom_engine::Session::default(), Default::default())
     }
 
     fn on(n: usize) -> Vec<bool> {

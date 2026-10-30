@@ -415,7 +415,7 @@ fn nearest_vertical_slot(slots: &[VerticalSlot], y: f32) -> Option<VerticalSlot>
     slots.iter().min_by(|a, b| (a.y - y).abs().total_cmp(&(b.y - y).abs())).copied()
 }
 
-fn valid_folder_target(items: &DragItems, groups: &[solidcraft_engine::doc::TimelineGroup], target: u64) -> bool {
+fn valid_folder_target(items: &DragItems, groups: &[polykrom_engine::doc::TimelineGroup], target: u64) -> bool {
     !items.groups.iter().any(|source| *source == target || group_is_descendant(groups, target, *source))
 }
 
@@ -426,7 +426,7 @@ fn vertical_drop_group(
     pointer: egui::Pos2,
     slot: VerticalSlot,
     folder_drop_zones: &[(Rect, u64)],
-    groups: &[solidcraft_engine::doc::TimelineGroup],
+    groups: &[polykrom_engine::doc::TimelineGroup],
     panel_left: f32,
     drag_x: f32,
     source_group: Option<u64>,
@@ -470,11 +470,11 @@ fn vertical_drop_group(
     target
 }
 
-fn drop_level_anchor(panel_left: f32, group: Option<u64>, groups: &[solidcraft_engine::doc::TimelineGroup]) -> f32 {
+fn drop_level_anchor(panel_left: f32, group: Option<u64>, groups: &[polykrom_engine::doc::TimelineGroup]) -> f32 {
     panel_left + DROP_LEVEL_ANCHOR + group.map(|id| (group_depth(groups, id) + 1) as f32 * FOLDER_INDENT).unwrap_or(0.0)
 }
 
-fn vertical_drop_bar_left(panel_left: f32, target: Option<u64>, groups: &[solidcraft_engine::doc::TimelineGroup]) -> f32 {
+fn vertical_drop_bar_left(panel_left: f32, target: Option<u64>, groups: &[polykrom_engine::doc::TimelineGroup]) -> f32 {
     target.map(|group| panel_left + DROP_BAR_INSET + (group_depth(groups, group) + 1) as f32 * FOLDER_INDENT).unwrap_or(panel_left + DROP_BAR_INSET)
 }
 
@@ -496,7 +496,7 @@ fn vertical_marker(app: &mut SolveApp, ui: &mut egui::Ui, drag: &mut Option<Drag
     rect.center().y
 }
 
-fn group_for(groups: &[solidcraft_engine::doc::TimelineGroup], feature: u64) -> Option<u64> {
+fn group_for(groups: &[polykrom_engine::doc::TimelineGroup], feature: u64) -> Option<u64> {
     groups.iter().find(|group| group.features.contains(&feature)).map(|group| group.id)
 }
 
@@ -599,7 +599,7 @@ fn select_item(app: &mut SolveApp, ui: &egui::Ui, item: TimelineItem, order: &[T
     }
 }
 
-fn selection_actions(app: &mut SolveApp, ui: &mut egui::Ui, groups: &[solidcraft_engine::doc::TimelineGroup]) {
+fn selection_actions(app: &mut SolveApp, ui: &mut egui::Ui, groups: &[polykrom_engine::doc::TimelineGroup]) {
     let features = selected_feature_ids(app);
     let selected_groups = app.tree.picked_timeline_groups.clone();
     let has_selection = !features.is_empty() || !selected_groups.is_empty();
@@ -662,7 +662,7 @@ pub fn delete_selected_folders(app: &mut SolveApp) -> bool {
     true
 }
 
-fn group_is_descendant(groups: &[solidcraft_engine::doc::TimelineGroup], group: u64, ancestor: u64) -> bool {
+fn group_is_descendant(groups: &[polykrom_engine::doc::TimelineGroup], group: u64, ancestor: u64) -> bool {
     let mut current = groups.iter().find(|candidate| candidate.id == group).and_then(|candidate| candidate.parent);
     let mut steps = 0usize;
     while let Some(id) = current {
@@ -678,7 +678,7 @@ fn group_is_descendant(groups: &[solidcraft_engine::doc::TimelineGroup], group: 
     false
 }
 
-fn group_depth(groups: &[solidcraft_engine::doc::TimelineGroup], id: u64) -> usize {
+fn group_depth(groups: &[polykrom_engine::doc::TimelineGroup], id: u64) -> usize {
     let mut depth = 0;
     let mut current = groups.iter().find(|group| group.id == id).and_then(|group| group.parent);
     while let Some(parent) = current {
@@ -691,7 +691,7 @@ fn group_depth(groups: &[solidcraft_engine::doc::TimelineGroup], id: u64) -> usi
     depth
 }
 
-fn group_is_open(app: &SolveApp, groups: &[solidcraft_engine::doc::TimelineGroup], id: u64) -> bool {
+fn group_is_open(app: &SolveApp, groups: &[polykrom_engine::doc::TimelineGroup], id: u64) -> bool {
     let mut current = Some(id);
     let mut steps = 0usize;
     while let Some(group_id) = current {
@@ -707,7 +707,7 @@ fn group_is_open(app: &SolveApp, groups: &[solidcraft_engine::doc::TimelineGroup
     true
 }
 
-fn group_ancestors_are_open(app: &SolveApp, groups: &[solidcraft_engine::doc::TimelineGroup], id: u64) -> bool {
+fn group_ancestors_are_open(app: &SolveApp, groups: &[polykrom_engine::doc::TimelineGroup], id: u64) -> bool {
     let mut current = groups.iter().find(|group| group.id == id).and_then(|group| group.parent);
     let mut steps = 0usize;
     while let Some(group_id) = current {
@@ -724,7 +724,7 @@ fn group_ancestors_are_open(app: &SolveApp, groups: &[solidcraft_engine::doc::Ti
 }
 
 fn group_first_feature(
-    groups: &[solidcraft_engine::doc::TimelineGroup],
+    groups: &[polykrom_engine::doc::TimelineGroup],
     features: &[(u64, String, &'static str, bool, &'static str, TimelineKind)],
     id: u64,
 ) -> Option<usize> {
@@ -735,7 +735,7 @@ fn group_first_feature(
 }
 
 fn group_last_feature(
-    groups: &[solidcraft_engine::doc::TimelineGroup],
+    groups: &[polykrom_engine::doc::TimelineGroup],
     features: &[(u64, String, &'static str, bool, &'static str, TimelineKind)],
     id: u64,
 ) -> Option<usize> {
@@ -748,7 +748,7 @@ fn group_last_feature(
 fn visible_order(
     app: &SolveApp,
     features: &[(u64, String, &'static str, bool, &'static str, TimelineKind)],
-    groups: &[solidcraft_engine::doc::TimelineGroup],
+    groups: &[polykrom_engine::doc::TimelineGroup],
 ) -> Vec<TimelineItem> {
     let mut order = Vec::new();
     let mut shown = std::collections::BTreeSet::new();
@@ -779,7 +779,7 @@ fn visible_order(
 fn timeline_group_name(
     app: &mut SolveApp,
     ui: &mut egui::Ui,
-    group: &solidcraft_engine::doc::TimelineGroup,
+    group: &polykrom_engine::doc::TimelineGroup,
     rect: Rect,
     offset: f32,
     names: bool,
@@ -832,8 +832,8 @@ fn vertical_group_row(
     app: &mut SolveApp,
     names: bool,
     ui: &mut egui::Ui,
-    group: &solidcraft_engine::doc::TimelineGroup,
-    groups: &[solidcraft_engine::doc::TimelineGroup],
+    group: &polykrom_engine::doc::TimelineGroup,
+    groups: &[polykrom_engine::doc::TimelineGroup],
     order: &[TimelineItem],
     drag: &mut Option<Drag>,
     depth: usize,
@@ -1008,7 +1008,7 @@ fn vertical_features(app: &mut SolveApp, ui: &mut egui::Ui, names: bool) {
         let warning = result.and_then(|result| result.warning.clone());
         let rolled = index >= marker;
         let selected =
-            app.session.selection.iter().any(|selection| matches!(selection, solidcraft_engine::Sel::Feature { id: selected } if selected == id));
+            app.session.selection.iter().any(|selection| matches!(selection, polykrom_engine::Sel::Feature { id: selected } if selected == id));
         // Folder and sketch-pattern disclosure targets retain their original handles.
         let inset = if names { indent + if has_patterns { 16.0 } else { 0.0 } } else { 0.0 };
         let chip = Rect::from_min_max(rect.min + vec2(inset.min(rect.width()), 0.0), rect.max);
@@ -1733,7 +1733,7 @@ mod tests {
             .session
             .selection
             .iter()
-            .any(|selection| matches!(selection, solidcraft_engine::Sel::Feature { id } if harness.app.session.doc.feature(*id).is_some_and(|feature| feature.name == "Loose"))));
+            .any(|selection| matches!(selection, polykrom_engine::Sel::Feature { id } if harness.app.session.doc.feature(*id).is_some_and(|feature| feature.name == "Loose"))));
         harness.step(&json!({"drag": [{"handle": "timeline:Loose"}, {"handle": "timeline-folder:Destination"}]})).unwrap();
         let source = harness.app.session.doc.timeline_groups.iter().find(|entry| entry.id == group).unwrap();
         let target = harness.app.session.doc.timeline_groups.iter().find(|entry| entry.id == destination).unwrap();
@@ -1748,10 +1748,10 @@ mod tests {
         let at_end = VerticalSlot { y: 60.0, position: 2, group: None, indent_group: Some(3) };
         let folder_rect = Rect::from_min_max(pos2(0.0, 0.0), pos2(200.0, 20.0));
         let groups = vec![
-            solidcraft_engine::doc::TimelineGroup { id: 1, name: "Outer".into(), parent: None, features: vec![] },
-            solidcraft_engine::doc::TimelineGroup { id: 2, name: "Middle".into(), parent: Some(1), features: vec![] },
-            solidcraft_engine::doc::TimelineGroup { id: 3, name: "Inner".into(), parent: Some(2), features: vec![] },
-            solidcraft_engine::doc::TimelineGroup { id: 7, name: "Target".into(), parent: None, features: vec![] },
+            polykrom_engine::doc::TimelineGroup { id: 1, name: "Outer".into(), parent: None, features: vec![] },
+            polykrom_engine::doc::TimelineGroup { id: 2, name: "Middle".into(), parent: Some(1), features: vec![] },
+            polykrom_engine::doc::TimelineGroup { id: 3, name: "Inner".into(), parent: Some(2), features: vec![] },
+            polykrom_engine::doc::TimelineGroup { id: 7, name: "Target".into(), parent: None, features: vec![] },
         ];
 
         assert_eq!(

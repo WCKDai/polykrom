@@ -1,6 +1,6 @@
 # Independent CPU LOD reference
 
-`solidcraft_render::texture_lod::select_isotropic_lod` is the small numerical
+`polykrom_render::texture_lod::select_isotropic_lod` is the small numerical
 unit in #1339, supporting the eventual wood consumer under #786. It depends only
 on existing texture admission limits and the standard library; #1327/#1332 do
 not need to merge first. It installs no texture consumer or renderer capability.

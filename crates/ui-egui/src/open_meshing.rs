@@ -19,7 +19,7 @@ use crate::ui_kit::{Container, Surface};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
-use solidcraft_engine::doc::ModelState;
+use polykrom_engine::doc::ModelState;
 
 use crate::SolveApp;
 
@@ -68,7 +68,7 @@ impl Meshing {
         let job = (world.clone(), ready.clone(), done.clone(), stop.clone());
         let spawned = std::thread::Builder::new().name("open-meshing".into()).spawn(move || {
             let (world, ready, done, stop) = job;
-            solidcraft_engine::kernel::for_each_on_threads(&first, 16, |&i| {
+            polykrom_engine::kernel::for_each_on_threads(&first, 16, |&i| {
                 if stop.load(Ordering::Relaxed) {
                     return;
                 }
@@ -82,7 +82,7 @@ impl Meshing {
                     }
                     if plans {
                         let _ = b.display_plan();
-                        let _ = b.plan_mesh_in_place_at(solidcraft_engine::doc::display_quality::current());
+                        let _ = b.plan_mesh_in_place_at(polykrom_engine::doc::display_quality::current());
                     }
                 }
                 if let Ok(mut r) = ready.lock() {
@@ -255,5 +255,5 @@ pub(crate) fn refresh(app: &mut SolveApp, now: f64) {
 }
 
 fn profiling() -> bool {
-    solidcraft_engine::geom::env::var_os("PROFILE_OPEN").is_some()
+    polykrom_engine::geom::env::var_os("PROFILE_OPEN").is_some()
 }

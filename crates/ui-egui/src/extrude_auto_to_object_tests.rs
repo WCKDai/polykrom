@@ -1,8 +1,8 @@
 //! Extrude's automatic To Object: with profiles picked, a pick off their plane is the object to
 //! extrude to, and the extent turns to To Object without the Extent Type choice.
+use polykrom_engine::Sel;
+use polykrom_engine::geom::Vec3;
 use serde_json::json;
-use solidcraft_engine::Sel;
-use solidcraft_engine::geom::Vec3;
 
 use crate::dialogs::{Dialog, Kind, apply_commands, face_sel};
 use crate::scenario::Harness;
@@ -79,13 +79,13 @@ fn face_off_the_profile_plane_turns_the_extent_to_that_face() {
     let commands = apply_commands(&h.app, d).unwrap();
     let params = &commands[0].1;
     assert!(params.get("to").is_some());
-    let reach = solidcraft_engine::extrude_reach(&h.app.session, params).unwrap();
+    let reach = polykrom_engine::extrude_reach(&h.app.session, params).unwrap();
     assert!((reach - 20.0).abs() < 1e-9, "{reach}");
     // OK builds the extrude up to the face.
     h.step(&json!({"widget": "OK"})).unwrap();
     h.frames(4);
     let state = h.app.session.world_state();
-    let volume: f64 = state.bodies.iter().filter_map(|b| solidcraft_engine::doc::kernel::measure(&b.body).ok()).map(|m| m.volume).sum();
+    let volume: f64 = state.bodies.iter().filter_map(|b| polykrom_engine::doc::kernel::measure(&b.body).ok()).map(|m| m.volume).sum();
     // The box, the cylinder and the 10 x 10 x 20 extrude.
     let expected = 8000.0 + std::f64::consts::PI * 25.0 * 30.0 + 2000.0;
     assert!((volume - expected).abs() < 1.0, "{volume}");

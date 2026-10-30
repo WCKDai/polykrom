@@ -11,8 +11,8 @@ use crate::test_support::each_shape as each;
 
 /// The sample with Fillet1 failing (the plate made narrower than its fillets).
 fn failing_sample() -> SolveApp {
-    let mut s = solidcraft_engine::Session::default();
-    s.run_script(&solidcraft_engine::sample::script()).unwrap();
+    let mut s = polykrom_engine::Session::default();
+    s.run_script(&polykrom_engine::sample::script()).unwrap();
     s.execute("parameters.change", &json!({"name": "width", "expression": "5 mm"})).unwrap();
     SolveApp::new(s, crate::Services::default())
 }

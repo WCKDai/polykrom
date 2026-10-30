@@ -24,12 +24,12 @@
 //! in shape, and a picture of each shape names it better than a line of text.
 
 use egui::Pos2;
+use polykrom_engine::Sel;
+use polykrom_engine::doc::Document;
+use polykrom_engine::doc::expr::Kind as ValueKind;
+use polykrom_engine::geom::{Vec2, Vec3};
+use polykrom_engine::sketch::PatternAlignment;
 use serde_json::{Map, Value, json};
-use solidcraft_engine::Sel;
-use solidcraft_engine::doc::Document;
-use solidcraft_engine::doc::expr::Kind as ValueKind;
-use solidcraft_engine::geom::{Vec2, Vec3};
-use solidcraft_engine::sketch::PatternAlignment;
 
 use crate::SolveApp;
 use crate::dialogs::{CHAMFER_TYPES, Dialog, Kind};
@@ -219,7 +219,7 @@ pub fn start(app: &SolveApp, id: &str) -> Option<(Kind, Vec<SelInput>)> {
 
 /// Sketch modify inputs accept only the sketch being edited. Origin axes remain valid
 /// rectangular-pattern directions, while Hole continues using its separate POINTS mask.
-pub fn candidate(d: &Dialog, session: &solidcraft_engine::Session, hit: &Hit) -> Option<Sel> {
+pub fn candidate(d: &Dialog, session: &polykrom_engine::Session, hit: &Hit) -> Option<Sel> {
     let active = session.active_sketch?;
     match hit {
         Hit::SketchCurve { sketch, .. } | Hit::SketchPoint { sketch, .. } if *sketch != active => None,
@@ -230,7 +230,7 @@ pub fn candidate(d: &Dialog, session: &solidcraft_engine::Session, hit: &Hit) ->
 /// Reopen the same pattern window with its stored parameters. OK reaches the same engine
 /// command with the pattern id, so previews and programmatic edits share the implementation.
 pub fn edit_pattern(app: &mut SolveApp, id: &str) -> bool {
-    use solidcraft_engine::sketch::SketchPatternKind;
+    use polykrom_engine::sketch::SketchPatternKind;
     let Some(sid) = app.session.active_sketch else { return false };
     let state = app.session.world_state();
     let Some(sk) = state.sketch(sid).map(|s| &s.sketch) else { return false };
@@ -297,7 +297,7 @@ pub fn double_click_pattern(app: &mut SolveApp, pos: Pos2) -> bool {
 }
 
 /// Place a circular pattern centre in empty sketch space without creating a document point.
-pub fn pick_position(d: &mut Dialog, session: &solidcraft_engine::Session, point: Vec3) -> bool {
+pub fn pick_position(d: &mut Dialog, session: &polykrom_engine::Session, point: Vec3) -> bool {
     if !matches!(d.kind, Kind::SketchModify(Mod::PatternCirc { .. })) || d.active != 1 {
         return false;
     }
@@ -522,7 +522,7 @@ fn items(inputs: &[SelInput], i: usize) -> &[Sel] {
 
 /// A local point id. Qualified ids supplied by scripts or older selections are also accepted;
 /// commands check that their sketch prefix identifies the sketch being edited.
-pub(crate) fn point_id<'a>(session: &solidcraft_engine::Session, sel: &'a Sel) -> Option<&'a str> {
+pub(crate) fn point_id<'a>(session: &polykrom_engine::Session, sel: &'a Sel) -> Option<&'a str> {
     let Sel::SketchPoint { id } = sel else { return None };
     let Some((owner, point)) = id.split_once(':') else { return Some(id) };
     let active = session.active_sketch?;
@@ -536,7 +536,7 @@ pub(crate) fn point_id<'a>(session: &solidcraft_engine::Session, sel: &'a Sel) -
 }
 
 /// The curves and lone points picked in input `i`, as the engine's `entities` list.
-fn entity_ids(session: &solidcraft_engine::Session, inputs: &[SelInput], i: usize) -> Vec<String> {
+fn entity_ids(session: &polykrom_engine::Session, inputs: &[SelInput], i: usize) -> Vec<String> {
     items(inputs, i)
         .iter()
         .filter_map(|x| match x {
@@ -677,7 +677,7 @@ fn total_angle(app: &SolveApp, label: &str, text: &str) -> Result<f64, String> {
 
 /// The bare sketch point id of a single point pick, as a command's `center` or `base` reads it.
 /// `point_id` above takes one `Sel`; this one takes the first pick of an input.
-fn picked_point(session: &solidcraft_engine::Session, inputs: &[SelInput], i: usize) -> Option<String> {
+fn picked_point(session: &polykrom_engine::Session, inputs: &[SelInput], i: usize) -> Option<String> {
     items(inputs, i).first().and_then(|sel| point_id(session, sel)).map(str::to_string)
 }
 

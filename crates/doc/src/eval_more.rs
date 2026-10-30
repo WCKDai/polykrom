@@ -504,7 +504,7 @@ pub(super) fn sheet_eval(
     match &f.kind {
         FeatureKind::SheetBase { sketch, profiles, rule, flip } => {
             let ss = st.sketch(sketch.0).ok_or_else(|| DocError::Unknown(format!("sketch {sketch}")))?.clone();
-            let regions = solidcraft_sketch::merge_regions(&select_profiles(&ss, profiles)?);
+            let regions = polykrom_sketch::merge_regions(&select_profiles(&ss, profiles)?);
             let r = doc.sheet_rule(rule.as_deref());
             let rv = doc.rule_values(vals, &r)?;
             for (k, region) in regions.into_iter().enumerate() {
@@ -896,13 +896,13 @@ pub(super) fn sheet_cut(
         return Ok(Vec::new());
     }
     let Some(ss) = st.sketch(sketch.0).cloned() else { return Ok(Vec::new()) };
-    let regions = solidcraft_sketch::merge_regions(&select_profiles(&ss, profiles)?);
+    let regions = polykrom_sketch::merge_regions(&select_profiles(&ss, profiles)?);
     // The outlines of the sketch's text: the sheet remembers where its letters went.
     let text: Vec<Seg2> = ss
         .sketch
         .links
         .iter()
-        .filter(|l| matches!(l.source, solidcraft_sketch::LinkSource::Text { .. }))
+        .filter(|l| matches!(l.source, polykrom_sketch::LinkSource::Text { .. }))
         .flat_map(|l| ss.sketch.link_curves(&l.id))
         .flat_map(|ci| ss.sketch.exact_segs(ci).unwrap_or_else(|| ss.sketch.segs(ci)))
         .collect();

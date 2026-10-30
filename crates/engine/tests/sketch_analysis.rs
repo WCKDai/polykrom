@@ -2,10 +2,10 @@
 
 use std::sync::Arc;
 
+use polykrom_engine::Session;
+use polykrom_sketch::{Analysis, ConstraintKind, Sketch, profiling::capture};
 use serde_json::json;
-use solidcraft_engine::Session;
 use solidcraft_geom::Vec2;
-use solidcraft_sketch::{Analysis, ConstraintKind, Sketch, profiling::capture};
 
 fn session(horizontal: bool) -> (Session, u64, String) {
     let mut s = Session::default();
@@ -105,13 +105,13 @@ fn a_live_text_batch_keeps_full_diagnostics_when_it_publishes_without_evaluation
     assert_eq!(out["edits"][1]["link"], b["link"]);
     let state = s.model.state();
     let shown = state.sketch(id).unwrap();
-    let expected = solidcraft_sketch::solve(&mut s.doc.sketch(id).unwrap().clone());
+    let expected = polykrom_sketch::solve(&mut s.doc.sketch(id).unwrap().clone());
     assert!(shown.report.ok());
     assert!(shown.report.redundant.contains(&redundant));
     assert_eq!(serde_json::to_value(&shown.report).unwrap(), serde_json::to_value(expected).unwrap());
 }
 
-fn compare_document_levels(doc: &solidcraft_doc::Document, id: u64, expected_ok: bool) {
+fn compare_document_levels(doc: &polykrom_doc::Document, id: u64, expected_ok: bool) {
     let input = doc.sketch(id).unwrap();
     let stored = input.driving_values();
     let values = doc.param_values().0;
@@ -120,7 +120,7 @@ fn compare_document_levels(doc: &solidcraft_doc::Document, id: u64, expected_ok:
     assert_eq!(full.ok(), expected_ok);
     assert!(profile.counters.redundancy_checks > 0, "the default document API retains full diagnostics");
     if expected_ok {
-        let (_, last_only) = capture(|| solidcraft_sketch::solve(&mut full_geometry.clone()));
+        let (_, last_only) = capture(|| polykrom_sketch::solve(&mut full_geometry.clone()));
         assert_eq!(profile.counters.redundancy_checks, last_only.counters.redundancy_checks, "only the last offset solve needs redundant IDs");
     }
     for analysis in [Analysis::Freedom, Analysis::StatusOnly] {

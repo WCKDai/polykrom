@@ -74,7 +74,7 @@ pub fn kind(path: &Path) -> Kind {
         "pdf" => Kind::Pdf,
         _ => {
             let p = path.to_string_lossy();
-            if solidcraft_engine::io::is_step_path(&p) || solidcraft_engine::io::is_mesh_path(&p) { Kind::Cad } else { Kind::Other }
+            if polykrom_engine::io::is_step_path(&p) || polykrom_engine::io::is_mesh_path(&p) { Kind::Cad } else { Kind::Other }
         }
     }
 }

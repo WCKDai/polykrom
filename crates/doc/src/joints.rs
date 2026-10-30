@@ -19,7 +19,7 @@ use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use serde::{Deserialize, Serialize};
 use solidcraft_geom::{Aabb3, Vec3};
 
-use solidcraft_sketch::linalg;
+use polykrom_sketch::linalg;
 
 use crate::{DocError, Document, IDENTITY, Mat, ModelState, Result, apply_point, apply_vector, mat_inverse, mat_mul};
 

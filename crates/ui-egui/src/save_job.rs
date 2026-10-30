@@ -3,8 +3,8 @@
 //! command runs on a copy of the session on a worker; the design waits for it like it waits for
 //! a file picker, and the outcome is taken up as running the command here would have left it.
 
+use polykrom_engine::Session;
 use serde_json::Value;
-use solidcraft_engine::Session;
 
 use crate::SolveApp;
 

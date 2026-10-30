@@ -11,8 +11,8 @@ use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
+use polykrom_render::{AnalysisMode, Camera, Rgb, SECTION_CAP, Scene};
 use solidcraft_geom::Vec3;
-use solidcraft_render::{AnalysisMode, Camera, Rgb, SECTION_CAP, Scene};
 use wgpu::util::DeviceExt;
 
 use crate::view::{AccessMap, Frame, GpuScene, GpuTarget, Renderer, analysis_colors, analysis_uniform};
@@ -314,7 +314,7 @@ impl Capturer {
     /// [`Capturer::rgba`] as PNG bytes.
     pub fn png(&self, scene: &Scene, cam: &Camera, width: u32, height: u32) -> Result<Vec<u8>> {
         let rgba = self.rgba(scene, cam, width, height)?;
-        solidcraft_render::png(width as usize, height as usize, rgba).ok_or_else(|| GpuError::Render("PNG encoding failed".into()))
+        polykrom_render::png(width as usize, height as usize, rgba).ok_or_else(|| GpuError::Render("PNG encoding failed".into()))
     }
 }
 
@@ -364,7 +364,7 @@ pub fn headless_rgba(scene: &Scene, cam: &Camera, width: u32, height: u32) -> st
             if !(1..=MAX_SIDE).contains(&width) || !(1..=MAX_SIDE).contains(&height) {
                 return Err(format!("a picture is 1 to {MAX_SIDE} pixels a side, not {width} × {height}"));
             }
-            let canvas = solidcraft_render::render(scene, cam, width as usize, height as usize);
+            let canvas = polykrom_render::render(scene, cam, width as usize, height as usize);
             Ok((canvas.rgba, "cpu"))
         }
     }
@@ -409,7 +409,7 @@ fn frame(scene: &Scene, cam: &Camera, [width, height]: [u32; 2], key: u64, acces
 /// A scene's meshes and lines as the viewport's model scene: faces in their colours (smooth
 /// normals; a face normal where a vertex has none), lines as wide lines (over everything when
 /// `on_top`), the grid under everything. A body whose appearance is see-through
-/// ([`solidcraft_render::SceneMesh::glass`]) goes into the scene's glass, drawn as the viewport
+/// ([`polykrom_render::SceneMesh::glass`]) goes into the scene's glass, drawn as the viewport
 /// draws glass: far sides first, then near sides, so what lies inside it shows through.
 pub fn scene_geometry(scene: &Scene) -> GpuScene {
     let mut sc = GpuScene::default();
@@ -554,8 +554,8 @@ fn background_pipeline(device: &wgpu::Device, samples: u32, depth: wgpu::Texture
 mod tests {
     use super::*;
     use crate::view::TRI_SIZE;
+    use polykrom_render::SceneMesh;
     use solidcraft_geom::Mesh;
-    use solidcraft_render::SceneMesh;
     use std::sync::Arc;
 
     /// One triangle facing the camera.

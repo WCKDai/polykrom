@@ -1,11 +1,11 @@
 use super::*;
 use crate::scenario::Harness;
-use solidcraft_engine::Session;
+use polykrom_engine::Session;
 
 #[cfg(not(target_arch = "wasm32"))]
 #[test]
 fn opaque_pbr_product_gpu_and_cpu_share_color_and_material_semantics() {
-    use solidcraft_engine::render::{
+    use polykrom_engine::render::{
         StandardView,
         job::{CancelToken, ImageRequest, ImageTask, TaskPoll},
     };
@@ -20,7 +20,7 @@ fn opaque_pbr_product_gpu_and_cpu_share_color_and_material_semantics() {
             "pbr":{"metallic":metallic,"roughness":roughness,"dielectric_ior":1.5}}),
         )
         .unwrap();
-        let scene = solidcraft_engine::product_scene::extract(&s).unwrap();
+        let scene = polykrom_engine::product_scene::extract(&s).unwrap();
         let (key, gpu) = gpu_scene(&scene).unwrap();
         assert!(!gpu.pbr.is_empty() && gpu.tris.is_empty());
         assert_ne!(previous, Some(key));
@@ -294,7 +294,7 @@ fn saved_camera_survives_frames_and_product_fit_ignores_selection() {
     let mut h = Harness::new();
     h.app.run("solid.box", json!({"length":10,"width":20,"height":5,"body_name":"Product"})).unwrap();
     h.app.run("solid.box", json!({"corner":[100,0,0],"length":10,"width":20,"height":5,"body_name":"Other"})).unwrap();
-    let camera = Camera { up: solidcraft_engine::render::UpAxis::Y, roll: 0.2, ..Default::default() };
+    let camera = Camera { up: polykrom_engine::render::UpAxis::Y, roll: 0.2, ..Default::default() };
     h.app.run("render.settings.set", json!({"name":"Studio","set":{"camera":camera,"background":[21,43,65]}})).unwrap();
     h.frames(3);
     let design = h.app.cam;
@@ -304,8 +304,8 @@ fn saved_camera_survives_frames_and_product_fit_ignores_selection() {
     h.frames(3);
     assert_eq!(h.app.cam, camera);
     assert_eq!(h.app.render_workspace.view.draft.background, [21, 43, 65]);
-    h.app.session.selection = vec![solidcraft_engine::Sel::Body { name: "Product".into() }];
-    let bounds = solidcraft_engine::product_scene::extract(&h.app.session).unwrap().bounds;
+    h.app.session.selection = vec![polykrom_engine::Sel::Body { name: "Product".into() }];
+    let bounds = polykrom_engine::product_scene::extract(&h.app.session).unwrap().bounds;
     let mut expected = camera;
     expected.fit(&bounds);
     h.app.animate_view("fit");
@@ -378,18 +378,18 @@ fn product_gpu_buffers_preserve_opacity_and_never_contain_overlays() {
     let mut s = Session::default();
     s.execute("solid.box", &json!({"length":10,"width":10,"height":10,"body_name":"Glass"})).unwrap();
     s.execute("appearance.assign", &json!({"bodies":["Glass"],"color":"#336699","opacity":0.4})).unwrap();
-    let scene = solidcraft_engine::product_scene::extract(&s).unwrap();
+    let scene = polykrom_engine::product_scene::extract(&s).unwrap();
     let (key, gpu) = gpu_scene(&scene).unwrap();
     assert!(gpu.tris.is_empty());
     assert!(!gpu.glass.is_empty());
     assert!(gpu.glass.as_chunks::<{ crate::gpu::TRI_SIZE }>().0.iter().all(|v| v[24..] == [51, 102, 153, 102]));
     assert!(gpu.lines.is_empty() && gpu.overlay.is_empty() && gpu.under.is_empty() && gpu.hidden.is_empty() && gpu.ghost.is_empty());
-    s.selection = vec![solidcraft_engine::Sel::Body { name: "Glass".into() }];
-    s.section = Some((solidcraft_engine::geom::Vec3::ZERO, solidcraft_engine::geom::Vec3::X));
-    let after = solidcraft_engine::product_scene::extract(&s).unwrap();
+    s.selection = vec![polykrom_engine::Sel::Body { name: "Glass".into() }];
+    s.section = Some((polykrom_engine::geom::Vec3::ZERO, polykrom_engine::geom::Vec3::X));
+    let after = polykrom_engine::product_scene::extract(&s).unwrap();
     assert_eq!(gpu_scene(&after).unwrap().0, key);
     s.execute("appearance.assign", &json!({"bodies":["Glass"],"color":"#336699","opacity":0.0})).unwrap();
-    let invisible = solidcraft_engine::product_scene::extract(&s).unwrap();
+    let invisible = polykrom_engine::product_scene::extract(&s).unwrap();
     assert_eq!(invisible.meshes[0].opacity, 0.0);
     let (_, empty) = gpu_scene(&invisible).unwrap();
     assert!(empty.tris.is_empty() && empty.glass.is_empty());
@@ -397,7 +397,7 @@ fn product_gpu_buffers_preserve_opacity_and_never_contain_overlays() {
 
 #[test]
 fn host_profiles_advertise_only_installed_opaque_pbr_not_hdri_refraction_or_final() {
-    use solidcraft_engine::render::*;
+    use polykrom_engine::render::*;
     let host = host_executor(512, true, 4).unwrap();
     assert_eq!(host.limits.max_dimension, 512);
     assert_eq!(host.profiles.len(), 1);
@@ -432,7 +432,7 @@ fn host_profiles_advertise_only_installed_opaque_pbr_not_hdri_refraction_or_fina
     assert!(host_executor(1024, true, 0).is_err());
 }
 
-fn completed_preview(h: &mut Harness, background: [u8; 3]) -> solidcraft_engine::render::job::JobId {
+fn completed_preview(h: &mut Harness, background: [u8; 3]) -> polykrom_engine::render::job::JobId {
     let reply = h.app.session.execute("render.start", &json!({"settings":{"width":16,"height":16,"background":background}})).unwrap();
     let job = serde_json::from_value(reply["job"].clone()).unwrap();
     let host = h.app.session.render_job_host().unwrap().clone();
@@ -445,7 +445,7 @@ fn completed_preview(h: &mut Harness, background: [u8; 3]) -> solidcraft_engine:
     panic!("small cooperative image did not complete within the work budget");
 }
 
-fn async_export_fixture() -> (Harness, solidcraft_engine::render::job::JobId) {
+fn async_export_fixture() -> (Harness, polykrom_engine::render::job::JobId) {
     let mut h = Harness::new();
     h.app.run("solid.box", json!({"length":10,"width":20,"height":5})).unwrap();
     h.app.session.mark_saved();
@@ -609,8 +609,8 @@ fn nav_app(render: bool, preset: &str, around: crate::prefs::OrbitAround) -> cra
     app.preferences.zoom_to_cursor = true;
     app.ui.perspective = true;
     let mut cam = Camera::default();
-    cam.set_view(solidcraft_engine::render::StandardView::Iso);
-    cam.fit(&solidcraft_engine::product_scene::extract(&app.session).unwrap().bounds);
+    cam.set_view(polykrom_engine::render::StandardView::Iso);
+    cam.fit(&polykrom_engine::product_scene::extract(&app.session).unwrap().bounds);
     app.cam = cam;
     app
 }
@@ -696,9 +696,9 @@ fn render_workspace_view_keys_double_middle_click_and_navigators_work() {
         h.app.run("solid.box", json!({"length":40,"width":30,"height":20,"body_name":"Product"})).unwrap();
         enter(&mut h.app, true).unwrap();
         h.frames(3);
-        let bounds = solidcraft_engine::product_scene::extract(&h.app.session).unwrap().bounds;
+        let bounds = polykrom_engine::product_scene::extract(&h.app.session).unwrap().bounds;
         let mut home = h.app.cam;
-        home.set_view(solidcraft_engine::render::StandardView::Iso);
+        home.set_view(polykrom_engine::render::StandardView::Iso);
         home.fit(&bounds);
         let off = |h: &mut Harness| {
             h.app.cam.yaw += 0.7;
@@ -735,7 +735,7 @@ fn render_workspace_view_keys_double_middle_click_and_navigators_work() {
         // A standard view from the navigator.
         h.step(&json!({"click":{"handle":"axis_view:z"}})).unwrap();
         h.settle();
-        assert!(h.app.cam.back().dot(solidcraft_engine::geom::Vec3::Z) > 0.999, "{style:?}: view from +Z, got {:?}", h.app.cam.back());
+        assert!(h.app.cam.back().dot(polykrom_engine::geom::Vec3::Z) > 0.999, "{style:?}: view from +Z, got {:?}", h.app.cam.back());
         assert!(h.app.session.selection.is_empty());
     }
 }
@@ -744,7 +744,7 @@ fn render_workspace_view_keys_double_middle_click_and_navigators_work() {
 /// smaller at the same aspect instead of refusing every frame.
 #[test]
 fn four_and_five_k_viewports_preview_downscaled_within_the_limits() {
-    use solidcraft_engine::render::*;
+    use polykrom_engine::render::*;
     for samples in [1, 4, 16] {
         let host = host_executor(16384, true, samples).unwrap();
         let mut s = Session::default();

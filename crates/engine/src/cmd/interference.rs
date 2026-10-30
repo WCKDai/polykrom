@@ -13,8 +13,8 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
+use polykrom_doc::Mat;
 use serde_json::{Value, json};
-use solidcraft_doc::Mat;
 use solidcraft_geom::mesh_distance::TriangleSet;
 use solidcraft_geom::{Aabb3, Mesh, Vec3};
 use solidcraft_kernel::Body;
@@ -81,7 +81,7 @@ pub(super) fn interference(s: &mut Session, p: &Value) -> Result<Value> {
     };
     let want = string_list(p, "bodies");
     let st = s.world_state();
-    let (meshes_left, bodies): (Vec<&solidcraft_doc::ModelBody>, Vec<&solidcraft_doc::ModelBody>) =
+    let (meshes_left, bodies): (Vec<&polykrom_doc::ModelBody>, Vec<&polykrom_doc::ModelBody>) =
         st.bodies.iter().filter(|b| want.is_empty() || want.contains(&b.name)).partition(|b| b.body.is_mesh());
 
     // The bodies' display meshes, made once (in parallel) and kept on the bodies: a design open
@@ -152,16 +152,16 @@ pub(super) fn interference(s: &mut Session, p: &Value) -> Result<Value> {
             continue;
         }
         let (Some(a), Some(b)) = (bodies.get(i), bodies.get(j)) else { continue };
-        if let (Some(ka), Some(kb), Some(inv_a)) = (a.definition_key(), b.definition_key(), solidcraft_doc::mat_inverse(&a.source_transform)) {
-            let relative = solidcraft_doc::mat_mul(&inv_a, &b.source_transform);
+        if let (Some(ka), Some(kb), Some(inv_a)) = (a.definition_key(), b.definition_key(), polykrom_doc::mat_inverse(&a.source_transform)) {
+            let relative = polykrom_doc::mat_mul(&inv_a, &b.source_transform);
             let key = (ka, kb, relative.iter().flatten().map(|v| (v * 1e6).round() as i64).collect::<Vec<_>>());
             match first.get(&key) {
                 Some(&(orig, orig_body)) => {
                     // From where the first pair's a is to where this one's is.
                     let moved = bodies
                         .get(orig_body)
-                        .and_then(|o| solidcraft_doc::mat_inverse(&o.source_transform))
-                        .map(|inv| solidcraft_doc::mat_mul(&a.source_transform, &inv));
+                        .and_then(|o| polykrom_doc::mat_inverse(&o.source_transform))
+                        .map(|inv| polykrom_doc::mat_mul(&a.source_transform, &inv));
                     if let Some(moved) = moved {
                         reused.push((k, orig, moved));
                         continue;
@@ -259,13 +259,13 @@ pub(super) fn interference(s: &mut Session, p: &Value) -> Result<Value> {
 /// within the meshes' chord tolerance and without the overlap's volume.
 #[allow(clippy::too_many_arguments)]
 fn by_meshes(
-    bodies: &[&solidcraft_doc::ModelBody],
-    threads: &[solidcraft_doc::ThreadInfo],
+    bodies: &[&polykrom_doc::ModelBody],
+    threads: &[polykrom_doc::ThreadInfo],
     meshes: &[Arc<Mesh>],
     pairs: &[(usize, usize)],
     need_exact: &[solidcraft_kernel::Result<bool>],
     skipped: usize,
-    meshes_left: &[&solidcraft_doc::ModelBody],
+    meshes_left: &[&polykrom_doc::ModelBody],
     started: web_time::Instant,
 ) -> Value {
     let checks: Vec<(usize, usize)> = pairs.iter().zip(need_exact).filter(|(_, e)| e.as_ref().map_or(true, |x| *x)).map(|(p, _)| *p).collect();
@@ -280,7 +280,7 @@ fn by_meshes(
         .map(|(a, b, d)| {
             let mut hit = json!({"a": a.name, "b": b.name, "depth_mm": d, "method": "mesh"});
             // No deeper than a thread of either: likely its engagement, which the exact check tells.
-            let owns = |t: &solidcraft_doc::ThreadInfo| [a, b].iter().any(|m| m.name == t.body || m.definition_name() == t.body);
+            let owns = |t: &polykrom_doc::ThreadInfo| [a, b].iter().any(|m| m.name == t.body || m.definition_name() == t.body);
             if let Some(t) = threads.iter().find(|t| owns(t) && d <= 0.625 * t.pitch + 0.02 * t.major_diameter) {
                 hit["thread"] = json!(t.designation);
                 hit["note"] = json!("no deeper than this thread: likely its engagement (method exact lists engagement under threaded)");
@@ -299,7 +299,7 @@ fn by_meshes(
 
 /// A hit that is a cosmetic thread's engagement ([`super::clearance::engagement`]), as listed under
 /// `threaded`.
-fn engaged(threads: &[solidcraft_doc::ThreadInfo], bodies: &[&solidcraft_doc::ModelBody], v: &Value) -> Option<Value> {
+fn engaged(threads: &[polykrom_doc::ThreadInfo], bodies: &[&polykrom_doc::ModelBody], v: &Value) -> Option<Value> {
     let body = |k: &str| v.get(k).and_then(Value::as_str).and_then(|n| bodies.iter().find(|b| b.name == n));
     let point = |p: Option<&Value>| -> Option<Vec3> { Some(Vec3::new(p?.get(0)?.as_f64()?, p?.get(1)?.as_f64()?, p?.get(2)?.as_f64()?)) };
     let (a, b, volume) = (body("a")?, body("b")?, v.get("volume_mm3")?.as_f64()?);
@@ -316,7 +316,7 @@ fn moved_hit(v: &Value, (a, b): &(String, String), m: &Mat) -> Value {
     out["b"] = json!(b);
     let point = |p: &Value| -> Option<Vec3> { Some(Vec3::new(p.get(0)?.as_f64()?, p.get(1)?.as_f64()?, p.get(2)?.as_f64()?)) };
     if let Some(c) = v.get("center").and_then(point) {
-        out["center"] = json!(solidcraft_doc::apply_point(m, c));
+        out["center"] = json!(polykrom_doc::apply_point(m, c));
     }
     if let (Some(lo), Some(hi)) = (v.pointer("/bbox/min").and_then(point), v.pointer("/bbox/max").and_then(point)) {
         let mut b = Aabb3::EMPTY;
@@ -324,7 +324,7 @@ fn moved_hit(v: &Value, (a, b): &(String, String), m: &Mat) -> Value {
             let x = if k & 1 == 0 { lo.x } else { hi.x };
             let y = if k & 2 == 0 { lo.y } else { hi.y };
             let z = if k & 4 == 0 { lo.z } else { hi.z };
-            b.add(solidcraft_doc::apply_point(m, Vec3::new(x, y, z)));
+            b.add(polykrom_doc::apply_point(m, Vec3::new(x, y, z)));
         }
         out["bbox"] = json!({"min": b.min, "max": b.max});
     }

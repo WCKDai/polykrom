@@ -1,8 +1,8 @@
 #![allow(clippy::unwrap_used, clippy::panic)]
 //! #2424: curves start at the ends of an associated offset spline, and follow them.
+use polykrom_doc::Document;
+use polykrom_sketch::{ConstraintKind, CurveKind, Sketch};
 use serde_json::{Value, json};
-use solidcraft_doc::Document;
-use solidcraft_sketch::{ConstraintKind, CurveKind, Sketch};
 
 use crate::Session;
 

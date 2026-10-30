@@ -141,11 +141,11 @@ fn what_reads_the_display_mesh_of_a_large_sheet_answers_as_before() {
         // The middle of the face's corners, pushed out onto the cylinder.
         let along = origin + axis * (middle - origin).dot(axis);
         let p = along + (middle - along).normalized().unwrap() * radius;
-        assert_eq!(solidcraft_doc::appearance::face_index_at(b, p), Some(face), "radius {radius} at {p:?}");
+        assert_eq!(polykrom_doc::appearance::face_index_at(b, p), Some(face), "radius {radius} at {p:?}");
         round += 1;
     }
     assert_eq!(round, 12);
-    let top = solidcraft_doc::appearance::face_index_at(b, Vec3::new(1500.0, 500.0, 2.0)).unwrap();
+    let top = polykrom_doc::appearance::face_index_at(b, Vec3::new(1500.0, 500.0, 2.0)).unwrap();
     assert!(matches!(face_surface(&b.body, top), Some(FaceSurface::Plane { normal, .. }) if normal.dist(Vec3::Z) < 1e-9));
     // Inside and outside: in the sheet, in a flange's wall, in a hole and above the sheet.
     assert!(m.contains(Vec3::new(1500.0, 500.0, 1.0)) && m.contains(Vec3::new(1500.0, now.min.y + 1.0, now.max.z - 10.0)));

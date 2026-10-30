@@ -10,10 +10,10 @@ mod projection;
 #[path = "view_dxf_sketch.rs"]
 pub(super) mod sketch;
 
+use polykrom_io::{DxfEntity, DxfLayer, DxfLinetype, DxfShape};
+use polykrom_render::Camera;
 use serde_json::{Value, json};
 use solidcraft_geom::Vec2;
-use solidcraft_io::{DxfEntity, DxfLayer, DxfLinetype, DxfShape};
-use solidcraft_render::Camera;
 
 use super::CommandSpec;
 use crate::params::{bad, str_};
@@ -54,7 +54,7 @@ fn export(s: &mut Session, p: &Value) -> Result<Value> {
         Some(_) => Some(str_(p, "path").filter(|v| !v.trim().is_empty() && v.len() < 4096).ok_or_else(|| bad(CMD, "invalid path"))?),
     };
     if let Some(path) = path {
-        solidcraft_io::vfs::check(path).map_err(|e| crate::EngineError::Other(e.to_string()))?;
+        polykrom_io::vfs::check(path).map_err(|e| crate::EngineError::Other(e.to_string()))?;
     }
     let started = std::time::Instant::now();
     progress::Stage::new("dxf_meshes", 1).check().map_err(|e| bad(CMD, e))?;
@@ -88,15 +88,15 @@ fn export(s: &mut Session, p: &Value) -> Result<Value> {
     if sketch > 0 {
         layers.push(DxfLayer::new("SKETCH", 5));
     }
-    let text = solidcraft_io::write_dxf_drawing(&layers, &entities);
+    let text = polykrom_io::write_dxf_drawing(&layers, &entities);
     writing.check().map_err(|e| bad(CMD, e))?;
     let mut result = json!({"visible":visible,"hidden":hidden,"sketch":sketch,"units":"mm","tolerance":tolerance,"projection":if cam.fov > 0.0 {"perspective"} else {"orthographic"}});
     result["stats"] = json!({"bodies":meshes.placements.len(),"shared_meshes":meshes.meshes.len(),"triangles":meshes.triangles,
         "mesh_bytes":meshes.bytes,"worker_limit":meshes::WORKERS,"segments":drawing.segments,"occlusion_work":drawing.work,
         "prepare_ms":prepare_ms,"projection_ms":drawing.projection_ms,"occlusion_ms":drawing.occlusion_ms});
     if let Some(path) = path {
-        solidcraft_io::vfs::check(path).map_err(|e| crate::EngineError::Other(e.to_string()))?;
-        solidcraft_io::write_atomic(std::path::Path::new(path), text.as_bytes(), false).map_err(|e| crate::EngineError::Other(e.to_string()))?;
+        polykrom_io::vfs::check(path).map_err(|e| crate::EngineError::Other(e.to_string()))?;
+        polykrom_io::write_atomic(std::path::Path::new(path), text.as_bytes(), false).map_err(|e| crate::EngineError::Other(e.to_string()))?;
         result["path"] = json!(path);
     } else {
         result["dxf"] = json!(text);

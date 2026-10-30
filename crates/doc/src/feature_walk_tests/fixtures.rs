@@ -19,7 +19,7 @@ fn along(chain: &str) -> Value {
 
 pub(super) fn fixtures() -> Vec<(&'static str, Value)> {
     let o = [0, 0, 0];
-    let sk = serde_json::to_value(solidcraft_sketch::Sketch::new()).unwrap();
+    let sk = serde_json::to_value(polykrom_sketch::Sketch::new()).unwrap();
     let extent = |n: &str| {
         json!({"distance": format!("{n}.distance"), "distance2": format!("{n}.distance2"), "start_offset": format!("{n}.start_offset"),
             "taper": format!("{n}.taper"), "to_offset": format!("{n}.to_offset")})

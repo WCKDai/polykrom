@@ -1,8 +1,8 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use crate::Session;
+use polykrom_doc::{Document, ExtrudeConvention, FeatureKind};
 use serde_json::{Value, json};
-use solidcraft_doc::{Document, ExtrudeConvention, FeatureKind};
 
 fn run(s: &mut Session, cmd: &str, params: Value) {
     s.execute(cmd, &params).unwrap_or_else(|e| panic!("{cmd}: {e}"));
@@ -196,5 +196,5 @@ fn an_older_reversed_two_sided_extrude_keeps_its_shape() {
     let s = Session::new(Document::from_json(&saved.to_string()).unwrap());
     check(&s, -4.0, 10.0);
     let FeatureKind::Extrude { extent, .. } = &s.doc.find_feature("Depth").unwrap().kind else { panic!("extrude") };
-    assert_eq!(extent.direction, solidcraft_doc::Direction::Positive);
+    assert_eq!(extent.direction, polykrom_doc::Direction::Positive);
 }

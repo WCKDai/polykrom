@@ -2,10 +2,10 @@
 //! restores the opening snapshot, Apply keeps editing, and Defaults affects the current page.
 
 use egui::{Modifiers, Pos2};
+pub use polykrom_engine::doc::display_units::{format_length, length_number, length_precision, unit_scale};
+use polykrom_engine::geom::Vec3;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-pub use solidcraft_engine::doc::display_units::{format_length, length_number, length_precision, unit_scale};
-use solidcraft_engine::geom::Vec3;
 
 /// The key the apps keep the preferences under in eframe's storage.
 pub const STORAGE_KEY: &str = "solidcraft.prefs";
@@ -494,7 +494,7 @@ preference_settings! {
     /// Per 3D mouse (`space_mouse::Input::device`), the calibration that puts its axes on
     /// 3Dconnexion's. A device without one is read as it reports. Page resets keep calibrations.
     #[serde(deserialize_with = "calibrations_that_read")]
-    space_mouse_calibrations: std::collections::BTreeMap<String, solidcraft_space_mouse::Calibration> = Default::default();
+    space_mouse_calibrations: std::collections::BTreeMap<String, polykrom_space_mouse::Calibration> = Default::default();
     /// Per 3D mouse, what each of its buttons does, by number from 1, once the user has changed
     /// any of them; until then a measured device has its printed keys' jobs
     /// (`space_mouse::default_button_jobs`). Kept, like calibrations, when settings are reset.
@@ -962,8 +962,8 @@ fn defaults(app: &mut SolveApp, page: usize) {
 /// the interface scale.
 pub fn apply(app: &mut SolveApp, ctx: &egui::Context) {
     // The viewport's display quality (an unknown saved value draws at Normal).
-    solidcraft_engine::doc::display_quality::set_current(
-        solidcraft_engine::doc::display_quality::DisplayQuality::parse(&app.preferences.display_quality).unwrap_or_default(),
+    polykrom_engine::doc::display_quality::set_current(
+        polykrom_engine::doc::display_quality::DisplayQuality::parse(&app.preferences.display_quality).unwrap_or_default(),
     );
     // The view's up axis follows the preference (set in the dialog, by ui.prefs or loaded).
     if app.prefs_window.applied_up.as_deref() != Some(app.preferences.up_axis.as_str()) {
@@ -1108,12 +1108,12 @@ pub fn parse_number(text: &str) -> Option<f64> {
 /// A length typed into a field, in millimetres: a bare number is in the design's units (`scale`
 /// units per millimetre); an explicit unit ("10 mm", "0.5 in", "2 cm + 3 mm") is honoured.
 pub fn parse_length_mm(text: &str, scale: f64) -> Option<f64> {
-    use solidcraft_engine::doc::expr;
+    use polykrom_engine::doc::expr;
     if !(scale.is_finite() && scale > 0.0) {
         return None;
     }
     let defaults = expr::Defaults { len: 1.0 / scale, ..expr::Defaults::default() };
-    let no_params = |n: &str| Err(solidcraft_engine::doc::DocError::Expr(format!("unknown parameter `{n}`")));
+    let no_params = |n: &str| Err(polykrom_engine::doc::DocError::Expr(format!("unknown parameter `{n}`")));
     let value = expr::eval_with_defaults(text.trim(), &no_params, defaults).ok()?.to_kind_in(expr::Kind::Length, defaults).ok()?;
     value.is_finite().then_some(value)
 }
@@ -1332,7 +1332,7 @@ pub(crate) fn close(app: &mut SolveApp, revert: bool) {
 
 /// The default orientation changed: the view turns to match.
 fn up_axis_changed(app: &mut SolveApp) {
-    use solidcraft_engine::render::UpAxis;
+    use polykrom_engine::render::UpAxis;
     app.prefs_window.applied_up = Some(app.preferences.up_axis.clone());
     let up = if app.preferences.up_axis.eq_ignore_ascii_case("y") { UpAxis::Y } else { UpAxis::Z };
     if app.ui.up_axis != up || app.cam.up != up {
@@ -1543,7 +1543,7 @@ fn space_mouse_rows(app: &mut SolveApp, ui: &mut egui::Ui) {
                         ui_kit::slider(
                             ui,
                             &mut calibration.dead_zone_share,
-                            0.0..=solidcraft_space_mouse::MAX_DEAD_ZONE_SHARE,
+                            0.0..=polykrom_space_mouse::MAX_DEAD_ZONE_SHARE,
                             ui_kit::Slider { step: Some(0.01), format: |v| format!("{:.0} %", v * 100.0), ..Default::default() },
                         )
                         .on_hover_text(tip);
@@ -1701,7 +1701,7 @@ const AXIS_DRIVEN_WIDTH: f32 = 140.0;
 /// Where the motion that drives view axis `axis` sits, as a share of its full travel (calibrated
 /// when the device has a calibration, else the raw reading over full scale), and the share of that
 /// travel which reads as no motion on each side, for the live meter in its row.
-fn axis_meter(calibration: Option<&solidcraft_space_mouse::Calibration>, raw: [i16; 6], source: [usize; 6], axis: usize) -> (f32, [f32; 2]) {
+fn axis_meter(calibration: Option<&polykrom_space_mouse::Calibration>, raw: [i16; 6], source: [usize; 6], axis: usize) -> (f32, [f32; 2]) {
     let from = source.get(axis).copied().unwrap_or(axis);
     match calibration {
         Some(calibration) => {
@@ -1848,7 +1848,7 @@ fn button_job_label(app: &SolveApp, job: Option<&crate::space_mouse::ButtonJob>)
             ButtonKey::Alt => "Alt",
         }
         .to_string(),
-        Some(ButtonJob::Command(id)) => solidcraft_engine::find_command(id).map_or_else(|| id.clone(), |c| app.tr_label(c.label).to_string()),
+        Some(ButtonJob::Command(id)) => polykrom_engine::find_command(id).map_or_else(|| id.clone(), |c| app.tr_label(c.label).to_string()),
     }
 }
 
@@ -1875,7 +1875,7 @@ fn button_job_picker(
     use crate::space_mouse::{ButtonJob, ButtonKey};
     let views = ["home", "fit", "top", "front", "right", "left", "back", "bottom"].map(|view| ButtonJob::View(view.into()));
     let keys = [ButtonKey::Esc, ButtonKey::Shift, ButtonKey::Ctrl, ButtonKey::Alt].map(ButtonJob::Key);
-    let commands = solidcraft_engine::command_specs().into_iter().map(|spec| ButtonJob::Command(spec.id.into()));
+    let commands = polykrom_engine::command_specs().into_iter().map(|spec| ButtonJob::Command(spec.id.into()));
     let jobs: Vec<Option<ButtonJob>> =
         [None, Some(ButtonJob::Settings)].into_iter().chain(views.into_iter().chain(keys).chain(commands).map(Some)).collect();
     let entries: Vec<(String, String)> = jobs.iter().map(|job| (button_job_value(job.as_ref()), button_job_label(app, job.as_ref()))).collect();
@@ -1950,7 +1950,7 @@ pub fn control(app: &mut SolveApp, p: &serde_json::Value) -> Result<serde_json::
 /// format from another release) is dropped on its own, with a log line, not with all the others.
 fn calibrations_that_read<'de, D: serde::Deserializer<'de>>(
     saved: D,
-) -> Result<std::collections::BTreeMap<String, solidcraft_space_mouse::Calibration>, D::Error> {
+) -> Result<std::collections::BTreeMap<String, polykrom_space_mouse::Calibration>, D::Error> {
     let saved = std::collections::BTreeMap::<String, serde_json::Value>::deserialize(saved)?;
     Ok(saved
         .into_iter()
@@ -2168,7 +2168,7 @@ pub fn set(app: &mut SolveApp, p: &serde_json::Value) -> Result<serde_json::Valu
     if !accepted::ui_scale(&new) || !accepted::look_at_speed(&new) {
         return Err("`ui_scale` must be 0.5…2.5 and `look_at_speed` 0.25…4".into());
     }
-    if solidcraft_engine::doc::display_quality::DisplayQuality::parse(&new.display_quality).is_none() {
+    if polykrom_engine::doc::display_quality::DisplayQuality::parse(&new.display_quality).is_none() {
         return Err("`display_quality` must be coarse, normal, fine or ultra".into());
     }
     if !SUPERSAMPLING.contains(&new.supersampling) {
@@ -2252,12 +2252,12 @@ mod tests {
     #[test]
     fn the_3d_mouse_section_stays_inside_the_panel_at_every_width() {
         for width in [420.0_f32, 560.0, 700.0, 900.0, 1200.0] {
-            let mut app = crate::SolveApp::new(solidcraft_engine::Session::default(), crate::Services::default());
+            let mut app = crate::SolveApp::new(polykrom_engine::Session::default(), crate::Services::default());
             app.space_mouse.device = Some("hid 046d:c62b".into());
             app.space_mouse.drivers = Some(crate::space_mouse::DriversPresent { spacenavd: true, direct: true, denied: false });
             app.preferences.space_mouse_in_view = true;
             // Calibrated, so the device's picture and the test model sit side by side where there is room.
-            let axes = std::array::from_fn(|source| solidcraft_space_mouse::AxisCalibration {
+            let axes = std::array::from_fn(|source| polykrom_space_mouse::AxisCalibration {
                 source,
                 reversed: false,
                 rest: 0,
@@ -2266,7 +2266,7 @@ mod tests {
             });
             app.preferences.space_mouse_calibrations.insert(
                 "hid 046d:c62b".into(),
-                solidcraft_space_mouse::Calibration { dead_zone_share: 0.0, kind: solidcraft_space_mouse::Kind::ReturnToCenter, axes },
+                polykrom_space_mouse::Calibration { dead_zone_share: 0.0, kind: polykrom_space_mouse::Kind::ReturnToCenter, axes },
             );
             let ctx = crate::fonts::test_context();
             let panel = egui::Rect::from_min_size(egui::pos2(10.0, 10.0), egui::vec2(width, 1400.0));
@@ -2297,8 +2297,8 @@ mod tests {
     #[test]
     fn the_calibration_window_keeps_its_contents_inside() {
         for width in [360.0_f32, 520.0, 900.0] {
-            for kind in [solidcraft_space_mouse::Kind::ReturnToCenter, solidcraft_space_mouse::Kind::Trackball] {
-                let mut app = crate::SolveApp::new(solidcraft_engine::Session::default(), crate::Services::default());
+            for kind in [polykrom_space_mouse::Kind::ReturnToCenter, polykrom_space_mouse::Kind::Trackball] {
+                let mut app = crate::SolveApp::new(polykrom_engine::Session::default(), crate::Services::default());
                 app.space_mouse.device = Some("hid 046d:c62b".into());
                 crate::space_mouse_calibration::start(&mut app);
                 app.space_mouse.calibrating.as_mut().unwrap().1.choose(kind);
@@ -2332,7 +2332,7 @@ mod tests {
     #[test]
     fn preferred_units_update_only_a_blank_unsaved_design() {
         for design in ["new", "saved", "content"] {
-            let mut app = crate::SolveApp::new(solidcraft_engine::Session::default(), Default::default());
+            let mut app = crate::SolveApp::new(polykrom_engine::Session::default(), Default::default());
             match design {
                 "saved" => app.session.path = Some("empty.solidcraft".into()),
                 "content" => {
@@ -2487,8 +2487,8 @@ mod tests {
         assert_eq!(axis_meter(None, raw, source, 2), (175.0 / full, [0.0; 2]), "Zoom now shows Rotation X");
         assert_eq!(axis_meter(None, raw, source, 3).0, 0.0, "and the row that gave Rotation X up shows what it took in exchange");
         let axes =
-            std::array::from_fn(|source| solidcraft_space_mouse::AxisCalibration { source, reversed: false, rest: 0, dead_zone: 0, full: [350; 2] });
-        let calibration = solidcraft_space_mouse::Calibration { dead_zone_share: 0.2, kind: solidcraft_space_mouse::Kind::ReturnToCenter, axes };
+            std::array::from_fn(|source| polykrom_space_mouse::AxisCalibration { source, reversed: false, rest: 0, dead_zone: 0, full: [350; 2] });
+        let calibration = polykrom_space_mouse::Calibration { dead_zone_share: 0.2, kind: polykrom_space_mouse::Kind::ReturnToCenter, axes };
         assert_eq!(axis_meter(Some(&calibration), raw, source, 2), (0.5, [0.2; 2]), "calibrated: share of travel, with the dead zone");
     }
 
@@ -2498,8 +2498,8 @@ mod tests {
         let mut h = crate::scenario::Harness::new();
         h.app.home.open = false;
         let axes =
-            std::array::from_fn(|source| solidcraft_space_mouse::AxisCalibration { source, reversed: false, rest: 0, dead_zone: 0, full: [350; 2] });
-        let calibration = solidcraft_space_mouse::Calibration { dead_zone_share: 0.2, kind: solidcraft_space_mouse::Kind::ReturnToCenter, axes };
+            std::array::from_fn(|source| polykrom_space_mouse::AxisCalibration { source, reversed: false, rest: 0, dead_zone: 0, full: [350; 2] });
+        let calibration = polykrom_space_mouse::Calibration { dead_zone_share: 0.2, kind: polykrom_space_mouse::Kind::ReturnToCenter, axes };
         let p = &mut h.app.preferences;
         p.space_mouse_calibrations.insert("hid 046d:c62b".into(), calibration);
         p.space_mouse_buttons.insert("hid 046d:c62b".into(), [(1, crate::space_mouse::ButtonJob::Settings)].into());
@@ -2542,8 +2542,8 @@ mod tests {
         h.app.home.open = false;
         h.app.space_mouse.device = device.map(str::to_owned);
         let axes =
-            std::array::from_fn(|source| solidcraft_space_mouse::AxisCalibration { source, reversed: false, rest: 0, dead_zone: 0, full: [350; 2] });
-        let calibration = solidcraft_space_mouse::Calibration { dead_zone_share: 0.2, kind: solidcraft_space_mouse::Kind::ReturnToCenter, axes };
+            std::array::from_fn(|source| polykrom_space_mouse::AxisCalibration { source, reversed: false, rest: 0, dead_zone: 0, full: [350; 2] });
+        let calibration = polykrom_space_mouse::Calibration { dead_zone_share: 0.2, kind: polykrom_space_mouse::Kind::ReturnToCenter, axes };
         let p = &mut h.app.preferences;
         p.space_mouse_calibrations.insert("hid 046d:c62b".into(), calibration);
         p.space_mouse_driver = SpaceMouseDriver::Direct;
@@ -2765,7 +2765,7 @@ mod tests {
             h.app.home.open = false;
             h.app.preferences.language = catalog.id.to_string();
             h.app.space_mouse.device = Some("hid 046d:c62b".into());
-            let axes = std::array::from_fn(|source| solidcraft_space_mouse::AxisCalibration {
+            let axes = std::array::from_fn(|source| polykrom_space_mouse::AxisCalibration {
                 source,
                 reversed: false,
                 rest: 0,
@@ -2774,7 +2774,7 @@ mod tests {
             });
             h.app.preferences.space_mouse_calibrations.insert(
                 "hid 046d:c62b".into(),
-                solidcraft_space_mouse::Calibration { dead_zone_share: 0.0, kind: solidcraft_space_mouse::Kind::ReturnToCenter, axes },
+                polykrom_space_mouse::Calibration { dead_zone_share: 0.0, kind: polykrom_space_mouse::Kind::ReturnToCenter, axes },
             );
             h.app.preferences.space_mouse_buttons.insert("hid 046d:c62b".into(), [(1, crate::space_mouse::ButtonJob::Settings)].into());
             // The axis assignment is changed, so its reset button is enabled and drawn.
@@ -3024,7 +3024,7 @@ mod tests {
     #[test]
     fn the_calibration_choose_screen_fits_at_every_width() {
         for width in [300.0_f32, 360.0, 520.0, 900.0] {
-            let mut app = crate::SolveApp::new(solidcraft_engine::Session::default(), crate::Services::default());
+            let mut app = crate::SolveApp::new(polykrom_engine::Session::default(), crate::Services::default());
             app.space_mouse.device = Some("hid 046d:c62b".into());
             crate::space_mouse_calibration::start(&mut app);
             let ctx = crate::fonts::test_context();
@@ -3057,7 +3057,7 @@ mod tests {
         for width in [360.0_f32, 520.0, 900.0] {
             let mut heights = Vec::new();
             for values in sets {
-                let mut app = crate::SolveApp::new(solidcraft_engine::Session::default(), crate::Services::default());
+                let mut app = crate::SolveApp::new(polykrom_engine::Session::default(), crate::Services::default());
                 app.space_mouse.device = Some("hid 046d:c62b".into());
                 app.space_mouse.raw = values.into();
                 crate::space_mouse_calibration::start(&mut app);
@@ -3098,20 +3098,20 @@ mod tests {
     fn the_calibration_window_keeps_its_size_while_the_cap_moves() {
         let mut windows = Vec::new();
         for values in [[0_i16; 6], [-1; 6], [350; 6], [-350; 6], [i16::MAX; 6], [i16::MIN; 6], [159, -5, 0, 32, -17, 5]] {
-            let mut app = crate::SolveApp::new(solidcraft_engine::Session::default(), crate::Services::default());
+            let mut app = crate::SolveApp::new(polykrom_engine::Session::default(), crate::Services::default());
             app.space_mouse.device = Some("hid 046d:c62b".into());
             crate::space_mouse_calibration::start(&mut app);
             {
                 let wizard = &mut app.space_mouse.calibrating.as_mut().unwrap().1;
-                wizard.choose(solidcraft_space_mouse::Kind::ReturnToCenter);
-                let hold = |wizard: &mut solidcraft_space_mouse::Wizard, reading: [i16; 6], seconds: f64| {
+                wizard.choose(polykrom_space_mouse::Kind::ReturnToCenter);
+                let hold = |wizard: &mut polykrom_space_mouse::Wizard, reading: [i16; 6], seconds: f64| {
                     for _ in 0..(seconds / 0.02).round() as usize {
                         wizard.feed(reading, 0.02);
                     }
                 };
                 hold(wizard, [0; 6], 1.6);
                 hold(wizard, [0; 6], 2.6);
-                for step in solidcraft_space_mouse::STEPS {
+                for step in polykrom_space_mouse::STEPS {
                     let mut raw = [0_i16; 6];
                     raw[step.axis] = if step.positive { 300 } else { -300 };
                     hold(wizard, raw, 0.5);
@@ -3156,7 +3156,7 @@ mod tests {
     /// with the old `usize::MAX` (64-bit native) still reads as having no source on 64 bits.
     #[test]
     fn a_saved_calibration_with_no_source_reads_the_same_on_every_width() {
-        use solidcraft_space_mouse::{Calibration, NO_SOURCE};
+        use polykrom_space_mouse::{Calibration, NO_SOURCE};
         let axis = |source: &str, full: u32| format!(r#"{{"source":{source},"reversed":false,"rest":0,"dead_zone":3,"full":[{full},{full}]}}"#);
         let json = |absent: &str| {
             let axes = [axis("0", 300), axis("1", 300), axis("2", 300), axis(absent, 1), axis(absent, 1), axis("3", 300)].join(",");
@@ -3283,15 +3283,15 @@ mod tests {
     #[test]
     fn ui_font_is_checked_saved_and_restored() {
         use serde_json::json;
-        let mut app = crate::SolveApp::new(solidcraft_engine::Session::default(), crate::Services::default());
+        let mut app = crate::SolveApp::new(polykrom_engine::Session::default(), crate::Services::default());
         assert_eq!(app.preferences.ui_font, "");
-        let family = solidcraft_engine::sketch::DEFAULT_FONT_FAMILY;
+        let family = polykrom_engine::sketch::DEFAULT_FONT_FAMILY;
         let out = super::set(&mut app, &json!({ "ui_font": family })).unwrap();
         assert_eq!(out["ui_font"], family);
         let e = super::set(&mut app, &json!({"ui_font": "No Such Font 1290"})).unwrap_err();
         assert!(e.contains("ui_font"), "{e}");
         assert_eq!(app.preferences.ui_font, family, "a refused font leaves the choice as it was");
-        let mut other = crate::SolveApp::new(solidcraft_engine::Session::default(), crate::Services::default());
+        let mut other = crate::SolveApp::new(polykrom_engine::Session::default(), crate::Services::default());
         other.load_prefs(&app.prefs());
         assert_eq!(other.preferences.ui_font, family);
         super::defaults(&mut app, super::PAGE_INTERFACE);
@@ -3304,7 +3304,7 @@ mod tests {
     /// base and Cancel takes an import back.
     #[test]
     fn system_theme_tile_export_uses_os_brightness_without_selecting_it() {
-        let mut app = SolveApp::new(solidcraft_engine::Session::default(), Default::default());
+        let mut app = SolveApp::new(polykrom_engine::Session::default(), Default::default());
         app.preferences.theme = "light".into();
         app.ui.dark = false;
         assert_eq!(theme_file(&app, "system", true)["base"], "dark");
@@ -3327,7 +3327,7 @@ mod tests {
         assert_eq!(Tokens::get().panel, hard.panel);
         assert_eq!(
             crate::viewport::scene_palette(true, ColorVision::Off).background.0,
-            solidcraft_engine::render::Rgb(hard.viewport_top.r(), hard.viewport_top.g(), hard.viewport_top.b())
+            polykrom_engine::render::Rgb(hard.viewport_top.r(), hard.viewport_top.g(), hard.viewport_top.b())
         );
 
         let file = json!({"format": "solidcraft-theme/1", "name": "Paper", "base": "light", "colors": {"panel": "#fffdf0", "accent": "#aa3300"}, "borders":{"primary":{"width":2,"color":"#ffffff"},"tertiary":{"width":0,"color":"#000000"}}, "radii": {"radius_sm": 0, "control_radius": 0, "radius_xl": 16}});
@@ -3358,7 +3358,7 @@ mod tests {
         assert_eq!(h.app.preferences.theme, "paper", "a refused file changes nothing");
         assert!(h.call("ui.prefs", json!({"theme": "no-such-theme"}))["error"].is_string());
 
-        let mut other = crate::SolveApp::new(solidcraft_engine::Session::default(), crate::Services::default());
+        let mut other = crate::SolveApp::new(polykrom_engine::Session::default(), crate::Services::default());
         other.load_prefs(&h.app.prefs());
         assert_eq!((other.preferences.theme.as_str(), other.preferences.custom_themes.len()), ("paper", 1));
         assert_eq!(other.preferences.custom_themes[0].radii, h.app.preferences.custom_themes[0].radii);
@@ -3430,7 +3430,7 @@ mod tests {
     #[test]
     fn display_quality_is_set_checked_and_restored() {
         use serde_json::json;
-        let mut app = crate::SolveApp::new(solidcraft_engine::Session::default(), crate::Services::default());
+        let mut app = crate::SolveApp::new(polykrom_engine::Session::default(), crate::Services::default());
         assert_eq!(app.preferences.display_quality, "normal");
         let out = super::set(&mut app, &json!({"display_quality": "fine"})).unwrap();
         assert_eq!(out["display_quality"], "fine");
@@ -3445,7 +3445,7 @@ mod tests {
     #[test]
     fn supersampling_is_off_by_default_and_checked() {
         use serde_json::json;
-        let mut app = crate::SolveApp::new(solidcraft_engine::Session::default(), crate::Services::default());
+        let mut app = crate::SolveApp::new(polykrom_engine::Session::default(), crate::Services::default());
         assert_eq!((app.preferences.supersampling, app.preferences.supersampling_adaptive), (1.0, true));
         super::set(&mut app, &json!({"supersampling": 2.0})).unwrap();
         assert_eq!(app.preferences.supersampling, 2.0);
@@ -3467,11 +3467,11 @@ mod tests {
         assert_eq!(p.ui_scale, super::Prefs::default().ui_scale);
         assert_eq!(super::lenient(&json!("garbage")), super::Prefs::default());
         // Whole-app load: the other saved state is kept too, and nothing panics.
-        let mut app = crate::SolveApp::new(solidcraft_engine::Session::default(), crate::Services::default());
+        let mut app = crate::SolveApp::new(polykrom_engine::Session::default(), crate::Services::default());
         app.load_prefs(&json!({"grid": false, "preferences": saved}).to_string());
         assert!(!app.ui.show_grid && app.preferences.nav == "solidworks" && app.preferences.zoom_reverse);
         for junk in ["", "{", "[]", "null", "{\"preferences\": 7, \"recent\": {}, \"shortcuts\": 1, \"toolbar\": \"x\"}"] {
-            crate::SolveApp::new(solidcraft_engine::Session::default(), crate::Services::default()).load_prefs(junk);
+            crate::SolveApp::new(polykrom_engine::Session::default(), crate::Services::default()).load_prefs(junk);
         }
     }
 
@@ -3524,7 +3524,7 @@ mod tests {
         let _ = std::fs::create_dir_all(&dir);
         let path = dir.join("graphics.json");
         let services = crate::Services { graphics_path: Some(path.to_string_lossy().to_string()), ..Default::default() };
-        let mut app = SolveApp::new(solidcraft_engine::Session::default(), services);
+        let mut app = SolveApp::new(polykrom_engine::Session::default(), services);
         // WebGPU's guarantee for the surface format: 8x saved, the device can only do 1x and 4x.
         app.msaa_supported = vec![1, 4];
         app.preferences.msaa = 8;
@@ -3565,7 +3565,7 @@ mod tests {
 
     #[test]
     fn control_channel_rejects_msaa_the_device_cannot_do_and_bad_saved_msaa_loads_as_default() {
-        let mut app = SolveApp::new(solidcraft_engine::Session::default(), crate::Services::default());
+        let mut app = SolveApp::new(polykrom_engine::Session::default(), crate::Services::default());
         app.msaa_supported = vec![1, 4];
         assert!(set(&mut app, &serde_json::json!({ "msaa": 8 })).is_err());
         assert!(set(&mut app, &serde_json::json!({ "msaa": 1 })).is_ok());
@@ -3578,7 +3578,7 @@ mod tests {
     #[test]
     fn agent_control_is_on_unless_saved_off() {
         assert!(Prefs::default().agent_control);
-        let mut app = SolveApp::new(solidcraft_engine::Session::default(), crate::Services::default());
+        let mut app = SolveApp::new(polykrom_engine::Session::default(), crate::Services::default());
         app.preferences.agent_control = false;
         app.load_prefs(&serde_json::json!({ "preferences": { "msaa": 4 } }).to_string());
         assert!(app.preferences.agent_control);
@@ -3624,7 +3624,7 @@ mod tests {
         assert_eq!(h.app.preferences.nav, nav);
         assert_eq!(h.app.cam, camera);
         assert_eq!(h.app.session.doc.to_json(), design);
-        let mut restored = SolveApp::new(solidcraft_engine::Session::default(), Default::default());
+        let mut restored = SolveApp::new(polykrom_engine::Session::default(), Default::default());
         restored.load_prefs(&h.app.prefs());
         assert_eq!(restored.preferences.navigator_style, NavigatorStyle::Cube);
         let before = h.app.preferences.clone();
@@ -3655,7 +3655,7 @@ mod tests {
         h.call("ui.prefs", json!({"open":"Navigation"}));
         h.step(&json!({"click":{"handle":"prefs:free_orbit"}})).unwrap();
         assert!(h.app.preferences.free_orbit);
-        let mut restored = SolveApp::new(solidcraft_engine::Session::default(), Default::default());
+        let mut restored = SolveApp::new(polykrom_engine::Session::default(), Default::default());
         restored.load_prefs(&h.app.prefs());
         assert!(restored.preferences.free_orbit);
         h.call("ui.prefs", json!({"button":"cancel"}));
@@ -3684,7 +3684,7 @@ mod tests {
         }
         h.step(&json!({"widget":"Radial context menu"})).unwrap();
         assert!(h.app.preferences.radial_context_menu, "the actual checkbox enables radial menus");
-        let mut restored = SolveApp::new(solidcraft_engine::Session::default(), Default::default());
+        let mut restored = SolveApp::new(polykrom_engine::Session::default(), Default::default());
         restored.load_prefs(&h.app.prefs());
         assert!(restored.preferences.radial_context_menu, "enabled preference survives save/load");
         h.call("ui.prefs", json!({"button":"cancel"}));
@@ -3707,7 +3707,7 @@ mod tests {
         assert_eq!(old.suppress_sketch_snap, ModifierCombo::CTRL_ALT);
         assert!(!old.selection_shift_add_only);
         // Classic default: Ctrl/Cmd or Alt each suppress (`command` is primary on all hosts).
-        let mut app = SolveApp::new(solidcraft_engine::Session::default(), Default::default());
+        let mut app = SolveApp::new(polykrom_engine::Session::default(), Default::default());
         let ctrl = Modifiers { ctrl: true, command: true, ..Default::default() };
         let alt = Modifiers { alt: true, ..Default::default() };
         let shift = Modifiers { shift: true, ..Default::default() };
@@ -3725,7 +3725,7 @@ mod tests {
         assert_eq!(app.preferences.suppress_sketch_snap, ModifierCombo::CTRL);
         assert!(!app.preferences.manipulator_free_alt);
         assert!(app.preferences.selection_shift_add_only);
-        let mut other = SolveApp::new(solidcraft_engine::Session::default(), Default::default());
+        let mut other = SolveApp::new(polykrom_engine::Session::default(), Default::default());
         other.load_prefs(&app.prefs());
         assert_eq!(other.preferences.suppress_sketch_snap, ModifierCombo::CTRL);
         assert!(!other.preferences.manipulator_free_alt);
@@ -3741,7 +3741,7 @@ mod tests {
     #[test]
     fn wheel_smoothing_persists_and_follows_dialog_buttons() {
         assert!(serde_json::from_value::<Prefs>(json!({})).unwrap().smooth_wheel_zoom);
-        let mut app = SolveApp::new(solidcraft_engine::Session::default(), Default::default());
+        let mut app = SolveApp::new(polykrom_engine::Session::default(), Default::default());
         control(&mut app, &json!({"open":"Navigation", "smooth_wheel_zoom":false})).unwrap();
         control(&mut app, &json!({"button":"cancel"})).unwrap();
         assert!(app.preferences.smooth_wheel_zoom);
@@ -3749,7 +3749,7 @@ mod tests {
         control(&mut app, &json!({"button":"apply"})).unwrap();
         control(&mut app, &json!({"smooth_wheel_zoom":true, "button":"cancel"})).unwrap();
         assert!(!app.preferences.smooth_wheel_zoom);
-        let mut other = SolveApp::new(solidcraft_engine::Session::default(), Default::default());
+        let mut other = SolveApp::new(polykrom_engine::Session::default(), Default::default());
         other.load_prefs(&app.prefs());
         assert!(!other.preferences.smooth_wheel_zoom);
         control(&mut app, &json!({"open":"Navigation", "button":"defaults"})).unwrap();
@@ -3760,14 +3760,14 @@ mod tests {
 
     #[test]
     fn touchpad_preset_persists_and_obeys_preference_transactions() {
-        let mut app = SolveApp::new(solidcraft_engine::Session::default(), Default::default());
+        let mut app = SolveApp::new(polykrom_engine::Session::default(), Default::default());
         control(&mut app, &json!({"open":"Navigation", "nav":"touchpad"})).unwrap();
         assert_eq!(app.preferences.nav, "touchpad");
         assert!(app.preferences.trackpad_pan, "choosing Touchpad must not overwrite the saved scroll preference");
         control(&mut app, &json!({"button":"cancel"})).unwrap();
         assert_eq!(app.preferences.nav, "fusion");
         control(&mut app, &json!({"open":"Navigation", "nav":"touchpad", "button":"apply"})).unwrap();
-        let mut other = SolveApp::new(solidcraft_engine::Session::default(), Default::default());
+        let mut other = SolveApp::new(polykrom_engine::Session::default(), Default::default());
         other.load_prefs(&app.prefs());
         assert_eq!(other.preferences.nav, "touchpad");
         control(&mut app, &json!({"button":"defaults"})).unwrap();
@@ -3778,14 +3778,14 @@ mod tests {
 
     #[test]
     fn openscad_preset_maps_navigation_and_persists() {
-        let mut app = SolveApp::new(solidcraft_engine::Session::default(), Default::default());
+        let mut app = SolveApp::new(polykrom_engine::Session::default(), Default::default());
         set(&mut app, &json!({"nav": OPENSCAD_NAV})).unwrap();
         for button in [NavButton::Middle, NavButton::Right] {
             assert_eq!(nav_mode(&app, button, Modifiers::default()), Some(NavMode::Pan));
             assert_eq!(nav_mode(&app, button, Modifiers { shift: true, ..Default::default() }), Some(NavMode::Zoom));
         }
         assert_eq!(nav_mode(&app, NavButton::Left, Modifiers::default()), Some(NavMode::Orbit));
-        let mut other = SolveApp::new(solidcraft_engine::Session::default(), Default::default());
+        let mut other = SolveApp::new(polykrom_engine::Session::default(), Default::default());
         other.load_prefs(&app.prefs());
         assert_eq!(other.preferences.nav, OPENSCAD_NAV);
     }
@@ -3793,11 +3793,11 @@ mod tests {
     #[test]
     fn pan_reverse_x_defaults_off_persists_and_flips_the_sign() {
         assert!(!serde_json::from_value::<Prefs>(json!({})).unwrap().pan_reverse_x);
-        let mut app = SolveApp::new(solidcraft_engine::Session::default(), Default::default());
+        let mut app = SolveApp::new(polykrom_engine::Session::default(), Default::default());
         assert_eq!(pan_sign_x(&app), 1.0);
         set(&mut app, &json!({"pan_reverse_x": true})).unwrap();
         assert_eq!(pan_sign_x(&app), -1.0);
-        let mut other = SolveApp::new(solidcraft_engine::Session::default(), Default::default());
+        let mut other = SolveApp::new(polykrom_engine::Session::default(), Default::default());
         other.load_prefs(&app.prefs());
         assert!(other.preferences.pan_reverse_x);
     }
@@ -3806,14 +3806,14 @@ mod tests {
     fn trackpad_pan_defaults_on_persists_and_follows_dialog_buttons() {
         assert!(serde_json::from_value::<Prefs>(json!({})).unwrap().trackpad_pan);
         assert!(Prefs::default().trackpad_pan);
-        let mut app = SolveApp::new(solidcraft_engine::Session::default(), Default::default());
+        let mut app = SolveApp::new(polykrom_engine::Session::default(), Default::default());
         control(&mut app, &json!({"open":"Navigation", "trackpad_pan":false})).unwrap();
         control(&mut app, &json!({"button":"cancel"})).unwrap();
         assert!(app.preferences.trackpad_pan);
         control(&mut app, &json!({"open":"Navigation", "trackpad_pan":false})).unwrap();
         control(&mut app, &json!({"button":"apply"})).unwrap();
         assert!(!app.preferences.trackpad_pan);
-        let mut other = SolveApp::new(solidcraft_engine::Session::default(), Default::default());
+        let mut other = SolveApp::new(polykrom_engine::Session::default(), Default::default());
         other.load_prefs(&app.prefs());
         assert!(!other.preferences.trackpad_pan);
         control(&mut app, &json!({"open":"Navigation", "button":"defaults"})).unwrap();
@@ -3827,7 +3827,7 @@ mod tests {
         // #1090: orbit, pan and zoom all on the middle button; no left or right drag binding, so
         // those stay selection and the context menu (Ctrl+left on empty space orbits in every
         // preset, outside the bindings).
-        let mut app = SolveApp::new(solidcraft_engine::Session::default(), Default::default());
+        let mut app = SolveApp::new(polykrom_engine::Session::default(), Default::default());
         set(&mut app, &json!({"nav": "blender"})).unwrap();
         let none = Modifiers::default();
         let shift = Modifiers { shift: true, ..Default::default() };
@@ -3840,14 +3840,14 @@ mod tests {
             assert_eq!(nav_mode(&app, NavButton::Right, mods), None);
         }
         assert_eq!(zoom_sign(&app), 1.0, "the wheel turns the usual way");
-        let mut other = SolveApp::new(solidcraft_engine::Session::default(), Default::default());
+        let mut other = SolveApp::new(polykrom_engine::Session::default(), Default::default());
         other.load_prefs(&app.prefs());
         assert_eq!(other.preferences.nav, "blender");
     }
 
     #[test]
     fn presets_map_the_mouse_and_prefs_round_trip() {
-        let mut app = SolveApp::new(solidcraft_engine::Session::default(), Default::default());
+        let mut app = SolveApp::new(polykrom_engine::Session::default(), Default::default());
         let shift = Modifiers { shift: true, ..Default::default() };
         let ctrl = Modifiers { ctrl: true, ..Default::default() };
         let none = Modifiers::default();
@@ -3874,7 +3874,7 @@ mod tests {
         assert!(set(&mut app, &json!({"default_units": "furlong"})).is_err());
         assert!(set(&mut app, &json!({"nope": 1})).is_err());
         // Kept between runs.
-        let mut other = SolveApp::new(solidcraft_engine::Session::default(), Default::default());
+        let mut other = SolveApp::new(polykrom_engine::Session::default(), Default::default());
         other.load_prefs(&app.prefs());
         assert_eq!(other.preferences, app.preferences);
         assert_eq!(format_length(25.4, "in", 3), "1.000 in");
@@ -3884,7 +3884,7 @@ mod tests {
     /// keeps them, Restore Defaults resets one page, and the shortcuts menus open its page.
     #[test]
     fn preferences_dialog_cancel_apply_and_defaults() {
-        let mut app = SolveApp::new(solidcraft_engine::Session::default(), Default::default());
+        let mut app = SolveApp::new(polykrom_engine::Session::default(), Default::default());
         control(&mut app, &json!({"open": "general"})).unwrap();
         assert!(app.prefs_window.open && app.prefs_window.section == 0);
         control(&mut app, &json!({"theme": "light", "ui_scale": 1.25, "zoom_to_cursor": false})).unwrap();
@@ -3902,7 +3902,7 @@ mod tests {
         assert_eq!(app.preferences.nav, "alias", "Cancel goes back to the last Apply");
         let to = {
             let mut c = app.cam;
-            c.set_view(solidcraft_engine::render::StandardView::Top);
+            c.set_view(polykrom_engine::render::StandardView::Top);
             c
         };
         app.animate_to(to);
@@ -3929,7 +3929,7 @@ mod tests {
 
     #[test]
     fn language_preference_switches_and_persists() {
-        let mut app = SolveApp::new(solidcraft_engine::Session::default(), Default::default());
+        let mut app = SolveApp::new(polykrom_engine::Session::default(), Default::default());
         assert_eq!(app.preferences.language, "en");
         assert_eq!(app.tr("ui.preferences"), "Preferences");
         assert_eq!(app.tr("ui.extrude"), "Extrude");
@@ -3943,7 +3943,7 @@ mod tests {
         assert_eq!(app.tr("ui.extrude"), "押し出し");
 
         // Preferences round-trip
-        let mut other = SolveApp::new(solidcraft_engine::Session::default(), Default::default());
+        let mut other = SolveApp::new(polykrom_engine::Session::default(), Default::default());
         other.load_prefs(&app.prefs());
         assert_eq!(other.preferences.language, "ja");
         assert!(other.preferences.timeline_left);
@@ -3957,11 +3957,11 @@ mod tests {
         let dir = std::env::temp_dir().join(format!("solidcraft-standup-{}", std::process::id()));
         let _ = std::fs::create_dir_all(&dir);
         let path = dir.join("tall_in_y.step").to_string_lossy().to_string();
-        let mut src = SolveApp::new(solidcraft_engine::Session::default(), Default::default());
+        let mut src = SolveApp::new(polykrom_engine::Session::default(), Default::default());
         src.run("solid.box", json!({"length": 10, "width": 40, "height": 5})).unwrap();
         src.run("file.export", json!({"path": path})).unwrap();
 
-        let mut app = SolveApp::new(solidcraft_engine::Session::default(), Default::default());
+        let mut app = SolveApp::new(polykrom_engine::Session::default(), Default::default());
         app.open_path(&path);
         assert!(app.stand_up.is_none(), "Polykrom's own exports already have Z up");
         // Another originating system keeps the offer.
@@ -3970,7 +3970,7 @@ mod tests {
         app.open_path(&path);
         let offered = app.stand_up.clone().unwrap_or_default();
         assert_eq!(offered.len(), 1, "the file's body is offered");
-        let size = |app: &SolveApp| solidcraft_engine::view::bounds(&app.session);
+        let size = |app: &SolveApp| polykrom_engine::view::bounds(&app.session);
         assert!((size(&app).max.y - size(&app).min.y - 40.0).abs() < 1e-6);
         control(&mut app, &json!({"stand_up": true})).unwrap();
         let b = size(&app);
@@ -3980,11 +3980,11 @@ mod tests {
         assert!((size(&app).max.y - size(&app).min.y - 40.0).abs() < 1e-6, "one undo step");
 
         // Not offered when turned off, or with Y up as the default orientation.
-        let mut app = SolveApp::new(solidcraft_engine::Session::default(), Default::default());
+        let mut app = SolveApp::new(polykrom_engine::Session::default(), Default::default());
         app.preferences.offer_stand_up = false;
         app.open_path(&path);
         assert!(app.stand_up.is_none());
-        let mut app = SolveApp::new(solidcraft_engine::Session::default(), Default::default());
+        let mut app = SolveApp::new(polykrom_engine::Session::default(), Default::default());
         app.preferences.up_axis = "y".into();
         app.open_path(&path);
         assert!(app.stand_up.is_none());
@@ -3995,7 +3995,7 @@ mod tests {
     /// moved it off to the side.
     #[test]
     fn orbiting_around_the_origin_keeps_it_still() {
-        let mut app = SolveApp::new(solidcraft_engine::Session::default(), Default::default());
+        let mut app = SolveApp::new(polykrom_engine::Session::default(), Default::default());
         app.run("solid.box", json!({"length": 40, "width": 40, "height": 40})).unwrap();
         let rect = egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(800.0, 600.0));
         app.fit_view();
@@ -4019,7 +4019,7 @@ mod tests {
         assert_eq!(lenient(&json!({})).orbit_around, OrbitAround::ViewCentre);
         assert_eq!(lenient(&json!({"orbit_around": "origin"})).orbit_around, OrbitAround::Origin);
 
-        let mut app = SolveApp::new(solidcraft_engine::Session::default(), Default::default());
+        let mut app = SolveApp::new(polykrom_engine::Session::default(), Default::default());
         set(&mut app, &json!({"orbit_around": "origin"})).unwrap();
         assert_eq!(app.preferences.orbit_around, OrbitAround::Origin);
         set(&mut app, &json!({"orbit_cursor": true})).unwrap();
@@ -4029,7 +4029,7 @@ mod tests {
 
     #[test]
     fn orbiting_around_the_cursor_keeps_that_point_still() {
-        let mut app = SolveApp::new(solidcraft_engine::Session::default(), Default::default());
+        let mut app = SolveApp::new(polykrom_engine::Session::default(), Default::default());
         app.run("solid.box", json!({"length": 40, "width": 40, "height": 40})).unwrap();
         app.preferences.orbit_around = OrbitAround::Cursor;
         let rect = egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(800.0, 600.0));
@@ -4045,7 +4045,7 @@ mod tests {
     /// point far off to the side; with nothing visible it turns around the view's centre.
     #[test]
     fn orbiting_from_empty_space_turns_around_the_visible_geometry() {
-        let mut app = SolveApp::new(solidcraft_engine::Session::default(), Default::default());
+        let mut app = SolveApp::new(polykrom_engine::Session::default(), Default::default());
         app.run("solid.box", json!({"length": 40, "width": 40, "height": 40})).unwrap();
         app.preferences.orbit_around = OrbitAround::Cursor;
         let rect = egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(800.0, 600.0));
@@ -4059,18 +4059,18 @@ mod tests {
         orbit(&mut app, rect, 40.0, 25.0, Some(corner));
         assert_eq!(app.viewport.orbit_pivot, Some(centre));
 
-        let mut app = SolveApp::new(solidcraft_engine::Session::default(), Default::default());
+        let mut app = SolveApp::new(polykrom_engine::Session::default(), Default::default());
         app.preferences.orbit_around = OrbitAround::Cursor;
-        app.cam.target = solidcraft_engine::geom::Vec3::new(5.0, -3.0, 2.0);
+        app.cam.target = polykrom_engine::geom::Vec3::new(5.0, -3.0, 2.0);
         orbit(&mut app, rect, 40.0, 25.0, Some(corner));
-        assert_eq!(app.viewport.orbit_pivot, Some(solidcraft_engine::geom::Vec3::new(5.0, -3.0, 2.0)));
+        assert_eq!(app.viewport.orbit_pivot, Some(polykrom_engine::geom::Vec3::new(5.0, -3.0, 2.0)));
     }
 
     /// The Y up preference turns the view: the camera's up axis follows it, startup included.
     #[test]
     fn up_axis_preference_turns_the_view() {
-        use solidcraft_engine::render::UpAxis;
-        let mut app = SolveApp::new(solidcraft_engine::Session::default(), crate::Services::default());
+        use polykrom_engine::render::UpAxis;
+        let mut app = SolveApp::new(polykrom_engine::Session::default(), crate::Services::default());
         let ctx = crate::fonts::test_context();
         apply(&mut app, &ctx);
         assert_eq!(app.cam.up, UpAxis::Z);
@@ -4167,7 +4167,7 @@ mod ambient_occlusion_tests {
         let checkbox = crate::scenario::handle_at("view:ambient_occlusion").unwrap();
         h.call("ui.click", json!({"x":checkbox.x,"y":checkbox.y}));
         assert!(h.app.preferences.ambient_occlusion);
-        let mut restored = SolveApp::new(solidcraft_engine::Session::default(), Default::default());
+        let mut restored = SolveApp::new(polykrom_engine::Session::default(), Default::default());
         restored.load_prefs(&h.app.prefs());
         assert!(restored.preferences.ambient_occlusion);
         h.call("ui.prefs", json!({"button":"cancel"}));
@@ -4247,7 +4247,7 @@ mod graphics_preset_tests {
             h.call("ui.click", json!({"x":pos.x,"y":pos.y}));
         }
         assert!(h.app.preferences.ambient_occlusion);
-        let mut restored = SolveApp::new(solidcraft_engine::Session::default(), Default::default());
+        let mut restored = SolveApp::new(polykrom_engine::Session::default(), Default::default());
         restored.load_prefs(&h.app.prefs());
         assert!(restored.preferences.ambient_occlusion);
         h.call("ui.prefs", json!({"button":"cancel"}));

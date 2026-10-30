@@ -103,7 +103,7 @@ mod tests {
     fn feature_rows(h: &mut Harness, cache: &str) -> Vec<String> {
         h.app.tree.model = match cache {
             "current" => Some(model::Model::new(&h.app.session)),
-            "stale" => Some(model::Model::new(&solidcraft_engine::Session::default())),
+            "stale" => Some(model::Model::new(&polykrom_engine::Session::default())),
             _ => None,
         };
         h.app.tree.expanded.insert("c0/features".into());
@@ -192,9 +192,9 @@ mod tests {
     fn find(app: &mut SolveApp, feature: u64, body: &str) {
         let state = app.session.world_state();
         let model_body = state.body(body).unwrap();
-        let names = solidcraft_engine::doc::naming::face_names(model_body);
+        let names = polykrom_engine::doc::naming::face_names(model_body);
         let index = names.iter().position(|name| name.starts_with(&format!("F{feature}:"))).unwrap();
-        app.session.selection = vec![Sel::Face { body: body.into(), index, point: solidcraft_engine::geom::Vec3::ZERO }];
+        app.session.selection = vec![Sel::Face { body: body.into(), index, point: polykrom_engine::geom::Vec3::ZERO }];
         let item = crate::context_menu::items(app, &Target::Viewport).into_iter().find(|item| item.id == "ui.findBrowser").unwrap();
         assert!(item.enabled);
         crate::context_menu::run_item(app, &item, pos2(0.0, 0.0));
@@ -216,7 +216,7 @@ mod tests {
         h.app.run("component.activate", json!({"component":0})).unwrap();
         let world_body = h.app.session.occurrence_bodies(&path, false).unwrap()[0].clone();
         let saved = h.app.session.doc.to_json();
-        h.app.session = solidcraft_engine::Session::new(solidcraft_engine::doc::Document::from_json(&saved).unwrap());
+        h.app.session = polykrom_engine::Session::new(polykrom_engine::doc::Document::from_json(&saved).unwrap());
         h.app.tree.collapsed.insert("c0".into());
         h.app.tree.collapsed.insert(occurrence_key(&path));
         h.app.preferences.timeline_left_browser_collapsed = true;
@@ -262,7 +262,7 @@ mod tests {
         }
         let stamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos();
         let source = Source(std::env::temp_dir().join(format!("solidcraft-browser-import-{}-{stamp}.solidcraft", std::process::id())));
-        let mut saved = SolveApp::new(solidcraft_engine::Session::default(), crate::Services::default());
+        let mut saved = SolveApp::new(polykrom_engine::Session::default(), crate::Services::default());
         saved.run("solid.box", json!({"length":10,"width":10,"height":10,"body_name":"Imported"})).unwrap();
         saved.run("file.save", json!({"path":source.0.to_string_lossy()})).unwrap();
         let mut h = Harness::new();
@@ -273,7 +273,7 @@ mod tests {
         let state = h.app.session.world_state();
         let owner = state.body(&name).unwrap().feature;
         assert_ne!(owner, base);
-        h.app.session.selection = vec![Sel::Face { body: name, index: 0, point: solidcraft_engine::geom::Vec3::ZERO }];
+        h.app.session.selection = vec![Sel::Face { body: name, index: 0, point: polykrom_engine::geom::Vec3::ZERO }];
         for id in ["ui.findBrowser", "ui.findTimeline", "ui.editFeature"] {
             let item = crate::context_menu::items(&h.app, &Target::Viewport).into_iter().find(|item| item.id == id).unwrap();
             assert!(!item.enabled || item.params.as_ref().unwrap()["feature"] == json!(owner), "{id}: {item:?}");

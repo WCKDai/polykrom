@@ -101,7 +101,7 @@ fn fit_circle(pts: &[Vec3], tol: f64) -> Option<(Vec3, UnitVec3, f64)> {
 
 /// The round shape of mesh edge `index` of body `b`: from the kernel's exact curve when it
 /// is the same edge (its ends on the polyline), else fitted to the polyline's points.
-fn edge_round(b: &solidcraft_doc::ModelBody, m: &Mesh, index: usize, whole: bool) -> Option<Shape> {
+fn edge_round(b: &polykrom_doc::ModelBody, m: &Mesh, index: usize, whole: bool) -> Option<Shape> {
     let pts = m.edges.get(index)?;
     let tol = (m.bounds().diagonal().max(1.0) * 1e-6).max(1e-9);
     let exact = solidcraft_kernel::edge_circle(&b.body, index).filter(|c| {
@@ -139,10 +139,10 @@ fn arc_points(center: Vec3, axis: UnitVec3, start: Vec3, angle: f64) -> Vec<Vec3
 /// sketch, else the last sketch with that id.
 fn sketch_of<'a>(
     s: &Session,
-    st: &'a solidcraft_doc::ModelState,
+    st: &'a polykrom_doc::ModelState,
     sketch: Option<u64>,
-    has: impl Fn(&solidcraft_sketch::Sketch) -> bool,
-) -> Option<&'a solidcraft_doc::SolvedSketch> {
+    has: impl Fn(&polykrom_sketch::Sketch) -> bool,
+) -> Option<&'a polykrom_doc::SolvedSketch> {
     if let Some(id) = sketch {
         return st.sketch(id);
     }
@@ -152,8 +152,8 @@ fn sketch_of<'a>(
     st.sketches.iter().rev().map(|ss| &**ss).find(|ss| has(&ss.sketch))
 }
 
-fn sketch_curve(ss: &solidcraft_doc::SolvedSketch, id: &str) -> Option<Item> {
-    use solidcraft_sketch::CurveKind;
+fn sketch_curve(ss: &polykrom_doc::SolvedSketch, id: &str) -> Option<Item> {
+    use polykrom_sketch::CurveKind;
     let sk = &ss.sketch;
     let c = sk.curves.get(sk.curve_index(id)?)?;
     let at = |i: usize| sk.points.get(i).map(|p| ss.plane.to_world(p.pos));
@@ -198,7 +198,7 @@ fn sketch_curve(ss: &solidcraft_doc::SolvedSketch, id: &str) -> Option<Item> {
 
 /// A profile (closed region of a sketch): its area, and when it is a circle or a slot, its
 /// sizes.
-fn profile(ss: &solidcraft_doc::SolvedSketch, index: usize) -> Option<Item> {
+fn profile(ss: &polykrom_doc::SolvedSketch, index: usize) -> Option<Item> {
     use solidcraft_geom::{Seg2, Vec2};
     let pr = ss.profiles.get(index)?;
     let outline: Vec<Vec3> = pr.region.outer.polyline(1e-3).iter().map(|p| ss.plane.to_world(*p)).collect();
@@ -249,7 +249,7 @@ fn profile(ss: &solidcraft_doc::SolvedSketch, index: usize) -> Option<Item> {
 }
 
 /// A slot this cylindrical face is one end of, from the body's other faces.
-fn face_slot(b: &solidcraft_doc::ModelBody, m: &Mesh, shape: &Shape, pts: &[Vec3]) -> Option<Slot> {
+fn face_slot(b: &polykrom_doc::ModelBody, m: &Mesh, shape: &Shape, pts: &[Vec3]) -> Option<Slot> {
     let faces = m.tri_face.iter().map(|f| *f as usize + 1).max().unwrap_or(0);
     if faces > 4000 {
         return None;
@@ -412,7 +412,7 @@ fn closest(a: &Geo, b: &Geo) -> Option<(Vec3, Vec3)> {
 
 /// A face or edge picked by its `point` alone gets the `index` a selection carries: the face
 /// nearest the point (an edge's index is resolved from the point anyway, by `edge_index`).
-fn with_index(st: &solidcraft_doc::ModelState, value: &Value) -> Value {
+fn with_index(st: &polykrom_doc::ModelState, value: &Value) -> Value {
     let mut v = value.clone();
     let kind = v.get("type").and_then(Value::as_str).map(str::to_string);
     if v.get("index").is_some() || !matches!(kind.as_deref(), Some("face" | "edge")) {
@@ -420,7 +420,7 @@ fn with_index(st: &solidcraft_doc::ModelState, value: &Value) -> Value {
     }
     let (Some(body), Some(point)) = (v.get("body").and_then(Value::as_str), v.get("point").and_then(crate::params::vec3)) else { return v };
     let index = match kind.as_deref() {
-        Some("face") => st.body(body).and_then(|b| solidcraft_doc::appearance::nearest_face(b, point)).map(|(_, f)| f),
+        Some("face") => st.body(body).and_then(|b| polykrom_doc::appearance::nearest_face(b, point)).map(|(_, f)| f),
         _ => Some(0),
     };
     if let Some(i) = index {

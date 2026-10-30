@@ -26,7 +26,7 @@ agent through the MCP server, on harder parts and on assemblies.
 Needs the Claude Code CLI (`claude`), signed in, and a release build of the CLI:
 
 ```
-cargo build --release -p solidcraft-cli
+cargo build --release -p polykrom-cli
 python3 tools/agent-eval/run.py --cli target/release/polykrom-cli --out /tmp/agent-eval --round 5
 ```
 

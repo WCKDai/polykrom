@@ -1,7 +1,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 use crate::Session;
+use polykrom_doc::{Document, FeatureKind, PlaneRef};
 use serde_json::{Value, json};
-use solidcraft_doc::{Document, FeatureKind, PlaneRef};
 use solidcraft_geom::Vec3;
 use std::f64::consts::PI;
 
@@ -39,7 +39,7 @@ fn generated_face_profiles_keep_exact_links_live_after_edit_and_reopen() {
         let FeatureKind::Sketch { plane, sketch: profile } = &generated.kind else { panic!("sketch") };
         let PlaneRef::Face { anchor: Some(anchor), .. } = plane else { panic!("the original Box cap remains exact after a hole cut") };
         assert_eq!(anchor.target.origin_feature, base);
-        assert!(matches!(anchor.target.certificate, Some(solidcraft_doc::config::FaceCertificate::Box { axis: 2, high: true })));
+        assert!(matches!(anchor.target.certificate, Some(polykrom_doc::config::FaceCertificate::Box { axis: 2, high: true })));
         assert!(!profile.links.is_empty());
         assert!(profile.links.iter().all(|link| link.auto_face && !link.lost));
         let area = 1200.0 - if hole { 25.0 * PI } else { 0.0 };
@@ -242,7 +242,7 @@ fn blind_cut_inside_a_cylinder_keeps_only_planes_and_cylinders() {
     assert_eq!(body["faces"], 14, "{m}");
 }
 
-fn face_anchor(s: &Session, sketch: u64) -> solidcraft_doc::FaceAnchor {
+fn face_anchor(s: &Session, sketch: u64) -> polykrom_doc::FaceAnchor {
     let FeatureKind::Sketch { plane: PlaneRef::Face { anchor: Some(anchor), .. }, .. } = &s.doc.feature(sketch).unwrap().kind else {
         panic!("sketch {sketch} has no face anchor")
     };
@@ -296,11 +296,11 @@ fn join_gives_a_face_merged_from_both_operands_its_history_name() {
     // Both boxes' tops share one support: no single construction certificate owns it, but its
     // exact history names it (#491).
     let top = run(&mut s, "sketch.create", json!({"plane":{"face":[10,10,10]}}))["sketch"].as_u64().unwrap();
-    assert_eq!(face_anchor(&s, top).target.certificate, Some(solidcraft_doc::config::FaceCertificate::Lineage));
+    assert_eq!(face_anchor(&s, top).target.certificate, Some(polykrom_doc::config::FaceCertificate::Lineage));
     // An unshared support keeps its box role.
     run(&mut s, "sketch.finish", json!({}));
     let side = run(&mut s, "sketch.create", json!({"plane":{"face":[0,10,5]}}))["sketch"].as_u64().unwrap();
-    assert!(matches!(face_anchor(&s, side).target.certificate, Some(solidcraft_doc::config::FaceCertificate::Box { axis: 0, high: false })));
+    assert!(matches!(face_anchor(&s, side).target.certificate, Some(polykrom_doc::config::FaceCertificate::Box { axis: 0, high: false })));
 }
 
 #[test]
@@ -329,7 +329,7 @@ fn join_covering_a_whole_attached_face_loses_the_attachment_without_moving_it() 
     assert!((s.model.state().sketch(top).unwrap().plane.origin.z - 10.).abs() < 1e-9);
 }
 
-fn certificate_of(s: &Session, sketch: u64) -> Option<solidcraft_doc::config::FaceCertificate> {
+fn certificate_of(s: &Session, sketch: u64) -> Option<polykrom_doc::config::FaceCertificate> {
     let FeatureKind::Sketch { plane: PlaneRef::Face { anchor: Some(anchor), .. }, .. } = &s.doc.feature(sketch).unwrap().kind else {
         return None;
     };
@@ -338,7 +338,7 @@ fn certificate_of(s: &Session, sketch: u64) -> Option<solidcraft_doc::config::Fa
 
 #[test]
 fn cylinder_primitive_caps_take_attachments_that_follow_edits_and_reopen() {
-    use solidcraft_doc::config::FaceCertificate;
+    use polykrom_doc::config::FaceCertificate;
     let mut s = Session::default();
     run(&mut s, "solid.cylinder", json!({"radius":10,"height":40,"name":"Post"}));
     let top = run(&mut s, "sketch.create", json!({"plane":{"face":[2,1,40]}}))["sketch"].as_u64().unwrap();
@@ -377,7 +377,7 @@ fn crossed_cylinder_primitives_keep_their_caps_attachable() {
 
 #[test]
 fn shelled_cylinder_floor_keeps_its_cap_identity() {
-    use solidcraft_doc::config::FaceCertificate;
+    use polykrom_doc::config::FaceCertificate;
     let mut s = Session::default();
     run(&mut s, "solid.cylinder", json!({"radius":10,"height":40}));
     run(&mut s, "solid.shell", json!({"faces":[[2,1,40]],"thickness":2}));

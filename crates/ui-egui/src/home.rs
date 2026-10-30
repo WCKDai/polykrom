@@ -5,8 +5,8 @@
 use std::collections::HashMap;
 
 use egui::vec2;
-use solidcraft_engine::Session;
-use solidcraft_engine::render::{Camera, StandardView};
+use polykrom_engine::Session;
+use polykrom_engine::render::{Camera, StandardView};
 
 use crate::SolveApp;
 use crate::theme::Tokens;
@@ -14,7 +14,7 @@ use crate::ui_kit::{self, FileView, RecoveryMessage};
 
 /// Recent designs kept.
 pub const MAX_RECENT: usize = 12;
-const THUMB: [usize; 2] = solidcraft_engine::io::THUMBNAIL_SIZE;
+const THUMB: [usize; 2] = polykrom_engine::io::THUMBNAIL_SIZE;
 const SAMPLE_PICTURES: [&[u8]; 6] = [
     include_bytes!("../../../assets/samples/exports/0.png"),
     include_bytes!("../../../assets/samples/exports/1.png"),
@@ -76,7 +76,7 @@ impl HomeState {
     }
 
     pub fn ready_samples(&self) -> usize {
-        (0..solidcraft_engine::sample::samples().len()).filter(|i| self.thumbs.get(&format!("sample:{i}")).is_some_and(Option::is_some)).count()
+        (0..polykrom_engine::sample::samples().len()).filter(|i| self.thumbs.get(&format!("sample:{i}")).is_some_and(Option::is_some)).count()
     }
 
     pub fn show(&mut self, _rev: u64) {
@@ -101,16 +101,16 @@ impl HomeState {
 pub fn thumbnail(s: &Session) -> Option<egui::ColorImage> {
     let mut cam = Camera::default();
     cam.set_view(StandardView::Iso);
-    let b = solidcraft_engine::view::bounds(s);
+    let b = polykrom_engine::view::bounds(s);
     if b.is_empty() {
         return None;
     }
     cam.fit(&b);
     // Fill the card: the fit leaves room for a whole window's margins.
     cam.distance *= 0.7;
-    let scene = solidcraft_engine::view::scene(s, &cam);
+    let scene = polykrom_engine::view::scene(s, &cam);
     // Drawn on the GPU by the renderer the app installs; none (a browser): no picture.
-    let picture = solidcraft_engine::capture::rgba(&scene, &cam, THUMB[0] as u32, THUMB[1] as u32).ok()?;
+    let picture = polykrom_engine::capture::rgba(&scene, &cam, THUMB[0] as u32, THUMB[1] as u32).ok()?;
     Some(egui::ColorImage::from_rgba_unmultiplied(THUMB, &picture.rgba))
 }
 
@@ -175,11 +175,11 @@ fn remember_at(s: &Session, key: &str, #[cfg(not(target_arch = "wasm32"))] ident
     #[cfg(not(target_arch = "wasm32"))]
     if let Some(path) = identity.filter(|p| cache_path(key).as_ref() == Some(p)) {
         let rgba: Vec<u8> = img.pixels.iter().flat_map(|c| c.to_srgba_unmultiplied()).collect();
-        if let Some(bytes) = solidcraft_engine::render::png(THUMB[0], THUMB[1], rgba)
+        if let Some(bytes) = polykrom_engine::render::png(THUMB[0], THUMB[1], rgba)
             && let Some(dir) = path.parent()
             && std::fs::create_dir_all(dir).is_ok()
         {
-            let _ = solidcraft_engine::io::write_atomic(&path, &bytes, false);
+            let _ = polykrom_engine::io::write_atomic(&path, &bytes, false);
         }
     }
     Some(img)
@@ -235,7 +235,7 @@ fn picture(key: &str) -> Option<egui::ColorImage> {
     if let Some(img) = cached(key) {
         return Some(img);
     }
-    solidcraft_engine::io::read_design_thumbnail_file(key).and_then(decode_thumbnail)
+    polykrom_engine::io::read_design_thumbnail_file(key).and_then(decode_thumbnail)
 }
 
 /// A sample's shipped picture. Its model is built only when the sample is selected.
@@ -253,7 +253,7 @@ fn make(key: &str) -> Made {
     }
     let mut s = Session::default();
     let built = match sample {
-        Some(i) => solidcraft_engine::sample::samples().get(i).is_some_and(|smp| {
+        Some(i) => polykrom_engine::sample::samples().get(i).is_some_and(|smp| {
             let ok = s.run_script(&(smp.script)()).is_ok();
             s.doc_mut().name = smp.name.to_string();
             s.undo.clear();
@@ -444,7 +444,7 @@ pub fn open_sample(app: &mut SolveApp, i: usize) {
             crate::documents::adopt(app, copy);
             app.home.open = false;
         }
-        None if i < solidcraft_engine::sample::samples().len() => {
+        None if i < polykrom_engine::sample::samples().len() => {
             app.home.open = true;
             app.home.wanted = Some(i);
         }
@@ -458,7 +458,7 @@ pub fn available(app: &SolveApp, path: &str) -> bool {
 }
 
 pub fn open_recent(app: &mut SolveApp, path: &str) {
-    if !solidcraft_engine::io::vfs::exists(path) {
+    if !polykrom_engine::io::vfs::exists(path) {
         if let Some(restore) = app.services.restore_file.as_ref().filter(|_| available(app, path)) {
             restore(path);
             return;
@@ -480,7 +480,7 @@ fn ask_present(h: &mut HomeState, ctx: &egui::Context, recent: &[String]) {
             let ctx = ctx.clone();
             let spawned = std::thread::Builder::new().name("recent-files".into()).spawn(move || {
                 for p in new {
-                    let there = solidcraft_engine::io::vfs::exists(&p);
+                    let there = polykrom_engine::io::vfs::exists(&p);
                     if tx.send((p, there)).is_err() {
                         return;
                     }
@@ -499,7 +499,7 @@ fn ask_present(h: &mut HomeState, ctx: &egui::Context, recent: &[String]) {
     }
     #[cfg(target_arch = "wasm32")]
     for p in recent {
-        h.present.insert(p.clone(), solidcraft_engine::io::vfs::exists(p));
+        h.present.insert(p.clone(), polykrom_engine::io::vfs::exists(p));
     }
 }
 
@@ -527,7 +527,7 @@ enum FileAction {
     Shortcuts,
     Crashes,
     About,
-    Recovery(solidcraft_engine::recovery::Entry, bool),
+    Recovery(polykrom_engine::recovery::Entry, bool),
 }
 
 /// File view replaces the workspace while keeping the open design and its history intact.
@@ -578,7 +578,7 @@ pub fn show(app: &mut SolveApp, ui: &mut egui::Ui) {
         }
     }
     let t = Tokens::get();
-    let samples = solidcraft_engine::sample::samples();
+    let samples = polykrom_engine::sample::samples();
     for i in 0..samples.len() {
         let key = format!("sample:{i}");
         if !app.home.thumbs.contains_key(&key) {
@@ -818,7 +818,7 @@ fn start_content(app: &mut SolveApp, ui: &mut egui::Ui, action: &mut Option<File
     });
     ui.add_space(t.file_section_gap);
     FileView::section(ui, app.tr("home.samples"), t.space_10, |ui| {
-        let samples: Vec<_> = solidcraft_engine::sample::samples()
+        let samples: Vec<_> = polykrom_engine::sample::samples()
             .iter()
             .enumerate()
             .map(|(index, sample)| {
@@ -893,7 +893,7 @@ fn recent_time_at(app: &SolveApp, time: u64, now: u64) -> String {
     } else if seconds < 172800 {
         return app.tr("home.yesterday").to_string();
     } else {
-        let date = solidcraft_engine::crash::utc(time);
+        let date = polykrom_engine::crash::utc(time);
         let date = date.split_once('T').map_or(date.as_str(), |(date, _)| date);
         let mut parts = date.rsplitn(3, '-');
         let day = parts.next().unwrap_or("").trim_start_matches('0');
@@ -967,9 +967,9 @@ fn dispatch(app: &mut SolveApp, ctx: &egui::Context, action: FileAction) {
         FileAction::Section(section) => {
             app.home.section = section;
             if section == Section::Recovery && app.recoverable.is_empty() {
-                let dir = app.autosave.as_ref().map(|autosave| autosave.dir.clone()).or_else(solidcraft_engine::recovery::default_dir);
+                let dir = app.autosave.as_ref().map(|autosave| autosave.dir.clone()).or_else(polykrom_engine::recovery::default_dir);
                 if let Some(dir) = dir {
-                    app.recoverable = solidcraft_engine::recovery::orphans(&dir);
+                    app.recoverable = polykrom_engine::recovery::orphans(&dir);
                 }
             }
         }
@@ -1062,7 +1062,7 @@ mod tests {
     fn shipped_sample_pictures_are_bounded_and_match_the_current_scripts() {
         use sha2::{Digest, Sha256};
         let hashes: Vec<String> = serde_json::from_str(include_str!("../../../assets/samples/exports/scripts.json")).unwrap();
-        let samples = solidcraft_engine::sample::samples();
+        let samples = polykrom_engine::sample::samples();
         assert_eq!(samples.len(), SAMPLE_PICTURES.len());
         assert_eq!(hashes.len(), samples.len());
         for (i, sample) in samples.iter().enumerate() {
@@ -1106,14 +1106,14 @@ mod tests {
         let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets/samples/exports");
         std::fs::create_dir_all(&dir).unwrap();
         let mut hashes = Vec::new();
-        for (i, sample) in solidcraft_engine::sample::samples().into_iter().enumerate() {
+        for (i, sample) in polykrom_engine::sample::samples().into_iter().enumerate() {
             let began = std::time::Instant::now();
             let script = (sample.script)();
             let mut session = Session::default();
             session.run_script(&script).unwrap();
             let image = thumbnail(&session).unwrap();
             let rgba = image.pixels.iter().flat_map(|p| p.to_srgba_unmultiplied()).collect();
-            let png = solidcraft_engine::render::png(THUMB[0], THUMB[1], rgba).unwrap();
+            let png = polykrom_engine::render::png(THUMB[0], THUMB[1], rgba).unwrap();
             std::fs::write(dir.join(format!("{i}.png")), png).unwrap();
             hashes.push(format!("{:x}", Sha256::digest(serde_json::to_vec(&script).unwrap())));
             eprintln!("{}: {:.3} s", sample.name, began.elapsed().as_secs_f64());
@@ -1159,8 +1159,8 @@ mod tests {
         for body in &session.world_state().bodies {
             body.mesh();
         }
-        let bytes = session.design_container(solidcraft_engine::io::DesignCompression::Fast, false, true).unwrap();
-        let png = solidcraft_engine::io::read_design_thumbnail(&bytes).unwrap();
+        let bytes = session.design_container(polykrom_engine::io::DesignCompression::Fast, false, true).unwrap();
+        let png = polykrom_engine::io::read_design_thumbnail(&bytes).unwrap();
         let image = decode_thumbnail(png).unwrap();
         assert_eq!(image.size, THUMB);
         let nonce = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos();
@@ -1227,7 +1227,7 @@ mod tests {
         for b in &s.world_state().bodies {
             b.mesh();
         }
-        let bytes = s.design_container(solidcraft_engine::io::DesignCompression::Fast, false, true).unwrap();
+        let bytes = s.design_container(polykrom_engine::io::DesignCompression::Fast, false, true).unwrap();
         std::fs::write(&path, bytes).unwrap();
         let cold = format!("missing-cold-file-{nonce}.step");
         let (tx, rx) = std::sync::mpsc::channel();
@@ -1245,13 +1245,13 @@ mod tests {
         let mut h = crate::scenario::Harness::new();
         h.app.home.show(0);
         h.frames(1);
-        assert!(h.app.home.ready_samples() < solidcraft_engine::sample::samples().len(), "the first frame decodes nothing");
+        assert!(h.app.home.ready_samples() < polykrom_engine::sample::samples().len(), "the first frame decodes nothing");
         let deadline = std::time::Instant::now() + std::time::Duration::from_secs(30);
-        while h.app.home.ready_samples() < solidcraft_engine::sample::samples().len() && std::time::Instant::now() < deadline {
+        while h.app.home.ready_samples() < polykrom_engine::sample::samples().len() && std::time::Instant::now() < deadline {
             std::thread::sleep(std::time::Duration::from_millis(10));
             h.frames(1);
         }
-        assert_eq!(h.app.home.ready_samples(), solidcraft_engine::sample::samples().len());
+        assert_eq!(h.app.home.ready_samples(), polykrom_engine::sample::samples().len());
         assert!(h.app.home.samples.is_empty(), "no sample model was built");
     }
 
@@ -1405,7 +1405,7 @@ mod tests {
         h.app.run("solid.box", serde_json::json!({"length":10,"width":12,"height":14})).unwrap();
         let original = h.app.session.doc.to_json();
         h.app.recoverable =
-            vec![solidcraft_engine::recovery::Entry { id: "file-test".into(), name: "Bracket".into(), path: None, saved_at: 0, features: 3 }];
+            vec![polykrom_engine::recovery::Entry { id: "file-test".into(), name: "Bracket".into(), path: None, saved_at: 0, features: 3 }];
         h.app.home.show(0);
         h.frames(3);
         assert!(crate::scenario::handle_at("home:recovery:recover").is_some());

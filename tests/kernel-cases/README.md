@@ -7,7 +7,7 @@ them. `cargo xtask kernel-cases` runs them and writes [`docs/kernel-cases.md`](.
 ```sh
 cargo xtask kernel-cases                                    # every case
 cargo xtask kernel-cases --cli target/release/polykrom-cli --out /tmp/run   # with a CLI already built
-cargo run -p solidcraft-cli --bin polykrom-cli -- kernel-cases tests/kernel-cases/booleans/<id>   # one case
+cargo run -p polykrom-cli --bin polykrom-cli -- kernel-cases tests/kernel-cases/booleans/<id>   # one case
 ```
 
 The run's output folder (`--out`, default `target/kernel-cases`) gets `results.json`, every

@@ -71,14 +71,14 @@ pub(super) fn export_with(s: &Session, p: &Value, renderer: Option<&Renderer>) -
     let renderer = renderer.ok_or_else(|| bad(cmd, "no renderer is installed to draw pictures in this process"))?;
     // A destination outside an agent's folders is refused before anything is drawn.
     let io = |e: std::io::Error| bad(cmd, format!("{path}: {e}"));
-    solidcraft_io::vfs::check(path).map_err(io)?;
+    polykrom_io::vfs::check(path).map_err(io)?;
     let frame_path = |k: usize| std::path::Path::new(path).join(format!("frame-{k:04}.png")).to_string_lossy().to_string();
     if !gif {
-        solidcraft_io::vfs::create_dir_all(path).map_err(io)?;
+        polykrom_io::vfs::create_dir_all(path).map_err(io)?;
         // The frames of an earlier export here go first, so the folder never mixes two
         // animations: not after a shorter one, nor when this one fails part way.
-        for stale in (1..=MAX_FRAMES).map(frame_path).filter(|f| solidcraft_io::vfs::exists(f)) {
-            solidcraft_io::vfs::remove(&stale).map_err(|e| bad(cmd, format!("{stale}: {e}")))?;
+        for stale in (1..=MAX_FRAMES).map(frame_path).filter(|f| polykrom_io::vfs::exists(f)) {
+            polykrom_io::vfs::remove(&stale).map_err(|e| bad(cmd, format!("{stale}: {e}")))?;
         }
     }
     let mut t = s.scratch();
@@ -101,7 +101,7 @@ pub(super) fn export_with(s: &Session, p: &Value, renderer: Option<&Renderer>) -
         } else {
             let png = crate::render::png(width as usize, height as usize, picture.rgba).ok_or_else(|| bad(cmd, "PNG encoding failed"))?;
             let file = frame_path(k + 1);
-            solidcraft_io::vfs::write(&file, &png).map_err(|e| bad(cmd, format!("{file}: {e}")))?;
+            polykrom_io::vfs::write(&file, &png).map_err(|e| bad(cmd, format!("{file}: {e}")))?;
             bytes += png.len();
         }
     }
@@ -110,7 +110,7 @@ pub(super) fn export_with(s: &Session, p: &Value, renderer: Option<&Renderer>) -
         // GIF counts in hundredths of a second, and viewers slow anything under 2 down.
         let delay = (100.0 / fps).round().clamp(2.0, 100.0) as u16;
         let gif = crate::render::gif(width as usize, height as usize, &frames, delay).ok_or_else(|| bad(cmd, "GIF encoding failed"))?;
-        solidcraft_io::write_atomic(std::path::Path::new(path), &gif, false).map_err(io)?;
+        polykrom_io::write_atomic(std::path::Path::new(path), &gif, false).map_err(io)?;
         bytes = gif.len();
         out["fps"] = json!(100.0 / f64::from(delay));
     }

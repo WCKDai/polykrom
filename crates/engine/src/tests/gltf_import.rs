@@ -53,7 +53,7 @@ fn cube_file() -> Cube {
 impl Cube {
     fn glb(&self, dir: &std::path::Path, name: &str) -> String {
         let path = dir.join(name);
-        std::fs::write(&path, solidcraft_io::glb_container(self.json.to_string().as_bytes(), &self.bin)).unwrap();
+        std::fs::write(&path, polykrom_io::glb_container(self.json.to_string().as_bytes(), &self.bin)).unwrap();
         path.to_string_lossy().to_string()
     }
 }
@@ -201,7 +201,7 @@ fn a_gltf_with_its_bin_next_to_it_opens_and_broken_files_say_why() {
     let e = s.execute("file.insert_mesh", &json!({"path": path})).unwrap_err().to_string();
     assert!(e.contains("cube.bin"), "{e}");
     let glb = dir.join("cut.glb");
-    let whole = solidcraft_io::glb_container(c.json.to_string().as_bytes(), &c.bin);
+    let whole = polykrom_io::glb_container(c.json.to_string().as_bytes(), &c.bin);
     std::fs::write(&glb, &whole[..whole.len() / 2]).unwrap();
     let e = s.execute("file.insert_mesh", &json!({"path": glb.to_string_lossy()})).unwrap_err().to_string();
     assert!(e.contains("truncated") || e.contains("GLB"), "{e}");

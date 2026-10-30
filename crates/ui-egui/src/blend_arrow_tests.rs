@@ -5,9 +5,9 @@
 use crate::canvas::{anchor, blend_grow_dir};
 use crate::dialogs::Kind;
 use crate::scenario::Harness;
+use polykrom_engine::Sel;
+use polykrom_engine::geom::Vec3;
 use serde_json::json;
-use solidcraft_engine::Sel;
-use solidcraft_engine::geom::Vec3;
 
 /// A 40 x 30 x 20 block with a 20 x 30 x 10 step on its left half: the edge along y at x 20,
 /// z 20 is inside (concave); the block's right top edge (x 40, z 20) and the step's top right
@@ -71,7 +71,7 @@ fn box_edge_arrow_still_points_into_the_body() {
 /// The value of the open fillet or chamfer window.
 fn value(h: &Harness) -> f64 {
     let Some(Kind::Fillet { radius, .. }) = h.app.dialog.as_ref().map(|d| &d.kind) else { panic!("a fillet window") };
-    h.app.session.doc.eval(radius, solidcraft_engine::doc::expr::Kind::Length).unwrap()
+    h.app.session.doc.eval(radius, polykrom_engine::doc::expr::Kind::Length).unwrap()
 }
 
 /// On an inside edge (and on an outside one, a mixed chain's first edge either way), the arrow

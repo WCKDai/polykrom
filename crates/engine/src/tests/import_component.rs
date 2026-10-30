@@ -300,8 +300,8 @@ fn undo_takes_the_whole_import_away() {
 fn a_design_with_a_loose_import_rebuilds_unchanged() {
     let dir = temp_dir("loose");
     let path = rig_file(&dir);
-    let sf = solidcraft_io::step_import_feature(&std::fs::read(&path).unwrap(), &path).unwrap();
-    let mut doc = solidcraft_doc::Document::new("Old");
+    let sf = polykrom_io::step_import_feature(&std::fs::read(&path).unwrap(), &path).unwrap();
+    let mut doc = polykrom_doc::Document::new("Old");
     let id = doc.add_feature(sf.kind, Some(&sf.name)).unwrap();
     doc.feature_mut(id).unwrap().body_names = sf.body_names;
     // As a format 21 file (0.12.0) has it.

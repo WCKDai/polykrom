@@ -7,9 +7,9 @@
 
 use crate::ui_kit::{Container, Surface};
 use egui::{Color32, Pos2, Stroke, vec2};
-use solidcraft_engine::Sel;
-use solidcraft_engine::doc::expr::Kind as ValueKind;
-use solidcraft_engine::geom::{Mesh, Vec2, Vec3};
+use polykrom_engine::Sel;
+use polykrom_engine::doc::expr::Kind as ValueKind;
+use polykrom_engine::geom::{Mesh, Vec2, Vec3};
 
 use crate::SolveApp;
 use crate::dialogs::{Dialog, Kind};
@@ -37,9 +37,9 @@ pub fn anchor(app: &SolveApp, d: &Dialog) -> Option<(Vec3, Option<Vec3>)> {
                     })
                     .map(|p| p.region.clone())
                     .collect();
-                let regions = solidcraft_engine::sketch::merge_regions(&regions);
+                let regions = polykrom_engine::sketch::merge_regions(&regions);
                 let points: Vec<_> = regions.iter().flat_map(|r| r.outer.polyline(1e-2)).collect();
-                points.iter().fold(solidcraft_engine::geom::Vec2::default(), |sum, p| sum + *p) * (1.0 / points.len().max(1) as f64)
+                points.iter().fold(polykrom_engine::geom::Vec2::default(), |sum, p| sum + *p) * (1.0 / points.len().max(1) as f64)
             } else {
                 p.region.interior_point()
             };
@@ -78,9 +78,8 @@ pub fn anchor(app: &SolveApp, d: &Dialog) -> Option<(Vec3, Option<Vec3>)> {
         }
         Sel::Body { name } => (st.body(name)?.mesh().bounds().center(), None),
         Sel::Plane { name } => {
-            let pl = solidcraft_engine::geom::Plane::named(name).or_else(|| {
-                solidcraft_engine::view::construction_planes(&app.session).into_iter().find(|(_, n, _)| n == name).map(|(_, _, pl)| pl)
-            })?;
+            let pl = polykrom_engine::geom::Plane::named(name)
+                .or_else(|| polykrom_engine::view::construction_planes(&app.session).into_iter().find(|(_, n, _)| n == name).map(|(_, _, pl)| pl))?;
             (pl.origin, Some(pl.normal()))
         }
         _ => return None,
@@ -88,14 +87,14 @@ pub fn anchor(app: &SolveApp, d: &Dialog) -> Option<(Vec3, Option<Vec3>)> {
     Some(match &d.kind {
         Kind::Extrude { start, .. } => {
             let n = normal?;
-            let plane = solidcraft_engine::geom::Plane::from_normal(at, n)?;
+            let plane = polykrom_engine::geom::Plane::from_normal(at, n)?;
             let from = reference_height(app, d, "From Object", &plane, at).unwrap_or(0.0);
             let offset = if start.trim().is_empty() { 0.0 } else { app.session.doc.eval(start, ValueKind::Length).ok()? };
             (at + n * (from + offset), Some(n))
         }
         // A hole on a curved face drills against the face's normal where it was picked.
         Kind::Hole { .. } if matches!(first, Sel::Face { .. }) => {
-            (at, normal.or_else(|| solidcraft_engine::doc::hole_direction_at(&st, at).map(|d| -d)))
+            (at, normal.or_else(|| polykrom_engine::doc::hole_direction_at(&st, at).map(|d| -d)))
         }
         // Holes at sketch points go into the part the sketch touches (or away, flipped): the
         // arrow shows which way.
@@ -113,7 +112,7 @@ pub fn anchor(app: &SolveApp, d: &Dialog) -> Option<(Vec3, Option<Vec3>)> {
                 }
             }
             let flip = d.extra.get("flip").and_then(serde_json::Value::as_bool).unwrap_or(false);
-            let dir = by_sketch.first().and_then(|(sk, ids)| solidcraft_engine::doc::sketch_hole_direction(&st, *sk, ids, flip));
+            let dir = by_sketch.first().and_then(|(sk, ids)| polykrom_engine::doc::sketch_hole_direction(&st, *sk, ids, flip));
             (at, normal.or(dir.map(|d| -d)))
         }
         Kind::Section { .. } | Kind::OffsetPlane { .. } | Kind::OffsetFaces { .. } => (at, normal),
@@ -183,23 +182,23 @@ fn poly_mid(poly: &[Vec2]) -> Option<(Vec2, Vec2)> {
     last
 }
 
-pub(crate) fn profile_plane(app: &SolveApp, sketch: u64) -> Option<solidcraft_engine::geom::Plane> {
+pub(crate) fn profile_plane(app: &SolveApp, sketch: u64) -> Option<polykrom_engine::geom::Plane> {
     let component = app.session.doc.feature(sketch)?.component;
     let state = app.session.model.state();
     let plane = state.sketch(sketch)?.plane;
     let frame = crate::dialogs::feature_frame(&app.session, component);
-    solidcraft_engine::geom::Plane::new(
-        solidcraft_engine::doc::apply_point(&frame, plane.origin),
-        solidcraft_engine::doc::apply_vector(&frame, plane.x),
-        solidcraft_engine::doc::apply_vector(&frame, plane.y),
+    polykrom_engine::geom::Plane::new(
+        polykrom_engine::doc::apply_point(&frame, plane.origin),
+        polykrom_engine::doc::apply_vector(&frame, plane.x),
+        polykrom_engine::doc::apply_vector(&frame, plane.y),
     )
 }
 
-fn reference_height(app: &SolveApp, d: &Dialog, label: &str, plane: &solidcraft_engine::geom::Plane, centre: Vec3) -> Option<f64> {
+fn reference_height(app: &SolveApp, d: &Dialog, label: &str, plane: &polykrom_engine::geom::Plane, centre: Vec3) -> Option<f64> {
     let point = crate::dialogs::object_point(&d.inputs, label)?;
     let p = point.as_array()?;
     let p = Vec3::new(p.first()?.as_f64()?, p.get(1)?.as_f64()?, p.get(2)?.as_f64()?);
-    Some(solidcraft_engine::doc::object_height(&app.session.world_state(), plane, centre, p))
+    Some(polykrom_engine::doc::object_height(&app.session.world_state(), plane, centre, p))
 }
 
 /// The two faces at an edge, near `p`: for each, the normal and centroid of its triangle nearest
@@ -392,7 +391,7 @@ fn offset_plane_quad(proj: &Proj, c: Vec3, n: Vec3, h: f64) -> Option<Vec<Pos2>>
 fn draw(app: &SolveApp, ui: &mut egui::Ui, painter: &egui::Painter, proj: &Proj, d: &mut Dialog, base: Vec3, bs: Pos2, dir: Option<Vec3>) {
     let t = Tokens::get();
     let to_span = dir.and_then(|n| {
-        let plane = solidcraft_engine::geom::Plane::from_normal(base, n)?;
+        let plane = polykrom_engine::geom::Plane::from_normal(base, n)?;
         reference_height(app, d, "To Object", &plane, base)
     });
     let all_span = if matches!(d.kind, Kind::Extrude { all: true, .. }) {
@@ -400,7 +399,7 @@ fn draw(app: &SolveApp, ui: &mut egui::Ui, painter: &egui::Painter, proj: &Proj,
             let state = app.session.world_state();
             let plane = match d.inputs.first()?.items.first()? {
                 Sel::Profile { sketch, .. } => profile_plane(app, *sketch)?,
-                _ => solidcraft_engine::geom::Plane::from_normal(base, n)?,
+                _ => polykrom_engine::geom::Plane::from_normal(base, n)?,
             };
             let targets: Vec<String> = d
                 .extra
@@ -408,7 +407,7 @@ fn draw(app: &SolveApp, ui: &mut egui::Ui, painter: &egui::Painter, proj: &Proj,
                 .and_then(serde_json::Value::as_array)
                 .map(|a| a.iter().filter_map(|v| v.as_str().map(str::to_owned)).collect())
                 .unwrap_or_default();
-            solidcraft_engine::doc::through_all_distance(&state, &plane, &targets).ok()
+            polykrom_engine::doc::through_all_distance(&state, &plane, &targets).ok()
         })
     } else {
         None
@@ -429,8 +428,8 @@ fn draw(app: &SolveApp, ui: &mut egui::Ui, painter: &egui::Painter, proj: &Proj,
         d.extra
             .get("convention")
             .cloned()
-            .and_then(|v| serde_json::from_value::<solidcraft_engine::doc::ExtrudeConvention>(v).ok())
-            .unwrap_or(solidcraft_engine::doc::ExtrudeConvention::TotalDistance)
+            .and_then(|v| serde_json::from_value::<polykrom_engine::doc::ExtrudeConvention>(v).ok())
+            .unwrap_or(polykrom_engine::doc::ExtrudeConvention::TotalDistance)
             .symmetric_half_distance(1.0)
     } else {
         1.0
@@ -504,7 +503,7 @@ fn draw(app: &SolveApp, ui: &mut egui::Ui, painter: &egui::Painter, proj: &Proj,
             let ang = app.session.doc.eval(taper, ValueKind::Angle).ok().filter(|v| v.is_finite()).unwrap_or(0.0);
             let before = taper.clone();
             let st = app.session.world_state();
-            let regions: Vec<&solidcraft_engine::geom::Region2> = d
+            let regions: Vec<&polykrom_engine::geom::Region2> = d
                 .inputs
                 .first()
                 .map(|i| &i.items[..])
@@ -718,8 +717,8 @@ fn drag_arrow(
 /// only: the first edit makes the fillet a spline fillet starting from that edge's taper, which
 /// would put the same radius on every other edge. Whether the handles are shown.
 fn radius_spline_handles(app: &SolveApp, ui: &mut egui::Ui, painter: &egui::Painter, proj: &Proj, d: &mut Dialog) -> bool {
+    use polykrom_engine::doc::kernel::RadiusSpline;
     use serde_json::{Value, json};
-    use solidcraft_engine::doc::kernel::RadiusSpline;
     enum Edit {
         Set(usize, f64),
         Insert(f64),
@@ -755,7 +754,7 @@ fn radius_spline_handles(app: &SolveApp, ui: &mut egui::Ui, painter: &egui::Pain
         let Some(radii) = std::iter::once(radius.as_str()).chain(exprs.iter().map(String::as_str)).map(eval).collect::<Option<Vec<f64>>>() else {
             return false;
         };
-        let spline = solidcraft_engine::doc::FilletStyle::spline(&knots, radii);
+        let spline = polykrom_engine::doc::FilletStyle::spline(&knots, radii);
         let swap = d.extra.get("swap_ends").and_then(Value::as_bool).unwrap_or(false);
         let start = if swap { b0 } else { a0 };
         // Each edge runs from its end nearest the start, as the fillet builds it.
@@ -1010,7 +1009,7 @@ fn measure_components(app: &SolveApp, painter: &egui::Painter, proj: &Proj, a: V
 /// extruded `height` (#1602): going in, the sides close the material where they have moved its
 /// inradius; going out, they close the smallest hole. Each stops just short, so the drag ends at
 /// the largest taper that builds instead of one that fails. A typed angle is not limited.
-pub(crate) fn taper_limits(regions: &[&solidcraft_engine::geom::Region2], height: f64) -> (f64, f64) {
+pub(crate) fn taper_limits(regions: &[&polykrom_engine::geom::Region2], height: f64) -> (f64, f64) {
     const MAX: f64 = 89.0;
     if !(height > 1e-9) || regions.is_empty() {
         return (-MAX, MAX);
@@ -1084,7 +1083,7 @@ pub(crate) fn revolve_axis(app: &SolveApp, d: &Dialog) -> Option<(Vec3, Vec3)> {
                 "Y" => Vec3::Y,
                 _ => Vec3::Z,
             };
-            return Some((solidcraft_engine::doc::apply_point(&frame, Vec3::ZERO), solidcraft_engine::doc::apply_vector(&frame, dir)));
+            return Some((polykrom_engine::doc::apply_point(&frame, Vec3::ZERO), polykrom_engine::doc::apply_vector(&frame, dir)));
         }
         if let Sel::Axis { name } = selected
             && matches!(name.as_str(), "x" | "y")
@@ -1117,7 +1116,7 @@ fn draw_revolve(
     focus: bool,
 ) {
     let to_mode = d.inputs.iter().any(|input| input.label == "To Object");
-    let extent = revolve_display_extent(app, d, axis).unwrap_or(solidcraft_engine::doc::RevolveExtent {
+    let extent = revolve_display_extent(app, d, axis).unwrap_or(polykrom_engine::doc::RevolveExtent {
         start: 0.0,
         sweep: f64::NAN,
         rotation_axis: axis.1,
@@ -1134,8 +1133,8 @@ fn draw_revolve(
             let e1 = (base - centre) / radius;
             let e2 = extent.rotation_axis.cross(e1);
             let handed = match revolve_convention(d) {
-                solidcraft_engine::doc::RevolveConvention::LegacyAxisStart => -direction.dot(extent.rotation_axis),
-                solidcraft_engine::doc::RevolveConvention::SketchNormal => 1.0,
+                polykrom_engine::doc::RevolveConvention::LegacyAxisStart => -direction.dot(extent.rotation_axis),
+                polykrom_engine::doc::RevolveConvention::SketchNormal => 1.0,
             };
             let at = |angle: f64| centre + (e1 * angle.cos() + e2 * angle.sin()) * radius;
             let points: Vec<_> = (0..=48).filter_map(|i| proj.to_screen(at(extent.display_start + extent.sweep * i as f64 / 48.0))).collect();
@@ -1244,14 +1243,14 @@ fn draw_revolve(
     }
 }
 
-fn revolve_convention(d: &Dialog) -> solidcraft_engine::doc::RevolveConvention {
+fn revolve_convention(d: &Dialog) -> polykrom_engine::doc::RevolveConvention {
     d.extra
         .get("convention")
         .and_then(|value| serde_json::from_value(value.clone()).ok())
-        .unwrap_or(solidcraft_engine::doc::RevolveConvention::SketchNormal)
+        .unwrap_or(polykrom_engine::doc::RevolveConvention::SketchNormal)
 }
 
-fn revolve_display_extent(app: &SolveApp, d: &Dialog, axis: (Vec3, Vec3)) -> Option<solidcraft_engine::doc::RevolveExtent> {
+fn revolve_display_extent(app: &SolveApp, d: &Dialog, axis: (Vec3, Vec3)) -> Option<polykrom_engine::doc::RevolveExtent> {
     let Sel::Profile { sketch, .. } = d.inputs.first()?.items.first()? else { return None };
     let state = app.session.world_state();
     let ss = state.sketch(*sketch)?;
@@ -1265,7 +1264,7 @@ fn revolve_display_extent(app: &SolveApp, d: &Dialog, axis: (Vec3, Vec3)) -> Opt
             _ => None,
         })
         .collect();
-    let regions = solidcraft_engine::sketch::merge_regions(&regions);
+    let regions = polykrom_engine::sketch::merge_regions(&regions);
     let plane = profile_plane(app, *sketch)?;
     let to_mode = d.inputs.iter().any(|input| input.label == "To Object");
     let to = if to_mode {
@@ -1282,7 +1281,7 @@ fn revolve_display_extent(app: &SolveApp, d: &Dialog, axis: (Vec3, Vec3)) -> Opt
         let other = d.extra.get("angle2").map(|value| app.session.doc.eval(value.as_str().unwrap_or_default(), ValueKind::Angle)).transpose().ok()?;
         (angle, other)
     };
-    solidcraft_engine::doc::revolve_extent_with_convention(
+    polykrom_engine::doc::revolve_extent_with_convention(
         &state,
         &plane,
         &regions,
@@ -1421,7 +1420,7 @@ mod tests {
         let mut worst = f32::NEG_INFINITY;
         for n in [Vec3::X, Vec3::Y, Vec3::Z] {
             for dir in crate::viewport::orbit_directions() {
-                let cam = solidcraft_engine::render::Camera::default().looking_from(dir);
+                let cam = polykrom_engine::render::Camera::default().looking_from(dir);
                 let proj = Proj { cam, vp: cam.view_proj(4.0 / 3.0, 100.0), rect };
                 let h = cam.half_height() * 0.25;
                 let (Some(q), Some(c), Some(side)) =
@@ -1453,7 +1452,7 @@ mod tests {
 #[cfg(test)]
 mod taper_limit_tests {
     use super::taper_limits;
-    use solidcraft_engine::geom::{Loop2, Region2, Vec2};
+    use polykrom_engine::geom::{Loop2, Region2, Vec2};
 
     /// #1602: a drag stops just short of the taper that closes the profile, either way.
     #[test]

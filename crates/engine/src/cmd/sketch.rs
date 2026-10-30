@@ -1,9 +1,9 @@
 //! Sketch commands: create/edit/finish sketches, draw curves, constraints and dimensions.
 
+use polykrom_doc::{FeatureKind, PlaneRef, expr::Kind};
+use polykrom_sketch::{Analysis, Budget, ConstraintKind, CurveKind, Hold, PointExprs, Sketch, SolveReport, solve, solve_with};
 use serde_json::{Value, json};
-use solidcraft_doc::{FeatureKind, PlaneRef, expr::Kind};
 use solidcraft_geom::{Plane, Vec2, Vec3};
-use solidcraft_sketch::{Analysis, Budget, ConstraintKind, CurveKind, Hold, PointExprs, Sketch, SolveReport, solve, solve_with};
 
 use super::{CommandSpec, in_sketch};
 use crate::params::{bad, bool_, expr, num, req_vec2, str_, string_list, vec2, vec3};
@@ -240,7 +240,7 @@ pub(super) fn edit<T>(
     p: &Value,
     cmd: &str,
     strict: bool,
-    f: impl FnOnce(&mut Sketch, &mut solidcraft_doc::Document) -> Result<T>,
+    f: impl FnOnce(&mut Sketch, &mut polykrom_doc::Document) -> Result<T>,
 ) -> Result<(T, Value)> {
     let id = target_sketch(s, p, cmd)?;
     let (out, rep) = edit_solved(s, id, strict, Analysis::Freedom, |sk, doc| Ok((f(sk, doc)?, Left::Unsolved)))?;
@@ -283,7 +283,7 @@ pub(super) fn edit_solved<T>(
     id: u64,
     strict: bool,
     analysis: Analysis,
-    f: impl FnOnce(&mut Sketch, &mut solidcraft_doc::Document) -> Result<(T, Left)>,
+    f: impl FnOnce(&mut Sketch, &mut polykrom_doc::Document) -> Result<(T, Left)>,
 ) -> Result<(T, Option<SolveReport>)> {
     let mut doc = (*s.doc).clone();
     let mut sk = doc.sketch(id)?.clone();
@@ -360,7 +360,7 @@ pub(super) fn counted_solve(
 /// Inside an `edit` closure: solve the sketch for the document's parameter values from its
 /// stored solved state, as the edit's own solve does, for commands that work on the current
 /// geometry.
-pub(super) fn solve_current(sk: &mut Sketch, doc: &solidcraft_doc::Document) -> Result<SolveReport> {
+pub(super) fn solve_current(sk: &mut Sketch, doc: &polykrom_doc::Document) -> Result<SolveReport> {
     let stored = sk.driving_values();
     let (values, _) = doc.param_values();
     Ok(doc.solve_sketch_with_analysis(&values, sk, &stored, None, Analysis::Freedom)?)
@@ -372,7 +372,7 @@ pub(super) fn solve_current(sk: &mut Sketch, doc: &solidcraft_doc::Document) -> 
 pub(super) mod solve_counts {
     use std::cell::Cell;
 
-    use solidcraft_sketch::Analysis;
+    use polykrom_sketch::Analysis;
 
     thread_local! {
         static COUNTS: Cell<(usize, usize)> = const { Cell::new((0, 0)) };
@@ -422,7 +422,7 @@ pub(super) fn draw(
     s: &mut Session,
     p: &Value,
     cmd: &str,
-    f: impl FnOnce(&mut Sketch, &mut solidcraft_doc::Document) -> Result<(Vec<String>, Vec<String>)>,
+    f: impl FnOnce(&mut Sketch, &mut polykrom_doc::Document) -> Result<(Vec<String>, Vec<String>)>,
 ) -> Result<((Vec<String>, Vec<String>), Value)> {
     edit(s, p, cmd, false, |sk, doc| {
         let first = sk.points.len();
@@ -454,7 +454,7 @@ impl PArg {
     }
 }
 
-pub(super) fn parg(sk: &mut Sketch, doc: &solidcraft_doc::Document, v: &Value, cmd: &str) -> Result<PArg> {
+pub(super) fn parg(sk: &mut Sketch, doc: &polykrom_doc::Document, v: &Value, cmd: &str) -> Result<PArg> {
     if let Some(p) = vec2(v) {
         return Ok(PArg::At(p));
     }
@@ -479,7 +479,7 @@ pub(super) fn parg(sk: &mut Sketch, doc: &solidcraft_doc::Document, v: &Value, c
     Err(bad(cmd, "a point must be [x, y], a point id like \"l1.end\", or {at, ref}"))
 }
 
-pub(super) fn req_parg(sk: &mut Sketch, doc: &solidcraft_doc::Document, p: &Value, k: &str, cmd: &str) -> Result<PArg> {
+pub(super) fn req_parg(sk: &mut Sketch, doc: &polykrom_doc::Document, p: &Value, k: &str, cmd: &str) -> Result<PArg> {
     parg(sk, doc, p.get(k).ok_or_else(|| bad(cmd, format!("missing `{k}`")))?, cmd)
 }
 
@@ -487,7 +487,7 @@ const POINT_MUST: &str = "a point's coordinates must be numbers or expressions o
 
 /// A point given as `[x, y]` with a coordinate typed as text: where it is now and, when a
 /// coordinate names a parameter, the expressions that place it (none: a plain point).
-pub(super) fn expr_point(doc: &solidcraft_doc::Document, v: &Value, cmd: &str) -> Result<Option<(Vec2, Option<PointExprs>)>> {
+pub(super) fn expr_point(doc: &polykrom_doc::Document, v: &Value, cmd: &str) -> Result<Option<(Vec2, Option<PointExprs>)>> {
     let Some([x, y]) = v.as_array().map(Vec::as_slice) else { return Ok(None) };
     if !x.is_string() && !y.is_string() {
         return Ok(None);
@@ -573,7 +573,7 @@ pub(crate) fn created(before: Option<&Sketch>, after: &Sketch) -> Value {
     let points: Vec<&str> = after.points.iter().map(|x| x.id.as_str()).filter(new).collect();
     let curves: Vec<&str> = after.curves.iter().map(|x| x.id.as_str()).filter(new).collect();
     let (dims, cons): (Vec<_>, Vec<_>) = after.constraints.iter().filter(|c| new(&c.id.as_str())).partition(|c| c.kind.is_dimension());
-    let ids = |v: Vec<&solidcraft_sketch::Constraint>| v.into_iter().map(|c| c.id.clone()).collect::<Vec<_>>();
+    let ids = |v: Vec<&polykrom_sketch::Constraint>| v.into_iter().map(|c| c.id.clone()).collect::<Vec<_>>();
     let mut out = json!({"points": points, "curves": curves, "constraints": ids(cons), "dimensions": ids(dims)});
     let wires: Vec<&str> = after.wires.iter().map(|x| x.id.as_str()).filter(new).collect();
     if !wires.is_empty()
@@ -591,7 +591,7 @@ pub(super) fn result(sk_out: (Vec<String>, Vec<String>), info: Value) -> Value {
 // ---------------------------------------------------------------------------------------------
 // Sketch lifecycle
 
-pub(crate) fn author_path_for_rebind(s: &Session, feature: &solidcraft_doc::Feature, p: &Value, cmd: &str) -> Result<Vec<u64>> {
+pub(crate) fn author_path_for_rebind(s: &Session, feature: &polykrom_doc::Feature, p: &Value, cmd: &str) -> Result<Vec<u64>> {
     let mut saved = None;
     if let FeatureKind::Sketch { plane, .. } = &feature.kind {
         let mut plane = plane;
@@ -629,7 +629,7 @@ pub(crate) fn author_path_for_rebind(s: &Session, feature: &solidcraft_doc::Feat
     if feature.component != 0 && path.is_empty() {
         return Err(bad(cmd, "a component sketch needs an explicit complete author_path"));
     }
-    solidcraft_doc::EmbossFace::component_frame(&s.placed_document(), feature.component, &path)?;
+    polykrom_doc::EmbossFace::component_frame(&s.placed_document(), feature.component, &path)?;
     Ok(path)
 }
 
@@ -766,7 +766,7 @@ fn create_sketch_with_plane(s: &mut Session, p: &Value, plane: PlaneRef, interna
     let attachment = s.doc.feature(id).and_then(|feature| match &feature.kind {
         FeatureKind::Sketch { plane, .. } => Some(if face::anchor(plane).is_some() {
             "exact_face"
-        } else if solidcraft_doc::sheet::plane_sheet_face(plane).is_some() {
+        } else if polykrom_doc::sheet::plane_sheet_face(plane).is_some() {
             "sheet_face"
         } else if internal_body.is_some() {
             "internal_legacy_face"
@@ -794,7 +794,7 @@ fn edit_sketch(s: &mut Session, p: &Value) -> Result<Value> {
         _ => None,
     };
     if let Some(path) = authored_path {
-        solidcraft_doc::EmbossFace::component_frame(&s.placed_document(), component, &path)
+        polykrom_doc::EmbossFace::component_frame(&s.placed_document(), component, &path)
             .map_err(|error| bad("sketch.edit", format!("{error}; explicitly rebind the author placement before editing")))?;
         s.active_component = component;
         s.active_occurrence_path = (!path.is_empty()).then_some(path);
@@ -1524,7 +1524,7 @@ fn constrain(s: &mut Session, p: &Value, cmd: &str, f: impl FnOnce(&mut Sketch) 
         residual = residual_of(sk, &id);
         // A constraint that already holds needs nothing moved (even when both entities are
         // fully determined: it is then redundant, see `redundancy`).
-        let holds = residual.is_some_and(|r| r <= solidcraft_sketch::CONSISTENT);
+        let holds = residual.is_some_and(|r| r <= polykrom_sketch::CONSISTENT);
         if let Some((first, second)) = order.filter(|_| !holds) {
             apply_in_order(sk, &rep, &[first], second, cmd)?;
         }
@@ -1644,7 +1644,7 @@ pub(super) fn apply_in_order(sk: &mut Sketch, rep: &SolveReport, first: &[Ent], 
     const TEMP: &str = "__keep_size";
     for (h, extra) in tries {
         let mut trial = sk.clone();
-        trial.constraints.extend(extra.into_iter().map(|kind| solidcraft_sketch::Constraint {
+        trial.constraints.extend(extra.into_iter().map(|kind| polykrom_sketch::Constraint {
             id: TEMP.into(),
             kind,
             param: None,
@@ -1679,7 +1679,7 @@ pub(super) fn dof_now(sk: &Sketch) -> usize {
 
 /// A constraint just added that removes no degree of freedom (`before` → the edit's `info`) is
 /// redundant or a conflict. Redundant when it held where the sketch was before it was added
-/// (`residual`, see [`solidcraft_sketch::constraint_residual`]): what it asks for is already
+/// (`residual`, see [`polykrom_sketch::constraint_residual`]): what it asks for is already
 /// implied by other constraints, and the solver satisfies it with them. Returns the
 /// constraints that determine it (as "id (Name)"), or `None` when it removes a degree of
 /// freedom. A conflict is refused; the caller's edit is rolled back by returning the error.
@@ -1697,7 +1697,7 @@ pub(super) fn redundancy(
     if a < b {
         return Ok(None);
     }
-    if !residual.is_some_and(|r| r <= solidcraft_sketch::CONSISTENT) {
+    if !residual.is_some_and(|r| r <= polykrom_sketch::CONSISTENT) {
         return Err(bad(cmd, "that would over-constrain the sketch (it conflicts with what the other constraints already determine)"));
     }
     Ok(Some(determined_by(s, p, cmd, cid)))
@@ -1708,7 +1708,7 @@ pub(super) fn redundancy(
 fn determined_by(s: &Session, p: &Value, cmd: &str, cid: &str) -> Vec<String> {
     let Some(sk) = target_sketch(s, p, cmd).ok().and_then(|id| s.doc.sketch(id).ok()) else { return Vec::new() };
     let Some(ci) = sk.constraints.iter().position(|c| c.id == cid) else { return Vec::new() };
-    solidcraft_sketch::determined_by(sk, ci)
+    polykrom_sketch::determined_by(sk, ci)
         .into_iter()
         .filter_map(|k| sk.constraints.get(k))
         .map(|c| format!("{} ({})", c.id, c.kind.name()))
@@ -1745,9 +1745,9 @@ pub(super) fn constraint_result(p: &Value, cmd: &str, id: String, info: Value, b
 }
 
 /// The residual of the constraint `id` where the sketch is now (see
-/// [`solidcraft_sketch::constraint_residual`]).
+/// [`polykrom_sketch::constraint_residual`]).
 pub(super) fn residual_of(sk: &Sketch, id: &str) -> Option<f64> {
-    sk.constraints.iter().position(|c| c.id == id).and_then(|ci| solidcraft_sketch::constraint_residual(sk, ci))
+    sk.constraints.iter().position(|c| c.id == id).and_then(|ci| polykrom_sketch::constraint_residual(sk, ci))
 }
 
 /// The point already tied to the middle of line `l`, including one created by drawing.
@@ -2282,7 +2282,7 @@ fn dimension(s: &mut Session, p: &Value) -> Result<Value> {
     let text_at = p.get("text_at").and_then(vec2);
     let driven = bool_(p, "driven").unwrap_or(false);
     // `name = expression` defines the user parameter `name` and dimensions with it (#2916).
-    let (defines, value) = match value.as_ref().and_then(|v| solidcraft_doc::expr::definition(v.as_str())) {
+    let (defines, value) = match value.as_ref().and_then(|v| polykrom_doc::expr::definition(v.as_str())) {
         Some((name, rhs)) => {
             if rhs.is_empty() {
                 return Err(bad(cmd, format!("value: `{name} =` needs a value after the `=`")));
@@ -2290,7 +2290,7 @@ fn dimension(s: &mut Session, p: &Value) -> Result<Value> {
             if driven {
                 return Err(bad(cmd, format!("value: a driven dimension has no value, so it cannot define `{name}`")));
             }
-            (Some((name.to_string(), rhs.to_string())), Some(solidcraft_doc::expr::Expr::new(name)))
+            (Some((name.to_string(), rhs.to_string())), Some(polykrom_doc::expr::Expr::new(name)))
         }
         None => (None, value),
     };
@@ -2475,14 +2475,14 @@ fn dimension(s: &mut Session, p: &Value) -> Result<Value> {
         if let Some((name, rhs)) = &defines {
             // The new user parameter reads a bare number as the dimension would (the design's
             // unit for a length, degrees for an angle), and carries that unit.
-            if let Some(problem) = solidcraft_doc::Document::param_name_problem(name) {
+            if let Some(problem) = polykrom_doc::Document::param_name_problem(name) {
                 return Err(bad(cmd, format!("value: {problem}")));
             }
             if doc.param(name).is_some() {
                 return Err(bad(cmd, format!("value: there is already a parameter `{name}`: type `{name}` to use it, or change it in Parameters")));
             }
             let rhs = doc.with_design_unit(rhs, kind);
-            let unit = if is_angle { "deg".to_string() } else { solidcraft_doc::expr::length_unit_or_mm(&doc.units).to_string() };
+            let unit = if is_angle { "deg".to_string() } else { polykrom_doc::expr::length_unit_or_mm(&doc.units).to_string() };
             doc.add_user_param(name, &rhs, Some(&unit), None).map_err(|e| bad(cmd, format!("value: {e}")))?;
         }
         let e = value.as_ref().map(|e| doc.with_design_unit(e, kind)).unwrap_or(default_expr);
@@ -2566,7 +2566,7 @@ fn measured(is_angle: bool, v: f64) -> (f64, &'static str) {
 fn solved_measure(s: &Session, p: &Value, cmd: &str) -> Option<(f64, &'static str)> {
     let sk = s.doc.sketch(target_sketch(s, p, cmd).ok()?).ok()?;
     let k = &sk.constraints.last()?.kind;
-    Some(measured(k.is_angle(), solidcraft_sketch::measure_dimension(sk, k)?))
+    Some(measured(k.is_angle(), polykrom_sketch::measure_dimension(sk, k)?))
 }
 
 /// The type of a dimension between `a` and `b` (two points or a line's ends). `auto` takes it
@@ -2616,8 +2616,8 @@ fn midpoint_orientation(ty: &str, a: Vec2, b: Vec2, text_at: Option<Vec2>) -> &s
 /// dimension so it follows the geometry.
 fn place_text(sk: &mut Sketch, id: &str, at: Option<Vec2>) {
     let Some(i) = sk.constraints.iter().position(|c| c.id == id) else { return };
-    let text = match (at, sk.constraints.get(i).and_then(|c| solidcraft_sketch::dim_frame(sk, &c.kind))) {
-        (Some(at), Some(f)) => Some(solidcraft_sketch::encode_text(&f, at)),
+    let text = match (at, sk.constraints.get(i).and_then(|c| polykrom_sketch::dim_frame(sk, &c.kind))) {
+        (Some(at), Some(f)) => Some(polykrom_sketch::encode_text(&f, at)),
         _ => None,
     };
     if let Some(c) = sk.constraints.get_mut(i) {
@@ -2807,7 +2807,7 @@ fn sketch_delete(s: &mut Session, p: &Value) -> Result<Value> {
                 && topology
                     .roles
                     .iter()
-                    .any(|role| !role.retired && role.kind == solidcraft_sketch::OffsetRoleKind::Arc && !removed.contains(role.output.as_str()))
+                    .any(|role| !role.retired && role.kind == polykrom_sketch::OffsetRoleKind::Arc && !removed.contains(role.output.as_str()))
             {
                 return Err(bad(cmd, "break the offset association before deleting only part of its curved boundary"));
             }
@@ -2900,7 +2900,7 @@ fn drag_frame(s: &mut Session, p: &Value, live: bool) -> Result<(Value, Option<c
     // average displacement of their moving points, as before.
     let sk = s.doc.sketch(id)?;
     let at = d.at(sk, from);
-    let rep = rep.or_else(|| last.map(|ss| SolveReport { status: solidcraft_sketch::SolveStatus::Solved, failing: Vec::new(), ..ss.report.clone() }));
+    let rep = rep.or_else(|| last.map(|ss| SolveReport { status: polykrom_sketch::SolveStatus::Solved, failing: Vec::new(), ..ss.report.clone() }));
     let out = json!({"sketch": rep.as_ref().map(report_json), "reached": d.reached, "at": [at.x, at.y], "retry": d.retry});
     Ok((out, rep.filter(|_| live).map(|report| crate::LiveEdit { sketch: id, report })))
 }
@@ -2937,7 +2937,7 @@ fn drag_end(s: &mut Session, p: &Value) -> Result<Value> {
 }
 
 /// The Sketch Palette options of a sketch, by their palette names (true = shown / on).
-fn options_json(v: &solidcraft_sketch::SketchView) -> Value {
+fn options_json(v: &polykrom_sketch::SketchView) -> Value {
     json!({
         "show_profile": !v.hide_profile,
         "show_points": !v.hide_points,

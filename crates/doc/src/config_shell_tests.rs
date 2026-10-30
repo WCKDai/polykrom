@@ -88,9 +88,9 @@ fn shell_planar_anchor_rebuild_cold_geometry_and_missing_source_errors() {
     assert!(super::super::styles::shell_plane_family(outer_matches.iter().map(|(_, plane)| *plane)));
     let outer_plane = body.body.face_plane(face_index(body, false)).unwrap();
     let outer_anchor = doc.capture_face_anchor(body, face_index(body, false), &outer_plane, &[], 0, &[]).unwrap();
-    let projected = crate::project::resolve_anchored_face(&doc, &state, &outer_plane, solidcraft_sketch::LinkKind::Project, &outer_anchor).unwrap();
-    let mut linked = solidcraft_sketch::Sketch::new();
-    let link = linked.add_link(solidcraft_sketch::LinkKind::Project, projected.source, &projected.geom).unwrap();
+    let projected = crate::project::resolve_anchored_face(&doc, &state, &outer_plane, polykrom_sketch::LinkKind::Project, &outer_anchor).unwrap();
+    let mut linked = polykrom_sketch::Sketch::new();
+    let link = linked.add_link(polykrom_sketch::LinkKind::Project, projected.source, &projected.geom).unwrap();
     assert!(!linked.update_link(&link, &projected.geom).unwrap());
     let inner_index = face_index(body, true);
     let inner = doc.strong_face_target(body, inner_index, Vec3::default()).unwrap();
@@ -100,7 +100,7 @@ fn shell_planar_anchor_rebuild_cold_geometry_and_missing_source_errors() {
     let picked = body.body.face_plane(inner_index).unwrap();
     assert!((picked.origin.x - 18.).abs() < 1e-8);
     let anchor = doc.capture_face_anchor(body, inner_index, &picked, &[], 0, &[]).unwrap();
-    let mut sketch = solidcraft_sketch::Sketch::new();
+    let mut sketch = polykrom_sketch::Sketch::new();
     let points: Vec<_> =
         [(2., 2.), (4., 2.), (4., 4.), (2., 4.)].into_iter().map(|(x, y)| sketch.add_point(Vec2::new(x, y), None).unwrap()).collect();
     for edge in 0..4 {
@@ -141,7 +141,7 @@ fn shell_planar_anchor_rebuild_cold_geometry_and_missing_source_errors() {
     assert!((doc.resolve_face_anchor(&outer_anchor, 0, &changed).unwrap().origin.x - 30.).abs() < 1e-8);
     let changed_outer_plane = doc.resolve_face_anchor(&outer_anchor, 0, &changed).unwrap();
     let refreshed =
-        crate::project::resolve_anchored_face(&doc, &changed, &changed_outer_plane, solidcraft_sketch::LinkKind::Project, &outer_anchor).unwrap();
+        crate::project::resolve_anchored_face(&doc, &changed, &changed_outer_plane, polykrom_sketch::LinkKind::Project, &outer_anchor).unwrap();
     assert!(!linked.update_link(&link, &refreshed.geom).unwrap(), "same exterior boundary must retain projected IDs");
     assert!((after.min.x - before.min.x - 9.).abs() < 1e-8, "{before:?} -> {after:?}");
     assert!((after.max.x - before.max.x - 9.).abs() < 1e-8, "{before:?} -> {after:?}");
@@ -212,14 +212,14 @@ fn regularized_shell_keeps_legacy_and_explicit_single_face_projections_closed() 
                 .find_map(|(tri, face)| (*face as usize == index).then(|| mesh.tri(tri)).flatten())
                 .map(|[a, b, c]| (a + b + c) / 3.)
                 .unwrap();
-            let source = solidcraft_sketch::LinkSource::Face { body: "Case".into(), at: point };
+            let source = polykrom_sketch::LinkSource::Face { body: "Case".into(), at: point };
             let (values, _) = doc.param_values();
-            let legacy = crate::project::resolve(&doc, &values, &state, &plane, solidcraft_sketch::LinkKind::Project, &source).unwrap();
-            let explicit = crate::project::resolve_face_indices(&state, &plane, solidcraft_sketch::LinkKind::Project, "Case", &[index]).unwrap();
+            let legacy = crate::project::resolve(&doc, &values, &state, &plane, polykrom_sketch::LinkKind::Project, &source).unwrap();
+            let explicit = crate::project::resolve_face_indices(&state, &plane, polykrom_sketch::LinkKind::Project, "Case", &[index]).unwrap();
             assert_eq!(legacy.geom, explicit.geom);
             assert_eq!(explicit.geom.len(), 4, "raw planar piece keeps all four edges");
-            let mut sketch = solidcraft_sketch::Sketch::new();
-            let link = sketch.add_link(solidcraft_sketch::LinkKind::Project, source, &legacy.geom).unwrap();
+            let mut sketch = polykrom_sketch::Sketch::new();
+            let link = sketch.add_link(polykrom_sketch::LinkKind::Project, source, &legacy.geom).unwrap();
             sketch.links[0].face_name = Some(crate::naming::face_names(body)[index].clone());
             let warnings = crate::project::refresh_links(&doc, &values, &state, &plane, &mut sketch);
             assert!(warnings.is_empty(), "{warnings:?}");
@@ -264,13 +264,13 @@ fn saved_former_strip_projection_reports_lost_without_expanding_healthy_material
     assert_eq!(crate::naming::parent_piece(&captured), Some(stem.as_str()), "actual strip capture records a piece name");
     // What the builds before format 14 saved for that piece: its number by centroid order.
     let former = format!("{stem}#1");
-    let mut sketch = solidcraft_sketch::Sketch::new();
+    let mut sketch = polykrom_sketch::Sketch::new();
     let corners = [Vec2::new(0., 0.), Vec2::new(12., 0.), Vec2::new(12., 2.), Vec2::new(0., 2.)];
-    let geometry: Vec<_> = (0..4).map(|i| solidcraft_sketch::LinkGeom::Line(corners[i], corners[(i + 1) % 4])).collect();
+    let geometry: Vec<_> = (0..4).map(|i| polykrom_sketch::LinkGeom::Line(corners[i], corners[(i + 1) % 4])).collect();
     sketch
         .add_link(
-            solidcraft_sketch::LinkKind::Project,
-            solidcraft_sketch::LinkSource::Face { body: "Case".into(), at: Vec3::new(20., 6., 1.) },
+            polykrom_sketch::LinkKind::Project,
+            polykrom_sketch::LinkSource::Face { body: "Case".into(), at: Vec3::new(20., 6., 1.) },
             &geometry,
         )
         .unwrap();
@@ -327,8 +327,8 @@ fn saved_former_strip_projection_reports_lost_without_expanding_healthy_material
 
 #[test]
 fn saved_curved_strip_projection_is_lost_after_exact_wall_coalescence() {
+    use polykrom_sketch::{LinkKind, LinkSource, Sketch};
     use solidcraft_kernel::{FacePaint, Paint};
-    use solidcraft_sketch::{LinkKind, LinkSource, Sketch};
     let mut doc = Document::new("saved curved strip");
     doc.set_param("width", "80", Some("mm"), None).unwrap();
     doc.set_param("wall", "2", Some("mm"), None).unwrap();
@@ -423,7 +423,7 @@ fn saved_curved_strip_projection_is_lost_after_exact_wall_coalescence() {
             let t = ((q - a).dot(direction) / direction.dot(direction)).clamp(0., 1.);
             assert!(q.dist(a + direction * t) < 1e-7, "exact cylindrical quadrant projects to a straight support");
         }
-        geometry.push(solidcraft_sketch::LinkGeom::Line(a, b));
+        geometry.push(polykrom_sketch::LinkGeom::Line(a, b));
     }
     assert_eq!(geometry.len(), 4, "historical curved strip has a complete four-edge rectangular projection");
     let mut sketch = Sketch::new();
@@ -473,8 +473,8 @@ fn saved_curved_strip_projection_is_lost_after_exact_wall_coalescence() {
 
 #[test]
 fn saved_stepped_tab_cut_piece_projection_is_lost_without_expanding_material() {
+    use polykrom_sketch::{LinkKind, LinkSource, Sketch};
     use solidcraft_kernel::{BoolOp, FacePaint, Paint};
-    use solidcraft_sketch::{LinkKind, LinkSource, Sketch};
     let mut doc = Document::new("public stepped tab case");
     doc.set_param("length", "40", Some("mm"), None).unwrap();
     doc.set_param("wall", "2", Some("mm"), None).unwrap();

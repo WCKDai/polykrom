@@ -824,7 +824,7 @@ mod tests {
     #[test]
     fn command_meanings_choose_the_same_accent_on_every_surface() {
         let accent = |name| resolve(name).accent.map(|i| ACCENT_NAMES[i]);
-        for c in solidcraft_engine::command_specs() {
+        for c in polykrom_engine::command_specs() {
             let want = if c.id.starts_with("surface.") {
                 Some("surface")
             } else if c.panel == "CONSTRAINTS" {
@@ -921,7 +921,7 @@ mod tests {
 
     #[test]
     fn command_artwork_resolves_and_construct_methods_are_distinct() {
-        let specs = solidcraft_engine::command_specs();
+        let specs = polykrom_engine::command_specs();
         for command in &specs {
             assert!(!resolve(command.icon).placeholder, "{}: {}", command.id, command.icon);
         }
@@ -947,7 +947,7 @@ mod tests {
             &["sketch.chamfer.equal_distance", "sketch.chamfer.distance_angle", "sketch.chamfer.two_distance"],
         ];
         for commands in families {
-            let icons: std::collections::HashSet<_> = commands.iter().map(|id| solidcraft_engine::find_command(id).unwrap().icon).collect();
+            let icons: std::collections::HashSet<_> = commands.iter().map(|id| polykrom_engine::find_command(id).unwrap().icon).collect();
             assert_eq!(icons.len(), commands.len(), "Sketch modes share an icon: {commands:?}");
             for icon in icons {
                 assert!(!resolve(icon).placeholder, "{icon}");
@@ -958,9 +958,9 @@ mod tests {
     #[test]
     fn contact_actions_have_distinct_icons_from_interference_analysis() {
         let mut icons = std::collections::HashSet::new();
-        let interference = solidcraft_engine::find_command("inspect.interference").unwrap().icon;
+        let interference = polykrom_engine::find_command("inspect.interference").unwrap().icon;
         for id in ["contact.enable_sets", "contact.enable_all", "contact.disable_all", "contact.create"] {
-            let icon = solidcraft_engine::find_command(id).unwrap().icon;
+            let icon = polykrom_engine::find_command(id).unwrap().icon;
             assert_ne!(icon, interference, "{id} is a contact control, not an interference result");
             assert!(icons.insert(icon), "contact controls share an icon: {id}");
             assert!(!resolve(icon).placeholder, "{id}: {icon}");

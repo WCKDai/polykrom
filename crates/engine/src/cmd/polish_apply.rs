@@ -12,8 +12,8 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
+use polykrom_doc::joints::Snap;
 use serde_json::{Map, Value, json};
-use solidcraft_doc::joints::Snap;
 
 use super::CommandSpec;
 use crate::params::{bad, bool_, num};
@@ -553,7 +553,7 @@ fn hold_edges(s: &Session, body: &str, mut params: Value) -> (Value, usize) {
     }
     let points: Vec<Value> = params["edges"].as_array().cloned().unwrap_or_default();
     let at: Vec<solidcraft_geom::Vec3> = points.iter().filter_map(crate::params::vec3).collect();
-    let names = solidcraft_doc::naming::edge_names_at(b, &at);
+    let names = polykrom_doc::naming::edge_names_at(b, &at);
     // The faces and edges the origins name; an edge on such a face changes the face (and its
     // name, which can list its neighbours), so the origin may no longer be found.
     let named: BTreeSet<&str> =
@@ -616,7 +616,7 @@ fn state(s: &mut Session, run: &mut Run, touched: &BTreeSet<String>) -> State {
     let joint_errors = if mine.is_empty() {
         BTreeSet::new()
     } else {
-        solidcraft_doc::joints::solve(&s.doc, &s.model.state()).errors.iter().map(|e| e.0).filter(|id| mine.contains(id)).collect()
+        polykrom_doc::joints::solve(&s.doc, &s.model.state()).errors.iter().map(|e| e.0).filter(|id| mine.contains(id)).collect()
     };
     let clashes = s
         .execute("inspect.interference", &json!({"bodies": around, "method": "mesh"}))

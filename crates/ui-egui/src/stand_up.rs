@@ -16,8 +16,8 @@ use crate::ui_kit;
 /// new design), and the import's component placement from the command's `result`: offer to
 /// stand them up.
 pub fn offer(app: &mut SolveApp, path: &str, before: &[String], result: Option<&serde_json::Value>) {
-    let io = &solidcraft_engine::io::is_step_path;
-    if !(io(path) || solidcraft_engine::io::is_iges_path(path)) || app.preferences.up_axis != "z" {
+    let io = &polykrom_engine::io::is_step_path;
+    if !(io(path) || polykrom_engine::io::is_iges_path(path)) || app.preferences.up_axis != "z" {
         return;
     }
     let text = |k: &str| result.and_then(|r| r.get(k)).and_then(serde_json::Value::as_str);

@@ -46,7 +46,7 @@ fn number(cmd: &str, p: &Value, key: &str, default: f64, range: std::ops::RangeI
 }
 
 /// The two bodies: `a` and `b`, else the two selected bodies, else the design's only two.
-fn pair(s: &Session, st: &solidcraft_doc::ModelState, p: &Value, cmd: &str) -> Result<(String, String)> {
+fn pair(s: &Session, st: &polykrom_doc::ModelState, p: &Value, cmd: &str) -> Result<(String, String)> {
     let given = |k: &str| -> Result<Option<String>> {
         match p.get(k) {
             None | Some(Value::Null) => Ok(None),
@@ -269,12 +269,12 @@ fn faces_to_color(c: &compare::Comparison, r: &compare::Region) -> Vec<(usize, u
 /// Give the faces holding each region the colour of its side (a face holding several takes the
 /// largest one's); returns how many face appearances were set.
 fn color_regions(s: &mut Session, c: &compare::Comparison, names: [&String; 2], colors: [[u8; 3]; 2]) -> Result<usize> {
-    use solidcraft_doc::appearance::{FaceLook, Look};
+    use polykrom_doc::appearance::{FaceLook, Look};
     let st = s.model.state();
     // Where each face of the two bodies is, as the design file names and finds it. A body placed
     // by an occurrence is coloured where it is defined, if at all.
     let found: Vec<_> =
-        names.iter().map(|n| st.body(n).map(|b| (solidcraft_doc::naming::face_spots(b), solidcraft_doc::naming::face_names(b)))).collect();
+        names.iter().map(|n| st.body(n).map(|b| (polykrom_doc::naming::face_spots(b), polykrom_doc::naming::face_names(b)))).collect();
     let mut picks: Vec<(String, Vec3, Option<String>, Look)> = Vec::new();
     // Smallest region first, so the largest one's colour is the one that stays.
     for r in c.regions.iter().rev() {

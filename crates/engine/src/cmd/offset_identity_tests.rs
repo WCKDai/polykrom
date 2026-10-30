@@ -1,6 +1,6 @@
 #![allow(clippy::unwrap_used, clippy::panic)]
+use polykrom_doc::{Document, FeatureKind, ProfileSel};
 use serde_json::{Value, json};
-use solidcraft_doc::{Document, FeatureKind, ProfileSel};
 
 use crate::Session;
 
@@ -47,7 +47,7 @@ fn legacy_offset_capture_persists_reserved_curves_without_a_transient_associatio
     let state = session.model.state();
     let solved = state.sketch(sketch).unwrap();
     assert!(solved.sketch.offsets[0].topology.is_some(), "legacy upgrade belongs only to the evaluated copy");
-    let index = solidcraft_doc::profile_selection_indices(solved, &ProfileSel::Curves { loops: vec![reserved.clone()] }).unwrap()[0];
+    let index = polykrom_doc::profile_selection_indices(solved, &ProfileSel::Curves { loops: vec![reserved.clone()] }).unwrap()[0];
     let extrusion = run(&mut session, "solid.extrude", json!({"sketch":sketch,"profiles":[index],"distance":2,"name":"Legacy inner"}))["feature"]
         .as_u64()
         .unwrap();

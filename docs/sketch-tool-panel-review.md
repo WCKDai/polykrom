@@ -182,24 +182,24 @@ binaries, a native app launch, screenshots or process-management commands.
 
 | Check | Result | Evidence |
 | --- | --- | --- |
-| `cargo run -p solidcraft-cli -- commands` | Passed; registry used for inventory | `/private/tmp/solidcraft-sketch-commands.json` (subsequent CLI registry capture) |
-| `cargo test -p solidcraft-ui-egui --lib sketch_ --no-fail-fast` | 228 passed | `/private/tmp/solidcraft-sketch-tests.log` |
-| `cargo test -p solidcraft-ui-egui --lib dialogs --no-fail-fast` | 191 passed | `/private/tmp/solidcraft-dialog-tests.log` |
-| `cargo test -p solidcraft-ui-egui --lib browser --no-fail-fast` | 39 passed | `/private/tmp/solidcraft-browser-check.log` |
-| `cargo test -p solidcraft-ui-egui --lib frame::tests --no-fail-fast` | 3 passed, including exact title-drag displacement | `/private/tmp/solidcraft-frame-tests-check.log` |
-| `cargo test -p solidcraft-ui-egui --lib apply_off_thread_tests --no-fail-fast` | 4 passed | `/private/tmp/solidcraft-apply_off_thread_tests-final-check.log` |
-| `cargo test -p solidcraft-ui-egui --lib sketch_attachment_ui_tests --no-fail-fast` | 8 passed | `/private/tmp/solidcraft-sketch_attachment_ui_tests-final-check.log` |
-| `cargo test -p solidcraft-ui-egui --lib ui_kit --no-fail-fast` | 22 passed, including gallery, new field interactions and panel guard | `/private/tmp/solidcraft-ui_kit-final-check.log` |
-| `cargo test -p solidcraft-ui-egui --lib font_literals_tests --no-fail-fast` | 2 passed | `/private/tmp/solidcraft-font_literals_tests-final-check.log` |
-| `cargo test -p solidcraft-ui-egui --lib colour_tokens_tests --no-fail-fast` | 5 passed | `/private/tmp/solidcraft-colour_tokens_tests-final-check.log` |
-| `cargo test -p solidcraft-ui-egui --lib i18n --no-fail-fast` | 33 passed | `/private/tmp/solidcraft-i18n-final-check.log` |
-| `cargo test -p solidcraft-ui-egui --lib shell --no-fail-fast` | 16 passed | `/private/tmp/solidcraft-shell-final-check.log` |
+| `cargo run -p polykrom-cli -- commands` | Passed; registry used for inventory | `/private/tmp/solidcraft-sketch-commands.json` (subsequent CLI registry capture) |
+| `cargo test -p polykrom-ui-egui --lib sketch_ --no-fail-fast` | 228 passed | `/private/tmp/solidcraft-sketch-tests.log` |
+| `cargo test -p polykrom-ui-egui --lib dialogs --no-fail-fast` | 191 passed | `/private/tmp/solidcraft-dialog-tests.log` |
+| `cargo test -p polykrom-ui-egui --lib browser --no-fail-fast` | 39 passed | `/private/tmp/solidcraft-browser-check.log` |
+| `cargo test -p polykrom-ui-egui --lib frame::tests --no-fail-fast` | 3 passed, including exact title-drag displacement | `/private/tmp/solidcraft-frame-tests-check.log` |
+| `cargo test -p polykrom-ui-egui --lib apply_off_thread_tests --no-fail-fast` | 4 passed | `/private/tmp/solidcraft-apply_off_thread_tests-final-check.log` |
+| `cargo test -p polykrom-ui-egui --lib sketch_attachment_ui_tests --no-fail-fast` | 8 passed | `/private/tmp/solidcraft-sketch_attachment_ui_tests-final-check.log` |
+| `cargo test -p polykrom-ui-egui --lib ui_kit --no-fail-fast` | 22 passed, including gallery, new field interactions and panel guard | `/private/tmp/solidcraft-ui_kit-final-check.log` |
+| `cargo test -p polykrom-ui-egui --lib font_literals_tests --no-fail-fast` | 2 passed | `/private/tmp/solidcraft-font_literals_tests-final-check.log` |
+| `cargo test -p polykrom-ui-egui --lib colour_tokens_tests --no-fail-fast` | 5 passed | `/private/tmp/solidcraft-colour_tokens_tests-final-check.log` |
+| `cargo test -p polykrom-ui-egui --lib i18n --no-fail-fast` | 33 passed | `/private/tmp/solidcraft-i18n-final-check.log` |
+| `cargo test -p polykrom-ui-egui --lib shell --no-fail-fast` | 16 passed | `/private/tmp/solidcraft-shell-final-check.log` |
 | `cargo fmt` | Passed | No output; subsequent `git diff --check` passed |
-| `cargo clippy -p solidcraft-ui-egui --all-targets -- -D warnings` | Passed | `/private/tmp/solidcraft-clippy.log` |
-| `cargo check -p solidcraft-ui-egui --target wasm32-unknown-unknown` | Passed | `/private/tmp/solidcraft-wasm.log` |
+| `cargo clippy -p polykrom-ui-egui --all-targets -- -D warnings` | Passed | `/private/tmp/solidcraft-clippy.log` |
+| `cargo check -p polykrom-ui-egui --target wasm32-unknown-unknown` | Passed | `/private/tmp/solidcraft-wasm.log` |
 | `cargo xtask assets` | Passed; 387 files attributed | `/private/tmp/solidcraft-assets.log` |
 | `cargo xtask layers` | Passed; 16 crates, no violations | `/private/tmp/solidcraft-layers.log` |
-| `cargo test -p solidcraft-ui-egui --lib` (one full run) | 1252 passed, the 8 reported baseline failures, 1 already-ignored test; **no additional failures** | `/private/tmp/solidcraft-ui-lib-tests.log` |
+| `cargo test -p polykrom-ui-egui --lib` (one full run) | 1252 passed, the 8 reported baseline failures, 1 already-ignored test; **no additional failures** | `/private/tmp/solidcraft-ui-lib-tests.log` |
 
 The full-library command returned 101 solely for the eight baseline failures
 identified in the task. No additional failing tests were found. No test was newly

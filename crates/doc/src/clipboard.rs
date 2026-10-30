@@ -124,13 +124,13 @@ fn remap_plane(p: &mut PlaneRef, ids: &BTreeMap<u64, u64>, bodies: &BTreeMap<Str
 }
 
 pub(crate) fn remap_link(
-    source: &mut solidcraft_sketch::LinkSource,
+    source: &mut polykrom_sketch::LinkSource,
     ids: &BTreeMap<u64, u64>,
     names: &BTreeMap<String, String>,
     bodies: &BTreeMap<String, String>,
     depth: usize,
 ) {
-    use solidcraft_sketch::LinkSource;
+    use polykrom_sketch::LinkSource;
     if depth > 64 {
         return;
     }
@@ -296,11 +296,11 @@ fn checked_plane(p: &PlaneRef, depth: usize) -> crate::Result<()> {
     }
     Ok(())
 }
-fn checked_link(source: &solidcraft_sketch::LinkSource, depth: usize) -> crate::Result<()> {
+fn checked_link(source: &polykrom_sketch::LinkSource, depth: usize) -> crate::Result<()> {
     if depth > 64 {
         return Err(crate::DocError::Invalid("copy link nesting exceeds 64".into()));
     }
-    if let solidcraft_sketch::LinkSource::Intersection { a, b } = source {
+    if let polykrom_sketch::LinkSource::Intersection { a, b } = source {
         checked_link(a, depth + 1)?;
         checked_link(b, depth + 1)?;
     }

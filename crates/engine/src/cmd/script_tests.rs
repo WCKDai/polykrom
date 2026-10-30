@@ -30,7 +30,7 @@ fn volume(s: &mut Session) -> f64 {
     run(s, "inspect.measure", json!({}))["total"]["volume_mm3"].as_f64().unwrap_or(f64::NAN)
 }
 
-fn params(s: &Session) -> Vec<solidcraft_doc::Param> {
+fn params(s: &Session) -> Vec<polykrom_doc::Param> {
     let mut v = s.doc.params.clone();
     v.sort_by(|a, b| a.name.cmp(&b.name));
     v

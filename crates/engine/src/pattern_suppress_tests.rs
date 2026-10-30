@@ -45,11 +45,11 @@ fn enclosure_datums_follow_wall_height_and_board_depth_with_material_proofs() {
     assert!(s.model.results.iter().all(|result| result.error.is_none()));
     for (name, z) in [("PCB standoff", 2.5), ("Lid boss", 2.5), ("Lid lip", 30.), ("Lid screw", 34.)] {
         let feature =
-            s.doc.features.iter().find(|feature| feature.name == name && matches!(feature.kind, solidcraft_doc::FeatureKind::Sketch { .. })).unwrap();
+            s.doc.features.iter().find(|feature| feature.name == name && matches!(feature.kind, polykrom_doc::FeatureKind::Sketch { .. })).unwrap();
         assert!((s.model.state().sketch(feature.id).unwrap().plane.origin.z - z).abs() < 1e-6);
     }
     let usb =
-        s.doc.features.iter().find(|feature| feature.name == "USB" && matches!(feature.kind, solidcraft_doc::FeatureKind::Sketch { .. })).unwrap();
+        s.doc.features.iter().find(|feature| feature.name == "USB" && matches!(feature.kind, polykrom_doc::FeatureKind::Sketch { .. })).unwrap();
     assert!((s.model.state().sketch(usb.id).unwrap().plane.origin.y + 35.5).abs() < 1e-6);
     let assert_material = |session: &Session| {
         let state = session.world_state();
@@ -71,7 +71,7 @@ fn enclosure_datums_follow_wall_height_and_board_depth_with_material_proofs() {
                         .doc
                         .features
                         .iter()
-                        .find(|feature| feature.name == "Lid lip" && matches!(feature.kind, solidcraft_doc::FeatureKind::Sketch { .. }))
+                        .find(|feature| feature.name == "Lid lip" && matches!(feature.kind, polykrom_doc::FeatureKind::Sketch { .. }))
                         .unwrap()
                         .id
                 )
@@ -85,16 +85,16 @@ fn enclosure_datums_follow_wall_height_and_board_depth_with_material_proofs() {
         assert!(lid.contains(solidcraft_geom::Vec3::new(-31.5, -28.5, 32.)));
     };
     assert_material(&s);
-    let reopened = Session::new(solidcraft_doc::Document::from_json(&s.doc.to_json()).unwrap());
+    let reopened = Session::new(polykrom_doc::Document::from_json(&s.doc.to_json()).unwrap());
     assert!(reopened.model.results.iter().all(|result| result.error.is_none()));
     assert_material(&reopened);
 }
 
 #[test]
 fn enclosure_arc_extinction_keeps_a_real_sharp_inner_lip_after_resize_and_reopen() {
-    use solidcraft_doc::FeatureKind;
+    use polykrom_doc::FeatureKind;
+    use polykrom_sketch::CurveKind;
     use solidcraft_geom::{Vec2, Vec3};
-    use solidcraft_sketch::CurveKind;
 
     let mut s = Session::default();
     let script: Value = serde_json::from_str(include_str!("../../../examples/acceptance/sensor_enclosure.json")).unwrap();
@@ -139,7 +139,7 @@ fn enclosure_arc_extinction_keeps_a_real_sharp_inner_lip_after_resize_and_reopen
             }
         }
         assert_eq!(corners.len(), 4);
-        let regions = solidcraft_doc::select_profiles(solved, profiles).unwrap();
+        let regions = polykrom_doc::select_profiles(solved, profiles).unwrap();
         assert_eq!(regions.len(), 1);
         assert!((regions[0].area() - 332.570619298295).abs() < 1e-7, "area {}", regions[0].area());
         let ring = solidcraft_kernel::extrude(&solved.plane, &regions, 0., 2.).unwrap();
@@ -199,7 +199,7 @@ fn enclosure_arc_extinction_keeps_a_real_sharp_inner_lip_after_resize_and_reopen
     };
     check(&s);
     let saved = s.doc.to_json();
-    let reopened = Session::new(solidcraft_doc::Document::from_json(&saved).unwrap());
+    let reopened = Session::new(polykrom_doc::Document::from_json(&saved).unwrap());
     check(&reopened);
     assert_eq!(reopened.doc.to_json(), saved);
 }

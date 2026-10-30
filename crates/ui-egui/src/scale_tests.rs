@@ -78,9 +78,9 @@ fn frame_and_cheap_command_cost_by_body_count() {
 fn frame_cost_of_a_design_file() {
     let Some(path) = std::env::var_os("SOLIDCRAFT_SCALE_DESIGN") else { return };
     let bytes = std::fs::read(&path).unwrap();
-    let doc = solidcraft_engine::io::read_design(&bytes).unwrap();
+    let doc = polykrom_engine::io::read_design(&bytes).unwrap();
     let mut h = Harness::new();
-    h.app.session = solidcraft_engine::Session::new(doc);
+    h.app.session = polykrom_engine::Session::new(doc);
     h.app.session.world_state().warm_meshes(|| true);
     h.frames(3);
     let idle = ms(|| h.frames(5)) / 5.0;

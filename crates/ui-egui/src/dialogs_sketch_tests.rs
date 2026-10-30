@@ -63,7 +63,7 @@ fn form(command: &str, labels: &[&str]) {
         let rect = scenario::rect_of(&format!("dialog:row:{label}")).unwrap_or_else(|| panic!("{command}: missing {label}"));
         assert_eq!(rect.height(), Tokens::get().control_height);
     }
-    let spec = solidcraft_engine::find_command(command).unwrap();
+    let spec = polykrom_engine::find_command(command).unwrap();
     assert!(h.widget(spec.label).is_some(), "header uses command label");
     assert!(!spec.icon.is_empty());
     h.step(&json!({"click":{"handle":"dialog:cancel"}})).unwrap();

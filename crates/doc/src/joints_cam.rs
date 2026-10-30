@@ -470,13 +470,13 @@ fn chain(lines: &[&Vec<Vec3>], pool: &[&Vec<Vec3>], tol: f64) -> Option<Vec<Vec3
 /// on a tie), or with none named the one with the largest outer loop. `None` when no profile
 /// shares at least half of them (most of the cam's outline gone: a neighbouring region sharing a
 /// curve with it is not the cam).
-pub fn sketch_profile<'a>(sk: &'a crate::SolvedSketch, curves: &[String]) -> Option<&'a solidcraft_sketch::Profile> {
+pub fn sketch_profile<'a>(sk: &'a crate::SolvedSketch, curves: &[String]) -> Option<&'a polykrom_sketch::Profile> {
     if curves.len() > MAX_PROFILE_POINTS {
         return None;
     }
     let named: std::collections::BTreeSet<&String> = curves.iter().collect();
-    let shared = |p: &solidcraft_sketch::Profile| p.outer_curves.iter().filter(|c| named.contains(c)).count();
-    let area = |p: &solidcraft_sketch::Profile| p.region.outer.signed_area().abs();
+    let shared = |p: &polykrom_sketch::Profile| p.outer_curves.iter().filter(|c| named.contains(c)).count();
+    let area = |p: &polykrom_sketch::Profile| p.region.outer.signed_area().abs();
     sk.profiles
         .iter()
         .filter(|p| curves.is_empty() || 2 * shared(p) >= curves.len())

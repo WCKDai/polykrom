@@ -295,7 +295,7 @@ mod tests {
     #[test]
     fn every_registered_file_and_doc_command_asks() {
         let mut n = 0;
-        for spec in solidcraft_engine::command_specs() {
+        for spec in polykrom_engine::command_specs() {
             if (spec.id.starts_with("file.") || spec.id.starts_with("doc.")) && !reads_only(spec.id) {
                 n += 1;
                 assert!(matches!(exec(spec.id, json!({})), Verdict::Ask(_)), "{}", spec.id);

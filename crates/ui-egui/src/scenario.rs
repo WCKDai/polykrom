@@ -43,8 +43,8 @@ use std::cell::RefCell;
 use std::path::PathBuf;
 use std::rc::Rc;
 
+use polykrom_engine::Session;
 use serde_json::{Value, json};
-use solidcraft_engine::Session;
 
 use crate::control::{ControlRequest, Outcome, handle};
 use crate::{Services, SolveApp};
@@ -134,7 +134,7 @@ fn with_dir(v: Value, dir: &str) -> Value {
 fn scratch_dir() -> PathBuf {
     use std::sync::atomic::{AtomicUsize, Ordering};
     static N: AtomicUsize = AtomicUsize::new(0);
-    let d = solidcraft_engine::io::vfs::temp_dir().join(format!("solidcraft-scenario-{}-{}", std::process::id(), N.fetch_add(1, Ordering::Relaxed)));
+    let d = polykrom_engine::io::vfs::temp_dir().join(format!("solidcraft-scenario-{}-{}", std::process::id(), N.fetch_add(1, Ordering::Relaxed)));
     let _ = std::fs::create_dir_all(&d);
     d
 }
@@ -155,7 +155,7 @@ pub struct Harness {
     time: f64,
     size: egui::Vec2,
     /// The camera as the last `camera` step left it.
-    cam_mark: Option<solidcraft_engine::render::Camera>,
+    cam_mark: Option<polykrom_engine::render::Camera>,
 }
 
 impl Default for Harness {
@@ -167,7 +167,7 @@ impl Default for Harness {
 impl Drop for Harness {
     /// The scenario's files go with it (kept with SOLIDCRAFT_SCENARIO_KEEP set).
     fn drop(&mut self) {
-        if solidcraft_engine::geom::env::var_os("SCENARIO_KEEP").is_none() {
+        if polykrom_engine::geom::env::var_os("SCENARIO_KEEP").is_none() {
             let _ = std::fs::remove_dir_all(&self.dir);
         }
     }
@@ -391,7 +391,7 @@ impl Harness {
     /// frame may turn the view (its right or back vector) by more than `max_deg`, the last
     /// included, so the move ends without a jump.
     fn view_anim(&mut self, v: &str, max_deg: f64) -> Result<(), String> {
-        let basis = |c: &solidcraft_engine::render::Camera| c.basis();
+        let basis = |c: &polykrom_engine::render::Camera| c.basis();
         let mut prev = basis(&self.app.cam);
         self.app.animate_view(v);
         if self.app.cam_anim.is_none() {
@@ -401,7 +401,7 @@ impl Harness {
         for i in 0..240 {
             self.frame();
             let now = basis(&self.app.cam);
-            let ang = |a: solidcraft_engine::geom::Vec3, b: solidcraft_engine::geom::Vec3| a.dot(b).clamp(-1.0, 1.0).acos().to_degrees();
+            let ang = |a: polykrom_engine::geom::Vec3, b: polykrom_engine::geom::Vec3| a.dot(b).clamp(-1.0, 1.0).acos().to_degrees();
             let d = ang(prev.0, now.0).max(ang(prev.2, now.2));
             if d > worst.0 {
                 worst = (d, i);
@@ -515,13 +515,13 @@ impl Harness {
                 return Ok(());
             } else if let Some(name) = s.get("shot").and_then(Value::as_str) {
                 // With SOLIDCRAFT_SCENARIO_SHOTS set: a render of the model as the camera sees it.
-                if let Ok(dir) = solidcraft_engine::geom::env::var("SCENARIO_SHOTS").ok_or(()) {
+                if let Ok(dir) = polykrom_engine::geom::env::var("SCENARIO_SHOTS").ok_or(()) {
                     // Drawn on the GPU: the headless device, as the CLI draws.
                     #[cfg(not(target_arch = "wasm32"))]
-                    if solidcraft_engine::capture::installed().is_none() {
-                        solidcraft_engine::capture::install(std::sync::Arc::new(|scene, cam, w, h| {
-                            let (rgba, renderer) = solidcraft_gpu::capture::headless_rgba(scene, cam, w, h)?;
-                            Ok(solidcraft_engine::capture::Picture { rgba, renderer })
+                    if polykrom_engine::capture::installed().is_none() {
+                        polykrom_engine::capture::install(std::sync::Arc::new(|scene, cam, w, h| {
+                            let (rgba, renderer) = polykrom_gpu::capture::headless_rgba(scene, cam, w, h)?;
+                            Ok(polykrom_engine::capture::Picture { rgba, renderer })
                         }));
                     }
                     let path = std::path::Path::new(&dir).join(format!("{name}.png"));

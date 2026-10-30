@@ -9,7 +9,7 @@
 
 use std::collections::BTreeMap;
 
-use solidcraft_doc::{Document, IDENTITY, Mat, ModelState, joints, mat_mul};
+use polykrom_doc::{Document, IDENTITY, Mat, ModelState, joints, mat_mul};
 
 use crate::Result;
 use crate::urdf::{self, Inertial, Link, Step, UrdfJoint, UrdfModel, UrdfOptions, attr, num, triple};

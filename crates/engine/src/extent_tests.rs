@@ -59,7 +59,7 @@ fn extrude_to_a_planar_face_boundary_follows_it_after_reload() {
         run(&mut s, "solid.extrude", json!({"to": to, "to_offset": 2, "operation": "new", "body_name": "Post"}));
         let b = body(&mut s, "Post");
         assert!((b["bbox"]["min"][2].as_f64().unwrap() - 18.0).abs() < 1e-6, "{b}");
-        let doc = solidcraft_doc::Document::from_json(&s.doc.to_json()).unwrap();
+        let doc = polykrom_doc::Document::from_json(&s.doc.to_json()).unwrap();
         let mut cold = Session::new(doc);
         for current in [&mut s, &mut cold] {
             run(current, "parameters.change", json!({"name": "step_height", "expression": "15 mm"}));

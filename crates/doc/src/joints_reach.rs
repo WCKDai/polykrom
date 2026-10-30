@@ -5,8 +5,8 @@
 use std::cell::Cell;
 use std::collections::BTreeSet;
 
+use polykrom_sketch::linalg;
 use solidcraft_geom::Vec3;
-use solidcraft_sketch::linalg;
 
 use super::{
     Assembly, Held, MAX_LOOP_VALUES, MAX_LOOP_WORK, MAX_LOOPS, Solution, Tree, Values, apply_links, build, close_within, jacobian, joint_values,

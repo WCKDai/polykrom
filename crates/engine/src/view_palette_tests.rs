@@ -2,9 +2,9 @@
 //! while `polykrom-cli snapshot`, MCP screenshots and thumbnails keep [`Palette::DEFAULT`].
 
 use super::*;
+use polykrom_sketch::{LinkGeom, LinkKind, LinkSource};
 use serde_json::json;
 use solidcraft_geom::Vec2;
-use solidcraft_sketch::{LinkGeom, LinkKind, LinkSource};
 
 /// No colour here is one of [`colors`] or an appearance below, and each field has its own.
 const MARK: Palette = Palette {
@@ -24,7 +24,7 @@ const MARK: Palette = Palette {
     sketch_centerline: Rgb(43, 44, 45),
     axes: [Rgb(46, 47, 48), Rgb(49, 50, 51), Rgb(52, 53, 54)],
     cap: Rgb(55, 56, 57),
-    analysis: solidcraft_render::AnalysisColors {
+    analysis: polykrom_render::AnalysisColors {
         draft: [[0.1, 0.2, 0.3], [0.4, 0.5, 0.6], [0.7, 0.8, 0.9]],
         access: [[0.11, 0.12, 0.13], [0.14, 0.15, 0.16]],
         curvature: [[0.17, 0.18, 0.19], [0.21, 0.22, 0.23], [0.24, 0.25, 0.26]],
@@ -55,7 +55,7 @@ fn the_default_palette_is_the_colour_table() {
         (colors::SKETCH_PROJECTED, colors::SKETCH_LOST, colors::SKETCH_CONSTRUCTION, colors::SKETCH_CENTERLINE)
     );
     assert_eq!((p.axes, p.cap), ([colors::AXIS_X, colors::AXIS_Y, colors::AXIS_Z], colors::SECTION_CAP));
-    assert_eq!(p.analysis, solidcraft_render::AnalysisColors::DEFAULT);
+    assert_eq!(p.analysis, polykrom_render::AnalysisColors::DEFAULT);
 }
 
 #[test]

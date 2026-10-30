@@ -1,12 +1,12 @@
 //! Solid feature commands: extrude, revolve, fillet, chamfer, primitives, combine, move.
 
-use serde_json::{Value, json};
-use solidcraft_doc::{
+use polykrom_doc::{
     AxisRef, Direction, Expr, Extent, FeatureKind, Operation, PointExpr, ProfileSel, RailFit, SweepOrientation, SweepRail, ThinSide, ThinWall,
     expr::Kind, point_expr,
 };
-use solidcraft_doc::{BodyName, FeatureName, SketchId};
-use solidcraft_doc::{Dir, FacePick, Position};
+use polykrom_doc::{BodyName, FeatureName, SketchId};
+use polykrom_doc::{Dir, FacePick, Position};
+use serde_json::{Value, json};
 use solidcraft_geom::Vec3;
 
 use super::{CommandSpec, not_in_sketch};
@@ -147,7 +147,7 @@ fn extrude_base(s: &Session, p: &Value) -> Option<(Vec3, Vec3)> {
         ProfileSel::Indices { indices } => ps.get(*indices.first()?)?.region.interior_point(),
         ProfileSel::Points { points } => *points.first()?,
         selection @ (ProfileSel::Curves { .. } | ProfileSel::OffsetBoundaries { .. } | ProfileSel::WholeBoundaries { .. }) => {
-            let indices = solidcraft_doc::profile_selection_indices(ss, &selection).ok()?;
+            let indices = polykrom_doc::profile_selection_indices(ss, &selection).ok()?;
             ps.get(*indices.first()?)?.region.interior_point()
         }
     };
@@ -187,7 +187,7 @@ impl Session {
     /// active component has no body of its own while the model has some (a sketch in the
     /// assembly's root cutting through its parts, #1234). The command and its preview both ask
     /// this, so the preview never refuses a cut the command makes (#3085).
-    pub fn cut_takes_every_body(&self, st: &solidcraft_doc::ModelState) -> bool {
+    pub fn cut_takes_every_body(&self, st: &polykrom_doc::ModelState) -> bool {
         !st.bodies.is_empty() && !st.bodies.iter().any(|b| self.doc.model_body_component(b) == self.active_component)
     }
 }
@@ -254,7 +254,7 @@ fn auto_operation_in(s: &Session, p: &Value, world_faces: bool) -> Option<&'stat
 /// How far a Through All extrude with no distance reaches from `base`, signed by its
 /// direction: past every body of the model. Without it `auto` could not tell a cut through
 /// a part from an addition and made a separate body.
-fn through_all_reach(st: &solidcraft_doc::ModelState, p: &Value, base: Vec3) -> Option<f64> {
+fn through_all_reach(st: &polykrom_doc::ModelState, p: &Value, base: Vec3) -> Option<f64> {
     let through_all = bool_(p, "through_all").unwrap_or(false) || str_(p, "extent").is_some_and(|e| e.eq_ignore_ascii_case("through_all"));
     if !through_all {
         return None;
@@ -302,7 +302,7 @@ pub(super) fn feature_sketch(s: &Session, p: &Value, cmd: &str) -> Result<u64> {
 /// curves) stays as given. Curve picks are checked: one that names no profile, or several, is
 /// refused now rather than failing later.
 pub(super) fn stable_profiles(s: &Session, kind: &mut FeatureKind) -> Result<()> {
-    use solidcraft_doc::sketch::profile_at_point;
+    use polykrom_doc::sketch::profile_at_point;
     let st = s.model.state();
     for (sketch, sel) in kind.profile_sels_mut() {
         let Some(ss) = st.sketch(sketch) else { continue };
@@ -315,7 +315,7 @@ pub(super) fn stable_profiles(s: &Session, kind: &mut FeatureKind) -> Result<()>
                 if let Some(i) = indices.iter().find(|i| **i >= have) {
                     return Err(EngineError::Other(format!("there is no profile {i} in {} (it has {have})", ss.name)));
                 }
-                solidcraft_doc::profile_selection_indices(ss, sel)?
+                polykrom_doc::profile_selection_indices(ss, sel)?
             }
             ProfileSel::Points { points } => {
                 if points.len() > ss.profiles.len() {
@@ -353,19 +353,19 @@ pub(super) fn stable_profiles(s: &Session, kind: &mut FeatureKind) -> Result<()>
                     }
                 }
                 let selection = ProfileSel::Curves { loops: normalized };
-                solidcraft_doc::profile_selection_indices(ss, &selection)?;
+                polykrom_doc::profile_selection_indices(ss, &selection)?;
                 *sel = selection;
                 continue;
             }
             ProfileSel::OffsetBoundaries { .. } | ProfileSel::WholeBoundaries { .. } => {
                 // Explicit identities retain the caller's semantics. Validate through the
                 // same resolver as recomputation, including reserved-role precedence.
-                solidcraft_doc::profile_selection_indices(ss, sel)?;
+                polykrom_doc::profile_selection_indices(ss, sel)?;
                 continue;
             }
             ProfileSel::All => continue,
         };
-        let captured = solidcraft_doc::capture_profile_selection(ss, &indices)?;
+        let captured = polykrom_doc::capture_profile_selection(ss, &indices)?;
         *sel = match captured {
             ProfileSel::OffsetBoundaries { associations }
                 if associations.iter().any(|id| {
@@ -401,7 +401,7 @@ pub(crate) fn profiles(p: &Value, cmd: &str) -> Result<ProfileSel> {
     match v {
         Value::Object(fields) => {
             if fields.get("type").and_then(Value::as_str) == Some("whole_boundaries") {
-                return solidcraft_doc::whole_profile_selection_from_value(v).map_err(|error| bad(cmd, error.to_string()));
+                return polykrom_doc::whole_profile_selection_from_value(v).map_err(|error| bad(cmd, error.to_string()));
             }
             let associations = fields
                 .get("offset_boundaries")
@@ -509,25 +509,22 @@ fn add_feature_in(s: &mut Session, p: &Value, kind: FeatureKind, world: bool) ->
     let (refs, names) = match &kind {
         FeatureKind::Fillet { edges, body, .. } | FeatureKind::Chamfer { edges, body, .. } => {
             let st = s.model.state();
-            (
-                solidcraft_doc::edge_refs(&st, body, &solidcraft_doc::plain(edges)),
-                solidcraft_doc::edge_names_for(&st, body, &solidcraft_doc::plain(edges)),
-            )
+            (polykrom_doc::edge_refs(&st, body, &polykrom_doc::plain(edges)), polykrom_doc::edge_names_for(&st, body, &polykrom_doc::plain(edges)))
         }
         // Sheet metal edges are named by the sheet model.
         FeatureKind::SheetFlange { edges, .. } => {
             let points: Vec<_> = edges.iter().map(|e| e.point).collect();
-            (Vec::new(), solidcraft_doc::sheet::sheet_edge_names(&s.model.state(), &solidcraft_doc::plain(&points)))
+            (Vec::new(), polykrom_doc::sheet::sheet_edge_names(&s.model.state(), &polykrom_doc::plain(&points)))
         }
-        FeatureKind::SheetHem { edges, .. } => (Vec::new(), solidcraft_doc::sheet::sheet_edge_names(&s.model.state(), &solidcraft_doc::plain(edges))),
+        FeatureKind::SheetHem { edges, .. } => (Vec::new(), polykrom_doc::sheet::sheet_edge_names(&s.model.state(), &polykrom_doc::plain(edges))),
         // A hole's reference edges (#37) are edges of the body it is drilled into.
         FeatureKind::Hole { position, references, .. } if !references.is_empty() => {
             let edges: Vec<Vec3> = references.iter().map(|r| r.edge.0).collect();
-            (Vec::new(), solidcraft_doc::hole_reference::reference_edge_names(&s.model.state(), position.0, &edges))
+            (Vec::new(), polykrom_doc::hole_reference::reference_edge_names(&s.model.state(), position.0, &edges))
         }
         // A conversion's bend edges are edges of the body it converts.
         FeatureKind::SheetConvert { body, bends, .. } if !bends.is_empty() => {
-            (Vec::new(), solidcraft_doc::sheet::bend_edge_names(&s.model.state(), body, &solidcraft_doc::plain(bends)))
+            (Vec::new(), polykrom_doc::sheet::bend_edge_names(&s.model.state(), body, &polykrom_doc::plain(bends)))
         }
         _ => (Vec::new(), Vec::new()),
     };
@@ -537,11 +534,11 @@ fn add_feature_in(s: &mut Session, p: &Value, kind: FeatureKind, world: bool) ->
             let state = s.model.state();
             let body = state.body(&face.body).ok_or_else(|| EngineError::Other("selected cylinder body no longer exists".into()))?;
             let frame = face.body_frame(&s.doc, body).map_err(|e| EngineError::Other(e.to_string()))?;
-            let inverse = solidcraft_doc::mat_inverse(&frame).ok_or_else(|| EngineError::Other("invalid cylinder placement".into()))?;
-            let at = solidcraft_doc::apply_point(&solidcraft_doc::mat_mul(&inverse, &s.active_component_frame()), face.at.0);
-            let mut scoped = solidcraft_doc::ModelState::default();
+            let inverse = polykrom_doc::mat_inverse(&frame).ok_or_else(|| EngineError::Other("invalid cylinder placement".into()))?;
+            let at = polykrom_doc::apply_point(&polykrom_doc::mat_mul(&inverse, &s.active_component_frame()), face.at.0);
+            let mut scoped = polykrom_doc::ModelState::default();
             scoped.bodies.push(body.clone());
-            let names = solidcraft_doc::naming::face_names_at(&scoped, &[at]);
+            let names = polykrom_doc::naming::face_names_at(&scoped, &[at]);
             if names.len() != 1 || names.first().is_none_or(|name| name.is_empty()) {
                 return Err(EngineError::Other("selected cylinder face has no persistent identity".into()));
             }
@@ -549,7 +546,7 @@ fn add_feature_in(s: &mut Session, p: &Value, kind: FeatureKind, world: bool) ->
         } else if pts.is_empty() {
             Vec::new()
         } else {
-            solidcraft_doc::face_point_names(&s.doc, &s.model.state(), &kind, s.active_component)
+            polykrom_doc::face_point_names(&s.doc, &s.model.state(), &kind, s.active_component)
         }
     };
     // Primitives have no `targets` of their own: their `targets` are the bodies taking part (#259).
@@ -624,7 +621,7 @@ fn add_feature_in(s: &mut Session, p: &Value, kind: FeatureKind, world: bool) ->
     let st = s.model.state();
     let bodies: Vec<&str> = st.bodies.iter().map(|b| b.name.as_str()).collect();
     // Bodies that were there before and now have other geometry, and bodies that are gone.
-    let old: std::collections::HashMap<&str, &solidcraft_doc::kernel::Body> = before.bodies.iter().map(|b| (b.name.as_str(), &b.body)).collect();
+    let old: std::collections::HashMap<&str, &polykrom_doc::kernel::Body> = before.bodies.iter().map(|b| (b.name.as_str(), &b.body)).collect();
     // The bodies this feature made, apart from the ones it changed or that were there (#374),
     // and the pieces a cut left of a body made earlier, which keep that body's feature.
     let created: Vec<&str> = st.bodies.iter().filter(|b| b.feature == id || !old.contains_key(b.name.as_str())).map(|b| b.name.as_str()).collect();
@@ -728,7 +725,7 @@ fn extrude(s: &mut Session, p: &Value) -> Result<Value> {
 fn default_extrude_profiles(s: &Session, sketch: u64) -> ProfileSel {
     let st = s.model.state();
     let Some(ss) = st.sketch(sketch) else { return ProfileSel::All };
-    let drawn = solidcraft_sketch::find_drawn_profiles(&ss.sketch);
+    let drawn = polykrom_sketch::find_drawn_profiles(&ss.sketch);
     let ps = if drawn.is_empty() { ss.profiles.clone() } else { drawn };
     if ps.len() > 10_000 || ps.iter().all(|p| p.region.holes.is_empty()) {
         return ProfileSel::All;
@@ -742,7 +739,7 @@ fn default_extrude_profiles(s: &Session, sketch: u64) -> ProfileSel {
             ps.iter().filter(|other| other.region.holes.iter().any(|hole| hole.contains(probe))).count() % 2 == 0
         })
         .collect();
-    let all = solidcraft_sketch::without_text_counters(&ss.sketch, ps.clone());
+    let all = polykrom_sketch::without_text_counters(&ss.sketch, ps.clone());
     if material.iter().map(|p| &p.outer_curves).eq(all.iter().map(|p| &p.outer_curves)) {
         return ProfileSel::All;
     }
@@ -755,7 +752,7 @@ fn default_extrude_profiles(s: &Session, sketch: u64) -> ProfileSel {
     } else {
         ProfileSel::Curves { loops: material.iter().map(|p| p.outer_curves.clone()).collect() }
     };
-    match solidcraft_doc::profile_selection_indices(ss, &sel) {
+    match polykrom_doc::profile_selection_indices(ss, &sel) {
         Ok(found) if found.len() == material.len() && material.iter().all(|p| !p.outer_curves.is_empty()) => sel,
         _ => ProfileSel::All,
     }
@@ -764,7 +761,7 @@ fn default_extrude_profiles(s: &Session, sketch: u64) -> ProfileSel {
 /// The body whose face `sketch` is attached to (on the face itself, not offset from it), when
 /// it is one the active component works on ([`active_scope`]).
 fn sketch_face_body(s: &Session, sketch: u64) -> Option<String> {
-    let FeatureKind::Sketch { plane: solidcraft_doc::PlaneRef::Face { anchor: Some(anchor), .. }, .. } = &s.doc.feature(sketch)?.kind else {
+    let FeatureKind::Sketch { plane: polykrom_doc::PlaneRef::Face { anchor: Some(anchor), .. }, .. } = &s.doc.feature(sketch)?.kind else {
         return None;
     };
     let st = s.model.state();
@@ -776,13 +773,13 @@ fn sketch_face_body(s: &Session, sketch: u64) -> Option<String> {
 /// are components inside it) works on the bodies of the components inside it whose geometry is
 /// in its own frame, as an import places it: a profile sketched on such a part's face meets the
 /// part where it is shown (#3223).
-fn active_scope<'a>(s: &Session, st: &'a solidcraft_doc::ModelState) -> Vec<&'a solidcraft_doc::ModelBody> {
+fn active_scope<'a>(s: &Session, st: &'a polykrom_doc::ModelState) -> Vec<&'a polykrom_doc::ModelBody> {
     let active = s.active_component;
     let own: Vec<_> = st.bodies.iter().filter(|b| s.doc.model_body_component(b) == active).collect();
     if !own.is_empty() {
         return own;
     }
-    let Some(into_active) = solidcraft_doc::mat_inverse(&s.doc.component_transform(active)) else { return own };
+    let Some(into_active) = polykrom_doc::mat_inverse(&s.doc.component_transform(active)) else { return own };
     st.bodies
         .iter()
         .filter(|b| {
@@ -791,9 +788,9 @@ fn active_scope<'a>(s: &Session, st: &'a solidcraft_doc::ModelState) -> Vec<&'a 
                 return false;
             }
             let frame = s.doc.component_transform(comp);
-            let world = s.doc.model_body_offset(b).map_or(frame, |offset| solidcraft_doc::mat_mul(&frame, offset));
-            let rel = solidcraft_doc::mat_mul(&into_active, &world);
-            rel.iter().flatten().zip(solidcraft_doc::IDENTITY.iter().flatten()).all(|(a, b)| (a - b).abs() < 1e-9)
+            let world = s.doc.model_body_offset(b).map_or(frame, |offset| polykrom_doc::mat_mul(&frame, offset));
+            let rel = polykrom_doc::mat_mul(&into_active, &world);
+            rel.iter().flatten().zip(polykrom_doc::IDENTITY.iter().flatten()).all(|(a, b)| (a - b).abs() < 1e-9)
         })
         .collect()
 }
@@ -834,7 +831,7 @@ fn thin_param(s: &Session, p: &Value, sketch: u64, cmd: &str) -> Result<ThinWall
 }
 
 /// The regions of a thin wall in its (solved) sketch, with the current parameter values.
-fn thin_regions(s: &Session, ss: &solidcraft_doc::SolvedSketch, thin: &ThinWall) -> std::result::Result<Vec<solidcraft_geom::Region2>, String> {
+fn thin_regions(s: &Session, ss: &polykrom_doc::SolvedSketch, thin: &ThinWall) -> std::result::Result<Vec<solidcraft_geom::Region2>, String> {
     let length = |e: &str| s.doc.eval(&s.doc.with_design_unit(e, Kind::Length), Kind::Length).map_err(|e| e.to_string());
     let t = length(&thin.thickness)?;
     let (inside, outside) = match thin.side {
@@ -849,7 +846,7 @@ fn thin_regions(s: &Session, ss: &solidcraft_doc::SolvedSketch, thin: &ThinWall)
         .filter_map(|id| ss.sketch.curve_index(id))
         .map(|ci| ss.sketch.exact_segs(ci).unwrap_or_else(|| ss.sketch.segs(ci)))
         .collect();
-    solidcraft_sketch::thin_wall_regions(&curves, inside, outside).map_err(|e| format!("thin wall: {e}"))
+    polykrom_sketch::thin_wall_regions(&curves, inside, outside).map_err(|e| format!("thin wall: {e}"))
 }
 
 /// An extrude's extent from its parameters: distance (or through all, or to an object), the
@@ -885,8 +882,8 @@ pub(super) fn extent_param(s: &Session, p: &Value, cmd: &str) -> Result<Extent> 
     }
     let convention = match p.get("convention") {
         // Surface Extrude shares Extent but retains its existing per-side distance semantics.
-        None if cmd == "surface.extrude" => solidcraft_doc::ExtrudeConvention::LegacyPerSide,
-        None => solidcraft_doc::ExtrudeConvention::TotalDistance,
+        None if cmd == "surface.extrude" => polykrom_doc::ExtrudeConvention::LegacyPerSide,
+        None => polykrom_doc::ExtrudeConvention::TotalDistance,
         Some(value) => serde_json::from_value(value.clone()).map_err(|_| bad(cmd, "`convention` must be total_distance or legacy_per_side"))?,
     };
     Ok(Extent {
@@ -932,7 +929,7 @@ fn revolve(s: &mut Session, p: &Value) -> Result<Value> {
     let symmetric =
         matches!(str_(p, "direction").map(str::to_ascii_lowercase).as_deref(), Some("symmetric")) || bool_(p, "symmetric").unwrap_or(false);
     let convention = match p.get("convention") {
-        None => solidcraft_doc::RevolveConvention::SketchNormal,
+        None => polykrom_doc::RevolveConvention::SketchNormal,
         Some(value) => serde_json::from_value(value.clone()).map_err(|_| bad(cmd, "`convention` must be sketch_normal or legacy_axis_start"))?,
     };
     let kind = FeatureKind::Revolve {
@@ -992,7 +989,7 @@ fn radius_expr(s: &Session, p: &Value, cmd: &str) -> Result<Expr> {
 /// The unit a bare length typed into a command means: the design's units. (A point's bare
 /// coordinates, and a bare number already stored in a feature, are millimetres.)
 pub(super) fn typed_length_unit(s: &Session) -> String {
-    solidcraft_doc::expr::length_unit_or_mm(&s.doc.units).to_string()
+    polykrom_doc::expr::length_unit_or_mm(&s.doc.units).to_string()
 }
 
 /// The lengths a command works one expression out from (a radius from a diameter, a pitch from
@@ -1003,7 +1000,7 @@ pub(super) fn typed_length_unit(s: &Session) -> String {
 /// parameter), which is read in the design's units itself, they stay bare and are read with it,
 /// as before.
 pub(super) fn length_operands<const N: usize>(s: &Session, operands: [(&str, &str); N]) -> [String; N] {
-    use solidcraft_doc::expr::is_bare_number;
+    use polykrom_doc::expr::is_bare_number;
     let follows = operands.iter().any(|(e, _)| !is_bare_number(e) && s.doc.eval(e, Kind::Unitless).is_ok());
     operands.map(|(e, unit)| if !follows && is_bare_number(e) { format!("{} {unit}", e.trim()) } else { e.to_string() })
 }
@@ -1056,7 +1053,7 @@ fn prim_box(s: &mut Session, p: &Value) -> Result<Value> {
         // bare numbers are millimetres, the sizes' the design's units.
         (None, Some([cx, cy, cz])) => {
             let unit = typed_length_unit(s);
-            let mm_per_unit = solidcraft_doc::expr::unit_info(&unit).map_or(1.0, |(_, k)| k);
+            let mm_per_unit = polykrom_doc::expr::unit_info(&unit).map_or(1.0, |(_, k)| k);
             let back = |c: Expr, size: &Expr| -> Expr {
                 match (c.parse::<f64>(), size.parse::<f64>()) {
                     (Ok(a), Ok(b)) => format!("{}", a - b * mm_per_unit / 2.0).into(),
@@ -1190,7 +1187,7 @@ fn press_pull(s: &mut Session, p: &Value) -> Result<Value> {
     if let Some(fp) = vec3(face)
         && super::face::face_is_planar(s, fp) == Some(false)
     {
-        let name = solidcraft_doc::naming::face_names_at(&s.model.state(), &[fp]).into_iter().next().unwrap_or_default();
+        let name = polykrom_doc::naming::face_names_at(&s.model.state(), &[fp]).into_iter().next().unwrap_or_default();
         let fid = name.strip_prefix('F').and_then(|r| r.split(':').next()).and_then(|x| x.parse::<u64>().ok());
         if name.contains(":blend") {
             let f = fid.and_then(|id| s.doc.feature(id)).cloned().ok_or_else(|| bad(cmd, "the blend's feature is gone"))?;
@@ -1213,7 +1210,7 @@ fn press_pull(s: &mut Session, p: &Value) -> Result<Value> {
     // Pushed in: the extrude cuts the other way by as much (a bare number stays one, so it keeps
     // being read as a bare number typed into the extrude).
     let flipped = match distance.trim().parse::<f64>() {
-        Ok(v) if solidcraft_doc::expr::is_bare_number(&distance) => Expr::new(format!("{}", -v)),
+        Ok(v) if polykrom_doc::expr::is_bare_number(&distance) => Expr::new(format!("{}", -v)),
         _ => Expr::new(format!("-({distance})")),
     };
     let (dist, dir, op) = if d > 0.0 { (distance, "positive", "join") } else { (flipped, "negative", "cut") };
@@ -1226,9 +1223,9 @@ fn fillet(s: &mut Session, p: &Value) -> Result<Value> {
     let radius = req_expr(cmd, p, "radius")?;
     check_expr(s, &radius, Kind::Length, cmd, "radius")?;
     let style = match str_(p, "type").map(str::to_ascii_lowercase).as_deref() {
-        None | Some("constant") | Some("rolling_ball") => solidcraft_doc::FilletStyle::Constant,
-        Some("chord") | Some("chord_length") => solidcraft_doc::FilletStyle::Chord,
-        Some("curvature") | Some("g2") => solidcraft_doc::FilletStyle::Curvature,
+        None | Some("constant") | Some("rolling_ball") => polykrom_doc::FilletStyle::Constant,
+        Some("chord") | Some("chord_length") => polykrom_doc::FilletStyle::Chord,
+        Some("curvature") | Some("g2") => polykrom_doc::FilletStyle::Curvature,
         Some("variable") => {
             let radius2 = req_expr(cmd, p, "radius2")?;
             check_expr(s, &radius2, Kind::Length, cmd, "radius2")?;
@@ -1251,7 +1248,7 @@ fn fillet(s: &mut Session, p: &Value) -> Result<Value> {
                 mid.push((t, r.into()));
             }
             let smooth = p.get("smooth").and_then(Value::as_bool).unwrap_or(false);
-            solidcraft_doc::FilletStyle::Variable { radius2, start: Position(start), mid, smooth }
+            polykrom_doc::FilletStyle::Variable { radius2, start: Position(start), mid, smooth }
         }
         Some("spline") => {
             let start = p
@@ -1276,14 +1273,14 @@ fn fillet(s: &mut Session, p: &Value) -> Result<Value> {
                     "a spline fillet needs `radii` (the control radii after `radius`) and `knots` (as many as all control radii, the degree 1…3 and one more)",
                 ));
             }
-            solidcraft_doc::FilletStyle::Spline { start: Position(start), knots, radii }
+            polykrom_doc::FilletStyle::Spline { start: Position(start), knots, radii }
         }
         Some(o) => return Err(bad(cmd, format!("unknown fillet type `{o}` (constant, chord, variable, spline or curvature)"))),
     };
     let fit = match str_(p, "fit").map(str::to_ascii_lowercase).as_deref() {
-        None | Some("exact") => solidcraft_doc::FilletFit::Exact,
-        Some("reduce") => solidcraft_doc::FilletFit::Reduce,
-        Some("taper") => solidcraft_doc::FilletFit::Taper,
+        None | Some("exact") => polykrom_doc::FilletFit::Exact,
+        Some("reduce") => polykrom_doc::FilletFit::Reduce,
+        Some("taper") => polykrom_doc::FilletFit::Taper,
         Some(o) => return Err(bad(cmd, format!("unknown fit `{o}` (exact, reduce or taper)"))),
     };
     if !fit.is_exact() && !style.is_constant() {
@@ -1291,8 +1288,8 @@ fn fillet(s: &mut Session, p: &Value) -> Result<Value> {
     }
     // What fills the corners where three blended edges meet.
     let corner = match str_(p, "corner").map(str::to_ascii_lowercase).as_deref() {
-        None | Some("rolling") => solidcraft_doc::FilletCorner::Rolling,
-        Some("g2") => solidcraft_doc::FilletCorner::G2,
+        None | Some("rolling") => polykrom_doc::FilletCorner::Rolling,
+        Some("g2") => polykrom_doc::FilletCorner::G2,
         Some(o) => return Err(bad(cmd, format!("unknown corner `{o}` (rolling or g2)"))),
     };
     if !corner.is_rolling() && (!style.is_constant() || !fit.is_exact()) {
@@ -1493,7 +1490,7 @@ fn axis_line(s: &Session, p: &Value, cmd: &str) -> Result<(Vec3, Vec3, Option<Fe
 }
 
 /// A pattern feature, or for `components`, new occurrences of them at each placement.
-fn finish_pattern(s: &mut Session, p: &Value, features: Vec<String>, pattern: solidcraft_doc::PatternKind, bodies: Vec<String>) -> Result<Value> {
+fn finish_pattern(s: &mut Session, p: &Value, features: Vec<String>, pattern: polykrom_doc::PatternKind, bodies: Vec<String>) -> Result<Value> {
     let comps = string_list(p, "components");
     if comps.is_empty() {
         return add_feature(
@@ -1507,13 +1504,13 @@ fn finish_pattern(s: &mut Session, p: &Value, features: Vec<String>, pattern: so
         );
     }
     let cmd = "pattern (components)";
-    let mats = solidcraft_doc::pattern_matrices(&s.doc, &s.model.state(), &pattern)?;
+    let mats = polykrom_doc::pattern_matrices(&s.doc, &s.model.state(), &pattern)?;
     let mut made = Vec::new();
     for c in &comps {
         let id = s.doc.find_component(c).filter(|id| *id != 0).ok_or_else(|| bad(cmd, format!("no component `{c}`")))?;
         let src = s.doc.occurrence_of(id).cloned().ok_or_else(|| bad(cmd, format!("component `{c}` has no occurrence")))?;
         for m in &mats {
-            made.push(s.doc_mut().add_occurrence(id, src.parent, solidcraft_doc::mat_mul(m, &src.transform))?);
+            made.push(s.doc_mut().add_occurrence(id, src.parent, polykrom_doc::mat_mul(m, &src.transform))?);
         }
     }
     Ok(json!({"occurrences": made}))
@@ -1552,7 +1549,7 @@ fn pattern_rect(s: &mut Session, p: &Value) -> Result<Value> {
     if let Some(c) = &spacing2 {
         check_expr(s, c, Kind::Length, cmd, "spacing2")?;
     }
-    let pattern = solidcraft_doc::PatternKind::Rectangular {
+    let pattern = polykrom_doc::PatternKind::Rectangular {
         dir1: Dir(dir1),
         count1,
         spacing1,
@@ -1575,7 +1572,7 @@ fn pattern_circ(s: &mut Session, p: &Value) -> Result<Value> {
     check_expr(s, &count, Kind::Unitless, cmd, "count")?;
     let angle = expr(p, "angle").unwrap_or_else(|| "360 deg".into());
     check_expr(s, &angle, Kind::Angle, cmd, "angle")?;
-    let pattern = solidcraft_doc::PatternKind::Circular {
+    let pattern = polykrom_doc::PatternKind::Circular {
         origin: Position(origin),
         axis: Dir(axis),
         count,
@@ -1609,7 +1606,7 @@ fn pattern_path(s: &mut Session, p: &Value) -> Result<Value> {
         Some(o) => return Err(bad(cmd, format!("unknown orientation `{o}` (identical or path)"))),
     };
     let flip = bool_(p, "flip").unwrap_or(false);
-    let pattern = solidcraft_doc::PatternKind::Path { path_sketch: SketchId(path_sketch), path, count, spacing, extent, flip, orient };
+    let pattern = polykrom_doc::PatternKind::Path { path_sketch: SketchId(path_sketch), path, count, spacing, extent, flip, orient };
     finish_pattern(s, p, features, pattern, bodies)
 }
 
@@ -1686,8 +1683,8 @@ pub(super) fn check_plane_name(name: &str, cmd: &str) -> Result<()> {
 /// feature id; kept by name, so the feature follows the plane when it changes), or an
 /// explicit plane `{origin, x_dir, y_dir}` / `{origin, normal}`. Every command that takes a
 /// plane reads it here.
-pub(super) fn plane_param(s: &Session, v: Option<&Value>, cmd: &str) -> Result<solidcraft_doc::PlaneRef> {
-    use solidcraft_doc::PlaneRef;
+pub(super) fn plane_param(s: &Session, v: Option<&Value>, cmd: &str) -> Result<polykrom_doc::PlaneRef> {
+    use polykrom_doc::PlaneRef;
     const WANT: &str = "XY, XZ, YZ, a construction plane name or id, or {origin, normal} (origin coordinates may be length expressions)";
     let construction = |r: &str| match s.doc.find_feature(r) {
         Some(f) if matches!(f.kind, FeatureKind::ConstructionPlane { .. }) => Ok(PlaneRef::Construction { name: f.name.clone().into() }),
@@ -1731,7 +1728,7 @@ pub(super) fn plane_param(s: &Session, v: Option<&Value>, cmd: &str) -> Result<s
                 _ => None,
             };
             let plane = pl.ok_or_else(|| bad(cmd, "plane needs x_dir and y_dir, or normal"))?;
-            if origin.iter().all(|e| solidcraft_doc::expr::is_literal(e)) {
+            if origin.iter().all(|e| polykrom_doc::expr::is_literal(e)) {
                 return Ok(PlaneRef::Custom { plane });
             }
             Ok(PlaneRef::Placed { origin, x_dir: plane.x, y_dir: plane.y })
@@ -1748,12 +1745,12 @@ fn plane_offset(s: &mut Session, p: &Value) -> Result<Value> {
     if let Some(face) = p.get("base").filter(|b| b.get("face").is_some()) {
         let base = super::sketch::face::capture(s, face, cmd)?;
         super::sketch::face::capture_positions(s, &base)?;
-        let kind = FeatureKind::ConstructionPlane { plane: solidcraft_doc::PlaneRef::Offset { base: Box::new(base), distance: d } };
+        let kind = FeatureKind::ConstructionPlane { plane: polykrom_doc::PlaneRef::Offset { base: Box::new(base), distance: d } };
         // The capture is already in the authoring frame.
         return add_feature_in(s, p, kind, false);
     }
     let base = plane_param(s, p.get("base"), cmd)?;
-    add_feature(s, p, FeatureKind::ConstructionPlane { plane: solidcraft_doc::PlaneRef::Offset { base: Box::new(base), distance: d } })
+    add_feature(s, p, FeatureKind::ConstructionPlane { plane: polykrom_doc::PlaneRef::Offset { base: Box::new(base), distance: d } })
 }
 
 fn plane_angle(s: &mut Session, p: &Value) -> Result<Value> {
@@ -1766,7 +1763,7 @@ fn plane_angle(s: &mut Session, p: &Value) -> Result<Value> {
     if let Some(face) = p.get("base").filter(|b| b.get("face").is_some()) {
         let base = super::sketch::face::capture(s, face, cmd)?;
         super::sketch::face::capture_positions(s, &base)?;
-        let kind = FeatureKind::ConstructionPlane { plane: solidcraft_doc::PlaneRef::AtAngle { base: Box::new(base), axis_origin, axis_dir, angle } };
+        let kind = FeatureKind::ConstructionPlane { plane: polykrom_doc::PlaneRef::AtAngle { base: Box::new(base), axis_origin, axis_dir, angle } };
         // The capture is already in the authoring frame.
         return add_feature_in(s, p, kind, false);
     }
@@ -1774,7 +1771,7 @@ fn plane_angle(s: &mut Session, p: &Value) -> Result<Value> {
     add_feature(
         s,
         p,
-        FeatureKind::ConstructionPlane { plane: solidcraft_doc::PlaneRef::AtAngle { base: Box::new(base), axis_origin, axis_dir, angle } },
+        FeatureKind::ConstructionPlane { plane: polykrom_doc::PlaneRef::AtAngle { base: Box::new(base), axis_origin, axis_dir, angle } },
     )
 }
 
@@ -1782,7 +1779,7 @@ fn split_face(s: &mut Session, p: &Value) -> Result<Value> {
     let cmd = "solid.split_face";
     let faces = face_points(s, p, cmd)?;
     let body = str_(p, "body").map(str::to_string);
-    let xy = || solidcraft_doc::PlaneRef::Origin { name: "XY".into() };
+    let xy = || polykrom_doc::PlaneRef::Origin { name: "XY".into() };
     let kind = if let Some(t) = p.get("tool").filter(|t| !t.is_null()) {
         let tb = t.get("body").and_then(Value::as_str).ok_or_else(|| bad(cmd, "`tool.body` must name a body"))?.to_string();
         let point = t.get("point").and_then(crate::params::vec3).ok_or_else(|| bad(cmd, "`tool.point` must be [x, y, z] on the tool face"))?;
@@ -1790,7 +1787,7 @@ fn split_face(s: &mut Session, p: &Value) -> Result<Value> {
             faces: faces.into_iter().map(FacePick).collect(),
             body: body.map(BodyName),
             plane: xy(),
-            tool: Some(solidcraft_doc::FaceAt { body: BodyName(tb), point: Position(point) }),
+            tool: Some(polykrom_doc::FaceAt { body: BodyName(tb), point: Position(point) }),
             sketch: None,
         }
     } else if p.get("sketch").is_some_and(|v| !v.is_null()) {
@@ -1823,15 +1820,15 @@ fn split_body(s: &mut Session, p: &Value) -> Result<Value> {
         if st.sketch(sketch).is_none() {
             return Err(bad(cmd, format!("no sketch {sketch}")));
         }
-        solidcraft_doc::sketch_line_plane(&st, sketch, &line).map_err(|e| bad(cmd, e.to_string()))?;
+        polykrom_doc::sketch_line_plane(&st, sketch, &line).map_err(|e| bad(cmd, e.to_string()))?;
         return add_feature(
             s,
             p,
             FeatureKind::Split {
                 body: BodyName(body),
-                plane: solidcraft_doc::PlaneRef::Origin { name: "XY".into() },
+                plane: polykrom_doc::PlaneRef::Origin { name: "XY".into() },
                 tool: None,
-                sketch: Some(solidcraft_doc::SketchId(sketch)),
+                sketch: Some(polykrom_doc::SketchId(sketch)),
                 line: Some(line),
             },
         );
@@ -1842,7 +1839,7 @@ fn split_body(s: &mut Session, p: &Value) -> Result<Value> {
         let point = t.get("point").and_then(crate::params::vec3).ok_or_else(|| bad(cmd, "`tool.point` must be [x, y, z] on the tool face"))?;
         let st = s.model.state();
         let tbody = st.body(&tb).ok_or_else(|| bad(cmd, format!("no body `{tb}`")))?;
-        if solidcraft_doc::appearance::face_index_at(tbody, point).is_none() {
+        if polykrom_doc::appearance::face_index_at(tbody, point).is_none() {
             return Err(bad(cmd, "`tool.point` is not on a face of the tool body"));
         }
         return add_feature(
@@ -1850,8 +1847,8 @@ fn split_body(s: &mut Session, p: &Value) -> Result<Value> {
             p,
             FeatureKind::Split {
                 body: BodyName(body),
-                plane: solidcraft_doc::PlaneRef::Origin { name: "XY".into() },
-                tool: Some(solidcraft_doc::FaceAt { body: BodyName(tb), point: Position(point) }),
+                plane: polykrom_doc::PlaneRef::Origin { name: "XY".into() },
+                tool: Some(polykrom_doc::FaceAt { body: BodyName(tb), point: Position(point) }),
                 sketch: None,
                 line: None,
             },
@@ -1926,19 +1923,19 @@ fn hole(s: &mut Session, p: &Value) -> Result<Value> {
             if single && (ids.len() != 1 || flip) {
                 return Err(bad(cmd, "a `single` hole takes one sketch point and no `flip`"));
             }
-            Some((solidcraft_doc::SketchPoints { sketch: SketchId(sketch), ids, flip, single }, first, -n))
+            Some((polykrom_doc::SketchPoints { sketch: SketchId(sketch), ids, flip, single }, first, -n))
         }
         _ => None,
     };
     let thread = str_(p, "thread").map(|t| t.trim().to_string()).filter(|t| !t.is_empty());
     if let Some(t) = &thread
-        && solidcraft_doc::parse_tapped_thread(t).is_none()
+        && polykrom_doc::parse_tapped_thread(t).is_none()
     {
         return Err(bad(cmd, format!("unknown tapped thread `{t}` (ISO metric or a catalogued UNC/UNF, G or Rp size)")));
     }
     // A position given as length expressions (#1678), say `["leg_h*0.4", "width/2", "t"]`: kept,
     // so the hole follows the parameters; drilled where they evaluate now.
-    let at: Option<solidcraft_doc::PointExpr> = match p.get("position").and_then(Value::as_array) {
+    let at: Option<polykrom_doc::PointExpr> = match p.get("position").and_then(Value::as_array) {
         Some(a) if points.is_none() && a.len() == 3 && a.iter().any(Value::is_string) => {
             let mut coords = Vec::with_capacity(3);
             for v in a {
@@ -1948,16 +1945,16 @@ fn hole(s: &mut Session, p: &Value) -> Result<Value> {
                     _ => return Err(bad(cmd, "`position` must be [x, y, z]: numbers or length expressions")),
                 };
                 check_expr(s, &e, Kind::Length, cmd, "position")?;
-                coords.push(solidcraft_doc::Expr::new(e));
+                coords.push(polykrom_doc::Expr::new(e));
             }
-            let [x, y, z]: [solidcraft_doc::Expr; 3] = coords.try_into().map_err(|_| bad(cmd, "`position` must be [x, y, z]"))?;
+            let [x, y, z]: [polykrom_doc::Expr; 3] = coords.try_into().map_err(|_| bad(cmd, "`position` must be [x, y, z]"))?;
             Some([x, y, z])
         }
         _ => None,
     };
     let at_value = match &at {
         Some([x, y, z]) => {
-            let c = |e: &solidcraft_doc::Expr| s.doc.eval(e, Kind::Length).map_err(|e| bad(cmd, format!("`position`: {e}")));
+            let c = |e: &polykrom_doc::Expr| s.doc.eval(e, Kind::Length).map_err(|e| bad(cmd, format!("`position`: {e}")));
             Some(Vec3::new(c(x)?, c(y)?, c(z)?)).filter(|v| v.is_finite())
         }
         None => None,
@@ -1980,7 +1977,7 @@ fn hole(s: &mut Session, p: &Value) -> Result<Value> {
                 // Into the face the position lies on: against the outward normal of the face
                 // nearest it (planar or curved), as it faces out of its own body.
                 let st = s.model.state();
-                solidcraft_doc::hole_direction_at(&st, position).ok_or_else(|| bad(cmd, "no face at `position`; give `direction`"))?
+                polykrom_doc::hole_direction_at(&st, position).ok_or_else(|| bad(cmd, "no face at `position`; give `direction`"))?
             }
         },
     };
@@ -1995,9 +1992,9 @@ fn hole(s: &mut Session, p: &Value) -> Result<Value> {
             distances.push(s.doc.eval(&r.distance, Kind::Length).map_err(|e| bad(cmd, format!("`references`: {e}")))?);
         }
         let edges: Vec<(Vec3, Option<&str>)> = references.iter().map(|r| (r.edge.0, None)).collect();
-        let frame = solidcraft_doc::hole_reference::reference_frame(&st, position, direction, &edges, true).map_err(|e| bad(cmd, e.to_string()))?;
+        let frame = polykrom_doc::hole_reference::reference_frame(&st, position, direction, &edges, true).map_err(|e| bad(cmd, e.to_string()))?;
         let centre = frame.place(position, &distances).map_err(|e| bad(cmd, e.to_string()))?;
-        if !solidcraft_doc::hole_reference::on_reference_face(&st, &frame, centre) {
+        if !polykrom_doc::hole_reference::on_reference_face(&st, &frame, centre) {
             return Err(bad(cmd, "the reference distances put the hole's centre off its face"));
         }
         centre
@@ -2012,7 +2009,7 @@ fn hole(s: &mut Session, p: &Value) -> Result<Value> {
             Expr::new(format!("{d} mm"))
         }
         (None, Some(t), None) => {
-            let size = solidcraft_doc::parse_tapped_thread(t).ok_or_else(|| bad(cmd, "thread"))?;
+            let size = polykrom_doc::parse_tapped_thread(t).ok_or_else(|| bad(cmd, "thread"))?;
             Expr::new(format!("{} mm", size.tap_drill))
         }
         (None, None, None) => return Err(bad(cmd, "needs `diameter`, `thread` (a tapped hole) or `clearance` (a bolt size)")),
@@ -2028,15 +2025,14 @@ fn hole(s: &mut Session, p: &Value) -> Result<Value> {
     };
     let kind = match str_(p, "type").unwrap_or("simple") {
         "simple" => match expr(p, "tip_angle") {
-            Some(t) if depth.is_some() => solidcraft_doc::HoleKind::Drilled { tip_angle: t },
-            _ => solidcraft_doc::HoleKind::Simple,
+            Some(t) if depth.is_some() => polykrom_doc::HoleKind::Drilled { tip_angle: t },
+            _ => polykrom_doc::HoleKind::Simple,
         },
-        "drilled" => solidcraft_doc::HoleKind::Drilled { tip_angle: expr(p, "tip_angle").unwrap_or_else(|| "118 deg".into()) },
-        "counterbore" => solidcraft_doc::HoleKind::Counterbore { cb_diameter: get("cb_diameter")?, cb_depth: get("cb_depth")? },
-        "countersink" => solidcraft_doc::HoleKind::Countersink {
-            cs_diameter: get("cs_diameter")?,
-            cs_angle: expr(p, "cs_angle").unwrap_or_else(|| "90 deg".into()),
-        },
+        "drilled" => polykrom_doc::HoleKind::Drilled { tip_angle: expr(p, "tip_angle").unwrap_or_else(|| "118 deg".into()) },
+        "counterbore" => polykrom_doc::HoleKind::Counterbore { cb_diameter: get("cb_diameter")?, cb_depth: get("cb_depth")? },
+        "countersink" => {
+            polykrom_doc::HoleKind::Countersink { cs_diameter: get("cs_diameter")?, cs_angle: expr(p, "cs_angle").unwrap_or_else(|| "90 deg".into()) }
+        }
         other => return Err(bad(cmd, format!("unknown hole type `{other}`"))),
     };
     let to = match p.get("to") {
@@ -2083,10 +2079,10 @@ fn hole(s: &mut Session, p: &Value) -> Result<Value> {
 
 /// A hole's reference edges (#37): `references: [{edge: [x, y, z], distance: expr}]`, at most
 /// two, each distance a length.
-fn hole_reference_params(s: &Session, p: &Value, cmd: &str) -> Result<Vec<solidcraft_doc::HoleReference>> {
+fn hole_reference_params(s: &Session, p: &Value, cmd: &str) -> Result<Vec<polykrom_doc::HoleReference>> {
     let Some(v) = p.get("references") else { return Ok(Vec::new()) };
     let list = v.as_array().ok_or_else(|| bad(cmd, "`references` must be a list of {edge: [x, y, z], distance}"))?;
-    let most = solidcraft_doc::hole_reference::MAX_HOLE_REFERENCES;
+    let most = polykrom_doc::hole_reference::MAX_HOLE_REFERENCES;
     if list.len() > most {
         return Err(bad(cmd, format!("a hole takes at most {most} `references`")));
     }
@@ -2098,7 +2094,7 @@ fn hole_reference_params(s: &Session, p: &Value, cmd: &str) -> Result<Vec<solidc
             .ok_or_else(|| bad(cmd, format!("`references[{i}].edge` must be a point [x, y, z] on a straight edge of the face")))?;
         let distance = expr(r, "distance").ok_or_else(|| bad(cmd, format!("`references[{i}].distance` must be a number or an expression")))?;
         check_expr(s, &distance, Kind::Length, cmd, "references")?;
-        out.push(solidcraft_doc::HoleReference { edge: Position(edge), distance });
+        out.push(polykrom_doc::HoleReference { edge: Position(edge), distance });
     }
     Ok(out)
 }
@@ -2112,8 +2108,8 @@ fn body_of_other_component_at(s: &Session, p: Vec3) -> Option<String> {
         .iter()
         .filter(|b| !b.body.is_mesh())
         .filter_map(|b| {
-            let (d, _) = solidcraft_doc::appearance::nearest_face(b, p)?;
-            (d <= solidcraft_doc::appearance::pick_tolerance(b)).then_some((d, b))
+            let (d, _) = polykrom_doc::appearance::nearest_face(b, p)?;
+            (d <= polykrom_doc::appearance::pick_tolerance(b)).then_some((d, b))
         })
         .min_by(|a, b| a.0.total_cmp(&b.0))?;
     (s.doc.model_body_component(body) != s.active_component).then(|| body.name.clone())
@@ -2126,11 +2122,11 @@ fn sketch_hole_points(s: &Session, sketch: u64) -> Vec<String> {
     let mut ends: Vec<usize> = Vec::new();
     for c in &ss.sketch.curves {
         match &c.kind {
-            solidcraft_sketch::CurveKind::Circle { .. } => {}
-            solidcraft_sketch::CurveKind::Arc { a, b, .. } | solidcraft_sketch::CurveKind::Line { a, b } => ends.extend([*a, *b]),
-            solidcraft_sketch::CurveKind::Ellipse { m, .. } => ends.push(*m),
-            solidcraft_sketch::CurveKind::Spline { pts, .. } => ends.extend(pts.iter().copied()),
-            solidcraft_sketch::CurveKind::Conic { a, b, apex, .. } => ends.extend([*a, *b, *apex]),
+            polykrom_sketch::CurveKind::Circle { .. } => {}
+            polykrom_sketch::CurveKind::Arc { a, b, .. } | polykrom_sketch::CurveKind::Line { a, b } => ends.extend([*a, *b]),
+            polykrom_sketch::CurveKind::Ellipse { m, .. } => ends.push(*m),
+            polykrom_sketch::CurveKind::Spline { pts, .. } => ends.extend(pts.iter().copied()),
+            polykrom_sketch::CurveKind::Conic { a, b, apex, .. } => ends.extend([*a, *b, *apex]),
         }
     }
     ss.sketch.points.iter().enumerate().filter(|(i, p)| p.id != "origin" && !ends.contains(i)).map(|(_, p)| p.id.clone()).collect()
@@ -2340,14 +2336,14 @@ fn loft(s: &mut Session, p: &Value) -> Result<Value> {
             if !st.sketch(sketch).is_some_and(|ss| ss.sketch.points.iter().any(|q| q.id == pt)) {
                 return Err(bad(cmd, format!("no point `{pt}` in the section's sketch")));
             }
-            sections.push(solidcraft_doc::LoftSection {
+            sections.push(polykrom_doc::LoftSection {
                 sketch: SketchId(sketch),
-                profiles: solidcraft_doc::ProfileSel::All,
+                profiles: polykrom_doc::ProfileSel::All,
                 point: Some(pt.to_string()),
             });
             continue;
         }
-        sections.push(solidcraft_doc::LoftSection { sketch: SketchId(sketch), profiles: profiles(sec, cmd)?, point: None });
+        sections.push(polykrom_doc::LoftSection { sketch: SketchId(sketch), profiles: profiles(sec, cmd)?, point: None });
     }
     let (rails, rail_fit) = guide_rails(s, p, cmd, "loft", None)?;
     add_feature(
@@ -2371,7 +2367,7 @@ fn thread(s: &mut Session, p: &Value) -> Result<Value> {
         .ok_or_else(|| bad(cmd, "`face` must be a point [x, y, z] on a cylindrical face"))?;
     let designation = str_(p, "designation").map(|t| t.trim().to_string()).filter(|t| !t.is_empty());
     if let Some(t) = &designation
-        && solidcraft_doc::parse_metric_thread(t).is_none()
+        && polykrom_doc::parse_metric_thread(t).is_none()
     {
         return Err(bad(cmd, format!("unknown thread `{t}` (ISO metric, like M8 or M8x1)")));
     }

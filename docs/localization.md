@@ -94,7 +94,7 @@ Chinese font-name list (`PingFang`, `Microsoft YaHei`, `Noto Sans CJK SC`, …) 
 glyph. No fonts are redistributed in native desktop distribution packages; native builds rely
 entirely on existing operating system fonts or craft-fonts.
 
-In the browser, `solidcraft-web` bundles a self-hosted Japanese font (`BIZUDPGothic-Regular.ttf`, licensed
+In the browser, `polykrom-web` bundles a self-hosted Japanese font (`BIZUDPGothic-Regular.ttf`, licensed
 under SIL OFL 1.1) within the web distribution artifacts only. The font is loaded asynchronously from the same
 origin (`./fonts/BIZUDPGothic-Regular.ttf`) on-demand when the interface language is a CJK one, or, with
 any other interface language, the first time Japanese text (kana, kanji or full-width forms in a design name,

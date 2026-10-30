@@ -5,12 +5,12 @@ use std::hash::{Hash, Hasher};
 use std::sync::{Arc, Mutex};
 
 use egui::{Color32, Sense};
-use serde_json::json;
-use solidcraft_engine::doc::render_settings::RenderSetup;
-use solidcraft_engine::render::{
+use polykrom_engine::doc::render_settings::RenderSetup;
+use polykrom_engine::render::{
     Availability, Camera, ExecutorDescriptor, ExecutorId, ProductScene, RenderLimits, RenderMode, RenderOperation, RenderProfile, RenderRequest,
     ScratchLayout,
 };
+use serde_json::json;
 
 use crate::gpu::{Frame, GpuScene, SceneSlot, ViewportCallback};
 use crate::{SolveApp, theme::Tokens};
@@ -23,7 +23,7 @@ mod tests;
 
 pub struct State {
     pub host: Option<ExecutorDescriptor>,
-    pub image_host: Option<solidcraft_engine::render::job::CpuHost>,
+    pub image_host: Option<polykrom_engine::render::job::CpuHost>,
     pub view: ViewState,
     revision: u64,
     design_camera: Option<(Camera, bool)>,
@@ -39,8 +39,8 @@ pub struct ViewState {
     pub name: String,
     draft: RenderSetup,
     dirty: bool,
-    job: Option<solidcraft_engine::render::job::JobId>,
-    completed: Option<solidcraft_engine::render::job::JobId>,
+    job: Option<polykrom_engine::render::job::JobId>,
+    completed: Option<polykrom_engine::render::job::JobId>,
     transparent: bool,
     overwrite: bool,
 }
@@ -86,7 +86,7 @@ pub fn host_executor(max_dimension: u32, depth: bool, samples: u32) -> Result<Ex
             mode: RenderMode::Preview,
             operation: RenderOperation::Viewport,
             formats: Vec::new(),
-            features: vec![solidcraft_engine::render::RenderFeature::Pbr],
+            features: vec![polykrom_engine::render::RenderFeature::Pbr],
         }],
         limits: RenderLimits { max_dimension: u64::from(max_dimension.clamp(1, 4096)), ..Default::default() },
         scratch: ScratchLayout {
@@ -152,7 +152,7 @@ pub fn enter(app: &mut SolveApp, render: bool) -> Result<(), String> {
         if !active(app) {
             app.render_workspace.design_camera = Some((app.cam, app.ui.perspective));
             app.ui.tab = "RENDER".into();
-            let scene = solidcraft_engine::product_scene::extract(&app.session).map_err(|e| e.to_string())?;
+            let scene = polykrom_engine::product_scene::extract(&app.session).map_err(|e| e.to_string())?;
             if !scene.bounds.is_empty() {
                 app.cam.fit(&scene.bounds);
             }
@@ -273,7 +273,7 @@ fn scene_section(app: &mut SolveApp, ui: &mut egui::Ui) {
         if app.render_workspace.view.draft.backend.as_str() != "builtin" || app.render_workspace.view.draft.mode != RenderMode::Preview {
             crate::ui_kit::text(ui, app.tr("render.unavailable_preview"), crate::ui_kit::Text::Note("render_unavailable"));
             if crate::ui_kit::button(ui, app.tr("render.use_preview"), crate::ui_kit::Button::Normal).clicked() {
-                app.render_workspace.view.draft.backend = solidcraft_engine::render::builtin_backend().id;
+                app.render_workspace.view.draft.backend = polykrom_engine::render::builtin_backend().id;
                 app.render_workspace.view.draft.mode = RenderMode::Preview;
                 app.render_workspace.view.dirty = true;
             }
@@ -316,7 +316,7 @@ fn camera_section(app: &mut SolveApp, ui: &mut egui::Ui) {
             [(app.tr("render.fit"), app.tr("render.fit_help"), true), (app.tr("render.restore_camera"), app.tr("render.restore_help"), true)],
         );
         if fit {
-            match solidcraft_engine::product_scene::extract(&app.session) {
+            match polykrom_engine::product_scene::extract(&app.session) {
                 Ok(scene) if !scene.bounds.is_empty() => app.cam.fit(&scene.bounds),
                 Err(e) => app.set_status(e.to_string(), true),
                 _ => {}
@@ -460,7 +460,7 @@ fn image_controls(app: &mut SolveApp, ui: &mut egui::Ui) {
 }
 
 /// Keep the selected image and overwrite consent fixed while the upstream picker holds model input.
-fn export_image(app: &mut SolveApp, job: solidcraft_engine::render::job::JobId, overwrite: bool) {
+fn export_image(app: &mut SolveApp, job: polykrom_engine::render::job::JobId, overwrite: bool) {
     let origin = app.session.doc.clone();
     app.pick_save("render.png", &["png"], move |app, path| {
         let Some(path) = path else { return };
@@ -518,7 +518,7 @@ pub fn gpu_scene(scene: &ProductScene) -> Result<(u64, GpuScene), String> {
             let vertices = triangle.map(|i| {
                 let p = body.mesh.positions.get(i as usize)?.to_f32();
                 let n = *body.mesh.normals.get(i as usize)?;
-                let n = if surface.is_some() { solidcraft_engine::render::surface::unit_direction(n).ok()? } else { n }.to_f32();
+                let n = if surface.is_some() { polykrom_engine::render::surface::unit_direction(n).ok()? } else { n }.to_f32();
                 p.into_iter().chain(n).all(f32::is_finite).then_some((p, n))
             });
             let [Some(a), Some(b), Some(c)] = vertices else { return Err("invalid product triangle".into()) };
@@ -548,7 +548,7 @@ pub fn gpu_scene(scene: &ProductScene) -> Result<(u64, GpuScene), String> {
     Ok((hash.finish(), gpu))
 }
 
-fn hash_surface(surface: Option<solidcraft_engine::render::surface::OpaqueSurface>, hash: &mut impl Hasher) {
+fn hash_surface(surface: Option<polykrom_engine::render::surface::OpaqueSurface>, hash: &mut impl Hasher) {
     surface.is_some().hash(hash);
     if let Some(s) = surface {
         let c = s.base_color();
@@ -606,7 +606,7 @@ pub fn show(app: &mut SolveApp, ui: &mut egui::Ui) {
             features: Vec::new(),
             policy: Default::default(),
         };
-        solidcraft_engine::render::resolve_request(&[app.session.render_backend()], &request).map_err(|e| e.to_string())?;
+        polykrom_engine::render::resolve_request(&[app.session.render_backend()], &request).map_err(|e| e.to_string())?;
         if app.session.model.is_stale() {
             return Err("finish the modelling gesture before previewing".into());
         }
@@ -615,7 +615,7 @@ pub fn show(app: &mut SolveApp, ui: &mut egui::Ui) {
         app.session.visibility.hidden_occurrences.hash(&mut visibility);
         let signature = (app.session.revision, Arc::as_ptr(&app.session.world_state()) as usize, visibility.finish());
         if app.render_workspace.scene_signature != Some(signature) {
-            let scene = solidcraft_engine::product_scene::extract(&app.session).map_err(|e| e.to_string())?;
+            let scene = polykrom_engine::product_scene::extract(&app.session).map_err(|e| e.to_string())?;
             let (key, gpu) = gpu_scene(&scene)?;
             if app.render_workspace.key != Some(key) {
                 if let Ok(mut slot) = app.render_workspace.slot.lock() {
@@ -628,7 +628,7 @@ pub fn show(app: &mut SolveApp, ui: &mut egui::Ui) {
         }
         let scene = app.render_workspace.scene.as_ref().ok_or("no product scene")?;
         request.features = scene.required_features();
-        solidcraft_engine::render::resolve_request(&[app.session.render_backend()], &request).map_err(|e| e.to_string())?;
+        polykrom_engine::render::resolve_request(&[app.session.render_backend()], &request).map_err(|e| e.to_string())?;
         let key = app.render_workspace.key.ok_or("no product geometry")?;
         if scene.bounds.is_empty() {
             return Err("Create a visible solid in Design to preview it here.".into());

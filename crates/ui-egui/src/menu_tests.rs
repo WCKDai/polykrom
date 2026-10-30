@@ -2,9 +2,9 @@
 
 use crate::test_support::sample_app;
 use egui::pos2;
+use polykrom_engine::Session;
+use polykrom_engine::geom::Vec3;
 use serde_json::json;
-use solidcraft_engine::Session;
-use solidcraft_engine::geom::Vec3;
 
 use crate::context_menu::{self, Item, Target};
 use crate::viewport::Hit;
@@ -70,7 +70,7 @@ fn appearance_browser_action_targets_the_clicked_body() {
     act(&mut app, &Target::Body { name: b.clone() }, "Appearance");
     let dialog = app.dialog.as_ref().unwrap();
     assert!(matches!(dialog.kind, crate::dialogs::Kind::Appearance(_)));
-    assert_eq!(dialog.inputs[0].items, vec![solidcraft_engine::Sel::Body { name: b }]);
+    assert_eq!(dialog.inputs[0].items, vec![polykrom_engine::Sel::Body { name: b }]);
 }
 
 #[test]
@@ -171,7 +171,7 @@ fn face_menu_hides_and_finds_the_body() {
     }
     assert!(find(&items, "Appearance").enabled);
     context_menu::run_item(&mut app, &find(&items, "Find in Timeline"), pos2(0.0, 0.0));
-    assert!(matches!(app.session.selection.as_slice(), [solidcraft_engine::Sel::Feature { .. }]));
+    assert!(matches!(app.session.selection.as_slice(), [polykrom_engine::Sel::Feature { .. }]));
     context_menu::run_item(&mut app, &find(&items, "Show/Hide"), pos2(0.0, 0.0));
     assert_eq!(app.session.visibility.hidden_bodies, vec![b]);
 }
@@ -335,7 +335,7 @@ fn move_shortcut_respects_grounding_and_keeps_body_selection_as_a_body_move() {
     assert!(app.tree.occurrence_move.is_none(), "a body selection still edits geometry");
     let dialog = app.dialog.as_ref().expect("body Move opens");
     assert!(matches!(dialog.kind, crate::dialogs::Kind::Move { .. }));
-    assert_eq!(dialog.inputs[0].items, vec![solidcraft_engine::Sel::Body { name: "Body1".into() }]);
+    assert_eq!(dialog.inputs[0].items, vec![polykrom_engine::Sel::Body { name: "Body1".into() }]);
 }
 
 #[test]
@@ -394,7 +394,7 @@ fn browser_folds_are_kept_in_the_preferences() {
 
 #[test]
 fn delete_key_handles_every_kind_and_asks_about_dependents() {
-    use solidcraft_engine::Sel;
+    use polykrom_engine::Sel;
     let mut app = sample_app();
     app.run("construct.plane.offset", json!({"base": "XY", "offset": 10})).unwrap();
     app.run("solid.box", json!({"length": 5, "width": 5, "height": 5, "corner": [200, 0, 0]})).unwrap();
@@ -440,7 +440,7 @@ fn browser_feature_menu_deletes_its_target_and_supports_undo() {
     let keep = app.session.doc.features[0].id;
     let target = app.session.doc.features[1].id;
     // A Browser context menu acts on its row, even when another feature is selected.
-    app.session.selection = vec![solidcraft_engine::Sel::Feature { id: keep }];
+    app.session.selection = vec![polykrom_engine::Sel::Feature { id: keep }];
     let saved = app.session.doc.to_json();
     let undo = app.session.undo.len();
     act(&mut app, &Target::Feature { id: target }, "Delete");
@@ -467,7 +467,7 @@ fn browser_feature_menu_renames_its_target_and_supports_undo() {
     let target = app.session.doc.features[1].id;
     let keep_name = app.session.doc.feature(keep).unwrap().name.clone();
     let target_name = app.session.doc.feature(target).unwrap().name.clone();
-    app.session.selection = vec![solidcraft_engine::Sel::Feature { id: keep }];
+    app.session.selection = vec![polykrom_engine::Sel::Feature { id: keep }];
     let saved = app.session.doc.to_json();
     let undo = app.session.undo.len();
     act(&mut app, &Target::Feature { id: target }, "Rename");
@@ -511,7 +511,7 @@ fn browser_feature_menu_confirms_dependent_changes_before_deleting() {
 fn menu_delete_items_use_the_same_path() {
     let mut app = sample_app();
     let b = body(&app);
-    let original_volume = solidcraft_engine::kernel::measure(&app.session.world_state().body(&b).unwrap().body).unwrap().volume;
+    let original_volume = polykrom_engine::kernel::measure(&app.session.world_state().body(&b).unwrap().body).unwrap().volume;
     let created = app.run("component.from_bodies", json!({"bodies": [b]})).unwrap();
     let c = app.session.doc.components[0].id;
     let transfer = created["components"][0]["feature"].as_u64().unwrap();
@@ -530,14 +530,14 @@ fn menu_delete_items_use_the_same_path() {
     assert_eq!(restored.bodies.len(), 1, "the original joined plate stays intact");
     let plate = restored.body(&b).unwrap();
     assert_eq!(plate.component, 0);
-    assert!((solidcraft_engine::kernel::measure(&plate.body).unwrap().volume - original_volume).abs() < 1e-6);
-    assert!(plate.mesh().contains(solidcraft_engine::geom::Vec3::new(40.0, 35.0, 12.0)));
-    let mut reopened = solidcraft_engine::Session::new(solidcraft_engine::doc::Document::from_json(&app.session.doc.to_json()).unwrap());
+    assert!((polykrom_engine::kernel::measure(&plate.body).unwrap().volume - original_volume).abs() < 1e-6);
+    assert!(plate.mesh().contains(polykrom_engine::geom::Vec3::new(40.0, 35.0, 12.0)));
+    let mut reopened = polykrom_engine::Session::new(polykrom_engine::doc::Document::from_json(&app.session.doc.to_json()).unwrap());
     reopened.refresh();
     let reopened_state = reopened.world_state();
     assert_eq!(reopened_state.bodies.len(), 1);
     assert_eq!(reopened_state.body(&b).unwrap().component, 0);
-    assert!((solidcraft_engine::kernel::measure(&reopened_state.body(&b).unwrap().body).unwrap().volume - original_volume).abs() < 1e-6);
+    assert!((polykrom_engine::kernel::measure(&reopened_state.body(&b).unwrap().body).unwrap().volume - original_volume).abs() < 1e-6);
     // A sketch from the browser: asks, since its features go too.
     let id = app.session.doc.features.iter().find(|f| f.name == "Base").unwrap().id;
     act(&mut app, &Target::Sketch { id }, "Delete");
@@ -551,7 +551,7 @@ fn canvas_menu_hides_renames_calibrates_and_deletes() {
     png.extend(400u32.to_be_bytes());
     png.extend(200u32.to_be_bytes());
     png.extend([8, 6, 0, 0, 0, 0, 0, 0, 0]);
-    let data = solidcraft_engine::doc::canvas::base64_encode(&png);
+    let data = polykrom_engine::doc::canvas::base64_encode(&png);
     let id = app.run("canvas.insert", json!({"data": data, "plane": "XY", "width": 80})).unwrap()["canvas"].as_u64().unwrap();
     let t = Target::Canvas { id };
     act(&mut app, &t, "Show/Hide");
@@ -678,7 +678,7 @@ fn named_views_save_restore_rename_and_delete() {
     act(&mut app, &Target::NamedViews, "New Named View");
     assert_eq!(app.session.doc.named_views.len(), 1);
     let saved = app.cam;
-    app.cam.set_view(solidcraft_engine::render::StandardView::Top);
+    app.cam.set_view(polykrom_engine::render::StandardView::Top);
     let t = Target::NamedView { name: "Named View1".into() };
     act(&mut app, &t, "Restore");
     assert_eq!(app.cam_anim.map(|a| a.to), Some(saved), "animates back to the saved camera");
@@ -726,7 +726,7 @@ fn an_uncaptured_move_asks_before_the_next_command() {
     crate::browser::answer_capture(&mut app, "revert").unwrap();
     assert!(app.session.pending_moves.is_empty());
     assert!(app.dialog.is_some(), "Create Sketch started");
-    assert_eq!(app.session.doc.occurrences[0].transform, solidcraft_engine::doc::IDENTITY);
+    assert_eq!(app.session.doc.occurrences[0].transform, polykrom_engine::doc::IDENTITY);
     // Capture keeps the move.
     app.dialog = None;
     app.run("occurrence.move", json!({"occurrence": occ, "translate": [10, 0, 0], "capture": false})).unwrap();
@@ -756,21 +756,21 @@ fn occurrence_moves_turn_about_their_origin_then_move() {
     let occ = app.session.doc.occurrences[0].id;
     app.run("occurrence.ground", json!({"occurrence": occ, "grounded": false})).unwrap();
     let mut m = crate::browser::OccMove::new(occ);
-    m.pivot = Some(solidcraft_engine::geom::Vec3::new(5.0, 0.0, 0.0));
+    m.pivot = Some(polykrom_engine::geom::Vec3::new(5.0, 0.0, 0.0));
     m.translate = [10.0, 0.0, 0.0];
     m.angles = [0.0, 0.0, 90.0];
     crate::browser::apply_occurrence_move(&mut app, &m);
     let t = *app.session.pending_moves.get(&occ).unwrap();
     // The pivot lands 10 mm along X; X turns into Y.
-    let p = solidcraft_engine::doc::apply_point(&t, solidcraft_engine::geom::Vec3::new(5.0, 0.0, 0.0));
-    let x = solidcraft_engine::doc::apply_vector(&t, solidcraft_engine::geom::Vec3::X);
+    let p = polykrom_engine::doc::apply_point(&t, polykrom_engine::geom::Vec3::new(5.0, 0.0, 0.0));
+    let x = polykrom_engine::doc::apply_vector(&t, polykrom_engine::geom::Vec3::X);
     assert!((p.x - 15.0).abs() < 1e-9 && p.y.abs() < 1e-9, "{p:?}");
     assert!((x.y - 1.0).abs() < 1e-9, "{x:?}");
     // Changing the values again starts from where it was, not from the last move.
     m.translate = [0.0, 0.0, 0.0];
     m.angles = [0.0; 3];
     crate::browser::apply_occurrence_move(&mut app, &m);
-    assert_eq!(*app.session.pending_moves.get(&occ).unwrap(), solidcraft_engine::doc::IDENTITY);
+    assert_eq!(*app.session.pending_moves.get(&occ).unwrap(), polykrom_engine::doc::IDENTITY);
 }
 
 #[test]
@@ -843,7 +843,7 @@ fn construction_plane_row_opens_its_menu() {
     assert_eq!(menu["target"], json!({"type": "plane", "id": id}), "{menu}");
     let labels: Vec<&str> = menu["items"].as_array().unwrap().iter().filter_map(|i| i["label"].as_str()).filter(|l| !l.is_empty()).collect();
     assert_eq!(labels, ["Create Sketch", "Edit Feature", "Delete", "Rename", "Show/Hide", "Find in Timeline"]);
-    assert_eq!(h.app.session.selection, vec![solidcraft_engine::Sel::Plane { name: "Cut".into() }], "the right-click picks the plane");
+    assert_eq!(h.app.session.selection, vec![polykrom_engine::Sel::Plane { name: "Cut".into() }], "the right-click picks the plane");
     context_menu::close(&mut h.app);
 
     let t = Target::Plane { id };
@@ -855,7 +855,7 @@ fn construction_plane_row_opens_its_menu() {
     assert!(context_menu::finish_rename(&mut h.app, Some("Section"), true));
     assert!(h.app.session.doc.find_feature("Section").is_some_and(|f| f.id == id));
     act(&mut h.app, &t, "Find in Timeline");
-    assert_eq!(h.app.session.selection, vec![solidcraft_engine::Sel::Feature { id }]);
+    assert_eq!(h.app.session.selection, vec![polykrom_engine::Sel::Feature { id }]);
     act(&mut h.app, &t, "Edit Feature");
     assert!(h.app.dialog.is_some(), "Edit Feature opens the plane's dialog");
     h.app.dialog = None;
@@ -868,7 +868,7 @@ fn construction_plane_row_opens_its_menu() {
 /// starts the sketch on that plane.
 #[test]
 fn right_click_on_a_plane_offers_a_sketch_on_it() {
-    use solidcraft_engine::geom::Vec3;
+    use polykrom_engine::geom::Vec3;
     let normal = |h: &crate::scenario::Harness| h.app.session.world_state().sketches.first().map(|s| s.plane.normal()).unwrap_or_default();
     for (plane, axis) in [("XY", Vec3::Z), ("XZ", Vec3::Y), ("YZ", Vec3::X)] {
         let mut h = crate::scenario::Harness::new();
@@ -993,7 +993,7 @@ fn typing_a_new_body_name_and_enter_renames_it() {
 
 #[test]
 fn contribution_picked_faces_open_their_own_feature_after_later_modifiers() {
-    use solidcraft_engine::{Sel, geom::Vec3};
+    use polykrom_engine::{Sel, geom::Vec3};
     for expected in [1, 2, 3] {
         let mut app = SolveApp::new(Session::default(), Services::default());
         app.run("solid.box", json!({"length":40,"width":30,"height":20,"body_name":"Plate"})).unwrap();
@@ -1002,7 +1002,7 @@ fn contribution_picked_faces_open_their_own_feature_after_later_modifiers() {
         app.run("solid.hole", json!({"position":[32,20,20],"diameter":4})).unwrap();
         let state = app.session.world_state();
         let b = state.body("Plate").unwrap();
-        let names = solidcraft_engine::doc::naming::face_names(b);
+        let names = polykrom_engine::doc::naming::face_names(b);
         let index = names.iter().position(|n| n.starts_with(&format!("F{expected}:"))).unwrap();
         let mesh = b.mesh();
         let point = mesh
@@ -1036,8 +1036,7 @@ fn contribution_picked_faces_open_their_own_feature_after_later_modifiers() {
 fn contribution_unresolvable_face_does_not_edit_the_body_creator() {
     let mut app = SolveApp::new(Session::default(), Services::default());
     app.run("solid.box", json!({"length":10,"width":10,"height":10,"body_name":"Plate"})).unwrap();
-    app.session.selection =
-        vec![solidcraft_engine::Sel::Face { body: "Plate".into(), index: usize::MAX, point: solidcraft_engine::geom::Vec3::ZERO }];
+    app.session.selection = vec![polykrom_engine::Sel::Face { body: "Plate".into(), index: usize::MAX, point: polykrom_engine::geom::Vec3::ZERO }];
     let items = context_menu::items(&app, &Target::Viewport);
     assert!(!find(&items, "Edit Feature").enabled);
     assert!(!find(&items, "Find in Timeline").enabled);
@@ -1090,7 +1089,7 @@ fn every_context_target_has_identified_icon_rows_including_submenus() {
         assert!(!rows.is_empty(), "unexercised target: {target:?}");
         check(&rows);
     }
-    let sample = solidcraft_engine::sample::samples().into_iter().find(|s| s.name == "Hinge Assembly").unwrap();
+    let sample = polykrom_engine::sample::samples().into_iter().find(|s| s.name == "Hinge Assembly").unwrap();
     let mut assembly = SolveApp::new(Session::default(), Services::default());
     assembly.session.run_script(&(sample.script)()).unwrap();
     assert!(!assembly.session.doc.assembly.joints.is_empty());
