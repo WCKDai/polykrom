@@ -305,7 +305,9 @@ jobs:
     name: macOS universal
     needs: version
     if: needs.version.outputs.build == 'true'
-    runs-on: macos-14
+    # macos-14 is being retired on 2026-11-02, with brownouts before then (actions/runner-images#13518).
+    # The deployment target stays 11.0 (packaging/macos/package.sh), whatever the runner's SDK.
+    runs-on: macos-15
     env:
       SOLIDCRAFT_VERSION: ${{ needs.version.outputs.version }}
       SOLIDCRAFT_BUILD_DATE: ${{ needs.version.outputs.date }}
