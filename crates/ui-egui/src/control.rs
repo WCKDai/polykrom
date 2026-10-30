@@ -46,7 +46,6 @@ use std::sync::mpsc::Sender;
 use serde_json::{Value, json};
 use solidcraft_engine::io::vfs;
 use solidcraft_engine::render::StandardView;
-use solidcraft_engine::timing;
 
 use crate::SolveApp;
 
@@ -105,8 +104,8 @@ fn execute(app: &mut SolveApp, id: &str, params: Value) -> Result<Value, String>
     if r.is_ok()
         && !matches!(id, "view.layout" | "view.navigate" | "view.ambient_occlusion" | "view.graphics_preset" | "view.history_layout")
         && app.session.active_sketch.is_none()
-        && app.session.world_state().bodies.len() == 1
         && app.session.undo.len() <= 2
+        && app.session.world_state().bodies.len() == 1
     {
         app.fit_view();
     }
@@ -156,46 +155,9 @@ fn batch(app: &mut SolveApp, p: &Value) -> Outcome {
     if let Some(why) = batch_refusal(steps) {
         return err(why);
     }
-    let rollback = p.get("rollback").and_then(Value::as_bool).unwrap_or(true);
-    let profile = p.get("profile").and_then(Value::as_bool).unwrap_or(false);
-    let timed = profile || p.get("timings").and_then(Value::as_bool).unwrap_or(false);
-    let mut rows = Vec::new();
-    let clock = timing::Clock::start();
-    let checkpoint = if rollback { app.run("edit.checkpoint", json!({})).ok().and_then(|v| v["checkpoint"].as_u64()) } else { None };
-    let mut results = Vec::with_capacity(steps.len());
-    for (i, step) in steps.iter().enumerate() {
-        let (r, took) = timing::time(profile, || match command(step) {
-            Some(id) => execute(app, id, step.get("params").cloned().filter(|v| !v.is_null()).unwrap_or(json!({}))),
-            None => Err("missing `command`".to_string()),
-        });
-        if timed {
-            rows.push(took.to_json(i, command(step).unwrap_or_default()));
-        }
-        match r {
-            Ok(v) => results.push(v),
-            Err(e) => {
-                let restored = checkpoint.is_some_and(|id| app.run("edit.restore_checkpoint", json!({"checkpoint": id})).is_ok());
-                let failed = json!({"index": i, "command": command(step), "error": e});
-                // `rolled_back`: the design really is back at its checkpoint.
-                let reply =
-                    json!({"completed": i, "results": results, "failed": failed, "undone": if restored { i } else { 0 }, "rolled_back": restored});
-                return ok(with_timings(reply, timed, rows, clock.ms()));
-            }
-        }
-    }
-    if let Some(id) = checkpoint {
-        let _ = app.run("edit.restore_checkpoint", json!({"checkpoint": id, "forget": true}));
-    }
-    ok(with_timings(json!({"completed": results.len(), "results": results, "undone": 0}), timed, rows, clock.ms()))
-}
-
-/// A batch reply with `timings` and `total_ms` when they were asked for.
-fn with_timings(mut reply: Value, timed: bool, rows: Vec<Value>, total_ms: f64) -> Value {
-    if timed && let Some(o) = reply.as_object_mut() {
-        o.insert("timings".into(), Value::Array(rows));
-        o.insert("total_ms".into(), json!(timing::round_ms(total_ms)));
-    }
-    reply
+    // The design is evaluated once, at the end or when a step needs the model (#253).
+    let opts = solidcraft_engine::batch::Options::of(p);
+    ok(solidcraft_engine::batch::run(app, steps, opts, |app| &mut app.session, execute))
 }
 
 /// A request from an MCP server carries the folders its agent may use (`allow_paths`); every

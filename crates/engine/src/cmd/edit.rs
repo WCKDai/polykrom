@@ -153,8 +153,10 @@ fn delete(s: &mut Session, p: &Value) -> Result<Value> {
         return Err(bad(cmd, "`features` must list features"));
     }
     // Features that work now; any of them failing after the delete is reported (a later
-    // feature that names a deleted body, #267).
-    let worked = working_features(s);
+    // feature that names a deleted body, #267). In a batch, the evaluation and what it settles
+    // wait for the batch's end (#253).
+    let deferred = s.defers_delete();
+    let worked = if deferred { Default::default() } else { working_features(s) };
     let mut gone = Vec::new();
     for k in keys {
         let Some(id) = s.doc.find_feature(&k).map(|f| f.id) else {
@@ -173,6 +175,9 @@ fn delete(s: &mut Session, p: &Value) -> Result<Value> {
         s.active_component = 0;
     }
     s.selection.clear();
+    if deferred {
+        return Ok(json!({"deleted": gone}));
+    }
     s.refresh();
     let tools = settle_tool_features(s, &worked);
     let failing = newly_failing(s, &worked);
@@ -187,7 +192,7 @@ fn delete(s: &mut Session, p: &Value) -> Result<Value> {
 }
 
 /// The features that worked (`worked`) and fail now: `[{feature, error}]`.
-pub(super) fn newly_failing(s: &Session, worked: &std::collections::BTreeSet<u64>) -> Vec<Value> {
+pub(crate) fn newly_failing(s: &Session, worked: &std::collections::BTreeSet<u64>) -> Vec<Value> {
     whole_history(s)
         .results
         .iter()
@@ -198,7 +203,7 @@ pub(super) fn newly_failing(s: &Session, worked: &std::collections::BTreeSet<u64
 
 /// The features that work now (before a delete), for [`settle_tool_features`] and
 /// [`newly_failing`] after it.
-pub(super) fn working_features(s: &Session) -> std::collections::BTreeSet<u64> {
+pub(crate) fn working_features(s: &Session) -> std::collections::BTreeSet<u64> {
     whole_history(s).results.iter().filter(|r| r.error.is_none() && !r.skipped).map(|r| r.id).collect()
 }
 
