@@ -245,7 +245,11 @@ row, `motion.play` lists such joints under `unmoved`, and `joint.list` names eve
 it where it is), and it moves.
 
 `joint.drive` answers the joint's values as `joint.list` gives them, in degrees and millimetres
-with their units and limits, and `moved` says whether any part moved. A joint's origins are mated
+with their units and limits, and `moved` says whether any part moved. `hold: [joints]` keeps
+those joints at their current values while the loop closes: drive one input of a five-bar and
+hold the other, and the coupler takes the pose that keeps the loop closed; when no pose can, the
+drive stops where the loop last closed, names it under `stopped_by_loop`, and leaves the held
+values alone. The reply lists the held joints under `held`. A joint's origins are mated
 by default: B's z axis is turned against A's, as two faces meet. `flip: true` lines them up
 instead, so two origins given at one point with the same z stay as they are. Without an
 `angle`, a new joint (other than a relation, which starts where its parts are) takes no turn or a half turn about its axis, whichever turns B less: two
@@ -337,7 +341,7 @@ sets tell them apart: an occurrence inside a sub-assembly placed twice is one pa
 copies are not checked against each other. A check takes at most 256 bodies; on a large design,
 list the `occurrences` to check (an arm, with `against` the parts it must miss). When the work
 runs out it says `truncated` and the step it `checked_to`.
-`joint.sweep {joint, from, to, index?, step?, refine?, occurrences?, against?, contact_sets?,
+`joint.sweep {joint, hold?, from, to, index?, step?, refine?, occurrences?, against?, contact_sets?,
 report_gaps?, apply?}` drives one joint value from `from` toward `to` and answers how far it gets
 before parts touch: `stopped_at` (the last value clear of contact), `stopped_by` (the two parts
 and the point `at` which they touch, or `"loop"` where a closed loop can no longer close, or

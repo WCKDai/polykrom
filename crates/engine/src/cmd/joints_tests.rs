@@ -2157,3 +2157,78 @@ fn an_ungrounded_reference_is_not_reported_as_fixed() {
     assert!(r["fixed"].as_array().unwrap().iter().any(|o| o.as_u64() == Some(body)), "{r}");
     assert!(r.get("reference").is_none(), "{r}");
 }
+
+/// A symmetric planar five-bar: ground pivots O1=(0,0), O2=(100,0), moving joints
+/// A=(20,30), B=(50,50), C=(80,30). Inputs are the ground links O1-A and O2-C; the coupler
+/// is A-B-C. Both inputs start at 0 (the as-built pose).
+fn five_bar() -> Session {
+    let mut s = Session::default();
+    let (o1, a, b, c, o2) =
+        (Vec3::ZERO, Vec3::new(20.0, 30.0, 0.0), Vec3::new(50.0, 50.0, 0.0), Vec3::new(80.0, 30.0, 0.0), Vec3::new(100.0, 0.0, 0.0));
+    for (name, p) in [("Ground", o1), ("L1", a), ("L2", b), ("L3", c), ("L4", o2)] {
+        part(&mut s, name, [p.x, p.y, -5.0]);
+    }
+    let g = occ(&s, "Ground");
+    run(&mut s, "occurrence.ground", json!({"occurrence": g, "grounded": true}));
+    pin(&mut s, "revolute", "InputA", "Ground", "L1", o1, Vec3::Z);
+    pin(&mut s, "revolute", "A", "L1", "L2", a, Vec3::Z);
+    pin(&mut s, "revolute", "B", "L2", "L3", b, Vec3::Z);
+    pin(&mut s, "revolute", "C", "L3", "L4", c, Vec3::Z);
+    pin(&mut s, "revolute", "InputB", "L4", "Ground", o2, Vec3::Z);
+    s
+}
+
+fn joint_angle(s: &Session, name: &str) -> f64 {
+    s.doc.assembly.joints.iter().find(|j| j.name == name).map(|j| j.values[0]).unwrap_or(f64::NAN)
+}
+
+#[test]
+fn hold_keeps_the_other_input_of_a_five_bar() {
+    let mut s = five_bar();
+    let input_b = joint_angle(&s, "InputB");
+    let r = run(&mut s, "joint.drive", json!({"joint": "InputA", "value": 5, "hold": ["InputB"]}));
+    assert_eq!(r["held"], json!(["InputB"]), "{r}");
+    assert_eq!(r["conflicts"], json!([]), "{r}");
+    assert!(r["stopped_by_loop"].is_null(), "the loop closes at 5 deg: {r}");
+    assert!((joint_angle(&s, "InputA").to_degrees() - 5.0).abs() < 1e-6, "{r}");
+    assert!((joint_angle(&s, "InputB") - input_b).abs() < 1e-9, "the held input moved: {r}");
+    // The coupler took the pose that closes the loop instead of moving the held input.
+    let a = place(&s, "L1", Vec3::new(20.0, 30.0, 0.0));
+    assert!(
+        a.dist(Vec3::new(
+            20.0 * 5f64.to_radians().cos() - 30.0 * 5f64.to_radians().sin(),
+            20.0 * 5f64.to_radians().sin() + 30.0 * 5f64.to_radians().cos(),
+            0.0
+        )) < 1e-6,
+        "{r}"
+    );
+}
+
+#[test]
+fn hold_stops_the_drive_where_a_five_bar_cannot_close() {
+    let mut s = five_bar();
+    let input_b = joint_angle(&s, "InputB");
+    let r = run(&mut s, "joint.drive", json!({"joint": "InputA", "value": 45, "hold": ["InputB"]}));
+    assert_eq!(r["held"], json!(["InputB"]), "{r}");
+    let stop = r["stopped_by_loop"].as_object().unwrap_or_else(|| panic!("no stopped_by_loop: {r}"));
+    assert!(stop["fraction"].as_f64().is_some_and(|f| f > 0.0 && f < 1.0), "{r}");
+    assert_eq!(r["conflicts"], json!([]), "the stopped pose still closes: {r}");
+    assert!(joint_angle(&s, "InputA").to_degrees() < 45.0, "{r}");
+    assert!((joint_angle(&s, "InputB") - input_b).abs() < 1e-9, "the held input moved: {r}");
+}
+
+#[test]
+fn hold_refuses_the_driven_joint_a_rigid_joint_and_an_unknown_joint() {
+    let mut s = five_bar();
+    part(&mut s, "RigidPart", [200.0, 0.0, -5.0]);
+    run(
+        &mut s,
+        "joint.create",
+        json!({"type": "rigid", "a": {"occurrence": "L1", "point": [20, 30, 0], "z": [0, 0, 1]},
+               "b": {"occurrence": "RigidPart", "point": [200, 0, 0], "z": [0, 0, 1]}, "flip": true, "name": "Rigid"}),
+    );
+    for hold in [json!(["InputA"]), json!(["Rigid"]), json!(["no such joint"])] {
+        let e = s.execute("joint.drive", &json!({"joint": "InputA", "value": 5, "hold": hold}));
+        assert!(e.is_err(), "hold {hold} was accepted");
+    }
+}

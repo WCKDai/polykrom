@@ -12,11 +12,13 @@ use solidcraft_geom::Vec3;
 
 use super::analysis::checked_pairs;
 use super::contact_sweep::{ContactGeometry, Gap};
-use super::{drive_with_contact, joint_id, value};
+use super::{drive_with_contact_holding, joint_id, value};
+use crate::cmd::joints::{hold_ids, hold_values};
 use crate::params::{bad, bool_};
 use crate::{Result, Session};
 
-pub const SWEEP_DOC: &str = "joint: id|name; from, to: its value the sweep runs between (degrees for angles, mm for distances, \
+pub const SWEEP_DOC: &str = "joint: id|name; hold?: [ids or names] (keep these joints at their current values while the sweep solves); \
+     from, to: its value the sweep runs between (degrees for angles, mm for distances, \
      or expressions); index? (which value, default 0); step? (between samples, in the joint's unit; default: fine enough that \
      no part passes through another between two, or, for a motion too long to sample that finely, the finest step the sweep's \
      budget allows); refine?: mm (the first contact is bisected until no part moves more than \
@@ -68,6 +70,8 @@ struct Nearest {
 pub(super) fn sweep(s: &mut Session, p: &Value) -> Result<Value> {
     let cmd = "joint.sweep";
     let id = joint_id(s, p.get("joint"), cmd)?;
+    let held_ids = hold_ids(s, p, cmd, Some(id))?;
+    let held = hold_values(s, &held_ids);
     let joint = s.doc.assembly.joints.iter().find(|j| j.id == id).ok_or_else(|| bad(cmd, "joint"))?;
     let (kind, name) = (joint.kind, joint.name.clone());
     let dofs = kind.dofs().len();
@@ -128,7 +132,7 @@ pub(super) fn sweep(s: &mut Session, p: &Value) -> Result<Value> {
         if let Some(x) = q.get_mut(index) {
             *x = v;
         }
-        Ok(drive_with_contact(t, &[(id, q)], &given)?.0)
+        Ok(drive_with_contact_holding(t, &[(id, q)], &given, &held)?.0)
     };
     let reached = |t: &Session| t.doc.assembly.joints.iter().find(|j| j.id == id).and_then(|j| j.values.get(index).copied()).unwrap_or(0.0);
 
@@ -303,6 +307,10 @@ pub(super) fn sweep(s: &mut Session, p: &Value) -> Result<Value> {
     if report_gaps {
         out["min_gap"] =
             nearest.into_iter().map(|(k, g)| (k, json!({"mm": g.mm, "at_value": g.at, "to": g.to}))).collect::<serde_json::Map<_, _>>().into();
+    }
+    if !held_ids.is_empty() {
+        out["held"] =
+            json!(held_ids.iter().filter_map(|id| s.doc.assembly.joints.iter().find(|j| j.id == *id).map(|j| j.name.clone())).collect::<Vec<_>>());
     }
     Ok(out)
 }
