@@ -124,15 +124,18 @@ fn legacy_extension_and_format_tag_still_open() {
     let saved = dir.0.join("box.json");
     json_output(cli().arg("run").arg(dir.script()).arg("--save").arg(&saved).output().unwrap());
     let text = std::fs::read_to_string(&saved).unwrap();
-    assert!(text.contains("\"solidcraft/"), "new designs carry the current tag");
-    let legacy = dir.0.join("old.solvecraft");
-    std::fs::write(&legacy, text.replace("\"solidcraft/", "\"solvecraft/")).unwrap();
-    assert_eq!(body_count(&legacy), 1);
-    let resaved = dir.0.join("resaved.solidcraft");
-    json_output(cli().args(["run", "--in"]).arg(&legacy).arg(dir.script()).arg("--save").arg(&resaved).output().unwrap());
-    assert_eq!(body_count(&resaved), 2);
-    let reopened = polykrom_engine::io::read_design(&std::fs::read(&resaved).unwrap()).unwrap();
-    assert!(reopened.to_json().contains("\"solidcraft/"));
+    assert!(text.contains("\"polykrom/"), "new designs carry the current tag");
+    // SolidCraft's tag (#304) and SolveCraft's before it.
+    for (ext, tag) in [("solidcraft", "\"solidcraft/"), ("solvecraft", "\"solvecraft/")] {
+        let legacy = dir.0.join(format!("old.{ext}"));
+        std::fs::write(&legacy, text.replace("\"polykrom/", tag)).unwrap();
+        assert_eq!(body_count(&legacy), 1, "{ext}");
+        let resaved = dir.0.join(format!("resaved-{ext}.polykrom"));
+        json_output(cli().args(["run", "--in"]).arg(&legacy).arg(dir.script()).arg("--save").arg(&resaved).output().unwrap());
+        assert_eq!(body_count(&resaved), 2, "{ext}");
+        let reopened = polykrom_engine::io::read_design(&std::fs::read(&resaved).unwrap()).unwrap();
+        assert!(reopened.to_json().contains("\"polykrom/"), "{ext}: saved again with the current tag");
+    }
 }
 
 /// `snapshot` starts from `--in` as `run` does (its script runs on that design), and refuses an
