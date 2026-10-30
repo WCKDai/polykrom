@@ -457,7 +457,7 @@ pub(crate) fn check_arguments(name: &str, args: &Value) -> Result<(), String> {
 }
 
 /// A tool result: content blocks plus the error flag.
-fn text_result(v: &Value, is_error: bool) -> Value {
+pub(crate) fn text_result(v: &Value, is_error: bool) -> Value {
     let text = match v {
         Value::String(s) => s.clone(),
         v => serde_json::to_string_pretty(v).unwrap_or_default(),
@@ -1082,6 +1082,22 @@ fn batch(b: &mut dyn Backend, a: &Map<String, Value>) -> Value {
     let profile = profile && b.in_process();
     for (i, step) in steps.iter().enumerate() {
         let command = step.get("command").or_else(|| step.get("id")).and_then(Value::as_str);
+        // Cancelled (notifications/cancelled, #264): stop before the next step and take back
+        // the ones run.
+        if crate::call::cancelled() {
+            let (went_back, undone) = start.rollback(b, i);
+            let reply = json!({
+                "ok": false,
+                "cancelled": true,
+                "completed": i,
+                "rolled_back": went_back,
+                "undone": undone,
+                "applied": if went_back { Vec::new() } else { (0..i).collect::<Vec<_>>() },
+                "not_run": (i..steps.len()).collect::<Vec<_>>(),
+                "results": results,
+            });
+            return text_result(&with_timings(reply, timed, rows, clock.ms()), true);
+        }
         let (r, took) = timing::time(profile, || match command {
             Some(id) => exec(b, id, step.get("params").cloned().filter(|p| !p.is_null()).unwrap_or(json!({}))),
             None => Err("missing `command`".to_string()),

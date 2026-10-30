@@ -10,6 +10,7 @@
 #![forbid(unsafe_code)]
 
 mod backend;
+mod call;
 mod server;
 mod skill_reference;
 mod tools;
