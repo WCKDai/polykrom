@@ -8,12 +8,12 @@ version bump and no patch release for every merge.
 
 ## Names and deployment
 
-Release titles, installer product names and everything a person reads use the Polykrom name.
-Asset, binary and package file names keep SolidCraft's stable names until the second rename
-stage, because the updater picks assets by them
-(`polykrom-<version>-linux-<arch>.AppImage`, `Polykrom-<version>-windows-x64.exe`,
-`polykrom-cli` archives, …). The old name survives only in the shims listed in
-[compatibility.md](compatibility.md) (the end-of-life Flatpak refs of the old Linux app ID, the legacy `.zsync` and `.flatpakrepo`
+Release titles, installer product names, release files and everything a person reads use the
+Polykrom name (`polykrom-<version>-linux-<arch>.AppImage`, `Polykrom-<version>-windows-x64.exe`,
+`polykrom-cli` archives, …; #304). Binary and package names keep SolidCraft's names until their
+steps of the second rename stage. The old name survives only in the shims listed in
+[compatibility.md](compatibility.md) (the end-of-life Flatpak refs of the old Linux app ID, the
+`solidcraft-…` copies of the version-less installers, the legacy `.zsync` and `.flatpakrepo`
 copies, the deprecated old-name CLI alias); keep them until that document says they can go. Do not
 rewrite published assets, checksums, tags or historical release notes of earlier versions.
 
@@ -21,7 +21,7 @@ The main installers (`.msi`, portable `.zip`, `.dmg`, `.AppImage`, `.deb`, `.rpm
 also attached without the version in their names, for example `polykrom-windows-x64.msi` and
 `polykrom-linux-x86_64.AppImage`, and again under SolidCraft's names (`solidcraft-windows-x64.msi`, …)
 for links and installs from before the rename (docs/compatibility.md), all listed in `SHA256SUMS.txt`. The README's Download section
-links to `https://github.com/bherbruck/solidcraft/releases/latest/download/<name>`, which follows
+links to `https://github.com/WCKDai/polykrom/releases/latest/download/<name>`, which follows
 the release marked latest; nightlies never are. Keep these names stable: renaming one breaks the
 README links and the in-app update check, which picks them by name (`crates/ui-egui/src/update.rs`;
 [updates and privacy](book/src/guide/updates.md)).
