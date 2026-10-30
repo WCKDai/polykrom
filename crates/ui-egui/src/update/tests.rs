@@ -122,37 +122,43 @@ fn an_msi_install_outside_program_files_is_recognised() {
     assert_eq!(kind(Some(r"D:\Program Files\SolidCraft2\")), InstallKind::WindowsPortable, "a folder whose name only starts the same");
 }
 
-/// The assets of v0.10.0, as published.
+/// The assets of v0.10.0, as a release publishes them since #304: Polykrom's names, the
+/// version-less copies, and the same copies again under SolidCraft's name for older installs.
 fn release() -> Release {
     let names = [
         "SHA256SUMS.txt",
-        "solidcraft-0.10.0-linux-x86_64.AppImage",
+        "polykrom-0.10.0-linux-x86_64.AppImage",
+        "polykrom-0.10.0-linux-x86_64.AppImage.zsync",
         "solidcraft-0.10.0-linux-x86_64.AppImage.zsync",
-        "solidcraft-0.10.0-linux-x86_64.tar.gz",
-        "solidcraft-0.10.0-linux-aarch64.tar.gz",
-        "SolidCraft-0.10.0-windows-x64.exe",
-        "solidcraft-linux-aarch64.AppImage",
-        "solidcraft-linux-aarch64.deb",
+        "polykrom-0.10.0-linux-x86_64.tar.gz",
+        "polykrom-0.10.0-linux-aarch64.tar.gz",
+        "Polykrom-0.10.0-windows-x64.exe",
+        "polykrom-linux-aarch64.AppImage",
+        "polykrom-linux-aarch64.deb",
+        "polykrom-linux-x86_64.AppImage",
+        "polykrom-linux-x86_64.deb",
+        "polykrom-linux-x86_64.flatpak",
+        "polykrom-linux-x86_64.rpm",
+        "polykrom-linux-x86_64.snap",
+        "polykrom-macos-universal.dmg",
+        "polykrom-windows-arm64-portable.zip",
+        "polykrom-windows-arm64.msi",
+        "polykrom-windows-x64-portable.zip",
+        "polykrom-windows-x64.msi",
+        "polykrom-windows-x86-portable.zip",
+        "polykrom-windows-x86.msi",
         "solidcraft-linux-x86_64.AppImage",
         "solidcraft-linux-x86_64.deb",
-        "solidcraft-linux-x86_64.flatpak",
-        "solidcraft-linux-x86_64.rpm",
-        "solidcraft-linux-x86_64.snap",
         "solidcraft-macos-universal.dmg",
-        "solidcraft-windows-arm64-portable.zip",
-        "solidcraft-windows-arm64.msi",
-        "solidcraft-windows-x64-portable.zip",
         "solidcraft-windows-x64.msi",
-        "solidcraft-windows-x86-portable.zip",
-        "solidcraft-windows-x86.msi",
     ];
     let assets: Vec<Value> = names
         .iter()
-        .map(|n| json!({"name": n, "size": 10, "browser_download_url": format!("https://github.com/wckdboy/polykrom/releases/download/v0.10.0/{n}")}))
+        .map(|n| json!({"name": n, "size": 10, "browser_download_url": format!("https://github.com/WCKDai/polykrom/releases/download/v0.10.0/{n}")}))
         .collect();
     let body = json!({
         "tag_name": "v0.10.0", "name": "Polykrom v0.10.0", "body": "**What's new**\n\n- Surface tools.",
-        "html_url": "https://github.com/wckdboy/polykrom/releases/tag/v0.10.0", "draft": false, "prerelease": false, "assets": assets,
+        "html_url": "https://github.com/WCKDai/polykrom/releases/tag/v0.10.0", "draft": false, "prerelease": false, "assets": assets,
     });
     Release::parse(body.to_string().as_bytes()).unwrap()
 }
@@ -161,48 +167,45 @@ fn release() -> Release {
 fn each_installation_gets_its_own_file() {
     let r = release();
     let name = |k: InstallKind, arch: &str| r.asset_for(&k, arch).map(|a| a.name.clone());
-    assert_eq!(name(InstallKind::AppImage("/a".into()), "x86_64").as_deref(), Some("solidcraft-linux-x86_64.AppImage"));
-    assert_eq!(name(InstallKind::AppImage("/a".into()), "aarch64").as_deref(), Some("solidcraft-linux-aarch64.AppImage"));
-    assert_eq!(name(InstallKind::Deb, "x86_64").as_deref(), Some("solidcraft-linux-x86_64.deb"));
-    assert_eq!(name(InstallKind::Rpm, "x86_64").as_deref(), Some("solidcraft-linux-x86_64.rpm"));
-    assert_eq!(name(InstallKind::LinuxTarball, "aarch64").as_deref(), Some("solidcraft-0.10.0-linux-aarch64.tar.gz"));
-    assert_eq!(name(InstallKind::WindowsMsi, "x86_64").as_deref(), Some("solidcraft-windows-x64.msi"));
-    assert_eq!(name(InstallKind::WindowsMsi, "aarch64").as_deref(), Some("solidcraft-windows-arm64.msi"));
-    assert_eq!(name(InstallKind::WindowsMsi, "x86").as_deref(), Some("solidcraft-windows-x86.msi"));
-    assert_eq!(name(InstallKind::WindowsPortable, "x86_64").as_deref(), Some("solidcraft-windows-x64-portable.zip"));
-    assert_eq!(name(InstallKind::WindowsExe, "x86_64").as_deref(), Some("SolidCraft-0.10.0-windows-x64.exe"));
-    assert_eq!(name(InstallKind::WindowsExe, "aarch64").as_deref(), Some("solidcraft-windows-arm64-portable.zip"));
-    assert_eq!(name(InstallKind::MacApp("/A.app".into()), "aarch64").as_deref(), Some("solidcraft-macos-universal.dmg"));
+    assert_eq!(name(InstallKind::AppImage("/a".into()), "x86_64").as_deref(), Some("polykrom-linux-x86_64.AppImage"));
+    assert_eq!(name(InstallKind::AppImage("/a".into()), "aarch64").as_deref(), Some("polykrom-linux-aarch64.AppImage"));
+    assert_eq!(name(InstallKind::Deb, "x86_64").as_deref(), Some("polykrom-linux-x86_64.deb"));
+    assert_eq!(name(InstallKind::Rpm, "x86_64").as_deref(), Some("polykrom-linux-x86_64.rpm"));
+    assert_eq!(name(InstallKind::LinuxTarball, "aarch64").as_deref(), Some("polykrom-0.10.0-linux-aarch64.tar.gz"));
+    assert_eq!(name(InstallKind::WindowsMsi, "x86_64").as_deref(), Some("polykrom-windows-x64.msi"));
+    assert_eq!(name(InstallKind::WindowsMsi, "aarch64").as_deref(), Some("polykrom-windows-arm64.msi"));
+    assert_eq!(name(InstallKind::WindowsMsi, "x86").as_deref(), Some("polykrom-windows-x86.msi"));
+    assert_eq!(name(InstallKind::WindowsPortable, "x86_64").as_deref(), Some("polykrom-windows-x64-portable.zip"));
+    assert_eq!(name(InstallKind::WindowsExe, "x86_64").as_deref(), Some("Polykrom-0.10.0-windows-x64.exe"));
+    assert_eq!(name(InstallKind::WindowsExe, "aarch64").as_deref(), Some("polykrom-windows-arm64-portable.zip"));
+    assert_eq!(name(InstallKind::MacApp("/A.app".into()), "aarch64").as_deref(), Some("polykrom-macos-universal.dmg"));
     assert_eq!(name(InstallKind::Other, "x86_64"), None);
     assert_eq!(name(InstallKind::Deb, "riscv64"), None);
     // Download: the file, or the page when there is none or a package manager updates it.
     assert_eq!(
         r.download_url(&InstallKind::WindowsMsi, "x86_64"),
-        "https://github.com/wckdboy/polykrom/releases/download/v0.10.0/solidcraft-windows-x64.msi"
+        "https://github.com/WCKDai/polykrom/releases/download/v0.10.0/polykrom-windows-x64.msi"
     );
-    assert_eq!(r.download_url(&InstallKind::Other, "x86_64"), "https://github.com/wckdboy/polykrom/releases/tag/v0.10.0");
+    assert_eq!(r.download_url(&InstallKind::Other, "x86_64"), "https://github.com/WCKDai/polykrom/releases/tag/v0.10.0");
     assert_eq!(r.download_url(&InstallKind::Flatpak(APP_ID.into()), "x86_64"), r.page);
     assert_eq!(r.download_url(&InstallKind::Snap { store: true }, "x86_64"), r.page);
     assert_eq!(
         r.download_url(&InstallKind::Snap { store: false }, "x86_64"),
-        "https://github.com/wckdboy/polykrom/releases/download/v0.10.0/solidcraft-linux-x86_64.snap"
+        "https://github.com/WCKDai/polykrom/releases/download/v0.10.0/polykrom-linux-x86_64.snap"
     );
     assert_eq!(
-        InstallKind::Snap { store: false }.update_command(Some("solidcraft-linux-x86_64.snap")).as_deref(),
-        Some("sudo snap install --dangerous ./solidcraft-linux-x86_64.snap")
+        InstallKind::Snap { store: false }.update_command(Some("polykrom-linux-x86_64.snap")).as_deref(),
+        Some("sudo snap install --dangerous ./polykrom-linux-x86_64.snap")
     );
     assert_eq!(InstallKind::Flatpak(APP_ID.into()).update_command(None).as_deref(), Some("flatpak update ai.storyteller.solidcraft"));
-    assert_eq!(
-        InstallKind::Deb.update_command(Some("solidcraft-linux-x86_64.deb")).as_deref(),
-        Some("sudo apt install ./solidcraft-linux-x86_64.deb")
-    );
+    assert_eq!(InstallKind::Deb.update_command(Some("polykrom-linux-x86_64.deb")).as_deref(), Some("sudo apt install ./polykrom-linux-x86_64.deb"));
     assert_eq!(InstallKind::WindowsMsi.update_command(None), None);
 }
 
 #[test]
 fn release_answers_are_checked() {
     let r = release();
-    assert_eq!((r.tag.as_str(), r.version(), r.assets.len()), ("v0.10.0", "0.10.0", 20));
+    assert_eq!((r.tag.as_str(), r.version(), r.assets.len()), ("v0.10.0", "0.10.0", 25), "every asset kept: GitHub names the WCKDai owner");
     let bad = |v: Value| Release::parse(v.to_string().as_bytes()).is_err();
     assert!(bad(json!({"tag_name": "v0.11.0-rc.1", "prerelease": true})));
     assert!(bad(json!({"tag_name": "v0.11.0", "draft": true})));
@@ -212,14 +215,20 @@ fn release_answers_are_checked() {
     let r = Release::parse(
         json!({"tag_name": "v1.0.0", "html_url": "https://evil.example/x", "assets": [
             {"name": "solidcraft-windows-x64.msi", "browser_download_url": "https://evil.example/a.msi"},
-            {"name": "solidcraft-windows-x86.msi", "browser_download_url": "https://github.com/wckdboy/polykrom/releases/download/v1.0.0/solidcraft-windows-x86.msi"},
+            {"name": "polykrom-windows-x86.msi", "browser_download_url": "https://github.com/wckdboy/polykrom/releases/download/v1.0.0/polykrom-windows-x86.msi"},
+            {"name": "polykrom-windows-x64.msi", "browser_download_url": "https://github.com/WCKDai/polykrom/releases/download/v1.0.0/polykrom-windows-x64.msi"},
+            {"name": "polykrom-windows-arm64.msi", "browser_download_url": "https://github.com/WCKDai/polykrom-evil/releases/download/v1.0.0/polykrom-windows-arm64.msi"},
         ]})
         .to_string()
         .as_bytes(),
     )
     .unwrap();
     assert_eq!(r.page, RELEASES_PAGE);
-    assert_eq!(r.assets.len(), 1);
+    assert_eq!(
+        r.assets.iter().map(|a| a.name.as_str()).collect::<Vec<_>>(),
+        ["polykrom-windows-x86.msi", "polykrom-windows-x64.msi"],
+        "either owner; no look-alike"
+    );
     assert_eq!(r.name, "Polykrom v1.0.0");
     // Huge notes are cut (on a character boundary).
     let r = Release::parse(json!({"tag_name": "v1.0.0", "body": "é".repeat(MAX_NOTES)}).to_string().as_bytes()).unwrap();
@@ -495,21 +504,33 @@ fn only_polykrom_releases_are_accepted() {
         let base = format!("https://github.com/{owner}/releases");
         Release::parse(
             json!({"tag_name": "v1.0.0", "html_url": format!("{base}/tag/v1.0.0"), "assets": [
-                {"name": "solidcraft-windows-x64.msi", "browser_download_url": format!("{base}/download/v1.0.0/solidcraft-windows-x64.msi")},
+                {"name": "polykrom-windows-x64.msi", "browser_download_url": format!("{base}/download/v1.0.0/polykrom-windows-x64.msi")},
             ]})
             .to_string()
             .as_bytes(),
         )
         .unwrap()
     };
-    let r = parse("wckdboy/polykrom");
-    assert_eq!(r.page, "https://github.com/wckdboy/polykrom/releases/tag/v1.0.0");
-    assert_eq!(r.assets.len(), 1);
+    // The repository moved to the WCKDai organisation, and GitHub answers with its URLs (#304);
+    // the old owner's still count.
+    for owner in ["WCKDai/polykrom", "wckdboy/polykrom"] {
+        let r = parse(owner);
+        assert_eq!(r.page, format!("https://github.com/{owner}/releases/tag/v1.0.0"));
+        assert_eq!(r.assets.len(), 1, "{owner}");
+    }
     // Any other owner, repository, host or scheme is dropped, SolidCraft's own releases included:
     // they are another program's.
-    for owner in
-        ["bherbruck/solidcraft", "tangency-labs/solidcraft", "evil/polykrom", "wckdboy/polykrom-evil", "wckdboy.evil/polykrom", "wckdboy/other"]
-    {
+    for owner in [
+        "bherbruck/solidcraft",
+        "tangency-labs/solidcraft",
+        "evil/polykrom",
+        "wckdboy/polykrom-evil",
+        "wckdboy.evil/polykrom",
+        "wckdboy/other",
+        "WCKDai/polykrom-evil",
+        "WCKDai.evil/polykrom",
+        "WCKDai/other",
+    ] {
         let r = parse(owner);
         assert_eq!(r.page, RELEASES_PAGE, "{owner}");
         assert!(r.assets.is_empty(), "{owner}");

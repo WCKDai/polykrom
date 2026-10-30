@@ -70,8 +70,8 @@ jobs:
         run: |
           base="https://github.com/${GITHUB_REPOSITORY}/releases/download/$TAG"
           "$RUNNER_TEMP/komac" update "$PACKAGE_ID" --version "$VERSION" \
-            --urls "$base/solidcraft-$VERSION-windows-x64.msi" \
-                   "$base/solidcraft-$VERSION-windows-x86.msi" \
-                   "$base/solidcraft-$VERSION-windows-arm64.msi" \
+            --urls "$base/polykrom-$VERSION-windows-x64.msi" \
+                   "$base/polykrom-$VERSION-windows-x86.msi" \
+                   "$base/polykrom-$VERSION-windows-arm64.msi" \
             --release-notes-url "https://github.com/${GITHUB_REPOSITORY}/releases/tag/$TAG" \
             --submit

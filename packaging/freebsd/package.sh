@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # Build and package Polykrom for FreeBSD:
 #
-#   $DIST/solidcraft-<version>-freebsd-x86_64.tar.gz   a /usr/local-style tree:
-#       solidcraft-<version>-freebsd-x86_64/{bin, share/applications, share/icons, share/mime,
+#   $DIST/polykrom-<version>-freebsd-x86_64.tar.gz   a /usr/local-style tree:
+#       polykrom-<version>-freebsd-x86_64/{bin, share/applications, share/icons, share/mime,
 #       share/metainfo, share/doc/solidcraft}
 #
 # Install by copying the tree's contents into /usr/local:
-#   tar -xzf solidcraft-<version>-freebsd-x86_64.tar.gz --strip-components 1 -C /usr/local
+#   tar -xzf polykrom-<version>-freebsd-x86_64.tar.gz --strip-components 1 -C /usr/local
 #
 # Usage: packaging/freebsd/package.sh [--skip-build]
 # Needs: bash, cargo, and the packages installed by release.yml's FreeBSD job.
@@ -31,7 +31,7 @@ case "$(uname -m)" in
   arm64 | aarch64) ARCH=aarch64 ;;
   *) echo "unsupported architecture $(uname -m)" >&2; exit 2 ;;
 esac
-BASENAME="solidcraft-$VERSION-freebsd-$ARCH"
+BASENAME="polykrom-$VERSION-freebsd-$ARCH"
 echo "==> Polykrom $VERSION for FreeBSD $ARCH"
 
 # The release VM has 12 GB; full parallelism on the biggest crates runs it out of memory.

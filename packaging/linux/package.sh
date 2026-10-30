@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # Build and package Polykrom for Linux (<arch> is x86_64 or aarch64):
 #
-#   $DIST/solidcraft-<version>-linux-<arch>.AppImage        any distro with glibc >= the build host's
-#   $DIST/solidcraft-<version>-linux-<arch>.AppImage.zsync  delta updates (needs zsyncmake)
+#   $DIST/polykrom-<version>-linux-<arch>.AppImage        any distro with glibc >= the build host's
+#   $DIST/polykrom-<version>-linux-<arch>.AppImage.zsync  delta updates (needs zsyncmake)
 #   $DIST/solvecraft-<version>-linux-<arch>.AppImage.zsync  the same, for pre-rename AppImages
-#   $DIST/solidcraft-<version>-linux-<arch>.deb             Debian, Ubuntu, Mint, Pop!_OS, ...
-#   $DIST/solidcraft-<version>-linux-<arch>.rpm             Fedora, openSUSE, RHEL, ...
-#   $DIST/solidcraft-<version>-linux-<arch>.tar.gz          plain FHS-style tree (bin/, share/)
+#   $DIST/polykrom-<version>-linux-<arch>.deb             Debian, Ubuntu, Mint, Pop!_OS, ...
+#   $DIST/polykrom-<version>-linux-<arch>.rpm             Fedora, openSUSE, RHEL, ...
+#   $DIST/polykrom-<version>-linux-<arch>.tar.gz          plain FHS-style tree (bin/, share/)
 #
 # Usage: packaging/linux/package.sh [--skip-build] [--formats "appimage deb rpm tar"]
 #
@@ -39,7 +39,7 @@ case "$ARCH" in
   *) echo "unsupported architecture $ARCH" >&2; exit 2 ;;
 esac
 export SOLIDCRAFT_MAINTAINER="${SOLIDCRAFT_MAINTAINER:-${SOLVECRAFT_MAINTAINER:-Polykrom contributors <https://github.com/bherbruck/solidcraft>}}"  # SOLVECRAFT_*: compatibility shim, see docs/compatibility.md
-BASENAME="solidcraft-$VERSION-linux-$ARCH"
+BASENAME="polykrom-$VERSION-linux-$ARCH"
 
 echo "==> Polykrom $VERSION for Linux $ARCH ($FORMATS)"
 
@@ -112,7 +112,7 @@ fi
 
 # ---- AppImage -----------------------------------------------------------------------------------
 if has appimage; then
-  APPDIR="$WORK/SolidCraft.AppDir"
+  APPDIR="$WORK/Polykrom.AppDir"
   cp -R "$STAGE" "$APPDIR"
   mv "$APPDIR/usr/share/doc" "$WORK/doc-unused"
   # AppRun is a script, not a symlink: it installs the .desktop entry and icons into
@@ -138,20 +138,22 @@ if has appimage; then
   # Update information: AppImageUpdate and the like fetch only the changed blocks of a newer
   # release through the .zsync published next to each AppImage. `latest` is the newest published
   # release that is not a pre-release.
-  REPO="${GITHUB_REPOSITORY:-bherbruck/solidcraft}"
-  UPDATE_INFO="gh-releases-zsync|${REPO%%/*}|${REPO#*/}|latest|solidcraft-*-linux-$ARCH.AppImage.zsync"
+  REPO="${GITHUB_REPOSITORY:-WCKDai/polykrom}"
+  UPDATE_INFO="gh-releases-zsync|${REPO%%/*}|${REPO#*/}|latest|polykrom-*-linux-$ARCH.AppImage.zsync"
   # Extract-and-run: works without FUSE (containers, CI). With zsyncmake on the host appimagetool
   # also writes the .zsync, into its working directory, hence the cd.
   (cd "$DIST" && ARCH="$ARCH" APPIMAGE_EXTRACT_AND_RUN=1 "$TOOL" --no-appstream -u "$UPDATE_INFO" "$APPDIR" "$OUT")
   echo "wrote $OUT"
   if [ -s "$OUT.zsync" ]; then
     echo "wrote $OUT.zsync"
-    # Compatibility shim (docs/compatibility.md): AppImages from before the rename look for
-    # `solvecraft-*-linux-$ARCH.AppImage.zsync` in the latest release. The same .zsync under that
-    # name (its URL is the new AppImage's file name, relative to the release) updates them to
-    # Polykrom.
-    cp "$OUT.zsync" "$DIST/solvecraft-$VERSION-linux-$ARCH.AppImage.zsync"
-    echo "wrote $DIST/solvecraft-$VERSION-linux-$ARCH.AppImage.zsync (legacy update alias)"
+    # Compatibility shim (docs/compatibility.md): AppImages from before each rename look for
+    # `solvecraft-*-linux-$ARCH.AppImage.zsync` or `solidcraft-*-linux-$ARCH.AppImage.zsync` in the
+    # latest release. The same .zsync under those names (its URL is the new AppImage's file name,
+    # relative to the release) updates them to Polykrom.
+    for old in solvecraft solidcraft; do
+      cp "$OUT.zsync" "$DIST/$old-$VERSION-linux-$ARCH.AppImage.zsync"
+      echo "wrote $DIST/$old-$VERSION-linux-$ARCH.AppImage.zsync (legacy update alias)"
+    done
   else
     warn "zsyncmake not found, so $OUT.zsync was not written; AppImage delta updates need it"
   fi

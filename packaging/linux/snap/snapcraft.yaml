@@ -1,4 +1,4 @@
-# Snap package (solidcraft-<version>-linux-<arch>.snap on every GitHub release, and the Snap
+# Snap package (polykrom-<version>-linux-<arch>.snap on every GitHub release, and the Snap
 # Store when its credentials are configured). Build it with packaging/linux/snap-pack.sh.
 #
 # Like the Flatpak, it repackages the release's own Linux tarball (built on Ubuntu 22.04 by

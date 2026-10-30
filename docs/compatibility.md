@@ -19,6 +19,13 @@ below:
 | STEP files written by SolidCraft | Recognised as this program's own, like Polykrom's |
 | The updater's release key | Polykrom needs its own key before it can publish updates |
 
+The second stage (#304) renames the rest, one step at a time; each step moves its row out of the
+table above and into this list, with its shim:
+
+| Renamed | Shim |
+| --- | --- |
+| Release files: `polykrom-<version>-<platform>.*` (the Windows exe `Polykrom-<version>-windows-x64.exe`), with version-less `polykrom-<platform>.*` copies | Every release also attaches the version-less copies under SolidCraft's name (`solidcraft-windows-x64.msi`, `solidcraft-linux-x86_64.AppImage`, …), for download links and the update check of builds from before the rename, and a copy of the AppImage's `.zsync` as `solidcraft-<version>-linux-<arch>.AppImage.zsync`, which AppImages from before it look for (`.github/workflows/release.yml`, `packaging/linux/package.sh`) |
+
 # Compatibility with the SolveCraft name
 
 SolidCraft was first called SolveCraft, and builds up to 0.4 kept that name in their
@@ -142,7 +149,7 @@ test `legacy_design_files_and_resource_uris`).
 | macOS bundle ID | changed to `ai.storyteller.solidcraft` | No updater depends on it; the app is drag-installed. macOS may ask again on first launch (unsigned builds). |
 | MSI `UpgradeCode` | **kept** | So the new MSI upgrades the old install in place. Product name is SolidCraft; the default folder becomes `Program Files\SolidCraft` (the major upgrade removes the old folder). A custom install folder isn't remembered across this one upgrade. |
 | deb / rpm package name | renamed to `solidcraft`; deb `Replaces`/`Conflicts`/`Provides: solvecraft`, rpm `Obsoletes`/`Provides: solvecraft` | Installing the new package replaces the old one instead of installing side by side. |
-| AppImage | `solidcraft-<version>-linux-<arch>.AppImage`; the release also carries a copy of its `.zsync` under the old `solvecraft-…` name | AppImages already installed look for the old-named `.zsync`, so AppImageUpdate keeps finding updates. |
+| AppImage | `polykrom-<version>-linux-<arch>.AppImage` since #304; the release also carries copies of its `.zsync` under the old `solvecraft-…` and `solidcraft-…` names | AppImages already installed look for the old-named `.zsync`, so AppImageUpdate keeps finding updates. |
 
 ## Linux app ID
 

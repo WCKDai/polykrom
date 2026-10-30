@@ -26,13 +26,10 @@ fn hex(bytes: &[u8]) -> String {
 #[test]
 fn checksum_lists_are_read() {
     let h = "a".repeat(64);
-    let sums = format!(
-        "{h}  solidcraft-linux-x86_64.AppImage\n{}  *solidcraft-windows-x64.msi\nnot a line\n{}  short.txt\n",
-        "B".repeat(64),
-        "c".repeat(10)
-    );
-    assert_eq!(expected_sha256(&sums, "solidcraft-linux-x86_64.AppImage"), Some(h));
-    assert_eq!(expected_sha256(&sums, "solidcraft-windows-x64.msi"), Some("b".repeat(64)), "binary-mode marker and upper case");
+    let sums =
+        format!("{h}  polykrom-linux-x86_64.AppImage\n{}  *polykrom-windows-x64.msi\nnot a line\n{}  short.txt\n", "B".repeat(64), "c".repeat(10));
+    assert_eq!(expected_sha256(&sums, "polykrom-linux-x86_64.AppImage"), Some(h));
+    assert_eq!(expected_sha256(&sums, "polykrom-windows-x64.msi"), Some("b".repeat(64)), "binary-mode marker and upper case");
     assert_eq!(expected_sha256(&sums, "short.txt"), None, "not a SHA-256");
     assert_eq!(expected_sha256(&sums, "solidcraft-linux-x86_64"), None);
 }
@@ -69,14 +66,14 @@ fn methods_per_installation() {
     }
 }
 
-const BASE: &str = "https://github.com/bherbruck/solidcraft/releases/download/v9.9.9/";
+const BASE: &str = "https://github.com/WCKDai/polykrom/releases/download/v9.9.9/";
 
 fn release_with(assets: &[(&str, usize)]) -> Release {
     Release {
         tag: "v9.9.9".into(),
         name: "SolidCraft v9.9.9".into(),
         notes: String::new(),
-        page: "https://github.com/bherbruck/solidcraft/releases/tag/v9.9.9".into(),
+        page: "https://github.com/WCKDai/polykrom/releases/tag/v9.9.9".into(),
         assets: assets.iter().map(|(n, size)| Asset { name: n.to_string(), url: format!("{BASE}{n}"), size: *size as u64 }).collect(),
     }
 }
@@ -109,7 +106,7 @@ fn an_appimage_is_replaced_only_when_it_verifies() {
     let target = dir.join("SolidCraft.AppImage");
     std::fs::write(&target, b"old version").unwrap();
     let new = b"new version".to_vec();
-    let name = "solidcraft-linux-x86_64.AppImage";
+    let name = "polykrom-linux-x86_64.AppImage";
     let kind = InstallKind::AppImage(target.clone());
     let m = Method::AppImage(target.clone());
     let r = release_with(&[(name, new.len()), (SUMS, 100)]);
@@ -160,14 +157,14 @@ fn the_portable_zip_swaps_both_executables() {
     {
         let mut z = zip::ZipWriter::new(std::io::Cursor::new(&mut zip_bytes));
         let o = zip::write::SimpleFileOptions::default();
-        z.add_directory("solidcraft-9.9.9-windows-x64-portable/", o).unwrap();
+        z.add_directory("polykrom-9.9.9-windows-x64-portable/", o).unwrap();
         for (n, b) in [("solidcraft.exe", &b"new app"[..]), ("solidcraft-cli.exe", b"new cli"), ("README.md", b"readme")] {
-            z.start_file(format!("solidcraft-9.9.9-windows-x64-portable/{n}"), o).unwrap();
+            z.start_file(format!("polykrom-9.9.9-windows-x64-portable/{n}"), o).unwrap();
             z.write_all(b).unwrap();
         }
         z.finish().unwrap();
     }
-    let name = "solidcraft-windows-x64-portable.zip";
+    let name = "polykrom-windows-x64-portable.zip";
     let r = release_with(&[(name, zip_bytes.len()), (SUMS, 100)]);
     let n = net(vec![(name.into(), zip_bytes.clone()), (SUMS.into(), format!("{}  {name}\n", hex(&zip_bytes)).into_bytes())]);
     let out =
@@ -195,7 +192,7 @@ fn the_portable_zip_swaps_both_executables() {
 #[test]
 fn installers_and_disk_images_are_handed_over() {
     let dir = scratch("msi");
-    let pkg = dir.join("solidcraft-windows-x64.msi");
+    let pkg = dir.join("polykrom-windows-x64.msi");
     std::fs::write(&pkg, b"msi").unwrap();
     assert_eq!(
         apply(&Method::Msi, &pkg).unwrap(),

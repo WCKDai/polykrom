@@ -25,15 +25,15 @@ use crate::theme::Tokens;
 use crate::ui_kit;
 
 /// The repository releases come from.
-pub const REPO: &str = "bherbruck/solidcraft";
+pub const REPO: &str = "WCKDai/polykrom";
 /// The one request an update check makes.
-pub const LATEST_API: &str = "https://api.github.com/repos/wckdboy/polykrom/releases/latest";
+pub const LATEST_API: &str = "https://api.github.com/repos/WCKDai/polykrom/releases/latest";
 /// Where Download goes when no package fits this installation.
-pub const RELEASES_PAGE: &str = "https://github.com/wckdboy/polykrom/releases/latest";
-/// Release pages and assets must be on GitHub, under this repository. The repository is moving
-/// to the `tangency-labs` organisation, so releases may name either owner (the API request stays
-/// on the old name, which GitHub redirects after a transfer).
-const RELEASE_PREFIXES: [&str; 1] = ["https://github.com/wckdboy/polykrom/releases/"];
+pub const RELEASES_PAGE: &str = "https://github.com/WCKDai/polykrom/releases/latest";
+/// Release pages and assets must be on GitHub, under this repository. It moved from `wckdboy` to
+/// the `WCKDai` organisation, and GitHub answers with the new owner's URLs (#304: accepting only
+/// the old owner turned down every asset), so releases may name either owner.
+const RELEASE_PREFIXES: [&str; 2] = ["https://github.com/WCKDai/polykrom/releases/", "https://github.com/wckdboy/polykrom/releases/"];
 
 /// A release page or asset URL: github.com, Polykrom's repository exactly, then `/releases/` (the
 /// trailing slash rules out look-alike names such as `polykrom-evil`). SolidCraft's releases are
@@ -147,7 +147,7 @@ pub enum InstallKind {
     WindowsMsi,
     /// The portable `.zip`, unpacked somewhere.
     WindowsPortable,
-    /// The lone `SolidCraft-<version>-windows-x64.exe`.
+    /// The lone `Polykrom-<version>-windows-x64.exe`.
     WindowsExe,
     /// `SolidCraft.app`, at this path (the bundle).
     MacApp(PathBuf),
@@ -304,18 +304,16 @@ impl InstallKind {
         match self {
             InstallKind::Flatpak(id) => Some(format!("flatpak update {id}")),
             InstallKind::Snap { store: true } => Some("sudo snap refresh solidcraft".into()),
-            InstallKind::Snap { store: false } => {
-                Some(format!("sudo snap install --dangerous ./{}", asset.unwrap_or("solidcraft-linux-x86_64.snap")))
-            }
-            InstallKind::Deb => Some(format!("sudo apt install ./{}", asset.unwrap_or("solidcraft-linux-x86_64.deb"))),
-            InstallKind::Rpm => Some(format!("sudo dnf install ./{}", asset.unwrap_or("solidcraft-linux-x86_64.rpm"))),
+            InstallKind::Snap { store: false } => Some(format!("sudo snap install --dangerous ./{}", asset.unwrap_or("polykrom-linux-x86_64.snap"))),
+            InstallKind::Deb => Some(format!("sudo apt install ./{}", asset.unwrap_or("polykrom-linux-x86_64.deb"))),
+            InstallKind::Rpm => Some(format!("sudo dnf install ./{}", asset.unwrap_or("polykrom-linux-x86_64.rpm"))),
             _ => None,
         }
     }
 }
 
 /// The release asset that installs or replaces this installation, by its fixed name
-/// (docs/releasing.md: `solidcraft-windows-x64.msi`, `solidcraft-linux-x86_64.AppImage`, …), or
+/// (docs/releasing.md: `polykrom-windows-x64.msi`, `polykrom-linux-x86_64.AppImage`, …), or
 /// the versioned name for the packages without one. `arch` is `std::env::consts::ARCH`.
 pub fn asset_name(kind: &InstallKind, arch: &str, version: &str) -> Option<String> {
     let linux = match arch {
@@ -330,18 +328,18 @@ pub fn asset_name(kind: &InstallKind, arch: &str, version: &str) -> Option<Strin
     };
     let version = version.trim_start_matches('v');
     Some(match kind {
-        InstallKind::AppImage(_) => format!("solidcraft-linux-{}.AppImage", linux?),
-        InstallKind::Flatpak(_) => format!("solidcraft-linux-{}.flatpak", linux?),
-        InstallKind::Snap { .. } => format!("solidcraft-linux-{}.snap", linux?),
-        InstallKind::Deb => format!("solidcraft-linux-{}.deb", linux?),
-        InstallKind::Rpm => format!("solidcraft-linux-{}.rpm", linux?),
-        InstallKind::LinuxTarball => format!("solidcraft-{version}-linux-{}.tar.gz", linux?),
-        InstallKind::WindowsMsi => format!("solidcraft-windows-{}.msi", windows?),
-        InstallKind::WindowsPortable => format!("solidcraft-windows-{}-portable.zip", windows?),
+        InstallKind::AppImage(_) => format!("polykrom-linux-{}.AppImage", linux?),
+        InstallKind::Flatpak(_) => format!("polykrom-linux-{}.flatpak", linux?),
+        InstallKind::Snap { .. } => format!("polykrom-linux-{}.snap", linux?),
+        InstallKind::Deb => format!("polykrom-linux-{}.deb", linux?),
+        InstallKind::Rpm => format!("polykrom-linux-{}.rpm", linux?),
+        InstallKind::LinuxTarball => format!("polykrom-{version}-linux-{}.tar.gz", linux?),
+        InstallKind::WindowsMsi => format!("polykrom-windows-{}.msi", windows?),
+        InstallKind::WindowsPortable => format!("polykrom-windows-{}-portable.zip", windows?),
         // Only x64 has the lone .exe; elsewhere the portable zip is the same thing.
-        InstallKind::WindowsExe if windows == Some("x64") => format!("SolidCraft-{version}-windows-x64.exe"),
-        InstallKind::WindowsExe => format!("solidcraft-windows-{}-portable.zip", windows?),
-        InstallKind::MacApp(_) => "solidcraft-macos-universal.dmg".into(),
+        InstallKind::WindowsExe if windows == Some("x64") => format!("Polykrom-{version}-windows-x64.exe"),
+        InstallKind::WindowsExe => format!("polykrom-windows-{}-portable.zip", windows?),
+        InstallKind::MacApp(_) => "polykrom-macos-universal.dmg".into(),
         InstallKind::Dev | InstallKind::Web | InstallKind::Other => return None,
     })
 }
