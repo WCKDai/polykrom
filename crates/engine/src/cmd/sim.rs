@@ -253,6 +253,11 @@ mod native {
         let status = loop {
             match child.try_wait() {
                 Ok(Some(status)) => break Ok(status),
+                Ok(None) if crate::cancel::requested() => {
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    break Err(crate::cancel::error(CMD));
+                }
                 Ok(None) if started.elapsed() > budget => {
                     let _ = child.kill();
                     let _ = child.wait();

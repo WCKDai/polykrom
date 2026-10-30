@@ -211,3 +211,21 @@ fn a_threaded_shank_in_its_tapped_hole_is_listed_as_engagement() {
     let hit = &m["interferences"][0];
     assert!((hit["thread"].as_str(), (f(&hit["depth_mm"]) - 0.5).abs() < 0.05) == (Some("M6"), true), "{m}");
 }
+
+/// #264: a watched call that was cancelled stops instead of checking its pairs.
+#[test]
+fn a_cancelled_call_stops_before_checking_pairs() {
+    let mut s = Session::default();
+    for (i, name) in ["A", "B", "C"].iter().enumerate() {
+        let x = i as f64 * 15.0;
+        run(&mut s, "solid.box", json!({"length": 20, "width": 20, "height": 20, "corner": [x, 0, 0], "operation": "new", "body_name": name}));
+    }
+    let progress = std::sync::Arc::new(polykrom_doc::progress::Progress::default());
+    progress.cancel();
+    let r = polykrom_doc::progress::watch(progress, || s.execute("inspect.interference", &json!({})));
+    let e = r.expect_err("cancelled").to_string();
+    assert!(e.contains("cancelled"), "{e}");
+    // Unwatched, it runs as before.
+    let ok = run(&mut s, "inspect.interference", json!({}));
+    assert!(ok["interferences"].as_array().is_some_and(|a| !a.is_empty()), "{ok}");
+}

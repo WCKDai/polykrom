@@ -473,6 +473,9 @@ impl ContactGeometry {
             if *work > budget {
                 return Err(limit("motion exceeds contact sweep collision budget; simplify the contact set or use smaller increments"));
             }
+            if crate::cancel::requested() {
+                return Err(crate::cancel::error("contact sweep"));
+            }
             if let Some(depth) = depth {
                 found.insert((oa.0.min(ob.0), oa.0.max(ob.0)));
                 out.push((oa.clone(), ob.clone(), depth));

@@ -315,6 +315,10 @@ fn clearance(s: &mut Session, p: &Value) -> Result<Value> {
     let kept: Vec<std::sync::OnceLock<Option<polycore::Body>>> = (0..n).map(|_| std::sync::OnceLock::new()).collect();
     let kept_body = |i: usize| kept.get(i)?.get_or_init(|| solid.get(i).map(|b| b.body.keeping_meshes())).as_ref();
     // (the result, whether the pair used up its tries)
+    // The pairs are measured on worker threads, which don't see this thread's watch: they ask
+    // it themselves (#264).
+    let watch = polycore::watch::current();
+    let cancelled = || watch.as_ref().is_some_and(|w| w.cancelled());
     let pass = |todo: &[usize], tries: usize| {
         polycore::map_with_local_pools(todo, usize::MAX, |&k| {
             let Some(&(i, j)) = close.get(k) else { return Ok((PairResult::default(), false)) };
@@ -324,7 +328,7 @@ fn clearance(s: &mut Session, p: &Value) -> Result<Value> {
                 let why = format!("not checked: the time budget of {budget} s ran out (budget_s)");
                 Ok((PairResult { unchecked: Some(why), ..PairResult::default() }, false))
             };
-            if started.elapsed() > deadline {
+            if started.elapsed() > deadline || cancelled() {
                 return out_of_time();
             }
             let (Some(a), Some(b)) = (shape(i), shape(j)) else { return Ok((PairResult::default(), false)) };
@@ -344,8 +348,14 @@ fn clearance(s: &mut Session, p: &Value) -> Result<Value> {
         })
     };
     let first = pass(&todo, FIRST_ATTEMPTS);
+    if crate::cancel::requested() {
+        return Err(crate::cancel::error(cmd));
+    }
     let again: Vec<usize> = first.iter().enumerate().filter(|(_, r)| matches!(r, Ok((_, true)))).map(|(n, _)| n).collect();
     let retried = pass(&again.iter().filter_map(|&n| todo.get(n).copied()).collect::<Vec<_>>(), PAIR_ATTEMPTS);
+    if crate::cancel::requested() {
+        return Err(crate::cancel::error(cmd));
+    }
     let mut measured: Vec<_> = first.into_iter().map(|r| r.map(|(p, _)| p)).collect();
     for (n, r) in again.into_iter().zip(retried) {
         if let Some(slot) = measured.get_mut(n) {
