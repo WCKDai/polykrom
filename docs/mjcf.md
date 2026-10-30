@@ -3,7 +3,8 @@
 A design with components and joints exports as an MJCF model for the MuJoCo physics simulator.
 It is built from the same link tree as the [URDF export](urdf.md): the same parts, names,
 masses, inertias, joint chains and motion links, written as nested MuJoCo bodies, with a
-position actuator on every moving joint, a floor and a light.
+position actuator on each driven joint, a floor and a light. Loop-closing joints become MuJoCo
+equality constraints instead of being dropped like a URDF tree would drop them.
 
 - **Commands:** `file.export {"path": "robot.xml", "format": "mjcf"}`, or a `.mjcf` path
 - **Needs** MuJoCo 3.1.6 or later (the actuators' `dampratio`).
@@ -17,7 +18,8 @@ Paths are checked and written as for URDF: meshes first, the model last; a missi
 
 The reply says what the model holds, so a caller that can't read the file can check it:
 `bodies`, `joints` (hinges and slides), `actuators` and `meshes` counts, `free_root`, `mass_kg`
-(every body's mass together), `keyframe` (the `design` key was written) and, per actuator,
+(every body's mass together), `keyframe` (the `design` key was written), `loops` (each
+`connect`/`weld` with its `joint`, `body1`, `body2` and anchor) and, per actuator,
 `actuator_ranges`: its `name`, `joint`, `force` range (N m or N) and `ctrl` range (rad or m;
 `null` when the joint has no limits).
 
@@ -45,6 +47,7 @@ it (`ctrl`). Without it the actuators' targets are 0, the joints' zero.
 | `damping` | 0.1 | Joint damping, in N m s/rad or N s/m, for every joint (a `<default>`): the passive losses of a small geared joint. The actuators damp their own motion; this slows joints no actuator holds. |
 | `armature` | 0.01 | Joint armature, in kg m² or kg: the rotor inertia a gearbox reflects onto the joint, of the order of a hobby servo's. It also keeps a joint chain's massless in-between bodies stable at MuJoCo's 2 ms step. |
 | `effort` | 1000 | Actuator force limit, in N m or N, of a joint no rated actuator drives. When neither applies, 1000 is written with a warning. |
+| `actuated` | rated + non-loop joints | Joint ids or names to actuate. When given, only these (and rated joints) get position actuators; loop followers are passive unless listed. |
 
 A number that is not positive, or a flag that is not `true` or `false`, is refused.
 
@@ -67,11 +70,15 @@ A number that is not positive, or a flag that is not `true` or `false`, is refus
 - **Joints:** a revolute step is a `hinge`, a sliding step a `slide`, with `range` and
   `limited="true"` from the joint's limits, or `limited="false"` without them. Fixed steps
   weld the bodies. Joint chains (cylindrical, pin-slot, planar, ball, parallel) are as in URDF.
+- **Loop closures:** a joint whose two sides are already in the tree is written as an
+  `<equality><connect body1 body2 anchor>` (or `<weld>` for a rigid closure), anchored in
+  `body1`'s frame. Pass `actuated` for the crank of a four-bar; every other loop joint remains
+  passive. The reply's `loops` lists what was written.
 - **Motion links** (gears, rack and pinion, screws) are joint equality constraints:
   `<joint joint1="follower" joint2="driver" polycoef="0 ratio 0 0 0">`. MuJoCo measures both
   joints from the pose the model loads in, where the link already holds, so the offset is zero.
   A follower has no actuator.
-- **Actuators:** a `<position>` per moving joint that no motion link drives, with `ctrlrange`
+- **Actuators:** a `<position>` per driven joint that no motion link drives, with `ctrlrange`
   equal to the joint's range when it has one, and `forcerange` from:
   1. the rated torque of a library actuator at an end of the joint (a turning joint): the part
      the joint picks, or the part it is nested in (a horn inside a servo), whose ratings give

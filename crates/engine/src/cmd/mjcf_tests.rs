@@ -407,3 +407,26 @@ fn mjcf_gains_follow_the_ratings() {
     assert_eq!(xml.matches(r#"kp="7""#).count(), 2, "{xml}");
     let _ = std::fs::remove_dir_all(&d);
 }
+
+#[test]
+fn mjcf_writes_a_loop_closure_and_leaves_passive_followers_unactuated() {
+    let mut s = arm();
+    // A second revolute joint between the same two links closes a loop; the exporter must not
+    // throw it away as a URDF tree would.
+    run(
+        &mut s,
+        "joint.create",
+        json!({"type": "revolute", "a": {"occurrence": "Base", "circle": [1, 37, 4]},
+               "b": {"occurrence": "Arm", "circle": [1, 37, 4]}, "flip": true, "name": "LoopPin"}),
+    );
+    let d = temp("loop");
+    let (r, xml) = export(&mut s, &d, "loop.xml", json!({"actuated": ["Elbow"]}));
+    assert_eq!(r["format"], "Mjcf", "{r}");
+    assert_eq!(r["loops"].as_array().map(Vec::len), Some(1), "{r}");
+    assert_eq!(r["actuators"], json!(1), "{r}");
+    assert!(xml.contains("<connect body1="), "{xml}");
+    assert!(!xml.contains("closes a loop"), "{xml}");
+    let actuators = r["actuator_ranges"].as_array().unwrap();
+    assert_eq!(actuators.len(), 1, "{r}");
+    assert_eq!(actuators[0]["joint"], "Elbow", "{r}");
+}

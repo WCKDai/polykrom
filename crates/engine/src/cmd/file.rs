@@ -50,7 +50,7 @@ pub static COMMANDS: &[CommandSpec] = &[
         .noundo()
         .params("path; format?: stl|stla|obj|step|3mf|3mf-tagged|urdf|mjcf|json (default from extension; 3mf-tagged: 3MF whose triangles carry their B-rep face, at full precision, for meshing and analysis tools; docs/formats/3mf-face-tags.md; urdf: the whole assembly as a robot, with STL meshes written next to it; docs/urdf.md); bodies?: [names] (JSON and URDF export the complete design); urdf only: mesh_prefix? (before each mesh file name, e.g. package://robot/meshes/), velocity? (default 10); urdf and mjcf: effort? (default 1000; mjcf: the actuator force limit of a joint no rated library actuator drives); \
                  mjcf (a .mjcf path, or format mjcf for .xml: the assembly as a MuJoCo model with STL meshes next to it; docs/mjcf.md): floating?: bool (a free root that falls onto the floor; default: when nothing is grounded), \
-                 scene?: bool (floor at z = 0 and a light; default true), kp? (position actuator gain, N m/rad or N/m, default 1000), damping? (default 0.1), armature? (default 0.01)"),
+                 scene?: bool (floor at z = 0 and a light; default true), kp? (position actuator gain, N m/rad or N/m, default 1000), damping? (default 0.1), armature? (default 0.01), actuated?: [joint ids or names] (actuate exactly these; default: rated joints and every joint outside a closed loop)"),
     CommandSpec::new("file.save_mesh", "Save As Mesh", save_mesh)
         .at("INSERT", "FILES")
         .icon("mesh_export")
@@ -633,7 +633,7 @@ fn write_package(path: &str, meshes: &[(String, Vec<u8>)], xml: &str) -> Result<
 fn export_urdf(s: &Session, path: &str, p: &Value) -> Result<Value> {
     // `io::urdf` refuses a prefix XML cannot hold.
     let mesh_prefix = str_(p, "mesh_prefix").unwrap_or("").to_string();
-    let options = solidcraft_io::UrdfOptions { mesh_prefix, effort: positive(p, "effort")?, velocity: positive(p, "velocity")? };
+    let options = solidcraft_io::UrdfOptions { mesh_prefix, effort: positive(p, "effort")?, velocity: positive(p, "velocity")?, record_loops: false };
     let (doc, stem, held) = robot_doc(s, path, p)?;
     let mut pkg = solidcraft_io::urdf(&doc, &doc.painted(&s.model.state()), &stem, &options)?;
     pkg.warnings.extend(held);
@@ -665,7 +665,9 @@ fn export_mjcf(s: &Session, path: &str, p: &Value) -> Result<Value> {
     Ok(json!({
         "path": path, "format": "Mjcf", "files": written,
         "bodies": pkg.model.links.len(), "joints": m.joints, "actuators": m.actuators.len(), "meshes": pkg.meshes.len(),
-        "free_root": m.free_root, "mass_kg": r(m.mass), "keyframe": m.keyframe, "actuator_ranges": actuators, "warnings": pkg.warnings,
+        "free_root": m.free_root, "mass_kg": r(m.mass), "keyframe": m.keyframe, "actuator_ranges": actuators,
+        "loops": m.loops.iter().map(|l| json!({"joint": l.joint, "body1": l.body1, "body2": l.body2, "anchor": l.anchor})).collect::<Vec<_>>(),
+        "warnings": pkg.warnings,
     }))
 }
 
@@ -683,6 +685,22 @@ pub(super) fn mjcf_package(s: &Session, path: &str, p: &Value) -> Result<solidcr
         armature: positive(p, "armature")?,
         effort: positive(p, "effort")?,
         torques: super::parts::rated_torques(&s.doc),
+        actuated: if p.get("actuated").is_some() {
+            let mut ids = Vec::new();
+            for want in string_list(p, "actuated") {
+                let j = s
+                    .doc
+                    .assembly
+                    .joints
+                    .iter()
+                    .find(|j| j.name == want || j.id.to_string() == want)
+                    .ok_or_else(|| bad("file.export", format!("no joint `{want}` for `actuated`")))?;
+                ids.push(j.id);
+            }
+            Some(ids)
+        } else {
+            None
+        },
     };
     let (doc, stem, held) = robot_doc(s, path, p)?;
     let mut pkg = solidcraft_io::mjcf(&doc, &doc.painted(&s.model.state()), &stem, &options)?;
