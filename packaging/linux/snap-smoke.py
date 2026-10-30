@@ -38,7 +38,7 @@ REQUESTS = [
 
 
 def drive(app, port, frame):
-    """Connect to the app's control port, model the box and capture a frame."""
+    """Connect to the app's control port, wait for its viewport, model the box and capture a frame."""
     deadline = time.monotonic() + 60
     while True:
         if app.poll() is not None:
@@ -51,12 +51,30 @@ def drive(app, port, frame):
                 raise RuntimeError("the control port never opened") from None
             time.sleep(.2)
     with conn, conn.makefile("rw") as io:
-        replies = []
-        for request in REQUESTS + [{"id": 4, "method": "ui.screenshot", "params": {"path": str(frame)}},
-                                   {"id": 5, "method": "app.quit", "params": {"force": True}}]:
+        def ask(request):
             io.write(json.dumps(request) + "\n")
             io.flush()
-            replies.append(io.readline())
+            line = io.readline()
+            if not line:
+                raise RuntimeError("the app closed the control connection")
+            return line
+        # The control port opens before the first frame, so ui.inspect has no viewport yet.
+        # A slower aarch64 runner needs the same poll the Flatpak smoke does.
+        deadline = time.monotonic() + 60
+        while True:
+            ui = ask(REQUESTS[0])
+            viewport = (json.loads(ui).get("result") or {}).get("viewport")
+            if isinstance(viewport, list):
+                break
+            if app.poll() is not None:
+                raise RuntimeError(f"the app exited with {app.returncode} before its viewport")
+            if time.monotonic() >= deadline:
+                raise RuntimeError(f"viewport never appeared: {ui.strip()}")
+            time.sleep(.25)
+        replies = [ui]
+        for request in REQUESTS[1:] + [{"id": 4, "method": "ui.screenshot", "params": {"path": str(frame)}},
+                                       {"id": 5, "method": "app.quit", "params": {"force": True}}]:
+            replies.append(ask(request))
     renderer = flatpak_smoke.validate_replies("".join(replies[:3]))
     capture = json.loads(replies[3])
     if any(json.loads(reply).get("ok") is not True for reply in replies[4:]):
