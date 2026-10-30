@@ -8,14 +8,17 @@ Any code adapted from other projects (MIT OR Apache-2.0) is noted in ATTRIBUTION
 
 ## Product name
 Polykrom is a fork of SolidCraft (github.com/tangency-labs/solidcraft). Say Polykrom in
-everything a person reads: the UI, messages, docs, MCP descriptions, packaging names. Until the
-second rename stage, the internals keep SolidCraft's names: crates `solidcraft-*`, binaries
-`solidcraft` and `polykrom-cli` (with `polykrom` and `polykrom-cli` aliases), the
-`solidcraft/N` format tag inside designs, settings and recovery folders and the bundle IDs.
-Variables read through `polycore_geom::env` are `POLYKROM_*`, with `SOLIDCRAFT_*` and
-`SOLVECRAFT_*` fallbacks; read new ones that way. Designs are saved as `.polykrom`
-(`polykrom_io::DESIGN_EXT`); `.solidcraft` and `.solvecraft` still open (`DESIGN_EXTS`). The rest are still `SOLIDCRAFT_*`. Don't rename those internals piecemeal; `docs/compatibility.md` lists
-them. Credit SolidCraft wherever its work is described.
+everything: the UI, messages, docs, MCP descriptions, packaging, crates and code. The second
+rename stage (#304) is under way, one step at a time: release files, crates (`polykrom-*`, and
+PolyCore's `polycore` and `polycore-geom`) and apps (`apps/polykrom*`) are renamed. Still on
+SolidCraft's names until their steps land: the `solidcraft/N` format tag (step 3), settings and
+recovery folders (step 4), `SOLIDCRAFT_*` variables (step 5) and the bundle and package IDs (step
+6). The programs are `polykrom` and `polykrom-cli`; `solidcraft` and `solidcraft-cli` are alias
+programs that run them. Variables read through `polycore_geom::env` are `POLYKROM_*`, with
+`SOLIDCRAFT_*` and `SOLVECRAFT_*` fallbacks; read new ones that way. Designs are saved as
+`.polykrom` (`polykrom_io::DESIGN_EXT`); `.solidcraft` and `.solvecraft` still open
+(`DESIGN_EXTS`). Don't rename outside a step of #304; `docs/compatibility.md` lists what is kept
+and the shims for what moved. Credit SolidCraft wherever its work is described.
 
 ## Start every session here
 1. Read `plan/STATUS.md` (current milestone, next task), then the task in `plan/execution-plan.md`

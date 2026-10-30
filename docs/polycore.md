@@ -43,7 +43,7 @@ must name the same revision: the kernel's public types are the geometry crate's 
   ```toml
   [patch."https://github.com/WCKDai/polycore"]
   polycore = { path = "../polycore/crates/polycore" }
-  polycore-geom = { path = "../polycore/crates/solidcraft-geom" }
+  polycore-geom = { path = "../polycore/crates/polycore-geom" }
   ```
 
 Remaining follow-ups after this dependency switch:
