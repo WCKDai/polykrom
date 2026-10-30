@@ -52,11 +52,15 @@ extension, and keyboard-shortcut files exported as `solvecraft-shortcuts/1` stil
 `is_design_path`), `legacy_extension_and_format_tag_still_open` (CLI, `run_results.rs`) and
 `legacy_design_files_and_resource_uris` (MCP `open`).
 
-## 2. The `solvecraft/N` format tag
+## 2. The `solvecraft/N` and `solidcraft/N` format tags
 
-Designs record their format as `"format": "solidcraft/N"`. Files saved by builds up to 0.5 say
-`"format": "solvecraft/N"`; `crates/doc/src/format.rs` (`version_of`) reads both prefixes and
-upgrades them as usual (the file is re-tagged `solidcraft/N` when saved).
+Designs record their format as `"format": "polykrom/N"` (#304). Files saved by SolidCraft and by
+Polykrom before #304 say `"format": "solidcraft/N"`, and builds up to 0.5 say `"format":
+"solvecraft/N"`; `crates/doc/src/format.rs` (`version_of`, `LEGACY_FORMAT_PREFIXES`) reads all
+three and upgrades them as usual (the file is re-tagged `polykrom/N` when saved).
+
+Not backward-compatible: SolidCraft, and Polykrom builds from before #304, don't know the new tag
+and refuse designs saved by later builds (`format/pending/polykrom-format-tag.rs`).
 
 Not backward-compatible: builds up to 0.5 don't know the new tag and refuse files saved by
 later builds. Test: `version_of` accepts both prefixes; legacy-tagged designs load and are

@@ -151,7 +151,7 @@ A design is saved as a *design file*.
 
 A file in which Polykrom saves one design, with the `.solidcraft` extension.
 
-- **In Polykrom:** `file.save`, `file.save_as`, `doc.open`; the `solidcraft/N` format tag.
+- **In Polykrom:** `file.save`, `file.save_as`, `doc.open`; the `polykrom/N` format tag.
 - **Don't use:** document, project file.
 - **Elsewhere:** design file, model file.
 - **For translators:** "file" is only for what is on disk: opening, saving, importing and
