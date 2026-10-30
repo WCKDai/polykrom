@@ -1,6 +1,12 @@
-# Polykrom's checks on GitHub-hosted runners. The inherited ci.yml targets SolidCraft's Blacksmith
-# runners, which this repository does not have (its jobs never start here), so this workflow runs
-# the same gate as `cargo xtask ci` in three parallel test parts. It runs only in wckdboy/polykrom.
+# Polykrom's checks. The inherited ci.yml targets SolidCraft's Blacksmith runners, which this
+# repository does not have (its jobs never start here), so this workflow runs the same gate as
+# `cargo xtask ci` in three test parts. It runs only in WCKDai/polykrom.
+#
+# Pushes to main run the checks and tests on alpha, the organisation's trusted self-hosted runner
+# (16 cores; runner group `trusted`, which allows this file only at refs/heads/main). Pull requests
+# never do: their code is untrusted, so they run on GitHub-hosted runners. On alpha the build folder
+# persists outside the checkout ($HOME/ci-target/polykrom), so main builds start warm; the system
+# packages the tests need (software Vulkan) are installed there once.
 name: Polykrom CI
 
 on:
@@ -44,15 +50,36 @@ jobs:
   checks:
     name: Format, repository checks, Clippy, wasm
     if: github.repository == 'WCKDai/polykrom'
-    runs-on: ubuntu-24.04
+    runs-on: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/main') && fromJSON('["self-hosted","linux","x64","rust-16","trusted"]') || 'ubuntu-24.04' }}
     timeout-minutes: 90
+    # The R2 compile cache (sccache), as PolyCore's CI uses it: on alpha and on GitHub-hosted
+    # runners alike. A fork's pull request has no secrets, so it compiles without the cache rather
+    # than failing at sccache startup.
+    env:
+      R2_READY: ${{ secrets.R2_ACCESS_KEY_ID != '' && vars.R2_CONFIGURED == 'true' }}
+      RUSTC_WRAPPER: ${{ secrets.R2_ACCESS_KEY_ID != '' && vars.R2_CONFIGURED == 'true' && 'sccache' || '' }}
+      CARGO_INCREMENTAL: 0
+      SCCACHE_BUCKET: ${{ vars.R2_BUCKET }}
+      SCCACHE_ENDPOINT: ${{ vars.R2_ENDPOINT }}
+      SCCACHE_REGION: ${{ vars.SCCACHE_REGION }}
+      SCCACHE_S3_USE_SSL: ${{ vars.SCCACHE_S3_USE_SSL }}
+      SCCACHE_S3_KEY_PREFIX: ${{ vars.SCCACHE_S3_KEY_PREFIX }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
           targets: wasm32-unknown-unknown
+      - name: Persistent build folder (alpha)
+        if: runner.environment == 'self-hosted'
+        run: echo "CARGO_TARGET_DIR=$HOME/ci-target/polykrom" >> "$GITHUB_ENV"
+      - name: Install sccache
+        if: env.R2_READY == 'true'
+        uses: mozilla-actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba # v0.0.11
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        if: runner.environment == 'github-hosted'
         with:
           key: checks
       - name: Format
@@ -71,12 +98,29 @@ jobs:
         run: cargo clippy --workspace --all-targets --locked -- -D warnings
       - name: WebAssembly check
         run: cargo xtask wasm
+      - name: Compile cache statistics
+        if: always() && env.R2_READY == 'true'
+        run: sccache --show-stats
 
   tests:
     name: Tests (${{ matrix.part }})
     if: github.repository == 'WCKDai/polykrom'
-    runs-on: ubuntu-24.04
+    runs-on: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/main') && fromJSON('["self-hosted","linux","x64","rust-16","trusted"]') || 'ubuntu-24.04' }}
     timeout-minutes: 300
+    # The R2 compile cache (sccache), as PolyCore's CI uses it: on alpha and on GitHub-hosted
+    # runners alike. A fork's pull request has no secrets, so it compiles without the cache rather
+    # than failing at sccache startup.
+    env:
+      R2_READY: ${{ secrets.R2_ACCESS_KEY_ID != '' && vars.R2_CONFIGURED == 'true' }}
+      RUSTC_WRAPPER: ${{ secrets.R2_ACCESS_KEY_ID != '' && vars.R2_CONFIGURED == 'true' && 'sccache' || '' }}
+      CARGO_INCREMENTAL: 0
+      SCCACHE_BUCKET: ${{ vars.R2_BUCKET }}
+      SCCACHE_ENDPOINT: ${{ vars.R2_ENDPOINT }}
+      SCCACHE_REGION: ${{ vars.SCCACHE_REGION }}
+      SCCACHE_S3_USE_SSL: ${{ vars.SCCACHE_S3_USE_SSL }}
+      SCCACHE_S3_KEY_PREFIX: ${{ vars.SCCACHE_S3_KEY_PREFIX }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
     strategy:
       fail-fast: false
       matrix:
@@ -91,10 +135,19 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: dtolnay/rust-toolchain@stable
+      - name: Persistent build folder (alpha)
+        if: runner.environment == 'self-hosted'
+        run: echo "CARGO_TARGET_DIR=$HOME/ci-target/polykrom" >> "$GITHUB_ENV"
+      - name: Install sccache
+        if: env.R2_READY == 'true'
+        uses: mozilla-actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba # v0.0.11
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        if: runner.environment == 'github-hosted'
         with:
           key: tests-${{ matrix.part }}
+      # Installed once on alpha, where the runner has no sudo.
       - name: Software Vulkan for the GPU tests
+        if: runner.environment == 'github-hosted'
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends mesa-vulkan-drivers libvulkan1
@@ -118,6 +171,9 @@ jobs:
       - name: Doc tests
         if: matrix.part == 'rest'
         run: cargo test --locked --profile ci --doc --workspace
+      - name: Compile cache statistics
+        if: always() && env.R2_READY == 'true'
+        run: sccache --show-stats
 
   site:
     name: Site viewer tests
