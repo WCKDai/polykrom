@@ -11,7 +11,6 @@ below:
 | Kept | Why |
 | --- | --- |
 | Binaries `solidcraft` and `solidcraft-cli` | Since #98 the programs are `polykrom` and `polykrom-cli`. The old names ship as small aliases that run them, so scripts, shortcuts and MCP registrations keep working (section 5) |
-| The `solidcraft/N` format tag inside designs | Polykrom saves `.polykrom` files, but their contents are SolidCraft's container, so a renamed file still opens in SolidCraft. `.solidcraft` (and the older `.solvecraft`) open in Polykrom and save as `.polykrom` |
 | Settings, preferences, autosave, recovery and thumbnail folders | Moving them needs a one-time migration, like section 4 |
 | Bundle and package IDs (`ai.storyteller.solidcraft`), the MSI UpgradeCode, `SolidCraft.app`, installer folders and registry keys, the agent-chat keychain service | Changing them makes a second, separate install or loses saved keys; until then a Polykrom install replaces a SolidCraft one |
 | `SOLIDCRAFT_*` environment variables | Those read through `polycore_geom::env` accept `POLYKROM_*` first; the others keep the old name |
@@ -25,6 +24,7 @@ table above and into this list, with its shim:
 | --- | --- |
 | Release files: `polykrom-<version>-<platform>.*` (the Windows exe `Polykrom-<version>-windows-x64.exe`), with version-less `polykrom-<platform>.*` copies | Every release also attaches the version-less copies under SolidCraft's name (`solidcraft-windows-x64.msi`, `solidcraft-linux-x86_64.AppImage`, …), for download links and the update check of builds from before the rename, and a copy of the AppImage's `.zsync` as `solidcraft-<version>-linux-<arch>.AppImage.zsync`, which AppImages from before it look for (`.github/workflows/release.yml`, `packaging/linux/package.sh`) |
 | Crates and apps: Polykrom's are `polykrom-*` (`apps/polykrom`, `apps/polykrom-cli`, `apps/polykrom-web`), PolyCore's `polycore` and `polycore-geom` | None needed: no program, file or setting changes. The cost: merges from upstream SolidCraft rewrite crate paths |
+| The design format tag: `polykrom/N` | `solidcraft/N` and `solvecraft/N` designs open and are re-tagged when saved (section 2). Not backward-compatible: SolidCraft, and Polykrom before this step, refuse designs saved with the new tag |
 
 # Compatibility with the SolveCraft name
 
