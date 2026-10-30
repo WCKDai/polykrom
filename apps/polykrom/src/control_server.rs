@@ -229,6 +229,8 @@ struct InFlight {
     steps: Option<usize>,
     since: Instant,
     started: Arc<AtomicBool>,
+    /// The request's watch: `control.cancel` cancels it (#264).
+    progress: Arc<polykrom_engine::doc::progress::Progress>,
 }
 
 /// The app's requests, from both of its listeners.
@@ -263,8 +265,29 @@ impl Running {
         };
         let method = req.method.chars().take(64).collect();
         let started = req.started.clone();
-        self.lock().push(InFlight { key, connection, id, method, command, steps, since: Instant::now(), started });
+        let progress = req.progress.clone();
+        self.lock().push(InFlight { key, connection, id, method, command, steps, since: Instant::now(), started, progress });
         Ticket { running: self, key }
+    }
+
+    /// `control.cancel {id}`: cancel every listed request with that id, from any connection (an
+    /// MCP server cancels from a connection of its own, as its own is waiting on the request). A
+    /// request stops at its next check and is taken back; one still queued never runs. Ids are
+    /// the clients' own, so a client that cancels uses ids no other client does (#264).
+    fn cancel(&self, params: &Value) -> Value {
+        let Some(id) = params.get("id").filter(|id| !id.is_null()) else {
+            return json!({"cancelled": [], "note": "give the `id` of the request to cancel"});
+        };
+        let rows: Vec<Value> = self
+            .lock()
+            .iter()
+            .filter(|e| e.id == *id)
+            .map(|e| {
+                e.progress.cancel();
+                json!({"connection": e.connection, "id": e.id, "method": e.method, "queued": !e.started.load(Ordering::Relaxed)})
+            })
+            .collect();
+        json!({"cancelled": rows})
     }
 
     /// The `control.running` result, as `asker`'s connection sees it.
@@ -405,13 +428,16 @@ fn serve_with(
                 let params = msg.get("params").cloned().unwrap_or(json!({}));
                 // A request that timed out may have finished since (#1618). `control.running` only
                 // looks, so it leaves that reply where it is.
-                let late = pending.as_ref().filter(|_| method != "control.running").and_then(|p| match p.reply.try_recv() {
-                    Ok(reply) => Some(reply),
-                    Err(TryRecvError::Disconnected) => Some(json!({"ok": false, "error": "the app ended the request without a reply"})),
-                    Err(TryRecvError::Empty) => None,
-                });
+                let late =
+                    pending.as_ref().filter(|_| method != "control.running" && method != "control.cancel").and_then(|p| match p.reply.try_recv() {
+                        Ok(reply) => Some(reply),
+                        Err(TryRecvError::Disconnected) => Some(json!({"ok": false, "error": "the app ended the request without a reply"})),
+                        Err(TryRecvError::Empty) => None,
+                    });
                 let mut r = if method == "control.running" {
                     json!({"ok": true, "result": running.result(connection)})
+                } else if method == "control.cancel" {
+                    json!({"ok": true, "result": running.cancel(&params)})
                 } else if method == "control.pending" {
                     match (pending.take(), late) {
                         (None, _) => json!({"ok": true, "result": {"pending": null}}),
@@ -749,5 +775,72 @@ mod tests {
         // The same line against a smaller cap is refused.
         let mut r = BufReader::with_capacity(64, text.as_slice());
         assert!(read_line(&mut r, 1000).is_err());
+    }
+
+    /// #264: `control.cancel {id}` from another connection reaches a request that is running: it
+    /// answers at once, listing the request, and the request (which watches its progress) ends as
+    /// cancelled. An id nobody uses cancels nothing.
+    #[test]
+    fn control_cancel_reaches_a_running_request_from_another_connection() {
+        let token = "0123456789abcdef0123456789abcdef";
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap();
+        let (tx, rx) = channel::<ControlRequest>();
+        // The window: a "slow" request runs until it is cancelled, as a watched command stops.
+        std::thread::spawn(move || {
+            for req in rx {
+                req.started.store(true, Ordering::Relaxed);
+                if req.method == "slow" {
+                    let deadline = std::time::Instant::now() + Duration::from_secs(20);
+                    while !req.progress.is_cancelled() && std::time::Instant::now() < deadline {
+                        std::thread::sleep(Duration::from_millis(5));
+                    }
+                }
+                let reply =
+                    if req.progress.is_cancelled() { json!({"ok": false, "cancelled": true}) } else { json!({"ok": true, "result": req.method}) };
+                let _ = req.reply.send(reply);
+            }
+        });
+        let waits = Waits { short: Duration::from_millis(100), long: Duration::from_millis(100) };
+        static RUNNING: Running = Running::new();
+        let tx2 = tx.clone();
+        std::thread::spawn(move || {
+            // Each connection is served as it comes, as the app's listener does.
+            let mut senders = [tx, tx2].into_iter();
+            for stream in listener.incoming().flatten() {
+                let Some(tx) = senders.next() else { break };
+                std::thread::spawn(move || serve_with(stream, token, tx, egui::Context::default(), false, waits, &RUNNING));
+            }
+        });
+        let connect = || {
+            let s = TcpStream::connect(addr).unwrap();
+            s.set_read_timeout(Some(Duration::from_secs(10))).unwrap();
+            let out = s.try_clone().unwrap();
+            (out, BufReader::new(s))
+        };
+        let ask = |(out, lines): &mut (TcpStream, BufReader<TcpStream>), v: Value| -> Value {
+            writeln!(out, "{v}").unwrap();
+            let mut l = String::new();
+            lines.read_line(&mut l).unwrap();
+            serde_json::from_str(&l).unwrap()
+        };
+        let mut agent = connect();
+        let r = ask(&mut agent, json!({"id": "mcp-7-1", "method": "slow", "token": token}));
+        assert!(r["running"] == true, "the slow request outlasts the wait: {r}");
+        let mut canceller = connect();
+        let r = ask(&mut canceller, json!({"id": 1, "method": "control.cancel", "params": {"id": "nobody"}, "token": token}));
+        assert_eq!(r["result"]["cancelled"], json!([]), "{r}");
+        let r = ask(&mut canceller, json!({"id": 2, "method": "control.cancel", "params": {"id": "mcp-7-1"}}));
+        let rows = r["result"]["cancelled"].as_array().unwrap();
+        assert!(rows.len() == 1 && rows[0]["id"] == "mcp-7-1" && rows[0]["method"] == "slow", "{r}");
+        let deadline = std::time::Instant::now() + Duration::from_secs(10);
+        let r = loop {
+            let r = ask(&mut agent, json!({"id": 3, "method": "control.pending"}));
+            if r["result"]["done"] == true || std::time::Instant::now() > deadline {
+                break r;
+            }
+            std::thread::sleep(Duration::from_millis(10));
+        };
+        assert_eq!(r["result"]["reply"]["cancelled"], json!(true), "the request ended as cancelled: {r}");
     }
 }

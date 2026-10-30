@@ -36,7 +36,16 @@ pub trait Backend {
     }
     /// Put the design back as [`Backend::save_point`] found it.
     fn return_to(&mut self, _point: polykrom_engine::SavePoint) {}
+    /// Something that cancels the request this backend is waiting on, from another thread (the
+    /// server's reader calls it when the client cancels the call, #264). `None`: the call runs in
+    /// this process and its own watch stops it.
+    fn canceller(&self) -> Option<Canceller> {
+        None
+    }
 }
+
+/// Cancels the request a backend waits on; called from the server's reader thread.
+pub type Canceller = std::sync::Arc<dyn Fn() + Send + Sync>;
 
 /// Longest reply line accepted from the app.
 const MAX_REPLY: u64 = 64 << 20;
@@ -133,6 +142,11 @@ pub struct Remote {
     /// An outstanding request's end, once a later call waited for it (for `pending`).
     settled: Option<Settled>,
     waits: Waits,
+    /// This bridge's request ids are `<prefix>-<n>`: no other client of the app uses them, so
+    /// `control.cancel` from a connection of its own names only this bridge's request (#264).
+    id_prefix: String,
+    /// The id of the last request sent for a call (not `control.*`): the one to cancel.
+    last_sent: std::sync::Arc<std::sync::Mutex<Option<String>>>,
 }
 
 /// How a tool error starts when no app listens at the bridged address. The agent reads it, and
@@ -158,7 +172,20 @@ impl Remote {
     pub fn new(addr: &str, token: Option<&str>) -> Self {
         let port = addr.rsplit(':').next().and_then(|p| p.parse::<u16>().ok()).unwrap_or(0);
         let explicit_token = token.map(str::to_string);
-        Self { addr: addr.to_string(), port, conn: None, next_id: 1, explicit_token, outstanding: None, settled: None, waits: WAITS }
+        let started = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_millis() % 1_000_000_000);
+        let id_prefix = format!("mcp-{}-{started}", std::process::id());
+        Self {
+            addr: addr.to_string(),
+            port,
+            conn: None,
+            next_id: 1,
+            explicit_token,
+            outstanding: None,
+            settled: None,
+            waits: WAITS,
+            id_prefix,
+            last_sent: Default::default(),
+        }
     }
 
     /// Shorter waits for requests still running (tests).
@@ -265,8 +292,13 @@ impl Remote {
 impl Remote {
     /// The request line for `method`: a fresh id, the agent's folders and the app's token.
     fn request_line(&mut self, method: &str, params: Value) -> String {
-        let id = self.next_id;
+        let id = format!("{}-{}", self.id_prefix, self.next_id);
         self.next_id += 1;
+        if !method.starts_with("control.")
+            && let Ok(mut last) = self.last_sent.lock()
+        {
+            *last = Some(id.clone());
+        }
         let mut params = params;
         // The app confines the files this request reaches to the agent's folders (control.rs).
         if let (Some(scope), Some(o)) = (polykrom_engine::io::vfs::current_scope(), params.as_object_mut()) {
@@ -434,6 +466,24 @@ impl Remote {
 }
 
 impl Backend for Remote {
+    fn canceller(&self) -> Option<Canceller> {
+        let (addr, port, token, last) = (self.addr.clone(), self.port, self.explicit_token.clone(), self.last_sent.clone());
+        Some(std::sync::Arc::new(move || {
+            let Some(id) = last.lock().ok().and_then(|l| l.clone()) else { return };
+            let mut msg = json!({"id": "cancel", "method": "control.cancel", "params": {"id": id}});
+            if let Some(t) = polykrom_engine::control_auth::client_token(port, token.as_deref()) {
+                msg["token"] = json!(t);
+            }
+            // A connection of its own: the bridge's is waiting on the request.
+            let Some(sock) = addr.to_socket_addrs().ok().and_then(|mut a| a.next()) else { return };
+            let Ok(mut stream) = TcpStream::connect_timeout(&sock, Duration::from_secs(5)) else { return };
+            stream.set_read_timeout(Some(Duration::from_secs(5))).ok();
+            if stream.write_all(format!("{msg}\n").as_bytes()).is_ok() {
+                let mut reply = String::new();
+                let _ = BufReader::new(stream).take(MAX_REPLY).read_line(&mut reply);
+            }
+        }))
+    }
     fn call(&mut self, method: &str, params: Value) -> Result<Value, String> {
         if method == "control.pending" {
             return self.pending_status();

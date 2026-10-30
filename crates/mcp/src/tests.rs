@@ -2474,3 +2474,50 @@ fn a_running_call_reports_progress_when_asked() {
     assert!(p.windows(2).all(|w| w[1] > w[0]), "progress grows: {p:?}");
     assert!(notes[0]["params"]["message"].as_str().unwrap().contains("set_parameter"), "{notes:?}");
 }
+
+/// #264: bridged to an app, a cancelled call is cancelled in the app: the canceller sends
+/// `control.cancel` with the id of the request in flight, on a connection of its own (the
+/// bridge's is waiting on that request), and the request's ids are this bridge's own.
+#[test]
+fn a_bridged_call_is_cancelled_in_the_app() {
+    use crate::backend::Backend;
+    use std::io::{BufRead, BufReader, Write};
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let addr = listener.local_addr().unwrap().to_string();
+    let (got_request, request_seen) = std::sync::mpsc::channel::<Value>();
+    let (got_cancel, cancel_seen) = std::sync::mpsc::channel::<Value>();
+    let app = std::thread::spawn(move || {
+        // The bridge's connection: its request runs until the cancel comes in.
+        let (stream, _) = listener.accept().unwrap();
+        let mut line = String::new();
+        BufReader::new(stream.try_clone().unwrap()).read_line(&mut line).unwrap();
+        let request: Value = serde_json::from_str(&line).unwrap();
+        got_request.send(request.clone()).unwrap();
+        // The canceller's connection.
+        let (other, _) = listener.accept().unwrap();
+        let mut cline = String::new();
+        BufReader::new(other.try_clone().unwrap()).read_line(&mut cline).unwrap();
+        let cancel: Value = serde_json::from_str(&cline).unwrap();
+        writeln!(&other, "{}", json!({"id": cancel["id"], "ok": true, "result": {"cancelled": [{"id": request["id"]}]}})).unwrap();
+        got_cancel.send(cancel).unwrap();
+        writeln!(
+            &stream,
+            "{}",
+            json!({"id": request["id"], "ok": false, "cancelled": true, "error": "cancelled (control.cancel): nothing was applied"})
+        )
+        .unwrap();
+    });
+    let mut remote = crate::Remote::new(&addr, Some("0123456789abcdef0123456789abcdef"));
+    let cancel = remote.canceller().expect("a bridge can cancel in the app");
+    let call = std::thread::spawn(move || remote.call("engine.execute", json!({"command": "solid.fillet"})));
+    let request = request_seen.recv_timeout(std::time::Duration::from_secs(10)).unwrap();
+    let id = request["id"].as_str().expect("the bridge's ids are strings").to_string();
+    assert!(id.starts_with(&format!("mcp-{}-", std::process::id())), "{id}");
+    cancel();
+    let sent = cancel_seen.recv_timeout(std::time::Duration::from_secs(10)).unwrap();
+    assert_eq!((sent["method"].clone(), sent["params"]["id"].clone()), (json!("control.cancel"), json!(id)), "{sent}");
+    assert!(sent["token"].is_string(), "the cancel is authenticated: {sent}");
+    let e = call.join().unwrap().unwrap_err();
+    assert!(e.contains("cancelled"), "{e}");
+    app.join().unwrap();
+}

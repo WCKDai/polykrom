@@ -352,8 +352,12 @@ impl SolveApp {
     fn answer_on_a_copy(&mut self, req: ControlRequest, id: &'static str, params: Value) -> Option<ControlRequest> {
         let Ok(scope) = crate::control::request_scope(self, &req.params) else { return Some(req) };
         let mut copy = self.session.scratch();
+        // Watched on its thread, so `control.cancel` stops it there (#264).
+        let progress = req.progress.clone();
         let rx = spawn(scope, move || {
-            Some(match copy.execute(id, &params) {
+            let r = polykrom_engine::doc::progress::watch(progress.clone(), || copy.execute(id, &params));
+            Some(match r {
+                _ if progress.is_cancelled() => json!({"ok": false, "cancelled": true, "error": "cancelled (control.cancel)"}),
                 Ok(v) => json!({"ok": true, "result": v}),
                 Err(e) => json!({"ok": false, "error": e.to_string()}),
             })

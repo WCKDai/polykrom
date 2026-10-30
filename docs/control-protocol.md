@@ -109,6 +109,23 @@ turn behind another. `command` is the command id of `engine.execute` (a known on
 paths and expressions stay with the connection that sent them. `self` marks the asking
 connection's own request. `{"running": []}` when the app is idle.
 
+`control.cancel {id}` cancels every listed request with that `id`, from any connection, at once,
+like `control.running` (a client cancels from a second connection, since its own waits on the
+request). A running request stops at its next check (between features as the design evaluates,
+before the kernel's next operation, between a check's pairs) and is taken back whole: the design,
+its model and the undo history are as before it. Its reply is
+`{"ok": false, "cancelled": true, "error": "cancelled (control.cancel): nothing was applied"}`. A
+request still queued never runs. Ids are the clients' own, so a client that cancels gives its
+requests ids no other client uses (`polykrom-cli mcp` uses `mcp-<pid>-<start>-<n>`):
+
+```text
+{"id":"c1","method":"control.cancel","params":{"id":"mcp-4242-981-7"},"token":"…"}
+→ {"id":"c1","ok":true,"result":{"cancelled":[{"connection":3,"id":"mcp-4242-981-7","method":"engine.execute","queued":false}]}}
+```
+
+`{"cancelled": []}` when no request has that id (it has finished, or never came). Requests the
+app runs ahead on another thread (the `agent_off_thread` preference) are not cancelled yet.
+
 Any request's `params` may carry `allow_paths: ["/abs/folder", …]`: every file that request
 reads, writes or deletes (command paths such as `file.export`'s `path` or `doc.recovery_*`'s
 `dir`, `ui.render`, `ui.screenshot`) must then lie inside one of those folders after `..` and
