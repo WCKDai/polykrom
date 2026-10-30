@@ -754,6 +754,7 @@
   "cmd.inspect_minimum_radius": "Minimum Radius Analysis",
   "cmd.inspect_polish": "Polish",
   "cmd.inspect_printability": "Printability",
+  "cmd.inspect_quality": "Model Quality",
   "cmd.inspect_silhouette": "Silhouette",
   "cmd.inspect_statics": "Statics",
   "cmd.inspect_zebra": "Zebra Analysis",
