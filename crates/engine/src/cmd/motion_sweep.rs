@@ -165,9 +165,10 @@ pub(super) fn sweep(s: &mut Session, p: &Value) -> Result<Value> {
     // stop it only when they pass into each other, deeper than they start (by more than their
     // meshes can be off): a door resting on its frame cannot sweep through it.
     let start: Vec<Gap> = geometry.gaps(&t, touch, &mut work, MAX_WORK)?;
-    let touching: BTreeSet<(u64, u64)> = start.iter().map(|g| key(g.a.0, g.b.0)).collect();
     let touching_names: Vec<Value> = start.iter().map(|g| json!([g.a.1, g.b.1])).collect();
-    let resting = geometry.take_pairs(|x, y| touching.contains(&key(x, y)));
+    // Take only the body pairs that touch, not every body pair of those two occurrences: a pin
+    // in its bore must not hide a new contact between another body of the same parts (#295).
+    let resting = geometry.take_touching(&t, touch, &mut work, MAX_WORK)?;
     let rest_depth: BTreeMap<(u64, u64), f64> = if resting.has_pairs() {
         resting.hits(&t, &mut work, MAX_WORK, true)?.into_iter().map(|(a, b, d)| (key(a.0, b.0), d)).collect()
     } else {
