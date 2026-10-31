@@ -146,8 +146,10 @@ pub fn tool_definitions() -> Vec<Value> {
         tool(
             "inspect_design",
             "Inspect the design",
-            "The whole design: user parameters (expression, value, errors), the timeline (features with type, suppressed, \
-             rolled back, error, warning, timing), bodies (volume, area, centre of mass, bounding box, face/edge/vertex \
+            "With no arguments, a summary: counts (features, bodies, sketches, components, joints, parameters), the \
+             parameters, the features with errors or warnings, the bodies and top-level components by name, the active sketch \
+             and undo depth. With any argument, the whole design: user parameters (expression, value, errors), the timeline \
+             (features with type, suppressed, rolled back, error, warning, timing), bodies (volume, area, centre of mass, bounding box, face/edge/vertex \
              counts), sketches (curves with ids and coordinates, points, constraints, profiles, degrees of freedom, solve \
              status), assembly joints (what each origin is attached to: occurrence, the feature, face, edge or sketch \
              curve its face names refer to, whether it resolves and why not; `execute` `joint.inspect {joint}` gives one), \
@@ -665,6 +667,8 @@ fn dispatch(b: &mut dyn Backend, name: &str, a: &Map<String, Value>) -> Result<V
             Ok(selected(v, a.get("select")))
         }
         "quality" => exec(b, "inspect.quality", pick(a, &["bodies", "allow_open", "allow_underconstrained", "require_parameters"])),
+        // With no arguments, a summary (#266): the full design took 396 KB on a median stage.
+        "inspect_design" if a.is_empty() => design_summary(b),
         "inspect_design" => {
             let measure = a.get("measure").and_then(Value::as_bool).unwrap_or(true);
             let mut d = b.call("document.inspect", json!({"measure": measure}))?;
@@ -733,6 +737,53 @@ fn filter_commands(all: Value, filter: Option<&str>) -> Value {
     let hit =
         |c: &Value| ["id", "label", "panel", "tab"].iter().any(|k| c.get(*k).and_then(Value::as_str).is_some_and(|s| s.to_lowercase().contains(&f)));
     Value::Array(all.as_array().map(|v| v.iter().filter(|c| hit(c)).cloned().collect()).unwrap_or_default())
+}
+
+/// `inspect_design` with no arguments: what an agent needs to orient itself, small on any design
+/// (#266). Any argument gives the whole design.
+fn design_summary(b: &mut dyn Backend) -> Result<Value, String> {
+    let d = b.call("document.inspect", json!({"measure": false}))?;
+    let list = |k: &str| d[k].as_array().cloned().unwrap_or_default();
+    let (timeline, bodies, sketches, params) = (list("timeline"), list("bodies"), list("sketches"), list("params"));
+    let components = d["components"].as_array().cloned().unwrap_or_default();
+    let joints = exec(b, "joint.inspect", json!({})).ok().and_then(|j| j["joints"].as_array().map(Vec::len)).unwrap_or(0);
+    let flagged: Vec<Value> = timeline
+        .iter()
+        .filter(|f| !f["error"].is_null() || !f["warning"].is_null())
+        .map(|f| json!({"id": f["id"], "name": f["name"], "type": f["type"], "error": f["error"], "warning": f["warning"]}))
+        .collect();
+    let param_rows: Vec<Value> = params
+        .iter()
+        .map(|p| {
+            let mut r = json!({"name": p["name"], "expression": p["expression"], "value": p["value"]});
+            if let Some(e) = p.get("error").filter(|e| !e.is_null()) {
+                r["error"] = e.clone();
+            }
+            r
+        })
+        .collect();
+    let top: Vec<Value> = components.iter().filter(|c| c["parent"].is_null()).map(|c| c["name"].clone()).collect();
+    Ok(json!({
+        "name": d["name"],
+        "path": d["path"],
+        "units": d["units"],
+        "dirty": d["dirty"],
+        "counts": {
+            "features": timeline.len(),
+            "bodies": bodies.len(),
+            "sketches": sketches.len(),
+            "components": components.len(),
+            "joints": joints,
+            "params": params.len(),
+        },
+        "params": param_rows,
+        "features_with_errors": flagged,
+        "bodies": bodies.iter().map(|x| x["name"].clone()).collect::<Vec<_>>(),
+        "components": top,
+        "active_sketch": d["active_sketch"],
+        "undo": d["undo"],
+        "summary": "inspect_design with any argument (measure, sketches, joints) gives the whole design; page_path pages one of its lists",
+    }))
 }
 
 /// `pending`: the end of a request still running when its call returned (bridged only; a

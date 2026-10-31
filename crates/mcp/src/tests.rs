@@ -293,7 +293,8 @@ fn agent_builds_box_fillet_hole() {
     assert!((8..=9).contains(&m["bodies"][0]["faces"].as_u64().unwrap()), "{m}");
     assert!(rel(m["bodies"][0]["bbox"]["max"][0].as_f64().unwrap(), 40.0) < 1e-6, "{m}");
 
-    let d = tool(&mut s, "inspect_design", json!({}));
+    // The whole design (with no arguments it is a summary, #266).
+    let d = tool(&mut s, "inspect_design", json!({"measure": true}));
     assert_eq!(d["timeline"].as_array().unwrap().len(), 5, "{d}");
     assert!(d["timeline"].as_array().unwrap().iter().all(|f| f["error"].is_null()), "{d}");
     assert_eq!(d["sketches"][0]["curves"].as_array().unwrap().len(), 4, "{d}");
@@ -2602,4 +2603,28 @@ fn replies_are_held_to_a_budget_and_page() {
     // A small reply is untouched.
     let v = tool(&mut s, "inspect_design", json!({"measure": false}));
     assert!(v.get("truncated").is_none() && v.get("page").is_none(), "{v}");
+}
+
+/// #266: `inspect_design` with no arguments is a summary: counts, parameters, the features with
+/// errors, bodies and components by name. Small whatever the design's size; any argument gives the
+/// whole design.
+#[test]
+fn inspect_design_summarises_by_default() {
+    let mut s = server();
+    tool(&mut s, "set_parameter", json!({"name": "len", "value": "40 mm"}));
+    for z in 0..30 {
+        tool(&mut s, "execute", json!({"command": "solid.box", "params": {"length": "len", "width": 10, "height": 10, "corner": [0, 0, z * 20]}}));
+    }
+    let r = raw_tool(&mut s, "inspect_design", json!({}));
+    let text = r["result"]["content"][0]["text"].as_str().unwrap();
+    let v: Value = serde_json::from_str(text).unwrap();
+    assert_eq!(v["counts"]["features"], 30, "{v}");
+    assert_eq!(v["counts"]["bodies"], 30, "{v}");
+    assert_eq!(v["counts"]["params"], 1, "{v}");
+    assert_eq!(v["params"][0]["name"], "len", "{v}");
+    assert_eq!(v["features_with_errors"], json!([]), "{v}");
+    assert!(v.get("timeline").is_none(), "no timeline in the summary: {v}");
+    let full = raw_tool(&mut s, "inspect_design", json!({"measure": true, "reply_kb": 512}));
+    let full_text = full["result"]["content"][0]["text"].as_str().unwrap();
+    assert!(text.len() * 4 < full_text.len(), "summary {} bytes, whole design {} bytes", text.len(), full_text.len());
 }
