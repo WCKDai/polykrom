@@ -187,6 +187,9 @@ pub(super) fn interference(s: &mut Session, p: &Value) -> Result<Value> {
     let left = budget.saturating_sub(started.elapsed());
     let waited = web_time::Instant::now();
     let (mut done, threads) = run_jobs(jobs, left);
+    if crate::cancel::requested() {
+        return Err(crate::cancel::error(cmd));
+    }
     // The reused pairs take the answer of the pair they repeat, at their own place.
     let answers: HashMap<(String, String), usize> = done.iter().enumerate().map(|(n, (names, _))| (names.clone(), n)).collect();
     for (k, orig, moved) in &reused {
@@ -543,14 +546,19 @@ fn run_ordered(jobs: Vec<Job>, budget: std::time::Duration) -> (Vec<Option<Done>
     let mut received = 0;
     while received < n {
         let left = deadline.saturating_duration_since(web_time::Instant::now());
-        match rx.recv_timeout(left) {
+        if left.is_zero() {
+            break;
+        }
+        // Wake now and then to see whether the call was cancelled (#264).
+        match rx.recv_timeout(left.min(std::time::Duration::from_millis(200))) {
             Ok((k, done)) => {
                 if let Some(slot) = out.get_mut(k) {
                     *slot = Some(done);
                 }
                 received += 1;
             }
-            // Out of time, or every worker gone (none is left with work then).
+            Err(mpsc::RecvTimeoutError::Timeout) if !crate::cancel::requested() => {}
+            // Cancelled, or every worker gone (none is left with work then).
             Err(_) => break,
         }
     }
@@ -566,7 +574,7 @@ fn run_ordered(jobs: Vec<Job>, budget: std::time::Duration) -> (Vec<Option<Done>
 
 /// The jobs one after another on this thread, none started past `deadline`.
 fn run_here(jobs: &[Job], deadline: web_time::Instant) -> Vec<Option<Done>> {
-    jobs.iter().map(|job| (web_time::Instant::now() < deadline).then(|| check(job))).collect()
+    jobs.iter().map(|job| (web_time::Instant::now() < deadline && !crate::cancel::requested()).then(|| check(job))).collect()
 }
 
 #[cfg(test)]

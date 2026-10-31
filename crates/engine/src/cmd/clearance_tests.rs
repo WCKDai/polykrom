@@ -651,3 +651,16 @@ fn a_threaded_shank_in_its_tapped_hole_is_engagement_not_overlap() {
     let r = run(&mut s, "inspect.clearance", json!({}));
     assert_eq!((r["overlaps"].as_array().map(Vec::len), r["threaded"].as_array().map(Vec::len)), (Some(1), Some(0)), "core rod: {r}");
 }
+
+/// #264: a watched call that was cancelled stops instead of measuring its pairs.
+#[test]
+fn a_cancelled_call_stops_before_measuring_pairs() {
+    let mut s = Session::default();
+    cube(&mut s, "A", 10.0, [0.0, 0.0, 0.0]);
+    cube(&mut s, "B", 10.0, [10.5, 0.0, 0.0]);
+    let progress = std::sync::Arc::new(polykrom_doc::progress::Progress::default());
+    progress.cancel();
+    let r = polykrom_doc::progress::watch(progress, || s.execute("inspect.clearance", &json!({"gap": 1.0})));
+    let e = r.expect_err("cancelled").to_string();
+    assert!(e.contains("cancelled"), "{e}");
+}
