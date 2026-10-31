@@ -460,7 +460,9 @@ fn serve_with(
                     let wait = if patient || method == "engine.batch" { waits.long } else { waits.short };
                     let what = control_pending::describe(&method, &params);
                     let effect = control_pending::effect(&method, &params);
-                    let (req, rrx) = ControlRequest::new(method.clone(), params);
+                    let (mut req, rrx) = ControlRequest::new(method.clone(), params);
+                    // The design the request is for, when the client names one (#290).
+                    req.document = msg.get("document").and_then(Value::as_u64);
                     let ticket = running.add(connection, &id, &req);
                     if tx.send(req).is_err() {
                         break;

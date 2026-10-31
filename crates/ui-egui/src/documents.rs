@@ -19,6 +19,8 @@ pub const MAX_OPEN: usize = 32;
 
 /// A design that is not the active one: everything that belongs to it alone.
 pub struct DocSlot {
+    /// The tab's id ([`Documents::active_id`]).
+    pub(crate) id: u64,
     pub(crate) session: Session,
     pub(crate) autosave: Option<polykrom_engine::recovery::Autosaver>,
     pub(crate) big_operation: bool,
@@ -38,8 +40,9 @@ struct DocView {
 }
 
 impl DocSlot {
-    fn new(session: Session) -> DocSlot {
+    fn new(session: Session, id: u64) -> DocSlot {
         DocSlot {
+            id,
             session,
             autosave: None,
             big_operation: false,
@@ -68,6 +71,12 @@ pub struct Documents {
     /// is closed first, so the ones before it keep their places). One with unsaved changes asks
     /// first; Cancel stops the rest (#3055).
     pub batch: Option<Vec<usize>>,
+    /// The shown tab's id. Every tab has one for as long as it is open, whatever is moved,
+    /// closed or opened around it (a design opened or made new in it keeps it), so a control
+    /// client can name the design it works on (`document`, #290).
+    pub active_id: u64,
+    /// The last id given.
+    last_id: u64,
 }
 
 impl Documents {
@@ -79,6 +88,50 @@ impl Documents {
     pub fn count(&self) -> usize {
         self.slots.len().max(1)
     }
+
+    fn fresh_id(&mut self) -> u64 {
+        self.last_id += 1;
+        self.last_id
+    }
+
+    /// Where the tab with `id` is (its index), if it is open.
+    pub fn find(&self, id: u64) -> Option<usize> {
+        if id == self.active_id {
+            return Some(self.active);
+        }
+        self.slots.iter().position(|s| s.as_ref().is_some_and(|d| d.id == id))
+    }
+
+    /// The tab ids, in order.
+    pub fn ids(&self) -> Vec<u64> {
+        if self.slots.is_empty() {
+            return vec![self.active_id];
+        }
+        self.slots.iter().map(|s| s.as_ref().map_or(self.active_id, |d| d.id)).collect()
+    }
+}
+
+/// The shown design as replies name it: `{id, name}` (#290).
+pub fn shown(app: &SolveApp) -> Value {
+    json!({"id": app.docs.active_id, "name": app.session.doc.name})
+}
+
+/// Why a control request naming `document` can't run now, if it can't: the design it names is
+/// closed, or isn't the shown one (a request runs on the shown design, so it fails rather than
+/// change another, #290).
+pub fn refusal(app: &SolveApp, document: u64) -> Option<String> {
+    if document == app.docs.active_id {
+        return None;
+    }
+    Some(match app.docs.find(document) {
+        None => format!("document closed: document {document} is no longer open; nothing was run"),
+        Some(i) => format!(
+            "document {document} is not the shown tab (tab {}; the shown tab is document {}, `{}`): nothing was run. Switch to it with ui.documents {{action: switch, document: {document}}}",
+            i + 1,
+            app.docs.active_id,
+            app.session.doc.name
+        ),
+    })
 }
 
 fn take_view(app: &mut SolveApp) -> DocView {
@@ -121,7 +174,9 @@ fn swap_in(app: &mut SolveApp, slot: DocSlot) -> DocSlot {
     app.menu.props = None;
     crate::sketch_attachment_ui::clear(app);
     let out_rev = app.session.revision;
+    let out_id = std::mem::replace(&mut app.docs.active_id, slot.id);
     let mut out = DocSlot {
+        id: out_id,
         session: std::mem::replace(&mut app.session, slot.session),
         autosave: app.autosave.as_mut().and_then(|a| std::mem::replace(&mut a.active, slot.autosave)),
         big_operation: std::mem::replace(&mut app.big_operation, slot.big_operation),
@@ -198,7 +253,8 @@ pub fn open_tab(app: &mut SolveApp, session: Session) -> Result<(), String> {
         return Err(format!("at most {MAX_OPEN} designs can be open"));
     }
     let at = app.docs.active + 1;
-    app.docs.slots.insert(at, Some(DocSlot::new(session)));
+    let id = app.docs.fresh_id();
+    app.docs.slots.insert(at, Some(DocSlot::new(session, id)));
     switch(app, at);
     app.fit_view();
     Ok(())
@@ -424,11 +480,21 @@ pub fn tabs_info(app: &SolveApp) -> Vec<(String, bool)> {
         .collect()
 }
 
-/// The control channel's `ui.documents`: list, `new`, `switch`, `close` (by index; `force`
-/// closes without asking), `close_others` (all but `index`), `close_all`, `move` (`from`, `to`)
-/// or `quit`; `answer`: save | dont_save | cancel answers "save changes?".
+/// The control channel's `ui.documents`: list, `new`, `switch`, `close` (by `document` id or
+/// `index`; `force` closes without asking), `close_others` (all but that one), `close_all`, `move`
+/// (`from`, `to`) or `quit`; `answer`: save | dont_save | cancel answers "save changes?". The reply
+/// lists each tab's `id`, `name`, `path` and `dirty`, and the shown tab's `active_id` (#290).
 pub fn control(app: &mut SolveApp, p: &Value) -> Value {
-    let i = p.get("index").and_then(Value::as_u64).map(|x| x as usize);
+    if let Some(id) = p.get("document").and_then(Value::as_u64)
+        && app.docs.find(id).is_none()
+    {
+        return json!({"ok": false, "error": format!("document closed: document {id} is no longer open")});
+    }
+    let i = p
+        .get("document")
+        .and_then(Value::as_u64)
+        .and_then(|id| app.docs.find(id))
+        .or_else(|| p.get("index").and_then(Value::as_u64).map(|x| x as usize));
     match p.get("action").and_then(Value::as_str) {
         Some("new") => new_design(app),
         Some("switch") => switch(app, i.unwrap_or(app.docs.active)),
@@ -456,8 +522,25 @@ pub fn control(app: &mut SolveApp, p: &Value) -> Value {
     if let Some(a) = answer {
         answer_prompt(app, a);
     }
-    let tabs: Vec<Value> = tabs_info(app).into_iter().map(|(name, dirty)| json!({"name": name, "dirty": dirty})).collect();
-    json!({"documents": tabs, "active": app.docs.active, "closing": app.docs.closing, "quitting": app.docs.quitting.is_some(), "batch": app.docs.batch})
+    let paths: Vec<Option<String>> = if app.docs.slots.is_empty() {
+        vec![app.session.path.clone()]
+    } else {
+        app.docs.slots.iter().map(|s| s.as_ref().map_or(app.session.path.clone(), |d| d.session.path.clone())).collect()
+    };
+    let tabs: Vec<Value> = tabs_info(app)
+        .into_iter()
+        .zip(app.docs.ids())
+        .zip(paths)
+        .map(|(((name, dirty), id), path)| json!({"id": id, "name": name, "path": path, "dirty": dirty}))
+        .collect();
+    json!({
+        "documents": tabs,
+        "active": app.docs.active,
+        "active_id": app.docs.active_id,
+        "closing": app.docs.closing,
+        "quitting": app.docs.quitting.is_some(),
+        "batch": app.docs.batch,
+    })
 }
 
 /// A design tab being dragged along the strip to a new place: its index, and where the pointer
@@ -1276,6 +1359,37 @@ mod tests {
     }
 
     /// A design built elsewhere replaces a blank one and gets a tab otherwise.
+    /// #290: a tab keeps its id whatever is opened, moved or closed around it; `ui.documents`
+    /// lists the ids and switches or closes by id; a closed id is refused.
+    #[test]
+    fn tabs_keep_their_ids() {
+        let mut a = app();
+        let first = a.docs.active_id;
+        open_tab(&mut a, Session::default()).unwrap();
+        let second = a.docs.active_id;
+        open_tab(&mut a, Session::default()).unwrap();
+        let third = a.docs.active_id;
+        assert!(first != second && second != third && first != third);
+        assert_eq!(a.docs.ids(), vec![first, second, third]);
+        // Moving and switching keep each tab's id with its design.
+        move_tab(&mut a, 2, 0);
+        assert_eq!(a.docs.ids(), vec![third, first, second]);
+        assert_eq!(a.docs.active_id, third, "the moved tab is still the shown one");
+        let v = control(&mut a, &json!({"action": "switch", "document": first}));
+        assert_eq!((v["active_id"].clone(), v["active"].clone()), (json!(first), json!(1)), "{v}");
+        let listed: Vec<u64> = v["documents"].as_array().unwrap().iter().map(|d| d["id"].as_u64().unwrap()).collect();
+        assert_eq!(listed, vec![third, first, second]);
+        // Closing one leaves the others' ids alone, and its id is then refused.
+        control(&mut a, &json!({"action": "close", "document": third, "force": true}));
+        assert_eq!(a.docs.ids(), vec![first, second]);
+        assert_eq!(a.docs.find(third), None);
+        let v = control(&mut a, &json!({"action": "switch", "document": third}));
+        assert!(v["error"].as_str().is_some_and(|e| e.starts_with("document closed")), "{v}");
+        assert_eq!(refusal(&a, first), None, "the shown document runs");
+        assert!(refusal(&a, second).is_some_and(|e| e.contains("not the shown tab")));
+        assert!(refusal(&a, third).is_some_and(|e| e.starts_with("document closed")));
+    }
+
     #[test]
     fn adopt_reuses_a_blank_design() {
         let mut a = app();

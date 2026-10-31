@@ -147,6 +147,23 @@ pub struct Remote {
     id_prefix: String,
     /// The id of the last request sent for a call (not `control.*`): the one to cancel.
     last_sent: std::sync::Arc<std::sync::Mutex<Option<String>>>,
+    /// The design this bridge works on (the app's tab id): sent with every request, so one the
+    /// person or another client switched away from fails instead of changing another design
+    /// (#290). Taken from the first reply that names one, and again after the bridge opens a
+    /// file, starts a new design or switches tabs.
+    document: Option<u64>,
+}
+
+/// A request that may move the bridge to another design: it names none, and the design its
+/// reply names becomes the bridge's.
+fn moves_design(method: &str, params: &Value) -> bool {
+    match method {
+        "ui.documents" => matches!(params.get("action").and_then(Value::as_str), Some("new" | "switch")),
+        "engine.execute" | "command" => {
+            matches!(params.get("command").and_then(Value::as_str), Some("doc.open" | "file.new" | "doc.recover"))
+        }
+        _ => false,
+    }
 }
 
 /// How a tool error starts when no app listens at the bridged address. The agent reads it, and
@@ -185,6 +202,7 @@ impl Remote {
             waits: WAITS,
             id_prefix,
             last_sent: Default::default(),
+            document: None,
         }
     }
 
@@ -304,7 +322,13 @@ impl Remote {
         if let (Some(scope), Some(o)) = (polykrom_engine::io::vfs::current_scope(), params.as_object_mut()) {
             o.insert("allow_paths".into(), json!(scope.roots().iter().map(|r| r.to_string_lossy()).collect::<Vec<_>>()));
         }
+        let moves = moves_design(method, &params);
         let mut msg = json!({"id": id, "method": method, "params": params});
+        if let Some(d) = self.document.filter(|_| !moves && !method.starts_with("control."))
+            && let Some(o) = msg.as_object_mut()
+        {
+            o.insert("document".into(), json!(d));
+        }
         // The token goes with every request (an app restarted mid-session has a new one).
         if let Some(t) = polykrom_engine::control_auth::client_token(self.port, self.explicit_token.as_deref()) {
             msg["token"] = json!(t);
@@ -423,6 +447,7 @@ impl Remote {
         let effect = control_pending::effect(method, &params);
         let again = retry_busy.then(|| params.clone());
         let sent = Instant::now();
+        let moves = moves_design(method, &params);
         let line = self.request_line(method, params);
         let reply = if method == "engine.batch" {
             self.send_batch(&line)
@@ -436,6 +461,13 @@ impl Remote {
         }
         .map_err(|e| self.explain(&e))?;
         let v: Value = serde_json::from_str(&reply).map_err(|e| format!("bad reply from the app: {e}"))?;
+        // The design it ran on: the bridge's from the first reply on, and a new one after it
+        // opened a file, started a design or switched tabs (#290).
+        if let Some(d) = v.pointer("/document/id").and_then(Value::as_u64)
+            && (self.document.is_none() || (moves && v.get("ok") != Some(&Value::Bool(false))))
+        {
+            self.document = Some(d);
+        }
         // Timed out in the app, still running (#1618): wait for its result on this connection.
         if v.get("running").and_then(Value::as_bool) == Some(true) {
             self.outstanding = Some(Outstanding { what: what.clone(), effect: Some(effect), since: sent });

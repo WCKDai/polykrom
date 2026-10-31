@@ -135,6 +135,25 @@ a hidden folder, the open design's folder (whose hidden files stay out of reach)
 MCP server sends its folders this way on every request ([mcp.md](mcp.md)). Without
 `allow_paths` file paths are not limited: a client holding the token can do what the user can.
 
+### Documents (#290)
+
+Every open design (tab) has an `id`, kept whatever is opened, moved or closed around it; a design
+opened or made new in that tab keeps it. `ui.documents` lists them. Every reply says which design
+the request ran on, `"document": {"id": 3, "name": "Bracket"}`, so a client sees when the shown
+tab changed under it.
+
+A request may name the design it is for with a top-level `document` (beside `id` and `method`):
+
+```text
+{"id":7,"method":"engine.execute","params":{"command":"solid.box","params":{…}},"document":3,"token":"…"}
+```
+
+It runs only when that design is the shown one. Otherwise it fails and nothing runs: `document 3
+is not the shown tab …` (switch to it with `ui.documents {action: switch, document: 3}`), or
+`document closed` once that tab is gone. Never on another design. `polykrom-cli mcp` does this
+by itself: it takes its design from the first reply, names it on every request, and moves to the
+design an open, a new design or a tab switch of its own answers with.
+
 ## Engine
 
 | Method | Params | Result |
@@ -248,7 +267,7 @@ labels; `prefs:measure_axis_distances` identifies the checkbox.
 | `ui.render` | `path`, `width?`, `height?`, `grid?`, `axes?` | Render of the model with the current camera (no window needed), drawn on the app's GPU device with the viewport's pipelines (the reply's `renderer`: `gpu`, or `gpu-software` on a software adapter), in the window's theme (light or dark; `polykrom-cli snapshot` keeps the light colours); cut by the section the viewport shows (`inspect.section`, an open Section Analysis dialog's preview, a sketch's Slice), with the cut face capped. The ground grid and the origin's axes are drawn as the window shows them (`ui.set` `showGrid` and `showOrigin`, `hiddenOrigin`); `grid` and `axes` (booleans) say otherwise for this render |
 | `ui.confirm` | `accept?`: bool | answers the Delete confirmation (shown when a delete takes other features with it or makes some fail); without `accept`, what it lists |
 | `ui.messages` | `clear?`: `true` (empty the list), `open?`: bool (show or hide the Messages window) | every status message of this run, oldest first (the last 200; a message repeated in a row is one entry with a `count`): `messages` `[{text, error, at, count}]` (`at` in ms since the Unix epoch), and whether the window is `open` (#2763) |
-| `ui.documents` | `action?`: `new`, `switch`, `close`, `quit`; `index?`; `force?` (close without asking); `answer?`: `save`, `dont_save`, `cancel` (answers "save changes?") | the open designs (tabs): names, unsaved flags, the active one, a pending "save changes?" prompt, whether a quit is asking |
+| `ui.documents` | `action?`: `new`, `switch`, `close`, `close_others`, `close_all`, `move` (`from`, `to`), `quit`; `document?` (a tab's id) or `index?`; `force?` (close without asking); `answer?`: `save`, `dont_save`, `cancel` (answers "save changes?") | the open designs (tabs): `documents` `[{id, name, path, dirty}]`, the shown one (`active`, `active_id`), a pending "save changes?" prompt, whether a quit is asking. A closed `document` is refused (`document closed`) |
 | `ui.file` | `path`; `insert?`: bool | starts an interactive background Open or Insert; poll `ui.inspect.file_busy` for completion; the window stays responsive |
 | `ui.home` | `open?`: bool; `sample?`: index | the start page: show or hide it, open a built-in sample (once built); returns `open` and the recent designs |
 | `ui.shortcut` | `command`, `key?`, `replace?` | a command's key, or rebinds it (`""` clears; a key another command uses is refused unless `replace`) |

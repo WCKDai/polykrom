@@ -515,3 +515,47 @@ fn cancelling_a_step_open_releases_the_slot_before_the_worker_returns() {
     assert_eq!(fingerprint(&w.app.session), fingerprint(&expected));
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+/// #290: a control request naming the shown document runs and its reply names it; one naming
+/// another tab fails and changes nothing (it never runs on the shown design); one naming a closed
+/// tab fails with `document closed`; an open's reply names the tab the file went into.
+#[test]
+fn a_request_runs_only_on_the_document_it_names() {
+    let dir = scratch("documents");
+    let path = large_design(&dir, 1);
+    let mut w = Win::new();
+    let (tx, rx) = std::sync::mpsc::channel();
+    w.app.control_rx = Some(rx);
+    let send = |w: &mut Win, method: &str, params: serde_json::Value, document: Option<u64>| {
+        let (mut req, reply) = crate::control::ControlRequest::new(method, params);
+        req.document = document;
+        tx.send(req).unwrap();
+        for _ in 0..100_000 {
+            w.frame(vec![]);
+            if let Ok(v) = reply.try_recv() {
+                return v;
+            }
+        }
+        panic!("no reply to {method}");
+    };
+    let first = w.app.docs.active_id;
+    let boxed = json!({"command": "solid.box", "params": {"length": 1, "width": 1, "height": 1}});
+    let r = send(&mut w, "engine.execute", boxed.clone(), Some(first));
+    assert_eq!((r["ok"].clone(), r["document"]["id"].clone()), (json!(true), json!(first)), "{r}");
+    // Opening a file goes into a new tab (the first isn't blank), and the reply names it.
+    let r = send(&mut w, "engine.execute", json!({"command": "doc.open", "params": {"path": path}}), None);
+    let opened = r["document"]["id"].as_u64().expect("the open names its tab");
+    assert!(r["ok"] == true && opened != first && w.app.docs.active_id == opened, "{r}");
+    let features = w.app.session.doc.features.len();
+    // The first tab is now in the background: a request for it fails, and nothing changes.
+    let r = send(&mut w, "engine.execute", boxed.clone(), Some(first));
+    assert!(r["ok"] == false && r["error"].as_str().is_some_and(|e| e.contains("not the shown tab")), "{r}");
+    assert_eq!(r["document"]["id"], json!(opened), "the refusal says which design is shown: {r}");
+    assert_eq!(w.app.session.doc.features.len(), features, "the shown design is unchanged");
+    // Closed: refused as closed.
+    send(&mut w, "ui.documents", json!({"action": "close", "document": first, "force": true}), None);
+    let r = send(&mut w, "engine.execute", boxed, Some(first));
+    assert!(r["ok"] == false && r["error"].as_str().is_some_and(|e| e.starts_with("document closed")), "{r}");
+    assert_eq!(w.app.session.doc.features.len(), features);
+    let _ = std::fs::remove_dir_all(&dir);
+}

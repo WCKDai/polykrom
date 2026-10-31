@@ -2521,3 +2521,37 @@ fn a_bridged_call_is_cancelled_in_the_app() {
     assert!(e.contains("cancelled"), "{e}");
     app.join().unwrap();
 }
+
+/// #290: bridged to an app, the bridge works on one design. It takes it from the first reply,
+/// names it on every request after, names none on an open (which may move it), and moves to the
+/// design the open's reply names.
+#[test]
+fn a_bridge_stays_on_its_document() {
+    use crate::backend::Backend;
+    use std::io::{BufRead, BufReader, Write};
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let addr = listener.local_addr().unwrap().to_string();
+    let app = std::thread::spawn(move || {
+        let (stream, _) = listener.accept().unwrap();
+        let mut lines = BufReader::new(stream.try_clone().unwrap());
+        let mut seen = Vec::new();
+        // The app shows document 5 until the open, then 7.
+        for doc in [5, 5, 7, 7] {
+            let mut line = String::new();
+            lines.read_line(&mut line).unwrap();
+            let req: Value = serde_json::from_str(&line).unwrap();
+            writeln!(&stream, "{}", json!({"id": req["id"], "ok": true, "result": {}, "document": {"id": doc, "name": "d"}})).unwrap();
+            seen.push(req);
+        }
+        seen
+    });
+    let mut remote = crate::Remote::new(&addr, Some("0123456789abcdef0123456789abcdef"));
+    let boxed = json!({"command": "solid.box", "params": {"length": 1, "width": 1, "height": 1}});
+    remote.call("engine.execute", boxed.clone()).unwrap();
+    remote.call("engine.execute", boxed.clone()).unwrap();
+    remote.call("engine.execute", json!({"command": "doc.open", "params": {"path": "/x/part.polykrom"}})).unwrap();
+    remote.call("engine.execute", boxed).unwrap();
+    let seen = app.join().unwrap();
+    let named: Vec<Value> = seen.iter().map(|r| r.get("document").cloned().unwrap_or(Value::Null)).collect();
+    assert_eq!(named, vec![Value::Null, json!(5), Value::Null, json!(7)], "{seen:?}");
+}
