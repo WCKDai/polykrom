@@ -723,6 +723,7 @@
   "cmd.document_units": "デザインの単位を変更",
   "cmd.edit_checkpoint": "チェックポイント",
   "cmd.edit_restore_checkpoint": "チェックポイントを復元",
+  "cmd.edit_squash_checkpoint": "チェックポイントを統合",
   "cmd.engine_commands": "コマンドを一覧表示",
   "cmd.engine_describe": "コマンドの詳細を表示",
   "cmd.explode_create": "分解図",

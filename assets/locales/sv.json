@@ -516,6 +516,7 @@
   "cmd.document_units": "Ändra konstruktionsenheter",
   "cmd.edit_checkpoint": "Kontrollpunkt",
   "cmd.edit_restore_checkpoint": "Återställ kontrollpunkt",
+  "cmd.edit_squash_checkpoint": "Slå ihop kontrollpunkt",
   "cmd.engine_commands": "Lista kommandon",
   "cmd.engine_describe": "Beskriv kommando",
   "cmd.explode_create": "Sprängvy",

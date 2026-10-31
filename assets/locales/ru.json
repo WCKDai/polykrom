@@ -516,6 +516,7 @@
   "cmd.document_units": "Изменить единицы дизайна",
   "cmd.edit_checkpoint": "Контрольная точка",
   "cmd.edit_restore_checkpoint": "Вернуть контрольную точку",
+  "cmd.edit_squash_checkpoint": "Объединить контрольную точку",
   "cmd.engine_commands": "Список команд",
   "cmd.engine_describe": "Описание команды",
   "cmd.explode_create": "Разобранный вид",

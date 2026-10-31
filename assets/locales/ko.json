@@ -518,6 +518,7 @@
   "cmd.document_units": "설계 단위 변경",
   "cmd.edit_checkpoint": "체크포인트",
   "cmd.edit_restore_checkpoint": "체크포인트 복원",
+  "cmd.edit_squash_checkpoint": "체크포인트 병합",
   "cmd.engine_commands": "명령 목록",
   "cmd.engine_describe": "명령 설명",
   "cmd.explode_create": "분해 보기",

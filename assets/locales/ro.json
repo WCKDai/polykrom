@@ -516,6 +516,7 @@
   "cmd.document_units": "Schimbă unitățile proiectului",
   "cmd.edit_checkpoint": "Punct de control",
   "cmd.edit_restore_checkpoint": "Restabilește punctul de control",
+  "cmd.edit_squash_checkpoint": "Combină punctul de control",
   "cmd.engine_commands": "Listează comenzile",
   "cmd.engine_describe": "Descrie comanda",
   "cmd.explode_create": "Vedere explodată",

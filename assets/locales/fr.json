@@ -517,6 +517,7 @@
   "cmd.document_units": "Changer les unités de la conception",
   "cmd.edit_checkpoint": "Point de restauration",
   "cmd.edit_restore_checkpoint": "Revenir au point de restauration",
+  "cmd.edit_squash_checkpoint": "Fusionner le point de restauration",
   "cmd.engine_commands": "Lister les commandes",
   "cmd.engine_describe": "Décrire la commande",
   "cmd.explode_create": "Vue éclatée",

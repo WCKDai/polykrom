@@ -517,6 +517,7 @@
   "cmd.document_units": "Skift designets enheder",
   "cmd.edit_checkpoint": "Kontrolpunkt",
   "cmd.edit_restore_checkpoint": "Gendan kontrolpunkt",
+  "cmd.edit_squash_checkpoint": "Sammenlæg kontrolpunkt",
   "cmd.engine_commands": "Vis kommandoer",
   "cmd.engine_describe": "Beskriv kommando",
   "cmd.explode_create": "Eksploderet visning",

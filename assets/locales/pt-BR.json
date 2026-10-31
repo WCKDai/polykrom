@@ -517,6 +517,7 @@
   "cmd.document_units": "Alterar unidades do projeto",
   "cmd.edit_checkpoint": "Ponto de restauração",
   "cmd.edit_restore_checkpoint": "Restaurar ponto de restauração",
+  "cmd.edit_squash_checkpoint": "Combinar ponto de restauração",
   "cmd.engine_commands": "Listar comandos",
   "cmd.engine_describe": "Descrever comando",
   "cmd.explode_create": "Vista explodida",

@@ -723,6 +723,7 @@
   "cmd.document_units": "更改设计单位",
   "cmd.edit_checkpoint": "检查点",
   "cmd.edit_restore_checkpoint": "恢复检查点",
+  "cmd.edit_squash_checkpoint": "合并检查点",
   "cmd.engine_commands": "列出命令",
   "cmd.engine_describe": "描述命令",
   "cmd.explode_create": "爆炸图",

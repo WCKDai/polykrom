@@ -723,6 +723,7 @@
   "cmd.document_units": "Change Design Units",
   "cmd.edit_checkpoint": "Checkpoint",
   "cmd.edit_restore_checkpoint": "Restore Checkpoint",
+  "cmd.edit_squash_checkpoint": "Squash Checkpoint",
   "cmd.engine_commands": "List Commands",
   "cmd.engine_describe": "Describe Command",
   "cmd.explode_create": "Exploded View",

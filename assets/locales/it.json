@@ -520,6 +520,7 @@
   "cmd.document_units": "Modifica unità del progetto",
   "cmd.edit_checkpoint": "Punto di ripristino",
   "cmd.edit_restore_checkpoint": "Ripristina punto di ripristino",
+  "cmd.edit_squash_checkpoint": "Unisci punto di ripristino",
   "cmd.engine_commands": "Elenca comandi",
   "cmd.engine_describe": "Descrivi comando",
   "cmd.explode_create": "Vista esplosa",

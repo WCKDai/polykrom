@@ -517,6 +517,7 @@
   "cmd.document_units": "Ubah Unit Reka Bentuk",
   "cmd.edit_checkpoint": "Titik Semak",
   "cmd.edit_restore_checkpoint": "Pulihkan Titik Semak",
+  "cmd.edit_squash_checkpoint": "Gabungkan Titik Semak",
   "cmd.engine_commands": "Senarai Arahan",
   "cmd.engine_describe": "Terangkan Arahan",
   "cmd.explode_create": "Pandangan Terlerai",

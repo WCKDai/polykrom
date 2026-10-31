@@ -516,6 +516,7 @@
   "cmd.document_units": "變更設計單位",
   "cmd.edit_checkpoint": "檢查點",
   "cmd.edit_restore_checkpoint": "還原檢查點",
+  "cmd.edit_squash_checkpoint": "合併檢查點",
   "cmd.engine_commands": "列出命令",
   "cmd.engine_describe": "描述命令",
   "cmd.explode_create": "爆炸圖",
