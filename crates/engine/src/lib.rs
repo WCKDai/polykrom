@@ -1134,6 +1134,26 @@ impl Session {
     }
 
     /// Forget checkpoint `id` (and later ones) without going back.
+    /// Make everything done since checkpoint `id` one undo step, `label`, as if one command had
+    /// done it (#269: a batch that keeps what it finished). It and later checkpoints are used up.
+    /// `false` when nothing changed, which leaves the history as it is.
+    pub fn squash_checkpoint(&mut self, id: u64, label: &str) -> Result<bool> {
+        let i = self.checkpoints.iter().position(|c| c.id == id).ok_or_else(|| EngineError::Other(format!("no checkpoint {id}")))?;
+        let Some(c) = self.checkpoints.drain(i..).next() else { return Err(EngineError::Other(format!("no checkpoint {id}"))) };
+        let changed = !Arc::ptr_eq(&self.doc, &c.doc) || self.active_sketch != c.active_sketch || self.pending_moves != c.pending_moves;
+        if !changed {
+            return Ok(false);
+        }
+        let mut undo = c.undo;
+        undo.push(Snapshot { label: label.to_string(), doc: c.doc, active_sketch: c.active_sketch, pending_moves: c.pending_moves });
+        if undo.len() > MAX_UNDO {
+            undo.drain(..undo.len() - MAX_UNDO);
+        }
+        self.undo = undo;
+        self.redo.clear();
+        Ok(true)
+    }
+
     pub fn drop_checkpoint(&mut self, id: u64) {
         if let Some(i) = self.checkpoints.iter().position(|c| c.id == id) {
             self.checkpoints.truncate(i);

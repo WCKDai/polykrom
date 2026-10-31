@@ -1856,6 +1856,39 @@ fn checkpoint_restores_with_a_full_undo_history() {
     assert!(s.execute("edit.restore_checkpoint", &json!({"checkpoint": id})).is_err());
 }
 
+/// #269: everything since a checkpoint becomes one undo step, which takes the design back to
+/// the checkpoint; the history before it is kept, and nothing changed leaves it alone.
+#[test]
+fn squash_checkpoint_makes_one_undo_step() {
+    let mut s = Session::default();
+    run(&mut s, "solid.box", json!({"length": 1.0, "width": 1.0, "height": 1.0}));
+    let before: Vec<String> = s.undo.iter().map(|u| u.label.clone()).collect();
+    let doc = s.doc.clone();
+    let id = run(&mut s, "edit.checkpoint", json!({}))["checkpoint"].as_u64().unwrap();
+    run(&mut s, "solid.box", json!({"length": 2.0, "width": 2.0, "height": 2.0, "corner": [5, 0, 0]}));
+    run(&mut s, "parameters.add", json!({"name": "w", "expression": "3 mm"}));
+    assert_eq!(s.undo.len(), before.len() + 2);
+    let r = run(&mut s, "edit.squash_checkpoint", json!({"checkpoint": id, "label": "Kept steps"}));
+    assert_eq!(r["squashed"], true, "{r}");
+    assert_eq!(s.undo.len(), before.len() + 1);
+    assert_eq!(s.undo.last().map(|u| u.label.as_str()), Some("Kept steps"));
+    assert_eq!(run(&mut s, "inspect.measure", json!({}))["total"]["volume_mm3"].as_f64(), Some(9.0));
+    // One undo goes back to the checkpoint; a redo comes back.
+    run(&mut s, "edit.undo", json!({}));
+    assert!(Arc::ptr_eq(&s.doc, &doc));
+    assert_eq!(s.undo.iter().map(|u| u.label.clone()).collect::<Vec<_>>(), before);
+    run(&mut s, "edit.redo", json!({}));
+    assert_eq!(run(&mut s, "inspect.measure", json!({}))["total"]["volume_mm3"].as_f64(), Some(9.0));
+    // Used up.
+    assert!(s.execute("edit.squash_checkpoint", &json!({"checkpoint": id})).is_err());
+    // Nothing changed: the history stays as it is, redo included.
+    run(&mut s, "edit.undo", json!({}));
+    let id = run(&mut s, "edit.checkpoint", json!({}))["checkpoint"].as_u64().unwrap();
+    let r = run(&mut s, "edit.squash_checkpoint", json!({"checkpoint": id}));
+    assert_eq!(r["squashed"], false, "{r}");
+    assert_eq!(s.redo.len(), 1);
+}
+
 /// Regression (#3242): `file.new` replaced the session and its checkpoints with it, so a
 /// batch that failed after `file.new` could not go back to the design it began in.
 #[test]

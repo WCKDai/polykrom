@@ -135,6 +135,7 @@ pub fn tool_definitions() -> Vec<Value> {
                         "items": {"type": "object", "properties": {"command": {"type": "string"}, "params": {"type": "object"}, "select": {"type": "array", "items": {"type": "string"}, "description": "This step's result only at these dotted paths (as execute's select)"}}, "required": ["command"]},
                     },
                     "rollback": {"type": "boolean", "description": "Undo completed steps when one fails (default true)"},
+                    "on_error": {"type": "string", "enum": ["rollback", "keep"], "description": "When a step fails: rollback (default) takes back the steps before it; keep keeps them as one undo step (`kept` says whether they are one)"},
                     "timings": {"type": "boolean", "description": "Add `timings`: [{index, command, ms}] for every step run (the failing one included) and `total_ms` (default false)"},
                     "profile": {"type": "boolean", "description": "Like timings, and each step's `profile`: {boolean_ms, tessellate_ms, other_ms}, its time in kernel booleans, in tessellation and the rest (default false)"},
                     "verbose": {"type": "boolean", "description": "false: a compact reply. Feature steps leave out the full body list (created_bodies, changed_bodies and removed_bodies stay), sketch steps the ids they repeat outside `created` (default true)"},
@@ -1027,6 +1028,20 @@ impl Undo {
         }
     }
 
+    /// A step failed and the batch keeps what it finished (`on_error: "keep"`): those steps
+    /// become one undo step. `false` when they couldn't be (an app without checkpoints or
+    /// `edit.squash_checkpoint`): they stay, each its own step.
+    fn keep(self, b: &mut dyn Backend) -> bool {
+        let Undo::Checkpoint(id) = self else { return false };
+        match exec(b, "edit.squash_checkpoint", json!({"checkpoint": id, "label": "Batch"})) {
+            Ok(_) => true,
+            Err(_) => {
+                Undo::Checkpoint(id).finish(b);
+                false
+            }
+        }
+    }
+
     /// The batch went through: forget the checkpoint.
     fn finish(self, b: &mut dyn Backend) {
         if let Undo::Checkpoint(id) = self {
@@ -1159,7 +1174,16 @@ fn batch(b: &mut dyn Backend, a: &Map<String, Value>) -> Value {
     if steps.len() > MAX_BATCH {
         return text_result(&json!(format!("batch too long ({} steps, at most {MAX_BATCH})", steps.len())), true);
     }
-    let rollback = a.get("rollback").and_then(Value::as_bool).unwrap_or(true);
+    // `on_error: "keep"` keeps the finished steps of a failed batch as one undo step (#269).
+    let keep = match a.get("on_error").and_then(Value::as_str) {
+        None | Some("rollback") => false,
+        Some("keep") => true,
+        Some(other) => return text_result(&json!(format!("`on_error` is \"rollback\" or \"keep\", not {other:?}")), true),
+    };
+    if keep && a.get("rollback").and_then(Value::as_bool) == Some(true) {
+        return text_result(&json!("`on_error: \"keep\"` keeps the finished steps and `rollback: true` takes them back: give one of them"), true);
+    }
+    let rollback = !keep && a.get("rollback").and_then(Value::as_bool).unwrap_or(true);
     let verbose = a.get("verbose").and_then(Value::as_bool).unwrap_or(true);
     let profile = a.get("profile").and_then(Value::as_bool).unwrap_or(false);
     let timed = profile || a.get("timings").and_then(Value::as_bool).unwrap_or(false);
@@ -1259,8 +1283,15 @@ fn batch(b: &mut dyn Backend, a: &Map<String, Value>) -> Value {
         o.insert("profile".into(), Value::Bool(profile));
     }
     if params.to_string().len() + 64 * 1024 <= polykrom_engine::MAX_LINE {
+        let kept = if keep { Undo::begin(b) } else { Undo::None };
         match b.call("engine.batch", params) {
             Ok(mut r) => {
+                let kept = if r.get("failed").is_some_and(|f| !f.is_null()) {
+                    keep.then(|| kept.keep(b))
+                } else {
+                    kept.finish(b);
+                    None
+                };
                 if let Some(failed) = r.get_mut("failed")
                     && let (Some(command), Some(error)) = (failed.get("command").and_then(Value::as_str), failed.get("error").and_then(Value::as_str))
                 {
@@ -1269,10 +1300,11 @@ fn batch(b: &mut dyn Backend, a: &Map<String, Value>) -> Value {
                         failed.insert("error".into(), Value::String(error));
                     }
                 }
-                return batch_reply(&r, steps.len(), rollback, verbose, &narrow, &selects);
+                return batch_reply(&r, steps.len(), rollback, verbose, &narrow, &selects, kept);
             }
-            // Older apps and the headless session, or the app wants the steps one by one.
-            Err(e) if e.starts_with("unknown method") || e.starts_with("engine.batch unavailable") => {}
+            // Older apps and the headless session, or the app wants the steps one by one (which
+            // take a checkpoint of their own).
+            Err(e) if e.starts_with("unknown method") || e.starts_with("engine.batch unavailable") => kept.finish(b),
             // Never sent: no app to send it to. Or sent and still running (it was not cancelled):
             // the `pending` tool gets its result.
             Err(e) if e.starts_with(crate::backend::NOT_RUNNING) || e.starts_with(STILL_RUNNING) => {
@@ -1285,7 +1317,7 @@ fn batch(b: &mut dyn Backend, a: &Map<String, Value>) -> Value {
             }
         }
     }
-    let start = if rollback { Undo::begin(b) } else { Undo::None };
+    let start = if rollback || keep { Undo::begin(b) } else { Undo::None };
     let mut results = Vec::with_capacity(steps.len());
     let mut rows = Vec::new();
     let clock = timing::Clock::start();
@@ -1325,7 +1357,7 @@ fn batch(b: &mut dyn Backend, a: &Map<String, Value>) -> Value {
                 // A step still running in the app was not cancelled: the rollback first waits for
                 // it (the backend does), so a restored checkpoint takes it back too.
                 let running = e.starts_with(STILL_RUNNING);
-                let (went_back, undone) = start.rollback(b, i);
+                let (kept, (went_back, undone)) = if keep { (Some(start.keep(b)), (false, 0)) } else { (None, start.rollback(b, i)) };
                 // Only a rollback asked for is reported as one.
                 let rolled_back = rollback && went_back;
                 let mut failed = json!({"index": i, "command": command, "error": e});
@@ -1346,6 +1378,7 @@ fn batch(b: &mut dyn Backend, a: &Map<String, Value>) -> Value {
                     "not_run": (i + 1..steps.len()).collect::<Vec<_>>(),
                     "results": results,
                 });
+                let reply = with_kept(reply, kept);
                 return text_result(&with_timings(reply, timed, rows, clock.ms()), true);
             }
         }
@@ -1353,6 +1386,15 @@ fn batch(b: &mut dyn Backend, a: &Map<String, Value>) -> Value {
     start.finish(b);
     let reply = json!({"ok": true, "completed": results.len(), "results": results});
     text_result(&with_timings(reply, timed, rows, clock.ms()), false)
+}
+
+/// A failed batch's `reply` with what `on_error: "keep"` kept: the steps in `applied`, and
+/// whether they are one undo step.
+fn with_kept(mut reply: Value, kept: Option<bool>) -> Value {
+    if let (Some(one), Some(o)) = (kept, reply.as_object_mut()) {
+        o.insert("kept".into(), json!({"steps": o.get("applied").cloned().unwrap_or(json!([])), "one_undo_step": one}));
+    }
+    reply
 }
 
 /// `reply` with `timings` and `total_ms` when they were asked for.
@@ -1378,7 +1420,16 @@ fn unknown_step(b: &dyn Backend, steps: &[Value]) -> Option<(usize, String)> {
 }
 
 /// The `batch` reply from the app's `engine.batch` answer, shaped as the per-step path shapes it.
-fn batch_reply(r: &Value, len: usize, rollback: bool, verbose: bool, narrow: &dyn Fn(usize, Value) -> Value, selects: &[Option<Value>]) -> Value {
+#[allow(clippy::too_many_arguments)]
+fn batch_reply(
+    r: &Value,
+    len: usize,
+    rollback: bool,
+    verbose: bool,
+    narrow: &dyn Fn(usize, Value) -> Value,
+    selects: &[Option<Value>],
+    kept: Option<bool>,
+) -> Value {
     let results: Vec<Value> = r["results"]
         .as_array()
         .cloned()
@@ -1421,6 +1472,7 @@ fn batch_reply(r: &Value, len: usize, rollback: bool, verbose: bool, narrow: &dy
             }
         }
     }
+    let reply = with_kept(reply, kept);
     text_result(&reply, error)
 }
 

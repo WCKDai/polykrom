@@ -20,6 +20,10 @@ pub static COMMANDS: &[CommandSpec] = &[
         .noundo()
         .doc_only()
         .params("checkpoint: id; forget?: bool (true = drop it without going back). Goes back to it, undo history included"),
+    CommandSpec::new("edit.squash_checkpoint", "Squash Checkpoint", squash_checkpoint).icon("checkpoint")
+        .noundo()
+        .doc_only()
+        .params("checkpoint: id; label?: text (default \"Batch\") → {checkpoint, squashed: bool}: everything since the checkpoint becomes one undo step (none when nothing changed)"),
     CommandSpec::new("timeline.compute_all", "Compute All", compute_all).at("SOLID", "MODIFY").icon("compute").noundo(),
     CommandSpec::new("timeline.delete", "Delete", delete)
         .at("SOLID", "MODIFY")
@@ -118,6 +122,14 @@ fn restore_checkpoint(s: &mut Session, p: &Value) -> Result<Value> {
     }
     s.restore_checkpoint(id)?;
     Ok(json!({"checkpoint": id, "restored": true}))
+}
+
+fn squash_checkpoint(s: &mut Session, p: &Value) -> Result<Value> {
+    let cmd = "edit.squash_checkpoint";
+    let id = p.get("checkpoint").and_then(Value::as_u64).ok_or_else(|| bad(cmd, "`checkpoint` must be an id from edit.checkpoint"))?;
+    let label = p.get("label").and_then(Value::as_str).map(str::trim).filter(|l| !l.is_empty() && l.len() <= 128).unwrap_or("Batch");
+    let squashed = s.squash_checkpoint(id, label)?;
+    Ok(json!({"checkpoint": id, "squashed": squashed}))
 }
 
 fn compute_all(s: &mut Session, _p: &Value) -> Result<Value> {
