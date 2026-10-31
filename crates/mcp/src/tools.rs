@@ -675,7 +675,8 @@ fn dispatch(b: &mut dyn Backend, name: &str, a: &Map<String, Value>) -> Result<V
             if tool_definitions().iter().any(|t| t["name"] == id) {
                 return Err(format!("`{id}` is a tool, not a command: call the {id} tool itself"));
             }
-            let v = exec(b, id, a.get("params").cloned().filter(Value::is_object).unwrap_or(json!({})))?;
+            let params = a.get("params").cloned().filter(Value::is_object).unwrap_or(json!({}));
+            let v = joint_errors_touched(id, &params, exec(b, id, params.clone())?);
             let v = if a.get("verbose").and_then(Value::as_bool).unwrap_or(true) { v } else { compact(v) };
             Ok(selected(v, a.get("select")))
         }
@@ -1034,6 +1035,42 @@ impl Undo {
     }
 }
 
+/// A joint change's reply with the errors and conflicts of the joints it changed, and only a count
+/// of the rest under `elsewhere` (#266). The engine answers each joint command with the whole
+/// assembly's, so a run of them repeated the same broken joints at every step; `joint.list` and
+/// `joint.solve` still give them all.
+fn joint_errors_touched(command: &str, params: &Value, mut v: Value) -> Value {
+    let touched: Vec<&Value> = match command {
+        "joint.create" | "joint.as_built" => vec![&v["joint"], &v["name"]],
+        "joint.edit" | "joint.limits" => vec![&params["joint"], &params["name"]],
+        "joint.delete" => vec![],
+        _ => return v,
+    };
+    // A joint is named by id or name; an id may come as a string.
+    let touched: Vec<Value> = touched
+        .into_iter()
+        .filter(|t| !t.is_null())
+        .flat_map(|t| [Some(t.clone()), t.as_str().and_then(|x| x.trim().parse::<u64>().ok()).map(Value::from)])
+        .flatten()
+        .collect();
+    let mine = |item: &Value| touched.iter().any(|t| *t == item["joint"] || *t == item["name"]);
+    let Some(o) = v.as_object_mut() else { return v };
+    let mut elsewhere = Map::new();
+    for key in ["errors", "conflicts"] {
+        let Some(Value::Array(list)) = o.get_mut(key) else { continue };
+        let total = list.len();
+        list.retain(|item| mine(item));
+        if total > list.len() {
+            elsewhere.insert(key.into(), json!(total - list.len()));
+        }
+    }
+    if !elsewhere.is_empty() {
+        elsewhere.insert("see".into(), json!("joint.list (or joint.solve) lists every joint's errors and conflicts"));
+        o.insert("elsewhere".into(), Value::Object(elsewhere));
+    }
+    v
+}
+
 /// A result cut down to the dotted `select` paths (`*` for every item of a list or every value of
 /// an object), merged into one value shaped like the result; paths that match nothing are listed in
 /// `missing_paths`. No `select` (or one that is not a list of strings) leaves the result whole.
@@ -1175,9 +1212,19 @@ fn batch(b: &mut dyn Backend, a: &Map<String, Value>) -> Value {
     let selects: Vec<Option<Value>> = steps.iter().map(|st| st.get("select").cloned()).collect();
     let steps = &mapped;
     // A `list_commands` step's catalog, filtered as the tool filters it.
-    let narrow = |i: usize, v: Value| match filters.iter().find(|(j, _)| *j == i) {
-        Some((_, f)) => filter_commands(v, Some(f)),
-        None => v,
+    // A joint change's step, with the errors of the joints it changed (the others counted).
+    let narrow = |i: usize, v: Value| {
+        let v = match filters.iter().find(|(j, _)| *j == i) {
+            Some((_, f)) => filter_commands(v, Some(f)),
+            None => v,
+        };
+        match steps.get(i) {
+            Some(st) => {
+                let command = st.get("command").or_else(|| st.get("id")).and_then(Value::as_str).unwrap_or_default();
+                joint_errors_touched(command, st.get("params").unwrap_or(&Value::Null), v)
+            }
+            None => v,
+        }
     };
     // An app that runs batches itself answers the whole batch in one request, so one frame
     // (#743). One too long for a control line goes step by step: the app would refuse it unrun.

@@ -1530,6 +1530,61 @@ fn running_asks_the_app() {
     assert!(r["content"][0]["text"].as_str().is_some_and(|t| t.starts_with("unknown method")), "{r}");
 }
 
+/// #266: a joint change's reply keeps the errors and conflicts of the joints it changed and
+/// counts the rest, so a run of joint changes doesn't repeat every broken joint at each step.
+/// Joint queries and drives keep the whole list.
+#[test]
+fn joint_changes_report_their_own_errors() {
+    let broken = json!([{"joint": 7, "name": "Seat1", "why": "origin gone"}, {"joint": 8, "name": "Seat2", "why": "origin gone"}, {"joint": 9, "name": "Seat3", "why": "origin gone"}]);
+    let conflicts = json!([{"joint": 9, "name": "Seat3", "why": "loop"}]);
+    let solve = |extra: Value| {
+        let mut v = json!({"errors": broken, "conflicts": conflicts, "dof": []});
+        v.as_object_mut().unwrap().extend(extra.as_object().unwrap().clone());
+        v
+    };
+    let results =
+        json!([solve(json!({"deleted": 5})), solve(json!({"joint": 8, "name": "Seat2"})), solve(json!({})), solve(json!({})), solve(json!({})),]);
+    let steps = json!([
+        {"command": "joint.delete", "params": {"joint": 5}},
+        {"command": "joint.as_built", "params": {"type": "rigid", "a": "A:1", "b": "B:1"}},
+        {"command": "joint.edit", "params": {"joint": "Seat3", "flip": true}},
+        {"command": "joint.limits", "params": {"joint": "7", "min": 0, "max": 10}},
+        {"command": "joint.drive", "params": {"joint": "Seat1", "value": 3}},
+    ]);
+    let (_, body, is_error) = recorded_batch(Ok(json!({"completed": 5, "results": results, "undone": 0})), json!({"commands": steps}));
+    assert!(!is_error, "{body}");
+    let r = &body["results"];
+    let names = |v: &Value, k: &str| v[k].as_array().unwrap().iter().map(|e| e["name"].as_str().unwrap().to_string()).collect::<Vec<_>>();
+    // Deleted: none of its own, all counted.
+    assert!(names(&r[0], "errors").is_empty(), "{r}");
+    assert_eq!((r[0]["elsewhere"]["errors"].as_u64(), r[0]["elsewhere"]["conflicts"].as_u64()), (Some(3), Some(1)), "{r}");
+    assert_eq!(r[0]["deleted"], 5, "{r}");
+    // Made, by the id in its reply; edited, by name; limited, by an id as a string.
+    assert_eq!(names(&r[1], "errors"), ["Seat2"], "{r}");
+    assert_eq!(r[1]["elsewhere"]["errors"], 2, "{r}");
+    assert_eq!((names(&r[2], "errors"), names(&r[2], "conflicts")), (vec!["Seat3".to_string()], vec!["Seat3".to_string()]), "{r}");
+    assert!(r[2]["elsewhere"].get("conflicts").is_none(), "{r}");
+    assert_eq!(names(&r[3], "errors"), ["Seat1"], "{r}");
+    // A drive is not narrowed.
+    assert_eq!(r[4]["errors"], broken, "{r}");
+    assert!(r[4].get("elsewhere").is_none(), "{r}");
+}
+
+/// The same narrowing on a joint change sent through `execute`, against a real design: a clean
+/// assembly's reply is unchanged.
+#[test]
+fn joint_change_through_execute_keeps_a_clean_reply() {
+    let mut s = server();
+    for (name, corner) in [("A", [0, 0, 0]), ("B", [20, 0, 0])] {
+        tool(&mut s, "execute", json!({"command": "component.activate", "params": {"component": "root"}}));
+        tool(&mut s, "execute", json!({"command": "component.create", "params": {"name": name}}));
+        tool(&mut s, "execute", json!({"command": "solid.box", "params": {"length": 10, "width": 10, "height": 10, "corner": corner}}));
+    }
+    let r = tool(&mut s, "execute", json!({"command": "joint.as_built", "params": {"type": "rigid", "a": "A:1", "b": "B:1", "name": "Glue"}}));
+    assert_eq!((r["errors"].clone(), r["conflicts"].clone()), (json!([]), json!([])), "{r}");
+    assert!(r.get("elsewhere").is_none() && r["name"] == "Glue", "{r}");
+}
+
 /// #743: bridged to an app that has `engine.batch`, a batch is one control request.
 #[test]
 fn batch_is_one_engine_batch_call() {
