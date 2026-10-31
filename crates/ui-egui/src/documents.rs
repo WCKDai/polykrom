@@ -102,6 +102,14 @@ impl Documents {
         self.slots.iter().position(|s| s.as_ref().is_some_and(|d| d.id == id))
     }
 
+    /// The tab `id` when it is open and not the shown one (its design is in its slot).
+    pub(crate) fn background(&mut self, id: u64) -> Option<&mut DocSlot> {
+        if id == self.active_id {
+            return None;
+        }
+        self.slots.iter_mut().filter_map(Option::as_mut).find(|d| d.id == id)
+    }
+
     /// The tab ids, in order.
     pub fn ids(&self) -> Vec<u64> {
         if self.slots.is_empty() {

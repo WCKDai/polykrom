@@ -1869,6 +1869,13 @@ impl SolveApp {
             req.started.store(true, std::sync::atomic::Ordering::Relaxed);
             // A request for a design that isn't the shown one fails, whatever path it would take:
             // it never runs on another design (#290). Opening or switching tabs names none.
+            // One for a design open in another tab runs there, without showing it (#290).
+            if let Some(d) = req.document
+                && let Some(reply) = control::run_in_background(self, d, &req)
+            {
+                let _ = req.reply.send(reply);
+                continue;
+            }
             if let Some(why) = req.document.and_then(|d| documents::refusal(self, d)) {
                 let _ = req.reply.send(json!({"ok": false, "error": why, "document": documents::shown(self)}));
                 continue;

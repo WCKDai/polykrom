@@ -516,11 +516,11 @@ fn cancelling_a_step_open_releases_the_slot_before_the_worker_returns() {
     let _ = std::fs::remove_dir_all(&dir);
 }
 
-/// #290: a control request naming the shown document runs and its reply names it; one naming
-/// another tab fails and changes nothing (it never runs on the shown design); one naming a closed
-/// tab fails with `document closed`; an open's reply names the tab the file went into.
+/// #290: a control request runs on the document it names: on the shown one as before, and on one
+/// in another tab without showing it (engine methods; the window's own are refused). A closed
+/// document fails with `document closed`. An open's reply names the tab the file went into.
 #[test]
-fn a_request_runs_only_on_the_document_it_names() {
+fn a_request_runs_on_the_document_it_names() {
     let dir = scratch("documents");
     let path = large_design(&dir, 1);
     let mut w = Win::new();
@@ -546,16 +546,73 @@ fn a_request_runs_only_on_the_document_it_names() {
     let r = send(&mut w, "engine.execute", json!({"command": "doc.open", "params": {"path": path}}), None);
     let opened = r["document"]["id"].as_u64().expect("the open names its tab");
     assert!(r["ok"] == true && opened != first && w.app.docs.active_id == opened, "{r}");
-    let features = w.app.session.doc.features.len();
-    // The first tab is now in the background: a request for it fails, and nothing changes.
+    let shown = w.app.session.doc.features.len();
+    // The first tab is now in the background: a command for it runs there, unseen.
     let r = send(&mut w, "engine.execute", boxed.clone(), Some(first));
-    assert!(r["ok"] == false && r["error"].as_str().is_some_and(|e| e.contains("not the shown tab")), "{r}");
-    assert_eq!(r["document"]["id"], json!(opened), "the refusal says which design is shown: {r}");
-    assert_eq!(w.app.session.doc.features.len(), features, "the shown design is unchanged");
-    // Closed: refused as closed.
+    assert!(r["ok"] == true && r["document"]["id"] == first, "{r}");
+    assert_eq!((w.app.docs.active_id, w.app.session.doc.features.len()), (opened, shown), "the shown design is unchanged");
+    let r = send(&mut w, "document.inspect", json!({}), Some(first));
+    assert_eq!(r["result"]["timeline"].as_array().map(Vec::len), Some(2), "the first design has both boxes: {r}");
+    // The window's own methods need the design shown.
+    let r = send(&mut w, "ui.render", json!({"path": dir.join("x.png")}), Some(first));
+    assert!(r["ok"] == false && r["error"].as_str().is_some_and(|e| e.contains("needs document")), "{r}");
+    // Closed: refused as closed, and nothing changes.
     send(&mut w, "ui.documents", json!({"action": "close", "document": first, "force": true}), None);
     let r = send(&mut w, "engine.execute", boxed, Some(first));
     assert!(r["ok"] == false && r["error"].as_str().is_some_and(|e| e.starts_with("document closed")), "{r}");
-    assert_eq!(w.app.session.doc.features.len(), features);
+    assert_eq!(w.app.session.doc.features.len(), shown);
     let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// #290's acceptance: two clients each on their own tab interleave their commands; each design
+/// ends exactly as it would running its commands alone, whichever tab is shown.
+#[test]
+fn interleaved_clients_each_build_their_own_design() {
+    const EACH: usize = 100;
+    let step = |k: usize, side: f64| json!({"command": "solid.box", "params": {"length": side, "width": 1 + k % 3, "height": 1 + k % 5, "corner": [k as f64 * 3.0, 0, 0]}});
+    let alone = |side: f64| {
+        let mut s = Session::default();
+        for k in 0..EACH {
+            let c = step(k, side);
+            s.execute(c["command"].as_str().unwrap(), &c["params"]).unwrap();
+        }
+        serde_json::to_value(&s.doc.features).unwrap()
+    };
+    let mut w = Win::new();
+    let (tx, rx) = std::sync::mpsc::channel();
+    w.app.control_rx = Some(rx);
+    let a = w.app.docs.active_id;
+    // A second tab (`new` would reuse the first, still blank).
+    crate::documents::open_tab(&mut w.app, Session::default()).unwrap();
+    let b = w.app.docs.active_id;
+    assert_ne!(a, b);
+    let mut replies = Vec::new();
+    for k in 0..EACH {
+        for (doc, side) in [(a, 2.0), (b, 5.0)] {
+            let (mut req, reply) = crate::control::ControlRequest::new("engine.execute", step(k, side));
+            req.document = Some(doc);
+            tx.send(req).unwrap();
+            replies.push(reply);
+        }
+        // The person switches tabs now and then while the clients work.
+        if k % 17 == 0 {
+            crate::documents::control(&mut w.app, &json!({"action": "switch", "document": if k % 2 == 0 { a } else { b }}));
+        }
+        w.frame(vec![]);
+    }
+    for reply in replies {
+        let v = loop {
+            if let Ok(v) = reply.try_recv() {
+                break v;
+            }
+            w.frame(vec![]);
+        };
+        assert_eq!(v["ok"], true, "{v}");
+    }
+    let design = |w: &mut Win, doc: u64| {
+        crate::documents::control(&mut w.app, &json!({"action": "switch", "document": doc}));
+        serde_json::to_value(&w.app.session.doc.features).unwrap()
+    };
+    assert_eq!(design(&mut w, a), alone(2.0), "client A's design");
+    assert_eq!(design(&mut w, b), alone(5.0), "client B's design");
 }

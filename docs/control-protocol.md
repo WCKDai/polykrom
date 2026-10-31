@@ -148,11 +148,15 @@ A request may name the design it is for with a top-level `document` (beside `id`
 {"id":7,"method":"engine.execute","params":{"command":"solid.box","params":{…}},"document":3,"token":"…"}
 ```
 
-It runs only when that design is the shown one. Otherwise it fails and nothing runs: `document 3
-is not the shown tab …` (switch to it with `ui.documents {action: switch, document: 3}`), or
-`document closed` once that tab is gone. Never on another design. `polykrom-cli mcp` does this
-by itself: it takes its design from the first reply, names it on every request, and moves to the
-design an open, a new design or a tab switch of its own answers with.
+It runs on that design whichever tab is shown, and the person's view doesn't move. Engine
+methods (`engine.execute`, `engine.batch`, `engine.script`, `engine.commands`, `document.inspect`)
+run on a design in another tab without showing it, watched and cancellable like any request.
+Methods that act on the window (`ui.*`), and commands that replace the design (`doc.open`,
+`file.new`, `doc.recover`), need it shown: they fail with `… needs document 3 shown` (switch with
+`ui.documents {action: switch, document: 3}`). Once that tab is closed, a request fails with
+`document closed`. Nothing runs on another design. `polykrom-cli mcp` does this by itself: it
+takes its design from the first reply, names it on every request, and moves to the design that
+an open, a new design or a tab switch of its own answers with.
 
 ## Engine
 
