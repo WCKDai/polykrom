@@ -956,6 +956,118 @@ pub fn save_screenshot(image: &egui::ColorImage, path: Option<&str>) -> Value {
     }
 }
 
+/// The control methods a design that isn't shown can run: they act on its session alone, with no
+/// window (#290). Replacing the design (open, new, recover) needs it shown.
+fn runs_in_background(method: &str, p: &Value) -> bool {
+    match method {
+        "engine.execute" | "command" => {
+            !matches!(p.get("command").or(p.get("id")).and_then(Value::as_str), Some("doc.open" | "file.new" | "doc.recover"))
+        }
+        "engine.batch" | "engine.script" | "engine.commands" | "document.inspect" => true,
+        _ => false,
+    }
+}
+
+/// Run `req` on the open but not shown design `document`, without showing it (#290): the
+/// engine methods ([`runs_in_background`]) on its session, watched and taken back whole when
+/// cancelled, in the request's folders. The reply names the design. `None`: `document` is not a
+/// background tab.
+pub(crate) fn run_in_background(app: &mut SolveApp, document: u64, req: &ControlRequest) -> Option<Value> {
+    app.docs.background(document)?;
+    if !runs_in_background(&req.method, &req.params) {
+        return Some(json!({"ok": false, "error": format!(
+            "`{}` acts on the window or replaces the design: it needs document {document} shown (ui.documents {{action: switch, document: {document}}}); nothing was run",
+            req.method
+        )}));
+    }
+    if app.file_load.busy() || app.file_picker.is_some() || app.saving.is_some() {
+        return Some(json!({"ok": false, "error": "a file operation is in progress"}));
+    }
+    let mut p = req.params.clone();
+    let allowed = match p.get("allow_paths") {
+        None => None,
+        Some(a) => match a.as_array().and_then(|a| a.iter().map(|r| r.as_str().map(std::path::PathBuf::from)).collect::<Option<Vec<_>>>()) {
+            Some(roots) => Some(roots),
+            None => return Some(json!({"ok": false, "error": "`allow_paths` must be a list of folders"})),
+        },
+    };
+    if let Some(o) = p.as_object_mut() {
+        o.remove("allow_paths");
+    }
+    let slot = app.docs.background(document)?;
+    let scope = allowed.map(|roots| {
+        vfs::PathScope::new(roots.into_iter().chain(polykrom_engine::recovery::default_dir())).with_design(slot.session.path.as_deref())
+    });
+    let session = &mut slot.session;
+    let point = session.save_point();
+    let progress = req.progress.clone();
+    let t0 = crate::now_ms();
+    let r = polykrom_engine::doc::progress::watch(progress.clone(), || vfs::scoped(scope, || on_session(session, &req.method, &p)));
+    slot.big_operation |= crate::now_ms() - t0 >= crate::recovery_ui::BIG_OPERATION_MS;
+    let name = slot.session.doc.name.clone();
+    let mut v = if progress.is_cancelled() {
+        slot.session.return_to(point);
+        json!({"ok": false, "cancelled": true, "error": "cancelled (control.cancel): nothing was applied"})
+    } else {
+        match r {
+            Ok(v) => json!({"ok": true, "result": v}),
+            Err(e) => json!({"ok": false, "error": e}),
+        }
+    };
+    v["document"] = json!({"id": document, "name": name});
+    Some(v)
+}
+
+/// An engine method on a session, as the window runs it on the shown one (`engine.batch` with the
+/// same steps, rollback and reply).
+fn on_session(s: &mut polykrom_engine::Session, method: &str, p: &Value) -> Result<Value, String> {
+    let params = |v: Option<&Value>| v.cloned().filter(|v| !v.is_null()).unwrap_or(json!({}));
+    match method {
+        "engine.execute" | "command" => {
+            let id = p.get("command").or(p.get("id")).and_then(Value::as_str).ok_or("missing `command`")?;
+            s.execute(id, &params(p.get("params"))).map_err(|e| e.to_string())
+        }
+        "engine.script" => s.run_script(p).map(|v| json!(v)).map_err(|e| e.to_string()),
+        "engine.commands" => s.execute("engine.commands", &json!({})).map_err(|e| e.to_string()),
+        "document.inspect" => s.execute("document.inspect", p).map_err(|e| e.to_string()),
+        "engine.batch" => {
+            let Some(steps) = p.get("commands").and_then(Value::as_array).filter(|s| s.len() <= MAX_BATCH) else {
+                return Err(format!("engine.batch: commands must be an array of at most {MAX_BATCH} steps"));
+            };
+            if let Some(why) = batch_refusal(steps) {
+                return Err(why);
+            }
+            let rollback = p.get("rollback").and_then(Value::as_bool).unwrap_or(true);
+            let checkpoint = rollback.then(|| s.checkpoint());
+            let mut results = Vec::with_capacity(steps.len());
+            for (i, step) in steps.iter().enumerate() {
+                let r = match command(step) {
+                    Some(id) if matches!(id, "doc.open" | "file.new" | "doc.recover") => {
+                        Err(format!("`{id}` replaces the design: it needs it shown"))
+                    }
+                    Some(id) => s.execute(id, &params(step.get("params"))).map_err(|e| e.to_string()),
+                    None => Err("missing `command`".to_string()),
+                };
+                match r {
+                    Ok(v) => results.push(v),
+                    Err(e) => {
+                        let restored = checkpoint.is_some_and(|id| s.restore_checkpoint(id).is_ok());
+                        let failed = json!({"index": i, "command": command(step), "error": e});
+                        return Ok(
+                            json!({"completed": i, "results": results, "failed": failed, "undone": if restored { i } else { 0 }, "rolled_back": restored}),
+                        );
+                    }
+                }
+            }
+            if let Some(id) = checkpoint {
+                s.drop_checkpoint(id);
+            }
+            Ok(json!({"completed": results.len(), "results": results, "undone": 0}))
+        }
+        _ => Err(format!("`{method}` can't run on a design that isn't shown")),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use polykrom_engine::{Sel, Session};
