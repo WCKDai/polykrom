@@ -9,3 +9,6 @@ self-hosted-runner:
     - blacksmith-16vcpu-ubuntu-2404
     - blacksmith-32vcpu-ubuntu-2404
     - blacksmith-8vcpu-windows-2025
+    # alpha, the organisation's trusted runner (see the top of workflows/polykrom-ci.yml).
+    - rust-16
+    - trusted
