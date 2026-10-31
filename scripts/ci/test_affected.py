@@ -58,7 +58,7 @@ class Synthetic(unittest.TestCase):
 
     def test_full_triggers(self):
         for p in ["Cargo.lock", "Cargo.toml", ".cargo/config.toml", ".config/nextest.toml", "rust-toolchain.toml",
-                  ".github/workflows/ci.yml", "vendor/x/lib.rs", "tests/oracle/a.json", "assets/a.png",
+                  ".github/workflows/ci.yml", ".github/workflows/polykrom-ci.yml", "vendor/x/lib.rs", "tests/oracle/a.json", "assets/a.png",
                   "scripts/ci/affected.py", "unknown.txt"]:
             self.assertEqual(affected.select(SYNTH, ["crates/alone/a.rs", p]), (True, []), p)
 

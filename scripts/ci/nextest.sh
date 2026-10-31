@@ -40,5 +40,31 @@ case "$part" in
   *) echo "nextest.sh: no part '$part' (engine, ui, rest, action-matrix, all)" >&2; exit 2 ;;
 esac
 
+# Pull requests test only what their change can affect: the workflow's `changes` job runs
+# scripts/ci/affected.py and passes AFFECTED_FULL and AFFECTED_PACKAGES. Each part narrows to the
+# affected packages it covers, and a part with none passes at once (its check must still report,
+# or a required check would wait for it). Main always runs everything.
+if [ "$set_name" = pr ] && [ "${AFFECTED_FULL:-true}" != true ]; then
+  affected=()
+  for p in ${AFFECTED_PACKAGES:-}; do
+    case "$part:$p" in
+      engine:polykrom-engine | ui:polykrom-ui-egui | action-matrix:polykrom-cli | all:*) affected+=("$p") ;;
+      rest:polykrom-engine | rest:polykrom-ui-egui) ;;
+      rest:*) affected+=("$p") ;;
+    esac
+  done
+  if [ ${#affected[@]} -eq 0 ]; then
+    echo "nextest.sh: this change affects no package in the $part part; nothing to run"
+    exit 0
+  fi
+  case "$part" in
+    engine | ui) ;;
+    *)
+      scope=()
+      for p in "${affected[@]}"; do scope+=(-p "$p"); done
+      ;;
+  esac
+fi
+
 set -x
 exec cargo nextest run --locked --cargo-profile ci --profile ci --no-tests=pass --ignore-default-filter -E "$filter" "${scope[@]}" "$@"
