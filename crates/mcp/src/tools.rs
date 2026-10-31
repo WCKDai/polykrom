@@ -38,7 +38,16 @@ enum Effect {
     Files,
 }
 
-fn tool(name: &str, title: &str, desc: &str, schema: Value, effect: Effect) -> Value {
+fn tool(name: &str, title: &str, desc: &str, mut schema: Value, effect: Effect) -> Value {
+    // Every tool takes its reply's size and paging (#266).
+    if let Some(o) = schema.as_object_mut() {
+        let props = o.entry("properties").or_insert_with(|| json!({}));
+        if let Some(p) = props.as_object_mut() {
+            for (k, v) in crate::reply::schema() {
+                p.entry(k).or_insert(v);
+            }
+        }
+    }
     let (read_only, destructive, open_world) = match effect {
         Effect::ReadOnly => (true, false, false),
         Effect::Edits => (false, false, false),
@@ -458,6 +467,14 @@ pub(crate) fn check_arguments(name: &str, args: &Value) -> Result<(), String> {
 
 /// A tool result: content blocks plus the error flag.
 pub(crate) fn text_result(v: &Value, is_error: bool) -> Value {
+    // Held to the call's budget, paged as asked (#266); errors go as they are.
+    let fitted;
+    let v = if !is_error && crate::reply::active() && !v.is_string() {
+        fitted = crate::reply::fit(v.clone());
+        &fitted
+    } else {
+        v
+    };
     let text = match v {
         Value::String(s) => s.clone(),
         v => serde_json::to_string_pretty(v).unwrap_or_default(),
@@ -472,18 +489,22 @@ pub(crate) fn text_result(v: &Value, is_error: bool) -> Value {
 /// Run a tool. Failures are tool results with `isError: true` (the model sees the message);
 /// nothing here panics on hostile arguments.
 pub fn call_tool(b: &mut dyn Backend, name: &str, args: &Value) -> Value {
-    let empty = Map::new();
-    let a = args.as_object().unwrap_or(&empty);
-    let r = match name {
-        "screenshot" => return screenshot(b, a),
-        "polish" => return polish_result(b, a),
-        "batch" => return batch(b, a),
-        _ => dispatch(b, name, a),
-    };
-    match r {
-        Ok(v) => text_result(&v, false),
-        Err(e) => text_result(&Value::String(e), true),
-    }
+    let mut a = args.as_object().cloned().unwrap_or_default();
+    // The reply's size and paging are the server's; the tool never sees them (#266).
+    let shape = crate::reply::take(&mut a);
+    crate::reply::shaped(shape, || {
+        let a = &a;
+        let r = match name {
+            "screenshot" => return screenshot(b, a),
+            "polish" => return polish_result(b, a),
+            "batch" => return batch(b, a),
+            _ => dispatch(b, name, a),
+        };
+        match r {
+            Ok(v) => text_result(&v, false),
+            Err(e) => text_result(&Value::String(e), true),
+        }
+    })
 }
 
 fn exec(b: &mut dyn Backend, command: &str, params: Value) -> Result<Value, String> {
