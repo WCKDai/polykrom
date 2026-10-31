@@ -12,7 +12,7 @@
 #   ui             polykrom-ui-egui
 #   rest           every other package, but not the action matrix sample
 #   action-matrix  the action matrix sample on its own: it takes every core for minutes
-#   all            all of the above
+#   all            all of the above; on main also the engine's own test binaries (crates/engine/tests)
 set -euo pipefail
 
 set_name=${1:?usage: nextest.sh <pr|main> <part> [nextest arguments]}
@@ -34,9 +34,12 @@ case "$part" in
   ui) scope=(-p polykrom-ui-egui); filter="$base" ;;
   rest) scope=("${rest[@]}"); filter="($base) & not ($sample)" ;;
   action-matrix) scope=("${rest[@]}"); filter="($base) & ($sample)" ;;
-  # The engine's own test binaries (crates/engine/tests) are not part of the engine part: keep them
-  # out here too, so `all` is exactly the parts together.
-  all) scope=(--workspace); filter="($base) & not (package(polykrom-engine) & not kind(lib))" ;;
+  # Pull requests: exactly the parts together, so without the engine's own test binaries
+  # (crates/engine/tests, the engine part is --lib). Main runs those too (#327).
+  all)
+    scope=(--workspace)
+    if [ "$set_name" = main ]; then filter="$base"; else filter="($base) & not (package(polykrom-engine) & not kind(lib))"; fi
+    ;;
   *) echo "nextest.sh: no part '$part' (engine, ui, rest, action-matrix, all)" >&2; exit 2 ;;
 esac
 
