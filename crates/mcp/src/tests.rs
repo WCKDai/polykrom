@@ -710,8 +710,12 @@ fn hostile_arguments_never_panic() {
         }
     }
     assert!(n > 100);
-    // Execute every command with hostile params through MCP too.
-    let cmds = tool(&mut s, "list_commands", json!({}));
+    // Execute every command with hostile params through MCP too. The whole catalog, from the
+    // engine: the tool's reply is held to a budget (#266).
+    let cmds = {
+        use crate::backend::Backend;
+        crate::Headless::default().call("engine.commands", json!({})).unwrap()
+    };
     for c in cmds.as_array().unwrap() {
         let id = c["id"].as_str().unwrap();
         if matches!(id, "doc.open" | "file.save" | "file.save_as" | "file.export" | "file.save_mesh") {
@@ -1428,10 +1432,13 @@ fn skills_name_only_real_tools_and_commands() {
         include_str!("../../../skills/solidcraft-mechanisms/reference.md"),
         include_str!("../../../skills/solidcraft-polish/SKILL.md"),
     ];
-    let mut s = server();
     let tools: Vec<String> = tool_definitions().iter().filter_map(|t| t["name"].as_str()).map(str::to_owned).collect();
-    let commands: Vec<String> =
-        tool(&mut s, "list_commands", json!({})).as_array().unwrap().iter().filter_map(|c| c["id"].as_str()).map(str::to_owned).collect();
+    // The whole catalog, from the engine: the tool's reply is held to a budget (#266).
+    let catalog = {
+        use crate::backend::Backend;
+        crate::Headless::default().call("engine.commands", json!({})).unwrap()
+    };
+    let commands: Vec<String> = catalog.as_array().unwrap().iter().filter_map(|c| c["id"].as_str()).map(str::to_owned).collect();
     let mut checked = 0;
     for doc in docs {
         // A call in backticks is `name {}`, `name {"json":…}` or `name {placeholder}`: a tool when the
@@ -2554,4 +2561,45 @@ fn a_bridge_stays_on_its_document() {
     let seen = app.join().unwrap();
     let named: Vec<Value> = seen.iter().map(|r| r.get("document").cloned().unwrap_or(Value::Null)).collect();
     assert_eq!(named, vec![Value::Null, json!(5), Value::Null, json!(7)], "{seen:?}");
+}
+
+/// #266: a reply over the budget keeps its shape but cuts its longest lists, giving each one's
+/// total and how to get the rest; paging returns every item exactly once; a small reply is as
+/// it was.
+#[test]
+fn replies_are_held_to_a_budget_and_page() {
+    use crate::backend::Backend;
+    let ids = |v: &Value| -> Vec<String> {
+        let list = if v.is_array() { v } else { &v["value"] };
+        list.as_array().unwrap().iter().map(|c| c["id"].as_str().unwrap().to_string()).collect()
+    };
+    let catalog = crate::Headless::default().call("engine.commands", json!({})).unwrap();
+    let all = ids(&catalog);
+    assert!(serde_json::to_string_pretty(&catalog).unwrap().len() > 60 * 1024, "the catalog is over the default budget, or this tests nothing");
+    let mut s = server();
+    // The default: under 60 KB, with the list's total.
+    let r = raw_tool(&mut s, "list_commands", json!({}));
+    let text = r["result"]["content"][0]["text"].as_str().unwrap();
+    assert!(text.len() <= 60 * 1024, "{} bytes", text.len());
+    let v: Value = serde_json::from_str(text).unwrap();
+    let cut = &v["truncated"]["lists"][0];
+    assert_eq!((cut["path"].as_str(), cut["total"].as_u64()), (Some("value"), Some(all.len() as u64)), "{}", v["truncated"]);
+    assert!(ids(&v).len() < all.len() && all.starts_with(&ids(&v)), "the first commands, in order");
+    // Paging: every command once, in order.
+    let mut paged = Vec::new();
+    let mut offset = 0;
+    loop {
+        let v = tool(&mut s, "list_commands", json!({"page_offset": offset, "page_limit": 40}));
+        assert_eq!(v["page"]["total"], json!(all.len()), "{}", v["page"]);
+        let got = ids(&v);
+        offset += got.len();
+        paged.extend(got);
+        if v["page"]["more"] != true {
+            break;
+        }
+    }
+    assert_eq!(paged, all);
+    // A small reply is untouched.
+    let v = tool(&mut s, "inspect_design", json!({"measure": false}));
+    assert!(v.get("truncated").is_none() && v.get("page").is_none(), "{v}");
 }
