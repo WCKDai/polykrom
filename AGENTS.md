@@ -30,6 +30,12 @@ and the shims for what moved. Credit SolidCraft wherever its work is described.
 
 `plan/` is gitignored (local only).
 
+## Work tracking
+GitHub issues on WCKDai/polykrom hold the work (the plan is #309). Plane, workspace `wckd`, is the
+overview across all projects: this repository's project is **Polykrom** (`PK`). Work you take has a
+PK item that links its issue; put the issue number or the PK ID in the PR title, and move the item
+to Done with the PR link when it merges. WCKDai/.github/PLANE.md maps repositories to projects.
+
 ## Never crash
 People trust Polykrom with their designs; a crash loses their work. **This outranks feature work.**
 - **No panics in non-test code:** no `unwrap()`, `expect()`, `panic!`, `unreachable!`, `todo!`,
