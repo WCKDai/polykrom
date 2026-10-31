@@ -713,9 +713,9 @@ fn cmd_mcp(args: &[String]) -> Result<(), String> {
 }
 
 fn serve_mcp(backend: Box<dyn polykrom_mcp::Backend>, scope: Option<polykrom_engine::io::vfs::PathScope>) -> Result<(), String> {
-    let stdin = std::io::stdin();
-    let stdout = std::io::stdout();
-    polykrom_mcp::Server::new(backend).with_path_scope(scope).serve(stdin.lock(), stdout.lock()).map_err(|e| e.to_string())
+    // Requests are read on a thread of their own (#264), so the reader takes stdin itself.
+    let stdin = std::io::BufReader::new(std::io::stdin());
+    polykrom_mcp::Server::new(backend).with_path_scope(scope).serve(stdin, std::io::stdout()).map_err(|e| e.to_string())
 }
 
 /// The port of the running desktop app: the one its discovery file names, if something listens

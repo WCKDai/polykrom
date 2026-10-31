@@ -348,6 +348,21 @@ pub struct LiveEdit {
     pub report: polykrom_sketch::SolveReport,
 }
 
+/// What [`Session::save_point`] keeps: the design's state, its evaluated model and its histories.
+pub struct SavePoint {
+    doc: Arc<Document>,
+    model: Model,
+    active_sketch: Option<u64>,
+    pending_moves: std::collections::BTreeMap<u64, polykrom_doc::Mat>,
+    undo: Vec<Snapshot>,
+    redo: Vec<Snapshot>,
+    selection: Vec<Sel>,
+    active_component: u64,
+    active_occurrence_path: Option<Vec<u64>>,
+    checkpoints: Vec<Checkpoint>,
+    next_checkpoint: u64,
+}
+
 /// The design, active sketch, pending positions and undo history at an `edit.checkpoint`.
 #[derive(Clone, Debug)]
 pub(crate) struct Checkpoint {
@@ -1063,6 +1078,42 @@ impl Session {
         let selection = std::mem::take(&mut self.selection);
         self.go_to(mark);
         self.selection = selection;
+    }
+
+    /// Everything a command can change in the design's state, kept by the caller to take back
+    /// work cancelled midway (an MCP call, #264) with [`Session::return_to`]. Unlike a checkpoint
+    /// it holds the evaluated model too: a cancelled evaluation stops partway, and evaluating
+    /// again could take as long as the work that was cancelled. Files a command wrote (a save, an
+    /// export) stay written.
+    pub fn save_point(&self) -> SavePoint {
+        SavePoint {
+            doc: self.doc.clone(),
+            model: self.model.clone(),
+            active_sketch: self.active_sketch,
+            pending_moves: self.pending_moves.clone(),
+            undo: self.undo.clone(),
+            redo: self.redo.clone(),
+            selection: self.selection.clone(),
+            active_component: self.active_component,
+            active_occurrence_path: self.active_occurrence_path.clone(),
+            checkpoints: self.checkpoints.clone(),
+            next_checkpoint: self.next_checkpoint,
+        }
+    }
+
+    /// Put back everything [`Session::save_point`] kept, as it was: nothing is evaluated again.
+    pub fn return_to(&mut self, p: SavePoint) {
+        self.doc = p.doc;
+        self.model = p.model;
+        self.active_sketch = p.active_sketch;
+        self.pending_moves = p.pending_moves;
+        self.undo = p.undo;
+        self.redo = p.redo;
+        self.selection = p.selection;
+        self.active_component = p.active_component;
+        self.active_occurrence_path = p.active_occurrence_path;
+        self.checkpoints = p.checkpoints;
+        self.next_checkpoint = p.next_checkpoint;
     }
 
     fn go_to(&mut self, c: Checkpoint) {

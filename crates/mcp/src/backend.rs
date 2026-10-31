@@ -29,6 +29,13 @@ pub trait Backend {
     fn in_process(&self) -> bool {
         false
     }
+    /// The design's state before a call, to take the call back if it is cancelled midway (#264).
+    /// `None` where this side doesn't hold the design (a running app keeps its own).
+    fn save_point(&mut self) -> Option<polykrom_engine::SavePoint> {
+        None
+    }
+    /// Put the design back as [`Backend::save_point`] found it.
+    fn return_to(&mut self, _point: polykrom_engine::SavePoint) {}
 }
 
 /// Longest reply line accepted from the app.
@@ -557,5 +564,11 @@ impl Backend for Headless {
     }
     fn in_process(&self) -> bool {
         true
+    }
+    fn save_point(&mut self) -> Option<polykrom_engine::SavePoint> {
+        Some(self.session.save_point())
+    }
+    fn return_to(&mut self, point: polykrom_engine::SavePoint) {
+        self.session.return_to(point);
     }
 }

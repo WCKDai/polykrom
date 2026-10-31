@@ -2300,3 +2300,177 @@ fn polish_keeps_to_its_categories_and_lists_assembly_findings() {
         assert!(print[k].as_array().unwrap().iter().all(|v| v["category"] == "print"), "{k}: {print}");
     }
 }
+
+/// stdin for `serve` that the test writes to while the server runs.
+struct Pipe {
+    rx: std::sync::mpsc::Receiver<Vec<u8>>,
+    buf: Vec<u8>,
+    pos: usize,
+}
+
+impl std::io::Read for Pipe {
+    fn read(&mut self, out: &mut [u8]) -> std::io::Result<usize> {
+        use std::io::BufRead;
+        let n = {
+            let avail = self.fill_buf()?;
+            let n = avail.len().min(out.len());
+            out[..n].copy_from_slice(&avail[..n]);
+            n
+        };
+        self.consume(n);
+        Ok(n)
+    }
+}
+
+impl std::io::BufRead for Pipe {
+    fn fill_buf(&mut self) -> std::io::Result<&[u8]> {
+        while self.pos == self.buf.len() {
+            match self.rx.recv() {
+                Ok(b) => (self.buf, self.pos) = (b, 0),
+                Err(_) => return Ok(&[]),
+            }
+        }
+        Ok(&self.buf[self.pos..])
+    }
+    fn consume(&mut self, n: usize) {
+        self.pos += n;
+    }
+}
+
+/// stdout for `serve` that the test reads while the server runs.
+#[derive(Clone, Default)]
+struct Sink(std::sync::Arc<std::sync::Mutex<Vec<u8>>>);
+
+impl std::io::Write for Sink {
+    fn write(&mut self, b: &[u8]) -> std::io::Result<usize> {
+        self.0.lock().unwrap().extend_from_slice(b);
+        Ok(b.len())
+    }
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
+impl Sink {
+    fn messages(&self) -> Vec<Value> {
+        String::from_utf8(self.0.lock().unwrap().clone()).unwrap().lines().map(|l| serde_json::from_str(l).unwrap()).collect()
+    }
+    /// The reply to request `id`, waiting up to `secs` for it.
+    fn reply(&self, id: u64, secs: f64) -> Option<Value> {
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs_f64(secs);
+        loop {
+            if let Some(m) = self.messages().into_iter().find(|m| m["id"] == id) {
+                return Some(m);
+            }
+            if std::time::Instant::now() > deadline {
+                return None;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+    }
+}
+
+/// A design of three boxes sized by the parameter `len` (40 mm), its evaluation held before
+/// feature 1 whenever a call changes it, until the call is cancelled.
+fn held_server() -> (Server, std::sync::mpsc::Receiver<Value>) {
+    let mut s = server();
+    tool(&mut s, "set_parameter", json!({"name": "len", "value": "40 mm"}));
+    for z in [0, 100, 200] {
+        tool(&mut s, "execute", json!({"command": "solid.box", "params": {"length": "len", "width": 10, "height": 10, "corner": [0, 0, z]}}));
+    }
+    let (tx, rx) = std::sync::mpsc::channel();
+    s.hold_at = Some(1);
+    s.started = Some(tx);
+    (s, rx)
+}
+
+fn line(v: Value) -> Vec<u8> {
+    let mut b = v.to_string().into_bytes();
+    b.push(b'\n');
+    b
+}
+
+fn tool_line(id: u64, name: &str, args: Value) -> Vec<u8> {
+    line(json!({"jsonrpc": "2.0", "id": id, "method": "tools/call", "params": {"name": name, "arguments": args}}))
+}
+
+/// #264: while a call runs, `ping`, `pending` and `running` answer at once; a cancelled call
+/// stops, gets no reply, and leaves the design as it was; a request cancelled before it ran never
+/// runs; the server then goes on as usual.
+#[test]
+fn a_running_call_answers_status_and_cancels_cleanly() {
+    let (mut s, started) = held_server();
+    let before = volume(&mut s);
+    let (tx, rx) = std::sync::mpsc::channel();
+    let out = Sink::default();
+    let sink = out.clone();
+    let feeder = std::thread::spawn(move || {
+        tx.send(tool_line(1, "set_parameter", json!({"name": "len", "value": 50}))).unwrap();
+        // Call 1 is running (held before feature 1); a second call waits behind it.
+        assert_eq!(started.recv_timeout(std::time::Duration::from_secs(60)).unwrap(), json!(1));
+        tx.send(tool_line(2, "execute", json!({"command": "solid.box", "params": {"length": 5, "width": 5, "height": 5, "corner": [0, 0, 500]}})))
+            .unwrap();
+        // These answer at once, while call 1 still runs.
+        tx.send(line(json!({"jsonrpc": "2.0", "id": 3, "method": "ping"}))).unwrap();
+        let ping = sink.reply(3, 10.0).expect("ping answered while a call runs");
+        assert_eq!(ping["result"], json!({}), "{ping}");
+        tx.send(tool_line(4, "pending", json!({}))).unwrap();
+        let pending = sink.reply(4, 10.0).expect("pending answered while a call runs");
+        let status: Value = serde_json::from_str(pending["result"]["content"][0]["text"].as_str().unwrap()).unwrap();
+        assert_eq!(
+            (status["running"].clone(), status["tool"].clone(), status["cancelling"].clone()),
+            (json!(true), json!("set_parameter"), json!(false)),
+            "{status}"
+        );
+        tx.send(tool_line(5, "running", json!({}))).unwrap();
+        assert!(sink.reply(5, 10.0).is_some(), "running answered while a call runs");
+        // Cancel call 2 before it runs, then call 1 while it runs.
+        tx.send(line(json!({"jsonrpc": "2.0", "method": "notifications/cancelled", "params": {"requestId": 2}}))).unwrap();
+        tx.send(line(json!({"jsonrpc": "2.0", "method": "notifications/cancelled", "params": {"requestId": 1, "reason": "test"}}))).unwrap();
+        // The server goes on: a later request runs as usual.
+        tx.send(tool_line(6, "inspect_design", json!({"measure": false, "sketches": false}))).unwrap();
+        assert!(sink.reply(6, 60.0).is_some(), "the next request runs after the cancelled one");
+    });
+    s.serve(Pipe { rx, buf: Vec::new(), pos: 0 }, out.clone()).unwrap();
+    feeder.join().unwrap();
+    let messages = out.messages();
+    assert!(messages.iter().all(|m| m["id"] != 1 && m["id"] != 2), "cancelled calls get no reply: {messages:?}");
+    let design = out.reply(6, 0.0).unwrap();
+    let d: Value = serde_json::from_str(design["result"]["content"][0]["text"].as_str().unwrap()).unwrap();
+    assert!(d["params"].as_array().unwrap().iter().any(|p| p["name"] == "len" && p["value"] == 40.0), "the cancelled change is taken back: {d}");
+    // The box from call 2 never ran, and the model is the one from before (not half-evaluated).
+    s.hold_at = None;
+    assert_eq!(volume(&mut s), before, "the design is as it was before the cancelled call");
+}
+
+/// #264: a client that sent a `progressToken` hears how far a long call is, and `progress` grows.
+#[test]
+fn a_running_call_reports_progress_when_asked() {
+    let (mut s, started) = held_server();
+    let (tx, rx) = std::sync::mpsc::channel();
+    let out = Sink::default();
+    let sink = out.clone();
+    let feeder = std::thread::spawn(move || {
+        tx.send(line(json!({"jsonrpc": "2.0", "id": 1, "method": "tools/call",
+            "params": {"name": "set_parameter", "arguments": {"name": "len", "value": 60}, "_meta": {"progressToken": "t1"}}})))
+            .unwrap();
+        started.recv_timeout(std::time::Duration::from_secs(60)).unwrap();
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(20);
+        let notes = loop {
+            let notes: Vec<Value> = sink.messages().into_iter().filter(|m| m["method"] == "notifications/progress").collect();
+            if notes.len() >= 2 || std::time::Instant::now() > deadline {
+                break notes;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(50));
+        };
+        tx.send(line(json!({"jsonrpc": "2.0", "method": "notifications/cancelled", "params": {"requestId": 1}}))).unwrap();
+        notes
+    });
+    s.serve(Pipe { rx, buf: Vec::new(), pos: 0 }, out.clone()).unwrap();
+    let notes = feeder.join().unwrap();
+    assert!(notes.len() >= 2, "progress notifications while the call runs: {notes:?}");
+    assert!(notes.iter().all(|n| n["params"]["progressToken"] == "t1"), "{notes:?}");
+    let p: Vec<u64> = notes.iter().map(|n| n["params"]["progress"].as_u64().unwrap()).collect();
+    assert!(p.windows(2).all(|w| w[1] > w[0]), "progress grows: {p:?}");
+    assert!(notes[0]["params"]["message"].as_str().unwrap().contains("set_parameter"), "{notes:?}");
+}
