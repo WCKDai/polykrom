@@ -60,12 +60,15 @@ pub struct ControlRequest {
     pub started: std::sync::Arc<std::sync::atomic::AtomicBool>,
     /// Watches the request while it runs: `control.cancel` stops it at its next check (#264).
     pub progress: std::sync::Arc<polykrom_engine::doc::progress::Progress>,
+    /// The design the request is for (a tab's id, `ui.documents`): it runs only on that one, and
+    /// fails when another is shown or that one is closed. `None`: the shown design (#290).
+    pub document: Option<u64>,
 }
 
 impl ControlRequest {
     pub fn new(method: impl Into<String>, params: Value) -> (Self, std::sync::mpsc::Receiver<ControlResponse>) {
         let (tx, rx) = std::sync::mpsc::channel();
-        (Self { method: method.into(), params, reply: tx, started: Default::default(), progress: Default::default() }, rx)
+        (Self { method: method.into(), params, reply: tx, started: Default::default(), progress: Default::default(), document: None }, rx)
     }
 }
 

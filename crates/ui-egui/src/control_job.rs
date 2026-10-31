@@ -386,6 +386,10 @@ impl SolveApp {
             let result = if reply["ok"] == true { Ok(reply["result"].clone()) } else { Err(reply["error"].as_str().unwrap_or_default().to_string()) };
             crate::agent_activity::record(self, id, &result);
         }
+        let mut reply = reply;
+        if let Some(o) = reply.as_object_mut() {
+            o.entry("document").or_insert_with(|| crate::documents::shown(self));
+        }
         let _ = job.req.reply.send(reply);
     }
 

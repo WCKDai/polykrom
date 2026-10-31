@@ -71,11 +71,19 @@ impl Request {
         }
     }
     fn answer(&self, r: Result<Value, String>) {
+        self.answer_in(r, None);
+    }
+    /// Answer, naming the design the file went into (`document`, #290).
+    fn answer_in(&self, r: Result<Value, String>, document: Option<Value>) {
         if let Some(reply) = &self.reply {
-            let _ = reply.send(match r {
+            let mut v = match r {
                 Ok(v) => json!({"ok": true, "result": v}),
                 Err(e) => json!({"ok": false, "error": e}),
-            });
+            };
+            if let Some(d) = document {
+                v["document"] = d;
+            }
+            let _ = reply.send(v);
         }
     }
 }
@@ -837,7 +845,7 @@ pub fn tick(app: &mut SolveApp, ctx: &egui::Context) {
                     let status = crate::opened_status(app, &request.path, request.insert(), warnings.map(Vec::as_slice).unwrap_or_default());
                     app.set_status(status, false);
                 }
-                request.answer(Ok(made.result));
+                request.answer_in(Ok(made.result), Some(crate::documents::shown(app)));
             }
             Ok(_) => {
                 let e = "the active design changed while loading; the file operation was discarded";

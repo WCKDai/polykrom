@@ -1867,6 +1867,12 @@ impl SolveApp {
                 continue;
             }
             req.started.store(true, std::sync::atomic::Ordering::Relaxed);
+            // A request for a design that isn't the shown one fails, whatever path it would take:
+            // it never runs on another design (#290). Opening or switching tabs names none.
+            if let Some(why) = req.document.and_then(|d| documents::refusal(self, d)) {
+                let _ = req.reply.send(json!({"ok": false, "error": why, "document": documents::shown(self)}));
+                continue;
+            }
             // Opening or importing a file: answered when the file is in, without freezing the window.
             let Some(req) = file_load::control(self, req) else {
                 ctx.request_repaint();
@@ -1907,7 +1913,11 @@ impl SolveApp {
             return;
         }
         match outcome {
-            control::Outcome::Done(v) => {
+            control::Outcome::Done(mut v) => {
+                // Which design it ran on: a client sees when the shown tab changed (#290).
+                if let Some(o) = v.as_object_mut() {
+                    o.entry("document").or_insert_with(|| documents::shown(self));
+                }
                 let _ = reply.send(v);
             }
             // A window that is minimised or covered (another macOS Space) presents no frame:
