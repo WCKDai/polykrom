@@ -10,10 +10,10 @@ Any code adapted from other projects (MIT OR Apache-2.0) is noted in ATTRIBUTION
 Polykrom is a fork of SolidCraft (github.com/tangency-labs/solidcraft). Say Polykrom in
 everything: the UI, messages, docs, MCP descriptions, packaging, crates and code. The second
 rename stage (#304) is under way, one step at a time: release files, crates (`polykrom-*`, and
-PolyCore's `polycore` and `polycore-geom`) and apps (`apps/polykrom*`) are renamed. Still on
-SolidCraft's names until their steps land: the `solidcraft/N` format tag (step 3), settings and
-recovery folders (step 4), `SOLIDCRAFT_*` variables (step 5) and the bundle and package IDs (step
-6). The programs are `polykrom` and `polykrom-cli`; `solidcraft` and `solidcraft-cli` are alias
+PolyCore's `polycore` and `polycore-geom`), apps (`apps/polykrom*`) and the design format tag
+(`polykrom/N`; `solidcraft/N` and `solvecraft/N` still open) are renamed. Still on SolidCraft's
+names until their steps land: settings and recovery folders (step 4), `SOLIDCRAFT_*` variables
+(step 5) and the bundle and package IDs (step 6). The programs are `polykrom` and `polykrom-cli`; `solidcraft` and `solidcraft-cli` are alias
 programs that run them. Variables read through `polycore_geom::env` are `POLYKROM_*`, with
 `SOLIDCRAFT_*` and `SOLVECRAFT_*` fallbacks; read new ones that way. Designs are saved as
 `.polykrom` (`polykrom_io::DESIGN_EXT`); `.solidcraft` and `.solvecraft` still open

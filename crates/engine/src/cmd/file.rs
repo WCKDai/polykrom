@@ -1198,7 +1198,7 @@ mod tests {
         let original = std::fs::read(&packaged).unwrap();
         assert!(polykrom_io::is_design_container(&original));
         session.execute("file.save_as", &json!({"path":plain})).unwrap();
-        assert!(std::fs::read_to_string(&plain).unwrap().contains("solidcraft/"));
+        assert!(std::fs::read_to_string(&plain).unwrap().contains("polykrom/"));
         let path = session.path.clone();
         session.execute("file.export", &json!({"path":export,"format":"json"})).unwrap();
         assert_eq!(session.path, path);
@@ -1216,7 +1216,7 @@ mod tests {
         assert!(session.execute("file.save", &json!({"path":packaged,"format":"invalid"})).is_err());
         assert_eq!(std::fs::read(&packaged).unwrap(), before);
         session.execute("file.save", &json!({"path":packaged,"format":"json"})).unwrap();
-        assert!(std::fs::read_to_string(&packaged).unwrap().contains("solidcraft/"));
+        assert!(std::fs::read_to_string(&packaged).unwrap().contains("polykrom/"));
         std::fs::remove_dir_all(dir).unwrap();
     }
 

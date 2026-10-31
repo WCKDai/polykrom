@@ -1,6 +1,7 @@
 //! The design file format version and the migrations that bring older files up to date.
 //!
-//! A design file starts with `"format": "solidcraft/N"`. A file of an older format is read and
+//! A design file starts with `"format": "polykrom/N"` (`solidcraft/N` and `solvecraft/N` before the
+//! renames, still read). A file of an older format is read and
 //! upgraded step by step (N → N+1 → … → current): JSON-level steps first, for changes in the
 //! file's shape, then document-level steps. A file of a newer format than this build knows is
 //! refused with a message saying so, never guessed at.
@@ -328,17 +329,20 @@ fn take_pending(v: &mut Value) -> Result<Option<Vec<String>>> {
     list.iter().map(|n| n.as_str().filter(|n| n.len() <= 128).map(str::to_string).ok_or_else(invalid)).collect::<Result<_>>().map(Some)
 }
 
+/// The format tag designs are saved with (#304; `solidcraft/` before).
+pub const FORMAT_PREFIX: &str = "polykrom/";
+
 pub fn format_string(n: u32) -> String {
-    format!("solidcraft/{n}")
+    format!("{FORMAT_PREFIX}{n}")
 }
 
-/// The format tag of designs saved before the rename. Compatibility shim (docs/compatibility.md):
-/// read, never written.
-pub const LEGACY_FORMAT_PREFIX: &str = "solvecraft/";
+/// The format tags of designs saved before the renames (SolidCraft's, and SolveCraft's before
+/// it). Compatibility shim (docs/compatibility.md): read, never written.
+pub const LEGACY_FORMAT_PREFIXES: [&str; 2] = ["solidcraft/", "solvecraft/"];
 
-/// The version in a format string (`solidcraft/N`, or the legacy `solvecraft/N`).
+/// The version in a format string (`polykrom/N`, or the legacy `solidcraft/N` and `solvecraft/N`).
 pub fn version_of(s: &str) -> Option<u32> {
-    s.strip_prefix("solidcraft/").or_else(|| s.strip_prefix(LEGACY_FORMAT_PREFIX))?.parse().ok()
+    std::iter::once(FORMAT_PREFIX).chain(LEGACY_FORMAT_PREFIXES).find_map(|p| s.strip_prefix(p))?.parse().ok()
 }
 
 /// JSON-level upgrades up to [`HAND_WRITTEN`]: entry `i` turns format `i + 1` into `i + 2`.
@@ -1915,8 +1919,11 @@ mod tests {
 
     #[test]
     fn versions() {
+        assert_eq!(version_of("polykrom/36"), Some(36));
+        assert_eq!(version_of("polykrom/x"), None);
         assert_eq!(version_of("solidcraft/1"), Some(1));
         assert_eq!(version_of("solidcraft/x"), None);
+        assert!(format_string(FORMAT).starts_with("polykrom/"), "new designs are saved with Polykrom's tag");
         // Compatibility shim: files saved before the rename carry the legacy tag.
         assert_eq!(version_of("solvecraft/13"), Some(13));
         assert_eq!(version_of("solvecraftx/13"), None);

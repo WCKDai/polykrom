@@ -239,7 +239,7 @@ never change an expected value to match Polykrom's output.
 
 ## Changing the design file format
 
-A design file says which format it is in (`"format": "solidcraft/N"`). If your change saves
+A design file says which format it is in (`"format": "polykrom/N"`). If your change saves
 something new in a design (a field, a feature type, a new kind of name), or makes older designs
 mean something else, it needs a format change. **Add one file, and edit nothing shared:**
 

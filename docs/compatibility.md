@@ -11,7 +11,6 @@ below:
 | Kept | Why |
 | --- | --- |
 | Binaries `solidcraft` and `solidcraft-cli` | Since #98 the programs are `polykrom` and `polykrom-cli`. The old names ship as small aliases that run them, so scripts, shortcuts and MCP registrations keep working (section 5) |
-| The `solidcraft/N` format tag inside designs | Polykrom saves `.polykrom` files, but their contents are SolidCraft's container, so a renamed file still opens in SolidCraft. `.solidcraft` (and the older `.solvecraft`) open in Polykrom and save as `.polykrom` |
 | Settings, preferences, autosave, recovery and thumbnail folders | Moving them needs a one-time migration, like section 4 |
 | Bundle and package IDs (`ai.storyteller.solidcraft`), the MSI UpgradeCode, `SolidCraft.app`, installer folders and registry keys, the agent-chat keychain service | Changing them makes a second, separate install or loses saved keys; until then a Polykrom install replaces a SolidCraft one |
 | `SOLIDCRAFT_*` environment variables | Those read through `polycore_geom::env` accept `POLYKROM_*` first; the others keep the old name |
@@ -25,6 +24,7 @@ table above and into this list, with its shim:
 | --- | --- |
 | Release files: `polykrom-<version>-<platform>.*` (the Windows exe `Polykrom-<version>-windows-x64.exe`), with version-less `polykrom-<platform>.*` copies | Every release also attaches the version-less copies under SolidCraft's name (`solidcraft-windows-x64.msi`, `solidcraft-linux-x86_64.AppImage`, …), for download links and the update check of builds from before the rename, and a copy of the AppImage's `.zsync` as `solidcraft-<version>-linux-<arch>.AppImage.zsync`, which AppImages from before it look for (`.github/workflows/release.yml`, `packaging/linux/package.sh`) |
 | Crates and apps: Polykrom's are `polykrom-*` (`apps/polykrom`, `apps/polykrom-cli`, `apps/polykrom-web`), PolyCore's `polycore` and `polycore-geom` | None needed: no program, file or setting changes. The cost: merges from upstream SolidCraft rewrite crate paths |
+| The design format tag: `polykrom/N` | `solidcraft/N` and `solvecraft/N` designs open and are re-tagged when saved (section 2). Not backward-compatible: SolidCraft, and Polykrom before this step, refuse designs saved with the new tag |
 
 # Compatibility with the SolveCraft name
 
@@ -59,11 +59,15 @@ extension, and keyboard-shortcut files exported as `solvecraft-shortcuts/1` stil
 `is_design_path`), `legacy_extension_and_format_tag_still_open` (CLI, `run_results.rs`) and
 `legacy_design_files_and_resource_uris` (MCP `open`).
 
-## 2. The `solvecraft/N` format tag
+## 2. The `solvecraft/N` and `solidcraft/N` format tags
 
-Designs record their format as `"format": "solidcraft/N"`. Files saved by builds up to 0.5 say
-`"format": "solvecraft/N"`; `crates/doc/src/format.rs` (`version_of`) reads both prefixes and
-upgrades them as usual (the file is re-tagged `solidcraft/N` when saved).
+Designs record their format as `"format": "polykrom/N"` (#304). Files saved by SolidCraft and by
+Polykrom before #304 say `"format": "solidcraft/N"`, and builds up to 0.5 say `"format":
+"solvecraft/N"`; `crates/doc/src/format.rs` (`version_of`, `LEGACY_FORMAT_PREFIXES`) reads all
+three and upgrades them as usual (the file is re-tagged `polykrom/N` when saved).
+
+Not backward-compatible: SolidCraft, and Polykrom builds from before #304, don't know the new tag
+and refuse designs saved by later builds (`format/pending/polykrom-format-tag.rs`).
 
 Not backward-compatible: builds up to 0.5 don't know the new tag and refuse files saved by
 later builds. Test: `version_of` accepts both prefixes; legacy-tagged designs load and are

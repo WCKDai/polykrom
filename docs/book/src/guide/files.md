@@ -103,8 +103,8 @@ is available. Missing or incompatible pictures use the usual thumbnail generatio
 The default `cache: false` omits the portable thumbnail too.
 The repository's `docs/design-container.md` describes limits and encoding details.
 
-Designs are saved in the newest format this version of Polykrom knows (`"format": "solidcraft/N"`
-in the file). It opens designs of every older format and upgrades them as they open; a design
+Designs are saved in the newest format this version of Polykrom knows (`"format": "polykrom/N"`
+in the file; designs saved before 0.21 say `solidcraft/N` and open as before). It opens designs of every older format and upgrades them as they open; a design
 from a newer version asks you to update instead of being guessed at. Development (nightly) builds
 save a format number no release reads yet.
 

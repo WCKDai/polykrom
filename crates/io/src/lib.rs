@@ -997,7 +997,7 @@ mod tests {
         let doc = read_design(bytes).expect("legacy fixture must open");
         assert_eq!(doc.name, "Untitled");
         let saved = String::from_utf8(write_design(&doc)).expect("design JSON is UTF-8");
-        assert!(saved.contains("\"solidcraft/"), "saved design keeps the current tag");
+        assert!(saved.contains("\"polykrom/"), "saved design keeps the current tag");
         assert!(!saved.contains("solvecraft/"), "saved design is re-tagged");
     }
 
