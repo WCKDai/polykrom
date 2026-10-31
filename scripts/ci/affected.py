@@ -27,7 +27,7 @@ import sys
 
 # Changes here can affect every package. The CI workflow itself is one; other workflows are not.
 FULL_PREFIXES = (".cargo/", ".config/", "scripts/")
-FULL_FILES = ("Cargo.toml", "Cargo.lock", ".github/workflows/ci.yml")
+FULL_FILES = ("Cargo.toml", "Cargo.lock", ".github/workflows/ci.yml", ".github/workflows/polykrom-ci.yml")
 # Changes here affect no code: documentation, packaging, the other workflows and GitHub settings,
 # and the GitHub bots' scripts (tested in the repository checks). Root *.md files too, unless
 # embedded (below).

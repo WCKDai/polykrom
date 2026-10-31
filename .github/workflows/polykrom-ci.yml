@@ -80,6 +80,8 @@ jobs:
         run: cargo xtask icons
       - name: Sorted lists
         run: cargo xtask lists
+      - name: Affected-package selector
+        run: python3 -I scripts/ci/test_affected.py
       - name: Dependency layers
         run: cargo xtask layers
       - name: Universal UI containers
@@ -89,13 +91,37 @@ jobs:
       - name: WebAssembly check
         run: cargo xtask wasm
 
+  # What a pull request's change can affect (scripts/ci/affected.py): the test jobs narrow to those
+  # packages. Every test job still runs and reports, so required checks never wait on a skipped one.
+  changes:
+    name: Affected packages
+    if: github.repository == 'WCKDai/polykrom' && github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    outputs:
+      full: ${{ steps.affected.outputs.full }}
+      packages: ${{ steps.affected.outputs.packages }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@stable
+      - id: affected
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          git diff --no-renames --name-only -z "$BASE_SHA...$HEAD_SHA" > "$RUNNER_TEMP/paths"
+          python3 -I scripts/ci/affected.py --paths "$RUNNER_TEMP/paths" --github-output "$GITHUB_OUTPUT"
+
   # Pull requests (and runs by hand): the tests split over GitHub-hosted runners, which are free
   # for a public repository but have 4 cores each, so the parts run side by side. The test set is
   # scripts/ci/nextest.sh's; `--partition` splits a part, and the parts together are its `all`.
   # The action matrix sample takes every core for minutes, so it has a runner of its own.
   tests:
     name: Tests (${{ matrix.name }})
-    if: github.repository == 'WCKDai/polykrom' && github.event_name != 'push'
+    needs: changes
+    if: ${{ !cancelled() && github.repository == 'WCKDai/polykrom' && github.event_name != 'push' && needs.changes.result != 'failure' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     strategy:
@@ -132,12 +158,15 @@ jobs:
           SET: ${{ github.event_name == 'pull_request' && 'pr' || 'main' }}
           PART: ${{ matrix.part }}
           PARTITION: ${{ matrix.partition }}
+          AFFECTED_FULL: ${{ needs.changes.outputs.full || 'true' }}
+          AFFECTED_PACKAGES: ${{ needs.changes.outputs.packages }}
         run: scripts/ci/nextest.sh "$SET" "$PART" ${PARTITION:+--partition "$PARTITION"}
 
   # nextest does not run doc tests.
   doc-tests:
     name: Doc tests
-    if: github.repository == 'WCKDai/polykrom' && github.event_name != 'push'
+    needs: changes
+    if: ${{ !cancelled() && github.repository == 'WCKDai/polykrom' && github.event_name != 'push' && needs.changes.result != 'failure' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
@@ -152,7 +181,16 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends mesa-vulkan-drivers libvulkan1
       - name: Doc tests
-        run: cargo test --locked --profile ci --doc --workspace
+        env:
+          AFFECTED_FULL: ${{ needs.changes.outputs.full || 'true' }}
+          AFFECTED_PACKAGES: ${{ needs.changes.outputs.packages }}
+        run: |
+          scope=(--workspace)
+          if [ "$AFFECTED_FULL" != true ]; then
+            scope=(); for p in $AFFECTED_PACKAGES; do scope+=(-p "$p"); done
+            if [ ${#scope[@]} -eq 0 ]; then echo "this change affects no package; no doc tests to run"; exit 0; fi
+          fi
+          cargo test --locked --profile ci --doc "${scope[@]}"
 
   # Pushes to main: every test, in one nextest run on alpha (16 cores), so the workspace builds once
   # and every core stays busy until the end. The build folder persists between runs.
