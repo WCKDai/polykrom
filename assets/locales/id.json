@@ -516,6 +516,7 @@
   "cmd.document_units": "Ubah Satuan Desain",
   "cmd.edit_checkpoint": "Checkpoint",
   "cmd.edit_restore_checkpoint": "Pulihkan Checkpoint",
+  "cmd.edit_squash_checkpoint": "Gabungkan Checkpoint",
   "cmd.engine_commands": "Daftar Perintah",
   "cmd.engine_describe": "Jelaskan Perintah",
   "cmd.explode_create": "Tampilan Urai",

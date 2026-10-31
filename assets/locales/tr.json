@@ -516,6 +516,7 @@
   "cmd.document_units": "Tasarımın birimlerini değiştir",
   "cmd.edit_checkpoint": "Kontrol noktası",
   "cmd.edit_restore_checkpoint": "Kontrol noktasını geri yükle",
+  "cmd.edit_squash_checkpoint": "Kontrol noktasını birleştir",
   "cmd.engine_commands": "Komutları listele",
   "cmd.engine_describe": "Komutu açıkla",
   "cmd.explode_create": "Patlatılmış görünüm",

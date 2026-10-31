@@ -517,6 +517,7 @@
   "cmd.document_units": "Змінити одиниці проєкту",
   "cmd.edit_checkpoint": "Контрольна точка",
   "cmd.edit_restore_checkpoint": "Відновити контрольну точку",
+  "cmd.edit_squash_checkpoint": "Об'єднати контрольну точку",
   "cmd.engine_commands": "Список команд",
   "cmd.engine_describe": "Описати команду",
   "cmd.explode_create": "Рознесений вид",

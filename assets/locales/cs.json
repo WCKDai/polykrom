@@ -517,6 +517,7 @@
   "cmd.document_units": "Změnit jednotky návrhu",
   "cmd.edit_checkpoint": "Kontrolní bod",
   "cmd.edit_restore_checkpoint": "Obnovit kontrolní bod",
+  "cmd.edit_squash_checkpoint": "Sloučit kontrolní bod",
   "cmd.engine_commands": "Seznam příkazů",
   "cmd.engine_describe": "Popsat příkaz",
   "cmd.explode_create": "Rozložený pohled",

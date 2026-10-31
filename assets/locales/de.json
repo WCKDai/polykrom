@@ -628,6 +628,7 @@
   "cmd.document_units": "Einheiten der Konstruktion ändern",
   "cmd.edit_checkpoint": "Prüfpunkt",
   "cmd.edit_restore_checkpoint": "Prüfpunkt wiederherstellen",
+  "cmd.edit_squash_checkpoint": "Prüfpunkt zusammenfassen",
   "cmd.engine_commands": "Befehle auflisten",
   "cmd.engine_describe": "Befehl beschreiben",
   "cmd.explode_create": "Explosionsdarstellung",

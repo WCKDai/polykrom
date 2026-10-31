@@ -1602,6 +1602,66 @@ fn batch_with_an_unknown_command_runs_nothing() {
     assert_eq!(d["bodies"].as_array().map(Vec::len), Some(0), "nothing ran: {d}");
 }
 
+/// #269: `on_error: "keep"` keeps the steps a failed batch finished, as one undo step.
+#[test]
+fn a_failed_batch_can_keep_its_finished_steps_as_one_undo_step() {
+    let mut s = server();
+    let undo = |s: &mut Server| tool(s, "inspect_design", json!({"measure": false}))["undo"].as_u64().unwrap();
+    let before = undo(&mut s);
+    let r = raw_tool(
+        &mut s,
+        "batch",
+        json!({"on_error": "keep", "commands": [
+            {"command": "solid.box", "params": {"length": 10, "width": 10, "height": 10}},
+            {"command": "solid.box", "params": {"length": 2, "width": 2, "height": 2, "corner": [30, 0, 0], "operation": "new"}},
+            {"command": "solid.extrude", "params": {"distance": "bogus +"}},
+        ]}),
+    );
+    assert_eq!(r["result"]["isError"], json!(true), "{r}");
+    let body: Value = serde_json::from_str(r["result"]["content"][0]["text"].as_str().unwrap()).unwrap();
+    assert_eq!(body["failed"]["index"], 2, "{body}");
+    assert_eq!((body["rolled_back"].clone(), body["applied"].clone()), (json!(false), json!([0, 1])), "{body}");
+    assert_eq!(body["kept"], json!({"steps": [0, 1], "one_undo_step": true}), "{body}");
+    assert_eq!(tool(&mut s, "measure", json!({}))["body_count"], 2);
+    assert_eq!(undo(&mut s), before + 1, "one undo step");
+    tool(&mut s, "undo", json!({}));
+    assert_eq!(tool(&mut s, "measure", json!({}))["body_count"], 0, "one undo takes both boxes back");
+
+    for bad in [json!({"on_error": "keep", "rollback": true, "commands": []}), json!({"on_error": "ignore", "commands": []})] {
+        let r = raw_tool(&mut s, "batch", bad.clone());
+        assert!(r["result"]["isError"] == json!(true) || r["error"].is_object(), "{bad}: {r}");
+    }
+}
+
+/// Bridged, `on_error: "keep"` takes a checkpoint, sends the batch without rollback and makes
+/// what it kept one step; a batch that goes through only forgets the checkpoint.
+#[test]
+fn a_bridged_batch_keeps_its_finished_steps_through_a_checkpoint() {
+    let reply = json!({"completed": 1, "results": [{"x": 1}], "failed": {"index": 1, "command": "a.two", "error": "boom"}, "undone": 0, "rolled_back": false});
+    let (b, body, is_error) = recorded_batch(Ok(reply), json!({"on_error": "keep", "commands": [{"command": "a.one"}, {"command": "a.two"}]}));
+    assert!(is_error, "{body}");
+    let sent: Vec<(String, Value)> = b.calls.iter().map(|(m, p)| (m.clone(), p["command"].clone())).collect();
+    assert_eq!(
+        sent,
+        [
+            ("engine.execute".to_string(), json!("edit.checkpoint")),
+            ("engine.batch".to_string(), Value::Null),
+            ("engine.execute".to_string(), json!("edit.squash_checkpoint"))
+        ],
+        "{:?}",
+        b.calls
+    );
+    assert_eq!(b.calls[1].1["rollback"], false);
+    assert_eq!(b.calls[2].1["params"]["checkpoint"], 3);
+    assert_eq!(body["kept"], json!({"steps": [0], "one_undo_step": true}), "{body}");
+
+    let (b, body, is_error) =
+        recorded_batch(Ok(json!({"completed": 1, "results": [{}], "undone": 0})), json!({"on_error": "keep", "commands": [{"command": "a.one"}]}));
+    assert!(!is_error && body.get("kept").is_none(), "{body}");
+    assert_eq!(b.calls.last().unwrap().1["command"], "edit.restore_checkpoint");
+    assert_eq!(b.calls.last().unwrap().1["params"]["forget"], true);
+}
+
 /// #743: bridged to an app that has `engine.batch`, a batch is one control request.
 #[test]
 fn batch_is_one_engine_batch_call() {

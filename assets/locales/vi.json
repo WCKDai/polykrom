@@ -517,6 +517,7 @@
   "cmd.document_units": "Thay đổi đơn vị thiết kế",
   "cmd.edit_checkpoint": "Điểm kiểm tra (Checkpoint)",
   "cmd.edit_restore_checkpoint": "Khôi phục điểm kiểm tra",
+  "cmd.edit_squash_checkpoint": "Gộp điểm kiểm tra",
   "cmd.engine_commands": "Danh sách lệnh hệ thống",
   "cmd.engine_describe": "Mô tả lệnh",
   "cmd.explode_create": "Tạo chế độ xem phân rã",

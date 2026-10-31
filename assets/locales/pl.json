@@ -565,6 +565,7 @@
   "cmd.document_units": "Zmień jednostki projektu",
   "cmd.edit_checkpoint": "Punkt kontrolny",
   "cmd.edit_restore_checkpoint": "Przywróć punkt kontrolny",
+  "cmd.edit_squash_checkpoint": "Scal punkt kontrolny",
   "cmd.engine_commands": "Lista poleceń",
   "cmd.engine_describe": "Opisz polecenie",
   "cmd.explode_create": "Widok rozstrzelony",

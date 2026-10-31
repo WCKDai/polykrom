@@ -517,6 +517,7 @@
   "cmd.document_units": "Cambiar as unidades do deseño",
   "cmd.edit_checkpoint": "Punto de control",
   "cmd.edit_restore_checkpoint": "Restaurar o punto de control",
+  "cmd.edit_squash_checkpoint": "Combinar o punto de control",
   "cmd.engine_commands": "Listar as ordes",
   "cmd.engine_describe": "Describir a orde",
   "cmd.explode_create": "Vista explosionada",

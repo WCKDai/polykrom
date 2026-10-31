@@ -516,6 +516,7 @@
   "cmd.document_units": "Terv egységeinek módosítása",
   "cmd.edit_checkpoint": "Ellenőrzőpont",
   "cmd.edit_restore_checkpoint": "Ellenőrzőpont visszaállítása",
+  "cmd.edit_squash_checkpoint": "Ellenőrzőpont összevonása",
   "cmd.engine_commands": "Parancsok listázása",
   "cmd.engine_describe": "Parancs leírása",
   "cmd.explode_create": "Robbantott nézet",

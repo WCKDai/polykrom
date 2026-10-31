@@ -516,6 +516,7 @@
   "cmd.document_units": "Ontwerpeenheden wijzigen",
   "cmd.edit_checkpoint": "Controlepunt",
   "cmd.edit_restore_checkpoint": "Controlepunt herstellen",
+  "cmd.edit_squash_checkpoint": "Controlepunt samenvoegen",
   "cmd.engine_commands": "Opdrachten weergeven",
   "cmd.engine_describe": "Opdracht beschrijven",
   "cmd.explode_create": "Explosieweergave",
