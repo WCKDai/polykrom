@@ -1890,7 +1890,23 @@ impl SolveApp {
     /// Run a control request here, now, and reply (or queue the screenshot it asks for).
     pub(crate) fn run_control(&mut self, ctx: &egui::Context, req: ControlRequest) {
         let reply = req.reply.clone();
-        match control::handle(self, ctx, &req) {
+        // Cancelled while it waited its turn: never run.
+        if req.progress.is_cancelled() {
+            let _ = reply.send(json!({"ok": false, "cancelled": true, "error": "cancelled (control.cancel) before it ran: nothing was applied"}));
+            return;
+        }
+        // Watched, so `control.cancel` stops it at its next check; a cancelled request is taken
+        // back whole (#264).
+        let point = self.session.save_point();
+        let progress = req.progress.clone();
+        let outcome = polykrom_engine::doc::progress::watch(progress.clone(), || control::handle(self, ctx, &req));
+        if progress.is_cancelled() {
+            self.session.return_to(point);
+            let _ = reply.send(json!({"ok": false, "cancelled": true, "error": "cancelled (control.cancel): nothing was applied"}));
+            ctx.request_repaint();
+            return;
+        }
+        match outcome {
             control::Outcome::Done(v) => {
                 let _ = reply.send(v);
             }

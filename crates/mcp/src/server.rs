@@ -191,9 +191,10 @@ impl Server {
             started: Instant::now(),
             progress: progress.clone(),
             progress_token: params.and_then(|p| p.pointer("/_meta/progressToken")).filter(|t| !t.is_null()).cloned(),
+            canceller: self.backend.canceller(),
         });
-        // Only this side's own session can be taken back: a running app keeps its design, and
-        // the call is not stopped there (yet), so its reply is sent as usual.
+        // Only this side's own session can be taken back. A running app stops and takes back a
+        // cancelled request itself (control.cancel), and its reply is sent as usual.
         let point = self.backend.save_point();
         #[cfg(test)]
         let started_id = flight.id.clone();
@@ -392,7 +393,14 @@ fn answer_now(msg: &Value, shared: &Shared) -> Option<Option<Value>> {
         // Cancel the running call, or one still waiting to run.
         let Some(target) = msg.pointer("/params/requestId") else { return Some(None) };
         match current {
-            Some(c) if c.id == *target => c.progress.cancel(),
+            Some(c) if c.id == *target => {
+                c.progress.cancel();
+                // Where the call runs in an app, it is cancelled there too, without holding up
+                // the reader.
+                if let Some(cancel) = c.canceller.clone() {
+                    std::thread::spawn(move || cancel());
+                }
+            }
             _ => {
                 if let Ok(mut cancelled) = shared.cancelled.lock() {
                     if cancelled.len() >= MAX_CANCELLED {

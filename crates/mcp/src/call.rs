@@ -23,6 +23,8 @@ pub(crate) struct InFlight {
     pub progress: Arc<Progress>,
     /// The client's `_meta.progressToken`: progress notifications go out under it.
     pub progress_token: Option<Value>,
+    /// Cancels the call where it really runs (a running app), when it isn't in this process.
+    pub canceller: Option<crate::backend::Canceller>,
 }
 
 impl InFlight {
