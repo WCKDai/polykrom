@@ -151,7 +151,8 @@ pub(crate) fn batch_step_command(step: &Value) -> Option<&str> {
 /// step runs as `engine.execute` runs it; the first failure stops the batch and, with
 /// `rollback` (the default), the design goes back to its checkpoint. Step failures are part of
 /// the reply; refusals (`engine.batch unavailable: …`) come before anything runs, so the client
-/// can send the steps one by one instead.
+/// can send the steps one by one instead. A step naming an unknown command fails the batch before
+/// anything runs (`failed.kind: "unknown_command"`).
 fn batch(app: &mut SolveApp, p: &Value) -> Outcome {
     let Some(steps) = p.get("commands").and_then(Value::as_array).filter(|s| s.len() <= MAX_BATCH) else {
         return err(format!("engine.batch: commands must be an array of at most {MAX_BATCH} steps"));
@@ -164,6 +165,16 @@ fn batch(app: &mut SolveApp, p: &Value) -> Outcome {
     let rollback = p.get("rollback").and_then(Value::as_bool).unwrap_or(true);
     let profile = p.get("profile").and_then(Value::as_bool).unwrap_or(false);
     let timed = profile || p.get("timings").and_then(Value::as_bool).unwrap_or(false);
+    // A step naming a command the engine doesn't have fails the batch before anything runs (#269),
+    // not after the steps before it ran and were taken back. The reply has the usual shape.
+    if let Some((i, id)) =
+        steps.iter().enumerate().find_map(|(i, s)| command(s).filter(|id| polykrom_engine::find_command(id).is_none()).map(|id| (i, id)))
+    {
+        let error = polykrom_engine::EngineError::UnknownCommand(id.to_string()).to_string();
+        let failed = json!({"index": i, "command": id, "error": error, "kind": "unknown_command"});
+        let reply = json!({"completed": 0, "results": [], "failed": failed, "undone": 0, "rolled_back": false});
+        return ok(with_timings(reply, timed, Vec::new(), 0.0));
+    }
     let mut rows = Vec::new();
     let clock = timing::Clock::start();
     let checkpoint = if rollback { app.run("edit.checkpoint", json!({})).ok().and_then(|v| v["checkpoint"].as_u64()) } else { None };
@@ -1354,7 +1365,7 @@ mod tests {
         assert_eq!(rows[1]["index"], 1);
         assert!(rows[1]["profile"]["boolean_ms"].as_f64().is_some_and(|ms| ms > 0.0), "{v}");
         assert!(v["result"]["total_ms"].as_f64().is_some(), "{v}");
-        let v = batch(&mut h, json!({"timings": true, "commands": [{"command": "NoSuchCommand"}]}));
+        let v = batch(&mut h, json!({"timings": true, "commands": [{"command": "solid.extrude", "params": {"distance": "bogus +"}}]}));
         assert_eq!(v["result"]["timings"].as_array().map(Vec::len), Some(1), "{v}");
         assert!(v["result"]["timings"][0].get("profile").is_none(), "{v}");
         let v = batch(&mut h, json!({"commands": [{"command": "solid.box", "params": {"length": 1, "width": 1, "height": 1}}]}));
@@ -1391,12 +1402,35 @@ mod tests {
             &mut h,
             json!({"rollback": false, "commands": [
                 {"command": "solid.sphere", "params": {"radius": 3}},
-                {"command": "NoSuchCommand"},
+                {"command": "solid.extrude", "params": {"distance": "bogus +"}},
             ]}),
         );
         assert_eq!(v["result"]["failed"]["index"], 1, "{v}");
         assert_eq!(v["result"]["undone"], 0, "{v}");
         assert_eq!(inspect(&mut h)["bodies"].as_array().map(Vec::len), Some(1));
+    }
+
+    /// #269: a step naming a command the engine doesn't have fails the batch before anything
+    /// runs, in the usual reply shape.
+    #[test]
+    fn engine_batch_with_an_unknown_command_runs_nothing() {
+        let mut h = crate::scenario::Harness::new();
+        let v = batch(
+            &mut h,
+            json!({"rollback": false, "commands": [
+                {"command": "solid.sphere", "params": {"radius": 3}},
+                {"command": "NoSuchCommand"},
+            ]}),
+        );
+        assert_eq!(v["ok"], true, "{v}");
+        let r = &v["result"];
+        assert_eq!(
+            (r["completed"].clone(), r["failed"]["index"].clone(), r["failed"]["kind"].clone()),
+            (json!(0), json!(1), json!("unknown_command")),
+            "{v}"
+        );
+        assert!(r["failed"]["error"].as_str().is_some_and(|e| e.contains("NoSuchCommand")), "{v}");
+        assert_eq!(inspect(&mut h)["bodies"].as_array().map(Vec::len), Some(0), "nothing may run before the refusal");
     }
 
     #[test]
@@ -1437,7 +1471,10 @@ mod tests {
     #[test]
     fn engine_batch_reports_whether_it_rolled_back() {
         let mut h = crate::scenario::Harness::new();
-        let steps = json!([{"command": "solid.box", "params": {"length": 10, "width": 10, "height": 10}}, {"command": "NoSuchCommand"}]);
+        let steps = json!([
+            {"command": "solid.box", "params": {"length": 10, "width": 10, "height": 10}},
+            {"command": "solid.extrude", "params": {"distance": "bogus +"}},
+        ]);
         let v = batch(&mut h, json!({"commands": steps.clone()}));
         assert_eq!((&v["result"]["rolled_back"], &v["result"]["undone"]), (&json!(true), &json!(1)), "{v}");
         let v = batch(&mut h, json!({"commands": steps, "rollback": false}));
