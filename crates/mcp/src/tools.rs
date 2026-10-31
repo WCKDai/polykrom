@@ -201,8 +201,21 @@ pub fn tool_definitions() -> Vec<Value> {
             "List edges and faces",
             "The edges (index, midpoint, length, endpoints) and faces (index, name, area, centroid, plane normal, a `point` that lies \
              on the face, and for a cylindrical face its `cylinder`: origin, axis, radius) of a body. Use an edge midpoint as the \
-             [x,y,z] point that picks the edge for fillet and chamfer; a face's point or its name picks the face for the face commands.",
-            obj(json!({"body": string("Body name, e.g. \"Body1\"")}), &["body"]),
+             [x,y,z] point that picks the edge for fillet and chamfer; a face's point or its name picks the face for the face commands. \
+             A large body has hundreds of each: narrow it with `kind`, `near` (+ `radius`), `min_area`, `min_length` and `limit`; \
+             `edges_total` and `faces_total` count the body's edges and faces before filtering.",
+            obj(
+                json!({
+                    "body": string("Body name, e.g. \"Body1\""),
+                    "kind": {"type": "string", "enum": ["edges", "faces"], "description": "Only edges or only faces (default both)"},
+                    "near": {"type": "array", "items": {"type": "number"}, "minItems": 3, "maxItems": 3, "description": "[x,y,z]: nearest first, each with its `distance` (to a face's `point`, to the nearest of an edge's midpoint and ends: spots on it, not its closest point)"},
+                    "radius": {"type": "number", "exclusiveMinimum": 0, "description": "With `near`: only those within this distance (mm)"},
+                    "min_area": {"type": "number", "minimum": 0, "description": "Only faces of at least this area (mm²)"},
+                    "min_length": {"type": "number", "minimum": 0, "description": "Only edges of at least this length (mm)"},
+                    "limit": {"type": "integer", "minimum": 1, "description": "At most this many edges and this many faces (after the filters; with `near`, the nearest)"},
+                }),
+                &["body"],
+            ),
             Effect::ReadOnly,
         ),
         tool(
@@ -700,12 +713,7 @@ fn dispatch(b: &mut dyn Backend, name: &str, a: &Map<String, Value>) -> Result<V
             };
             exec(b, "inspect.measure", p)
         }
-        "body_topology" => {
-            let p = pick(a, &["body"]);
-            let edges = exec(b, "model.edges", p.clone())?;
-            let faces = exec(b, "model.faces", p)?;
-            Ok(json!({"body": a.get("body"), "edges": edges["edges"], "faces": faces["faces"]}))
-        }
+        "body_topology" => body_topology(b, a),
         "set_parameter" => {
             let mut p = pick(a, &["name", "unit", "comment"]);
             p["expression"] = parameter_value(a)?;
@@ -728,6 +736,73 @@ fn dispatch(b: &mut dyn Backend, name: &str, a: &Map<String, Value>) -> Result<V
         "save" => exec(b, "file.save", pick(a, &["path", "format"])),
         other => Err(format!("unknown tool `{other}`")),
     }
+}
+
+/// A body's edges and faces, narrowed to what the call asks for (#266): a large body's full lists
+/// run to hundreds of kilobytes, and an agent usually wants one face or edge near a point.
+fn body_topology(b: &mut dyn Backend, a: &Map<String, Value>) -> Result<Value, String> {
+    let p = pick(a, &["body"]);
+    let kind = a.get("kind").and_then(Value::as_str);
+    if let Some(k) = kind.filter(|k| !matches!(*k, "edges" | "faces")) {
+        return Err(format!("`kind` is \"edges\" or \"faces\", not {k:?}"));
+    }
+    let point = |v: &Value| -> Option<[f64; 3]> {
+        let a = v.as_array().filter(|a| a.len() == 3)?;
+        Some([a[0].as_f64()?, a[1].as_f64()?, a[2].as_f64()?])
+    };
+    let near = match a.get("near") {
+        None | Some(Value::Null) => None,
+        Some(v) => Some(point(v).ok_or("`near` is a point [x, y, z]")?),
+    };
+    let num = |k: &str| a.get(k).and_then(Value::as_f64);
+    let radius = num("radius");
+    if radius.is_some() && near.is_none() {
+        return Err("`radius` needs `near`, the point it is measured from".into());
+    }
+    let limit = a.get("limit").and_then(Value::as_u64).map(|l| l.max(1) as usize);
+    let dist = |q: [f64; 3], x: [f64; 3]| ((q[0] - x[0]).powi(2) + (q[1] - x[1]).powi(2) + (q[2] - x[2]).powi(2)).sqrt();
+    // Keep the items passing `keep`, nearest first when there is a point, cut to `limit`.
+    let narrow = |items: &Value, keep: &dyn Fn(&Value) -> bool, spots: &dyn Fn(&Value) -> Vec<[f64; 3]>| -> Vec<Value> {
+        let mut out: Vec<(f64, Value)> = Vec::new();
+        for item in items.as_array().into_iter().flatten().filter(|i| keep(i)) {
+            let d = near.and_then(|q| spots(item).into_iter().map(|x| dist(q, x)).min_by(f64::total_cmp));
+            if let (Some(r), Some(d)) = (radius, d) {
+                if d > r {
+                    continue;
+                }
+            } else if radius.is_some() {
+                continue;
+            }
+            let mut item = item.clone();
+            if let (Some(d), Some(o)) = (d, item.as_object_mut()) {
+                o.insert("distance".into(), json!(d));
+            }
+            out.push((d.unwrap_or(0.0), item));
+        }
+        if near.is_some() {
+            out.sort_by(|x, y| x.0.total_cmp(&y.0));
+        }
+        out.into_iter().take(limit.unwrap_or(usize::MAX)).map(|(_, v)| v).collect()
+    };
+    let mut reply = json!({"body": a.get("body")});
+    if kind != Some("faces") {
+        let edges = exec(b, "model.edges", p.clone())?;
+        let min = num("min_length");
+        let keep = |e: &Value| min.is_none_or(|m| e["length"].as_f64().is_some_and(|l| l >= m));
+        let spots = |e: &Value| ["mid", "start", "end"].iter().filter_map(|k| point(&e[*k])).collect();
+        reply["edges_total"] = json!(edges["edges"].as_array().map_or(0, Vec::len));
+        reply["edges"] = json!(narrow(&edges["edges"], &keep, &spots));
+    }
+    if kind != Some("edges") {
+        let faces = exec(b, "model.faces", p)?;
+        let min = num("min_area");
+        let keep = |f: &Value| min.is_none_or(|m| f["area"].as_f64().is_some_and(|x| x >= m));
+        // A face's point lies on it; its centroid may not (a face with a hole), so it is the fallback.
+        let spots = |f: &Value| point(&f["point"]).or_else(|| point(&f["centroid"])).into_iter().collect();
+        reply["faces_total"] = json!(faces["faces"].as_array().map_or(0, Vec::len));
+        reply["faces"] = json!(narrow(&faces["faces"], &keep, &spots));
+    }
+    Ok(reply)
 }
 
 /// The command catalog filtered by a case-insensitive substring of id, label, panel or tab

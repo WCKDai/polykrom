@@ -2104,6 +2104,49 @@ fn batch_steps_may_name_tools() {
     assert!(volume(&mut s) > 4000.0);
 }
 
+/// `body_topology` narrows its lists: by kind, by size, nearest a point first, and to a limit,
+/// with the body's totals kept (#266).
+#[test]
+fn body_topology_narrows_to_what_is_asked() {
+    let mut s = server();
+    tool(&mut s, "execute", json!({"command": "solid.box", "params": {"length": 10, "width": 20, "height": 30, "corner": [0, 0, 0]}}));
+    let len = |v: &Value, k: &str| v[k].as_array().map_or(0, Vec::len);
+
+    let all = tool(&mut s, "body_topology", json!({"body": "Body1"}));
+    assert_eq!((len(&all, "edges"), len(&all, "faces")), (12, 6), "{all}");
+    assert_eq!((all["edges_total"].as_u64(), all["faces_total"].as_u64()), (Some(12), Some(6)), "{all}");
+
+    let faces = tool(&mut s, "body_topology", json!({"body": "Body1", "kind": "faces"}));
+    assert!(faces.get("edges").is_none() && len(&faces, "faces") == 6, "{faces}");
+
+    // The two 20 x 30 faces; the four 30 mm edges.
+    let big = tool(&mut s, "body_topology", json!({"body": "Body1", "kind": "faces", "min_area": 500}));
+    assert_eq!(len(&big, "faces"), 2, "{big}");
+    assert_eq!(big["faces_total"], 6, "{big}");
+    let long = tool(&mut s, "body_topology", json!({"body": "Body1", "kind": "edges", "min_length": 25}));
+    assert_eq!(len(&long, "edges"), 4, "{long}");
+
+    // Nearest a face's own point: that face first, at distance 0, and only one of each.
+    let target = &all["faces"][3];
+    let near = tool(&mut s, "body_topology", json!({"body": "Body1", "near": target["point"], "limit": 1}));
+    assert_eq!((len(&near, "edges"), len(&near, "faces")), (1, 1), "{near}");
+    assert_eq!(near["faces"][0]["index"], target["index"], "{near}");
+    assert!(near["faces"][0]["distance"].as_f64().unwrap() < 1e-9, "{near}");
+
+    // Within a radius: nothing farther.
+    let close = tool(&mut s, "body_topology", json!({"body": "Body1", "near": [0, 0, 0], "radius": 12}));
+    assert!(len(&close, "edges") >= 1, "{close}");
+    for item in close["edges"].as_array().unwrap().iter().chain(close["faces"].as_array().unwrap()) {
+        assert!(item["distance"].as_f64().unwrap() <= 12.0, "{close}");
+    }
+    assert!(len(&close, "edges") < 12, "{close}");
+
+    for bad in [json!({"body": "Body1", "radius": 5}), json!({"body": "Body1", "kind": "vertices"}), json!({"body": "Body1", "near": [1, 2]})] {
+        let r = raw_tool(&mut s, "body_topology", bad.clone());
+        assert!(r["result"]["isError"] == json!(true) || r["error"].is_object(), "{bad}: {r}");
+    }
+}
+
 /// An unknown argument is refused with the tool's real arguments listed.
 #[test]
 fn unknown_arguments_list_the_real_ones() {
