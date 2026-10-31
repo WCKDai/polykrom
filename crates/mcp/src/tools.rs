@@ -1195,7 +1195,7 @@ fn batch(b: &mut dyn Backend, a: &Map<String, Value>) -> Value {
                 let reply = json!({
                     "ok": false,
                     "completed": 0,
-                    "failed": {"index": i, "command": command, "error": e},
+                    "failed": {"index": i, "command": command, "error": e, "kind": "not_a_step"},
                     "rolled_back": false,
                     "undone": 0,
                     "applied": [],
@@ -1206,6 +1206,23 @@ fn batch(b: &mut dyn Backend, a: &Map<String, Value>) -> Value {
                 return text_result(&reply, true);
             }
         }
+    }
+    // An unknown command fails the batch before anything runs (#269), not after the steps before
+    // it ran and were taken back.
+    if let Some((i, id)) = unknown_step(&*b, &mapped) {
+        let error = command_error(&id, polykrom_engine::EngineError::UnknownCommand(id.clone()).to_string());
+        let reply = json!({
+            "ok": false,
+            "completed": 0,
+            "failed": {"index": i, "command": id, "error": error, "kind": "unknown_command"},
+            "rolled_back": false,
+            "undone": 0,
+            "applied": [],
+            "not_run": (0..steps.len()).collect::<Vec<_>>(),
+            "results": [],
+            "note": "nothing was run",
+        });
+        return text_result(&reply, true);
     }
     // Each step's `select` (as the agent wrote the step) is applied here, to its result: the app is
     // sent the steps without it.
@@ -1345,6 +1362,19 @@ fn with_timings(mut reply: Value, timed: bool, rows: Vec<Value>, total_ms: f64) 
         o.insert("total_ms".into(), json!(timing::round_ms(total_ms)));
     }
     reply
+}
+
+/// The first step naming a command that doesn't exist, as `(index, command)`, in a session this
+/// process runs: its catalog is the one the steps run against. A bridged app may be of another
+/// version, so its steps go as before and the app reports an unknown one where it stands.
+fn unknown_step(b: &dyn Backend, steps: &[Value]) -> Option<(usize, String)> {
+    if !b.in_process() {
+        return None;
+    }
+    steps.iter().enumerate().find_map(|(i, st)| {
+        let id = st.get("command").or_else(|| st.get("id"))?.as_str()?;
+        polykrom_engine::find_command(id).is_none().then(|| (i, id.to_string()))
+    })
 }
 
 /// The `batch` reply from the app's `engine.batch` answer, shaped as the per-step path shapes it.

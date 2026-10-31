@@ -511,10 +511,10 @@ fn batch_stops_at_first_error_and_rolls_back() {
     let r = raw_tool(
         &mut s,
         "batch",
-        json!({"rollback": false, "commands": [{"command": "solid.sphere", "params": {"radius": 3, "center": [50, 0, 0]}}, {"command": "NoSuchCommand"}]}),
+        json!({"rollback": false, "commands": [{"command": "solid.sphere", "params": {"radius": 3, "center": [50, 0, 0]}}, {"command": "solid.extrude", "params": {"distance": "bogus +"}}]}),
     );
     assert_eq!(r["result"]["isError"], true);
-    assert!(r["result"]["content"][0]["text"].as_str().unwrap().contains("NoSuchCommand"));
+    assert!(r["result"]["content"][0]["text"].as_str().unwrap().contains("solid.extrude"));
     assert_eq!(tool(&mut s, "measure", json!({}))["body_count"], 2);
 }
 
@@ -561,7 +561,7 @@ fn a_failed_batch_with_file_new_restores_the_original_design() {
         json!({"rollback": true, "commands": [
             {"command": "file.new", "params": {"name": "Replacement"}},
             {"command": "solid.box", "params": {"length": 2, "width": 2, "height": 2}},
-            {"command": "not.a.command"},
+            {"command": "solid.extrude", "params": {"distance": "bogus +"}},
         ]}),
     );
     assert_eq!(r["result"]["isError"], true, "{r}");
@@ -1585,6 +1585,23 @@ fn joint_change_through_execute_keeps_a_clean_reply() {
     assert!(r.get("elsewhere").is_none() && r["name"] == "Glue", "{r}");
 }
 
+/// #269: a batch naming an unknown command fails before anything runs, with the failure shape
+/// every batch failure has, rather than after the earlier steps ran and were taken back.
+#[test]
+fn batch_with_an_unknown_command_runs_nothing() {
+    let mut s = server();
+    let box_step = json!({"command": "solid.box", "params": {"length": 10, "width": 10, "height": 10}});
+    let r = raw_tool(&mut s, "batch", json!({"commands": [box_step, box_step, {"command": "solid.filet", "params": {}}]}));
+    assert_eq!(r["result"]["isError"], json!(true), "{r}");
+    let body: Value = serde_json::from_str(r["result"]["content"][0]["text"].as_str().unwrap()).unwrap();
+    assert_eq!(body["failed"]["index"], 2, "{body}");
+    assert_eq!(body["failed"]["kind"], "unknown_command", "{body}");
+    assert!(body["failed"]["error"].as_str().unwrap().contains("solid.fillet"), "the nearest command is suggested: {body}");
+    assert_eq!((body["completed"].clone(), body["applied"].clone(), body["not_run"].clone()), (json!(0), json!([]), json!([0, 1, 2])), "{body}");
+    let d = tool(&mut s, "inspect_design", json!({"measure": false}));
+    assert_eq!(d["bodies"].as_array().map(Vec::len), Some(0), "nothing ran: {d}");
+}
+
 /// #743: bridged to an app that has `engine.batch`, a batch is one control request.
 #[test]
 fn batch_is_one_engine_batch_call() {
@@ -1842,7 +1859,7 @@ fn batch_reports_timings_and_profile() {
     let r = raw_tool(
         &mut s,
         "batch",
-        json!({"timings": true, "commands": [{"command": "solid.box", "params": {"length": 1, "width": 1, "height": 1}}, {"command": "NoSuchCommand"}]}),
+        json!({"timings": true, "commands": [{"command": "solid.box", "params": {"length": 1, "width": 1, "height": 1}}, {"command": "solid.extrude", "params": {"distance": "bogus +"}}]}),
     );
     let body: Value = serde_json::from_str(r["result"]["content"][0]["text"].as_str().unwrap()).unwrap();
     assert_eq!(body["timings"].as_array().map(Vec::len), Some(2), "the failing step is timed too: {body}");
