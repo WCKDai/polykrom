@@ -1633,6 +1633,31 @@ fn a_batch_that_went_through_is_one_undo_step() {
     assert_ne!(r["undone"], "Batch", "{r}");
 }
 
+/// #271: a step that fails on a body an earlier step of the batch consumed says which step,
+/// in-process and bridged.
+#[test]
+fn a_batch_says_which_step_consumed_a_missing_body() {
+    let mut s = server();
+    let r = raw_tool(
+        &mut s,
+        "batch",
+        json!({"rollback": false, "commands": [
+            {"command": "solid.box", "params": {"length": 10, "width": 10, "height": 10, "body_name": "A"}},
+            {"command": "solid.box", "params": {"length": 4, "width": 4, "height": 4, "corner": [8, 0, 0], "operation": "new", "body_name": "B"}},
+            {"command": "solid.combine", "params": {"target": "A", "tools": ["B"], "operation": "join"}},
+            {"command": "inspect.measure", "params": {"bodies": ["B"]}},
+        ]}),
+    );
+    let body: Value = serde_json::from_str(r["result"]["content"][0]["text"].as_str().unwrap()).unwrap();
+    let error = body["failed"]["error"].as_str().unwrap_or_default();
+    assert!(error.contains("`B` was consumed by step 2 (`solid.combine`)"), "{body}");
+
+    let reply = json!({"completed": 1, "results": [{"removed_bodies": ["B"]}], "undone": 0, "rolled_back": false,
+        "failed": {"index": 1, "command": "inspect.measure", "error": "invalid parameters for `inspect.measure`: no body `B`"}});
+    let (_, body, _) = recorded_batch(Ok(reply), json!({"commands": [{"command": "solid.combine"}, {"command": "inspect.measure"}]}));
+    assert!(body["failed"]["error"].as_str().is_some_and(|e| e.contains("`B` was consumed by step 0 (`solid.combine`)")), "{body}");
+}
+
 /// #3654: bridged, `running` asks the app's `control.running`; an older app's refusal is the
 /// tool's error.
 #[test]
