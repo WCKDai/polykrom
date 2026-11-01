@@ -136,7 +136,7 @@ enum Work {
 
 /// A control request computing off the window thread.
 pub struct ControlJob {
-    req: ControlRequest,
+    pub(crate) req: ControlRequest,
     work: Work,
     /// The worker's result: `Some` reply for [`Work::Answer`].
     done: Receiver<Option<Value>>,
@@ -154,6 +154,11 @@ impl ControlJob {
             Err(TryRecvError::Empty) => None,
         }
     }
+}
+
+/// The reply to a request `control.cancel` stopped.
+fn cancelled() -> Value {
+    json!({"ok": false, "cancelled": true, "error": "cancelled (control.cancel)"})
 }
 
 fn label(app: &SolveApp, command: &str) -> String {
@@ -176,13 +181,26 @@ fn spawn(scope: Option<polykrom_engine::io::vfs::PathScope>, f: impl FnOnce() ->
 }
 
 /// Evaluate `commands` ahead on a copy of the session, on a worker (with the folder scope
-/// `request` names). What it computes is kept for the run here.
-fn evaluate_ahead(app: &SolveApp, request: &Value, commands: Vec<(String, Value)>) -> Option<(Receiver<Option<Value>>, Arc<KeptResults>)> {
+/// `request` names), watched by `progress` when the request has one, so `control.cancel` stops
+/// it there (#316). What it computes is kept for the run here.
+fn evaluate_ahead(
+    app: &SolveApp,
+    request: &Value,
+    commands: Vec<(String, Value)>,
+    progress: Option<Arc<polykrom_engine::doc::progress::Progress>>,
+) -> Option<(Receiver<Option<Value>>, Arc<KeptResults>)> {
     let scope = crate::control::request_scope(app, request).ok()?;
     let ahead = app.session.ahead();
     let kept = ahead.kept();
     let rx = spawn(scope, move || {
-        let _ = ahead.evaluate(&commands);
+        match progress {
+            Some(progress) => {
+                let _ = polykrom_engine::doc::progress::watch(progress, || ahead.evaluate(&commands));
+            }
+            None => {
+                let _ = ahead.evaluate(&commands);
+            }
+        }
         None
     })?;
     Some((rx, kept))
@@ -190,7 +208,7 @@ fn evaluate_ahead(app: &SolveApp, request: &Value, commands: Vec<(String, Value)
 
 /// Start computing a design change ahead, for the design as it is now.
 fn begin_ahead(app: &SolveApp, req: &ControlRequest, commands: Vec<(String, Value)>, tries: u8) -> Option<(Work, Receiver<Option<Value>>)> {
-    let (rx, kept) = evaluate_ahead(app, &req.params, commands.clone())?;
+    let (rx, kept) = evaluate_ahead(app, &req.params, commands.clone(), Some(req.progress.clone()))?;
     Some((Work::Ahead { commands, doc: app.session.doc.clone(), revision: app.session.revision, tries, kept }, rx))
 }
 
@@ -232,7 +250,7 @@ impl Ahead {
         }
         let commands = ahead_commands(method, request);
         let label = label(app, &commands.first()?.0);
-        let (done, kept) = evaluate_ahead(app, request, commands)?;
+        let (done, kept) = evaluate_ahead(app, request, commands, None)?;
         Some(Ahead { done, kept, started: crate::now_ms(), label })
     }
 
@@ -295,7 +313,11 @@ impl SolveApp {
     /// behind it go on.
     pub fn stop_agent_command(&mut self) {
         let stopped = match self.control_job.take() {
-            Some(job) => Some((job.req.reply, job.label)),
+            Some(job) => {
+                // Its worker stops too, rather than finishing unseen (#316).
+                job.req.progress.cancel();
+                Some((job.req.reply, job.label))
+            }
             None => self.agent.stop(),
         };
         if let Some((reply, label)) = stopped {
@@ -337,6 +359,10 @@ impl SolveApp {
         let Some((work, rx)) = begin_ahead(self, &req, commands, 0) else { return Some(req) };
         let job = ControlJob { label: label(self, &first), req, work, done: rx, started: crate::now_ms() };
         if within_wait(self, &job.done).is_some() {
+            if job.req.progress.is_cancelled() {
+                let _ = job.req.reply.send(cancelled());
+                return None;
+            }
             // Computed within the wait: it runs now, as before, finding what was computed.
             let Work::Ahead { kept, .. } = job.work else { return Some(job.req) };
             self.run_with_kept(Some(kept), |app| app.run_control(ctx, job.req));
@@ -357,7 +383,7 @@ impl SolveApp {
         let rx = spawn(scope, move || {
             let r = polykrom_engine::doc::progress::watch(progress.clone(), || copy.execute(id, &params));
             Some(match r {
-                _ if progress.is_cancelled() => json!({"ok": false, "cancelled": true, "error": "cancelled (control.cancel)"}),
+                _ if progress.is_cancelled() => cancelled(),
                 Ok(v) => json!({"ok": true, "result": v}),
                 Err(e) => json!({"ok": false, "error": e.to_string()}),
             })
@@ -414,6 +440,11 @@ impl SolveApp {
             return;
         }
         let Some(job) = self.control_job.take() else { return };
+        // Cancelled (`control.cancel`) while it computed: nothing of it is applied (#316).
+        if job.req.progress.is_cancelled() {
+            let _ = job.req.reply.send(cancelled());
+            return;
+        }
         // A file opening meanwhile: the request waits for it as any design change does.
         if self.file_load.busy() || self.file_picker.is_some() {
             self.control_held.push_front(job.req);

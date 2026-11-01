@@ -245,9 +245,36 @@ fn stopping_an_agent_command_applies_nothing_and_goes_on() {
     );
     h.frames(1);
     assert!(h.app.agent_computing().is_some());
+    let worker = h.app.control_job.as_ref().map(|j| j.req.progress.clone());
     h.app.stop_agent_command();
     let r = hole.try_recv().expect("answered at once");
     assert!(r["ok"] == false && r["stopped"] == true, "{r}");
+    // Its worker is told to stop too, rather than finishing unseen (#316).
+    assert!(worker.is_some_and(|p| p.is_cancelled()));
+    let r = reply_to(&mut h, &boss);
+    assert_eq!(r["ok"], true, "{r}");
+    assert_eq!(h.app.session.doc.features.len(), features + 1, "only the boss");
+}
+
+/// #316: `control.cancel` reaches an agent's design change computing off the window thread:
+/// it is answered as cancelled and nothing of it is applied; the requests behind it go on.
+#[test]
+fn a_cancelled_agent_command_applies_nothing() {
+    let (mut h, tx) = agent_harness();
+    let features = h.app.session.doc.features.len();
+    let (req, hole) = crate::ControlRequest::new("engine.execute", second_hole());
+    let progress = req.progress.clone();
+    tx.send(req).unwrap();
+    let boss = ask(
+        &tx,
+        "engine.execute",
+        json!({"command": "solid.box", "params": {"corner": [40, 5, 10], "length": 5, "width": 5, "height": 5, "operation": "join"}}),
+    );
+    h.frames(1);
+    assert!(h.app.agent_computing().is_some());
+    progress.cancel();
+    let r = reply_to(&mut h, &hole);
+    assert!(r["ok"] == false && r["cancelled"] == true, "{r}");
     let r = reply_to(&mut h, &boss);
     assert_eq!(r["ok"], true, "{r}");
     assert_eq!(h.app.session.doc.features.len(), features + 1, "only the boss");
