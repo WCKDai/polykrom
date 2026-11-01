@@ -1549,6 +1549,47 @@ fn undo_steps_on_an_older_app_sends_the_rest_one_by_one() {
     assert_ne!(r["isError"], json!(true), "{r}");
 }
 
+/// #265: a headless session autosaves its unsaved changes, so one that is stopped leaves them to
+/// recover; a save, and a design replaced by `file.new`, finish its entry.
+#[test]
+fn a_stopped_headless_session_leaves_its_work_to_recover() {
+    use crate::backend::Backend;
+    use polykrom_engine::recovery;
+    let dir = std::env::temp_dir().join(format!("polykrom-mcp-autosave-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    let headless = |dir: &std::path::Path| crate::Headless::default().with_autosave_every(dir, std::time::Duration::ZERO);
+    let boxed = json!({"command": "solid.box", "params": {"length": 10, "width": 10, "height": 10}});
+
+    // Stopped with unsaved work: an entry to recover, holding it.
+    let mut h = headless(&dir);
+    h.call("engine.execute", boxed.clone()).unwrap();
+    let built = h.session.doc.clone();
+    drop(h);
+    let left = recovery::orphans(&dir);
+    assert_eq!(left.len(), 1, "{left:?}");
+    let (doc, _) = recovery::load(&dir, &left[0].id).unwrap();
+    assert_eq!(doc.features.len(), built.features.len());
+    recovery::remove(&dir, &left[0].id).unwrap();
+
+    // Saved before it stopped: nothing to recover.
+    let mut h = headless(&dir);
+    h.call("engine.execute", boxed.clone()).unwrap();
+    let path = dir.join("saved.polykrom");
+    h.call("engine.execute", json!({"command": "file.save", "params": {"path": path.to_string_lossy()}})).unwrap();
+    drop(h);
+    assert!(recovery::orphans(&dir).is_empty(), "{:?}", recovery::orphans(&dir));
+
+    // A new design: the old one's unsaved work stays to recover, the new one has none.
+    let mut h = headless(&dir);
+    h.call("engine.execute", boxed).unwrap();
+    h.call("engine.execute", json!({"command": "file.new", "params": {}})).unwrap();
+    drop(h);
+    let left = recovery::orphans(&dir);
+    assert_eq!(left.len(), 1, "{left:?}");
+    assert_eq!(recovery::load(&dir, &left[0].id).unwrap().0.features.len(), built.features.len());
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
 /// #3654: bridged, `running` asks the app's `control.running`; an older app's refusal is the
 /// tool's error.
 #[test]
