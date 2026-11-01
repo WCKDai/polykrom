@@ -223,17 +223,88 @@ fn skill_reference_refuses_unknown_names_and_paths_with_available_choices() {
             assert!(text.contains(available), "{text}");
         }
     }
-    for file in ["missing.md", "../reference.md", "/etc/passwd", "reference/../reference.md"] {
+    for file in ["../reference.md", "/etc/passwd", "reference/../reference.md", "..\\reference.md"] {
         let r = raw_tool(&mut s, "skill_reference", json!({"skill": "solidcraft-modeling", "file": file}));
         assert_eq!(r["result"]["isError"], true, "{r}");
         let text = r["result"]["content"][0]["text"].as_str().unwrap();
         assert!(text.contains("Available files: SKILL.md, reference.md"), "{text}");
     }
-    for (skill, files) in [("solidcraft-checking", "SKILL.md, reference/porting.md"), ("solidcraft-editing", "SKILL.md")] {
+}
+
+/// #272: a skill without reference.md answers with its SKILL.md, and a file it doesn't have
+/// gets the closest document with a note, not a failed call.
+#[test]
+fn skill_reference_answers_with_the_closest_document() {
+    let mut s = server();
+    let text = |r: &Value| r["result"]["content"][0]["text"].as_str().unwrap_or_default().to_string();
+    for (skill, main) in [
+        ("solidcraft-checking", include_str!("../../../skills/solidcraft-checking/SKILL.md")),
+        ("solidcraft-editing", include_str!("../../../skills/solidcraft-editing/SKILL.md")),
+        ("solidcraft-polish", include_str!("../../../skills/solidcraft-polish/SKILL.md")),
+    ] {
         let r = raw_tool(&mut s, "skill_reference", json!({"skill": skill}));
-        assert_eq!(r["result"]["isError"], true, "{r}");
-        assert!(r["result"]["content"][0]["text"].as_str().unwrap().contains(files), "{r}");
+        assert_ne!(r["result"]["isError"], true, "{r}");
+        assert_eq!(text(&r), main);
     }
+    // The cases the agents tried: the main document, a subfolder's file by its name, and others.
+    let porting = include_str!("../../../skills/solidcraft-checking/reference/porting.md");
+    for (skill, file, shown, body) in [
+        ("solidcraft-checking", "reference.md", "SKILL.md", include_str!("../../../skills/solidcraft-checking/SKILL.md")),
+        ("solidcraft-checking", "porting.md", "reference/porting.md", porting),
+        ("solidcraft-checking", "docs/mjcf.md", "SKILL.md", include_str!("../../../skills/solidcraft-checking/SKILL.md")),
+        ("solidcraft-mechanisms", "mujoco.md", "reference.md", include_str!("../../../skills/solidcraft-mechanisms/reference.md")),
+    ] {
+        let r = raw_tool(&mut s, "skill_reference", json!({"skill": skill, "file": file}));
+        assert_ne!(r["result"]["isError"], true, "{r}");
+        let t = text(&r);
+        assert!(t.starts_with(&format!("(No `{file}` in {skill}; this is {shown}. Available files: ")), "{t}");
+        assert!(t.ends_with(body), "{skill} {file}");
+    }
+}
+
+/// #272: every document a skill points to resolves: each `skill_reference` call written in the
+/// skills, exactly, and each `.md` path they name in backticks, in some skill.
+#[test]
+fn skills_point_only_at_documents_they_have() {
+    let mut b = Recorder { calls: Vec::new(), batch: Err("unused".into()) };
+    let docs = [
+        include_str!("../../../skills/solidcraft-checking/SKILL.md"),
+        include_str!("../../../skills/solidcraft-checking/reference/porting.md"),
+        include_str!("../../../skills/solidcraft-editing/SKILL.md"),
+        include_str!("../../../skills/solidcraft-mechanisms/SKILL.md"),
+        include_str!("../../../skills/solidcraft-mechanisms/reference.md"),
+        include_str!("../../../skills/solidcraft-modeling/SKILL.md"),
+        include_str!("../../../skills/solidcraft-modeling/reference.md"),
+        include_str!("../../../skills/solidcraft-polish/SKILL.md"),
+    ];
+    let skills = ["solidcraft-checking", "solidcraft-editing", "solidcraft-mechanisms", "solidcraft-modeling", "solidcraft-polish"];
+    let has = |b: &mut Recorder, skill: &str, file: &str| {
+        let r = crate::call_tool(b, "skill_reference", &json!({"skill": skill, "file": file}));
+        r["isError"] != true && !r["content"][0]["text"].as_str().unwrap_or_default().starts_with("(No `")
+    };
+    let mut calls = 0;
+    for doc in docs {
+        for (i, _) in doc.match_indices("skill_reference {") {
+            let call = &doc[i + "skill_reference ".len()..];
+            let Some(end) = call.find('}') else { continue };
+            let args: Value = serde_json::from_str(&call[..=end]).unwrap_or_else(|e| panic!("{e}: {}", &call[..=end]));
+            let r = crate::call_tool(&mut b, "skill_reference", &args);
+            assert_ne!(r["isError"], true, "{args}: {r}");
+            if let Some(file) = args["file"].as_str() {
+                assert!(has(&mut b, args["skill"].as_str().unwrap_or_default(), file), "{args}");
+            }
+            calls += 1;
+        }
+        for path in doc.split('`').skip(1).step_by(2).filter(|p| p.ends_with(".md") && !p.contains(' ')) {
+            let path = path.trim_start_matches("$SKILL/");
+            let found = match path.split_once('/').filter(|(skill, _)| skills.contains(skill)) {
+                Some((skill, file)) => has(&mut b, skill, file),
+                None => skills.iter().any(|skill| has(&mut b, skill, path)),
+            };
+            assert!(found, "no skill has `{path}`");
+        }
+    }
+    assert!(calls >= 4, "{calls}");
 }
 
 #[test]
@@ -245,7 +316,7 @@ fn skill_reference_is_advertised_as_read_only() {
     assert_eq!(t["annotations"]["destructiveHint"], false);
     assert_eq!(t["annotations"]["openWorldHint"], false);
     assert_eq!(t["inputSchema"]["required"], json!(["skill"]));
-    assert_eq!(t["inputSchema"]["properties"]["file"]["default"], "reference.md");
+    assert!(t["inputSchema"]["properties"]["file"].get("default").is_none(), "{t}");
 }
 
 /// A URDF goes through `export` with its own options (#719).
