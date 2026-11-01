@@ -1,0 +1,68 @@
+# polykrom.app (and cad.polykrom.app): the landing page and showcases (site/build.py), the browser
+# app at /app/ and the book at /docs/, deployed to the Cloudflare Worker polykrom-cad-site
+# (site/wrangler.jsonc). Only main deploys; the Cloudflare secrets are WCKDai org secrets.
+name: Site
+
+on:
+  push:
+    branches: [main]
+    # Test data and the GitHub bots' scripts change nothing on the site.
+    paths-ignore: ["tests/**", "scripts/claim/**", "scripts/triage/**"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: site-deploy
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+  MDBOOK_VERSION: v0.5.4
+  TRUNK_VERSION: v0.21.14
+
+jobs:
+  deploy:
+    if: github.repository == 'WCKDai/polykrom' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - name: Install mdbook and trunk
+        run: |
+          mkdir -p "$HOME/.local/bin"
+          curl -sSL "https://github.com/rust-lang/mdBook/releases/download/${MDBOOK_VERSION}/mdbook-${MDBOOK_VERSION}-x86_64-unknown-linux-gnu.tar.gz" | tar -xz -C "$HOME/.local/bin"
+          curl -sSL "https://github.com/trunk-rs/trunk/releases/download/${TRUNK_VERSION}/trunk-x86_64-unknown-linux-gnu.tar.gz" | tar -xz -C "$HOME/.local/bin"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: Install a software Vulkan driver (lavapipe)
+        # The book's pictures and the showcases' posters are CLI snapshots, drawn on the GPU.
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends mesa-vulkan-drivers libvulkan1
+      - name: Build the book (and the release CLI)
+        env:
+          SOLIDCRAFT_GPU: software
+        run: cargo xtask book
+      - name: Build the web app
+        working-directory: apps/polykrom-web
+        run: trunk build --release --public-url ./
+      - name: Test the web app offline and across an update (headless Chrome)
+        run: cargo xtask web-offline-test --site dist/web
+      - name: Assemble the site
+        env:
+          SOLIDCRAFT_GPU: software
+        run: python3 site/build.py
+      - name: Deploy polykrom.app
+        if: env.CLOUDFLARE_API_TOKEN != ''
+        run: npx --yes wrangler@4.156.0 deploy --config site/wrangler.jsonc
+      - name: Cloudflare is not configured
+        if: env.CLOUDFLARE_API_TOKEN == ''
+        run: echo "::warning::CLOUDFLARE_API_TOKEN is not available to this repository; the site was built but not deployed."
