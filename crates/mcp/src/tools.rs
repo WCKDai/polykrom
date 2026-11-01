@@ -329,8 +329,23 @@ pub fn tool_definitions() -> Vec<Value> {
             obj(json!({}), &[]),
             Effect::ReadOnly,
         ),
-        tool("undo", "Undo", "Undo the last change to the design.", obj(json!({}), &[]), Effect::Edits),
-        tool("redo", "Redo", "Redo the last undone change.", obj(json!({}), &[]), Effect::Edits),
+        tool(
+            "undo",
+            "Undo",
+            "Undo the last change to the design, or the last `steps` changes in one go. A command is one step, however many it ran inside. The reply lists what was undone, the label of the step the next undo would take back (`next`) and how many are `left`.",
+            obj(
+                json!({"steps": {"type": "integer", "minimum": 1, "description": "How many changes to undo (default 1); the design is evaluated once"}}),
+                &[],
+            ),
+            Effect::Edits,
+        ),
+        tool(
+            "redo",
+            "Redo",
+            "Redo the last undone change, or the last `steps` of them. The reply lists what was redone, the next redo's label and how many are left.",
+            obj(json!({"steps": {"type": "integer", "minimum": 1, "description": "How many changes to redo (default 1)"}}), &[]),
+            Effect::Edits,
+        ),
         tool(
             "new_design",
             "New design",
@@ -731,8 +746,8 @@ fn dispatch(b: &mut dyn Backend, name: &str, a: &Map<String, Value>) -> Result<V
         "skill_reference" => crate::skill_reference::read(a),
         "polish" => polish(b, a).map(|(v, _)| v),
         "running" => b.call("control.running", json!({})),
-        "undo" => exec(b, "edit.undo", json!({})),
-        "redo" => exec(b, "edit.redo", json!({})),
+        "undo" => undo_steps(b, "edit.undo", a),
+        "redo" => undo_steps(b, "edit.redo", a),
         "new_design" => exec(b, "file.new", pick(a, &["name"])),
         "open" => exec(b, "doc.open", pick(a, &["path", "up", "names"])),
         "save" => exec(b, "file.save", pick(a, &["path", "format"])),
@@ -918,8 +933,8 @@ fn batch_step(step: &Value) -> Result<(String, Value, Option<String>), String> {
             None => mapped("inspect.measure", str_arg(a, "body").map_or(json!({}), |body| json!({"bodies": [body]}))),
         },
         "inspect_design" => mapped("document.inspect", json!({"measure": a.get("measure").and_then(Value::as_bool).unwrap_or(true)})),
-        "undo" => mapped("edit.undo", json!({})),
-        "redo" => mapped("edit.redo", json!({})),
+        "undo" => mapped("edit.undo", pick(a, &["steps"])),
+        "redo" => mapped("edit.redo", pick(a, &["steps"])),
         "export" => {
             mapped("file.export", pick(a, &["path", "format", "bodies", "mesh_prefix", "effort", "velocity", "floating", "scene", "kp", "actuated"]))
         }
@@ -1404,6 +1419,25 @@ fn with_timings(mut reply: Value, timed: bool, rows: Vec<Value>, total_ms: f64) 
         o.insert("total_ms".into(), json!(timing::round_ms(total_ms)));
     }
     reply
+}
+
+/// `undo` / `redo` with `steps` (#270). An app from before `steps` existed undoes one step and
+/// answers without the `steps` list; the rest are then sent one at a time.
+fn undo_steps(b: &mut dyn Backend, command: &str, a: &Map<String, Value>) -> Result<Value, String> {
+    let want = a.get("steps").and_then(Value::as_u64).unwrap_or(1).max(1);
+    let r = exec(b, command, pick(a, &["steps"]))?;
+    if want == 1 || r.get("steps").is_some() {
+        return Ok(r);
+    }
+    let key = if command == "edit.undo" { "undone" } else { "redone" };
+    let mut done = vec![r[key].clone()];
+    for _ in 1..want {
+        match exec(b, command, json!({})) {
+            Ok(v) => done.push(v[key].clone()),
+            Err(_) => break,
+        }
+    }
+    Ok(json!({key: done.last(), "steps": done}))
 }
 
 /// The first step naming a command that doesn't exist, as `(index, command)`, in a session this

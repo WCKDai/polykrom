@@ -1519,6 +1519,36 @@ fn methods(b: &Recorder) -> Vec<&str> {
     b.calls.iter().map(|(m, _)| m.as_str()).collect()
 }
 
+/// #270: `undo {steps}` takes several changes back in one call and says what is left.
+#[test]
+fn undo_takes_steps() {
+    let mut s = server();
+    for x in [0, 20, 40] {
+        tool(
+            &mut s,
+            "execute",
+            json!({"command": "solid.box", "params": {"length": 5, "width": 5, "height": 5, "corner": [x, 0, 0], "operation": "new"}}),
+        );
+    }
+    let r = tool(&mut s, "undo", json!({"steps": 2}));
+    assert_eq!(r["steps"].as_array().map(Vec::len), Some(2), "{r}");
+    assert_eq!(tool(&mut s, "measure", json!({}))["body_count"], 1);
+    let r = tool(&mut s, "redo", json!({"steps": 2}));
+    assert_eq!(r["left"], 0, "{r}");
+    assert_eq!(tool(&mut s, "measure", json!({}))["body_count"], 3);
+}
+
+/// An app from before `steps` undoes one step and answers without the list: the rest are sent
+/// one at a time.
+#[test]
+fn undo_steps_on_an_older_app_sends_the_rest_one_by_one() {
+    let mut b = Recorder { calls: Vec::new(), batch: Ok(json!({})) };
+    let r = crate::tools::call_tool(&mut b, "undo", &json!({"steps": 3}));
+    let sent: Vec<Value> = b.calls.iter().map(|(_, p)| json!([p["command"], p["params"]])).collect();
+    assert_eq!(sent, [json!(["edit.undo", {"steps": 3}]), json!(["edit.undo", {}]), json!(["edit.undo", {}])], "{r}");
+    assert_ne!(r["isError"], json!(true), "{r}");
+}
+
 /// #3654: bridged, `running` asks the app's `control.running`; an older app's refusal is the
 /// tool's error.
 #[test]
