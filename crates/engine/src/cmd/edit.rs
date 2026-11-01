@@ -10,8 +10,10 @@ use crate::params::{bad, bool_, num, str_, string_list};
 use crate::{EngineError, Result, Sel, Session, Snapshot};
 
 pub static COMMANDS: &[CommandSpec] = &[
-    CommandSpec::new("edit.undo", "Undo", undo).icon("undo").key("Ctrl+Z").noundo().doc_only(),
-    CommandSpec::new("edit.redo", "Redo", redo).icon("redo").key("Ctrl+Y").noundo().doc_only(),
+    CommandSpec::new("edit.undo", "Undo", undo).icon("undo").key("Ctrl+Z").noundo().doc_only()
+        .params("steps?: n (default 1; at most what can be undone). → {undone: last step's label, steps: labels undone, next: label of the step the next undo would take back (null: none), left: n}"),
+    CommandSpec::new("edit.redo", "Redo", redo).icon("redo").key("Ctrl+Y").noundo().doc_only()
+        .params("steps?: n (default 1; at most what can be redone). → {redone: last step's label, steps: labels redone, next: label of the next redo (null: none), left: n}"),
     CommandSpec::new("edit.checkpoint", "Checkpoint", checkpoint).icon("checkpoint")
         .noundo()
         .doc_only()
@@ -78,20 +80,45 @@ pub static COMMANDS: &[CommandSpec] = &[
     CommandSpec::new("select.clear", "Clear Selection", select_clear).icon("select").noundo(),
 ];
 
-fn undo(s: &mut Session, _p: &Value) -> Result<Value> {
-    let Some(prev) = s.undo.pop() else { return Err(EngineError::Other("nothing to undo".into())) };
-    let now = go_to(s, prev);
-    let label = now.label.clone();
-    s.redo.push(now);
-    Ok(json!({"undone": label}))
+/// `steps` (default 1) for `cmd`: at least one, and no more than `available`.
+fn steps(cmd: &str, p: &Value, available: usize) -> Result<usize> {
+    let n = match p.get("steps") {
+        None | Some(Value::Null) => 1,
+        Some(v) => v.as_u64().filter(|n| *n >= 1).ok_or_else(|| bad(cmd, "`steps` must be a whole number of at least 1"))? as usize,
+    };
+    Ok(n.min(available))
 }
 
-fn redo(s: &mut Session, _p: &Value) -> Result<Value> {
-    let Some(next) = s.redo.pop() else { return Err(EngineError::Other("nothing to redo".into())) };
-    let now = go_to(s, next);
-    let label = now.label.clone();
-    s.undo.push(now);
-    Ok(json!({"redone": label}))
+/// Undo `steps` changes (#270). The design changes once, to where the last of them leaves it, so it
+/// is evaluated once however many steps go.
+fn undo(s: &mut Session, p: &Value) -> Result<Value> {
+    if s.undo.is_empty() {
+        return Err(EngineError::Other("nothing to undo".into()));
+    }
+    let n = steps("edit.undo", p, s.undo.len())?;
+    let mut done = Vec::with_capacity(n);
+    for _ in 0..n {
+        let Some(prev) = s.undo.pop() else { break };
+        let now = go_to(s, prev);
+        done.push(now.label.clone());
+        s.redo.push(now);
+    }
+    Ok(json!({"undone": done.last(), "steps": done, "next": s.undo.last().map(|u| u.label.as_str()), "left": s.undo.len()}))
+}
+
+fn redo(s: &mut Session, p: &Value) -> Result<Value> {
+    if s.redo.is_empty() {
+        return Err(EngineError::Other("nothing to redo".into()));
+    }
+    let n = steps("edit.redo", p, s.redo.len())?;
+    let mut done = Vec::with_capacity(n);
+    for _ in 0..n {
+        let Some(next) = s.redo.pop() else { break };
+        let now = go_to(s, next);
+        done.push(now.label.clone());
+        s.undo.push(now);
+    }
+    Ok(json!({"redone": done.last(), "steps": done, "next": s.redo.last().map(|u| u.label.as_str()), "left": s.redo.len()}))
 }
 
 /// Put the session at `snap`; returns where it was, under the same label.

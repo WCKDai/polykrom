@@ -1907,6 +1907,36 @@ fn a_command_running_others_is_one_undo_step() {
     assert_eq!(s.undo.len(), history + 1);
 }
 
+/// #270: `edit.undo {steps}` and `edit.redo {steps}` go several changes at once, and the reply
+/// says what went, what the next undo would take back and how many are left.
+#[test]
+fn undo_and_redo_take_steps() {
+    let mut s = Session::default();
+    let empty = s.doc.clone();
+    run(&mut s, "solid.box", json!({"length": 1.0, "width": 1.0, "height": 1.0}));
+    let one = s.doc.clone();
+    run(&mut s, "solid.box", json!({"length": 1.0, "width": 1.0, "height": 1.0, "corner": [5, 0, 0], "operation": "new"}));
+    run(&mut s, "parameters.add", json!({"name": "w", "expression": "3 mm"}));
+    let three = s.doc.clone();
+    let r = run(&mut s, "edit.undo", json!({"steps": 2}));
+    assert!(Arc::ptr_eq(&s.doc, &one), "{r}");
+    assert_eq!(r["steps"].as_array().map(Vec::len), Some(2), "{r}");
+    assert_eq!(r["undone"], r["steps"][1], "{r}");
+    assert_eq!((r["next"].is_string(), r["left"].clone()), (true, json!(1)), "{r}");
+    // One step is as before.
+    let r = run(&mut s, "edit.redo", json!({}));
+    assert_eq!((r["steps"].as_array().map(Vec::len), r["left"].clone()), (Some(1), json!(1)), "{r}");
+    // More than there are goes as far as it can.
+    let r = run(&mut s, "edit.redo", json!({"steps": 9}));
+    assert!(Arc::ptr_eq(&s.doc, &three), "{r}");
+    assert_eq!((r["next"].clone(), r["left"].clone()), (Value::Null, json!(0)), "{r}");
+    let r = run(&mut s, "edit.undo", json!({"steps": 3}));
+    assert!(Arc::ptr_eq(&s.doc, &empty), "{r}");
+    assert_eq!((r["next"].clone(), r["left"].clone()), (Value::Null, json!(0)), "{r}");
+    assert!(s.execute("edit.undo", &json!({})).is_err(), "nothing left to undo");
+    assert!(s.execute("edit.redo", &json!({"steps": 0})).is_err(), "steps is at least 1");
+}
+
 /// Regression (#3242): `file.new` replaced the session and its checkpoints with it, so a
 /// batch that failed after `file.new` could not go back to the design it began in.
 #[test]
