@@ -535,10 +535,25 @@ pub fn call_tool(b: &mut dyn Backend, name: &str, args: &Value) -> Value {
             _ => dispatch(b, name, a),
         };
         match r {
-            Ok(v) => text_result(&v, false),
+            Ok(v) => text_result(&with_save_hint(&*b, v), false),
             Err(e) => text_result(&Value::String(e), true),
         }
     })
+}
+
+/// After this long with unsaved changes, replies remind the agent to save (#265).
+pub(crate) const SAVE_HINT_AFTER: std::time::Duration = std::time::Duration::from_secs(15 * 60);
+
+/// A reply with `unsaved_s` and a hint once the design has gone [`SAVE_HINT_AFTER`] without a
+/// save (#265): headless runs lost hours of work that only a save would have kept.
+fn with_save_hint(b: &dyn Backend, mut v: Value) -> Value {
+    if let Some(t) = b.unsaved_for().filter(|t| *t >= SAVE_HINT_AFTER)
+        && let Some(o) = v.as_object_mut()
+    {
+        o.insert("unsaved_s".into(), json!(t.as_secs()));
+        o.insert("save_hint".into(), json!("unsaved for a while: `save` keeps the work (autosave only helps recover it)"));
+    }
+    v
 }
 
 fn exec(b: &mut dyn Backend, command: &str, params: Value) -> Result<Value, String> {

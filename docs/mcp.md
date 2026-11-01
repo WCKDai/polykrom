@@ -122,7 +122,8 @@ session that hangs, times out or is stopped leaves its work there instead of los
 session finds it with `doc.recovery_list` and opens it with `doc.recover {id}`, unsaved, with its
 file path; `open` of that file says so too (`recovery: {autosaves: [{id, name, saved_at}], how}`)
 when the autosave is at least as new as the file. `save` and `new_design`/`open` finish the entry: a design with nothing unsaved has none.
-`--no-autosave` turns it off. Bridged sessions are the app's, which autosaves on its own.
+`--no-autosave` turns it off. After 15 minutes with unsaved changes, a headless session's replies
+add `unsaved_s` and a `save_hint`: an autosave only helps recover work, a `save` keeps it. Bridged sessions are the app's, which autosaves on its own.
 
 ### Which files the agent can reach
 
