@@ -1010,9 +1010,28 @@ impl Session {
                     self.pending_moves = before.pending_moves;
                     self.refresh();
                 }
-                Err(e)
+                Err(self.with_body_hint(e))
             }
         }
+    }
+
+    /// A command's "no body `X`" also names the bodies closest to `X` (#271). Commands say it in
+    /// their own words and none named any, so an agent had to list the bodies to find the one it
+    /// meant (`Upper_arm_SO101` for `Upper_arm_SO101 v4`).
+    fn with_body_hint(&self, e: EngineError) -> EngineError {
+        let EngineError::BadParams { cmd, msg } = e else { return e };
+        if msg.contains("(closest: ") {
+            return EngineError::BadParams { cmd, msg };
+        }
+        let quoted = ["no body `", "unknown body name `", "unknown body `"]
+            .iter()
+            .find_map(|p| msg.split_once(p).and_then(|(_, rest)| rest.split_once('`')).map(|(n, _)| n.to_string()));
+        let Some(name) = quoted.or_else(|| msg.split_once("no body named ").map(|(_, n)| n.trim().to_string())) else {
+            return EngineError::BadParams { cmd, msg };
+        };
+        let state = self.model.state();
+        let hint = cmd::closest_hint(&name, state.bodies.iter().map(|b| b.name.as_str()));
+        EngineError::BadParams { cmd, msg: msg + &hint }
     }
 
     /// A sketch command's result gets `created`: the ids of the points, curves, constraints and
