@@ -1035,16 +1035,8 @@ impl ModelState {
         bodies + sketches + self.sheets.len() * 4096 + self.threads.len() * 192 + self.construct.len() * 192
     }
 
-    /// The body named `name`, or `name (occurrence path)` as `inspect.interference` prints a body
-    /// in an assembly (`Arm v2 (robot:1/Arm v2:1)`, #271). The path form is taken only when the
-    /// whole name is no body's and the part in brackets is an occurrence path (it has a `:`), so a
-    /// body really named `Part (3)` is still found by that name.
     pub fn body(&self, name: &str) -> Option<&ModelBody> {
-        self.bodies.iter().find(|b| b.name == name).or_else(|| {
-            let (base, rest) = name.rsplit_once(" (")?;
-            rest.strip_suffix(')').filter(|path| path.contains(':'))?;
-            self.bodies.iter().find(|b| b.name == base)
-        })
+        self.bodies.iter().find(|b| b.name == name)
     }
 
     /// Make every body's display mesh now, on all cores (bodies are meshed independently and

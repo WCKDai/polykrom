@@ -1937,20 +1937,14 @@ fn undo_and_redo_take_steps() {
     assert!(s.execute("edit.redo", &json!({"steps": 0})).is_err(), "steps is at least 1");
 }
 
-/// #271: a body is found by the `name (occurrence path)` form `inspect.interference` prints, a
-/// body really named with brackets still by its own name, and a name that is no body's is
-/// refused with the bodies closest to it, by every command.
+/// #271: a name that is no body's is refused with the bodies closest to it, by every command,
+/// and `inspect.measure` names each body it can't find rather than "unknown body name".
 #[test]
-fn body_names_resolve_in_every_form_and_misses_say_what_is_close() {
+fn body_name_misses_say_what_is_close() {
     let mut s = Session::default();
     run(&mut s, "solid.box", json!({"length": 10.0, "width": 10.0, "height": 10.0, "body_name": "Upper_arm_SO101 v4"}));
     run(&mut s, "solid.box", json!({"length": 5.0, "width": 5.0, "height": 5.0, "corner": [30, 0, 0], "operation": "new", "body_name": "Part (3)"}));
-    let st = s.model.state();
-    assert_eq!(st.body("Upper_arm_SO101 v4 (so101:1/Upper_arm_SO101 v4:1)").map(|b| b.name.as_str()), Some("Upper_arm_SO101 v4"));
-    assert_eq!(st.body("Part (3)").map(|b| b.name.as_str()), Some("Part (3)"));
-    assert!(st.body("Upper_arm_SO101 v4 (3)").is_none(), "brackets without a path are part of a name");
-    // measure takes the path form, and names every body it can't find, with the closest.
-    let r = run(&mut s, "inspect.measure", json!({"bodies": ["Upper_arm_SO101 v4 (so101:1/Upper_arm_SO101 v4:1)"]}));
+    let r = run(&mut s, "inspect.measure", json!({"bodies": ["Part (3)"]}));
     assert_eq!(r["bodies"].as_array().map(Vec::len), Some(1), "{r}");
     let e = s.execute("inspect.measure", &json!({"bodies": ["Upper_arm_SO101", "Part (3)", "Nothing like it"]})).unwrap_err().to_string();
     assert!(e.contains("no body `Upper_arm_SO101` (closest: `Upper_arm_SO101 v4`)"), "{e}");
