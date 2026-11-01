@@ -544,7 +544,25 @@ pub struct Headless {
     pub session: Session,
     /// Orientation for renders; the camera is refitted to the model every time.
     pub view: StandardView,
+    /// Autosave into the recovery folder (#265), when [`Headless::with_autosave`] turned it on.
+    autosave: Option<Autosave>,
+    autosave_every: Duration,
 }
+
+/// A headless session's autosave: the design's unsaved changes go to the recovery folder at most
+/// every [`AUTOSAVE_EVERY`], so a session that hangs or is stopped leaves them to recover
+/// (`doc.recovery_list`, `doc.recover`) as an app that crashed does.
+struct Autosave {
+    dir: std::path::PathBuf,
+    saver: polykrom_engine::recovery::Autosaver,
+}
+
+/// How often a headless session autosaves while it has unsaved changes.
+pub const AUTOSAVE_EVERY: Duration = Duration::from_secs(60);
+
+/// Commands that replace the design: its autosave entry is finished first, and the new design
+/// gets one of its own.
+const REPLACES_DESIGN: [&str; 3] = ["doc.open", "file.new", "doc.recover"];
 
 impl Default for Headless {
     fn default() -> Self {
@@ -562,7 +580,51 @@ impl Headless {
             }
             Err(e) => session.log.push(format!("image host unavailable: {e}")),
         }
-        Headless { session, view: StandardView::Iso }
+        Headless { session, view: StandardView::Iso, autosave: None, autosave_every: AUTOSAVE_EVERY }
+    }
+
+    /// Autosave this session's unsaved changes into `dir` (the recovery folder). Without it a
+    /// headless session kept its work only in memory, and lost it when it hung or was stopped.
+    pub fn with_autosave(self, dir: &std::path::Path) -> Self {
+        self.with_autosave_every(dir, AUTOSAVE_EVERY)
+    }
+
+    /// [`Headless::with_autosave`] at another interval (tests use none).
+    pub fn with_autosave_every(mut self, dir: &std::path::Path, every: Duration) -> Self {
+        self.autosave_every = every;
+        match polykrom_engine::recovery::Autosaver::new(dir, every) {
+            Ok(saver) => self.autosave = Some(Autosave { dir: dir.to_path_buf(), saver }),
+            Err(e) => self.session.log.push(format!("autosave unavailable: {e}")),
+        }
+        self
+    }
+
+    /// After a call: autosave when it is due (written on a worker thread).
+    fn autosave_tick(&mut self) {
+        if let Some(a) = self.autosave.as_mut()
+            && let Err(e) = a.saver.tick(&self.session, false)
+        {
+            self.session.log.push(format!("autosave failed: {e}"));
+        }
+    }
+
+    /// Before the design is replaced: write its unsaved changes now (an entry nothing holds is
+    /// recoverable once this session lets go of it).
+    fn autosave_finish(&mut self) {
+        if let Some(a) = self.autosave.as_mut()
+            && let Err(e) = a.saver.save(&self.session)
+        {
+            self.session.log.push(format!("autosave failed: {e}"));
+        }
+    }
+
+    /// After the design was replaced: a new entry for the new design; the old one is let go.
+    fn autosave_restart(&mut self) {
+        let Some(dir) = self.autosave.take().map(|a| a.dir) else { return };
+        match polykrom_engine::recovery::Autosaver::new(&dir, self.autosave_every) {
+            Ok(saver) => self.autosave = Some(Autosave { dir, saver }),
+            Err(e) => self.session.log.push(format!("autosave unavailable: {e}")),
+        }
     }
 }
 
@@ -570,8 +632,8 @@ fn dim(p: &Value, k: &str, default: f64) -> u32 {
     p.get(k).and_then(Value::as_f64).filter(|x| x.is_finite()).unwrap_or(default).clamp(16.0, 4096.0) as u32
 }
 
-impl Backend for Headless {
-    fn call(&mut self, method: &str, p: Value) -> Result<Value, String> {
+impl Headless {
+    fn run(&mut self, method: &str, p: Value) -> Result<Value, String> {
         let s = &mut self.session;
         let str_p = |k: &str| p.get(k).and_then(Value::as_str);
         match method {
@@ -634,6 +696,26 @@ impl Backend for Headless {
             "control.pending" => Ok(json!({"pending": null})),
             other => Err(format!("unknown method `{other}`")),
         }
+    }
+}
+
+impl Backend for Headless {
+    fn call(&mut self, method: &str, p: Value) -> Result<Value, String> {
+        let command = matches!(method, "engine.execute" | "command").then(|| p.get("command").and_then(Value::as_str)).flatten();
+        let replaces = command.is_some_and(|c| REPLACES_DESIGN.contains(&c));
+        let saves = command.is_some_and(|c| matches!(c, "file.save" | "file.save_as"));
+        if replaces {
+            self.autosave_finish();
+        }
+        let r = self.run(method, p);
+        match (&r, replaces, saves) {
+            (Ok(_), true, _) => self.autosave_restart(),
+            // Saved: nothing is unsaved, so the entry goes now, not at the next tick.
+            (Ok(_), _, true) => self.autosave_finish(),
+            // A refused replacement left the design as it was, with its entry.
+            _ => self.autosave_tick(),
+        }
+        r
     }
     fn has_ui(&self) -> bool {
         false

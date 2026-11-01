@@ -16,7 +16,7 @@
 //! polykrom-cli recipe <recipe.json>                         translate an oracle recipe to a script
 //! polykrom-cli oracle <case-dir>...                         replay recipes and compare with expected.json
 //! polykrom-cli kernel-cases <case-dir>... [--json]          the kernel regression rig (tests/kernel-cases)
-//! polykrom-cli mcp [--headless] [--in design|script] [--connect HOST:PORT [--token T]] [--allow-path DIR]... [--allow-any-path]
+//! polykrom-cli mcp [--headless] [--in design|script] [--connect HOST:PORT [--token T]] [--allow-path DIR]... [--allow-any-path] [--no-autosave]
 //!                    [--param-check off|warn|strict]
 //!                                                             MCP server on stdio (docs/mcp.md)
 //! polykrom-cli licences                                     Polykrom's licence and the third-party licences
@@ -85,7 +85,7 @@ const USAGE_KERNEL_CASES: &str = "  polykrom-cli kernel-cases <case-dir>... [--j
 /// `fuzz`'s lines in the usage.
 const USAGE_FUZZ: &str = "  polykrom-cli fuzz [--from N] [--count N] [--jobs J] [--timeout S] [--steps N] [--minimise] [--out DIR] [--report FILE]\n";
 /// `mcp`'s lines in the usage.
-const USAGE_MCP: &str = "  polykrom-cli mcp [--headless] [--in design.polykrom|script.json] [--connect 127.0.0.1:PORT [--token T]] [--allow-path DIR]... [--allow-any-path]\n                     [--param-check off|warn|strict]\n";
+const USAGE_MCP: &str = "  polykrom-cli mcp [--headless] [--in design.polykrom|script.json] [--connect 127.0.0.1:PORT [--token T]] [--allow-path DIR]... [--allow-any-path]\n                     [--param-check off|warn|strict] [--no-autosave]\n";
 /// `crashes`'s lines in the usage.
 const USAGE_CRASHES: &str = "  polykrom-cli crashes [list [--json] | show <id> | replay <id> | dir | clear [<id>]]\n";
 /// `licences`'s lines in the usage.
@@ -694,7 +694,7 @@ fn cmd_mcp(args: &[String]) -> Result<(), String> {
             }
             Box::new(remote)
         }
-        (None, Some(path)) => Box::new(polykrom_mcp::Headless::new(load_checked(path, param_check)?)),
+        (None, Some(path)) => Box::new(autosaving(polykrom_mcp::Headless::new(load_checked(path, param_check)?), args)),
         // No arguments: the running desktop app, found through the discovery file it wrote
         // (docs/control-protocol.md); none running (or `--headless`): a session of its own.
         (None, None) => {
@@ -706,10 +706,23 @@ fn cmd_mcp(args: &[String]) -> Result<(), String> {
             }
             let mut headless = polykrom_mcp::Headless::default();
             headless.session.param_check = param_check;
-            Box::new(headless)
+            Box::new(autosaving(headless, args))
         }
     };
     serve_mcp(backend, scope)
+}
+
+/// A headless MCP session autosaves its unsaved changes into the recovery folder (#265), as the
+/// app does, unless `--no-autosave` is given: a session that hangs or is stopped then leaves its
+/// work to `doc.recovery_list` / `doc.recover` instead of losing it.
+fn autosaving(headless: polykrom_mcp::Headless, args: &[String]) -> polykrom_mcp::Headless {
+    if args.iter().any(|a| a == "--no-autosave") {
+        return headless;
+    }
+    match polykrom_engine::recovery::default_dir() {
+        Some(dir) => headless.with_autosave(&dir),
+        None => headless,
+    }
 }
 
 fn serve_mcp(backend: Box<dyn polykrom_mcp::Backend>, scope: Option<polykrom_engine::io::vfs::PathScope>) -> Result<(), String> {

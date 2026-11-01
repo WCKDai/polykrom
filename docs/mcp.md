@@ -114,6 +114,15 @@ adds `param_warnings` to its result, such as ``unknown key `operaton`; did you m
 `operation`?`` (a starting script's warnings go to stderr). `strict` refuses the call, and the
 design is left as it was. Calls bridged to the app are not checked yet.
 
+### Autosave in a headless session
+
+A headless session autosaves its unsaved changes into Polykrom's recovery folder, as the app
+does: at most once a minute, written in the background, and only while something is unsaved. A
+session that hangs, times out or is stopped leaves its work there instead of losing it. The next
+session finds it with `doc.recovery_list` and opens it with `doc.recover {id}`, unsaved, with its
+file path. `save` and `new_design`/`open` finish the entry: a design with nothing unsaved has none.
+`--no-autosave` turns it off. Bridged sessions are the app's, which autosaves on its own.
+
 ### Which files the agent can reach
 
 Tool calls read, write and delete files only inside the server's folders:
