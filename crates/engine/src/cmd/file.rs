@@ -20,7 +20,7 @@ pub static COMMANDS: &[CommandSpec] = &[
         .icon("open")
         .key("Ctrl+O")
         .noundo()
-        .params("path: .polykrom design (or a SolidCraft .solidcraft one), or a .step/.stp/.igs/.fcstd/.3dm/.3mf/.stl/.obj/.glb/.gltf file (STEP, IGES, FreeCAD, Rhino, 3MF, STL, OBJ or glTF; opens as a new design holding the file as a component named after it, as file.insert_step and file.insert_mesh make); up?: z|y for a STEP, IGES, FreeCAD, Rhino or glTF file (see file.insert_step and file.insert_mesh); names?: auto|solid|product|instance for a STEP, IGES, FreeCAD or Rhino file (see file.insert_step)"),
+        .params("path: .polykrom design (or a SolidCraft .solidcraft one), or a .step/.stp/.igs/.fcstd/.3dm/.3mf/.stl/.obj/.glb/.gltf file (STEP, IGES, FreeCAD, Rhino, 3MF, STL, OBJ or glTF; opens as a new design holding the file as a component named after it, as file.insert_step and file.insert_mesh make); up?: z|y for a STEP, IGES, FreeCAD, Rhino or glTF file (see file.insert_step and file.insert_mesh); names?: auto|solid|product|instance for a STEP, IGES, FreeCAD or Rhino file (see file.insert_step) → recovery?: {autosaves: [{id, name, saved_at}], how} when a session that stopped left newer unsaved work for this file (doc.recover {id} opens it)"),
     CommandSpec::new("file.insert_step", "Insert STEP", insert_step)
         .at("SOLID", "INSERT")
         .icon("import")
@@ -296,7 +296,30 @@ fn open(s: &mut Session, p: &Value) -> Result<Value> {
     s.replace_design(Session::opened(doc, saved.as_ref()));
     s.path = Some(path.to_string());
     let errors = s.model.results.iter().filter(|r| r.error.is_some()).count();
-    Ok(json!({"path": path, "features": s.doc.features.len(), "errors": errors, "name": s.doc.name}))
+    let mut out = json!({"path": path, "features": s.doc.features.len(), "errors": errors, "name": s.doc.name});
+    let newer = newer_autosaves(path);
+    if !newer.is_empty() {
+        out["recovery"] = json!({
+            "autosaves": newer,
+            "how": "a session that stopped left this file's unsaved work, newer than the file: doc.recover {id} opens it (unsaved); doc.recovery_discard {id} drops it",
+        });
+    }
+    Ok(out)
+}
+
+/// Autosaves of the file at `path` that a stopped session left, at least as new as the file
+/// (#265): without saying so, opening the file showed the older design and the work stayed
+/// unnoticed in the recovery folder. A running session's own entry is locked and not listed.
+fn newer_autosaves(path: &str) -> Vec<Value> {
+    let Some(dir) = crate::recovery::default_dir() else { return Vec::new() };
+    let since_epoch = |t: std::time::SystemTime| t.duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).ok();
+    let Some(file_time) = std::fs::metadata(path).and_then(|m| m.modified()).ok().and_then(since_epoch) else { return Vec::new() };
+    let same = |other: &str| other == path || std::fs::canonicalize(other).ok().is_some_and(|o| std::fs::canonicalize(path).ok() == Some(o));
+    crate::recovery::orphans(&dir)
+        .into_iter()
+        .filter(|e| e.saved_at >= file_time && e.path.as_deref().is_some_and(same))
+        .map(|e| json!({"id": e.id, "name": e.name, "saved_at": e.saved_at}))
+        .collect()
 }
 
 /// The name a design never given one by its user is shown under.
