@@ -1633,6 +1633,42 @@ fn a_batch_that_went_through_is_one_undo_step() {
     assert_ne!(r["undone"], "Batch", "{r}");
 }
 
+/// #265: a headless session knows how long its design has been unsaved, and after a while its
+/// replies say so, with a hint to save.
+#[test]
+fn replies_remind_to_save_after_a_while_unsaved() {
+    use crate::backend::Backend;
+    let mut h = crate::Headless::default();
+    assert!(h.unsaved_for().is_none());
+    h.call("engine.execute", json!({"command": "solid.box", "params": {"length": 10, "width": 10, "height": 10}})).unwrap();
+    assert!(h.unsaved_for().is_some());
+    let path = std::env::temp_dir().join(format!("polykrom-save-hint-{}.polykrom", std::process::id()));
+    h.call("engine.execute", json!({"command": "file.save", "params": {"path": path.to_string_lossy()}})).unwrap();
+    assert!(h.unsaved_for().is_none(), "saved");
+    let _ = std::fs::remove_file(&path);
+
+    struct Unsaved(std::time::Duration);
+    impl crate::backend::Backend for Unsaved {
+        fn call(&mut self, _: &str, _: Value) -> Result<Value, String> {
+            Ok(json!({"ran": true}))
+        }
+        fn has_ui(&self) -> bool {
+            false
+        }
+        fn describe(&self) -> String {
+            "unsaved".into()
+        }
+        fn unsaved_for(&self) -> Option<std::time::Duration> {
+            Some(self.0)
+        }
+    }
+    let text = |r: Value| -> Value { serde_json::from_str(r["content"][0]["text"].as_str().unwrap()).unwrap() };
+    let late = text(crate::tools::call_tool(&mut Unsaved(crate::tools::SAVE_HINT_AFTER * 2), "execute", &json!({"command": "solid.box"})));
+    assert!(late["unsaved_s"].as_u64().is_some_and(|s| s >= 1800) && late["save_hint"].is_string(), "{late}");
+    let soon = text(crate::tools::call_tool(&mut Unsaved(std::time::Duration::from_secs(60)), "execute", &json!({"command": "solid.box"})));
+    assert!(soon.get("unsaved_s").is_none(), "{soon}");
+}
+
 /// #3654: bridged, `running` asks the app's `control.running`; an older app's refusal is the
 /// tool's error.
 #[test]

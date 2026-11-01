@@ -29,6 +29,10 @@ pub trait Backend {
     fn in_process(&self) -> bool {
         false
     }
+    /// How long the design has had unsaved changes, where the backend knows (#265).
+    fn unsaved_for(&self) -> Option<Duration> {
+        None
+    }
     /// The design's state before a call, to take the call back if it is cancelled midway (#264).
     /// `None` where this side doesn't hold the design (a running app keeps its own).
     fn save_point(&mut self) -> Option<polykrom_engine::SavePoint> {
@@ -547,6 +551,8 @@ pub struct Headless {
     /// Autosave into the recovery folder (#265), when [`Headless::with_autosave`] turned it on.
     autosave: Option<Autosave>,
     autosave_every: Duration,
+    /// Since when the design has had unsaved changes (`None`: nothing unsaved).
+    unsaved_since: Option<Instant>,
 }
 
 /// A headless session's autosave: the design's unsaved changes go to the recovery folder at most
@@ -580,7 +586,7 @@ impl Headless {
             }
             Err(e) => session.log.push(format!("image host unavailable: {e}")),
         }
-        Headless { session, view: StandardView::Iso, autosave: None, autosave_every: AUTOSAVE_EVERY }
+        Headless { session, view: StandardView::Iso, autosave: None, autosave_every: AUTOSAVE_EVERY, unsaved_since: None }
     }
 
     /// Autosave this session's unsaved changes into `dir` (the recovery folder). Without it a
@@ -715,6 +721,7 @@ impl Backend for Headless {
             // A refused replacement left the design as it was, with its entry.
             _ => self.autosave_tick(),
         }
+        self.unsaved_since = if self.session.is_dirty() { Some(self.unsaved_since.unwrap_or_else(Instant::now)) } else { None };
         r
     }
     fn has_ui(&self) -> bool {
@@ -728,6 +735,9 @@ impl Backend for Headless {
     }
     fn in_process(&self) -> bool {
         true
+    }
+    fn unsaved_for(&self) -> Option<Duration> {
+        self.unsaved_since.map(|t| t.elapsed())
     }
     fn save_point(&mut self) -> Option<polykrom_engine::SavePoint> {
         Some(self.session.save_point())
