@@ -46,8 +46,8 @@ def p_mark(fill='currentColor', ground=None, animate=False):
 
 # The masthead of every page: the p and the name, then the links split by rules (the WCKD kit).
 PAGES = [('home', 'overview', ''), ('so101', 'so-101', 'so101/'), ('printer', 'printer', 'printer/'), ('dog', 'dog', 'dog/'), ('kestrel', 'kestrel', 'kestrel/'), (None, 'open the app', 'app/'),
-         (None, 'docs', 'docs/'), (None, 'roadmap', 'https://github.com/wckdboy/polykrom/blob/main/docs/ROADMAP.md'),
-         (None, 'source', 'https://github.com/wckdboy/polykrom')]
+         (None, 'docs', 'docs/'), (None, 'roadmap', 'https://github.com/WCKDai/polykrom/blob/main/docs/ROADMAP.md'),
+         (None, 'source', 'https://github.com/WCKDai/polykrom')]
 
 
 def nav(current, root):
