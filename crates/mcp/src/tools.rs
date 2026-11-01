@@ -332,9 +332,12 @@ pub fn tool_definitions() -> Vec<Value> {
         tool(
             "undo",
             "Undo",
-            "Undo the last change to the design, or the last `steps` changes in one go. A command is one step, however many it ran inside. The reply lists what was undone, the label of the step the next undo would take back (`next`) and how many are `left`.",
+            "Undo the last change to the design, the last `steps` changes, or every change since a checkpoint (`to`), in one go. A command is one step, however many it ran inside. The reply lists what was undone, the label of the step the next undo would take back (`next`) and how many are `left`.",
             obj(
-                json!({"steps": {"type": "integer", "minimum": 1, "description": "How many changes to undo (default 1); the design is evaluated once"}}),
+                json!({
+                    "steps": {"type": "integer", "minimum": 1, "description": "How many changes to undo (default 1); the design is evaluated once"},
+                    "to": {"type": ["string", "integer"], "description": "Undo every change since this checkpoint: the name given to `edit.checkpoint {name}` (through execute), or its id"},
+                }),
                 &[],
             ),
             Effect::Edits,
@@ -933,7 +936,7 @@ fn batch_step(step: &Value) -> Result<(String, Value, Option<String>), String> {
             None => mapped("inspect.measure", str_arg(a, "body").map_or(json!({}), |body| json!({"bodies": [body]}))),
         },
         "inspect_design" => mapped("document.inspect", json!({"measure": a.get("measure").and_then(Value::as_bool).unwrap_or(true)})),
-        "undo" => mapped("edit.undo", pick(a, &["steps"])),
+        "undo" => mapped("edit.undo", pick(a, &["steps", "to"])),
         "redo" => mapped("edit.redo", pick(a, &["steps"])),
         "export" => {
             mapped("file.export", pick(a, &["path", "format", "bodies", "mesh_prefix", "effort", "velocity", "floating", "scene", "kp", "actuated"]))
@@ -1438,8 +1441,8 @@ fn with_timings(mut reply: Value, timed: bool, rows: Vec<Value>, total_ms: f64) 
 /// answers without the `steps` list; the rest are then sent one at a time.
 fn undo_steps(b: &mut dyn Backend, command: &str, a: &Map<String, Value>) -> Result<Value, String> {
     let want = a.get("steps").and_then(Value::as_u64).unwrap_or(1).max(1);
-    let r = exec(b, command, pick(a, &["steps"]))?;
-    if want == 1 || r.get("steps").is_some() {
+    let r = exec(b, command, pick(a, &["steps", "to"]))?;
+    if want == 1 || a.contains_key("to") || r.get("steps").is_some() {
         return Ok(r);
     }
     let key = if command == "edit.undo" { "undone" } else { "redone" };

@@ -1976,6 +1976,35 @@ fn occurrences_resolve_by_path_and_body_and_misses_say_what_is_close() {
     assert!(s.execute("occurrence.ground", &json!({"occurrence": "Robot:1/Nothing:1"})).is_err());
 }
 
+/// #270: a checkpoint can be named, `edit.undo {to}` undoes every step since it in one go (and
+/// they redo), and a history undone past it is refused with what to do instead.
+#[test]
+fn undo_to_a_named_checkpoint() {
+    let mut s = Session::default();
+    run(&mut s, "solid.box", json!({"length": 1.0, "width": 1.0, "height": 1.0}));
+    let at = s.doc.clone();
+    let r = run(&mut s, "edit.checkpoint", json!({"name": "base"}));
+    assert_eq!(r["name"], "base", "{r}");
+    run(&mut s, "solid.box", json!({"length": 1.0, "width": 1.0, "height": 1.0, "corner": [5, 0, 0], "operation": "new"}));
+    run(&mut s, "parameters.add", json!({"name": "w", "expression": "3 mm"}));
+    let after = s.doc.clone();
+    let r = run(&mut s, "edit.undo", json!({"to": "base"}));
+    assert!(Arc::ptr_eq(&s.doc, &at), "{r}");
+    assert_eq!(r["steps"].as_array().map(Vec::len), Some(2), "{r}");
+    run(&mut s, "edit.redo", json!({"steps": 2}));
+    assert!(Arc::ptr_eq(&s.doc, &after));
+    // Nothing since: refused.
+    run(&mut s, "edit.undo", json!({"to": "base"}));
+    assert!(s.execute("edit.undo", &json!({"to": "base"})).unwrap_err().to_string().contains("nothing to undo since"));
+    // Undone past it: the steps since can't be counted, and the error says what restores it.
+    run(&mut s, "edit.undo", json!({}));
+    let e = s.execute("edit.undo", &json!({"to": "base"})).unwrap_err().to_string();
+    assert!(e.contains("edit.restore_checkpoint"), "{e}");
+    run(&mut s, "edit.restore_checkpoint", json!({"checkpoint": "base"}));
+    assert!(Arc::ptr_eq(&s.doc, &at));
+    assert!(s.execute("edit.undo", &json!({"to": "nowhere"})).is_err());
+}
+
 /// Regression (#3242): `file.new` replaced the session and its checkpoints with it, so a
 /// batch that failed after `file.new` could not go back to the design it began in.
 #[test]
