@@ -1590,6 +1590,30 @@ fn a_stopped_headless_session_leaves_its_work_to_recover() {
     let _ = std::fs::remove_dir_all(&dir);
 }
 
+/// #270: a batch that went through is one undo step; a batch of one keeps its own.
+#[test]
+fn a_batch_that_went_through_is_one_undo_step() {
+    let mut s = server();
+    let undo = |s: &mut Server| tool(s, "inspect_design", json!({"measure": false}))["undo"].as_u64().unwrap();
+    let before = undo(&mut s);
+    let r = tool(
+        &mut s,
+        "batch",
+        json!({"commands": [
+            {"command": "solid.box", "params": {"length": 10, "width": 10, "height": 10}},
+            {"command": "solid.box", "params": {"length": 2, "width": 2, "height": 2, "corner": [30, 0, 0], "operation": "new"}},
+        ]}),
+    );
+    assert_eq!(r["completed"], 2, "{r}");
+    assert_eq!(undo(&mut s), before + 1, "one undo step");
+    let r = tool(&mut s, "undo", json!({}));
+    assert_eq!(r["undone"], "Batch", "{r}");
+    assert_eq!(tool(&mut s, "measure", json!({}))["body_count"], 0);
+    tool(&mut s, "batch", json!({"commands": [{"command": "solid.box", "params": {"length": 3, "width": 3, "height": 3}}]}));
+    let r = tool(&mut s, "undo", json!({}));
+    assert_ne!(r["undone"], "Batch", "{r}");
+}
+
 /// #3654: bridged, `running` asks the app's `control.running`; an older app's refusal is the
 /// tool's error.
 #[test]

@@ -1057,7 +1057,20 @@ impl Undo {
         }
     }
 
-    /// The batch went through: forget the checkpoint.
+    /// The batch went through, `steps` of them: one undo step (#270), as the app's `engine.batch`
+    /// makes it. A batch of one keeps its command's label, and an app that can't squash keeps
+    /// the steps as they are.
+    fn done(self, b: &mut dyn Backend, steps: usize) {
+        if let Undo::Checkpoint(id) = self
+            && steps > 1
+            && exec(b, "edit.squash_checkpoint", json!({"checkpoint": id, "label": "Batch"})).is_ok()
+        {
+            return;
+        }
+        self.finish(b);
+    }
+
+    /// Forget the checkpoint.
     fn finish(self, b: &mut dyn Backend) {
         if let Undo::Checkpoint(id) = self {
             let _ = exec(b, "edit.restore_checkpoint", json!({"checkpoint": id, "forget": true}));
@@ -1398,7 +1411,7 @@ fn batch(b: &mut dyn Backend, a: &Map<String, Value>) -> Value {
             }
         }
     }
-    start.finish(b);
+    start.done(b, results.len());
     let reply = json!({"ok": true, "completed": results.len(), "results": results});
     text_result(&with_timings(reply, timed, rows, clock.ms()), false)
 }

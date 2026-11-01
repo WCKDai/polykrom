@@ -140,6 +140,11 @@ pub(crate) fn batch_refusal(steps: &[Value]) -> Option<String> {
     Some(format!("engine.batch unavailable: step {i} ({c}) loads a file"))
 }
 
+/// The first step naming a command the engine doesn't have, as `(index, command)` (#269).
+fn unknown_step(steps: &[Value]) -> Option<(usize, &str)> {
+    steps.iter().enumerate().find_map(|(i, s)| command(s).filter(|id| polykrom_engine::find_command(id).is_none()).map(|id| (i, id)))
+}
+
 /// A batch step's command id (the agent cursor points at its toolbar button).
 pub(crate) fn batch_step_command(step: &Value) -> Option<&str> {
     command(step)
@@ -167,9 +172,7 @@ fn batch(app: &mut SolveApp, p: &Value) -> Outcome {
     let timed = profile || p.get("timings").and_then(Value::as_bool).unwrap_or(false);
     // A step naming a command the engine doesn't have fails the batch before anything runs (#269),
     // not after the steps before it ran and were taken back. The reply has the usual shape.
-    if let Some((i, id)) =
-        steps.iter().enumerate().find_map(|(i, s)| command(s).filter(|id| polykrom_engine::find_command(id).is_none()).map(|id| (i, id)))
-    {
+    if let Some((i, id)) = unknown_step(steps) {
         let error = polykrom_engine::EngineError::UnknownCommand(id.to_string()).to_string();
         let failed = json!({"index": i, "command": id, "error": error, "kind": "unknown_command"});
         let reply = json!({"completed": 0, "results": [], "failed": failed, "undone": 0, "rolled_back": false});
@@ -199,8 +202,12 @@ fn batch(app: &mut SolveApp, p: &Value) -> Outcome {
             }
         }
     }
+    // A batch that went through is one undo step (#270); a batch of one keeps its command's label.
     if let Some(id) = checkpoint {
-        let _ = app.run("edit.restore_checkpoint", json!({"checkpoint": id, "forget": true}));
+        let squashed = results.len() > 1 && app.run("edit.squash_checkpoint", json!({"checkpoint": id, "label": "Batch"})).is_ok();
+        if !squashed {
+            let _ = app.run("edit.restore_checkpoint", json!({"checkpoint": id, "forget": true}));
+        }
     }
     ok(with_timings(json!({"completed": results.len(), "results": results, "undone": 0}), timed, rows, clock.ms()))
 }
@@ -1048,6 +1055,10 @@ fn on_session(s: &mut polykrom_engine::Session, method: &str, p: &Value) -> Resu
             if let Some(why) = batch_refusal(steps) {
                 return Err(why);
             }
+            if let Some((i, id)) = unknown_step(steps) {
+                let failed = json!({"index": i, "command": id, "error": polykrom_engine::EngineError::UnknownCommand(id.to_string()).to_string(), "kind": "unknown_command"});
+                return Ok(json!({"completed": 0, "results": [], "failed": failed, "undone": 0, "rolled_back": false}));
+            }
             let rollback = p.get("rollback").and_then(Value::as_bool).unwrap_or(true);
             let checkpoint = rollback.then(|| s.checkpoint());
             let mut results = Vec::with_capacity(steps.len());
@@ -1070,7 +1081,10 @@ fn on_session(s: &mut polykrom_engine::Session, method: &str, p: &Value) -> Resu
                     }
                 }
             }
-            if let Some(id) = checkpoint {
+            // One undo step, as in the shown design.
+            if let Some(id) = checkpoint
+                && (results.len() < 2 || s.squash_checkpoint(id, "Batch").is_err())
+            {
                 s.drop_checkpoint(id);
             }
             Ok(json!({"completed": results.len(), "results": results, "undone": 0}))
@@ -1408,6 +1422,29 @@ mod tests {
         assert_eq!(v["result"]["failed"]["index"], 1, "{v}");
         assert_eq!(v["result"]["undone"], 0, "{v}");
         assert_eq!(inspect(&mut h)["bodies"].as_array().map(Vec::len), Some(1));
+    }
+
+    /// #270: a batch that went through is one undo step; a batch of one keeps its own.
+    #[test]
+    fn engine_batch_is_one_undo_step() {
+        let mut h = crate::scenario::Harness::new();
+        let undo = |h: &mut crate::scenario::Harness| inspect(h)["undo"].as_u64();
+        let before = undo(&mut h);
+        let v = batch(
+            &mut h,
+            json!({"commands": [
+                {"command": "solid.box", "params": {"length": 10, "width": 10, "height": 10}},
+                {"command": "solid.sphere", "params": {"radius": 3, "center": [50, 0, 0]}},
+            ]}),
+        );
+        assert_eq!(v["result"]["completed"], 2, "{v}");
+        assert_eq!(undo(&mut h), before.map(|n| n + 1), "one undo step");
+        let r = h.call("engine.execute", json!({"command": "edit.undo"}));
+        assert_eq!(r["result"]["undone"], "Batch", "{r}");
+        assert_eq!(inspect(&mut h)["bodies"].as_array().map(Vec::len), Some(0));
+        batch(&mut h, json!({"commands": [{"command": "solid.box", "params": {"length": 3, "width": 3, "height": 3}}]}));
+        let r = h.call("engine.execute", json!({"command": "edit.undo"}));
+        assert_ne!(r["result"]["undone"], "Batch", "{r}");
     }
 
     /// #269: a step naming a command the engine doesn't have fails the batch before anything
