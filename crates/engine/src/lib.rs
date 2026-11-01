@@ -421,6 +421,36 @@ impl SurfaceAnalysis {
 }
 
 const MAX_UNDO: usize = 200;
+
+thread_local! {
+    /// Whether an undoable command is running on this thread, so it records the undo step.
+    static UNDO_OWNED: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+/// While an undoable command runs, the commands it runs record no undo step of their own (#270).
+/// A command that isn't undoable owns nothing, so the undoable commands it runs still record theirs.
+struct UndoOwner(bool);
+
+impl UndoOwner {
+    /// Enter a command; true when it records its own undo step.
+    fn enter(undoable: bool) -> (UndoOwner, bool) {
+        let owned = UNDO_OWNED.with(|o| o.get());
+        let records = undoable && !owned;
+        if records {
+            UNDO_OWNED.with(|o| o.set(true));
+        }
+        (UndoOwner(records), records)
+    }
+}
+
+impl Drop for UndoOwner {
+    fn drop(&mut self) {
+        if self.0 {
+            UNDO_OWNED.with(|o| o.set(false));
+        }
+    }
+}
+
 /// Checkpoints kept (the oldest go first).
 const MAX_CHECKPOINTS: usize = 16;
 const MAX_LOG: usize = 2000;
@@ -910,6 +940,9 @@ impl Session {
         // Picks in the world go into their component's frame (once: commands run by commands
         // already have them there).
         let (_nested, outermost) = frames::Nested::enter(spec.id);
+        // One command, one undo step (#270): the commands an undoable command runs leave none of
+        // their own; its snapshot from before them all takes the whole change back.
+        let (_recording, records_undo) = UndoOwner::enter(spec.undoable);
         let mapped = if outermost { frames::to_local(self, spec.id, params) } else { None };
         let params = mapped.as_ref().unwrap_or(params);
         if outermost {
@@ -955,7 +988,7 @@ impl Session {
                     self.capture_tool_frames(&before.doc);
                     let render_only = self.render_only_change(&before);
                     let previous_doc = before.doc.clone();
-                    if spec.undoable {
+                    if records_undo {
                         self.undo.push(before);
                         if self.undo.len() > MAX_UNDO {
                             self.undo.remove(0);

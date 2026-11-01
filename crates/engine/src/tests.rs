@@ -1889,6 +1889,24 @@ fn squash_checkpoint_makes_one_undo_step() {
     assert_eq!(s.redo.len(), 1);
 }
 
+/// #270: a command that runs other commands is one undo step. `parts.insert` of a screw ran eleven
+/// (component, sketches, revolve, extrude, thread, rename, material, joint), and each left its
+/// own step, so backing a screw out took eleven undos.
+#[test]
+fn a_command_running_others_is_one_undo_step() {
+    let mut s = Session::default();
+    run(&mut s, "solid.box", json!({"length": 40.0, "width": 40.0, "height": 10.0}));
+    let (doc, history) = (s.doc.clone(), s.undo.len());
+    run(&mut s, "parts.insert", json!({"family": "socket_head_cap_screw", "size": "M6", "length": 20, "point": [60, 0, 0]}));
+    assert_eq!(s.undo.len(), history + 1, "{:?}", s.undo.iter().map(|u| u.label.as_str()).collect::<Vec<_>>());
+    assert_eq!(s.undo.last().map(|u| u.label.as_str()), find_command("parts.insert").map(|c| c.label));
+    run(&mut s, "edit.undo", json!({}));
+    assert!(Arc::ptr_eq(&s.doc, &doc), "one undo takes the whole insert back");
+    run(&mut s, "edit.redo", json!({}));
+    assert!(!Arc::ptr_eq(&s.doc, &doc));
+    assert_eq!(s.undo.len(), history + 1);
+}
+
 /// Regression (#3242): `file.new` replaced the session and its checkpoints with it, so a
 /// batch that failed after `file.new` could not go back to the design it began in.
 #[test]
