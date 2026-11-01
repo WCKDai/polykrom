@@ -31,7 +31,7 @@ const AREAS: &[(&str, &str)] = &[
 
 pub fn run(root: &Path) -> Result<(), String> {
     let out = crate::cargo()
-        .args(["run", "-q", "--release", "-p", "solidcraft-cli", "--", "commands"])
+        .args(["run", "-q", "--release", "-p", "polykrom-cli", "--", "commands"])
         .output()
         .map_err(|e| format!("solidcraft-cli: {e}"))?;
     if !out.status.success() {

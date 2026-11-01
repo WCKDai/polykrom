@@ -86,7 +86,7 @@ fn run_case(o: &Options, case: &Path) -> Value {
         Some(bin) => Command::new(bin),
         None => {
             let mut c = cargo();
-            c.args(["run", "-q", "--release", "-p", "solidcraft-cli", "--bin", "polykrom-cli", "--"]);
+            c.args(["run", "-q", "--release", "-p", "polykrom-cli", "--bin", "polykrom-cli", "--"]);
             c
         }
     };
