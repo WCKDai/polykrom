@@ -120,7 +120,8 @@ A headless session autosaves its unsaved changes into Polykrom's recovery folder
 does: at most once a minute, written in the background, and only while something is unsaved. A
 session that hangs, times out or is stopped leaves its work there instead of losing it. The next
 session finds it with `doc.recovery_list` and opens it with `doc.recover {id}`, unsaved, with its
-file path. `save` and `new_design`/`open` finish the entry: a design with nothing unsaved has none.
+file path; `open` of that file says so too (`recovery: {autosaves: [{id, name, saved_at}], how}`)
+when the autosave is at least as new as the file. `save` and `new_design`/`open` finish the entry: a design with nothing unsaved has none.
 `--no-autosave` turns it off. Bridged sessions are the app's, which autosaves on its own.
 
 ### Which files the agent can reach

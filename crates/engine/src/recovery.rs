@@ -457,6 +457,32 @@ mod tests {
         let _ = fs::remove_dir_all(&d);
     }
 
+    /// #265: opening a file that a stopped session left newer unsaved work for says so, and the
+    /// id it gives recovers that work.
+    #[test]
+    fn opening_a_file_with_a_newer_autosave_says_so() {
+        let d = default_dir().unwrap();
+        let path = polykrom_io::vfs::temp_dir().join(format!("polykrom-open-recovery-{}.polykrom", std::process::id()));
+        let path = path.to_string_lossy().to_string();
+        let mut s = Session::default();
+        s.execute("solid.box", &json!({"length": 10, "width": 10, "height": 10})).unwrap();
+        s.execute("file.save", &json!({"path": path})).unwrap();
+        let mut t = Session::default();
+        let r = t.execute("doc.open", &json!({"path": path})).unwrap();
+        assert!(r.get("recovery").is_none(), "{r}");
+        // More work, autosaved, and the session stops without saving.
+        s.execute("solid.box", &json!({"length": 4, "width": 4, "height": 4, "corner": [30, 0, 0], "operation": "new"})).unwrap();
+        let mut a = Autosaver::new(&d, Duration::from_secs(3600)).unwrap();
+        assert!(a.save(&s).unwrap());
+        drop(a);
+        let r = t.execute("doc.open", &json!({"path": path})).unwrap();
+        let id = r["recovery"]["autosaves"][0]["id"].as_str().map(str::to_string).unwrap_or_else(|| panic!("{r}"));
+        let r = t.execute("doc.recover", &json!({"id": id, "discard": true})).unwrap();
+        assert_eq!(r["features"].as_u64(), Some(s.doc.features.len() as u64), "{r}");
+        assert!(t.execute("doc.open", &json!({"path": path})).unwrap().get("recovery").is_none());
+        let _ = fs::remove_file(&path);
+    }
+
     /// A tick doesn't wait for the autosave (#3044): it starts the write on a worker and
     /// returns; the outcome is taken up by a later tick, and nothing new starts meanwhile. The
     /// entry is the design as it was when the write started, even when it changed since.
