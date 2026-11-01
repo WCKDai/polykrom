@@ -202,8 +202,11 @@ jobs:
         run: |
           scope=(--workspace)
           if [ "$AFFECTED_FULL" != true ]; then
-            scope=(); for p in $AFFECTED_PACKAGES; do scope+=(-p "$p"); done
-            if [ ${#scope[@]} -eq 0 ]; then echo "this change affects no package; no doc tests to run"; exit 0; fi
+            # Only libraries have doc tests: cargo refuses `--doc -p` for a binary-only package (xtask).
+            libs=$(cargo metadata --no-deps --format-version 1 --locked \
+              | python3 -I -c 'import json, sys; print(" ".join(p["name"] for p in json.load(sys.stdin)["packages"] if any("lib" in t["kind"] for t in p["targets"])))')
+            scope=(); for p in $AFFECTED_PACKAGES; do case " $libs " in *" $p "*) scope+=(-p "$p") ;; esac; done
+            if [ ${#scope[@]} -eq 0 ]; then echo "this change affects no package with a library; no doc tests to run"; exit 0; fi
           fi
           cargo test --locked --profile ci --doc "${scope[@]}"
 

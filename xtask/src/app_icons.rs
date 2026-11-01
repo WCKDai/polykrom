@@ -35,6 +35,6 @@ pub fn run(root: &Path) -> Result<(), String> {
 
 fn draw(path: &Path, size: usize) -> Result<(), String> {
     let mut c = crate::cargo();
-    c.args(["run", "-q", "--profile", "ci", "-p", "solidcraft-cli", "--", "icon", "--size", &size.to_string(), "--out"]).arg(path);
+    c.args(["run", "-q", "--profile", "ci", "-p", "polykrom-cli", "--", "icon", "--size", &size.to_string(), "--out"]).arg(path);
     crate::run(c, "solidcraft-cli icon")
 }

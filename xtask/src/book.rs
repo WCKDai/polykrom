@@ -21,7 +21,7 @@ pub fn run(root: &Path, build: bool) -> Result<(), String> {
     let book = root.join("docs/book");
     std::fs::copy(root.join("assets/branding/web/source/og.png"), book.join("src/og.png")).map_err(|e| format!("book preview card: {e}"))?;
     let mut c = cargo();
-    c.args(["build", "-q", "--release", "-p", "solidcraft-cli"]);
+    c.args(["build", "-q", "--release", "-p", "polykrom-cli"]);
     crate::run(c, "cargo build -p polykrom-cli")?;
 
     let out = cli().arg("commands").output().map_err(|e| format!("solidcraft-cli: {e}"))?;
@@ -62,7 +62,7 @@ pub fn run(root: &Path, build: bool) -> Result<(), String> {
 /// The release solidcraft-cli just built.
 fn cli() -> std::process::Command {
     let mut c = cargo();
-    c.args(["run", "-q", "--release", "-p", "solidcraft-cli", "--"]);
+    c.args(["run", "-q", "--release", "-p", "polykrom-cli", "--"]);
     c
 }
 

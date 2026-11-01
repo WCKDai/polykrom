@@ -168,7 +168,7 @@ fn cmd_action_matrix(bless: bool, results: Option<&str>, from: Option<&str>) -> 
         "--profile",
         "ci",
         "-p",
-        "solidcraft-cli",
+        "polykrom-cli",
         "--test",
         "action_matrix",
         "action_matrix_all",
@@ -261,7 +261,7 @@ fn cmd_oracle(cli: Option<&str>) -> Result<(), String> {
         }
         None => {
             let mut c = cargo();
-            c.args(["run", "-q", "--release", "-p", "solidcraft-cli", "--"]);
+            c.args(["run", "-q", "--release", "-p", "polykrom-cli", "--"]);
             c
         }
     };
