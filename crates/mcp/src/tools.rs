@@ -1320,11 +1320,12 @@ fn batch(b: &mut dyn Backend, a: &Map<String, Value>) -> Value {
                     kept.finish(b);
                     None
                 };
+                // Each finished step's `removed_bodies`, to say where a body a failed step wanted went.
+                let removed: Vec<Value> =
+                    r["results"].as_array().map(|v| v.iter().map(|x| x["removed_bodies"].clone()).collect()).unwrap_or_default();
                 if let Some(failed) = r.get_mut("failed")
                     && let (Some(command), Some(error)) = (failed.get("command").and_then(Value::as_str), failed.get("error").and_then(Value::as_str))
                 {
-                    let removed: Vec<Value> =
-                        r["results"].as_array().map(|v| v.iter().map(|x| x["removed_bodies"].clone()).collect()).unwrap_or_default();
                     let error = command_error(command, error.to_string()) + &consumed_by(error, &removed, steps);
                     if let Some(failed) = failed.as_object_mut() {
                         failed.insert("error".into(), Value::String(error));
