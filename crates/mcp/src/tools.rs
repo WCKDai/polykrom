@@ -1338,10 +1338,13 @@ fn batch(b: &mut dyn Backend, a: &Map<String, Value>) -> Value {
                     kept.finish(b);
                     None
                 };
+                // Each finished step's `removed_bodies`, to say where a body a failed step wanted went.
+                let removed: Vec<Value> =
+                    r["results"].as_array().map(|v| v.iter().map(|x| x["removed_bodies"].clone()).collect()).unwrap_or_default();
                 if let Some(failed) = r.get_mut("failed")
                     && let (Some(command), Some(error)) = (failed.get("command").and_then(Value::as_str), failed.get("error").and_then(Value::as_str))
                 {
-                    let error = command_error(command, error.to_string());
+                    let error = command_error(command, error.to_string()) + &consumed_by(error, &removed, steps);
                     if let Some(failed) = failed.as_object_mut() {
                         failed.insert("error".into(), Value::String(error));
                     }
@@ -1365,6 +1368,8 @@ fn batch(b: &mut dyn Backend, a: &Map<String, Value>) -> Value {
     }
     let start = if rollback || keep { Undo::begin(b) } else { Undo::None };
     let mut results = Vec::with_capacity(steps.len());
+    // Each finished step's `removed_bodies`, whatever its `select` keeps, to say where a body went.
+    let mut removed: Vec<Value> = Vec::with_capacity(steps.len());
     let mut rows = Vec::new();
     let clock = timing::Clock::start();
     // The kernel's share can only be measured where the commands run: in this process.
@@ -1396,10 +1401,13 @@ fn batch(b: &mut dyn Backend, a: &Map<String, Value>) -> Value {
         }
         match r {
             Ok(v) => {
+                removed.push(v.get("removed_bodies").cloned().unwrap_or(Value::Null));
                 let v = narrow(i, v);
                 results.push(selected(if verbose { v } else { compact(v) }, selects.get(i).and_then(Option::as_ref)))
             }
             Err(e) => {
+                let hint = consumed_by(&e, &removed, steps);
+                let e = e + &hint;
                 // A step still running in the app was not cancelled: the rollback first waits for
                 // it (the backend does), so a restored checkpoint takes it back too.
                 let running = e.starts_with(STILL_RUNNING);
@@ -1469,6 +1477,24 @@ fn undo_steps(b: &mut dyn Backend, command: &str, a: &Map<String, Value>) -> Res
         }
     }
     Ok(json!({key: done.last(), "steps": done}))
+}
+
+/// `; `X` was consumed by step N (`command`)` for a step that failed on a body an earlier step
+/// of the same batch removed (#271): agents read "no body `Arm_L`" and looked it up, when step 1's
+/// `solid.combine` had joined it into another. `removed` is each finished step's
+/// `removed_bodies`. Empty when the error names no body or no step removed it.
+fn consumed_by(error: &str, removed: &[Value], steps: &[Value]) -> String {
+    let Some(name) = error.split_once("no body `").and_then(|(_, rest)| rest.split_once('`')).map(|(n, _)| n) else {
+        return String::new();
+    };
+    let step = removed.iter().enumerate().rev().find(|(_, r)| r.as_array().is_some_and(|r| r.iter().any(|b| b.as_str() == Some(name))));
+    match step {
+        Some((i, _)) => {
+            let command = steps.get(i).and_then(|s| s.get("command").or_else(|| s.get("id"))).and_then(Value::as_str).unwrap_or("?");
+            format!("; `{name}` was consumed by step {i} (`{command}`)")
+        }
+        None => String::new(),
+    }
 }
 
 /// The first step naming a command that doesn't exist, as `(index, command)`, in a session this
