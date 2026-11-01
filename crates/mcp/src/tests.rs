@@ -305,7 +305,26 @@ fn agent_builds_box_fillet_hole() {
     assert!(topo["edges"].as_array().unwrap().len() >= 12, "{topo}");
     assert!(topo["faces"].as_array().unwrap().len() >= 8, "{topo}");
 
-    // Undo the hole, redo it.
+    // The batch is one undo step (#270): one undo takes the whole part back, one redo brings it.
+    let r = tool(&mut s, "undo", json!({}));
+    assert_eq!(r["undone"], "Batch", "{r}");
+    assert_eq!(tool(&mut s, "measure", json!({}))["body_count"], 0);
+    tool(&mut s, "redo", json!({}));
+    assert!(rel(volume(&mut s), expect) < 5e-4);
+    // Its steps one by one, as before: undo takes the hole back.
+    tool(&mut s, "undo", json!({}));
+    for step in [
+        json!({"command": "sketch.create", "params": {"plane": "XY"}}),
+        json!({"command": "sketch.rectangle.two_point", "params": {"p0": [0, 0], "p1": [40, 30]}}),
+        json!({"command": "sketch.finish"}),
+        json!({"command": "solid.extrude", "params": {"distance": 20}}),
+        json!({"command": "solid.fillet", "params": {"edges": [[0, 0, 10]], "radius": 3}}),
+        json!({"command": "sketch.create", "params": {"plane": "XY"}}),
+        json!({"command": "sketch.circle.center", "params": {"center": [20, 15], "radius": 5}}),
+        json!({"command": "solid.extrude", "params": {"distance": 20, "operation": "cut"}}),
+    ] {
+        tool(&mut s, "execute", step);
+    }
     tool(&mut s, "undo", json!({}));
     assert!(rel(volume(&mut s), 24000.0 - (9.0 - PI * 9.0 / 4.0) * 20.0) < 5e-4);
     tool(&mut s, "redo", json!({}));
