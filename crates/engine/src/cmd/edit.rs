@@ -110,11 +110,11 @@ fn steps_since(s: &Session, to: &Value) -> Result<usize> {
 /// Undo `steps` changes (#270). The design changes once, to where the last of them leaves it, so it
 /// is evaluated once however many steps go.
 fn undo(s: &mut Session, p: &Value) -> Result<Value> {
-    if s.undo.is_empty() {
-        return Err(EngineError::Other("nothing to undo".into()));
-    }
+    // A checkpoint first: undone past it, the history may be empty, and the error should say
+    // what goes back to it rather than that nothing is left.
     let n = match p.get("to").filter(|v| !v.is_null()) {
         Some(to) => steps_since(s, to)?,
+        None if s.undo.is_empty() => return Err(EngineError::Other("nothing to undo".into())),
         None => steps("edit.undo", p, s.undo.len())?,
     };
     let mut done = Vec::with_capacity(n);
