@@ -305,7 +305,26 @@ fn agent_builds_box_fillet_hole() {
     assert!(topo["edges"].as_array().unwrap().len() >= 12, "{topo}");
     assert!(topo["faces"].as_array().unwrap().len() >= 8, "{topo}");
 
-    // Undo the hole, redo it.
+    // The batch is one undo step (#270): one undo takes the whole part back, one redo brings it.
+    let r = tool(&mut s, "undo", json!({}));
+    assert_eq!(r["undone"], "Batch", "{r}");
+    assert_eq!(tool(&mut s, "measure", json!({}))["body_count"], 0);
+    tool(&mut s, "redo", json!({}));
+    assert!(rel(volume(&mut s), expect) < 5e-4);
+    // Its steps one by one, as before: undo takes the hole back.
+    tool(&mut s, "undo", json!({}));
+    for step in [
+        json!({"command": "sketch.create", "params": {"plane": "XY"}}),
+        json!({"command": "sketch.rectangle.two_point", "params": {"p0": [0, 0], "p1": [40, 30]}}),
+        json!({"command": "sketch.finish"}),
+        json!({"command": "solid.extrude", "params": {"distance": 20}}),
+        json!({"command": "solid.fillet", "params": {"edges": [[0, 0, 10]], "radius": 3}}),
+        json!({"command": "sketch.create", "params": {"plane": "XY"}}),
+        json!({"command": "sketch.circle.center", "params": {"center": [20, 15], "radius": 5}}),
+        json!({"command": "solid.extrude", "params": {"distance": 20, "operation": "cut"}}),
+    ] {
+        tool(&mut s, "execute", step);
+    }
     tool(&mut s, "undo", json!({}));
     assert!(rel(volume(&mut s), 24000.0 - (9.0 - PI * 9.0 / 4.0) * 20.0) < 5e-4);
     tool(&mut s, "redo", json!({}));
@@ -1588,6 +1607,30 @@ fn a_stopped_headless_session_leaves_its_work_to_recover() {
     assert_eq!(left.len(), 1, "{left:?}");
     assert_eq!(recovery::load(&dir, &left[0].id).unwrap().0.features.len(), built.features.len());
     let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// #270: a batch that went through is one undo step; a batch of one keeps its own.
+#[test]
+fn a_batch_that_went_through_is_one_undo_step() {
+    let mut s = server();
+    let undo = |s: &mut Server| tool(s, "inspect_design", json!({"measure": false}))["undo"].as_u64().unwrap();
+    let before = undo(&mut s);
+    let r = tool(
+        &mut s,
+        "batch",
+        json!({"commands": [
+            {"command": "solid.box", "params": {"length": 10, "width": 10, "height": 10}},
+            {"command": "solid.box", "params": {"length": 2, "width": 2, "height": 2, "corner": [30, 0, 0], "operation": "new"}},
+        ]}),
+    );
+    assert_eq!(r["completed"], 2, "{r}");
+    assert_eq!(undo(&mut s), before + 1, "one undo step");
+    let r = tool(&mut s, "undo", json!({}));
+    assert_eq!(r["undone"], "Batch", "{r}");
+    assert_eq!(tool(&mut s, "measure", json!({}))["body_count"], 0);
+    tool(&mut s, "batch", json!({"commands": [{"command": "solid.box", "params": {"length": 3, "width": 3, "height": 3}}]}));
+    let r = tool(&mut s, "undo", json!({}));
+    assert_ne!(r["undone"], "Batch", "{r}");
 }
 
 /// #3654: bridged, `running` asks the app's `control.running`; an older app's refusal is the
