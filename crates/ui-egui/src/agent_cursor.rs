@@ -579,6 +579,27 @@ mod tests {
         assert!(frames <= 3, "{frames}");
     }
 
+    /// #303: with the window hidden, eframe runs only the app's logic, and its clock stands
+    /// still. A batch acted out by the cursor, and a camera move, are still answered.
+    #[test]
+    fn requests_are_answered_while_the_window_is_hidden() {
+        let mut h = crate::scenario::Harness::new();
+        assert_eq!(h.call("ui.agent_cursor", json!({"show": true, "speed": 1}))["ok"], true);
+        h.hidden = true;
+        let began = std::time::Instant::now();
+        let steps = json!([
+            {"command": "solid.box", "params": {"length": 10, "width": 10, "height": 10}},
+            {"command": "solid.sphere", "params": {"radius": 3, "center": [30, 0, 0]}},
+        ]);
+        let (r, _) = h.call_queued("engine.batch", json!({"commands": steps}));
+        assert_eq!((&r["ok"], &r["result"]["completed"]), (&json!(true), &json!(2)), "{r}");
+        let camera = json!({"target": [0, 0, 5], "yaw": -0.42, "pitch": 0.12, "distance": 80});
+        let (r, _) = h.call_queued("engine.execute", json!({"command": "view.apply", "params": {"camera": camera}}));
+        assert_eq!(r["ok"], true, "{r}");
+        assert!(began.elapsed() < std::time::Duration::from_secs(30), "{:?}", began.elapsed());
+        assert!((h.app.cam.distance - 80.0).abs() < 1e-3, "{:?}", h.app.cam);
+    }
+
     #[test]
     fn the_pointer_follows_the_agents_own_mouse_input() {
         let mut h = crate::scenario::Harness::new();
