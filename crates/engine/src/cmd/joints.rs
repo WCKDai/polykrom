@@ -319,6 +319,9 @@ pub(crate) fn occurrence_id(s: &Session, v: Option<&Value>, cmd: &str) -> Result
     if let Some(o) = s.doc.occurrences.iter().find(|o| o.id.to_string() == key || o.name == key) {
         return Ok(o.id);
     }
+    if let Some(id) = s.occurrence_by_path_or_body(&key) {
+        return Ok(id);
+    }
     // A component name: its first occurrence.
     s.doc.find_component(&key).and_then(|c| s.doc.occurrence_of(c)).map(|o| o.id).ok_or_else(|| bad(cmd, format!("no occurrence `{key}`")))
 }

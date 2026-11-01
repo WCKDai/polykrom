@@ -1960,6 +1960,28 @@ fn body_names_resolve_in_every_form_and_misses_say_what_is_close() {
     assert!(e.contains("(closest: `Upper_arm_SO101 v4`"), "{e}");
 }
 
+/// #271: an occurrence is found by the forms other replies print: a path of names from the
+/// root, `name (path)`, and a body's name when its component is placed once; a miss names the
+/// closest occurrences.
+#[test]
+fn occurrences_resolve_by_path_and_body_and_misses_say_what_is_close() {
+    let mut s = Session::default();
+    run(&mut s, "component.create", json!({"name": "Robot"}));
+    run(&mut s, "component.create", json!({"name": "Servo", "parent": "Robot"}));
+    run(&mut s, "solid.box", json!({"length": 5.0, "width": 5.0, "height": 5.0, "body_name": "ServoBody"}));
+    run(&mut s, "component.activate", json!({"component": "root"}));
+    let servo = s.doc.occurrences.iter().find(|o| o.name == "Servo:1").map(|o| o.id).unwrap();
+    let grounded = |s: &Session| s.doc.occurrences.iter().find(|o| o.id == servo).is_some_and(|o| o.grounded);
+    for form in ["Robot:1/Servo:1", "Servo:1 (Robot:1/Servo:1)", "ServoBody"] {
+        let before = grounded(&s);
+        run(&mut s, "occurrence.ground", json!({"occurrence": form}));
+        assert_ne!(grounded(&s), before, "{form} names the servo's placement");
+    }
+    let e = s.execute("occurrence.ground", &json!({"occurrence": "Servo:9"})).unwrap_err().to_string();
+    assert!(e.contains("no occurrence `Servo:9` (closest: `Servo:1`"), "{e}");
+    assert!(s.execute("occurrence.ground", &json!({"occurrence": "Robot:1/Nothing:1"})).is_err());
+}
+
 /// Regression (#3242): `file.new` replaced the session and its checkpoints with it, so a
 /// batch that failed after `file.new` could not go back to the design it began in.
 #[test]

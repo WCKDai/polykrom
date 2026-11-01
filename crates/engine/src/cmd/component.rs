@@ -85,6 +85,9 @@ fn occurrence(s: &Session, p: &Value, cmd: &str) -> Result<u64> {
     if let Some(o) = s.doc.occurrences.iter().find(|o| o.id.to_string() == kk || o.name == kk) {
         return Ok(o.id);
     }
+    if let Some(id) = s.occurrence_by_path_or_body(&kk) {
+        return Ok(id);
+    }
     // A component's name stands for its placement when it has exactly one (`Fork` for `Fork:1`).
     let placed: Vec<&polykrom_doc::Occurrence> =
         s.doc.find_component(&kk).map(|c| s.doc.occurrences.iter().filter(|o| o.component == c).collect()).unwrap_or_default();
