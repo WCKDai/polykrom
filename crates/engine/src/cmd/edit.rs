@@ -11,13 +11,13 @@ use crate::{EngineError, Result, Sel, Session, Snapshot};
 
 pub static COMMANDS: &[CommandSpec] = &[
     CommandSpec::new("edit.undo", "Undo", undo).icon("undo").key("Ctrl+Z").noundo().doc_only()
-        .params("steps?: n (default 1; at most what can be undone). → {undone: last step's label, steps: labels undone, next: label of the step the next undo would take back (null: none), left: n}"),
+        .params("steps?: n (default 1; at most what can be undone), or to: a checkpoint's name or id (every step since it). → {undone: last step's label, steps: labels undone, next: label of the step the next undo would take back (null: none), left: n}"),
     CommandSpec::new("edit.redo", "Redo", redo).icon("redo").key("Ctrl+Y").noundo().doc_only()
         .params("steps?: n (default 1; at most what can be redone). → {redone: last step's label, steps: labels redone, next: label of the next redo (null: none), left: n}"),
     CommandSpec::new("edit.checkpoint", "Checkpoint", checkpoint).icon("checkpoint")
         .noundo()
         .doc_only()
-        .params("→ {checkpoint: id}: remember the design, active sketch and undo history (restore with edit.restore_checkpoint)"),
+        .params("name?: a name to go back to it by → {checkpoint: id, name}: remember the design, active sketch and undo history (edit.undo {to: name} undoes back to it, edit.restore_checkpoint restores it)"),
     CommandSpec::new("edit.restore_checkpoint", "Restore Checkpoint", restore_checkpoint).icon("restore")
         .noundo()
         .doc_only()
@@ -89,13 +89,34 @@ fn steps(cmd: &str, p: &Value, available: usize) -> Result<usize> {
     Ok(n.min(available))
 }
 
+/// The steps made since checkpoint `to` (#270): its undo history must still be the start of
+/// the session's, or the steps since it can't be counted.
+fn steps_since(s: &Session, to: &Value) -> Result<usize> {
+    let cmd = "edit.undo";
+    let c = s.find_checkpoint(to).ok_or_else(|| bad(cmd, format!("no checkpoint {to} (edit.checkpoint {{name}} makes one)")))?;
+    let kept = c.undo.len() <= s.undo.len() && c.undo.iter().zip(&s.undo).all(|(a, b)| std::sync::Arc::ptr_eq(&a.doc, &b.doc));
+    if !kept {
+        return Err(bad(
+            cmd,
+            format!("the history since checkpoint {to} was undone past it or replaced: edit.restore_checkpoint {{checkpoint: {to}}} goes back to it"),
+        ));
+    }
+    match s.undo.len() - c.undo.len() {
+        0 => Err(EngineError::Other(format!("nothing to undo since checkpoint {to}"))),
+        n => Ok(n),
+    }
+}
+
 /// Undo `steps` changes (#270). The design changes once, to where the last of them leaves it, so it
 /// is evaluated once however many steps go.
 fn undo(s: &mut Session, p: &Value) -> Result<Value> {
     if s.undo.is_empty() {
         return Err(EngineError::Other("nothing to undo".into()));
     }
-    let n = steps("edit.undo", p, s.undo.len())?;
+    let n = match p.get("to").filter(|v| !v.is_null()) {
+        Some(to) => steps_since(s, to)?,
+        None => steps("edit.undo", p, s.undo.len())?,
+    };
     let mut done = Vec::with_capacity(n);
     for _ in 0..n {
         let Some(prev) = s.undo.pop() else { break };
@@ -136,13 +157,22 @@ fn go_to(s: &mut Session, snap: Snapshot) -> Snapshot {
     was
 }
 
-fn checkpoint(s: &mut Session, _p: &Value) -> Result<Value> {
-    Ok(json!({"checkpoint": s.checkpoint()}))
+fn checkpoint(s: &mut Session, p: &Value) -> Result<Value> {
+    let name = match p.get("name") {
+        None | Some(Value::Null) => None,
+        Some(Value::String(n)) if !n.trim().is_empty() && n.trim().len() <= 64 => Some(n.trim().to_string()),
+        Some(_) => return Err(bad("edit.checkpoint", "`name` must be a text of 1 to 64 characters")),
+    };
+    let id = s.named_checkpoint(name.clone());
+    Ok(json!({"checkpoint": id, "name": name}))
 }
 
 fn restore_checkpoint(s: &mut Session, p: &Value) -> Result<Value> {
     let cmd = "edit.restore_checkpoint";
-    let id = p.get("checkpoint").and_then(Value::as_u64).ok_or_else(|| bad(cmd, "`checkpoint` must be an id from edit.checkpoint"))?;
+    let id = p
+        .get("checkpoint")
+        .and_then(|k| s.find_checkpoint(k).map(|c| c.id).or_else(|| k.as_u64()))
+        .ok_or_else(|| bad(cmd, "`checkpoint` must be an id or a name from edit.checkpoint"))?;
     if bool_(p, "forget") == Some(true) {
         s.drop_checkpoint(id);
         return Ok(json!({"checkpoint": id, "restored": false}));

@@ -368,6 +368,8 @@ pub struct SavePoint {
 #[derive(Clone, Debug)]
 pub(crate) struct Checkpoint {
     pub id: u64,
+    /// A name to go back to it by (`edit.checkpoint {name}`, #270).
+    pub name: Option<String>,
     pub doc: Arc<Document>,
     pub active_sketch: Option<u64>,
     pub pending_moves: std::collections::BTreeMap<u64, polykrom_doc::Mat>,
@@ -1089,10 +1091,16 @@ impl Session {
 
     /// Remember the design, active sketch, pending positions and undo history; returns the checkpoint's id.
     pub fn checkpoint(&mut self) -> u64 {
+        self.named_checkpoint(None)
+    }
+
+    /// [`Session::checkpoint`] with a name to go back to it by (#270).
+    pub fn named_checkpoint(&mut self, name: Option<String>) -> u64 {
         let id = self.next_checkpoint;
         self.next_checkpoint += 1;
         self.checkpoints.push(Checkpoint {
             id,
+            name,
             doc: self.doc.clone(),
             active_sketch: self.active_sketch,
             undo: self.undo.clone(),
@@ -1103,6 +1111,18 @@ impl Session {
             self.checkpoints.remove(0);
         }
         id
+    }
+
+    /// The checkpoint `key` names: its id, or the name it was given (the latest of that name).
+    pub(crate) fn find_checkpoint(&self, key: &Value) -> Option<&Checkpoint> {
+        match key {
+            Value::Number(n) => n.as_u64().and_then(|id| self.checkpoints.iter().find(|c| c.id == id)),
+            Value::String(name) => {
+                let name = name.trim();
+                self.checkpoints.iter().rev().find(|c| c.name.as_deref() == Some(name) || c.id.to_string() == name)
+            }
+            _ => None,
+        }
     }
 
     /// Go back to checkpoint `id` as if nothing since had happened (the undo history too). It
@@ -1120,6 +1140,7 @@ impl Session {
     pub(crate) fn mark(&self) -> Checkpoint {
         Checkpoint {
             id: 0,
+            name: None,
             doc: self.doc.clone(),
             active_sketch: self.active_sketch,
             pending_moves: self.pending_moves.clone(),
