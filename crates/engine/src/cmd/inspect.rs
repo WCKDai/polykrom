@@ -224,8 +224,23 @@ fn measure(s: &mut Session, p: &Value) -> Result<Value> {
     if let Some(items) = p.get("items") {
         return super::measure_sel::measure_items(s, items);
     }
-    let want = string_list(p, "bodies");
     let st = s.world_state();
+    // Each body asked for, by any name a reply prints (#271). Unknown ones fail the call, each
+    // named with the bodies closest to it.
+    let mut unknown = Vec::new();
+    let want: Vec<String> = string_list(p, "bodies")
+        .into_iter()
+        .filter_map(|w| match st.body(&w) {
+            Some(b) => Some(b.name.clone()),
+            None => {
+                unknown.push(format!("no body `{w}`{}", super::closest_hint(&w, st.bodies.iter().map(|b| b.name.as_str()))));
+                None
+            }
+        })
+        .collect();
+    if !unknown.is_empty() {
+        return Err(bad("inspect.measure", unknown.join("; ")));
+    }
     let selected: Vec<_> = st.bodies.iter().filter(|b| want.is_empty() || want.contains(&b.name)).collect();
     // Bodies measured before and unchanged since (same geometry, same place) come from the cache;
     // the rest are measured, each on its own, on all cores, and kept.

@@ -365,6 +365,45 @@ pub(crate) fn did_you_mean(id: &str) -> String {
     }
 }
 
+/// Up to three of `names` like `name`, nearest first (#271): the same name in another case, then
+/// names that contain it or that it contains (`Upper_arm_SO101` → `Upper_arm_SO101 v4`), then
+/// names a few letters away.
+pub(crate) fn closest_names<'a>(name: &str, names: impl Iterator<Item = &'a str>) -> Vec<&'a str> {
+    let want = name.to_lowercase();
+    if want.is_empty() || want.len() > 256 {
+        return Vec::new();
+    }
+    let near = (want.chars().count() / 4).max(2);
+    let mut found: Vec<(u8, usize, &str)> = names
+        .filter_map(|n| {
+            let have = n.to_lowercase();
+            let d = edit_distance(&want, &have);
+            let rank = if have == want {
+                0
+            } else if have.contains(&want) || want.contains(&have) {
+                1
+            } else if d <= near {
+                2
+            } else {
+                return None;
+            };
+            Some((rank, d, n))
+        })
+        .collect();
+    found.sort();
+    found.dedup_by(|a, b| a.2 == b.2);
+    found.into_iter().take(3).map(|(_, _, n)| n).collect()
+}
+
+/// ` (closest: `A`, `B`)` for a name that isn't one of `names`; empty when nothing is close.
+pub(crate) fn closest_hint<'a>(name: &str, names: impl Iterator<Item = &'a str>) -> String {
+    let near = closest_names(name, names);
+    if near.is_empty() {
+        return String::new();
+    }
+    format!(" (closest: {})", near.iter().map(|n| format!("`{n}`")).collect::<Vec<_>>().join(", "))
+}
+
 /// Levenshtein distance: the single-character edits that turn `a` into `b`.
 pub(crate) fn edit_distance(a: &str, b: &str) -> usize {
     let b: Vec<char> = b.chars().collect();

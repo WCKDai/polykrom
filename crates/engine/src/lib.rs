@@ -1010,9 +1010,33 @@ impl Session {
                     self.pending_moves = before.pending_moves;
                     self.refresh();
                 }
-                Err(e)
+                Err(self.with_body_hint(e))
             }
         }
+    }
+
+    /// A command's "no body `X`" or "no occurrence `X`" also names the closest ones (#271).
+    /// Commands say it in their own words and none named any, so an agent had to list the bodies
+    /// to find the one it meant (`Upper_arm_SO101` for `Upper_arm_SO101 v4`).
+    fn with_body_hint(&self, e: EngineError) -> EngineError {
+        let EngineError::BadParams { cmd, msg } = e else { return e };
+        if msg.contains("(closest: ") {
+            return EngineError::BadParams { cmd, msg };
+        }
+        let quoted = |prefixes: &[&str]| {
+            prefixes.iter().find_map(|p| msg.split_once(p).and_then(|(_, rest)| rest.split_once('`')).map(|(n, _)| n.to_string()))
+        };
+        let hint = if let Some(name) = quoted(&["no occurrence `"]) {
+            cmd::closest_hint(&name, self.doc.occurrences.iter().map(|o| o.name.as_str()))
+        } else if let Some(name) = quoted(&["no body `", "unknown body name `", "unknown body `"])
+            .or_else(|| msg.split_once("no body named ").map(|(_, n)| n.trim().to_string()))
+        {
+            let state = self.model.state();
+            cmd::closest_hint(&name, state.bodies.iter().map(|b| b.name.as_str()))
+        } else {
+            String::new()
+        };
+        EngineError::BadParams { cmd, msg: msg + &hint }
     }
 
     /// A sketch command's result gets `created`: the ids of the points, curves, constraints and

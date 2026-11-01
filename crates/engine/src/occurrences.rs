@@ -177,6 +177,37 @@ impl Session {
         self.visibility.hidden_occurrences.iter().any(|hidden| hidden == path)
     }
 
+    /// The occurrence `key` names in a form another reply printed (#271): a path of occurrence
+    /// names from the root (`robot:1/Servo v2:2`, as `inspect.interference` and the browser print
+    /// it), `name (path)`, or a body's name when its component is placed exactly once. `None` when
+    /// it is none of these; ids, names and component names are each resolver's own.
+    pub(crate) fn occurrence_by_path_or_body(&self, key: &str) -> Option<u64> {
+        let key = key.trim();
+        // `name (path)`: the path says which placement.
+        if let Some((_, rest)) = key.rsplit_once(" (")
+            && let Some(path) = rest.strip_suffix(')').filter(|p| p.contains(':'))
+        {
+            return self.occurrence_by_path_or_body(path);
+        }
+        if key.contains('/') {
+            let mut parent = 0;
+            let mut found = None;
+            for part in key.split('/').map(str::trim).filter(|p| !p.is_empty()) {
+                let o = self.doc.occurrences.iter().find(|o| o.parent == parent && o.name == part)?;
+                parent = o.component;
+                found = Some(o.id);
+            }
+            return found;
+        }
+        let state = self.model.state();
+        let body = state.body(key)?;
+        let component = self.doc.model_body_component(body);
+        match self.doc.occurrences.iter().filter(|o| o.component == component).collect::<Vec<_>>().as_slice() {
+            [one] => Some(one.id),
+            _ => None,
+        }
+    }
+
     /// Number of placements affected by editing this shared occurrence definition.
     pub fn occurrence_scope_count(&self, path: &[u64]) -> Result<usize> {
         let id = self.occurrence_placement(path)?.occurrence;
