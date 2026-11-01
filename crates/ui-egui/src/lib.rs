@@ -392,6 +392,9 @@ pub struct SolveApp {
     pub cam_anim: Option<CameraAnim>,
     /// Seconds since start, as of this frame.
     pub now: f64,
+    /// The last shown frame's time and when it was, by the wall clock (ms): [`Self::now`] goes on
+    /// from there while the window is hidden (#303).
+    shown_at: (f64, f64),
     /// The history marker before Edit Sketch rolled the timeline to the sketch; Finish Sketch
     /// restores it.
     pub pre_sketch_marker: Option<Option<usize>>,
@@ -568,6 +571,7 @@ impl SolveApp {
             cam: Camera::default(),
             cam_anim: None,
             now: 0.0,
+            shown_at: (0.0, 0.0),
             pre_sketch_marker: None,
             services,
             file_picker: None,
@@ -1558,7 +1562,16 @@ impl SolveApp {
             self.fit_view();
             self.fitted = true;
         }
-        self.now = ctx.input(|i| i.time);
+        // While the window is hidden (minimized, behind other windows, on another desktop), eframe
+        // runs only this logic, with the input of the last shown frame, its time included. Time
+        // then goes on by the wall clock, so what an agent's request waits for (the agent
+        // cursor's show, a camera move) still ends instead of waiting for the window (#303).
+        if ctx.input(|i| i.viewport().visible()) == Some(false) {
+            self.now = self.shown_at.0 + (now_ms() - self.shown_at.1).max(0.0) / 1000.0;
+        } else {
+            self.now = ctx.input(|i| i.time);
+            self.shown_at = (self.now, now_ms());
+        }
         if self.cam.up != self.ui.up_axis {
             self.set_up_axis(self.ui.up_axis);
         }

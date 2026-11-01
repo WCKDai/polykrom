@@ -153,6 +153,9 @@ pub struct Harness {
     /// The app's request queue, opened by the first queued request.
     queue: Option<std::sync::mpsc::Sender<ControlRequest>>,
     time: f64,
+    /// The window is hidden: frames run only the app's logic, with the clock of the last shown
+    /// frame, as eframe runs them then (#303).
+    pub hidden: bool,
     size: egui::Vec2,
     /// The camera as the last `camera` step left it.
     cam_mark: Option<polykrom_engine::render::Camera>,
@@ -187,6 +190,7 @@ impl Harness {
             next_file: Rc::new(RefCell::new(None)),
             queue: None,
             time: 0.0,
+            hidden: false,
             size: egui::vec2(1600.0, 1000.0),
             cam_mark: None,
         };
@@ -214,6 +218,14 @@ impl Harness {
 
     /// Lay out and draw one frame (feeding queued pointer and key events).
     pub fn frame(&mut self) {
+        if self.hidden {
+            let mut raw = egui::RawInput { time: Some(self.time), ..Default::default() };
+            let info = egui::ViewportInfo { minimized: Some(false), occluded: Some(true), ..Default::default() };
+            raw.viewports.insert(egui::ViewportId::ROOT, info);
+            let app = &mut self.app;
+            self.output = self.ctx.run_logic(&raw, |ctx| app.logic(ctx)).platform_output;
+            return;
+        }
         self.time += 1.0 / 60.0;
         let mut raw = egui::RawInput {
             screen_rect: Some(egui::Rect::from_min_size(egui::Pos2::ZERO, self.size)),
