@@ -1,0 +1,203 @@
+{
+  "source": {
+    "id": "13:1123",
+    "name": "Icon attribution / Lucide & Feather",
+    "fileKey": "s7EddZNQds492PBiNVbcYs",
+    "pageId": "2:5",
+    "category": "library-boards"
+  },
+  "paintIndexNote": "node.fill and node.stroke are indices into paints",
+  "nodes": [
+    {
+      "id": "13:1123",
+      "parent": "2:5",
+      "type": "FRAME",
+      "name": "Icon attribution / Lucide & Feather",
+      "x": 80,
+      "y": 1100,
+      "width": 1120,
+      "height": 1050,
+      "fill": 0,
+      "layout": {
+        "direction": "VERTICAL",
+        "gap": 16,
+        "padding": [
+          32,
+          32,
+          0,
+          32
+        ],
+        "primaryAlign": "MIN",
+        "counterAlign": "MIN"
+      },
+      "sizing": [
+        "FIXED",
+        "FIXED"
+      ]
+    },
+    {
+      "id": "13:1124",
+      "parent": "13:1123",
+      "type": "TEXT",
+      "name": "Icon library · attribution",
+      "x": 32,
+      "y": 32,
+      "width": 268,
+      "height": 34,
+      "fill": 1,
+      "text": "Icon library · attribution",
+      "font": {
+        "family": "Inter",
+        "style": "Medium",
+        "variationSettings": {
+          "wght": 500,
+          "slnt": 0
+        }
+      },
+      "fontSize": 24,
+      "lineHeight": {
+        "unit": "PERCENT",
+        "value": 139.9999976158142
+      },
+      "letterSpacing": {
+        "unit": "PERCENT",
+        "value": 0
+      },
+      "align": "LEFT",
+      "textStyleId": "",
+      "sizing": [
+        "HUG",
+        "HUG"
+      ]
+    },
+    {
+      "id": "13:1125",
+      "parent": "13:1123",
+      "type": "TEXT",
+      "name": "63 editable icons / Lucide general controls + custom CAD geometry and ",
+      "x": 32,
+      "y": 82,
+      "width": 559,
+      "height": 20,
+      "fill": 2,
+      "text": "63 editable icons / Lucide general controls + custom CAD geometry and constraints.",
+      "font": {
+        "family": "Inter",
+        "style": "Regular",
+        "variationSettings": {
+          "wght": 400,
+          "slnt": 0
+        }
+      },
+      "fontSize": 14,
+      "lineHeight": {
+        "unit": "PERCENT",
+        "value": 139.9999976158142
+      },
+      "letterSpacing": {
+        "unit": "PERCENT",
+        "value": 0
+      },
+      "align": "LEFT",
+      "textStyleId": "",
+      "sizing": [
+        "HUG",
+        "HUG"
+      ]
+    },
+    {
+      "id": "13:1126",
+      "parent": "13:1123",
+      "type": "TEXT",
+      "name": "ISC License\n\nCopyright (c) 2026 Lucide Icons and Contributors\n\nPermiss",
+      "x": 32,
+      "y": 118,
+      "width": 1056,
+      "height": 850,
+      "fill": 2,
+      "text": "ISC License\n\nCopyright (c) 2026 Lucide Icons and Contributors\n\nPermission to use, copy, modify, and/or distribute this software for any\npurpose with or without fee is hereby granted, provided that the above\ncopyright notice and this permission notice appear in all copies.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\" AND THE AUTHOR DISCLAIMS ALL WARRANTIES\nWITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF\nMERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR\nANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES\nWHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN\nACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF\nOR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.\n\n---\n\nThe following Lucide icons are derived from the Feather project:\n\nairplay, alert-circle, alert-octagon, alert-triangle, aperture, arrow-down-circle, arrow-down-left, arrow-down-right, arrow-down, arrow-left-circle, arrow-left, arrow-right-circle, arrow-right, arrow-up-circle, arrow-up-left, arrow-up-right, arrow-up, at-sign, calendar, cast, check, chevron-down, chevron-left, chevron-right, chevron-up, chevrons-down, chevrons-left, chevrons-right, chevrons-up, circle, clipboard, clock, code, columns, command, compass, corner-down-left, corner-down-right, corner-left-down, corner-left-up, corner-right-down, corner-right-up, corner-up-left, corner-up-right, crosshair, database, divide-circle, divide-square, dollar-sign, download, external-link, feather, frown, hash, headphones, help-circle, info, italic, key, layout, life-buoy, link-2, link, loader, lock, log-in, log-out, maximize, meh, minimize, minimize-2, minus-circle, minus-square, minus, monitor, moon, more-horizontal, more-vertical, move, music, navigation-2, navigation, octagon, pause-circle, percent, plus-circle, plus-square, plus, power, radio, rss, search, server, share, shopping-bag, sidebar, smartphone, smile, square, table-2, tablet, target, terminal, trash-2, trash, triangle, tv, type, upload, x-circle, x-octagon, x-square, x, zoom-in, zoom-out\n\nThe MIT License (MIT) (for the icons listed above)\n\nCopyright (c) 2013-present Cole Bemis\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the \"Software\"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\nSOFTWARE.\n",
+      "font": {
+        "family": "Inter",
+        "style": "Regular",
+        "variationSettings": {
+          "wght": 400,
+          "slnt": 0
+        }
+      },
+      "fontSize": 12,
+      "lineHeight": {
+        "unit": "PERCENT",
+        "value": 139.9999976158142
+      },
+      "letterSpacing": {
+        "unit": "PERCENT",
+        "value": 0
+      },
+      "align": "LEFT",
+      "textStyleId": "",
+      "sizing": [
+        "FIXED",
+        "HUG"
+      ]
+    }
+  ],
+  "paints": [
+    [
+      {
+        "type": "SOLID",
+        "visible": true,
+        "opacity": 1,
+        "blendMode": "NORMAL",
+        "color": {
+          "r": 0.125490203499794,
+          "g": 0.13333334028720856,
+          "b": 0.14509804546833038
+        },
+        "boundVariables": {
+          "color": {
+            "type": "VARIABLE_ALIAS",
+            "id": "VariableID:4:5"
+          }
+        }
+      }
+    ],
+    [
+      {
+        "type": "SOLID",
+        "visible": true,
+        "opacity": 1,
+        "blendMode": "NORMAL",
+        "color": {
+          "r": 0.9254902005195618,
+          "g": 0.9333333373069763,
+          "b": 0.9411764740943909
+        },
+        "boundVariables": {
+          "color": {
+            "type": "VARIABLE_ALIAS",
+            "id": "VariableID:4:13"
+          }
+        }
+      }
+    ],
+    [
+      {
+        "type": "SOLID",
+        "visible": true,
+        "opacity": 1,
+        "blendMode": "NORMAL",
+        "color": {
+          "r": 0.6627451181411743,
+          "g": 0.6901960968971252,
+          "b": 0.7176470756530762
+        },
+        "boundVariables": {
+          "color": {
+            "type": "VARIABLE_ALIAS",
+            "id": "VariableID:4:15"
+          }
+        }
+      }
+    ]
+  ]
+}

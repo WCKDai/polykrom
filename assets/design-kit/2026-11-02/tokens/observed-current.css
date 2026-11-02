@@ -1,0 +1,10 @@
+/* Observed current baseline values; see observed-current.json. */
+:root {
+  --polykrom-base: #202225;
+  --polykrom-toolbar: #202225;
+  --polykrom-surface: #292C2F;
+  --polykrom-viewport: #181B1F;
+  --polykrom-read-only-value-surface: #292C2F;
+  --polykrom-text-most-used: #A9B0B7;
+  --polykrom-text-second-most-used: #ECEEF0;
+}

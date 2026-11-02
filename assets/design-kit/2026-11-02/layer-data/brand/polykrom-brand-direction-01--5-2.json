@@ -1,0 +1,2908 @@
+{
+  "source": {
+    "id": "5:2",
+    "name": "Polykrom / Brand direction 01",
+    "fileKey": "s7EddZNQds492PBiNVbcYs",
+    "pageId": "2:2",
+    "category": "brand"
+  },
+  "paintIndexNote": "node.fill and node.stroke are indices into paints",
+  "nodes": [
+    {
+      "id": "5:2",
+      "parent": "2:2",
+      "type": "FRAME",
+      "name": "Polykrom / Brand direction 01",
+      "x": 80,
+      "y": 80,
+      "width": 1600,
+      "height": 1180,
+      "fill": 0,
+      "layout": {
+        "direction": "VERTICAL",
+        "gap": 24,
+        "padding": [
+          40,
+          56,
+          40,
+          56
+        ],
+        "primaryAlign": "MIN",
+        "counterAlign": "MIN"
+      },
+      "sizing": [
+        "FIXED",
+        "FIXED"
+      ]
+    },
+    {
+      "id": "5:3",
+      "parent": "5:2",
+      "type": "FRAME",
+      "name": "Brand page header",
+      "x": 56,
+      "y": 40,
+      "width": 1488,
+      "height": 34,
+      "fill": 0,
+      "layout": {
+        "direction": "HORIZONTAL",
+        "gap": 20,
+        "padding": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "primaryAlign": "MIN",
+        "counterAlign": "CENTER"
+      },
+      "sizing": [
+        "FIXED",
+        "FIXED"
+      ]
+    },
+    {
+      "id": "5:4",
+      "parent": "5:3",
+      "type": "TEXT",
+      "name": "WCKD / POLYKROM",
+      "x": 0,
+      "y": 9.5,
+      "width": 105,
+      "height": 15,
+      "fill": 1,
+      "text": "WCKD / POLYKROM",
+      "font": {
+        "family": "Inter",
+        "style": "Medium",
+        "variationSettings": {
+          "wght": 500,
+          "slnt": 0
+        }
+      },
+      "fontSize": 11,
+      "lineHeight": {
+        "unit": "PERCENT",
+        "value": 139.9999976158142
+      },
+      "letterSpacing": {
+        "unit": "PERCENT",
+        "value": 0
+      },
+      "align": "LEFT",
+      "textStyleId": "",
+      "sizing": [
+        "HUG",
+        "HUG"
+      ]
+    },
+    {
+      "id": "5:5",
+      "parent": "5:3",
+      "type": "FRAME",
+      "name": "Space",
+      "x": 125,
+      "y": 7,
+      "width": 1227,
+      "height": 20,
+      "fill": 0,
+      "layout": {
+        "direction": "VERTICAL",
+        "gap": 0,
+        "padding": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "primaryAlign": "MIN",
+        "counterAlign": "MIN"
+      },
+      "sizing": [
+        "FILL",
+        "FIXED"
+      ]
+    },
+    {
+      "id": "5:6",
+      "parent": "5:3",
+      "type": "TEXT",
+      "name": "BRAND DIRECTION 01",
+      "x": 1372,
+      "y": 9.5,
+      "width": 116,
+      "height": 15,
+      "fill": 1,
+      "text": "BRAND DIRECTION 01",
+      "font": {
+        "family": "Inter",
+        "style": "Regular",
+        "variationSettings": {
+          "wght": 400,
+          "slnt": 0
+        }
+      },
+      "fontSize": 11,
+      "lineHeight": {
+        "unit": "PERCENT",
+        "value": 139.9999976158142
+      },
+      "letterSpacing": {
+        "unit": "PERCENT",
+        "value": 0
+      },
+      "align": "LEFT",
+      "textStyleId": "",
+      "sizing": [
+        "HUG",
+        "HUG"
+      ]
+    },
+    {
+      "id": "5:7",
+      "parent": "5:2",
+      "type": "RECTANGLE",
+      "name": "Divider",
+      "x": 56,
+      "y": 98,
+      "width": 1488,
+      "height": 1,
+      "fill": 2,
+      "sizing": [
+        "FIXED",
+        "FIXED"
+      ]
+    },
+    {
+      "id": "5:8",
+      "parent": "5:2",
+      "type": "FRAME",
+      "name": "Master identity",
+      "x": 56,
+      "y": 123,
+      "width": 1488,
+      "height": 356,
+      "fill": 0,
+      "layout": {
+        "direction": "HORIZONTAL",
+        "gap": 58,
+        "padding": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "primaryAlign": "MIN",
+        "counterAlign": "CENTER"
+      },
+      "sizing": [
+        "FIXED",
+        "FIXED"
+      ]
+    },
+    {
+      "id": "5:9",
+      "parent": "5:8",
+      "type": "FRAME",
+      "name": "Supplied logo",
+      "x": 0,
+      "y": 23,
+      "width": 310,
+      "height": 310,
+      "fill": 0,
+      "layout": {
+        "direction": "HORIZONTAL",
+        "gap": 0,
+        "padding": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "primaryAlign": "CENTER",
+        "counterAlign": "CENTER"
+      },
+      "sizing": [
+        "FIXED",
+        "FIXED"
+      ]
+    },
+    {
+      "id": "5:10",
+      "parent": "5:9",
+      "type": "INSTANCE",
+      "name": "Polykrom / Brand / Supplied icon",
+      "x": 20,
+      "y": 20,
+      "width": 270,
+      "height": 270,
+      "componentId": "4:40",
+      "sizing": [
+        "FIXED",
+        "FIXED"
+      ]
+    },
+    {
+      "id": "I5:10;4:41",
+      "parent": "5:10",
+      "type": "FRAME",
+      "name": "Frame",
+      "x": 0,
+      "y": 0,
+      "width": 270,
+      "height": 270,
+      "fill": 3,
+      "sizing": [
+        "FIXED",
+        "FIXED"
+      ]
+    },
+    {
+      "id": "I5:10;4:42",
+      "parent": "I5:10;4:41",
+      "type": "GROUP",
+      "name": "Group",
+      "x": 0,
+      "y": 0,
+      "width": 230.52,
+      "height": 245.31,
+      "sizing": [
+        "FIXED",
+        "FIXED"
+      ]
+    },
+    {
+      "id": "I5:10;4:43",
+      "parent": "I5:10;4:42",
+      "type": "GROUP",
+      "name": "Group",
+      "x": 0,
+      "y": 0,
+      "width": 0,
+      "height": 0,
+      "sizing": [
+        "FIXED",
+        "FIXED"
+      ]
+    },
+    {
+      "id": "I5:10;4:45",
+      "parent": "I5:10;4:42",
+      "type": "GROUP",
+      "name": "Polykrom",
+      "x": 39.32,
+      "y": 24.53,
+      "width": 191.2,
+      "height": 220.78,
+      "sizing": [
+        "FIXED",
+        "FIXED"
+      ]
+    },
+    {
+      "id": "I5:10;4:46",
+      "parent": "I5:10;4:45",
+      "type": "GROUP",
+      "name": "Group",
+      "x": 103.05,
+      "y": 24.53,
+      "width": 63.73,
+      "height": 73.59,
+      "sizing": [
+        "FIXED",
+        "FIXED"
+      ]
+    },
+    {
+      "id": "I5:10;4:47",
+      "parent": "I5:10;4:46",
+      "type": "VECTOR",
+      "name": "Vector",
+      "x": 103.05,
+      "y": 24.53,
+      "width": 63.73,
+      "height": 73.59,
+      "fill": 4,
+      "sizing": [
+        "FIXED",
+        "FIXED"
+      ]
+    },
+    {
+      "id": "I5:10;4:48",
+      "parent": "I5:10;4:45",
+      "type": "GROUP",
+      "name": "Group",
+      "x": 103.05,
+      "y": 98.12,
+      "width": 63.73,
+      "height": 73.59,
+      "sizing": [
+        "FIXED",
+        "FIXED"
+      ]
+    },
+    {
+      "id": "I5:10;4:49",
+      "parent": "I5:10;4:48",
+      "type": "VECTOR",
+      "name": "Vector",
+      "x": 103.05,
+      "y": 98.12,
+      "width": 63.73,
+      "height": 73.59,
+      "fill": 5,
+      "sizing": [
+        "FIXED",
+        "FIXED"
+      ]
+    },
+    {
+      "id": "I5:10;4:50",
+      "parent": "I5:10;4:45",
+      "type": "GROUP",
+      "name": "Group",
+      "x": 103.05,
+      "y": 171.71,
+      "width": 63.73,
+      "height": 73.59,
+      "sizing": [
+        "FIXED",
+        "FIXED"
+      ]
+    },
+    {
+      "id": "I5:10;4:51",
+      "parent": "I5:10;4:50",
+      "type": "VECTOR",
+      "name": "Vector",
+      "x": 103.05,
+      "y": 171.71,
+      "width": 63.73,
+      "height": 73.59,
+      "fill": 6,
+      "sizing": [
+        "FIXED",
+        "FIXED"
+      ]
+    },
+    {
+      "id": "I5:10;4:52",
+      "parent": "I5:10;4:45",
+      "type": "GROUP",
+      "name": "Group",
+      "x": 166.78,
+      "y": 61.33,
+      "width": 63.73,
+      "height": 73.59,
+      "sizing": [
+        "FIXED",
+        "FIXED"
+      ]
+    },
+    {
+      "id": "I5:10;4:53",
+      "parent": "I5:10;4:52",
+      "type": "VECTOR",
+      "name": "Vector",
+      "x": 166.78,
+      "y": 61.33,
+      "width": 63.73,
+      "height": 73.59,
+      "fill": 7,
+      "sizing": [
+        "FIXED",
+        "FIXED"
+      ]
+    },
+    {
+      "id": "I5:10;4:54",
+      "parent": "I5:10;4:45",
+      "type": "GROUP",
+      "name": "Group",
+      "x": 166.78,
+      "y": 134.92,
+      "width": 63.73,
+      "height": 73.59,
+      "sizing": [
+        "FIXED",
+        "FIXED"
+      ]
+    },
+    {
+      "id": "I5:10;4:55",
+      "parent": "I5:10;4:54",
+      "type": "VECTOR",
+      "name": "Vector",
+      "x": 166.78,
+      "y": 134.92,
+      "width": 63.73,
+      "height": 73.59,
+      "fill": 8,
+      "sizing": [
+        "FIXED",
+        "FIXED"
+      ]
+    },
+    {
+      "id": "I5:10;4:56",
+      "parent": "I5:10;4:45",
+      "type": "GROUP",
+      "name": "Group",
+      "x": 39.32,
+      "y": 134.92,
+      "width": 63.73,
+      "height": 73.59,
+      "sizing": [
+        "FIXED",
+        "FIXED"
+      ]
+    },
+    {
+      "id": "I5:10;4:57",
+      "parent": "I5:10;4:56",
+      "type": "VECTOR",
+      "name": "Vector",
+      "x": 39.32,
+      "y": 134.92,
+      "width": 63.73,
+      "height": 73.59,
+      "fill": 9,
+      "sizing": [
+        "FIXED",
+        "FIXED"
+      ]
+    },
+    {
+      "id": "I5:10;4:58",
+      "parent": "I5:10;4:45",
+      "type": "GROUP",
+      "name": "Group",
+      "x": 39.32,
+      "y": 61.33,
+      "width": 63.73,
+      "height": 73.59,
+      "sizing": [
+        "FIXED",
+        "FIXED"
+      ]
+    },
+    {
+      "id": "I5:10;4:59",
+      "parent": "I5:10;4:58",
+      "type": "VECTOR",
+      "name": "Vector",
+      "x": 39.32,
+      "y": 61.33,
+      "width": 63.73,
+      "height": 73.59,
+      "fill": 10,
+      "sizing": [
+        "FIXED",
+        "FIXED"
+      ]
+    },
+    {
+      "id": "5:30",
+      "parent": "5:8",
+      "type": "FRAME",
+      "name": "Polykrom wordmark and positioning",
+      "x": 368,
+      "y": 38,
+      "width": 1050,
+      "height": 280,
+      "fill": 0,
+      "layout": {
+        "direction": "VERTICAL",
+        "gap": 20,
+        "padding": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "primaryAlign": "CENTER",
+        "counterAlign": "MIN"
+      },
+      "sizing": [
+        "FIXED",
+        "FIXED"
+      ]
+    },
+    {
+      "id": "5:31",
+      "parent": "5:30",
+      "type": "TEXT",
+      "name": "POLYKROM",
+      "x": 0,
+      "y": 17,
+      "width": 439,
+      "height": 106,
+      "fill": 11,
+      "text": "POLYKROM",
+      "font": {
+        "family": "Inter",
+        "style": "Bold",
+        "variationSettings": {
+          "wght": 700,
+          "slnt": 0
+        }
+      },
+      "fontSize": 76,
+      "lineHeight": {
+        "unit": "PERCENT",
+        "value": 139.9999976158142
+      },
+      "letterSpacing": {
+        "unit": "PIXELS",
+        "value": 1
+      },
+      "align": "LEFT",
+      "textStyleId": "",
+      "sizing": [
+        "HUG",
+        "HUG"
+      ]
+    },
+    {
+      "id": "5:32",
+      "parent": "5:30",
+      "type": "TEXT",
+      "name": "Mechanical CAD. Native AI.",
+      "x": 0,
+      "y": 143,
+      "width": 363,
+      "height": 39,
+      "fill": 11,
+      "text": "Mechanical CAD. Native AI.",
+      "font": {
+        "family": "Inter",
+        "style": "Medium",
+        "variationSettings": {
+          "wght": 500,
+          "slnt": 0
+        }
+      },
+      "fontSize": 28,
+      "lineHeight": {
+        "unit": "PERCENT",
+        "value": 139.9999976158142
+      },
+      "letterSpacing": {
+        "unit": "PERCENT",
+        "value": 0
+      },
+      "align": "LEFT",
+      "textStyleId": "",
+      "sizing": [
+        "HUG",
+        "HUG"
+      ]
+    },
+    {
+      "id": "5:33",
+      "parent": "5:30",
+      "type": "TEXT",
+      "name": "Parts, assemblies and drawings — powered by PolyCore.",
+      "x": 0,
+      "y": 202,
+      "width": 458,
+      "height": 24,
+      "fill": 1,
+      "text": "Parts, assemblies and drawings — powered by PolyCore.",
+      "font": {
+        "family": "Inter",
+        "style": "Regular",
+        "variationSettings": {
+          "wght": 400,
+          "slnt": 0
+        }
+      },
+      "fontSize": 17,
+      "lineHeight": {
+        "unit": "PERCENT",
+        "value": 139.9999976158142
+      },
+      "letterSpacing": {
+        "unit": "PERCENT",
+        "value": 0
+      },
+      "align": "LEFT",
+      "textStyleId": "",
+      "sizing": [
+        "HUG",
+        "HUG"
+      ]
+    },
+    {
+      "id": "5:34",
+      "parent": "5:30",
+      "type": "TEXT",
+      "name": "MADE BY WCKD",
+      "x": 0,
+      "y": 246,
+      "width": 95,
+      "height": 17,
+      "fill": 12,
+      "text": "MADE BY WCKD",
+      "font": {
+        "family": "Inter",
+        "style": "Medium",
+        "variationSettings": {
+          "wght": 500,
+          "slnt": 0
+        }
+      },
+      "fontSize": 12,
+      "lineHeight": {
+        "unit": "PERCENT",
+        "value": 139.9999976158142
+      },
+      "letterSpacing": {
+        "unit": "PERCENT",
+        "value": 0
+      },
+      "align": "LEFT",
+      "textStyleId": "",
+      "sizing": [
+        "HUG",
+        "HUG"
+      ]
+    },
+    {
+      "id": "5:35",
+      "parent": "5:2",
+      "type": "FRAME",
+      "name": "Brand colour system",
+      "x": 56,
+      "y": 503,
+      "width": 1488,
+      "height": 170,
+      "fill": 0,
+      "layout": {
+        "direction": "HORIZONTAL",
+        "gap": 20,
+        "padding": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "primaryAlign": "MIN",
+        "counterAlign": "MIN"
+      },
+      "sizing": [
+        "FIXED",
+        "FIXED"
+      ]
+    },
+    {
+      "id": "5:36",
+      "parent": "5:35",
+      "type": "FRAME",
+      "name": "Electric lime",
+      "x": 0,
+      "y": 0,
+      "width": 320,
+      "height": 170,
+      "fill": 13,
+      "layout": {
+        "direction": "VERTICAL",
+        "gap": 0,
+        "padding": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "primaryAlign": "MIN",
+        "counterAlign": "MIN"
+      },
+      "sizing": [
+        "FIXED",
+        "FIXED"
+      ]
+    },
+    {
+      "id": "5:37",
+      "parent": "5:36",
+      "type": "FRAME",
+      "name": "Electric lime swatch",
+      "x": 0,
+      "y": 0,
+      "width": 320,
+      "height": 100,
+      "fill": 12,
+      "stroke": 14,
+      "strokeWeight": 1,
+      "layout": {
+        "direction": "VERTICAL",
+        "gap": 0,
+        "padding": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "primaryAlign": "MIN",
+        "counterAlign": "MIN"
+      },
+      "sizing": [
+        "FIXED",
+        "FIXED"
+      ]
+    },
+    {
+      "id": "5:38",
+      "parent": "5:36",
+      "type": "FRAME",
+      "name": "Colour role",
+      "x": 0,
+      "y": 100,
+      "width": 320,
+      "height": 70,
+      "fill": 13,
+      "layout": {
+        "direction": "VERTICAL",
+        "gap": 5,
+        "padding": [
+          10,
+          14,
+          0,
+          14
+        ],
+        "primaryAlign": "MIN",
+        "counterAlign": "MIN"
+      },
+      "sizing": [
+        "FIXED",
+        "FIXED"
+      ]
+    },
+    {
+      "id": "5:39",
+      "parent": "5:38",
+      "type": "TEXT",
+      "name": "Electric lime",
+      "x": 14,
+      "y": 10,
+      "width": 76,
+      "height": 18,
+      "fill": 11,
+      "text": "Electric lime",
+      "font": {
+        "family": "Inter",
+        "style": "Medium",
+        "variationSettings": {
+          "wght": 500,
+          "slnt": 0
+        }
+      },
+      "fontSize": 13,
+      "lineHeight": {
+        "unit": "PERCENT",
+        "value": 139.9999976158142
+      },
+      "letterSpacing": {
+        "unit": "PERCENT",
+        "value": 0
+      },
+      "align": "LEFT",
+      "textStyleId": "",
+      "sizing": [
+        "HUG",
+        "HUG"
+      ]
+    },
+    {
+      "id": "5:40",
+      "parent": "5:38",
+      "type": "TEXT",
+      "name": "#E0FF30",
+      "x": 14,
+      "y": 33,
+      "width": 51,
+      "height": 17,
+      "fill": 1,
+      "text": "#E0FF30",
+      "font": {
+        "family": "IBM Plex Mono",
+        "style": "Regular"
+      },
+      "fontSize": 12,
+      "lineHeight": {
+        "unit": "PERCENT",
+        "value": 139.9999976158142
+      },
+      "letterSpacing": {
+        "unit": "PERCENT",
+        "value": 0
+      },
+      "align": "LEFT",
+      "textStyleId": "",
+      "sizing": [
+        "HUG",
+        "HUG"
+      ]
+    },
+    {
+      "id": "5:41",
+      "parent": "5:35",
+      "type": "FRAME",
+      "name": "Green",
+      "x": 340,
+      "y": 0,
+      "width": 224,
+      "height": 170,
+      "fill": 13,
+      "layout": {
+        "direction": "VERTICAL",
+        "gap": 0,
+        "padding": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "primaryAlign": "MIN",
+        "counterAlign": "MIN"
+      },
+      "sizing": [
+        "FIXED",
+        "FIXED"
+      ]
+    },
+    {
+      "id": "5:42",
+      "parent": "5:41",
+      "type": "FRAME",
+      "name": "Green swatch",
+      "x": 0,
+      "y": 0,
+      "width": 224,
+      "height": 100,
+      "fill": 15,
+      "stroke": 14,
+      "strokeWeight": 1,
+      "layout": {
+        "direction": "VERTICAL",
+        "gap": 0,
+        "padding": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "primaryAlign": "MIN",
+        "counterAlign": "MIN"
+      },
+      "sizing": [
+        "FIXED",
+        "FIXED"
+      ]
+    },
+    {
+      "id": "5:43",
+      "parent": "5:41",
+      "type": "FRAME",
+      "name": "Colour role",
+      "x": 0,
+      "y": 100,
+      "width": 224,
+      "height": 70,
+      "fill": 13,
+      "layout": {
+        "direction": "VERTICAL",
+        "gap": 5,
+        "padding": [
+          10,
+          14,
+          0,
+          14
+        ],
+        "primaryAlign": "MIN",
+        "counterAlign": "MIN"
+      },
+      "sizing": [
+        "FIXED",
+        "FIXED"
+      ]
+    },
+    {
+      "id": "5:44",
+      "parent": "5:43",
+      "type": "TEXT",
+      "name": "Green",
+      "x": 14,
+      "y": 10,
+      "width": 38,
+      "height": 18,
+      "fill": 11,
+      "text": "Green",
+      "font": {
+        "family": "Inter",
+        "style": "Medium",
+        "variationSettings": {
+          "wght": 500,
+          "slnt": 0
+        }
+      },
+      "fontSize": 13,
+      "lineHeight": {
+        "unit": "PERCENT",
+        "value": 139.9999976158142
+      },
+      "letterSpacing": {
+        "unit": "PERCENT",
+        "value": 0
+      },
+      "align": "LEFT",
+      "textStyleId": "",
+      "sizing": [
+        "HUG",
+        "HUG"
+      ]
+    },
+    {
+      "id": "5:45",
+      "parent": "5:43",
+      "type": "TEXT",
+      "name": "#70DE17",
+      "x": 14,
+      "y": 33,
+      "width": 51,
+      "height": 17,
+      "fill": 1,
+      "text": "#70DE17",
+      "font": {
+        "family": "IBM Plex Mono",
+        "style": "Regular"
+      },
+      "fontSize": 12,
+      "lineHeight": {
+        "unit": "PERCENT",
+        "value": 139.9999976158142
+      },
+      "letterSpacing": {
+        "unit": "PERCENT",
+        "value": 0
+      },
+      "align": "LEFT",
+      "textStyleId": "",
+      "sizing": [
+        "HUG",
+        "HUG"
+      ]
+    },
+    {
+      "id": "5:46",
+      "parent": "5:35",
+      "type": "FRAME",
+      "name": "Mint",
+      "x": 584,
+      "y": 0,
+      "width": 224,
+      "height": 170,
+      "fill": 13,
+      "layout": {
+        "direction": "VERTICAL",
+        "gap": 0,
+        "padding": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "primaryAlign": "MIN",
+        "counterAlign": "MIN"
+      },
+      "sizing": [
+        "FIXED",
+        "FIXED"
+      ]
+    },
+    {
+      "id": "5:47",
+      "parent": "5:46",
+      "type": "FRAME",
+      "name": "Mint swatch",
+      "x": 0,
+      "y": 0,
+      "width": 224,
+      "height": 100,
+      "fill": 16,
+      "stroke": 14,
+      "strokeWeight": 1,
+      "layout": {
+        "direction": "VERTICAL",
+        "gap": 0,
+        "padding": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "primaryAlign": "MIN",
+        "counterAlign": "MIN"
+      },
+      "sizing": [
+        "FIXED",
+        "FIXED"
+      ]
+    },
+    {
+      "id": "5:48",
+      "parent": "5:46",
+      "type": "FRAME",
+      "name": "Colour role",
+      "x": 0,
+      "y": 100,
+      "width": 224,
+      "height": 70,
+      "fill": 13,
+      "layout": {
+        "direction": "VERTICAL",
+        "gap": 5,
+        "padding": [
+          10,
+          14,
+          0,
+          14
+        ],
+        "primaryAlign": "MIN",
+        "counterAlign": "MIN"
+      },
+      "sizing": [
+        "FIXED",
+        "FIXED"
+      ]
+    },
+    {
+      "id": "5:49",
+      "parent": "5:48",
+      "type": "TEXT",
+      "name": "Mint",
+      "x": 14,
+      "y": 10,
+      "width": 28,
+      "height": 18,
+      "fill": 11,
+      "text": "Mint",
+      "font": {
+        "family": "Inter",
+        "style": "Medium",
+        "variationSettings": {
+          "wght": 500,
+          "slnt": 0
+        }
+      },
+      "fontSize": 13,
+      "lineHeight": {
+        "unit": "PERCENT",
+        "value": 139.9999976158142
+      },
+      "letterSpacing": {
+        "unit": "PERCENT",
+        "value": 0
+      },
+      "align": "LEFT",
+      "textStyleId": "",
+      "sizing": [
+        "HUG",
+        "HUG"
+      ]
+    },
+    {
+      "id": "5:50",
+      "parent": "5:48",
+      "type": "TEXT",
+      "name": "#00C099",
+      "x": 14,
+      "y": 33,
+      "width": 51,
+      "height": 17,
+      "fill": 1,
+      "text": "#00C099",
+      "font": {
+        "family": "IBM Plex Mono",
+        "style": "Regular"
+      },
+      "fontSize": 12,
+      "lineHeight": {
+        "unit": "PERCENT",
+        "value": 139.9999976158142
+      },
+      "letterSpacing": {
+        "unit": "PERCENT",
+        "value": 0
+      },
+      "align": "LEFT",
+      "textStyleId": "",
+      "sizing": [
+        "HUG",
+        "HUG"
+      ]
+    },
+    {
+      "id": "5:51",
+      "parent": "5:35",
+      "type": "FRAME",
+      "name": "Graphite",
+      "x": 828,
+      "y": 0,
+      "width": 320,
+      "height": 170,
+      "fill": 13,
+      "layout": {
+        "direction": "VERTICAL",
+        "gap": 0,
+        "padding": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "primaryAlign": "MIN",
+        "counterAlign": "MIN"
+      },
+      "sizing": [
+        "FIXED",
+        "FIXED"
+      ]
+    },
+    {
+      "id": "5:52",
+      "parent": "5:51",
+      "type": "FRAME",
+      "name": "Graphite swatch",
+      "x": 0,
+      "y": 0,
+      "width": 320,
+      "height": 100,
+      "fill": 0,
+      "stroke": 14,
+      "strokeWeight": 1,
+      "layout": {
+        "direction": "VERTICAL",
+        "gap": 0,
+        "padding": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "primaryAlign": "MIN",
+        "counterAlign": "MIN"
+      },
+      "sizing": [
+        "FIXED",
+        "FIXED"
+      ]
+    },
+    {
+      "id": "5:53",
+      "parent": "5:51",
+      "type": "FRAME",
+      "name": "Colour role",
+      "x": 0,
+      "y": 100,
+      "width": 320,
+      "height": 70,
+      "fill": 13,
+      "layout": {
+        "direction": "VERTICAL",
+        "gap": 5,
+        "padding": [
+          10,
+          14,
+          0,
+          14
+        ],
+        "primaryAlign": "MIN",
+        "counterAlign": "MIN"
+      },
+      "sizing": [
+        "FIXED",
+        "FIXED"
+      ]
+    },
+    {
+      "id": "5:54",
+      "parent": "5:53",
+      "type": "TEXT",
+      "name": "Graphite",
+      "x": 14,
+      "y": 10,
+      "width": 54,
+      "height": 18,
+      "fill": 11,
+      "text": "Graphite",
+      "font": {
+        "family": "Inter",
+        "style": "Medium",
+        "variationSettings": {
+          "wght": 500,
+          "slnt": 0
+        }
+      },
+      "fontSize": 13,
+      "lineHeight": {
+        "unit": "PERCENT",
+        "value": 139.9999976158142
+      },
+      "letterSpacing": {
+        "unit": "PERCENT",
+        "value": 0
+      },
+      "align": "LEFT",
+      "textStyleId": "",
+      "sizing": [
+        "HUG",
+        "HUG"
+      ]
+    },
+    {
+      "id": "5:55",
+      "parent": "5:53",
+      "type": "TEXT",
+      "name": "#202225",
+      "x": 14,
+      "y": 33,
+      "width": 51,
+      "height": 17,
+      "fill": 1,
+      "text": "#202225",
+      "font": {
+        "family": "IBM Plex Mono",
+        "style": "Regular"
+      },
+      "fontSize": 12,
+      "lineHeight": {
+        "unit": "PERCENT",
+        "value": 139.9999976158142
+      },
+      "letterSpacing": {
+        "unit": "PERCENT",
+        "value": 0
+      },
+      "align": "LEFT",
+      "textStyleId": "",
+      "sizing": [
+        "HUG",
+        "HUG"
+      ]
+    },
+    {
+      "id": "5:56",
+      "parent": "5:35",
+      "type": "FRAME",
+      "name": "Studio",
+      "x": 1168,
+      "y": 0,
+      "width": 320,
+      "height": 170,
+      "fill": 13,
+      "layout": {
+        "direction": "VERTICAL",
+        "gap": 0,
+        "padding": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "primaryAlign": "MIN",
+        "counterAlign": "MIN"
+      },
+      "sizing": [
+        "FIXED",
+        "FIXED"
+      ]
+    },
+    {
+      "id": "5:57",
+      "parent": "5:56",
+      "type": "FRAME",
+      "name": "Studio swatch",
+      "x": 0,
+      "y": 0,
+      "width": 320,
+      "height": 100,
+      "fill": 17,
+      "stroke": 14,
+      "strokeWeight": 1,
+      "layout": {
+        "direction": "VERTICAL",
+        "gap": 0,
+        "padding": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "primaryAlign": "MIN",
+        "counterAlign": "MIN"
+      },
+      "sizing": [
+        "FIXED",
+        "FIXED"
+      ]
+    },
+    {
+      "id": "5:58",
+      "parent": "5:56",
+      "type": "FRAME",
+      "name": "Colour role",
+      "x": 0,
+      "y": 100,
+      "width": 320,
+      "height": 70,
+      "fill": 13,
+      "layout": {
+        "direction": "VERTICAL",
+        "gap": 5,
+        "padding": [
+          10,
+          14,
+          0,
+          14
+        ],
+        "primaryAlign": "MIN",
+        "counterAlign": "MIN"
+      },
+      "sizing": [
+        "FIXED",
+        "FIXED"
+      ]
+    },
+    {
+      "id": "5:59",
+      "parent": "5:58",
+      "type": "TEXT",
+      "name": "Studio",
+      "x": 14,
+      "y": 10,
+      "width": 41,
+      "height": 18,
+      "fill": 11,
+      "text": "Studio",
+      "font": {
+        "family": "Inter",
+        "style": "Medium",
+        "variationSettings": {
+          "wght": 500,
+          "slnt": 0
+        }
+      },
+      "fontSize": 13,
+      "lineHeight": {
+        "unit": "PERCENT",
+        "value": 139.9999976158142
+      },
+      "letterSpacing": {
+        "unit": "PERCENT",
+        "value": 0
+      },
+      "align": "LEFT",
+      "textStyleId": "",
+      "sizing": [
+        "HUG",
+        "HUG"
+      ]
+    },
+    {
+      "id": "5:60",
+      "parent": "5:58",
+      "type": "TEXT",
+      "name": "#181B1F",
+      "x": 14,
+      "y": 33,
+      "width": 51,
+      "height": 17,
+      "fill": 1,
+      "text": "#181B1F",
+      "font": {
+        "family": "IBM Plex Mono",
+        "style": "Regular"
+      },
+      "fontSize": 12,
+      "lineHeight": {
+        "unit": "PERCENT",
+        "value": 139.9999976158142
+      },
+      "letterSpacing": {
+        "unit": "PERCENT",
+        "value": 0
+      },
+      "align": "LEFT",
+      "textStyleId": "",
+      "sizing": [
+        "HUG",
+        "HUG"
+      ]
+    },
+    {
+      "id": "5:61",
+      "parent": "5:2",
+      "type": "FRAME",
+      "name": "Brand rules",
+      "x": 56,
+      "y": 697,
+      "width": 1488,
+      "height": 260,
+      "fill": 0,
+      "layout": {
+        "direction": "HORIZONTAL",
+        "gap": 24,
+        "padding": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "primaryAlign": "MIN",
+        "counterAlign": "MIN"
+      },
+      "sizing": [
+        "FIXED",
+        "FIXED"
+      ]
+    },
+    {
+      "id": "5:62",
+      "parent": "5:61",
+      "type": "FRAME",
+      "name": "One WCKD family",
+      "x": 0,
+      "y": 0,
+      "width": 480,
+      "height": 260,
+      "fill": 13,
+      "layout": {
+        "direction": "VERTICAL",
+        "gap": 16,
+        "padding": [
+          22,
+          24,
+          0,
+          24
+        ],
+        "primaryAlign": "MIN",
+        "counterAlign": "MIN"
+      },
+      "sizing": [
+        "FIXED",
+        "FIXED"
+      ]
+    },
+    {
+      "id": "5:63",
+      "parent": "5:62",
+      "type": "TEXT",
+      "name": "One WCKD family",
+      "x": 24,
+      "y": 22,
+      "width": 186,
+      "height": 31,
+      "fill": 11,
+      "text": "One WCKD family",
+      "font": {
+        "family": "Inter",
+        "style": "Medium",
+        "variationSettings": {
+          "wght": 500,
+          "slnt": 0
+        }
+      },
+      "fontSize": 22,
+      "lineHeight": {
+        "unit": "PERCENT",
+        "value": 139.9999976158142
+      },
+      "letterSpacing": {
+        "unit": "PERCENT",
+        "value": 0
+      },
+      "align": "LEFT",
+      "textStyleId": "",
+      "sizing": [
+        "HUG",
+        "HUG"
+      ]
+    },
+    {
+      "id": "5:64",
+      "parent": "5:62",
+      "type": "TEXT",
+      "name": "The same graphite surfaces, typography and icon discipline as Trigon. ",
+      "x": 24,
+      "y": 69,
+      "width": 432,
+      "height": 66,
+      "fill": 1,
+      "text": "The same graphite surfaces, typography and icon discipline as Trigon. Mechanical CAD gets its own structure and lime accent.",
+      "font": {
+        "family": "Inter",
+        "style": "Regular",
+        "variationSettings": {
+          "wght": 400,
+          "slnt": 0
+        }
+      },
+      "fontSize": 16,
+      "lineHeight": {
+        "unit": "PERCENT",
+        "value": 139.9999976158142
+      },
+      "letterSpacing": {
+        "unit": "PERCENT",
+        "value": 0
+      },
+      "align": "LEFT",
+      "textStyleId": "",
+      "sizing": [
+        "FIXED",
+        "HUG"
+      ]
+    },
+    {
+      "id": "5:65",
+      "parent": "5:61",
+      "type": "FRAME",
+      "name": "Colour with a job",
+      "x": 504,
+      "y": 0,
+      "width": 480,
+      "height": 260,
+      "fill": 13,
+      "layout": {
+        "direction": "VERTICAL",
+        "gap": 16,
+        "padding": [
+          22,
+          24,
+          0,
+          24
+        ],
+        "primaryAlign": "MIN",
+        "counterAlign": "MIN"
+      },
+      "sizing": [
+        "FIXED",
+        "FIXED"
+      ]
+    },
+    {
+      "id": "5:66",
+      "parent": "5:65",
+      "type": "TEXT",
+      "name": "Colour with a job",
+      "x": 24,
+      "y": 22,
+      "width": 178,
+      "height": 31,
+      "fill": 11,
+      "text": "Colour with a job",
+      "font": {
+        "family": "Inter",
+        "style": "Medium",
+        "variationSettings": {
+          "wght": 500,
+          "slnt": 0
+        }
+      },
+      "fontSize": 22,
+      "lineHeight": {
+        "unit": "PERCENT",
+        "value": 139.9999976158142
+      },
+      "letterSpacing": {
+        "unit": "PERCENT",
+        "value": 0
+      },
+      "align": "LEFT",
+      "textStyleId": "",
+      "sizing": [
+        "HUG",
+        "HUG"
+      ]
+    },
+    {
+      "id": "5:67",
+      "parent": "5:65",
+      "type": "TEXT",
+      "name": "Lime identifies selections, active tools and proposed changes. The sup",
+      "x": 24,
+      "y": 69,
+      "width": 432,
+      "height": 66,
+      "fill": 1,
+      "text": "Lime identifies selections, active tools and proposed changes. The supplied gradient belongs to the logo and brand moments.",
+      "font": {
+        "family": "Inter",
+        "style": "Regular",
+        "variationSettings": {
+          "wght": 400,
+          "slnt": 0
+        }
+      },
+      "fontSize": 16,
+      "lineHeight": {
+        "unit": "PERCENT",
+        "value": 139.9999976158142
+      },
+      "letterSpacing": {
+        "unit": "PERCENT",
+        "value": 0
+      },
+      "align": "LEFT",
+      "textStyleId": "",
+      "sizing": [
+        "FIXED",
+        "HUG"
+      ]
+    },
+    {
+      "id": "5:68",
+      "parent": "5:61",
+      "type": "FRAME",
+      "name": "Trust the model",
+      "x": 1008,
+      "y": 0,
+      "width": 480,
+      "height": 260,
+      "fill": 13,
+      "layout": {
+        "direction": "VERTICAL",
+        "gap": 16,
+        "padding": [
+          22,
+          24,
+          0,
+          24
+        ],
+        "primaryAlign": "MIN",
+        "counterAlign": "MIN"
+      },
+      "sizing": [
+        "FIXED",
+        "FIXED"
+      ]
+    },
+    {
+      "id": "5:69",
+      "parent": "5:68",
+      "type": "TEXT",
+      "name": "Trust the model",
+      "x": 24,
+      "y": 22,
+      "width": 166,
+      "height": 31,
+      "fill": 11,
+      "text": "Trust the model",
+      "font": {
+        "family": "Inter",
+        "style": "Medium",
+        "variationSettings": {
+          "wght": 500,
+          "slnt": 0
+        }
+      },
+      "fontSize": 22,
+      "lineHeight": {
+        "unit": "PERCENT",
+        "value": 139.9999976158142
+      },
+      "letterSpacing": {
+        "unit": "PERCENT",
+        "value": 0
+      },
+      "align": "LEFT",
+      "textStyleId": "",
+      "sizing": [
+        "HUG",
+        "HUG"
+      ]
+    },
+    {
+      "id": "5:70",
+      "parent": "5:68",
+      "type": "TEXT",
+      "name": "Parameters, features and history stay visible. AI acts through the mod",
+      "x": 24,
+      "y": 69,
+      "width": 432,
+      "height": 66,
+      "fill": 1,
+      "text": "Parameters, features and history stay visible. AI acts through the model’s commands, with previews and Undo.",
+      "font": {
+        "family": "Inter",
+        "style": "Regular",
+        "variationSettings": {
+          "wght": 400,
+          "slnt": 0
+        }
+      },
+      "fontSize": 16,
+      "lineHeight": {
+        "unit": "PERCENT",
+        "value": 139.9999976158142
+      },
+      "letterSpacing": {
+        "unit": "PERCENT",
+        "value": 0
+      },
+      "align": "LEFT",
+      "textStyleId": "",
+      "sizing": [
+        "FIXED",
+        "HUG"
+      ]
+    },
+    {
+      "id": "5:71",
+      "parent": "5:2",
+      "type": "FRAME",
+      "name": "WCKD family signature",
+      "x": 56,
+      "y": 981,
+      "width": 1488,
+      "height": 110,
+      "fill": 13,
+      "layout": {
+        "direction": "HORIZONTAL",
+        "gap": 30,
+        "padding": [
+          0,
+          28,
+          0,
+          28
+        ],
+        "primaryAlign": "MIN",
+        "counterAlign": "CENTER"
+      },
+      "sizing": [
+        "FIXED",
+        "FIXED"
+      ]
+    },
+    {
+      "id": "5:72",
+      "parent": "5:71",
+      "type": "TEXT",
+      "name": "WCKD",
+      "x": 28,
+      "y": 37,
+      "width": 83,
+      "height": 36,
+      "fill": 11,
+      "text": "WCKD",
+      "font": {
+        "family": "Inter",
+        "style": "Bold",
+        "variationSettings": {
+          "wght": 700,
+          "slnt": 0
+        }
+      },
+      "fontSize": 26,
+      "lineHeight": {
+        "unit": "PERCENT",
+        "value": 139.9999976158142
+      },
+      "letterSpacing": {
+        "unit": "PERCENT",
+        "value": 0
+      },
+      "align": "LEFT",
+      "textStyleId": "",
+      "sizing": [
+        "HUG",
+        "HUG"
+      ]
+    },
+    {
+      "id": "5:73",
+      "parent": "5:71",
+      "type": "TEXT",
+      "name": "THE LAB",
+      "x": 141,
+      "y": 47.5,
+      "width": 47,
+      "height": 15,
+      "fill": 1,
+      "text": "THE LAB",
+      "font": {
+        "family": "Inter",
+        "style": "Regular",
+        "variationSettings": {
+          "wght": 400,
+          "slnt": 0
+        }
+      },
+      "fontSize": 11,
+      "lineHeight": {
+        "unit": "PERCENT",
+        "value": 139.9999976158142
+      },
+      "letterSpacing": {
+        "unit": "PERCENT",
+        "value": 0
+      },
+      "align": "LEFT",
+      "textStyleId": "",
+      "sizing": [
+        "HUG",
+        "HUG"
+      ]
+    },
+    {
+      "id": "5:74",
+      "parent": "5:71",
+      "type": "FRAME",
+      "name": "Polykrom family chip",
+      "x": 218,
+      "y": 27,
+      "width": 300,
+      "height": 56,
+      "fill": 18,
+      "layout": {
+        "direction": "HORIZONTAL",
+        "gap": 12,
+        "padding": [
+          0,
+          16,
+          0,
+          16
+        ],
+        "primaryAlign": "MIN",
+        "counterAlign": "CENTER"
+      },
+      "sizing": [
+        "FIXED",
+        "FIXED"
+      ]
+    },
+    {
+      "id": "5:75",
+      "parent": "5:74",
+      "type": "INSTANCE",
+      "name": "Polykrom / Brand / Supplied icon",
+      "x": 16,
+      "y": 12,
+      "width": 32,
+      "height": 32,
+      "componentId": "4:40",
+      "sizing": [
+        "FIXED",
+        "FIXED"
+      ]
+    },
+    {
+      "id": "I5:75;4:41",
+      "parent": "5:75",
+      "type": "FRAME",
+      "name": "Frame",
+      "x": 0,
+      "y": 0,
+      "width": 32,
+      "height": 32,
+      "fill": 3,
+      "sizing": [
+        "FIXED",
+        "FIXED"
+      ]
+    },
+    {
+      "id": "I5:75;4:42",
+      "parent": "I5:75;4:41",
+      "type": "GROUP",
+      "name": "Group",
+      "x": 0,
+      "y": 0,
+      "width": 27.32,
+      "height": 29.07,
+      "sizing": [
+        "FIXED",
+        "FIXED"
+      ]
+    },
+    {
+      "id": "I5:75;4:43",
+      "parent": "I5:75;4:42",
+      "type": "GROUP",
+      "name": "Group",
+      "x": 0,
+      "y": 0,
+      "width": 0,
+      "height": 0,
+      "sizing": [
+        "FIXED",
+        "FIXED"
+      ]
+    },
+    {
+      "id": "I5:75;4:45",
+      "parent": "I5:75;4:42",
+      "type": "GROUP",
+      "name": "Polykrom",
+      "x": 4.66,
+      "y": 2.91,
+      "width": 22.66,
+      "height": 26.17,
+      "sizing": [
+        "FIXED",
+        "FIXED"
+      ]
+    },
+    {
+      "id": "I5:75;4:46",
+      "parent": "I5:75;4:45",
+      "type": "GROUP",
+      "name": "Group",
+      "x": 12.21,
+      "y": 2.91,
+      "width": 7.55,
+      "height": 8.72,
+      "sizing": [
+        "FIXED",
+        "FIXED"
+      ]
+    },
+    {
+      "id": "I5:75;4:47",
+      "parent": "I5:75;4:46",
+      "type": "VECTOR",
+      "name": "Vector",
+      "x": 12.21,
+      "y": 2.91,
+      "width": 7.55,
+      "height": 8.72,
+      "fill": 4,
+      "sizing": [
+        "FIXED",
+        "FIXED"
+      ]
+    },
+    {
+      "id": "I5:75;4:48",
+      "parent": "I5:75;4:45",
+      "type": "GROUP",
+      "name": "Group",
+      "x": 12.21,
+      "y": 11.63,
+      "width": 7.55,
+      "height": 8.72,
+      "sizing": [
+        "FIXED",
+        "FIXED"
+      ]
+    },
+    {
+      "id": "I5:75;4:49",
+      "parent": "I5:75;4:48",
+      "type": "VECTOR",
+      "name": "Vector",
+      "x": 12.21,
+      "y": 11.63,
+      "width": 7.55,
+      "height": 8.72,
+      "fill": 5,
+      "sizing": [
+        "FIXED",
+        "FIXED"
+      ]
+    },
+    {
+      "id": "I5:75;4:50",
+      "parent": "I5:75;4:45",
+      "type": "GROUP",
+      "name": "Group",
+      "x": 12.21,
+      "y": 20.35,
+      "width": 7.55,
+      "height": 8.72,
+      "sizing": [
+        "FIXED",
+        "FIXED"
+      ]
+    },
+    {
+      "id": "I5:75;4:51",
+      "parent": "I5:75;4:50",
+      "type": "VECTOR",
+      "name": "Vector",
+      "x": 12.21,
+      "y": 20.35,
+      "width": 7.55,
+      "height": 8.72,
+      "fill": 6,
+      "sizing": [
+        "FIXED",
+        "FIXED"
+      ]
+    },
+    {
+      "id": "I5:75;4:52",
+      "parent": "I5:75;4:45",
+      "type": "GROUP",
+      "name": "Group",
+      "x": 19.77,
+      "y": 7.27,
+      "width": 7.55,
+      "height": 8.72,
+      "sizing": [
+        "FIXED",
+        "FIXED"
+      ]
+    },
+    {
+      "id": "I5:75;4:53",
+      "parent": "I5:75;4:52",
+      "type": "VECTOR",
+      "name": "Vector",
+      "x": 19.77,
+      "y": 7.27,
+      "width": 7.55,
+      "height": 8.72,
+      "fill": 7,
+      "sizing": [
+        "FIXED",
+        "FIXED"
+      ]
+    },
+    {
+      "id": "I5:75;4:54",
+      "parent": "I5:75;4:45",
+      "type": "GROUP",
+      "name": "Group",
+      "x": 19.77,
+      "y": 15.99,
+      "width": 7.55,
+      "height": 8.72,
+      "sizing": [
+        "FIXED",
+        "FIXED"
+      ]
+    },
+    {
+      "id": "I5:75;4:55",
+      "parent": "I5:75;4:54",
+      "type": "VECTOR",
+      "name": "Vector",
+      "x": 19.77,
+      "y": 15.99,
+      "width": 7.55,
+      "height": 8.72,
+      "fill": 8,
+      "sizing": [
+        "FIXED",
+        "FIXED"
+      ]
+    },
+    {
+      "id": "I5:75;4:56",
+      "parent": "I5:75;4:45",
+      "type": "GROUP",
+      "name": "Group",
+      "x": 4.66,
+      "y": 15.99,
+      "width": 7.55,
+      "height": 8.72,
+      "sizing": [
+        "FIXED",
+        "FIXED"
+      ]
+    },
+    {
+      "id": "I5:75;4:57",
+      "parent": "I5:75;4:56",
+      "type": "VECTOR",
+      "name": "Vector",
+      "x": 4.66,
+      "y": 15.99,
+      "width": 7.55,
+      "height": 8.72,
+      "fill": 9,
+      "sizing": [
+        "FIXED",
+        "FIXED"
+      ]
+    },
+    {
+      "id": "I5:75;4:58",
+      "parent": "I5:75;4:45",
+      "type": "GROUP",
+      "name": "Group",
+      "x": 4.66,
+      "y": 7.27,
+      "width": 7.55,
+      "height": 8.72,
+      "sizing": [
+        "FIXED",
+        "FIXED"
+      ]
+    },
+    {
+      "id": "I5:75;4:59",
+      "parent": "I5:75;4:58",
+      "type": "VECTOR",
+      "name": "Vector",
+      "x": 4.66,
+      "y": 7.27,
+      "width": 7.55,
+      "height": 8.72,
+      "fill": 10,
+      "sizing": [
+        "FIXED",
+        "FIXED"
+      ]
+    },
+    {
+      "id": "5:95",
+      "parent": "5:74",
+      "type": "TEXT",
+      "name": "POLYKROM",
+      "x": 60,
+      "y": 15.5,
+      "width": 103,
+      "height": 25,
+      "fill": 12,
+      "text": "POLYKROM",
+      "font": {
+        "family": "Inter",
+        "style": "Bold",
+        "variationSettings": {
+          "wght": 700,
+          "slnt": 0
+        }
+      },
+      "fontSize": 18,
+      "lineHeight": {
+        "unit": "PERCENT",
+        "value": 139.9999976158142
+      },
+      "letterSpacing": {
+        "unit": "PERCENT",
+        "value": 0
+      },
+      "align": "LEFT",
+      "textStyleId": "",
+      "sizing": [
+        "HUG",
+        "HUG"
+      ]
+    },
+    {
+      "id": "5:96",
+      "parent": "5:71",
+      "type": "FRAME",
+      "name": "Trigon family chip",
+      "x": 548,
+      "y": 27,
+      "width": 270,
+      "height": 56,
+      "fill": 0,
+      "layout": {
+        "direction": "HORIZONTAL",
+        "gap": 12,
+        "padding": [
+          0,
+          16,
+          0,
+          16
+        ],
+        "primaryAlign": "MIN",
+        "counterAlign": "CENTER"
+      },
+      "sizing": [
+        "FIXED",
+        "FIXED"
+      ]
+    },
+    {
+      "id": "5:97",
+      "parent": "5:96",
+      "type": "RECTANGLE",
+      "name": "Rectangle",
+      "x": 16,
+      "y": 23.5,
+      "width": 9,
+      "height": 9,
+      "fill": 19,
+      "sizing": [
+        "FIXED",
+        "FIXED"
+      ]
+    },
+    {
+      "id": "5:98",
+      "parent": "5:96",
+      "type": "TEXT",
+      "name": "TRIGON",
+      "x": 37,
+      "y": 15.5,
+      "width": 70,
+      "height": 25,
+      "fill": 11,
+      "text": "TRIGON",
+      "font": {
+        "family": "Inter",
+        "style": "Bold",
+        "variationSettings": {
+          "wght": 700,
+          "slnt": 0
+        }
+      },
+      "fontSize": 18,
+      "lineHeight": {
+        "unit": "PERCENT",
+        "value": 139.9999976158142
+      },
+      "letterSpacing": {
+        "unit": "PERCENT",
+        "value": 0
+      },
+      "align": "LEFT",
+      "textStyleId": "",
+      "sizing": [
+        "HUG",
+        "HUG"
+      ]
+    },
+    {
+      "id": "5:99",
+      "parent": "5:71",
+      "type": "TEXT",
+      "name": "Individual tools. Shared discipline.",
+      "x": 848,
+      "y": 45,
+      "width": 224,
+      "height": 20,
+      "fill": 1,
+      "text": "Individual tools. Shared discipline.",
+      "font": {
+        "family": "Inter",
+        "style": "Regular",
+        "variationSettings": {
+          "wght": 400,
+          "slnt": 0
+        }
+      },
+      "fontSize": 14,
+      "lineHeight": {
+        "unit": "PERCENT",
+        "value": 139.9999976158142
+      },
+      "letterSpacing": {
+        "unit": "PERCENT",
+        "value": 0
+      },
+      "align": "LEFT",
+      "textStyleId": "",
+      "sizing": [
+        "HUG",
+        "HUG"
+      ]
+    }
+  ],
+  "paints": [
+    [
+      {
+        "type": "SOLID",
+        "visible": true,
+        "opacity": 1,
+        "blendMode": "NORMAL",
+        "color": {
+          "r": 0.125490203499794,
+          "g": 0.13333334028720856,
+          "b": 0.14509804546833038
+        },
+        "boundVariables": {
+          "color": {
+            "type": "VARIABLE_ALIAS",
+            "id": "VariableID:4:5"
+          }
+        }
+      }
+    ],
+    [
+      {
+        "type": "SOLID",
+        "visible": true,
+        "opacity": 1,
+        "blendMode": "NORMAL",
+        "color": {
+          "r": 0.6627451181411743,
+          "g": 0.6901960968971252,
+          "b": 0.7176470756530762
+        },
+        "boundVariables": {
+          "color": {
+            "type": "VARIABLE_ALIAS",
+            "id": "VariableID:4:15"
+          }
+        }
+      }
+    ],
+    [
+      {
+        "type": "SOLID",
+        "visible": true,
+        "opacity": 1,
+        "blendMode": "NORMAL",
+        "color": {
+          "r": 0.25882354378700256,
+          "g": 0.27843138575553894,
+          "b": 0.3019607961177826
+        },
+        "boundVariables": {
+          "color": {
+            "type": "VARIABLE_ALIAS",
+            "id": "VariableID:4:11"
+          }
+        }
+      }
+    ],
+    [
+      {
+        "type": "SOLID",
+        "visible": false,
+        "opacity": 1,
+        "blendMode": "NORMAL",
+        "color": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "boundVariables": {}
+      }
+    ],
+    [
+      {
+        "type": "GRADIENT_LINEAR",
+        "visible": true,
+        "opacity": 1,
+        "blendMode": "NORMAL",
+        "gradientStops": [
+          {
+            "color": {
+              "r": 0.8784313797950745,
+              "g": 1,
+              "b": 0.1882352977991104,
+              "a": 1
+            },
+            "position": 0,
+            "boundVariables": {}
+          },
+          {
+            "color": {
+              "r": 0.43921568989753723,
+              "g": 0.8705882430076599,
+              "b": 0.09019608050584793,
+              "a": 1
+            },
+            "position": 0.5,
+            "boundVariables": {}
+          },
+          {
+            "color": {
+              "r": 0,
+              "g": 0.7529411911964417,
+              "b": 0.6000000238418579,
+              "a": 1
+            },
+            "position": 1,
+            "boundVariables": {}
+          }
+        ],
+        "gradientTransform": [
+          [
+            -0.21428565680980682,
+            0.2857142686843872,
+            0.17857131361961365
+          ],
+          [
+            -0.2474357634782791,
+            -0.2474358230829239,
+            0.9948714971542358
+          ]
+        ]
+      }
+    ],
+    [
+      {
+        "type": "GRADIENT_LINEAR",
+        "visible": true,
+        "opacity": 1,
+        "blendMode": "NORMAL",
+        "gradientStops": [
+          {
+            "color": {
+              "r": 0.8784313797950745,
+              "g": 1,
+              "b": 0.1882352977991104,
+              "a": 1
+            },
+            "position": 0,
+            "boundVariables": {}
+          },
+          {
+            "color": {
+              "r": 0.43921568989753723,
+              "g": 0.8705882430076599,
+              "b": 0.09019608050584793,
+              "a": 1
+            },
+            "position": 0.5,
+            "boundVariables": {}
+          },
+          {
+            "color": {
+              "r": 0,
+              "g": 0.7529411911964417,
+              "b": 0.6000000238418579,
+              "a": 1
+            },
+            "position": 1,
+            "boundVariables": {}
+          }
+        ],
+        "gradientTransform": [
+          [
+            -0.21428565680980682,
+            0.2857142686843872,
+            0.46428561210632324
+          ],
+          [
+            -0.2474357634782791,
+            -0.2474358230829239,
+            0.7474356889724731
+          ]
+        ]
+      }
+    ],
+    [
+      {
+        "type": "GRADIENT_LINEAR",
+        "visible": true,
+        "opacity": 1,
+        "blendMode": "NORMAL",
+        "gradientStops": [
+          {
+            "color": {
+              "r": 0.8784313797950745,
+              "g": 1,
+              "b": 0.1882352977991104,
+              "a": 1
+            },
+            "position": 0,
+            "boundVariables": {}
+          },
+          {
+            "color": {
+              "r": 0.43921568989753723,
+              "g": 0.8705882430076599,
+              "b": 0.09019608050584793,
+              "a": 1
+            },
+            "position": 0.5,
+            "boundVariables": {}
+          },
+          {
+            "color": {
+              "r": 0,
+              "g": 0.7529411911964417,
+              "b": 0.6000000238418579,
+              "a": 1
+            },
+            "position": 1,
+            "boundVariables": {}
+          }
+        ],
+        "gradientTransform": [
+          [
+            -0.21428565680980682,
+            0.2857142686843872,
+            0.7499998807907104
+          ],
+          [
+            -0.2474357634782791,
+            -0.2474358230829239,
+            0.49999985098838806
+          ]
+        ]
+      }
+    ],
+    [
+      {
+        "type": "GRADIENT_LINEAR",
+        "visible": true,
+        "opacity": 1,
+        "blendMode": "NORMAL",
+        "gradientStops": [
+          {
+            "color": {
+              "r": 0.8784313797950745,
+              "g": 1,
+              "b": 0.1882352977991104,
+              "a": 1
+            },
+            "position": 0,
+            "boundVariables": {}
+          },
+          {
+            "color": {
+              "r": 0.43921568989753723,
+              "g": 0.8705882430076599,
+              "b": 0.09019608050584793,
+              "a": 1
+            },
+            "position": 0.5,
+            "boundVariables": {}
+          },
+          {
+            "color": {
+              "r": 0,
+              "g": 0.7529411911964417,
+              "b": 0.6000000238418579,
+              "a": 1
+            },
+            "position": 1,
+            "boundVariables": {}
+          }
+        ],
+        "gradientTransform": [
+          [
+            -0.21428565680980682,
+            0.2857142686843872,
+            0.10714274644851685
+          ],
+          [
+            -0.2474357634782791,
+            -0.2474358230829239,
+            0.6237177848815918
+          ]
+        ]
+      }
+    ],
+    [
+      {
+        "type": "GRADIENT_LINEAR",
+        "visible": true,
+        "opacity": 1,
+        "blendMode": "NORMAL",
+        "gradientStops": [
+          {
+            "color": {
+              "r": 0.8784313797950745,
+              "g": 1,
+              "b": 0.1882352977991104,
+              "a": 1
+            },
+            "position": 0,
+            "boundVariables": {}
+          },
+          {
+            "color": {
+              "r": 0.43921568989753723,
+              "g": 0.8705882430076599,
+              "b": 0.09019608050584793,
+              "a": 1
+            },
+            "position": 0.5,
+            "boundVariables": {}
+          },
+          {
+            "color": {
+              "r": 0,
+              "g": 0.7529411911964417,
+              "b": 0.6000000238418579,
+              "a": 1
+            },
+            "position": 1,
+            "boundVariables": {}
+          }
+        ],
+        "gradientTransform": [
+          [
+            -0.21428565680980682,
+            0.2857142686843872,
+            0.39285704493522644
+          ],
+          [
+            -0.2474357634782791,
+            -0.2474358230829239,
+            0.3762819468975067
+          ]
+        ]
+      }
+    ],
+    [
+      {
+        "type": "GRADIENT_LINEAR",
+        "visible": true,
+        "opacity": 1,
+        "blendMode": "NORMAL",
+        "gradientStops": [
+          {
+            "color": {
+              "r": 0.8784313797950745,
+              "g": 1,
+              "b": 0.1882352977991104,
+              "a": 1
+            },
+            "position": 0,
+            "boundVariables": {}
+          },
+          {
+            "color": {
+              "r": 0.43921568989753723,
+              "g": 0.8705882430076599,
+              "b": 0.09019608050584793,
+              "a": 1
+            },
+            "position": 0.5,
+            "boundVariables": {}
+          },
+          {
+            "color": {
+              "r": 0,
+              "g": 0.7529411911964417,
+              "b": 0.6000000238418579,
+              "a": 1
+            },
+            "position": 1,
+            "boundVariables": {}
+          }
+        ],
+        "gradientTransform": [
+          [
+            -0.21428565680980682,
+            0.2857142686843872,
+            0.8214284777641296
+          ],
+          [
+            -0.2474357634782791,
+            -0.2474358230829239,
+            0.8711535930633545
+          ]
+        ]
+      }
+    ],
+    [
+      {
+        "type": "GRADIENT_LINEAR",
+        "visible": true,
+        "opacity": 1,
+        "blendMode": "NORMAL",
+        "gradientStops": [
+          {
+            "color": {
+              "r": 0.8784313797950745,
+              "g": 1,
+              "b": 0.1882352977991104,
+              "a": 1
+            },
+            "position": 0,
+            "boundVariables": {}
+          },
+          {
+            "color": {
+              "r": 0.43921568989753723,
+              "g": 0.8705882430076599,
+              "b": 0.09019608050584793,
+              "a": 1
+            },
+            "position": 0.5,
+            "boundVariables": {}
+          },
+          {
+            "color": {
+              "r": 0,
+              "g": 0.7529411911964417,
+              "b": 0.6000000238418579,
+              "a": 1
+            },
+            "position": 1,
+            "boundVariables": {}
+          }
+        ],
+        "gradientTransform": [
+          [
+            -0.21428565680980682,
+            0.2857142686843872,
+            0.5357141494750977
+          ],
+          [
+            -0.2474357634782791,
+            -0.2474358230829239,
+            1.1185894012451172
+          ]
+        ]
+      }
+    ],
+    [
+      {
+        "type": "SOLID",
+        "visible": true,
+        "opacity": 1,
+        "blendMode": "NORMAL",
+        "color": {
+          "r": 0.9254902005195618,
+          "g": 0.9333333373069763,
+          "b": 0.9411764740943909
+        },
+        "boundVariables": {
+          "color": {
+            "type": "VARIABLE_ALIAS",
+            "id": "VariableID:4:13"
+          }
+        }
+      }
+    ],
+    [
+      {
+        "type": "SOLID",
+        "visible": true,
+        "opacity": 1,
+        "blendMode": "NORMAL",
+        "color": {
+          "r": 0.8784313797950745,
+          "g": 1,
+          "b": 0.1882352977991104
+        },
+        "boundVariables": {
+          "color": {
+            "type": "VARIABLE_ALIAS",
+            "id": "VariableID:4:19"
+          }
+        }
+      }
+    ],
+    [
+      {
+        "type": "SOLID",
+        "visible": true,
+        "opacity": 1,
+        "blendMode": "NORMAL",
+        "color": {
+          "r": 0.16078431904315948,
+          "g": 0.1725490242242813,
+          "b": 0.18431372940540314
+        },
+        "boundVariables": {
+          "color": {
+            "type": "VARIABLE_ALIAS",
+            "id": "VariableID:4:7"
+          }
+        }
+      }
+    ],
+    [
+      {
+        "type": "SOLID",
+        "visible": true,
+        "opacity": 1,
+        "blendMode": "NORMAL",
+        "color": {
+          "r": 0.25882354378700256,
+          "g": 0.27843138575553894,
+          "b": 0.3019607961177826
+        },
+        "boundVariables": {}
+      }
+    ],
+    [
+      {
+        "type": "SOLID",
+        "visible": true,
+        "opacity": 1,
+        "blendMode": "NORMAL",
+        "color": {
+          "r": 0.43921568989753723,
+          "g": 0.8705882430076599,
+          "b": 0.09019608050584793
+        },
+        "boundVariables": {
+          "color": {
+            "type": "VARIABLE_ALIAS",
+            "id": "VariableID:4:21"
+          }
+        }
+      }
+    ],
+    [
+      {
+        "type": "SOLID",
+        "visible": true,
+        "opacity": 1,
+        "blendMode": "NORMAL",
+        "color": {
+          "r": 0,
+          "g": 0.7529411911964417,
+          "b": 0.6000000238418579
+        },
+        "boundVariables": {
+          "color": {
+            "type": "VARIABLE_ALIAS",
+            "id": "VariableID:4:23"
+          }
+        }
+      }
+    ],
+    [
+      {
+        "type": "SOLID",
+        "visible": true,
+        "opacity": 1,
+        "blendMode": "NORMAL",
+        "color": {
+          "r": 0.0941176488995552,
+          "g": 0.10588235408067703,
+          "b": 0.12156862765550613
+        },
+        "boundVariables": {
+          "color": {
+            "type": "VARIABLE_ALIAS",
+            "id": "VariableID:4:27"
+          }
+        }
+      }
+    ],
+    [
+      {
+        "type": "SOLID",
+        "visible": true,
+        "opacity": 1,
+        "blendMode": "NORMAL",
+        "color": {
+          "r": 0.21568627655506134,
+          "g": 0.2549019753932953,
+          "b": 0.14901961386203766
+        },
+        "boundVariables": {
+          "color": {
+            "type": "VARIABLE_ALIAS",
+            "id": "VariableID:4:25"
+          }
+        }
+      }
+    ],
+    [
+      {
+        "type": "SOLID",
+        "visible": true,
+        "opacity": 1,
+        "blendMode": "NORMAL",
+        "color": {
+          "r": 1,
+          "g": 0.43921568989753723,
+          "b": 0.2078431397676468
+        },
+        "boundVariables": {}
+      }
+    ]
+  ]
+}
