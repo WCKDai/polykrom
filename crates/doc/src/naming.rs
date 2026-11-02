@@ -1246,7 +1246,7 @@ mod tests {
     #[test]
     fn a_long_chain_of_models_frees_on_a_small_stack() {
         let run = || {
-            let block = solidcraft_kernel::box_solid(Vec3::ZERO, Vec3::new(4., 2., 1.)).unwrap();
+            let block = polycore::box_solid(Vec3::ZERO, Vec3::new(4., 2., 1.)).unwrap();
             let mut doc = crate::Document::default();
             let kind = FeatureKind::Combine { target: "B".into(), tools: Vec::new(), operation: crate::Operation::Join, keep_tools: false };
             let id = doc.add_feature(kind, None).unwrap();
