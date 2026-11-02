@@ -661,12 +661,24 @@ fn fillet_fitted(
     r: f64,
     fit: crate::FilletFit,
 ) -> std::result::Result<(kernel::Body, Option<Vec<f64>>), kernel::KernelError> {
-    match kernel::fillet(body, edges, r) {
-        Err(kernel::KernelError::TooLarge(why)) if fit == crate::FilletFit::Reduce => match kernel::fillet_max_each(body, edges, r) {
-            // Built at the radius asked for after all (the groups apart): nothing reduced.
-            Some((used, b)) => Ok((b, used.iter().any(|u| *u < r).then_some(used))),
-            None => Err(kernel::KernelError::TooLarge(why)),
-        },
+    // The radius asked for first, within a plain blend's budget. Edges that take more than half
+    // of it to refuse at one size are refused, not searched at a dozen more sizes (each as long,
+    // #243); a size search on edges that refuse quickly is what Reduce is for.
+    let mut used = 0;
+    let first = kernel::with_blend_budget(kernel::BLEND_WORK, edges, || {
+        let before = kernel::work_left().unwrap_or(0);
+        let r = kernel::fillet(body, edges, r);
+        used = before.saturating_sub(kernel::work_left().unwrap_or(0));
+        r
+    });
+    match first {
+        Err(kernel::KernelError::TooLarge(why)) if fit == crate::FilletFit::Reduce && used <= kernel::BLEND_WORK / 2 => {
+            match kernel::fillet_max_each(body, edges, r) {
+                // Built at the radius asked for after all (the groups apart): nothing reduced.
+                Some((used, b)) => Ok((b, used.iter().any(|u| *u < r).then_some(used))),
+                None => Err(kernel::KernelError::TooLarge(why)),
+            }
+        }
         Err(kernel::KernelError::TooLarge(_)) if fit == crate::FilletFit::Taper => kernel::fillet_tapered(body, edges, r).map(|(b, _)| (b, None)),
         other => other.map(|b| (b, None)),
     }
@@ -5894,34 +5906,41 @@ fn replay(
                 let moved: Vec<Vec3> = found.iter().map(|p| crate::apply_point(m, *p)).collect();
                 let ti = blend_target(st, &None, &moved)?;
                 let Some(mb) = st.bodies.get(ti).cloned() else { continue };
-                let nb = match &src.kind {
-                    FeatureKind::Chamfer { distance2, angle, flip, .. } => chamfer_with(vals, &mb.body, &moved, r, distance2, angle, *flip)?,
-                    // A radius per edge: each copied edge with its own, if every edge was found.
-                    // A radius per edge: each copied edge with the radius its edge took in the
-                    // source (the edges it found, in order), else from the feature's own list.
-                    FeatureKind::Fillet { edge_radii, .. } if !edge_radii.is_empty() => {
-                        let radii = match st.fitted.get(&src.id) {
-                            Some(used) if used.len() == moved.len() => used.clone(),
-                            _ if edge_radii.len() == moved.len() => {
-                                let mut radii = Vec::with_capacity(edge_radii.len());
-                                for e in edge_radii {
-                                    radii.push(val(vals, e, Kind::Length)?);
-                                }
-                                radii
-                            }
-                            _ => return Err(DocError::Invalid("a copied fillet with a radius per edge needs each of its edges".into())),
-                        };
-                        kernel::fillet_each(&mb.body, &moved, &radii)?
-                    }
-                    // A copy is congruent to the original: the radius it was reduced to first.
-                    FeatureKind::Fillet { fit, .. } => match st.fitted.get(&src.id) {
-                        Some(used) => {
-                            kernel::fillet_each(&mb.body, &moved, used).or_else(|_| fillet_fitted(&mb.body, &moved, r, *fit).map(|x| x.0))?
-                        }
-                        None => fillet_fitted(&mb.body, &moved, r, *fit)?.0,
-                    },
-                    _ => kernel::fillet(&mb.body, &moved, r)?,
+                let work = if matches!(&src.kind, FeatureKind::Fillet { fit: crate::FilletFit::Reduce, .. }) {
+                    kernel::BLEND_SEARCH_WORK
+                } else {
+                    kernel::BLEND_WORK
                 };
+                let nb = kernel::with_blend_budget(work, &moved, || -> Result<kernel::Body> {
+                    Ok(match &src.kind {
+                        FeatureKind::Chamfer { distance2, angle, flip, .. } => chamfer_with(vals, &mb.body, &moved, r, distance2, angle, *flip)?,
+                        // A radius per edge: each copied edge with its own, if every edge was found.
+                        // A radius per edge: each copied edge with the radius its edge took in the
+                        // source (the edges it found, in order), else from the feature's own list.
+                        FeatureKind::Fillet { edge_radii, .. } if !edge_radii.is_empty() => {
+                            let radii = match st.fitted.get(&src.id) {
+                                Some(used) if used.len() == moved.len() => used.clone(),
+                                _ if edge_radii.len() == moved.len() => {
+                                    let mut radii = Vec::with_capacity(edge_radii.len());
+                                    for e in edge_radii {
+                                        radii.push(val(vals, e, Kind::Length)?);
+                                    }
+                                    radii
+                                }
+                                _ => return Err(DocError::Invalid("a copied fillet with a radius per edge needs each of its edges".into())),
+                            };
+                            kernel::fillet_each(&mb.body, &moved, &radii)?
+                        }
+                        // A copy is congruent to the original: the radius it was reduced to first.
+                        FeatureKind::Fillet { fit, .. } => match st.fitted.get(&src.id) {
+                            Some(used) => {
+                                kernel::fillet_each(&mb.body, &moved, used).or_else(|_| fillet_fitted(&mb.body, &moved, r, *fit).map(|x| x.0))?
+                            }
+                            None => fillet_fitted(&mb.body, &moved, r, *fit)?.0,
+                        },
+                        _ => kernel::fillet(&mb.body, &moved, r)?,
+                    })
+                })?;
                 // A copy blends edges the pattern's own copies made: named after the body so far.
                 let nb = mb.traced().then(nb);
                 if let Some(slot) = st.bodies.get_mut(ti) {
@@ -6939,61 +6958,69 @@ fn eval_feature(doc: &Document, vals: &BTreeMap<String, Value>, f: &Feature, st:
             {
                 return Err(DocError::Invalid("a G2 corner is built for a constant-radius fillet (type: constant, fit: exact) only".into()));
             }
-            // The blended body, and the lineage of what the last blend started from.
-            let (nb, from) = match &f.kind {
-                FeatureKind::Fillet { corner: crate::FilletCorner::G2, .. } => (kernel::fillet_g2_corners(&mb.body, &edges, r)?, input),
-                FeatureKind::Fillet { style: crate::FilletStyle::Curvature, .. } => (kernel::fillet_g2(&mb.body, &edges, r)?, input),
-                FeatureKind::Fillet { style: crate::FilletStyle::Chord, .. } => (kernel::fillet_chord(&mb.body, &edges, r)?, input),
-                FeatureKind::Fillet { style: crate::FilletStyle::Variable { radius2, start, mid, smooth }, .. } => {
-                    let r2 = val(vals, radius2, Kind::Length)?;
-                    let mut pts = vec![(0.0, r), (1.0, r2)];
-                    for (t, e) in mid {
-                        pts.push((*t, val(vals, e, Kind::Length)?));
-                    }
-                    one_by_one(input, &edges, |b, p| kernel::fillet_variable_points(b, p, start.0, &pts, *smooth))?
-                }
-                FeatureKind::Fillet { style: crate::FilletStyle::Spline { start, knots, radii }, .. } => {
-                    let mut values = vec![r];
-                    for e in radii {
-                        values.push(val(vals, e, Kind::Length)?);
-                    }
-                    let law = crate::FilletStyle::spline(knots, values);
-                    one_by_one(input, &edges, |b, p| kernel::fillet_variable_spline(b, p, start.0, &law))?
-                }
-                FeatureKind::Fillet { fit: crate::FilletFit::Taper, .. } => {
-                    let (b, tapers) = kernel::fillet_tapered(&mb.body, &edges, r)?;
-                    if let Some(note) = tapered_note(&tapers) {
-                        append_warning(warning, note);
-                    }
-                    let tapered: Vec<(Vec3, kernel::Taper)> = edges.iter().copied().zip(tapers).filter_map(|(p, t)| Some((p, t?))).collect();
-                    if !tapered.is_empty() {
-                        st.tapered.insert(f.id, tapered);
-                    }
-                    (b, input)
-                }
-                FeatureKind::Fillet { edge_radii, .. } if per_edge => {
-                    let mut radii = Vec::with_capacity(came_from.len());
-                    for i in &came_from {
-                        let e = edge_radii.get(*i).ok_or_else(|| DocError::Invalid("edge radius".into()))?;
-                        radii.push(val(vals, e, Kind::Length)?);
-                    }
-                    let b = kernel::fillet_each(&mb.body, &edges, &radii)?;
-                    // The radius each found edge took, for copies of the fillet (as a fit keeps the
-                    // radii it reduced to).
-                    st.fitted.insert(f.id, radii);
-                    (b, input)
-                }
-                FeatureKind::Fillet { fit, .. } => {
-                    let (b, used) = fillet_fitted(&mb.body, &edges, r, *fit)?;
-                    if let Some(used) = used {
-                        append_warning(warning, reduced_note(&used, r));
-                        st.fitted.insert(f.id, used);
-                    }
-                    (b, input)
-                }
-                FeatureKind::Chamfer { distance2, angle, flip, .. } => (chamfer_with(vals, &mb.body, &edges, r, distance2, angle, *flip)?, input),
-                _ => return Err(DocError::Invalid("blend".into())),
+            // The blended body, and the lineage of what the last blend started from, within the
+            // blends' work budget.
+            let work = if matches!(&f.kind, FeatureKind::Fillet { fit: crate::FilletFit::Reduce, .. }) {
+                kernel::BLEND_SEARCH_WORK
+            } else {
+                kernel::BLEND_WORK
             };
+            let (nb, from) = kernel::with_blend_budget(work, &edges, || -> Result<(kernel::Body, Traced)> {
+                Ok(match &f.kind {
+                    FeatureKind::Fillet { corner: crate::FilletCorner::G2, .. } => (kernel::fillet_g2_corners(&mb.body, &edges, r)?, input),
+                    FeatureKind::Fillet { style: crate::FilletStyle::Curvature, .. } => (kernel::fillet_g2(&mb.body, &edges, r)?, input),
+                    FeatureKind::Fillet { style: crate::FilletStyle::Chord, .. } => (kernel::fillet_chord(&mb.body, &edges, r)?, input),
+                    FeatureKind::Fillet { style: crate::FilletStyle::Variable { radius2, start, mid, smooth }, .. } => {
+                        let r2 = val(vals, radius2, Kind::Length)?;
+                        let mut pts = vec![(0.0, r), (1.0, r2)];
+                        for (t, e) in mid {
+                            pts.push((*t, val(vals, e, Kind::Length)?));
+                        }
+                        one_by_one(input, &edges, |b, p| kernel::fillet_variable_points(b, p, start.0, &pts, *smooth))?
+                    }
+                    FeatureKind::Fillet { style: crate::FilletStyle::Spline { start, knots, radii }, .. } => {
+                        let mut values = vec![r];
+                        for e in radii {
+                            values.push(val(vals, e, Kind::Length)?);
+                        }
+                        let law = crate::FilletStyle::spline(knots, values);
+                        one_by_one(input, &edges, |b, p| kernel::fillet_variable_spline(b, p, start.0, &law))?
+                    }
+                    FeatureKind::Fillet { fit: crate::FilletFit::Taper, .. } => {
+                        let (b, tapers) = kernel::fillet_tapered(&mb.body, &edges, r)?;
+                        if let Some(note) = tapered_note(&tapers) {
+                            append_warning(warning, note);
+                        }
+                        let tapered: Vec<(Vec3, kernel::Taper)> = edges.iter().copied().zip(tapers).filter_map(|(p, t)| Some((p, t?))).collect();
+                        if !tapered.is_empty() {
+                            st.tapered.insert(f.id, tapered);
+                        }
+                        (b, input)
+                    }
+                    FeatureKind::Fillet { edge_radii, .. } if per_edge => {
+                        let mut radii = Vec::with_capacity(came_from.len());
+                        for i in &came_from {
+                            let e = edge_radii.get(*i).ok_or_else(|| DocError::Invalid("edge radius".into()))?;
+                            radii.push(val(vals, e, Kind::Length)?);
+                        }
+                        let b = kernel::fillet_each(&mb.body, &edges, &radii)?;
+                        // The radius each found edge took, for copies of the fillet (as a fit keeps the
+                        // radii it reduced to).
+                        st.fitted.insert(f.id, radii);
+                        (b, input)
+                    }
+                    FeatureKind::Fillet { fit, .. } => {
+                        let (b, used) = fillet_fitted(&mb.body, &edges, r, *fit)?;
+                        if let Some(used) = used {
+                            append_warning(warning, reduced_note(&used, r));
+                            st.fitted.insert(f.id, used);
+                        }
+                        (b, input)
+                    }
+                    FeatureKind::Chamfer { distance2, angle, flip, .. } => (chamfer_with(vals, &mb.body, &edges, r, distance2, angle, *flip)?, input),
+                    _ => return Err(DocError::Invalid("blend".into())),
+                })
+            })?;
             // Keeping the input's planar certificates may join faces; their history stays over
             // the same operand.
             let nb = Traced::step(nb.with_preserved_planar_sources(&mb.body)?, &[&from]);

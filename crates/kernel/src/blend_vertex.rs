@@ -134,6 +134,7 @@ fn ball_at(faces: &[&mt::Face; 3], v: Vec3, r: f64, tol: f64) -> Result<Ball> {
 
 /// Round the three edges at the vertex at `at`, ending in a sphere.
 fn round_vertex(cur: &Body, at: Vec3, r: f64) -> Result<Body> {
+    crate::work::blend_step("rounding a corner where three edges meet")?;
     let size = cur.size();
     let tol = (size * 1e-7).max(1e-9);
     let solid = cur.deep_copy();

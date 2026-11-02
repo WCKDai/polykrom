@@ -941,10 +941,15 @@ pub fn with_deadline<T>(deadline: web_time::Instant, f: impl FnOnce() -> T) -> T
     f()
 }
 
-/// Takes one of the attempts left under [`with_attempt_budget`]; false when none is left, or
-/// when the deadline of [`with_deadline`] has passed.
+/// Takes one of the attempts left under [`with_attempt_budget`]; false when none is left, when
+/// the deadline of [`with_deadline`] has passed, or when a work budget (`crate::work`) has run
+/// out.
 fn take_attempt() -> bool {
     if DEADLINE.with(|c| c.get()).is_some_and(|d| web_time::Instant::now() >= d) {
+        return false;
+    }
+    // A work budget that has run out (a blend's, #243): no more tries.
+    if crate::work::exhausted_now() {
         return false;
     }
     ATTEMPTS.with(|c| match c.get() {

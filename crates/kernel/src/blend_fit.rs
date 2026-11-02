@@ -495,6 +495,9 @@ fn check_in(sel: &Selection, size: Size) -> Result<()> {
 
 /// A blend's refusal `e`, with the largest size that fits added when the size is why.
 pub(crate) fn explain(body: &Body, edges: &[Vec3], size: Size, e: KernelError) -> KernelError {
+    if crate::work::blend_step("finding why the blend was refused").is_err() {
+        return e;
+    }
     let note = match misfit(body, edges, size) {
         Ok(Some((_, largest @ Some(_)))) => fits_note(size, largest),
         _ => return e,
@@ -509,6 +512,7 @@ pub(crate) fn explain(body: &Body, edges: &[Vec3], size: Size, e: KernelError) -
 /// A blend of `edges` at `size` that turned `input` into `out`, if it fits ([`check`]) and
 /// changes no more than it can ([`check_volume`]).
 pub(crate) fn accept(input: &Body, out: Body, edges: &[Vec3], size: Size) -> Result<Body> {
+    crate::work::blend_step("checking that the blend fits")?;
     if input.is_mesh() || out.is_mesh() || edges.is_empty() {
         return Ok(out);
     }
