@@ -8,9 +8,9 @@
 
 use std::collections::{BTreeMap, VecDeque};
 
+use polycore_geom::Vec3;
+use polykrom_doc::ModelBody;
 use serde_json::{Value, json};
-use solidcraft_doc::ModelBody;
-use solidcraft_geom::Vec3;
 
 use super::CommandSpec;
 use crate::params::{bad, bool_, num, str_};
@@ -52,7 +52,7 @@ pub static COMMANDS: &[CommandSpec] = &[
 ];
 
 /// The world bodies a reference names: bodies by name, or a component's.
-fn reference_bodies<'a>(s: &Session, st: &'a solidcraft_doc::ModelState, p: &Value, cmd: &str) -> Result<Vec<&'a ModelBody>> {
+fn reference_bodies<'a>(s: &Session, st: &'a polykrom_doc::ModelState, p: &Value, cmd: &str) -> Result<Vec<&'a ModelBody>> {
     let names: Vec<String> = match p.get("reference") {
         Some(Value::String(n)) => vec![n.clone()],
         Some(Value::Array(a)) if !a.is_empty() && a.len() <= 10_000 => {
@@ -82,7 +82,7 @@ fn reference_bodies<'a>(s: &Session, st: &'a solidcraft_doc::ModelState, p: &Val
 }
 
 /// The design's bodies: those named, else every visible body but the reference.
-fn design_bodies<'a>(s: &Session, st: &'a solidcraft_doc::ModelState, p: &Value, reference: &[&ModelBody], cmd: &str) -> Result<Vec<&'a ModelBody>> {
+fn design_bodies<'a>(s: &Session, st: &'a polykrom_doc::ModelState, p: &Value, reference: &[&ModelBody], cmd: &str) -> Result<Vec<&'a ModelBody>> {
     let asked: Option<Vec<String>> = match p.get("bodies").filter(|v| !v.is_null()) {
         None => None,
         Some(Value::Array(a)) => {
@@ -121,7 +121,7 @@ fn raster(design: &[&ModelBody], reference: &[&ModelBody], right: Vec3, up: Vec3
     let project = |p: Vec3| [p.dot(right), p.dot(up), p.dot(back)];
     let mut lo = [f64::INFINITY; 2];
     let mut hi = [f64::NEG_INFINITY; 2];
-    let meshes: Vec<(bool, u32, std::sync::Arc<solidcraft_geom::Mesh>)> = design
+    let meshes: Vec<(bool, u32, std::sync::Arc<polycore_geom::Mesh>)> = design
         .iter()
         .enumerate()
         .map(|(i, b)| (true, i as u32, b.mesh()))
@@ -305,7 +305,7 @@ fn compare(s: &mut Session, p: &Value) -> Result<Value> {
     let coloured = reference_colour.iter().any(Option::is_some);
     // Each design body's middle, to say which way a region lies from it.
     let middle: Vec<Vec3> = design.iter().map(|b| b.mesh().bounds().center()).collect();
-    let design_box = design.iter().map(|b| b.mesh().bounds()).fold(solidcraft_geom::Aabb3::EMPTY, |a, b| a.union(&b));
+    let design_box = design.iter().map(|b| b.mesh().bounds()).fold(polycore_geom::Aabb3::EMPTY, |a, b| a.union(&b));
     let mut out = Vec::new();
     let (mut iou_sum, mut colour_sum, mut colour_views) = (0.0, 0.0, 0usize);
     for name in &views {
@@ -524,7 +524,7 @@ fn fit(s: &mut Session, p: &Value) -> Result<Value> {
     let reference = reference_bodies(s, &st, p, FIT)?;
     let design = design_bodies(s, &st, p, &reference, FIT)?;
     let method = str_(p, "method").unwrap_or("bbox");
-    let bounds = |bs: &[&ModelBody]| bs.iter().map(|b| b.mesh().bounds()).fold(solidcraft_geom::Aabb3::EMPTY, |a, b| a.union(&b));
+    let bounds = |bs: &[&ModelBody]| bs.iter().map(|b| b.mesh().bounds()).fold(polycore_geom::Aabb3::EMPTY, |a, b| a.union(&b));
     let (db, rb) = (bounds(&design), bounds(&reference));
     if db.is_empty() || rb.is_empty() {
         return Err(bad(FIT, "the design or the reference has no extent"));
