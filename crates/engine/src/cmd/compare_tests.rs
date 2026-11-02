@@ -210,3 +210,103 @@ fn bad_parameters_are_refused() {
     assert!(close(f(&r["only_in_a"]["volume_mm3"]), 12_000.0 - 125.0, 0.01), "{r}");
     assert!(r["verdict"].as_str().unwrap_or_default().starts_with("1 region differs by more than 0.01 mm"), "{}", r["verdict"]);
 }
+
+// inspect.compare_reference and inspect.fit_reference (#193): the design against a concept.
+
+fn view<'a>(r: &'a Value, name: &str) -> &'a Value {
+    r["views"].as_array().and_then(|v| v.iter().find(|x| x["view"] == name)).unwrap_or_else(|| panic!("no {name} view in {r}"))
+}
+
+#[test]
+fn a_box_against_a_slightly_bigger_one_is_short_all_round() {
+    let mut s = Session::default();
+    run(&mut s, "solid.box", json!({"length": 40, "width": 20, "height": 10, "body_name": "Block"}));
+    // The reference: 2 mm bigger on every side, around it.
+    run(
+        &mut s,
+        "solid.box",
+        json!({"length": 44, "width": 24, "height": 14, "corner": [-2, -2, -2], "operation": "new_body", "body_name": "Concept"}),
+    );
+    let r = run(&mut s, "inspect.compare_reference", json!({"reference": "Concept", "tolerance_mm": 1, "rows": 280}));
+    // Front: 40 x 10 in 44 x 14; left: 20 x 10 in 24 x 14; top: 40 x 20 in 44 x 24.
+    for (name, want) in [("front", 400.0 / 616.0), ("left", 200.0 / 336.0), ("top", 800.0 / 1056.0)] {
+        let iou = view(&r, name)["iou"].as_f64().unwrap();
+        assert!((iou - want).abs() < 0.02, "{name}: IoU {iou}, want {want}");
+    }
+    let front = view(&r, "front");
+    let short = front["regions"].as_array().unwrap();
+    assert!(!short.is_empty() && short.iter().all(|g| g["kind"] == "short" && g["body"] == "Block"), "{front}");
+    let deepest = short.iter().map(|g| g["max_mm"].as_f64().unwrap()).fold(0.0, f64::max);
+    // 2 mm short along the sides, 2√2 at the corners.
+    assert!((2.0 - 0.1..=2.0 * std::f64::consts::SQRT_2 + 0.2).contains(&deepest), "2 mm short all round: {deepest}");
+    assert!(short[0]["message"].as_str().unwrap().starts_with("Block is "), "{}", short[0]);
+    assert!(short[0]["message"].as_str().unwrap().contains("mm short of the reference toward"), "{}", short[0]);
+    assert!(r["score"].as_f64().unwrap() < 80.0, "{r}");
+}
+
+#[test]
+fn a_reference_identical_to_the_design_matches_and_the_fit_finds_it() {
+    let mut s = Session::default();
+    run(&mut s, "solid.box", json!({"length": 40, "width": 20, "height": 10, "body_name": "Block"}));
+    // The concept as an inserted mesh of the same box, twice the size and elsewhere.
+    let dir = std::env::temp_dir().join(format!("polykrom-compare-reference-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let stl = dir.join("concept.stl");
+    let mut concept = Session::default();
+    run(&mut concept, "solid.box", json!({"length": 80, "width": 40, "height": 20, "corner": [100, 50, 0], "body_name": "Concept"}));
+    run(&mut concept, "file.export", json!({"path": stl.to_string_lossy()}));
+    run(&mut s, "file.insert_mesh", json!({"path": stl.to_string_lossy()}));
+    let _ = std::fs::remove_dir_all(&dir);
+    let mesh = s.world_state().bodies.iter().find(|b| b.body.is_mesh()).map(|b| b.name.clone()).unwrap();
+    let fit = run(&mut s, "inspect.fit_reference", json!({"reference": mesh, "bodies": ["Block"]}));
+    assert!((fit["scale"].as_f64().unwrap() - 0.5).abs() < 1e-6, "{fit}");
+    assert_eq!(fit["residual"], json!({"x": 1.0, "y": 1.0, "z": 1.0}), "{fit}");
+    // The fit's steps put it on the design: the silhouettes match.
+    for step in fit["steps"].as_array().unwrap() {
+        run(&mut s, step["command"].as_str().unwrap(), step["params"].clone());
+    }
+    let mesh = s.world_state().bodies.iter().find(|b| b.body.is_mesh()).map(|b| b.name.clone()).unwrap();
+    let r = run(&mut s, "inspect.compare_reference", json!({"reference": mesh, "bodies": ["Block"]}));
+    for v in r["views"].as_array().unwrap() {
+        assert!(v["iou"].as_f64().unwrap() > 0.99, "{v}");
+        assert_eq!(v["regions"], json!([]), "{v}");
+    }
+    assert!(r["score"].as_f64().unwrap() > 99.0, "{r}");
+    let principal = run(&mut s, "inspect.fit_reference", json!({"reference": mesh, "bodies": ["Block"], "method": "principal"}));
+    assert!((principal["scale"].as_f64().unwrap() - 1.0).abs() < 0.01, "{principal}");
+    assert!(principal["axes"].as_array().unwrap().iter().all(|a| a["angle_deg"].as_f64().unwrap() < 1.0), "{principal}");
+}
+
+#[test]
+fn colour_blocks_are_compared_where_the_reference_has_colours() {
+    let mut s = Session::default();
+    run(&mut s, "solid.box", json!({"length": 40, "width": 20, "height": 10, "body_name": "Block"}));
+    run(&mut s, "solid.box", json!({"length": 40, "width": 20, "height": 10, "operation": "new_body", "body_name": "Concept"}));
+    run(&mut s, "appearance.assign", json!({"bodies": ["Block"], "color": "#ccff00"}));
+    run(&mut s, "appearance.assign", json!({"bodies": ["Concept"], "color": "#111111"}));
+    let r = run(&mut s, "inspect.compare_reference", json!({"reference": "Concept", "bodies": ["Block"], "views": ["front"]}));
+    let colour = &view(&r, "front")["colour"];
+    assert!(colour["match"].as_f64().unwrap() < 0.05, "{colour}");
+    assert_eq!(colour["mismatches"][0]["design"], "#ccff00", "{colour}");
+    assert_eq!(colour["mismatches"][0]["reference"], "#111111", "{colour}");
+    assert!(s.execute("inspect.compare_reference", &json!({"reference": "Nope"})).is_err());
+    assert!(s.execute("inspect.compare_reference", &json!({"reference": "Concept", "views": ["sideways"]})).is_err());
+}
+
+#[test]
+fn a_reference_modelled_with_another_axis_up_is_turned_first() {
+    let mut s = Session::default();
+    run(&mut s, "solid.box", json!({"length": 40, "width": 20, "height": 10, "body_name": "Block"}));
+    // The same block lying the other way (40 along Y, 20 along X), larger and elsewhere.
+    run(
+        &mut s,
+        "solid.box",
+        json!({"length": 30, "width": 60, "height": 15, "corner": [200, 100, 50], "operation": "new_body", "body_name": "Concept"}),
+    );
+    let fit = run(&mut s, "inspect.fit_reference", json!({"reference": "Concept", "bodies": ["Block"], "apply": true}));
+    assert_eq!(fit["turn"]["axis"], "z", "{fit}");
+    assert_eq!(fit["residual"], json!({"x": 1.0, "y": 1.0, "z": 1.0}), "{fit}");
+    let r = run(&mut s, "inspect.compare_reference", json!({"reference": "Concept", "bodies": ["Block"]}));
+    assert!(r["score"].as_f64().unwrap() > 99.0, "{r}");
+}

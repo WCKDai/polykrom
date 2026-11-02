@@ -395,7 +395,9 @@ pub fn tool_definitions() -> Vec<Value> {
              if it fails) and measure again. Returns before and after scores, what was applied and skipped, the fixes still suggested \
              and the findings to act on by hand, the `style` judged by (organic, faceted or technical, asked or inferred) and the \
              design's `colours` (palette, near-duplicate colours). With `views`, also four model renders (front three-quarter, side, \
-             top, back three-quarter) as images and PNG paths to critique. Repeat, making the judgement changes in between, until the score stops rising \
+             top, back three-quarter) as images and PNG paths to critique. With `reference` (a concept mesh, fitted first with \
+             inspect.fit_reference), also `reference_match`: how well the silhouettes match per view, where the design sticks out or \
+             falls short, and the colour match. Repeat, making the judgement changes in between, until the score stops rising \
              (skill_reference solidcraft-polish).",
             obj(
                 json!({
@@ -406,6 +408,7 @@ pub fn tool_definitions() -> Vec<Value> {
                     "printed": {"type": "array", "items": {"type": "string"}, "description": "Bodies to judge as printed whatever their material"},
                     "skip": {"type": "array", "items": {"type": "string"}, "description": "Bodies to leave out, such as bought parts modelled as blocks"},
                     "max_fixes": {"type": "integer", "description": "How many fixes to list or try (1–100)"},
+                    "reference": {"type": "array", "items": {"type": "string"}, "description": "A concept to compare with: the reference body names (an inserted concept mesh, fitted first with inspect.fit_reference). Adds `reference_match`: inspect.compare_reference's silhouette IoU per view, the regions that stick out or fall short, named by part, and the colour match"},
                     "style": {"type": "string", "enum": ["auto", "organic", "faceted", "technical"], "description": "The finish aimed at. auto (default): faceted when the parts carry more chamfers than fillets, else organic; organic: fillets in a radius family, raw flat faces read as boxy; faceted: hard-surface facets with crisp chamfers in two or three sizes, flat facets are good and fixes are chamfers; technical: edges just broken, flat faces fine. Match it to the concept: faceted for a hard-surface or low-poly look"},
                 }),
                 &[],
@@ -1634,6 +1637,13 @@ fn polish(b: &mut dyn Backend, a: &Map<String, Value>) -> Result<(Value, Vec<Vec
         if let Some(list) = out.get_mut(k).and_then(Value::as_array_mut) {
             list.retain(|v| v.get("category").is_none() || wanted(v));
         }
+    }
+    if let Some(reference) = a.get("reference").filter(|v| !v.is_null()) {
+        let mut p = json!({"reference": reference});
+        if let Some(bodies) = a.get("bodies").filter(|v| !v.is_null()) {
+            p["bodies"] = bodies.clone();
+        }
+        out["reference_match"] = exec(b, "inspect.compare_reference", p)?;
     }
     let mut pngs = Vec::new();
     if a.get("views").and_then(Value::as_bool).unwrap_or(false) {

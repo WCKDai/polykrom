@@ -26,6 +26,7 @@ pub(crate) mod browser;
 pub(crate) mod clearance;
 mod clipboard;
 mod compare;
+mod compare_reference;
 mod component;
 mod component_clone;
 mod component_clone_assembly;
@@ -292,6 +293,7 @@ pub fn command_specs() -> Vec<&'static CommandSpec> {
     v.extend(clearance::COMMANDS.iter());
     v.extend(printability::COMMANDS.iter());
     v.extend(polish::COMMANDS.iter());
+    v.extend(compare_reference::COMMANDS.iter());
     v.extend(polish_apply::COMMANDS.iter());
     v.extend(statics::COMMANDS.iter());
     v.extend(motion::COMMANDS.iter());
