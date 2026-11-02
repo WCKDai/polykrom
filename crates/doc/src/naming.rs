@@ -1037,7 +1037,7 @@ mod tests {
     /// one merged into it. The reference finds that face, and says it is merged.
     #[test]
     fn a_renumbered_piece_merged_into_another_face_is_found_by_its_alias() {
-        let body = solidcraft_kernel::box_solid(Vec3::ZERO, Vec3::new(4., 2., 1.)).unwrap();
+        let body = polycore::box_solid(Vec3::ZERO, Vec3::new(4., 2., 1.)).unwrap();
         let faces = body.faces(0.01).unwrap();
         let facing = |z: f64| faces.iter().find(|f| f.plane_normal.is_some_and(|n| n.z * z > 0.99)).unwrap().index;
         let (top, bottom) = (facing(1.0), facing(-1.0));
@@ -1061,7 +1061,7 @@ mod tests {
     /// that number at the point does not take a renumbered piece's reference (#143).
     #[test]
     fn a_renumbered_piece_stays_on_the_body_asked_for() {
-        let block = solidcraft_kernel::box_solid(Vec3::ZERO, Vec3::new(4., 2., 1.)).unwrap();
+        let block = polycore::box_solid(Vec3::ZERO, Vec3::new(4., 2., 1.)).unwrap();
         let faces = block.faces(0.01).unwrap();
         let facing = |z: f64| faces.iter().find(|f| f.plane_normal.is_some_and(|n| n.z * z > 0.99)).unwrap().index;
         let (top, bottom) = (facing(1.0), facing(-1.0));

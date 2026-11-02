@@ -485,19 +485,19 @@ fn a_numbered_piece_is_found_at_its_point_when_the_numbers_move() {
     run(&mut s, "sketch.finish", json!({}));
     run(&mut s, "solid.extrude", json!({"sketch": "Wave", "distance": 10, "operation": "cut", "targets": ["Plate"]}));
     let pick = Vec3::new(50.0, 0.0, 5.0);
-    let name = solidcraft_doc::naming::face_name_at_body(s.model.state().body("Plate").unwrap(), pick).unwrap();
+    let name = polykrom_doc::naming::face_name_at_body(s.model.state().body("Plate").unwrap(), pick).unwrap();
     assert!(name.ends_with("#2"), "the second numbered piece of the front: {name}");
     // Its top edge, named after it.
     let on_edge = Vec3::new(50.0, 0.0, 10.0);
-    let edge = solidcraft_doc::naming::edge_names_at(s.model.state().body("Plate").unwrap(), &[on_edge]).remove(0);
+    let edge = polykrom_doc::naming::edge_names_at(s.model.state().body("Plate").unwrap(), &[on_edge]).remove(0);
     assert!(edge.contains(&name), "{edge}");
     change(&mut s, "notch", "40 mm");
     let st = s.model.state();
-    let hit = solidcraft_doc::naming::locate_face(&st, &name, pick).unwrap();
+    let hit = polykrom_doc::naming::locate_face(&st, &name, pick).unwrap();
     let b = st.bodies.get(hit.body).unwrap();
     let centre = b.body.faces(0.01).unwrap()[hit.face].centroid;
     assert!((centre.x - 50.0).abs() < 3.0, "{name} now names the piece at x = {}; the one picked is at x = 50", centre.x);
     assert!(!hit.verified, "found by its point, not by its number");
-    let hit = solidcraft_doc::naming::locate_edge(b, &edge, on_edge).unwrap();
+    let hit = polykrom_doc::naming::locate_edge(b, &edge, on_edge).unwrap();
     assert!(hit.on_point && !hit.verified, "{edge} found at its point: {hit:?}");
 }
