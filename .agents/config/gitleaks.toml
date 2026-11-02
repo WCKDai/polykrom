@@ -25,3 +25,15 @@ regexes = [
   '''fedcba9876543210''',
   '''c29saWRjcmFmdC10ZXN0IQ==''',
 ]
+
+# Polykrom design kit (PK-70): Figma file keys and variable/style keys are identifiers, not
+# credentials. Owner accepted them in the public repo on 2026-11-03. Only these exact single-line
+# JSON shapes are allowed; any other secret-shaped value is still reported. (No `paths` with
+# condition AND: in gitleaks 8.30.1 that suppressed every finding under the path.)
+[[allowlists]]
+description = "Figma identifiers in the design kit (owner-approved, PK-70)"
+regexTarget = "line"
+regexes = [
+  '''^\s*"(fileKey|sourceFileKey)": "[A-Za-z0-9]{22}",?$''',
+  '''^\s*"key": "[0-9a-f]{40}",?$''',
+]
