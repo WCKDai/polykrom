@@ -10,8 +10,21 @@
 //! roles. GAP instead erases preceding artwork to transparency; it never paints a background.
 //! `palette.toml` owns defaults; theme files may override display roles and semantic ramps.
 //!
-//! Nothing here panics on bad artwork: a master that does not parse is logged and drawn as the
-//! placeholder, and `every_master_parses` holds that none do.
+//! The design kit (`assets/design-kit/<date>/components/svg`) is drawn by the same renderer and
+//! uses a little more: `<linearGradient>` with `<stop>`s referenced as `url(#id)` for fill and
+//! stroke (`gradientUnits`, `x1 y1 x2 y2`, `offset`, `stop-color`, `stop-opacity`), literal hex
+//! colours, `H` and `V` path commands, any square or rectangular `viewBox` (the kit draws on a
+//! 24 grid, the masters on 64), `stroke-dasharray`, `fill-rule`, `clip-rule` and `opacity`. A hex
+//! colour that is a palette source identifier still names its role, whether written long or
+//! short; any other hex is a fixed colour that no theme recolours. Fill and stroke default to
+//! none, strokes always get round caps and joins, and a gradient whose ends coincide paints its
+//! last stop (the SVG rule).
+//!
+//! Nothing here panics on bad artwork: a document that does not parse is logged and drawn as the
+//! placeholder, and `every_master_parses` holds that no master fails. The parser rejects what
+//! tiny-skia could not draw safely (a `viewBox` or path coordinates outside [`VIEW_RANGE`], a
+//! non-finite stroke width), and the renderer skips any node that would still leave
+//! [`DEVICE_LIMIT`] pixels once scaled.
 
 use std::collections::HashMap;
 use std::sync::OnceLock;
@@ -81,9 +94,38 @@ enum Paint {
     Line,
     /// A palette role (index into `ROLE_NAMES`).
     Role(usize),
-    /// A fixed colour (mask artwork).
+    /// A fixed colour: mask artwork, or a kit hex that is not a palette identifier.
     Fixed([u8; 3]),
+    /// A `<linearGradient>` (index into `Doc::gradients`).
+    Gradient(usize),
 }
+
+/// A `<linearGradient>`: its axis in user units, or in fractions of the painted shape's bounding
+/// box, and its stops (offset in 0..=1, straight RGBA).
+#[derive(Debug)]
+struct Gradient {
+    start: (f32, f32),
+    end: (f32, f32),
+    bounding_box: bool,
+    stops: Vec<(f32, [u8; 4])>,
+}
+
+/// The `viewBox`: the user-unit rectangle mapped onto the square texture.
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct ViewBox {
+    x: f32,
+    y: f32,
+    w: f32,
+    h: f32,
+}
+
+/// The `viewBox` and path coordinates the parser accepts, in user units. Outside this a texture
+/// of a few thousand pixels could ask tiny-skia for coordinates it cannot scan safely.
+pub const VIEW_RANGE: std::ops::RangeInclusive<f32> = 1.0..=100_000.0;
+
+/// A node whose scaled bounds or stroke width would pass this many pixels is skipped rather than
+/// handed to tiny-skia, whose stroker is not safe for coordinates far beyond the canvas.
+pub const DEVICE_LIMIT: f32 = 1.0e7;
 
 #[derive(Debug)]
 struct Node {
@@ -109,6 +151,8 @@ pub struct Doc {
     items: Vec<Item>,
     masks: Vec<Vec<Node>>,
     clips: Vec<Vec<Node>>,
+    gradients: Vec<Gradient>,
+    view: ViewBox,
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -273,6 +317,14 @@ fn parse_path(d: &str) -> Result<sk::Path, String> {
                 (x, y) = (num(&mut k)?, num(&mut k)?);
                 pb.line_to(x, y);
             }
+            'H' => {
+                x = num(&mut k)?;
+                pb.line_to(x, y);
+            }
+            'V' => {
+                y = num(&mut k)?;
+                pb.line_to(x, y);
+            }
             'C' => {
                 let v = [num(&mut k)?, num(&mut k)?, num(&mut k)?, num(&mut k)?, num(&mut k)?, num(&mut k)?];
                 pb.cubic_to(v[0], v[1], v[2], v[3], v[4], v[5]);
@@ -298,10 +350,29 @@ fn parse_path(d: &str) -> Result<sk::Path, String> {
             other => return Err(format!("path command {other} is not supported")),
         }
     }
-    pb.finish().ok_or_else(|| "empty path".to_string())
+    let path = pb.finish().ok_or_else(|| "empty path".to_string())?;
+    let b = path.bounds();
+    if ![b.left(), b.top(), b.right(), b.bottom()].iter().all(|c| c.is_finite() && c.abs() <= *VIEW_RANGE.end()) {
+        return Err(format!("path coordinates leave ±{}", VIEW_RANGE.end()));
+    }
+    Ok(path)
 }
 
-fn parse_paint(v: Option<&str>, in_mask: bool) -> Result<Paint, String> {
+/// `#rgb` or `#rrggbb`, in any case.
+fn parse_hex(v: &str) -> Option<[u8; 3]> {
+    let digits = v.strip_prefix('#')?;
+    let long: String = match digits.len() {
+        3 => digits.chars().flat_map(|c| [c, c]).collect(),
+        6 => digits.to_owned(),
+        _ => return None,
+    };
+    let channel = |i: usize| u8::from_str_radix(long.get(i..i + 2)?, 16).ok();
+    Some([channel(0)?, channel(2)?, channel(4)?])
+}
+
+/// A `fill`, `stroke` or `stop-color` value. A hex that is a palette source identifier names its
+/// role; any other hex is fixed; `url(#id)` is a gradient (`gradients` maps the ids).
+fn parse_paint(v: Option<&str>, in_mask: bool, gradients: &HashMap<String, usize>) -> Result<Paint, String> {
     let Some(v) = v else { return Ok(Paint::None) };
     match v {
         "none" => Ok(Paint::None),
@@ -309,22 +380,134 @@ fn parse_paint(v: Option<&str>, in_mask: bool) -> Result<Paint, String> {
         "white" if in_mask => Ok(Paint::Fixed([255, 255, 255])),
         "black" if in_mask => Ok(Paint::Fixed([0, 0, 0])),
         _ => {
-            let lower = v.to_ascii_lowercase();
-            ROLE_SOURCE_HEX
-                .iter()
-                .position(|h| *h == lower)
-                .map(|role| if ROLE_NAMES.get(role) == Some(&"gap") { Paint::Knockout } else { Paint::Role(role) })
-                .ok_or_else(|| format!("colour {v} is not a palette colour"))
+            if let Some(id) = url_ref(v) {
+                return gradients.get(id).map(|i| Paint::Gradient(*i)).ok_or_else(|| format!("{v}: no such gradient"));
+            }
+            let rgb = parse_hex(v).ok_or_else(|| format!("colour {v} is neither a hex colour nor a palette colour"))?;
+            let lower = format!("#{:02x}{:02x}{:02x}", rgb[0], rgb[1], rgb[2]);
+            Ok(match ROLE_SOURCE_HEX.iter().position(|h| *h == lower) {
+                Some(role) if ROLE_NAMES.get(role) == Some(&"gap") => Paint::Knockout,
+                Some(role) => Paint::Role(role),
+                None => Paint::Fixed(rgb),
+            })
         }
     }
 }
 
+/// A finite number in `range`, or an error naming the attribute.
+fn finite(v: &str, what: &str, range: std::ops::RangeInclusive<f32>) -> Result<f32, String> {
+    let n = v.trim().parse::<f32>().map_err(|e| format!("{what}: {e}"))?;
+    if n.is_finite() && range.contains(&n) { Ok(n) } else { Err(format!("{what}: {v} is outside {range:?}")) }
+}
+
+/// A gradient coordinate or offset: a number, or a percentage of `full` from `origin`.
+fn fraction(v: Option<&str>, what: &str, default: f32, origin: f32, full: f32) -> Result<f32, String> {
+    let Some(v) = v else { return Ok(default) };
+    match v.trim().strip_suffix('%') {
+        Some(p) => Ok(origin + finite(p, what, -1.0e6..=1.0e6)? / 100.0 * full),
+        None => finite(v, what, -1.0e6..=1.0e6),
+    }
+}
+
+/// `viewBox="x y w h"`: finite, with the sides in `VIEW_RANGE`. Missing means the 64 master grid.
+fn parse_view_box(v: Option<&str>) -> Result<ViewBox, String> {
+    let Some(v) = v else { return Ok(ViewBox { x: 0.0, y: 0.0, w: 64.0, h: 64.0 }) };
+    let n: Vec<&str> = v.split([' ', ',', '\t', '\n']).filter(|s| !s.is_empty()).collect();
+    let [x, y, w, h] = n.as_slice() else { return Err(format!("viewBox {v:?} is not four numbers")) };
+    let origin = -*VIEW_RANGE.end()..=*VIEW_RANGE.end();
+    Ok(ViewBox {
+        x: finite(x, "viewBox x", origin.clone())?,
+        y: finite(y, "viewBox y", origin)?,
+        w: finite(w, "viewBox width", VIEW_RANGE)?,
+        h: finite(h, "viewBox height", VIEW_RANGE)?,
+    })
+}
+
+/// The gradients of a document, by id, read before the shapes so `<defs>` may follow them.
+fn parse_gradients(tags: &[Tag<'_>], view: ViewBox) -> Result<(Vec<Gradient>, HashMap<String, usize>), String> {
+    let mut gradients: Vec<Gradient> = Vec::new();
+    let mut ids = HashMap::new();
+    let mut open = false;
+    for t in tags {
+        match (t.name, t.close) {
+            ("linearGradient", false) => {
+                if open {
+                    return Err("nested linearGradient".into());
+                }
+                for unsupported in ["gradientTransform", "href", "xlink:href", "spreadMethod"] {
+                    if t.get(unsupported).is_some() {
+                        return Err(format!("linearGradient {unsupported} is not supported"));
+                    }
+                }
+                let bounding_box = match t.get("gradientUnits") {
+                    None | Some("objectBoundingBox") => true,
+                    Some("userSpaceOnUse") => false,
+                    Some(other) => return Err(format!("gradientUnits {other} is not supported")),
+                };
+                // Percentages (and the default axis) span the bounding box, or the viewBox.
+                let (ox, oy, fw, fh) = if bounding_box { (0.0, 0.0, 1.0, 1.0) } else { (view.x, view.y, view.w, view.h) };
+                let gradient = Gradient {
+                    start: (fraction(t.get("x1"), "x1", ox, ox, fw)?, fraction(t.get("y1"), "y1", oy, oy, fh)?),
+                    end: (fraction(t.get("x2"), "x2", ox + fw, ox, fw)?, fraction(t.get("y2"), "y2", oy, oy, fh)?),
+                    bounding_box,
+                    stops: Vec::new(),
+                };
+                let id = t.get("id").ok_or("linearGradient without id")?;
+                if ids.insert(id.to_owned(), gradients.len()).is_some() {
+                    return Err(format!("duplicate gradient id {id}"));
+                }
+                if t.selfclose {
+                    return Err(format!("linearGradient {id} without stops"));
+                }
+                gradients.push(gradient);
+                open = true;
+            }
+            ("linearGradient", true) => {
+                if !open {
+                    return Err("unbalanced tags".into());
+                }
+                open = false;
+                if gradients.last().is_some_and(|g| g.stops.is_empty()) {
+                    return Err("linearGradient without stops".into());
+                }
+            }
+            ("stop", false) => {
+                let g = gradients.last_mut().filter(|_| open).ok_or("stop outside a linearGradient")?;
+                // The SVG rule: an offset never goes below the one before it.
+                let floor = g.stops.last().map_or(0.0, |(o, _)| *o);
+                let offset = fraction(t.get("offset"), "offset", 0.0, 0.0, 1.0)?.clamp(0.0, 1.0).max(floor);
+                let rgb = match t.get("stop-color") {
+                    None => [0, 0, 0],
+                    Some(v) => parse_hex(v).ok_or_else(|| format!("stop-color {v} is not a hex colour"))?,
+                };
+                let alpha = t.get("stop-opacity").map_or(Ok(1.0), |o| finite(o, "stop-opacity", 0.0..=1.0))?;
+                g.stops.push((offset, [rgb[0], rgb[1], rgb[2], (alpha * 255.0).round() as u8]));
+            }
+            ("stop", true) => {}
+            _ => {}
+        }
+    }
+    if open {
+        return Err("unbalanced tags".into());
+    }
+    Ok((gradients, ids))
+}
+
+/// `stroke-dasharray`; a negative or non-finite entry makes the stroke solid (the SVG rule).
 fn parse_dash(v: Option<&str>) -> Vec<f32> {
     let mut d: Vec<f32> = v.map(|s| s.split([' ', ',']).filter_map(|n| n.parse().ok()).collect()).unwrap_or_default();
+    if d.iter().any(|n| !n.is_finite() || *n < 0.0) {
+        return Vec::new();
+    }
     if d.len() % 2 == 1 {
         d.extend(d.clone());
     }
     d
+}
+
+/// An `opacity` attribute: missing or unreadable is 1, otherwise clamped to 0..=1.
+fn parse_opacity(v: Option<&str>) -> f32 {
+    v.and_then(|o| o.trim().parse::<f32>().ok()).filter(|o| o.is_finite()).map_or(1.0, |o| o.clamp(0.0, 1.0))
 }
 
 fn url_ref(v: &str) -> Option<&str> {
@@ -340,12 +523,15 @@ enum Frame {
 
 impl Doc {
     pub fn parse(src: &str) -> Result<Doc, String> {
-        let mut doc = Doc { items: Vec::new(), masks: Vec::new(), clips: Vec::new() };
+        let tags = tags(src)?;
+        let view = parse_view_box(tags.iter().find(|t| t.name == "svg" && !t.close).and_then(|t| t.get("viewBox")))?;
+        let (gradients, gradient_ids) = parse_gradients(&tags, view)?;
+        let mut doc = Doc { items: Vec::new(), masks: Vec::new(), clips: Vec::new(), gradients, view };
         let (mut mask_ids, mut clip_ids): (HashMap<String, usize>, HashMap<String, usize>) = (HashMap::new(), HashMap::new());
         let mut stack: Vec<Frame> = Vec::new();
-        for t in tags(src)? {
+        for t in tags {
             match (t.name, t.close) {
-                ("svg" | "title", _) => {}
+                ("svg" | "title" | "linearGradient" | "stop", _) => {}
                 ("defs", false) => stack.push(Frame::Defs),
                 ("mask", false) => {
                     doc.masks.push(Vec::new());
@@ -362,8 +548,7 @@ impl Doc {
                         Some(id) => Some(*clip_ids.get(id).ok_or("unknown clip")?),
                         None => None,
                     };
-                    let opacity = t.get("opacity").and_then(|o| o.parse().ok()).unwrap_or(1.0);
-                    stack.push(Frame::Group { clip, opacity, items: Vec::new() });
+                    stack.push(Frame::Group { clip, opacity: parse_opacity(t.get("opacity")), items: Vec::new() });
                 }
                 ("defs" | "mask" | "clipPath" | "g", true) => match stack.pop() {
                     Some(Frame::Group { clip, opacity, items }) => {
@@ -387,8 +572,9 @@ impl Doc {
                         Some(id) => Some(*mask_ids.get(id).ok_or("unknown mask")?),
                         None => None,
                     };
+                    let in_clip = matches!(stack.last(), Some(Frame::Clip(_)));
                     let dash = parse_dash(t.get("stroke-dasharray"));
-                    let mut stroke = parse_paint(t.get("stroke"), in_mask)?;
+                    let mut stroke = parse_paint(t.get("stroke"), in_mask, &gradient_ids)?;
                     let visible_stroke = match stroke {
                         Paint::Line => true,
                         Paint::Role(role) => !matches!(ROLE_NAMES.get(role).copied(), Some("gap" | "active-1" | "active-2" | "active-3")),
@@ -400,14 +586,20 @@ impl Doc {
                     if !dash.is_empty() && visible_stroke && !in_mask {
                         stroke = Paint::Role(ROLE_NAMES.iter().position(|name| *name == "guide").ok_or("missing guide colour")?);
                     }
+                    // A clip path's shape is governed by clip-rule, a painted shape's by fill-rule.
+                    let rule = if in_clip { t.get("clip-rule") } else { t.get("fill-rule") };
                     let node = Node {
                         path,
-                        fill: if t.get("fill").is_none() && in_mask { Paint::None } else { parse_paint(t.get("fill").or(Some("none")), in_mask)? },
-                        rule: if t.get("fill-rule") == Some("evenodd") { sk::FillRule::EvenOdd } else { sk::FillRule::Winding },
+                        fill: if t.get("fill").is_none() && in_mask {
+                            Paint::None
+                        } else {
+                            parse_paint(t.get("fill").or(Some("none")), in_mask, &gradient_ids)?
+                        },
+                        rule: if rule == Some("evenodd") { sk::FillRule::EvenOdd } else { sk::FillRule::Winding },
                         stroke,
-                        width: t.get("stroke-width").and_then(|w| w.parse().ok()).unwrap_or(1.0),
+                        width: t.get("stroke-width").map_or(Ok(1.0), |w| finite(w, "stroke-width", 0.0..=*VIEW_RANGE.end()))?,
                         dash,
-                        opacity: t.get("opacity").and_then(|o| o.parse().ok()).unwrap_or(1.0),
+                        opacity: parse_opacity(t.get("opacity")),
                         mask,
                     };
                     match stack.last_mut() {
@@ -501,7 +693,7 @@ impl Look {
 
     fn resolve(self, p: Paint) -> Option<[u8; 3]> {
         match p {
-            Paint::None | Paint::Knockout => None,
+            Paint::None | Paint::Knockout | Paint::Gradient(_) => None,
             Paint::Fixed(c) => Some(c),
             Paint::Role(r) => Some(self.rgb(r)),
             Paint::Line => ROLE_NAMES.iter().position(|n| *n == "line").map(|r| self.rgb(r)),
@@ -543,17 +735,55 @@ fn paint_of(c: [u8; 3], alpha: f32) -> sk::Paint<'static> {
     p
 }
 
-fn shape_paint(paint: Paint, look: PaintLook, alpha: f32) -> Option<sk::Paint<'static>> {
-    if paint == Paint::Knockout {
-        let mut paint = paint_of([0, 0, 0], alpha);
-        paint.blend_mode = sk::BlendMode::DestinationOut;
-        Some(paint)
+/// A tiny-skia gradient shader for `g` over `path`, in user space (tiny-skia applies the node's
+/// transform to the shader with the path). A bounding-box gradient on a shape without area
+/// paints nothing, the SVG rule.
+fn gradient_shader(g: &Gradient, path: &sk::Path, alpha: f32) -> Option<sk::Shader<'static>> {
+    let ts = if g.bounding_box {
+        let b = path.compute_tight_bounds()?;
+        if b.width() <= 0.0 || b.height() <= 0.0 {
+            return None;
+        }
+        sk::Transform::from_row(b.width(), 0.0, 0.0, b.height(), b.left(), b.top())
     } else {
-        look.resolve(paint).map(|colour| paint_of(colour, alpha))
+        sk::Transform::identity()
+    };
+    let stops = g.stops.iter().map(|(o, c)| sk::GradientStop::new(*o, sk::Color::from_rgba8(c[0], c[1], c[2], c[3]))).collect();
+    let start = sk::Point::from_xy(g.start.0, g.start.1);
+    let end = sk::Point::from_xy(g.end.0, g.end.1);
+    let mut shader = sk::LinearGradient::new(start, end, stops, sk::SpreadMode::Pad, ts)?;
+    shader.apply_opacity(alpha.clamp(0.0, 1.0));
+    Some(shader)
+}
+
+fn shape_paint(paint: Paint, look: PaintLook, alpha: f32, doc: &Doc, path: &sk::Path) -> Option<sk::Paint<'static>> {
+    match paint {
+        Paint::Knockout => {
+            let mut paint = paint_of([0, 0, 0], alpha);
+            paint.blend_mode = sk::BlendMode::DestinationOut;
+            Some(paint)
+        }
+        Paint::Gradient(i) => {
+            let mut paint = sk::Paint { shader: gradient_shader(doc.gradients.get(i)?, path, alpha)?, ..sk::Paint::default() };
+            paint.anti_alias = true;
+            Some(paint)
+        }
+        _ => look.resolve(paint).map(|colour| paint_of(colour, alpha)),
     }
 }
 
+/// Whether `path` under `tf`, widened by `extra` user units, stays within `DEVICE_LIMIT` pixels.
+fn drawable(path: &sk::Path, tf: sk::Transform, extra: f32) -> bool {
+    let b = path.bounds();
+    let mut corners = [sk::Point::from_xy(b.left() - extra, b.top() - extra), sk::Point::from_xy(b.right() + extra, b.bottom() + extra)];
+    tf.map_points(&mut corners);
+    tf.is_finite() && corners.iter().all(|p| p.x.is_finite() && p.y.is_finite() && p.x.abs() <= DEVICE_LIMIT && p.y.abs() <= DEVICE_LIMIT)
+}
+
 fn draw_node(pm: &mut sk::Pixmap, n: &Node, look: PaintLook, tf: sk::Transform, doc: &Doc, clip: Option<&sk::Mask>, opacity: f32) {
+    if !drawable(&n.path, tf, n.width) {
+        return;
+    }
     let own;
     let mask = if let Some(m) = n.mask {
         own = doc.masks.get(m).and_then(|nodes| {
@@ -574,10 +804,10 @@ fn draw_node(pm: &mut sk::Pixmap, n: &Node, look: PaintLook, tf: sk::Transform, 
         clip
     };
     let alpha = n.opacity * opacity;
-    if let Some(paint) = shape_paint(n.fill, look, alpha) {
+    if let Some(paint) = shape_paint(n.fill, look, alpha, doc, &n.path) {
         pm.fill_path(&n.path, &paint, n.rule, tf, mask);
     }
-    if let Some(paint) = shape_paint(n.stroke, look, alpha) {
+    if let Some(paint) = shape_paint(n.stroke, look, alpha, doc, &n.path) {
         let stroke = sk::Stroke {
             width: n.width,
             line_cap: sk::LineCap::Round,
@@ -596,7 +826,7 @@ fn draw_items(pm: &mut sk::Pixmap, items: &[Item], look: PaintLook, tf: sk::Tran
             Item::Group { clip: c, opacity: o, items } => {
                 let mask = c.and_then(|c| doc.clips.get(c)).and_then(|nodes| {
                     let mut m = sk::Mask::new(pm.width(), pm.height())?;
-                    for n in nodes {
+                    for n in nodes.iter().filter(|n| drawable(&n.path, tf, 0.0)) {
                         m.fill_path(&n.path, n.rule, true, tf);
                     }
                     Some(m)
@@ -617,10 +847,17 @@ pub(crate) fn render_tinted(doc: &Doc, look: Look, px: u32) -> Option<sk::Pixmap
     render_with_look(doc, PaintLook { look, tint_passive: true }, px)
 }
 
+/// The transform that fits the `viewBox` into a `px` square: uniform scale by the longer side,
+/// the shorter side centred (the SVG `xMidYMid meet` default).
+fn fit(view: ViewBox, px: u32) -> sk::Transform {
+    let s = px as f32 / view.w.max(view.h);
+    let (tx, ty) = (-view.x * s + (px as f32 - view.w * s) / 2.0, -view.y * s + (px as f32 - view.h * s) / 2.0);
+    sk::Transform::from_row(s, 0.0, 0.0, s, tx, ty)
+}
+
 fn render_with_look(doc: &Doc, look: PaintLook, px: u32) -> Option<sk::Pixmap> {
     let mut pm = sk::Pixmap::new(px, px)?;
-    let s = px as f32 / 64.0;
-    draw_items(&mut pm, &doc.items, look, sk::Transform::from_scale(s, s), doc, None, 1.0);
+    draw_items(&mut pm, &doc.items, look, fit(doc.view, px), doc, None, 1.0);
     Some(pm)
 }
 
@@ -1008,6 +1245,43 @@ mod tests {
         pm.data().to_vec()
     }
 
+    /// One line per (master, theme, size): the SHA-256 of its premultiplied RGBA render.
+    fn master_render_hashes() -> String {
+        use sha2::Digest as _;
+        let mut out = String::new();
+        for id in master_ids() {
+            for dark in [false, true] {
+                for px in [16, 24, 64] {
+                    let doc = doc_for(id, px).unwrap_or_else(|| panic!("{id}"));
+                    let pm = render(doc, Look { dark, accent: None, vision: crate::theme::ColorVision::Off, palette: None }, px)
+                        .unwrap_or_else(|| panic!("{id} at {px}"));
+                    out += &format!("{id}\tdark={dark}\tpx={px}\t{:x}\n", sha2::Sha256::digest(pm.data()));
+                }
+            }
+        }
+        out
+    }
+
+    /// The masters render byte for byte as they did before a renderer change. Set
+    /// `ICON_RENDER_BASELINE=<file>`: a missing file is written from the current renders, an
+    /// existing one is compared against them. Without the variable the hashes are only computed.
+    #[test]
+    fn master_renders_match_recorded_baseline() {
+        let hashes = master_render_hashes();
+        assert!(hashes.lines().count() >= 6 * master_ids().len());
+        let Ok(path) = std::env::var("ICON_RENDER_BASELINE") else {
+            eprintln!("ICON_RENDER_BASELINE is not set: {} render hashes computed, none compared", hashes.lines().count());
+            return;
+        };
+        match std::fs::read_to_string(&path) {
+            Ok(recorded) => {
+                let changed: Vec<&str> = recorded.lines().zip(hashes.lines()).filter(|(a, b)| a != b).map(|(a, _)| a).collect();
+                assert!(recorded.lines().count() == hashes.lines().count() && changed.is_empty(), "renders differ from {path}: {changed:?}");
+            }
+            Err(_) => std::fs::write(&path, hashes).unwrap_or_else(|e| panic!("{path}: {e}")),
+        }
+    }
+
     #[test]
     fn dark_theme_and_accents_change_colour_not_shape() {
         let doc = doc_for("extrude", 64).unwrap_or_else(|| panic!("extrude"));
@@ -1044,6 +1318,185 @@ mod tests {
         }
         assert!(Doc::parse("<svg><path d=\"M 1\"/></svg>").is_err());
         assert!(Doc::parse("<svg><g></svg>").is_err());
+    }
+
+    fn plain(dark: bool) -> Look {
+        Look { dark, accent: None, vision: crate::theme::ColorVision::Off, palette: None }
+    }
+
+    fn rgb_at(pm: &sk::Pixmap, x: u32, y: u32) -> [u8; 4] {
+        let p = pm.pixel(x, y).unwrap();
+        [p.red(), p.green(), p.blue(), p.alpha()]
+    }
+
+    #[test]
+    fn kit_gradients_hex_colours_h_v_commands_and_a_24_grid_draw_as_the_kit_does() {
+        // A kit-style document: the gradient is defined after its use, an H/V square fills the
+        // 24 grid, a stroke takes the gradient, fixed hex colours are not themed.
+        let svg = "<svg width='24' height='24' viewBox='0 0 24 24' fill='none'>\
+            <path d='M0 0H24V24H0Z' fill='url(#g)'/>\
+            <path d='M2 12H22' stroke='url(#g)' stroke-width='2'/>\
+            <path d='M4 20H20' stroke='#CED3D8' stroke-width='2' stroke-dasharray='2 3'/>\
+            <path d='M12 2V6' stroke='#fff' stroke-width='2'/>\
+            <defs><linearGradient id='g' x1='0' y1='0' x2='24' y2='0' gradientUnits='userSpaceOnUse'>\
+            <stop stop-color='#FF0000'/><stop offset='1' stop-color='#0000FF'/></linearGradient></defs></svg>";
+        let doc = Doc::parse(svg).unwrap();
+        assert_eq!(doc.view, ViewBox { x: 0.0, y: 0.0, w: 24.0, h: 24.0 });
+        let Item::Node(dashed) = &doc.items[2] else { panic!("dashed") };
+        assert_eq!(dashed.stroke, Paint::Fixed([0xce, 0xd3, 0xd8]), "a kit hex is fixed, even dashed");
+        let Item::Node(short) = &doc.items[3] else { panic!("short hex") };
+        assert_eq!(short.stroke, Paint::Knockout, "#fff names the gap role like #ffffff");
+        for dark in [false, true] {
+            let pm = render(&doc, plain(dark), 96).unwrap();
+            // The 24 grid fills the texture: the square's corners are opaque, red to blue.
+            assert_eq!(rgb_at(&pm, 1, 1)[3], 255);
+            assert_eq!(rgb_at(&pm, 94, 94)[3], 255);
+            assert!(rgb_at(&pm, 1, 1)[0] > 240 && rgb_at(&pm, 94, 1)[2] > 240, "{:?} {:?}", rgb_at(&pm, 1, 1), rgb_at(&pm, 94, 1));
+            let mid = rgb_at(&pm, 48, 48);
+            assert!((100..=156).contains(&mid[0]) && (100..=156).contains(&mid[2]), "midpoint mixes both stops: {mid:?}");
+            assert_eq!(rgb_at(&pm, 18, 80), [0xce, 0xd3, 0xd8, 255], "fixed hex in theme dark={dark}");
+            assert_eq!(rgb_at(&pm, 48, 16)[3], 0, "the knockout stroke erases the gradient");
+        }
+    }
+
+    #[test]
+    fn bounding_box_gradients_follow_the_shape_and_a_shape_without_area_paints_nothing() {
+        let svg = "<svg viewBox='0 0 64 64'><defs><linearGradient id='g'><stop stop-color='#000000'/><stop offset='1' stop-color='#ffffff'/></linearGradient></defs>\
+            <path d='M16 16L48 16L48 48L16 48Z' fill='url(#g)'/><path d='M0 60L64 60' fill='url(#g)'/></svg>";
+        let doc = Doc::parse(svg).unwrap();
+        let pm = render(&doc, plain(true), 64).unwrap();
+        assert!(rgb_at(&pm, 17, 32)[0] < 24, "left edge is the first stop: {:?}", rgb_at(&pm, 17, 32));
+        assert!(rgb_at(&pm, 46, 32)[0] > 224, "right edge is the last stop: {:?}", rgb_at(&pm, 46, 32));
+        assert_eq!(rgb_at(&pm, 8, 32)[3], 0);
+        assert_eq!(rgb_at(&pm, 32, 60)[3], 0, "a zero-area bounding box paints nothing");
+    }
+
+    #[test]
+    fn a_degenerate_gradient_paints_its_last_stop_and_stop_offsets_never_go_backwards() {
+        let svg = "<svg viewBox='0 0 64 64'><defs><linearGradient id='g' x1='5' y1='5' x2='5' y2='5' gradientUnits='userSpaceOnUse'>\
+            <stop offset='0.8' stop-color='#ff0000'/><stop offset='0.2' stop-color='#00ff00' stop-opacity='0.5'/></linearGradient></defs>\
+            <path d='M0 0L64 0L64 64L0 64Z' fill='url(#g)'/></svg>";
+        let doc = Doc::parse(svg).unwrap();
+        assert_eq!(doc.gradients[0].stops, vec![(0.8, [255, 0, 0, 255]), (0.8, [0, 255, 0, 128])]);
+        let pm = render(&doc, plain(false), 64).unwrap();
+        assert_eq!(rgb_at(&pm, 32, 32), [0, 128, 0, 128], "premultiplied last stop");
+    }
+
+    #[test]
+    fn clip_rule_governs_clip_paths_and_fill_rule_governs_shapes() {
+        let ring = "M8 8L56 8L56 56L8 56ZM24 24L40 24L40 40L24 40Z";
+        let svg = format!(
+            "<svg viewBox='0 0 64 64'><defs><clipPath id='c'><path d='{ring}' clip-rule='evenodd' fill-rule='nonzero'/></clipPath></defs>\
+             <g clip-path='url(#c)'><path d='M0 0L64 0L64 64L0 64Z' fill='#8e9faf'/></g></svg>"
+        );
+        let pm = render(&Doc::parse(&svg).unwrap(), plain(false), 64).unwrap();
+        assert_eq!(rgb_at(&pm, 12, 12)[3], 255);
+        assert_eq!(rgb_at(&pm, 32, 32)[3], 0, "clip-rule evenodd leaves the hole");
+        let shape = format!("<svg viewBox='0 0 64 64'><path d='{ring}' clip-rule='evenodd' fill='#8e9faf'/></svg>");
+        let pm = render(&Doc::parse(&shape).unwrap(), plain(false), 64).unwrap();
+        assert_eq!(rgb_at(&pm, 32, 32)[3], 255, "clip-rule does not reach a painted shape");
+    }
+
+    #[test]
+    fn a_rectangular_view_box_is_fitted_and_centred() {
+        let doc = Doc::parse("<svg viewBox='10 0 20 10'><path d='M10 0H30V10H10Z' fill='#8e9faf'/></svg>").unwrap();
+        let pm = render(&doc, plain(false), 40).unwrap();
+        assert_eq!(rgb_at(&pm, 1, 11)[3], 255);
+        assert_eq!(rgb_at(&pm, 38, 28)[3], 255);
+        assert_eq!(rgb_at(&pm, 20, 5)[3], 0, "letterboxed above");
+        assert_eq!(rgb_at(&pm, 20, 35)[3], 0, "letterboxed below");
+        // Percentages and the default axis span the viewBox from its origin.
+        let doc = Doc::parse(
+            "<svg viewBox='10 0 20 10'><defs><linearGradient id='g' gradientUnits='userSpaceOnUse' x1='0%' y1='50%'><stop stop-color='#000000'/></linearGradient>\
+             <linearGradient id='h'><stop stop-color='#000000'/></linearGradient></defs><path d='M10 0H30V10H10Z' fill='url(#g)' stroke='url(#h)'/></svg>",
+        )
+        .unwrap();
+        assert_eq!((doc.gradients[0].start, doc.gradients[0].end), ((10.0, 5.0), (30.0, 0.0)));
+        assert_eq!((doc.gradients[1].start, doc.gradients[1].end), ((0.0, 0.0), (1.0, 0.0)));
+    }
+
+    #[test]
+    fn malformed_gradient_colour_and_view_box_input_is_an_error_not_a_panic() {
+        let rejected = [
+            // gradients
+            "<svg><path d='M0 0L1 1' fill='url(#nope)'/></svg>",
+            "<svg><defs><linearGradient id='g'></linearGradient></defs><path d='M0 0L1 1' fill='url(#g)'/></svg>",
+            "<svg><defs><linearGradient id='g'/></defs><path d='M0 0L1 1' fill='url(#g)'/></svg>",
+            "<svg><defs><linearGradient id='g'><stop stop-color='#12345'/></linearGradient></defs><path d='M0 0L1 1' fill='url(#g)'/></svg>",
+            "<svg><defs><linearGradient id='g'><stop stop-color='red'/></linearGradient></defs><path d='M0 0L1 1' fill='url(#g)'/></svg>",
+            "<svg><defs><linearGradient id='g'><stop offset='x' stop-color='#123456'/></linearGradient></defs></svg>",
+            "<svg><defs><linearGradient id='g'><stop stop-color='#123456' stop-opacity='2'/></linearGradient></defs></svg>",
+            "<svg><defs><linearGradient id='g'><stop stop-color='#123456' stop-opacity='NaN'/></linearGradient></defs></svg>",
+            "<svg><defs><linearGradient id='g' x1='NaN'><stop stop-color='#123456'/></linearGradient></defs></svg>",
+            "<svg><defs><linearGradient id='g' x1='inf'><stop stop-color='#123456'/></linearGradient></defs></svg>",
+            "<svg><defs><linearGradient id='g' x1='1e30'><stop stop-color='#123456'/></linearGradient></defs></svg>",
+            "<svg><defs><linearGradient x1='0'><stop stop-color='#123456'/></linearGradient></defs></svg>",
+            "<svg><defs><linearGradient id='g' gradientUnits='pixels'><stop stop-color='#123456'/></linearGradient></defs></svg>",
+            "<svg><defs><linearGradient id='g' gradientTransform='rotate(45)'><stop stop-color='#123456'/></linearGradient></defs></svg>",
+            "<svg><defs><linearGradient id='g' href='#h'><stop stop-color='#123456'/></linearGradient></defs></svg>",
+            "<svg><defs><linearGradient id='g'><linearGradient id='h'><stop stop-color='#123456'/></linearGradient></linearGradient></defs></svg>",
+            "<svg><defs><linearGradient id='g'><stop stop-color='#123456'/></linearGradient><linearGradient id='g'><stop stop-color='#123456'/></linearGradient></defs></svg>",
+            "<svg><defs><stop stop-color='#123456'/></defs></svg>",
+            "<svg><defs><linearGradient id='g'><stop stop-color='#123456'/></defs></svg>",
+            "<svg><defs><linearGradient id='g'><stop stop-color='#123456'/></linearGradient><radialGradient id='r'/></defs></svg>",
+            // colours
+            "<svg><path d='M0 0L1 1' fill='#12'/></svg>",
+            "<svg><path d='M0 0L1 1' fill='#gggggg'/></svg>",
+            "<svg><path d='M0 0L1 1' fill='#1234567'/></svg>",
+            "<svg><path d='M0 0L1 1' fill='red'/></svg>",
+            "<svg><path d='M0 0L1 1' fill='rgb(1,2,3)'/></svg>",
+            "<svg><path d='M0 0L1 1' stroke='url(g)'/></svg>",
+            // view boxes
+            "<svg viewBox='0 0 24'><path d='M0 0L1 1' fill='#123456'/></svg>",
+            "<svg viewBox='0 0 24 24 1'><path d='M0 0L1 1' fill='#123456'/></svg>",
+            "<svg viewBox='0 0 0 24'><path d='M0 0L1 1' fill='#123456'/></svg>",
+            "<svg viewBox='0 0 -24 24'><path d='M0 0L1 1' fill='#123456'/></svg>",
+            "<svg viewBox='0 0 NaN 24'><path d='M0 0L1 1' fill='#123456'/></svg>",
+            "<svg viewBox='0 0 inf 24'><path d='M0 0L1 1' fill='#123456'/></svg>",
+            "<svg viewBox='0 0 1e-30 1e-30'><path d='M0 0H24V24Z' stroke='#654321' stroke-width='2'/></svg>",
+            "<svg viewBox='0 0 1e-6 1e-6'><path d='M0 0H24V24Z' stroke='#654321' stroke-width='2'/></svg>",
+            "<svg viewBox='0 0 0.5 0.5'><path d='M0 0H24V24Z' stroke='#654321' stroke-width='2'/></svg>",
+            "<svg viewBox='0 0 1e9 1e9'><path d='M0 0H24V24Z' stroke='#654321' stroke-width='2'/></svg>",
+            "<svg viewBox='1e30 0 24 24'><path d='M0 0H24V24Z' stroke='#654321' stroke-width='2'/></svg>",
+            "<svg viewBox='a b c d'><path d='M0 0L1 1' fill='#123456'/></svg>",
+            // strokes and coordinates
+            "<svg><path d='M0 0L1 1' stroke='#654321' stroke-width='NaN'/></svg>",
+            "<svg><path d='M0 0L1 1' stroke='#654321' stroke-width='-1'/></svg>",
+            "<svg><path d='M0 0L1 1' stroke='#654321' stroke-width='inf'/></svg>",
+            "<svg><path d='M0 0L1e31 1' stroke='#654321' stroke-width='2'/></svg>",
+            "<svg><path d='M0 0L1e7 1' fill='#654321'/></svg>",
+            "<svg><path d='M0 0H1e31' stroke='#654321' stroke-width='2'/></svg>",
+            "<svg><path d='M0 0V' stroke='#654321' stroke-width='2'/></svg>",
+            "<svg><path d='M0 0H1V' stroke='#654321' stroke-width='2'/></svg>",
+        ];
+        for bad in rejected {
+            match Doc::parse(bad) {
+                Ok(doc) => {
+                    let _ = render(&doc, plain(true), 96);
+                    panic!("accepted: {bad}");
+                }
+                Err(e) => assert!(!e.is_empty()),
+            }
+        }
+        // Accepted at the edge of the documented range, drawn without a panic at every size.
+        let edge = [
+            format!("<svg viewBox='0 0 1 1'><path d='M0 0H{m}V{m}Z' stroke='#654321' stroke-width='{m}'/></svg>", m = VIEW_RANGE.end()),
+            format!(
+                "<svg viewBox='0 0 {m} {m}'><path d='M0 0H{m}V{m}Z' fill='#654321' stroke='#654321' stroke-width='1'/></svg>",
+                m = VIEW_RANGE.end()
+            ),
+            format!("<svg viewBox='-{m} -{m} 1 1'><path d='M-{m} -{m}H{m}V{m}Z' stroke='#654321' stroke-width='2'/></svg>", m = VIEW_RANGE.end()),
+            "<svg viewBox='0 0 1 1'><path d='M0 0H1V1Z' stroke='#654321' stroke-width='0'/></svg>".to_owned(),
+            "<svg viewBox='0 0 24 24'><path d='M0 0H24V24Z' stroke='#654321' stroke-width='2' stroke-dasharray='0 0'/></svg>".to_owned(),
+            "<svg viewBox='0 0 24 24'><path d='M0 0H24V24Z' stroke='#654321' stroke-width='2' stroke-dasharray='NaN'/></svg>".to_owned(),
+            "<svg viewBox='0 0 24 24'><path d='M0 0H24V24Z' stroke='#654321' stroke-width='2' opacity='NaN'/></svg>".to_owned(),
+        ];
+        for svg in edge {
+            let doc = Doc::parse(&svg).unwrap_or_else(|e| panic!("{svg}: {e}"));
+            for px in [1, 16, 96, 4096] {
+                assert!(render(&doc, plain(true), px).is_some(), "{svg} at {px}px");
+            }
+        }
     }
 
     #[test]
