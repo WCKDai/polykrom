@@ -82,6 +82,18 @@ pub mod audit {
             });
         }
     }
+
+    /// The design-kit drawing `crate::icons` chose for `name` replaces the recorded master, so
+    /// the audit reports what is actually drawn.
+    pub(crate) fn record_kit(name: &str, file: &str) {
+        if ACTIVE.get() {
+            REQUESTS.with(|requests| {
+                if let Some(request) = requests.borrow_mut().get_mut(name) {
+                    request.master = file.to_owned();
+                }
+            });
+        }
+    }
 }
 
 /// How a shape is painted.

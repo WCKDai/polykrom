@@ -4,12 +4,20 @@ use egui::{ColorImage, TextureId, pos2, vec2};
 use polykrom_ui_egui::scenario::Harness;
 use std::collections::HashMap;
 
+/// The window the default painters lay out and rasterise.
+pub const DEFAULT_SIZE: egui::Vec2 = vec2(1100.0, 1500.0);
+
 pub fn paint(h: &mut Harness, textures: &mut HashMap<TextureId, ColorImage>, events: Vec<egui::Event>) -> egui::FullOutput {
+    paint_sized(h, textures, events, DEFAULT_SIZE)
+}
+
+/// One laid-out frame of the app in a window of `size` points, recording every texture upload.
+pub fn paint_sized(h: &mut Harness, textures: &mut HashMap<TextureId, ColorImage>, events: Vec<egui::Event>, size: egui::Vec2) -> egui::FullOutput {
     let time = h.ctx.cumulative_frame_nr() as f64 / 15.0;
     let mut out = h.ctx.run_ui(
         egui::RawInput {
             time: Some(time),
-            screen_rect: Some(egui::Rect::from_min_size(egui::Pos2::ZERO, vec2(1100.0, 1500.0))),
+            screen_rect: Some(egui::Rect::from_min_size(egui::Pos2::ZERO, size)),
             focused: true,
             events,
             ..Default::default()
@@ -40,8 +48,13 @@ pub fn paint(h: &mut Harness, textures: &mut HashMap<TextureId, ColorImage>, eve
 }
 
 pub fn raster(h: &mut Harness, textures: &HashMap<TextureId, ColorImage>, out: egui::FullOutput) -> image::RgbaImage {
+    raster_sized(h, textures, out, DEFAULT_SIZE)
+}
+
+/// The frame `out` of a window of `size` points, drawn triangle by triangle on white.
+pub fn raster_sized(h: &mut Harness, textures: &HashMap<TextureId, ColorImage>, out: egui::FullOutput, size: egui::Vec2) -> image::RgbaImage {
     let ppp = out.pixels_per_point;
-    let (width, height) = ((1100.0 * ppp) as u32, (1500.0 * ppp) as u32);
+    let (width, height) = ((size.x * ppp) as u32, (size.y * ppp) as u32);
     let mut pixels = vec![255u8; (width * height * 4) as usize];
     let primitives = h.ctx.tessellate(out.shapes, out.pixels_per_point);
     for clipped in primitives {
