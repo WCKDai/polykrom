@@ -115,6 +115,26 @@ changes to body grouping can therefore change the generated design. This preserv
 original geometric reference independently of those choices. These checks supplement the
 snapshots' stricter repeatability comparisons of raw topology and tessellated measurements.
 
+Seeds 14 and 61 were checked the same way when PolyCore moved to `5dbc694` (its `38e08fe`,
+polycore#42: a shell's moved edge between two curved faces, where a hole's wall meets a round
+side, is taken between its moved ends instead of running past the moved top and bottom). Both
+designs are a plate (a rectangle closed by an arc, extruded along z) with a cylinder cut along
+x and a 2 mm shell opened at the far end face; the reference integrates, at each (x, z), the
+exact y extent of the body minus its sharp 2 mm face offset cavity (every face moved into the
+material and extended to meet its neighbours, as the shell builds it) over a 0.0025 mm grid.
+Seed 61's arc through (−12.5, 10) has radius 10.25 about (−2.25, 10), so the plate bulges
+0.25 mm past y = 0 and y = 20 and its 2 mm offset rises to y = 18.25: the plate is 8705.877 mm³
+in closed form, 7435.835 after the R10 groove and 4906.638 after the shell, which the kernel now
+builds at 4906.553 (it was refused with "implausible result volume NaN" from PolyCore `be450be`
+to `338f230`); the run then fails at the pattern step as it did before that regression. Seed 14's
+shell is 10400.213 by the same integral and its r2 fillet along the top face's tangent chain
+removes 98.728 in closed form (the kernel removes 98.752 at both pins); the kernel's shell moved
+from 10416.115 to 10415.713, nearer the reference, and only the hole's offset wall at the moved
+edge meshes differently (its 16 other faces and 36 edges are identical at every tolerance). The
+15.5 mm³ it still exceeds the reference by is the same at both pins: the hole's 2 mm offset wall
+crosses the back face's 2 mm offset (the wall between them is 2.5 mm), which the integral fills
+solid.
+
 ## Successful Boolean retries
 
 When an accepted Boolean result needs a retry that can make it differ from the

@@ -18,9 +18,9 @@ repository = "https://github.com/wckdboy/polykrom"
 # internal
 # The kernel and its geometry foundation are maintained in PolyCore and pinned by revision.
 # Bump both entries together; they must resolve to the same commit so their types are the same.
-polycore-geom = { git = "https://github.com/WCKDai/polycore", rev = "338f230925c5be291f64870ec7af46a06705c0fb" }
+polycore-geom = { git = "https://github.com/WCKDai/polycore", rev = "5dbc6949e59c5bb17a9283a9c0c5c1d3c7b0dce0" }
 polykrom-sketch = { path = "crates/sketch" }
-polycore = { git = "https://github.com/WCKDai/polycore", rev = "338f230925c5be291f64870ec7af46a06705c0fb" }
+polycore = { git = "https://github.com/WCKDai/polycore", rev = "5dbc6949e59c5bb17a9283a9c0c5c1d3c7b0dce0" }
 polykrom-render = { path = "crates/render" }
 polykrom-gpu = { path = "crates/gpu" }
 polykrom-doc = { path = "crates/doc" }
