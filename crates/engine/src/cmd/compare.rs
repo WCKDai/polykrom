@@ -20,6 +20,8 @@ pub static COMMANDS: &[CommandSpec] = &[CommandSpec::new("inspect.compare", "Com
      one with the largest share; an undo step) → a, b: volume_mm3, area_mm2, center_of_mass, bbox; difference: b − a; \
      deviation: a_to_b, b_to_a (max_mm, mean_mm, at, area_beyond_mm2); regions, largest first: side (only_in_a | only_in_b), volume_mm3 (integrated along \
      lines through the region: resolution), area_mm2, max_deviation_mm, at, center, bbox, faces_a, faces_b (face indices, as model.faces lists them); \
+     only_in_a, only_in_b: regions, volume_mm3 (their totals); intersection_mm3 = a − only_in_a, union_mm3 = a + only_in_b and iou = intersection / union (0: nothing in \
+     common, 1: the same shape; exact up to the region volumes' precision; null when a region was left unmeasured); \
      identical; verdict; warnings (a body whose surface does not enclose what it measures, lines left out). Works from the two surfaces, without a boolean of the bodies, so near-identical bodies compare too",
 )];
 
@@ -144,6 +146,30 @@ fn warnings(bodies: [(&str, &Value, &polycore_geom::Mesh); 2], chord: f64, c: &c
     out
 }
 
+/// How much of the two bodies is common to both: the volume of their intersection over that of
+/// their union (mm³), and their ratio.
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct Overlap {
+    intersection: f64,
+    union: f64,
+    iou: f64,
+}
+
+/// Intersection over union from `a`'s volume and the material only one body has:
+/// a ∩ b = a − (only in a), a ∪ b = a + (only in b). Exact up to the region volumes' precision;
+/// `None` when the volumes do not make a union.
+fn iou(volume_a: f64, only_in_a: f64, only_in_b: f64) -> Option<Overlap> {
+    if ![volume_a, only_in_a, only_in_b].iter().all(|v| v.is_finite() && *v >= 0.0) {
+        return None;
+    }
+    let union = volume_a + only_in_b;
+    if !(union > 0.0) {
+        return None;
+    }
+    let intersection = (volume_a - only_in_a).clamp(0.0, union);
+    Some(Overlap { intersection, union, iou: intersection / union })
+}
+
 fn deviation_json(d: &compare::Deviation) -> Value {
     json!({"max_mm": d.max, "mean_mm": d.mean, "at": d.at, "area_beyond_mm2": d.beyond_area, "area_mm2": d.area, "points": d.points})
 }
@@ -210,6 +236,9 @@ fn compare_bodies(s: &mut Session, p: &Value) -> Result<Value> {
         (rs.len(), rs.iter().map(|r| r.volume).filter(|v| v.is_finite()).sum::<f64>() + 0.0)
     };
     let ((ca, va), (cb, vb)) = (total(Side::OnlyInA), total(Side::OnlyInB));
+    // Every region measured: the intersection and union follow from a's volume and the regions.
+    let every_region_measured = c.unlisted == 0 && c.regions.iter().all(|r| r.volume.is_finite());
+    let overlap = measure_a["volume_mm3"].as_f64().filter(|_| every_region_measured).and_then(|volume_a| iou(volume_a, va, vb));
     let worst = c.a_to_b.max.max(c.b_to_a.max);
     let identical = c.regions.is_empty() && c.unlisted == 0;
     let warnings = warnings([(na.as_str(), &measure_a, &mesh_a), (nb.as_str(), &measure_b, &mesh_b)], chord, &c);
@@ -237,6 +266,9 @@ fn compare_bodies(s: &mut Session, p: &Value) -> Result<Value> {
         "regions": regions,
         "only_in_a": {"regions": ca, "volume_mm3": va},
         "only_in_b": {"regions": cb, "volume_mm3": vb},
+        "intersection_mm3": overlap.map(|o| o.intersection),
+        "union_mm3": overlap.map(|o| o.union),
+        "iou": overlap.map(|o| o.iou),
         "unlisted_regions": c.unlisted,
         "warnings": warnings,
         "sampling": {"spacing_mm": c.spacing, "chord_mm": chord, "triangles_a": mesh_a.triangles.len(), "triangles_b": mesh_b.triangles.len()},

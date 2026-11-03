@@ -191,6 +191,19 @@ beyond the tolerance (a small change on a large face leaves the face alone), or,
 with none, the face with the largest share.
 That is one undo step; without `color` the command changes nothing.
 
+`only_in_a` and `only_in_b` total the regions on each side (`regions`, `volume_mm3`), and from
+them the reply scores how much of the two bodies is common to both, the way generated shapes are
+scored against a reference: `intersection_mm3` = a's volume − `only_in_a`, `union_mm3` = a's
+volume + `only_in_b`, and `iou` = intersection / union, from 0 (nothing in common) to 1 (the same
+shape). A body and its copy score exactly 1 (no region to measure); two 10 mm cubes offset by
+5 mm score 1/3 and two cubes apart 0, each within the region volumes' precision. A region's
+volume is integrated along a grid of at most 40,000 lines through its box, which puts a region
+within about 1 % of its true volume (0.2 % for a 10 mm cube, 0.8 % for a 5 mm one: the cells
+its outline cuts), so the IoU of two bodies that differ by half is within about 0.005 of the
+truth, and that of two that nearly match far closer (the error is 1 % of the small regions over
+the whole union). `iou` is `null` when a region was
+left unmeasured (`unlisted_regions`, or one that would take too long).
+
 The bodies are meshed within a quarter of the tolerance. The kernel meshes no finer than a
 millionth of a body's size, so keep the tolerance at least twice that (0.02 mm for a part 10 m
 across). Large bodies are sampled more coarsely, at about `max_points` (eight million) points
