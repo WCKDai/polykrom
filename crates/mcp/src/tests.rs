@@ -157,6 +157,8 @@ fn handshake_and_tools_list() {
         "export",
         "undo",
         "redo",
+        "propose",
+        "apply_proposal",
         "crash_reports",
         "skill_reference",
         "polish",
@@ -3056,4 +3058,72 @@ fn inspect_design_summarises_by_default() {
     let full = raw_tool(&mut s, "inspect_design", json!({"measure": true, "reply_kb": 512}));
     let full_text = full["result"]["content"][0]["text"].as_str().unwrap();
     assert!(text.len() * 4 < full_text.len(), "summary {} bytes, whole design {} bytes", text.len(), full_text.len());
+}
+
+/// An agent proposes a change, the design stays as it is, and an explicit apply makes exactly
+/// that change as one undo step. Driven through the tool layer only.
+#[test]
+fn propose_then_apply_is_one_undo_step() {
+    let mut s = server();
+    tool(&mut s, "batch", json!({"commands": polykrom_engine::sample::script()["commands"].clone()}));
+    let v0 = volume(&mut s);
+    let undo0 = tool(&mut s, "inspect_design", json!({}))["undo"].clone();
+
+    // A tool's name works as a step, as in `batch`.
+    let p = tool(
+        &mut s,
+        "propose",
+        json!({"commands": [{"command": "set_parameter", "params": {"name": "thickness", "value": "10 mm"}}], "label": "Thicker plate"}),
+    );
+    let id = p["proposal"].as_str().expect("a proposal id").to_string();
+    assert_eq!(p["label"], "Thicker plate");
+    let plate = p["bodies"]["changed"].as_array().unwrap().iter().find(|b| b["name"] == "Plate").expect("the plate changes").clone();
+    assert!(plate["delta"]["volume_mm3"].as_f64().unwrap() > 100.0, "{plate}");
+    assert!(!p["timeline"]["affected"].as_array().unwrap().is_empty(), "{}", p["timeline"]);
+    assert_eq!(p["parameters"][0]["name"], "thickness");
+
+    // Nothing happened to the design.
+    assert_eq!(volume(&mut s), v0);
+    assert_eq!(tool(&mut s, "inspect_design", json!({}))["undo"], undo0);
+
+    let a = tool(&mut s, "apply_proposal", json!({"proposal": id}));
+    assert_eq!(a["applied"], true, "{a}");
+    let proposed = p["totals"]["after"]["volume_mm3"].as_f64().unwrap();
+    assert_eq!(volume(&mut s), proposed);
+    assert_eq!(tool(&mut s, "inspect_design", json!({}))["undo"].as_u64().unwrap(), undo0.as_u64().unwrap() + 1);
+
+    // One undo gives the original volumes back.
+    tool(&mut s, "undo", json!({}));
+    assert_eq!(volume(&mut s), v0);
+    assert_eq!(tool(&mut s, "inspect_design", json!({}))["undo"], undo0);
+}
+
+/// A proposal is refused, with a structured error and nothing changed, once the design moved on.
+#[test]
+fn applying_a_stale_proposal_is_refused() {
+    let mut s = server();
+    tool(&mut s, "batch", json!({"commands": polykrom_engine::sample::script()["commands"].clone()}));
+    let p = tool(&mut s, "propose", json!({"commands": [{"command": "parameters.change", "params": {"name": "thickness", "expression": "10 mm"}}]}));
+    tool(&mut s, "set_parameter", json!({"name": "width", "value": "90 mm"}));
+    let v = volume(&mut s);
+    let undo = tool(&mut s, "inspect_design", json!({}))["undo"].clone();
+
+    let r = raw_tool(&mut s, "apply_proposal", json!({"proposal": p["proposal"]}));
+    assert_eq!(r["result"]["isError"], json!(true), "{r}");
+    let err: Value = serde_json::from_str(r["result"]["content"][0]["text"].as_str().unwrap()).expect("the error is a JSON object");
+    assert_eq!(err["code"], "stale_proposal", "{err}");
+    assert_eq!(err["proposal"], p["proposal"]);
+    assert_eq!(volume(&mut s), v);
+    assert_eq!(tool(&mut s, "inspect_design", json!({}))["undo"], undo);
+
+    // Not a design edit, an unknown id and tools as steps are all refused too.
+    for args in [
+        json!({"commands": [{"command": "inspect.measure"}]}),
+        json!({"commands": [{"command": "undo"}]}),
+        json!({"commands": [{"command": "batch"}]}),
+    ] {
+        assert_eq!(raw_tool(&mut s, "propose", args.clone())["result"]["isError"], json!(true), "{args}");
+    }
+    assert_eq!(raw_tool(&mut s, "apply_proposal", json!({"proposal": "nope"}))["result"]["isError"], json!(true));
+    assert_eq!(volume(&mut s), v);
 }

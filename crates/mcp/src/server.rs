@@ -39,7 +39,7 @@ and dimension (`sketch.dimension {entities, value}`; values may name parameters)
 (`solid.extrude {distance, operation?: new|join|cut|intersect}`, `solid.revolve`, `solid.fillet {edges: [[x,y,z] point on \
 edge], radius}`, `solid.chamfer`, patterns, mirror, primitives). Use `batch` for several steps at once, \
 `list_commands` for ids and parameter docs, `describe_command` for a command's schemas, `inspect_design` / `measure` to verify, `body_topology` to find edge points, \
-`set_parameter` to drive the design and `screenshot` to look at it. While a call runs, the `pending` and `running` tools (and a protocol ping) answer at once \
+`set_parameter` to drive the design and `screenshot` to look at it. `propose` previews a change without making it (volumes before and after, the features it touches) and `apply_proposal` applies it as one undo step. While a call runs, the `pending` and `running` tools (and a protocol ping) answer at once \
 and say how far it is; to stop it, send `notifications/cancelled` with its request id: the design goes back to where it was before \
 the call. A call whose error starts `still running:` was not cancelled: don't send it again; `pending` waits for its result. \
 Assemblies: make each part a component (`component.create {name}`, model inside it, then `component.activate {component: root}`), \

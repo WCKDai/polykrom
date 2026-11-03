@@ -40,6 +40,7 @@ mod features_more;
 mod polish;
 mod polish_apply;
 mod printability;
+pub mod proposal;
 mod statics;
 pub(crate) use face::{FaceRefForm, face_ref_form};
 pub(crate) use features::profiles as feature_profiles;
@@ -303,6 +304,7 @@ pub fn command_specs() -> Vec<&'static CommandSpec> {
     v.extend(browser::COMMANDS.iter());
     v.extend(delete::COMMANDS.iter());
     v.extend(edit::COMMANDS.iter());
+    v.extend(proposal::COMMANDS.iter());
     v.extend(clipboard::COMMANDS.iter());
     v.extend(sketch_clipboard::COMMANDS.iter());
     v.extend(script::COMMANDS.iter());
