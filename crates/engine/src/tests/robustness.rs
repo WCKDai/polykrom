@@ -165,7 +165,9 @@ fn shell_thicker_than_a_step_says_so() {
     ] {
         s.execute(c, &p).unwrap();
     }
-    let e = s.execute("solid.shell", &json!({"faces": [[18.75, 35.0, 2.5]], "thickness": 1.5})).unwrap_err();
+    // Inside the back face: its centroid [18.75, 35, 2.5] lies on the step's edge, which is an
+    // ambiguous pick since #297 (seed 51 is refused there now).
+    let e = s.execute("solid.shell", &json!({"faces": [[26.25, 35.0, 3.75]], "thickness": 1.5})).unwrap_err();
     assert!(e.to_string().contains("not supported yet"), "{e}");
 }
 

@@ -370,7 +370,8 @@ fn convert(s: &mut Session, p: &Value) -> Result<Value> {
         return Err(bad(cmd, format!("no body `{body}`")));
     }
     let face = p.get("face").ok_or_else(|| bad(cmd, "`face` must be a point [x, y, z] on the plate's face, or its name from model.faces"))?;
-    let face = super::face::face_ref(s, face, Some(&body), cmd)?;
+    let picked = super::face::picked_faces(s, std::slice::from_ref(face), Some(&body), cmd)?;
+    let face = picked.points.first().copied().ok_or_else(|| bad(cmd, "`face` must be a point [x, y, z] on the plate's face"))?;
     // With bend edges, a solid or shelled body; without, a plate.
     let bends = match p.get("bends") {
         None | Some(Value::Null) => Vec::new(),
@@ -381,11 +382,11 @@ fn convert(s: &mut Session, p: &Value) -> Result<Value> {
         return Err(bad(cmd, format!("`{key}` is not a sheet.convert parameter: the sheet metal rule sets it. Pass a rule's name as `rule`")));
     }
     let rule = rule_param(s, p, cmd)?;
-    add_feature(
+    picked.into_reply(add_feature(
         s,
         p,
         FeatureKind::SheetConvert { body: BodyName(body), face: FacePick(face), rule, bends: bends.into_iter().map(Position).collect() },
-    )
+    ))
 }
 
 fn rules(s: &mut Session, p: &Value) -> Result<Value> {
