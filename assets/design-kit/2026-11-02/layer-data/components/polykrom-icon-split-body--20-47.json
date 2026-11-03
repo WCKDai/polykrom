@@ -1,0 +1,218 @@
+{
+  "source": {
+    "id": "20:47",
+    "name": "Polykrom / Icon / Split body",
+    "fileKey": "s7EddZNQds492PBiNVbcYs",
+    "pageId": "2:5",
+    "category": "components"
+  },
+  "paintIndexNote": "node.fill and node.stroke are indices into paints",
+  "nodes": [
+    {
+      "id": "20:47",
+      "parent": "20:46",
+      "type": "COMPONENT",
+      "name": "Polykrom / Icon / Split body",
+      "x": 68,
+      "y": 16,
+      "width": 24,
+      "height": 24,
+      "sizing": [
+        "FIXED",
+        "FIXED"
+      ]
+    },
+    {
+      "id": "20:48",
+      "parent": "20:47",
+      "type": "FRAME",
+      "name": "Frame",
+      "x": 0,
+      "y": 0,
+      "width": 24,
+      "height": 24,
+      "fill": 0,
+      "sizing": [
+        "FIXED",
+        "FIXED"
+      ]
+    },
+    {
+      "id": "20:49",
+      "parent": "20:48",
+      "type": "VECTOR",
+      "name": "Vector",
+      "x": 2,
+      "y": 4,
+      "width": 13,
+      "height": 17,
+      "fill": 1,
+      "stroke": 2,
+      "strokeWeight": 1.5,
+      "sizing": [
+        "FIXED",
+        "FIXED"
+      ]
+    },
+    {
+      "id": "20:50",
+      "parent": "20:48",
+      "type": "VECTOR",
+      "name": "Vector",
+      "x": 12,
+      "y": 3,
+      "width": 11,
+      "height": 16,
+      "fill": 1,
+      "stroke": 2,
+      "strokeWeight": 1.5,
+      "sizing": [
+        "FIXED",
+        "FIXED"
+      ]
+    },
+    {
+      "id": "20:51",
+      "parent": "20:48",
+      "type": "VECTOR",
+      "name": "Vector",
+      "x": 10,
+      "y": 2,
+      "width": 0,
+      "height": 20,
+      "stroke": 3,
+      "strokeWeight": 1.75,
+      "sizing": [
+        "FIXED",
+        "FIXED"
+      ]
+    },
+    {
+      "id": "20:52",
+      "parent": "20:48",
+      "type": "VECTOR",
+      "name": "Vector",
+      "x": 2,
+      "y": 6,
+      "width": 21,
+      "height": 13,
+      "stroke": 2,
+      "strokeWeight": 1.5,
+      "sizing": [
+        "FIXED",
+        "FIXED"
+      ]
+    }
+  ],
+  "paints": [
+    [
+      {
+        "type": "SOLID",
+        "visible": false,
+        "opacity": 1,
+        "blendMode": "NORMAL",
+        "color": {
+          "r": 0.9254902005195618,
+          "g": 0.9333333373069763,
+          "b": 0.9411764740943909
+        },
+        "boundVariables": {
+          "color": {
+            "type": "VARIABLE_ALIAS",
+            "id": "VariableID:4:13"
+          }
+        }
+      }
+    ],
+    [
+      {
+        "type": "SOLID",
+        "visible": true,
+        "opacity": 1,
+        "blendMode": "NORMAL",
+        "color": {
+          "r": 0.25882354378700256,
+          "g": 0.27843138575553894,
+          "b": 0.3019607961177826
+        },
+        "boundVariables": {
+          "color": {
+            "type": "VARIABLE_ALIAS",
+            "id": "VariableID:4:11"
+          }
+        }
+      }
+    ],
+    [
+      {
+        "type": "SOLID",
+        "visible": true,
+        "opacity": 1,
+        "blendMode": "NORMAL",
+        "color": {
+          "r": 0.8078431487083435,
+          "g": 0.8274509906768799,
+          "b": 0.8470588326454163
+        },
+        "boundVariables": {
+          "color": {
+            "type": "VARIABLE_ALIAS",
+            "id": "VariableID:4:17"
+          }
+        }
+      }
+    ],
+    [
+      {
+        "type": "GRADIENT_LINEAR",
+        "visible": true,
+        "opacity": 1,
+        "blendMode": "NORMAL",
+        "gradientStops": [
+          {
+            "color": {
+              "r": 0.8784313797950745,
+              "g": 1,
+              "b": 0.1882352977991104,
+              "a": 1
+            },
+            "position": 0,
+            "boundVariables": {}
+          },
+          {
+            "color": {
+              "r": 0.43921568989753723,
+              "g": 0.8705882430076599,
+              "b": 0.09019608050584793,
+              "a": 1
+            },
+            "position": 0.5,
+            "boundVariables": {}
+          },
+          {
+            "color": {
+              "r": 0,
+              "g": 0.7529411911964417,
+              "b": 0.6000000238418579,
+              "a": 1
+            },
+            "position": 1,
+            "boundVariables": {}
+          }
+        ],
+        "gradientTransform": [
+          [
+            0.5,
+            -0.5,
+            0.5
+          ],
+          [
+            0.5,
+            0.5,
+            0
+          ]
+        ]
+      }
+    ]
+  ]
+}

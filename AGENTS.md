@@ -83,11 +83,14 @@ People trust Polykrom with their designs; a crash loses their work. **This outra
   nothing from FreeCAD is linked, vendored or shipped.) The sketch solver and the blend
   operations are our own.
 - **Assets — absolutely essential.** Polykrom contains **no iconography, images, fonts or
-  artwork from commercial CAD products — ever.** Command icons are the original SVG masters in
-  `assets/icons/ui/design/svg/`, compiled through `crates/ui-egui/src/icon_svg.rs`.
-  **Before any icon, icon assignment or media edit, read `assets/AGENTS.md`,
-  `assets/icons/ui/AGENTS.md` and `assets/icons/ui/STYLE_GUIDE.md`.** Use the canonical
-  bases and named finished references there; never invent a parallel icon style. Any file asset must be original or openly licensed and **must have a row in ATTRIBUTION.md**
+  artwork from commercial CAD products — ever.** **The design kit in
+  `assets/design-kit/2026-11-02/` is the authority for icons, logo and brand** (owner decision
+  2026-11-02; it replaces Facet as the icon authority). Its component SVGs are the icon masters;
+  use the exact vector assets, never redraw them from screenshots or invent a parallel style.
+  Until the kit icons are wired in, the app still renders the older masters in
+  `assets/icons/ui/design/svg/` through `crates/ui-egui/src/icon_svg.rs`; do not draw new Facet
+  icons. **Before any icon, icon assignment or media edit, read `assets/AGENTS.md`,
+  `assets/icons/ui/AGENTS.md` and `assets/design-kit/2026-11-02/AGENT_BRIEF.md`.** Any file asset must be original or openly licensed and **must have a row in ATTRIBUTION.md**
   (`cargo xtask assets` enforces it). Screenshots of commercial CAD software are never committed.
   Breaking this rule is the most serious mistake you can make in this repo.
 - **Everything is a command.** User-visible behaviour = a command in `crates/engine/src/cmd/*`
@@ -130,6 +133,33 @@ People trust Polykrom with their designs; a crash loses their work. **This outra
   check `git ls-files` before pushing.
 - **Never break wasm**: everything below the apps must build for `wasm32-unknown-unknown`
   (`cargo xtask wasm`, part of `cargo xtask ci`).
+
+## Product UI and brand (design kit 2026-11-02)
+
+The binding visual reference is `assets/design-kit/2026-11-02/`: start with its `AGENT_BRIEF.md`,
+then `VIEWS.md` (five current views with SVG, PNG preview, layer JSON and the Figma node). SVGs are
+the geometry source; layer JSON gives node ids, bounds, text, paints and prototype actions; the
+linked Figma document remains the editable design source. Rules:
+
+- **Shell:** dark graphite. The supplied transparent logo appears **alone in the document
+  toolbar**; one discreet bottom-right credit, **"Polykrom by WCKD"**. Keep kernel/parametric
+  branding (PolyCore, engine names) out of the application chrome. The logo's white background
+  stays absent.
+- **Accents:** the lime/green/mint gradient identifies profiles, actions and control points only;
+  geometry stays neutral. The 69-icon set is authoritative, including mirrored Undo/Redo,
+  full-outline Rectangle/Circle, the revised Spline and the latest Shell.
+- **Native AI belongs in the modelling workflow:** visible scope, a preview of the proposed change,
+  an explicit **Apply**, and **Undo**. Keep blocked, pending and applied states. Do not replace this
+  with a generic chat overlay.
+- **Real behaviour:** connect every UI action to a real model command; a visible tool is not proof
+  that its backend exists. Match the current views before generalising components; check toolbar
+  actions, mode changes, selection, properties, browser rows, drawings, empty states, dialogs,
+  validation and keyboard focus.
+- The five-state example (actuator mount: 120 × 80 × 8 mm base, Ø44 boss, Ø24 bore, four Ø8 holes
+  on 84 × 44 mm pitch, R2 fillet; manual and AI edits preview Ø10 holes and apply the same command)
+  is one coherent flow, not five unrelated screenshots.
+- Fonts in the kit (Inter, IBM Plex Mono, OFL-1.1) render the SVG text; adopting them in the app is
+  a separate, attributed change.
 
 ## Showing and following through on changes
 

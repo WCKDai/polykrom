@@ -1,0 +1,52 @@
+[
+  {
+    "id": "0:1",
+    "name": "00 · Start Here",
+    "children": 1
+  },
+  {
+    "id": "2:2",
+    "name": "01 · Brand & Identity",
+    "children": 1
+  },
+  {
+    "id": "2:3",
+    "name": "02 · Research & Flows",
+    "children": 0
+  },
+  {
+    "id": "2:4",
+    "name": "03 · Foundations",
+    "children": 0
+  },
+  {
+    "id": "2:5",
+    "name": "04 · Components",
+    "children": 5
+  },
+  {
+    "id": "2:6",
+    "name": "05 · Product Design",
+    "children": 5
+  },
+  {
+    "id": "2:7",
+    "name": "06 · Prototypes",
+    "children": 0
+  },
+  {
+    "id": "2:8",
+    "name": "07 · Marketing",
+    "children": 0
+  },
+  {
+    "id": "2:9",
+    "name": "08 · Ready for Development",
+    "children": 0
+  },
+  {
+    "id": "2:10",
+    "name": "99 · Archive",
+    "children": 0
+  }
+]

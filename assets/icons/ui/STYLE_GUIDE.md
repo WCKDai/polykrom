@@ -1,5 +1,11 @@
 # Polykrom UI icon specification: Facet
 
+> **Superseded as the icon authority (owner decision 2026-11-02).** The design kit in
+> `assets/design-kit/2026-11-02/` (component SVGs, `AGENT_BRIEF.md`) is now authoritative. The
+> Facet masters below stay in the app until the kit icons are wired in (the renderer in
+> `crates/ui-egui/src/icon_svg.rs` does not yet support the kit's gradients); do not draw new Facet
+> icons. The review tool and lint keep working for the existing masters during the transition.
+
 This is the binding specification for new and revised icons. Facet is Polykrom's own icon
 language; it replaced the set inherited from SolidCraft. Every master is drawn from code in
 `design/tools/author/facet_icons.py` with the primitives in `facet.py`; read both before drawing.
