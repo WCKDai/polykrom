@@ -58,6 +58,10 @@ pub enum EngineError {
     BadParams { cmd: String, msg: String },
     #[error("{0}")]
     Other(String),
+    /// A request refused for a reason a client acts on, as a JSON object `{code, message, …}`
+    /// (the error text is that object): `stale_proposal`, `unknown_proposal`.
+    #[error("{0}")]
+    Refused(Value),
     /// A command panicked; the document was kept as it was (a bug: please report it).
     #[error("internal error in `{0}` (the design was kept as it was): {1}")]
     Internal(String, String),
@@ -332,6 +336,8 @@ pub struct Session {
     /// Record this session's top-level commands in the crash journal (the app's own design;
     /// never previews or other scratch sessions). See [`crash`].
     pub crash_journal: bool,
+    /// Changes proposed with `engine.propose`, held until the design changes (not saved).
+    pub(crate) proposals: cmd::proposal::Proposals,
     /// Full model evaluations (`refresh`), for tests.
     #[cfg(test)]
     pub(crate) evaluations: usize,
@@ -526,6 +532,7 @@ impl Session {
             evaluations: 0,
             motion_traces: Default::default(),
             crash_journal: false,
+            proposals: Default::default(),
         }
     }
 
@@ -987,6 +994,7 @@ impl Session {
             Ok((v, live_edit)) => {
                 let v = if changed { self.with_created(spec.id, params, &before, v) } else { v };
                 if changed {
+                    self.proposals.design_changed();
                     self.capture_tool_frames(&before.doc);
                     let render_only = self.render_only_change(&before);
                     let previous_doc = before.doc.clone();
@@ -1284,6 +1292,7 @@ impl Session {
             evaluations: 0,
             motion_traces: self.motion_traces.clone(),
             crash_journal: false,
+            proposals: Default::default(),
         }
     }
 
@@ -1311,6 +1320,7 @@ impl Session {
     /// saved state, view state, checkpoints or earlier undo steps.
     pub fn accept_computed(&mut self, mut computed: Session) {
         let previous_revision = self.revision;
+        self.proposals.design_changed();
         self.doc = computed.doc;
         self.model = computed.model;
         self.world_cache = computed.world_cache;
@@ -1371,6 +1381,11 @@ impl Session {
         copy.redo.clone_from(&self.redo);
         copy.model.keep(Some(Arc::default()));
         Ahead(copy)
+    }
+
+    /// [`Session::preview_in_place`] for a proposal: the scratch session after the commands, and the replies.
+    pub(crate) fn preview_steps(self, commands: &[(String, Value)]) -> Result<(Self, Vec<Value>)> {
+        self.preview_in_place(commands)
     }
 
     fn preview_in_place(mut self, commands: &[(String, Value)]) -> Result<(Self, Vec<Value>)> {

@@ -350,6 +350,40 @@ pub fn tool_definitions() -> Vec<Value> {
             Effect::Edits,
         ),
         tool(
+            "propose",
+            "Propose a change",
+            "Show what some commands would do, without doing it: the person reviews, then `apply_proposal` applies. Takes the \
+             same steps as `batch` ({command, params}, or a tool name such as set_parameter) and runs them on a scratch copy. \
+             The design, its revision, selection and undo history stay as they are. Returns `proposal` (an id bound to the \
+             design as it is now), `replies` (each step's result), `bodies` (`created`, `changed` and `removed`, each with \
+             volume_mm3 and area_mm2 before and after, and the `delta`), `totals`, `timeline` (features `added`, `changed`, \
+             `removed`, and `affected`: rebuilt because something they depend on changed), `parameters` (changed expressions), \
+             `warnings` and `errors`. Steps must edit the design (no files, no inspection). A step that fails fails the \
+             proposal and nothing is held. The last 8 proposals are kept in memory until the design changes.",
+            obj(
+                json!({
+                    "commands": {
+                        "type": "array",
+                        "description": "Steps: [{\"command\": id, \"params\": {...}}, ...] (at most 200)",
+                        "items": {"type": "object", "properties": {"command": {"type": "string"}, "params": {"type": "object"}}, "required": ["command"]},
+                    },
+                    "label": string("Short name of the change, shown with the proposal (default: the first command)"),
+                }),
+                &["commands"],
+            ),
+            Effect::ReadOnly,
+        ),
+        tool(
+            "apply_proposal",
+            "Apply a proposal",
+            "Apply exactly the commands of a proposal made with `propose`, as one undo step (`undo` takes it back). Refused, \
+             with the design unchanged, when the design changed since the proposal was made (any edit, undo or redo): the error \
+             is a JSON object with `code` \"stale_proposal\" (or \"unknown_proposal\" for an id that is not held), a `message`, \
+             and the revisions; propose the change again. Returns `applied`, the `label` and the bodies with their volumes.",
+            obj(json!({"proposal": string("The `proposal` id `propose` returned")}), &["proposal"]),
+            Effect::Edits,
+        ),
+        tool(
             "new_design",
             "New design",
             "Start a new, empty design (unsaved changes to the current one are discarded).",
@@ -770,11 +804,30 @@ fn dispatch(b: &mut dyn Backend, name: &str, a: &Map<String, Value>) -> Result<V
         "running" => b.call("control.running", json!({})),
         "undo" => undo_steps(b, "edit.undo", a),
         "redo" => undo_steps(b, "edit.redo", a),
+        "propose" => propose(b, a),
+        "apply_proposal" => exec(b, "engine.apply_proposal", pick(a, &["proposal"])),
         "new_design" => exec(b, "file.new", pick(a, &["name"])),
         "open" => exec(b, "doc.open", pick(a, &["path", "up", "names"])),
         "save" => exec(b, "file.save", pick(a, &["path", "format"])),
         other => Err(format!("unknown tool `{other}`")),
     }
+}
+
+/// `propose`: the steps as `batch` reads them (a tool's name stands for its command), run by
+/// `engine.propose` on a scratch copy.
+fn propose(b: &mut dyn Backend, a: &Map<String, Value>) -> Result<Value, String> {
+    let steps = a.get("commands").and_then(Value::as_array).ok_or("`commands` is required: [{command, params}]")?;
+    let mut mapped = Vec::with_capacity(steps.len());
+    for (i, step) in steps.iter().enumerate() {
+        let (command, params, _) = batch_step(step).map_err(|e| format!("step {i}: {e}"))?;
+        mapped.push(if command.is_empty() {
+            let id = step.get("command").or_else(|| step.get("id")).cloned().unwrap_or(Value::Null);
+            json!({"command": id, "params": step.get("params").cloned().filter(Value::is_object).unwrap_or(json!({}))})
+        } else {
+            json!({"command": command, "params": params})
+        });
+    }
+    exec(b, "engine.propose", json!({"commands": mapped, "label": a.get("label")}))
 }
 
 /// A body's edges and faces, narrowed to what the call asks for (#266): a large body's full lists
@@ -970,6 +1023,7 @@ fn batch_step(step: &Value) -> Result<(String, Value, Option<String>), String> {
         "body_topology" => Err("`body_topology` is a tool, not a command: in a batch use model.edges {body} and model.faces {body}".into()),
         "screenshot" => Err("`screenshot` is a tool, not a command: call it after the batch".into()),
         "batch" => Err("batches don't nest: put the steps in this batch".into()),
+        "propose" | "apply_proposal" => Err(format!("`{command}` is a tool, not a command: call it on its own")),
         "pending" => Err("`pending` is a tool, not a command: call it on its own".into()),
         "running" => Err("`running` is a tool, not a command: call it on its own".into()),
         "skill_reference" => Err("`skill_reference` is a tool, not a command: call it on its own".into()),
@@ -981,6 +1035,7 @@ fn batch_step(step: &Value) -> Result<(String, Value, Option<String>), String> {
 
 /// The tool names a `batch` step may not be (or is mapped from): `execute` must not wrap them.
 const TOOL_STEPS: &[&str] = &[
+    "apply_proposal",
     "batch",
     "body_topology",
     "crash_reports",
@@ -994,6 +1049,7 @@ const TOOL_STEPS: &[&str] = &[
     "open",
     "pending",
     "polish",
+    "propose",
     "redo",
     "running",
     "save",
