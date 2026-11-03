@@ -1656,10 +1656,12 @@ fn confirm_radial_and_history_rows_keep_multitone_artwork() {
     let previous = crate::theme::is_dark();
     for dark in [false, true] {
         crate::theme::set_dark(dark);
+        // Box is a multitone master with active faces; Extrude draws the design kit, whose
+        // geometry is neutral and takes no ramp.
         let mut cases = vec![
-            ("warning", "extrude", "", "MODEL", Some("construction"), 20),
-            ("danger", "extrude", "", "MODEL", Some("constraint"), 20),
-            ("info", "extrude", "", "MODEL", None, 20),
+            ("warning", "box", "", "MODEL", Some("construction"), 20),
+            ("danger", "box", "", "MODEL", Some("constraint"), 20),
+            ("info", "box", "", "MODEL", None, 20),
             ("warning", "status_warning", "", "MODEL", Some("construction"), 20),
             ("danger", "delete", "", "MODEL", Some("constraint"), 20),
             ("danger_menu", "delete", "", "MODEL", Some("constraint"), 16),
@@ -1676,7 +1678,7 @@ fn confirm_radial_and_history_rows_keep_multitone_artwork() {
             ("unknown", None),
         ] {
             for surface in ["radial", "radial_hover"] {
-                cases.push((surface, "extrude", "", tab, ramp, 24));
+                cases.push((surface, "box", "", tab, ramp, 24));
             }
         }
         for (kind, ramp) in [
@@ -1687,7 +1689,7 @@ fn confirm_radial_and_history_rows_keep_multitone_artwork() {
             ("ExtrudeFeature", None),
         ] {
             for (surface, side) in [("history_names", 15), ("history_icons", 19)] {
-                cases.push((surface, "extrude", kind, "MODEL", ramp, side));
+                cases.push((surface, "box", kind, "MODEL", ramp, side));
             }
         }
         // Surface feature names without the Surface prefix use the same alias rule
@@ -1783,7 +1785,7 @@ fn confirm_radial_and_history_rows_keep_multitone_artwork() {
                 &egui::ColorImage::from_rgba_premultiplied([side, side], expected.data()),
                 "{surface}/{kind}/{tab}: preserve roles with {ramp:?}"
             );
-            if icon == "extrude" {
+            if icon == "box" {
                 let dominant = ["active-1", "active-2", "active-3"]
                     .map(|role| {
                         let colour = crate::icon_svg::role_colour(role, look);
