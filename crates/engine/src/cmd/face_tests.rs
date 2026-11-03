@@ -391,3 +391,27 @@ fn shelled_cylinder_floor_keeps_its_cap_identity() {
         certificate_of(&s, floor)
     );
 }
+
+/// Every command that takes faces resolves them before the kernel sees them (#297): a pick on
+/// an edge is refused as ambiguous, and the reply lists the faces used, for the single `face`
+/// of `sheet.convert` too.
+#[test]
+fn face_taking_commands_refuse_edge_picks_and_list_the_faces_used() {
+    let mut s = Session::default();
+    run(&mut s, "solid.box", json!({"length": 60, "width": 40, "height": 30}));
+    let e = s.execute("solid.draft", &json!({"faces": [[60, 20, 30]], "angle": 2, "neutral": "XY"})).unwrap_err().to_string();
+    assert!(e.contains("ambiguous pick at [60, 20, 30]") && e.contains("`F1:+x`") && e.contains("`F1:+z`"), "{e}");
+    let e = s.execute("solid.offset_face", &json!({"faces": [[60, 40, 15]], "distance": 1})).unwrap_err().to_string();
+    assert!(e.contains("ambiguous pick at [60, 40, 15]"), "{e}");
+    assert_eq!(s.doc.features.len(), 1, "nothing was added");
+    let reply = run(&mut s, "solid.draft", json!({"faces": [[60, 20, 15], "F1:-x"], "angle": 2, "neutral": "XY"}));
+    assert_eq!(reply["faces_used"], json!(["F1:+x", "F1:-x"]), "{reply}");
+    let reply = run(&mut s, "face.delete", json!({"faces": [[30, 20, 30]], "heal": false}));
+    assert_eq!(reply["faces_used"], json!(["F1:+z"]), "{reply}");
+    let mut s = Session::default();
+    run(&mut s, "solid.box", json!({"length": 100, "width": 60, "height": 2, "body_name": "Plate"}));
+    let reply = run(&mut s, "sheet.convert", json!({"body": "Plate", "face": [50, 30, 2]}));
+    assert_eq!(reply["faces_used"], json!(["F1:+z"]), "{reply}");
+    let e = s.execute("sheet.convert", &json!({"body": "Plate", "face": [50, 60, 2]})).unwrap_err().to_string();
+    assert!(e.contains("ambiguous pick at [50, 60, 2]"), "{e}");
+}

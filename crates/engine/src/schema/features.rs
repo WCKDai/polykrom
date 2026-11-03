@@ -183,6 +183,12 @@ pub struct FeatureResult {
     /// In the warn parameter-check mode: what the call's parameters got wrong.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub param_warnings: Vec<String>,
+    /// For a command that takes faces (`solid.shell`, `solid.draft`, `solid.offset_face`,
+    /// `solid.split_face`, `solid.replace_face`, `face.delete`, `sheet.convert`): the persistent
+    /// name (`model.faces`) of the face each entry of `faces` resolved to, in the order given;
+    /// empty where no face was within the pick tolerance. Other commands leave it out.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub faces_used: Option<Vec<String>>,
 }
 
 #[cfg(test)]

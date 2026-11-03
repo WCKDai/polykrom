@@ -644,6 +644,7 @@ fn add_feature_in(s: &mut Session, p: &Value, kind: FeatureKind, world: bool) ->
         warning,
         ms: r.map(|r| r.ms),
         param_warnings: Vec::new(),
+        faces_used: None,
     };
     serde_json::to_value(reply).map_err(|e| EngineError::Other(e.to_string()))
 }
@@ -1784,7 +1785,7 @@ fn split_face(s: &mut Session, p: &Value) -> Result<Value> {
         let tb = t.get("body").and_then(Value::as_str).ok_or_else(|| bad(cmd, "`tool.body` must name a body"))?.to_string();
         let point = t.get("point").and_then(crate::params::vec3).ok_or_else(|| bad(cmd, "`tool.point` must be [x, y, z] on the tool face"))?;
         FeatureKind::SplitFace {
-            faces: faces.into_iter().map(FacePick).collect(),
+            faces: faces.points.iter().copied().map(FacePick).collect(),
             body: body.map(BodyName),
             plane: xy(),
             tool: Some(polykrom_doc::FaceAt { body: BodyName(tb), point: Position(point) }),
@@ -1793,7 +1794,7 @@ fn split_face(s: &mut Session, p: &Value) -> Result<Value> {
     } else if p.get("sketch").is_some_and(|v| !v.is_null()) {
         let sketch = sketch_id(s, p.get("sketch"), cmd, "sketch")?;
         FeatureKind::SplitFace {
-            faces: faces.into_iter().map(FacePick).collect(),
+            faces: faces.points.iter().copied().map(FacePick).collect(),
             body: body.map(BodyName),
             plane: xy(),
             tool: None,
@@ -1801,9 +1802,15 @@ fn split_face(s: &mut Session, p: &Value) -> Result<Value> {
         }
     } else {
         let plane = plane_param(s, p.get("plane"), cmd)?;
-        FeatureKind::SplitFace { faces: faces.into_iter().map(FacePick).collect(), body: body.map(BodyName), plane, tool: None, sketch: None }
+        FeatureKind::SplitFace {
+            faces: faces.points.iter().copied().map(FacePick).collect(),
+            body: body.map(BodyName),
+            plane,
+            tool: None,
+            sketch: None,
+        }
     };
-    add_feature(s, p, kind)
+    faces.into_reply(add_feature(s, p, kind))
 }
 
 fn split_body(s: &mut Session, p: &Value) -> Result<Value> {
@@ -2132,12 +2139,14 @@ fn sketch_hole_points(s: &Session, sketch: u64) -> Vec<String> {
     ss.sketch.points.iter().enumerate().filter(|(i, p)| p.id != "origin" && !ends.contains(i)).map(|(_, p)| p.id.clone()).collect()
 }
 
-fn face_points(s: &Session, p: &Value, cmd: &str) -> Result<Vec<Vec3>> {
+/// A command's `faces` (1…1000 points or face names), resolved to faces before the feature is
+/// added (#297): the reply then lists `faces_used`.
+fn face_points(s: &Session, p: &Value, cmd: &str) -> Result<super::face::PickedFaces> {
     let a = p.get("faces").and_then(Value::as_array).ok_or_else(|| bad(cmd, "`faces` must be a list of points or face names"))?;
     if a.is_empty() || a.len() > 1000 {
         return Err(bad(cmd, "select 1…1000 faces"));
     }
-    a.iter().map(|v| super::face::face_ref(s, v, str_(p, "body"), cmd)).collect()
+    super::face::picked_faces(s, a, str_(p, "body"), cmd)
 }
 
 fn shell(s: &mut Session, p: &Value) -> Result<Value> {
@@ -2149,17 +2158,14 @@ fn shell(s: &mut Session, p: &Value) -> Result<Value> {
     if !matches!(direction.as_str(), "" | "inside" | "outside" | "both") {
         return Err(bad(cmd, "`direction` must be inside, outside or both"));
     }
-    add_feature(
-        s,
-        p,
-        FeatureKind::Shell {
-            faces: faces.into_iter().map(FacePick).collect(),
-            thickness,
-            body: str_(p, "body").map(BodyName::from),
-            direction: if direction == "inside" { String::new() } else { direction },
-            tangent_chain: bool_(p, "tangent_chain").unwrap_or(false),
-        },
-    )
+    let kind = FeatureKind::Shell {
+        faces: faces.points.iter().copied().map(FacePick).collect(),
+        thickness,
+        body: str_(p, "body").map(BodyName::from),
+        direction: if direction == "inside" { String::new() } else { direction },
+        tangent_chain: bool_(p, "tangent_chain").unwrap_or(false),
+    };
+    faces.into_reply(add_feature(s, p, kind))
 }
 
 fn draft(s: &mut Session, p: &Value) -> Result<Value> {
@@ -2171,17 +2177,14 @@ fn draft(s: &mut Session, p: &Value) -> Result<Value> {
     let (vals, _) = s.doc.param_values();
     let pl = s.doc.resolve_plane_in(&vals, &neutral, 0, Some(&s.model.state()))?;
     let pull = p.get("pull").and_then(vec3).unwrap_or_else(|| pl.normal());
-    add_feature(
-        s,
-        p,
-        FeatureKind::Draft {
-            faces: faces.into_iter().map(FacePick).collect(),
-            angle,
-            neutral,
-            pull: Dir(pull),
-            body: str_(p, "body").map(BodyName::from),
-        },
-    )
+    let kind = FeatureKind::Draft {
+        faces: faces.points.iter().copied().map(FacePick).collect(),
+        angle,
+        neutral,
+        pull: Dir(pull),
+        body: str_(p, "body").map(BodyName::from),
+    };
+    faces.into_reply(add_feature(s, p, kind))
 }
 
 pub(super) fn sketch_id(s: &Session, v: Option<&Value>, cmd: &str, what: &str) -> Result<u64> {
@@ -2446,7 +2449,9 @@ fn scale(s: &mut Session, p: &Value) -> Result<Value> {
 fn delete_face(s: &mut Session, p: &Value) -> Result<Value> {
     let faces = face_points(s, p, "face.delete")?;
     let heal = bool_(p, "heal").unwrap_or(true);
-    add_feature(s, p, FeatureKind::DeleteFace { faces: faces.into_iter().map(FacePick).collect(), body: str_(p, "body").map(BodyName::from), heal })
+    let kind =
+        FeatureKind::DeleteFace { faces: faces.points.iter().copied().map(FacePick).collect(), body: str_(p, "body").map(BodyName::from), heal };
+    faces.into_reply(add_feature(s, p, kind))
 }
 
 fn offset_face(s: &mut Session, p: &Value) -> Result<Value> {
@@ -2454,11 +2459,9 @@ fn offset_face(s: &mut Session, p: &Value) -> Result<Value> {
     let faces = face_points(s, p, cmd)?;
     let distance = req_expr(cmd, p, "distance")?;
     check_expr(s, &distance, Kind::Length, cmd, "distance")?;
-    add_feature(
-        s,
-        p,
-        FeatureKind::OffsetFace { faces: faces.into_iter().map(FacePick).collect(), distance, body: str_(p, "body").map(BodyName::from) },
-    )
+    let kind =
+        FeatureKind::OffsetFace { faces: faces.points.iter().copied().map(FacePick).collect(), distance, body: str_(p, "body").map(BodyName::from) };
+    faces.into_reply(add_feature(s, p, kind))
 }
 
 #[cfg(test)]
