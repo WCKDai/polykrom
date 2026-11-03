@@ -6,6 +6,12 @@ Each task is a plain-language spec with an analytic answer. Claude Code runs hea
 with `polykrom-cli`: parts by body count, volume and bounding box; systems by replaying
 commands on the design (joints, motion studies, interference and clearance, URDF, BOM). The
 agent's own claims are never the verdict. See README.md.
+
+A parts task whose spec fixes where the part sits also carries a `reference`: a command script
+that builds the intended part. The saved design is scored against it by intersection over union
+(`inspect.compare`, nothing aligned), recorded beside the checks as `iou` and, over the run, as
+`mean_iou`; it does not change pass/fail. `--grade-only DIR` grades saved designs without
+running the agent; `--check-references` tests the references themselves.
 """
 import argparse, json, math, os, subprocess, time
 from pathlib import Path
@@ -63,16 +69,34 @@ TASKS = [
      "bodies": 1, "bbox": [17 / math.cos(PI / 6), 17, 8], "volume": (math.sqrt(3) / 2 * 17**2 - PI * 25) * 8},
     {"id": "v_pulley", "round": 4,
      "prompt": "Model a V-belt pulley as one solid, axis along Z: 60 mm outside diameter, 20 mm wide (from z = 0 to z = 20), with a 10 mm centre bore. Around its rim cut a V-groove symmetric about z = 10: 10 mm wide at the outside diameter and 6 mm deep, so its two flanks meet at a point on a 48 mm diameter.",
-     "bodies": 1, "bbox": [60, 60, 20], "volume": PI * (900 - 25) * 20 - 2 * PI * 28 * 30},
+     "bodies": 1, "bbox": [60, 60, 20], "volume": PI * (900 - 25) * 20 - 2 * PI * 28 * 30,
+     # The groove's cross-section: (30, 5), (30, 15), (24, 10) in the XZ plane (sketch y is −z), revolved about Z.
+     "reference": [{"command": "solid.cylinder", "params": {"diameter": 60, "height": 20, "body_name": "Pulley"}},
+                   {"command": "solid.cylinder", "params": {"diameter": 10, "height": 20, "operation": "cut", "targets": ["Pulley"]}},
+                   {"command": "sketch.create", "params": {"plane": "XZ", "name": "Groove"}},
+                   {"command": "sketch.line", "params": {"points": [[30, -5], [30, -15], [24, -10]], "closed": True}},
+                   {"command": "sketch.finish", "params": {}},
+                   {"command": "solid.revolve", "params": {"axis": "Z", "sketch": "Groove", "operation": "cut", "targets": ["Pulley"]}}]},
     {"id": "nema17_plate", "round": 4,
      "prompt": "Model a NEMA 17 stepper motor mounting plate: 60 mm by 60 mm in XY, 5 mm thick, with its four vertical corner edges rounded to a 4 mm radius. It has a 22 mm diameter hole in its centre for the motor's boss and four 3.4 mm holes on a 31 mm square bolt pattern centred on it.",
      "bodies": 1, "bbox": [60, 60, 5], "volume": (3600 - 4 * (16 - 4 * PI) - PI * 121 - 4 * PI * 1.7**2) * 5},
     {"id": "shelf_bracket", "round": 4,
      "prompt": "Model a shelf bracket as one solid: a horizontal arm 100 mm long (X from 0 to 100), 30 mm wide (Y from 0 to 30) and 6 mm thick (Z from 0 to 6); a vertical arm, the same width, at X from 0 to 6, from the horizontal arm up to Z = 100; and a triangular stiffening rib 6 mm thick, centred in the width (Y from 12 to 18), filling the inside corner, with one leg 60 mm along the horizontal arm's top (from x = 6) and the other 60 mm up the vertical arm's face (from z = 6).",
-     "bodies": 1, "bbox": [100, 30, 100], "volume": 100 * 30 * 6 + 6 * 30 * 94 + 0.5 * 60 * 60 * 6},
+     "bodies": 1, "bbox": [100, 30, 100], "volume": 100 * 30 * 6 + 6 * 30 * 94 + 0.5 * 60 * 60 * 6,
+     # The rib: a triangle on the XZ plane moved to y = 12 (sketch y is −z), extruded 6 mm along +Y.
+     "reference": [{"command": "solid.box", "params": {"length": 100, "width": 30, "height": 6, "body_name": "Bracket"}},
+                   {"command": "solid.box", "params": {"length": 6, "width": 30, "height": 94, "corner": [0, 0, 6], "operation": "join", "targets": ["Bracket"]}},
+                   {"command": "sketch.create", "params": {"plane": "XZ", "offset": 12, "name": "Rib"}},
+                   {"command": "sketch.line", "params": {"points": [[6, -6], [66, -6], [6, -66]], "closed": True}},
+                   {"command": "sketch.finish", "params": {}},
+                   {"command": "solid.extrude", "params": {"distance": 6, "sketch": "Rib", "operation": "join", "targets": ["Bracket"]}}]},
     {"id": "board_tray", "round": 4,
      "prompt": "Model a tray for a circuit board as one solid: a box 100 mm (X) by 70 mm (Y) by 20 mm tall (Z), with one corner at the origin, hollowed out with 2 mm walls and a 2 mm floor and an open top. Inside, four cylindrical standoffs 6 mm in diameter stand on the floor and reach up to z = 8 mm, centred at x = 15 and 85 and y = 15 and 55. Each standoff has a 2.5 mm diameter hole down its axis, 6 mm deep from its top.",
-     "bodies": 1, "bbox": [100, 70, 20], "volume": 100 * 70 * 20 - 96 * 66 * 18 + 4 * PI * 6 * (9 - 1.5625)},
+     "bodies": 1, "bbox": [100, 70, 20], "volume": 100 * 70 * 20 - 96 * 66 * 18 + 4 * PI * 6 * (9 - 1.5625),
+     "reference": [{"command": "solid.box", "params": {"length": 100, "width": 70, "height": 20, "body_name": "Tray"}},
+                   {"command": "solid.shell", "params": {"faces": [[50, 35, 20]], "thickness": 2, "body": "Tray"}}]
+                  + [{"command": "solid.cylinder", "params": {"diameter": 6, "height": 6, "base": [x, y, 2], "operation": "join", "targets": ["Tray"]}} for x in (15, 85) for y in (15, 55)]
+                  + [{"command": "solid.cylinder", "params": {"diameter": 2.5, "height": 6, "base": [x, y, 2], "operation": "cut", "targets": ["Tray"]}} for x in (15, 85) for y in (15, 55)]},
     {"id": "box_and_lid", "round": 4,
      "prompt": "Model a small box with a separate lid as two bodies. The box: 60 mm (X) by 40 mm (Y) by 30 mm tall (Z from 0 to 30), hollowed out with 2 mm walls and a 2 mm floor and an open top. The lid: a plate 60 by 40 mm and 3 mm thick sitting on the box (Z from 30 to 33), with a lip under it: a rectangular ring 1.5 mm thick and 4 mm deep (Z from 26 to 30) whose outside fits inside the box's walls with 0.2 mm of clearance on every side.",
      "bodies": 2, "bbox": [60, 40, 33], "volume": 60 * 40 * 30 - 56 * 36 * 28 + 60 * 40 * 3 + (55.6 * 35.6 - 52.6 * 32.6) * 4},
@@ -87,7 +111,11 @@ TASKS = [
      "urdf": {"links": 2, "prismatic": [0.0, 0.15]}},
     {"id": "edit_plate", "round": 4, "input": "input_mounting_plate.polykrom",
      "prompt": "Open the design {input}: a mounting plate 100 mm by 60 mm by 6 mm thick with 5 mm rounded corners and four 6.5 mm holes 10 mm in from the edges. Edit it: make the plate 10 mm thick and the four holes 8.5 mm in diameter, keeping everything else as it is.",
-     "bodies": 1, "bbox": [100, 60, 10], "volume": (6000 - 4 * (25 - 25 * PI / 4) - 4 * PI * 4.25**2) * 10},
+     "bodies": 1, "bbox": [100, 60, 10], "volume": (6000 - 4 * (25 - 25 * PI / 4) - 4 * PI * 4.25**2) * 10,
+     # Run on the input design: the plate's extrude grows to 10 mm; its hole cut and sketch go, and 8.5 mm holes are cut where they were.
+     "reference": [{"command": "timeline.edit", "params": {"feature": "Extrude1", "set": {"extent": {"distance": "10"}}}},
+                   {"command": "timeline.delete", "params": {"features": ["Extrude2", "Sketch2"]}}]
+                  + [{"command": "solid.cylinder", "params": {"diameter": 8.5, "height": 10, "base": [x, y, 0], "operation": "cut", "targets": ["Body1"]}} for x in (10, 90) for y in (10, 50)]},
 
     # Round 5: systems: assemblies, joints, materials, fitment, motion and animation.
     {"id": "slider_crank", "round": 5, "system": "slider_crank",
@@ -208,12 +236,13 @@ def check_urdf(task, path):
             fails.append("revolute limit is not a 180 degree range")
     return fails
 
-def run_cmds(cli, save, cmds):
-    """Run commands on the saved design; their results, or an error string."""
-    script = Path(save).with_name("grade.json"); out = Path(save).with_name("grade.out.json")
+def run_cmds(cli, save, cmds, name="grade", save_to=None):
+    """Run commands on the saved design (`save_to`: save the result there); their results, or an error string."""
+    script = Path(save).with_name(f"{name}.json"); out = Path(save).with_name(f"{name}.out.json")
     script.write_text(json.dumps({"commands": cmds}))
     if out.exists(): out.unlink()
-    run = subprocess.run([cli, "run", str(script), "--in", str(save), "--results", "--quiet", "--allow-errors", "--json-out", str(out)], capture_output=True, text=True)
+    args = [cli, "run", str(script), "--in", str(save), "--results", "--quiet", "--allow-errors", "--json-out", str(out)]
+    run = subprocess.run(args + (["--save", str(save_to)] if save_to else []), capture_output=True, text=True)
     if not out.exists():
         return run.stderr.strip()[-400:] or "no results"
     return json.loads(out.read_text())
@@ -378,19 +407,149 @@ def check_system(cli, task, save, work):
             if n != 2: fails.append(f"bearings in BOM {n}")
     return fails, info
 
+HERE = Path(__file__).resolve().parent
+
+def reference_design(cli, task, folder, commands=None):
+    """Build the task's reference design in `folder` from its command script (`commands`: another script),
+    on the task's input design when it has one: (path, error)."""
+    folder = Path(folder); folder.mkdir(parents=True, exist_ok=True)
+    script, design = folder / "reference.json", folder / "reference.polykrom"
+    script.write_text(json.dumps({"commands": task["reference"] if commands is None else commands}, indent=1))
+    if design.exists(): design.unlink()
+    args = [cli, "run", str(script), "--save", str(design), "--quiet"] + (["--in", str(HERE / task["input"])] if "input" in task else [])
+    run = subprocess.run(args, capture_output=True, text=True)
+    if run.returncode != 0 or not design.exists():
+        return None, run.stderr.strip()[-300:] or "no reference saved"
+    return design, ""
+
+def iou(cli, design, reference, work):
+    """Intersection over union of the design's visible bodies and the reference's, where they are (nothing is
+    aligned): (iou, note). The reference is inserted into a copy of the design, each side's bodies are joined
+    into one, and `inspect.compare` measures the material only one side has."""
+    d, err = measure(cli, design)
+    if not d:
+        return None, f"eval failed: {err}"
+    mine = [b["name"] for b in d.get("bodies", []) if b.get("visible", True) is not False]
+    if not mine:
+        return 0.0, "no bodies"
+    merged = Path(work) / "iou.polykrom"
+    r = run_cmds(cli, design, [{"command": "component.insert_design", "params": {"path": str(Path(reference).resolve()), "name": "reference"}}],
+                 name="iou_insert", save_to=merged)
+    theirs = r[0].get("created_bodies") if isinstance(r, list) and r and isinstance(r[0], dict) else None
+    if not theirs or not merged.exists():
+        return None, f"inserting the reference failed: {r if isinstance(r, str) else r[0]}"[:400]
+    cmds = [{"command": "solid.combine", "params": {"target": names[0], "tools": names[1:], "operation": "join"}} for names in (mine, theirs) if len(names) > 1]
+    cmds.append({"command": "inspect.compare", "params": {"a": mine[0], "b": theirs[0]}})
+    r = run_cmds(cli, merged, cmds, name="iou")
+    c = r[-1] if isinstance(r, list) and r and isinstance(r[-1], dict) else {}
+    if not isinstance(c.get("iou"), (int, float)):
+        return None, f"compare failed: {r if isinstance(r, str) else c.get('verdict') or c}"[:400]
+    return round(c["iou"], 6), c.get("verdict", "")
+
+def grade(cli, task, save, work):
+    """The task's checks on the saved design (never the agent's claims), and, when the task has a reference,
+    its `iou` against it (0 when nothing was saved; None, with `iou_note`, when it could not be measured)."""
+    save, work = Path(save), Path(work); rec = {}
+    if "system" in task:
+        rec["fails"], rec["system"] = check_system(cli, task, save, work) if save.exists() else (["no design saved"], None)
+    elif "arm" in task:
+        rec["fails"], rec["arm"] = check_arm(cli, task, save) if save.exists() else (["no design saved"], None)
+    elif "urdf" in task:
+        rec["fails"] = check_urdf(task, work / "robot.urdf") + ([] if save.exists() else ["no design saved"])
+    elif save.exists():
+        d, err = measure(cli, save)
+        rec["fails"], rec["volume"] = (check(task, d) if d else ([f"eval failed: {err}"], None))
+    else:
+        rec["fails"] = ["no design saved"]
+    rec["ok"] = not rec["fails"]
+    if "reference" in task:
+        ref, err = reference_design(cli, task, work)
+        if not ref:
+            rec["iou"], rec["iou_note"] = None, f"reference failed: {err}"
+        elif not save.exists():
+            rec["iou"], rec["iou_note"] = 0.0, "no design saved"
+        else:
+            rec["iou"], rec["iou_note"] = iou(cli, save, ref, work)
+    return rec
+
+def summary(report):
+    scored = [r["iou"] for r in report if isinstance(r.get("iou"), (int, float))]
+    return {"correct": sum(1 for r in report if r.get("ok")), "total": len(report),
+            "mean_iou": round(sum(scored) / len(scored), 4) if scored else None, "iou_tasks": len(scored)}
+
+def write_report(out, report):
+    (out / "report.json").write_text(json.dumps({"tasks": report, **summary(report)}, indent=1))
+
+def read_report(out):
+    """The tasks of an earlier report in `out`, by id (either shape: the list of records, or {tasks, ...})."""
+    path = out / "report.json"
+    if not path.exists():
+        return {}
+    prev = json.loads(path.read_text())
+    prev = prev.get("tasks", []) if isinstance(prev, dict) else prev
+    return {r["id"]: r for r in prev if isinstance(r, dict) and "id" in r}
+
+def selected(a):
+    return [t for t in TASKS if (not a.round or t.get("round", 1) == a.round) and (not a.only or t["id"] in a.only.split(","))]
+
+def check_references(cli, out, tasks):
+    """The references' own test: each builds, passes its task's checks, scores 1.0 against itself, and the same
+    script without its last command (a feature missing) scores less. Returns the lines that failed."""
+    failed = []
+    for task in tasks:
+        if "reference" not in task:
+            continue
+        work = out / task["id"]; line = {"id": task["id"]}
+        ref, err = reference_design(cli, task, work)
+        if ref:
+            d, err = measure(cli, ref)
+            line["fails"], line["volume"] = check(task, d) if d else ([f"eval failed: {err}"], None)
+            # A copy stands in for the agent's design: a design can't be linked into itself.
+            import shutil
+            same = shutil.copy(ref, work / f"{task['id']}.polykrom")
+            line["self_iou"], note = iou(cli, same, ref, work)
+            wrong, err = reference_design(cli, task, work / "wrong", task["reference"][:-1])
+            line["wrong_iou"], wrong_note = iou(cli, wrong, ref, work / "wrong") if wrong else (None, f"the wrong design failed: {err}")
+            line["ok"] = not line["fails"] and line["self_iou"] == 1.0 and isinstance(line["wrong_iou"], float) and line["wrong_iou"] < 1.0
+            if not line["ok"]:
+                line["notes"] = [note, wrong_note]
+        else:
+            line["ok"], line["error"] = False, f"reference failed: {err}"
+        if not line["ok"]:
+            failed.append(line)
+        print(json.dumps(line), flush=True)
+    return failed
+
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--cli", required=True); ap.add_argument("--out", required=True)
+    ap.add_argument("--cli", required=True); ap.add_argument("--out", default="")
     ap.add_argument("--only", default=""); ap.add_argument("--max-turns", type=int, default=60)
     ap.add_argument("--timeout", type=int, default=1200); ap.add_argument("--model", default=""); ap.add_argument("--round", type=int, default=0)
+    ap.add_argument("--grade-only", default="", metavar="DIR", help="grade the designs saved by an earlier run in DIR (no agent); updates its report.json")
+    ap.add_argument("--check-references", action="store_true", help="test the tasks' reference designs instead of running the agent")
     a = ap.parse_args()
+    if a.check_references:
+        out = Path(a.out or a.grade_only or "/tmp/agent-eval-references"); out.mkdir(parents=True, exist_ok=True)
+        failed = check_references(a.cli, out, selected(a))
+        print(f"{len(failed)} reference(s) failed" if failed else "every reference passes its task, scores 1.0 against itself and less without its last feature")
+        raise SystemExit(1 if failed else 0)
+    if a.grade_only:
+        out = Path(a.grade_only); earlier = read_report(out); report = []
+        for task in selected(a):
+            work = out / task["id"]
+            if not work.is_dir():
+                continue
+            rec = {**earlier.get(task["id"], {}), "id": task["id"]}
+            rec.update(grade(a.cli, task, work / f"{task['id']}.polykrom", work))
+            report.append(rec); print(json.dumps(rec), flush=True)
+        write_report(out, report)
+        s = summary(report); print(f"{s['correct']}/{s['total']} tasks correct, mean IoU {s['mean_iou']} over {s['iou_tasks']} with a reference")
+        return
+    if not a.out:
+        ap.error("--out DIR is required (or --grade-only DIR)")
     out = Path(a.out); out.mkdir(parents=True, exist_ok=True)
     report = []
-    for task in TASKS:
-        if a.round and task.get("round", 1) != a.round:
-            continue
-        if a.only and task["id"] not in a.only.split(","):
-            continue
+    for task in selected(a):
         work = out / task["id"]; work.mkdir(exist_ok=True)
         save = work / f"{task['id']}.polykrom"
         if save.exists(): save.unlink()
@@ -398,7 +557,7 @@ def main():
         cfg.write_text(json.dumps({"mcpServers": {"polykrom": {"command": a.cli, "args": ["mcp", "--allow-path", str(work)]}}}))
         if "input" in task:
             import shutil
-            shutil.copy(Path(__file__).parent / task["input"], work / task["input"])
+            shutil.copy(HERE / task["input"], work / task["input"])
         prompt = task["prompt"].replace("{urdf}", str(work / "robot.urdf")).replace("{input}", str(work / task.get("input", ""))).replace("{gif}", str(work / "cycle.gif")).replace("{bom}", str(work / "bom.csv")) + SUFFIX.format(save=save)
         args = ["claude", "-p", prompt, "--mcp-config", str(cfg),
                 "--strict-mcp-config", "--allowedTools", "mcp__polykrom", "--disallowedTools", "Bash,Read,Write,Edit,MultiEdit,NotebookEdit,Glob,Grep,WebFetch,WebSearch,Task,LSP", "--output-format", "stream-json", "--verbose",
@@ -425,23 +584,12 @@ def main():
                "turns": payload.get("num_turns"), "cost": payload.get("total_cost_usd"),
                "reply": str(payload.get("result", payload.get("error", "")))[:300],
                "tool_calls": payload.get("tool_calls"), "tool_errors": payload.get("tool_errors", [])}
-        if "system" in task:
-            rec["fails"], rec["system"] = check_system(a.cli, task, save, work) if save.exists() else (["no design saved"], None)
-        elif "arm" in task:
-            rec["fails"], rec["arm"] = check_arm(a.cli, task, save) if save.exists() else (["no design saved"], None)
-        elif "urdf" in task:
-            rec["fails"] = check_urdf(task, work / "robot.urdf") + ([] if save.exists() else ["no design saved"])
-        elif save.exists():
-            d, err = measure(a.cli, save)
-            rec["fails"], rec["volume"] = (check(task, d) if d else ([f"eval failed: {err}"], None))
-        else:
-            rec["fails"] = ["no design saved"]
-        rec["ok"] = not rec["fails"]
+        rec.update(grade(a.cli, task, save, work))
         report.append(rec)
         print(json.dumps(rec), flush=True)
-        (out / "report.json").write_text(json.dumps(report, indent=1))
-    ok = sum(r["ok"] for r in report)
-    print(f"{ok}/{len(report)} tasks correct")
+        write_report(out, report)
+    s = summary(report)
+    print(f"{s['correct']}/{s['total']} tasks correct, mean IoU {s['mean_iou']} over {s['iou_tasks']} with a reference")
 
 if __name__ == "__main__":
     main()

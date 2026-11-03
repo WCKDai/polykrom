@@ -104,6 +104,71 @@ fn a_boss_is_material_only_the_box_with_it_has() {
     assert_eq!(s.doc.appearances.faces.iter().filter(|x| x.look.color == [0, 0, 255]).count(), 5);
 }
 
+/// Two 10 mm cubes, `A` at the origin and `B` with its corner at `corner`.
+fn two_cubes(corner: [f64; 3]) -> Session {
+    let mut s = Session::default();
+    run(&mut s, "solid.box", json!({"length": 10, "width": 10, "height": 10, "body_name": "A"}));
+    run(&mut s, "solid.box", json!({"length": 10, "width": 10, "height": 10, "corner": corner, "operation": "new_body", "body_name": "B"}));
+    s
+}
+
+/// Intersection over union: 1 for a box and its copy, exactly (no region to measure); 1/3 for
+/// two 10 mm cubes offset by 5 mm (500 mm³ common, 1500 mm³ together) and 0 for two apart,
+/// within the region volumes' precision: each is integrated along a grid of at most 40,000
+/// lines, which puts a compact region's volume within 1 % of the truth, and the IoU within
+/// 0.005 of it.
+#[test]
+fn iou_is_the_common_volume_over_the_volume_of_both() {
+    let mut s = two_boxes();
+    let r = run(&mut s, "inspect.compare", json!({"a": "A", "b": "A (2)"}));
+    assert_eq!(r["iou"], 1.0, "{r}");
+    assert!(close(f(&r["intersection_mm3"]), 12_000.0, 1e-9) && close(f(&r["union_mm3"]), 12_000.0, 1e-9), "{r}");
+
+    let mut s = two_cubes([5.0, 0.0, 0.0]);
+    for (a, b) in [("A", "B"), ("B", "A")] {
+        let r = run(&mut s, "inspect.compare", json!({"a": a, "b": b}));
+        assert!((f(&r["iou"]) - 1.0 / 3.0).abs() <= 0.005, "{a} vs {b}: {r}");
+        assert!(close(f(&r["intersection_mm3"]), 500.0, 0.01), "{a} vs {b}: {r}");
+        assert!(close(f(&r["union_mm3"]), 1500.0, 0.01), "{a} vs {b}: {r}");
+        assert!(close(f(&r["only_in_a"]["volume_mm3"]), 500.0, 0.01) && close(f(&r["only_in_b"]["volume_mm3"]), 500.0, 0.01), "{r}");
+    }
+
+    let mut s = two_cubes([20.0, 0.0, 0.0]);
+    let r = run(&mut s, "inspect.compare", json!({"a": "A", "b": "B"}));
+    assert!(f(&r["iou"]) <= 0.005, "{r}");
+    assert!(f(&r["intersection_mm3"]) <= 10.0, "{r}");
+    assert!(close(f(&r["union_mm3"]), 2000.0, 0.01), "{r}");
+}
+
+#[test]
+fn iou_is_left_out_when_it_cannot_be_measured() {
+    // Volumes that make no union, or that are not numbers.
+    assert_eq!(super::iou(0.0, 0.0, 0.0), None);
+    assert_eq!(super::iou(f64::NAN, 0.0, 0.0), None);
+    assert_eq!(super::iou(10.0, f64::INFINITY, 0.0), None);
+    assert_eq!(super::iou(10.0, -1.0, 0.0), None);
+    // Measured material only a has slightly over a's volume (the regions' precision): 0, not negative.
+    let o = super::iou(10.0, 10.1, 5.0).unwrap();
+    assert_eq!((o.intersection, o.union, o.iou), (0.0, 15.0, 0.0));
+    let o = super::iou(100.0, 10.0, 20.0).unwrap();
+    assert_eq!((o.intersection, o.union, o.iou), (90.0, 120.0, 0.75));
+    // Regions beyond max_regions are not measured, so the IoU is not known.
+    let mut s = two_boxes();
+    for (i, corner) in [[2.0, 2.0, 9.5], [12.0, 2.0, 9.5], [22.0, 2.0, 9.5]].into_iter().enumerate() {
+        run(
+            &mut s,
+            "solid.box",
+            json!({"length": 4, "width": 4, "height": 0.5, "corner": corner, "operation": "cut", "targets": ["A (2)"], "name": format!("Pocket {i}")}),
+        );
+    }
+    let r = run(&mut s, "inspect.compare", json!({"a": "A", "b": "A (2)", "max_regions": 2}));
+    assert_eq!(r["unlisted_regions"], 1, "{r}");
+    assert_eq!(r["iou"], Value::Null, "{r}");
+    let r = run(&mut s, "inspect.compare", json!({"a": "A", "b": "A (2)"}));
+    assert_eq!(r["unlisted_regions"], 0, "{r}");
+    assert!((f(&r["iou"]) - (12_000.0 - 24.0) / 12_000.0).abs() < 1e-4, "{r}");
+}
+
 /// A 100 x 60 sheet-metal plate with a 20 mm flange along y = 0 and a 5 mm hole at (x, 40).
 fn bracket(s: &mut Session, name: &str, x: f64) {
     run(s, "sketch.create", json!({"plane": "XY", "name": format!("{name} base")}));

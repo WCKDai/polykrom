@@ -7,6 +7,8 @@ saves a design, and the harness grades the **saved design**, never the agent's o
 
 - **parts** (rounds 1–4): body count, volume and bounding box from `polykrom-cli eval`,
   within tolerances stated per task (some tasks also check a URDF or an edited input design);
+  a task whose spec fixes where the part sits is also scored by **intersection over union**
+  against a reference design (below);
 - **systems** (rounds 5–6): commands replayed on the design with `polykrom-cli run`. The
   checks are:
   - joint types and names, and materials;
@@ -33,14 +35,68 @@ python3 tools/agent-eval/run.py --cli target/release/polykrom-cli --out /tmp/age
 - `--round N` runs one round;
 - `--only id1,id2` runs some tasks;
 - `--model` picks the model;
-- `--max-turns` and `--timeout` bound each task.
+- `--max-turns` and `--timeout` bound each task;
+- `--grade-only DIR` grades the designs an earlier run saved under `DIR` (each task's
+  `DIR/<id>/<id>.polykrom`) without running the agent, and rewrites `DIR/report.json`, keeping
+  each task's time, turns and cost from the earlier report. Use it to re-grade a run with a
+  newer grader or a newer build of the CLI, or to grade designs made any other way;
+- `--check-references` tests the reference designs themselves (below) instead of running the
+  agent; it needs no `claude`.
 
 Each task gets its own folder under `--out`: the saved design, the agent's transcript
-(`transcript.jsonl`), the MCP config and the grader's replay. `report.json` collects every
-task's time, turns, cost, tool calls, tool errors and failures.
+(`transcript.jsonl`), the MCP config and the grader's replay. `report.json` holds `tasks`,
+every task's time, turns, cost, tool calls, tool errors, failures and `iou`, and over the run
+`correct`, `tasks`, `mean_iou` and `iou_tasks` (how many tasks the mean is over).
 
 A task costs about $0.10–0.70 and takes about a minute; a round of four costs about $2.
 `analysis.static_stress` tasks need Nightfall's solver: set `POLYKROM_NIGHTFALL` to its `nf`.
+
+## Reference designs and IoU
+
+The field scores generated CAD by the mean intersection over union of the generated shape and a
+reference shape. The harness does the same, exactly, for the parts tasks whose spec fixes where
+the part sits: each such task carries a `reference`, a list of `{command, params}` that
+`polykrom-cli run` turns into the intended part (`<id>/reference.json`, `reference.polykrom`;
+`edit_plate`'s script runs on the task's input design). Grading inserts the reference into a
+copy of the saved design (`component.insert_design`, so the two sit where they were modelled:
+nothing is aligned), joins each side's visible bodies into one, and runs `inspect.compare`,
+which measures the material only one side has and replies with `intersection_mm3`, `union_mm3`
+and `iou`. The task's record gets `iou` (0 when no design was saved; `null`, with `iou_note`
+saying why, when the comparison itself failed) and the run gets `mean_iou`. The IoU is
+recorded beside the checks and does not change a task's pass/fail.
+
+Precision: `inspect.compare` integrates each region's volume along a grid of at most 40,000
+lines, which puts a compact region within about 1 % of its true volume (0.2 % for a 10 mm cube,
+0.8 % for a 5 mm one). Two bodies that differ by half therefore score within about 0.005 of
+the true IoU, and two that nearly match far closer, since the error is a share of the small
+regions over the whole union. A design identical to its reference scores exactly 1.
+
+Which tasks have a reference, and why the others do not (their spec leaves the placement to the
+agent, so a correct part elsewhere would score 0; aligning would be a different score):
+
+| Task | Reference | Placement in the spec |
+|---|---|---|
+| `v_pulley` | yes | the axis is Z, z from 0 to 20 |
+| `shelf_bracket` | yes | every extent is given in X, Y and Z |
+| `board_tray` | yes | one corner at the origin, standoffs at given x and y |
+| `edit_plate` | yes | the input design fixes it |
+| `mounting_plate`, `enclosure`, `pocket_fillets`, `nema17_plate` | no | on the XY plane or unplaced: x and y are free |
+| `l_bracket`, `aluminium_bracket`, `pipe_elbow`, `spacer_param` | no | unplaced |
+| `stepped_shaft`, `flanged_tube`, `cup`, `hex_nut`, `lightened_wheel` | no | on the Z axis, but where along it is free |
+| `hole_pattern` | no | the holes' x and y are given, the plate's edges are not |
+| `box_and_lid`, `param_table` | no | z is given, x and y are free |
+| `hinge_urdf`, `slider_urdf` | no | graded by their URDF, not as parts |
+
+`--check-references` is the references' test: each reference builds, passes its own task's
+checks (volume, bbox, bodies), scores `self_iou` 1.0 against a copy of itself, and the same
+script without its last command (the groove, the rib, a standoff's hole, a plate hole missing)
+scores `wrong_iou` below 1:
+
+```
+python3 tools/agent-eval/run.py --cli target/release/polykrom-cli --check-references --out /tmp/refs
+```
+
+To add a reference to a task, give the task a `reference` script and run that check.
 
 ## Results
 
