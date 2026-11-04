@@ -1,0 +1,10 @@
+{
+ "sources": [
+  "wckdboy/polykrom#243"
+ ],
+ "what": "fillet (0.3 mm, fit reduce) of the 18 edges of a box and two gussets standing on a foot sole with a 26-point spline outline and three tapered spline ridges, the shape of TinyRex's foot: no construction takes them, and the refusal took most of an hour (a size search halving to 0.0001 mm, each try a minute)",
+ "source": "invariants",
+ "method": "the gussets' and the box's edges meet the sole's spline wall and the ridges where no round of these edges at any size is built (TinyRex's Foot_L, whose same fillet is refused after 53 minutes, as the polish stage found). The right answer is a refusal that says so within the blend's work budget, not a wait of an hour. The case is slow by nature: building the sole with its gussets takes about two minutes on a loaded machine, before the fillet",
+ "outcome": "refused",
+ "timeout_s": 600
+}

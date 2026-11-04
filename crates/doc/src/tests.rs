@@ -471,3 +471,65 @@ fn self_referencing_construction_planes_are_errors() {
     m.evaluate(&doc);
     assert!(m.results.iter().any(|r| r.error.is_some()), "a cyclic perpendicular plane must report an error: {:?}", m.results);
 }
+
+/// A fillet whose first attempt at the radius asked for spends its work budget is refused as
+/// too costly, and `fit: reduce` searches no smaller radius (each try would cost as much, #243);
+/// within the budget it is fitted as before, and an outer budget's stop is passed on as it is.
+#[test]
+fn a_fillet_that_spends_its_work_budget_is_refused_without_a_size_search() {
+    use crate::eval::{FILLET_WORK, fillet_fitted_within, fillet_work};
+    // 3.5 is too large for the 6 mm end faces of a 14 x 6 x 10 box; reduce gives 3 (#293).
+    let b = kernel::box_solid(Vec3::new(14.0, 0.0, 0.0), Vec3::new(28.0, 6.0, 10.0)).unwrap();
+    let mids = [Vec3::new(14.0, 0.0, 5.0), Vec3::new(28.0, 0.0, 5.0), Vec3::new(14.0, 6.0, 5.0), Vec3::new(28.0, 6.0, 5.0)];
+    assert_eq!(fillet_work(&mids), FILLET_WORK);
+    let (_, used) = fillet_fitted_within(&b, &mids, 3.5, FilletFit::Reduce, FILLET_WORK).unwrap();
+    assert_eq!(used, Some(vec![3.0; 4]));
+    // The whole first attempt costs more than two units: spent on it, nothing is searched.
+    let (e, spent) = kernel::with_work_budget(10_000, || {
+        let e = fillet_fitted_within(&b, &mids, 3.5, FilletFit::Reduce, 2).unwrap_err();
+        (e, kernel::work_spent().unwrap_or(0))
+    });
+    let text = e.to_string();
+    assert!(text.contains("too costly at 3.5 mm on these 4 edges") && text.contains("no smaller radius was tried"), "{text}");
+    assert!(spent <= 2, "the size search ran: {spent} units");
+    // An exact fit says the same, without the search.
+    let e = fillet_fitted_within(&b, &mids, 3.5, FilletFit::Exact, 2).unwrap_err().to_string();
+    assert!(e.contains("too costly") && !e.contains("smaller radius"), "{e}");
+    // An outer budget with less left than half of this one is its own stop, passed on as it is.
+    let e = kernel::with_work_budget(1, || fillet_fitted_within(&b, &mids, 3.5, FilletFit::Reduce, FILLET_WORK)).unwrap_err();
+    assert!(matches!(e, kernel::KernelError::BudgetSpent { limit: 1, .. }), "{e:?}");
+    assert_eq!(kernel::work_spent(), None, "the budget ends with its scope");
+}
+
+/// A watcher that cancels the work (#264) during a reduce fillet's size search stops the kernel
+/// at its next step, and the fillet reports the cancel, not a refusal of its size: the search's
+/// tries were stopped, not refused. The cancel lands on the search's first poll of the watch,
+/// right after the first attempt (whose polls are counted first) was refused for its size.
+#[test]
+fn a_cancelled_size_search_reports_the_cancel_not_the_size() {
+    use crate::eval::{FILLET_WORK, fillet_fitted_within};
+    use std::sync::Arc;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    struct CancelAfter {
+        polls: AtomicUsize,
+        at: usize,
+    }
+    impl kernel::watch::Watch for CancelAfter {
+        fn cancelled(&self) -> bool {
+            self.polls.fetch_add(1, Ordering::Relaxed) >= self.at
+        }
+        fn progress(&self, _: &'static str, _: usize, _: usize) {}
+    }
+    let b = kernel::box_solid(Vec3::new(14.0, 0.0, 0.0), Vec3::new(28.0, 6.0, 10.0)).unwrap();
+    let mids = [Vec3::new(14.0, 0.0, 5.0), Vec3::new(28.0, 0.0, 5.0), Vec3::new(14.0, 6.0, 5.0), Vec3::new(28.0, 6.0, 5.0)];
+    // The polls the first attempt makes before it is refused for its size.
+    let counting = Arc::new(CancelAfter { polls: AtomicUsize::new(0), at: usize::MAX });
+    let r = kernel::watch::watching(counting.clone(), || kernel::with_work_budget(FILLET_WORK, || kernel::fillet(&b, &mids, 3.5)));
+    assert!(matches!(r, Err(kernel::KernelError::TooLarge(_))), "{r:?}");
+    let polls = counting.polls.load(Ordering::Relaxed);
+    assert!(polls > 0, "the kernel never asked its watch");
+    let cancelling = Arc::new(CancelAfter { polls: AtomicUsize::new(0), at: polls });
+    let e = kernel::watch::watching(cancelling.clone(), || fillet_fitted_within(&b, &mids, 3.5, FilletFit::Reduce, FILLET_WORK)).unwrap_err();
+    assert!(e.to_string().contains("cancelled"), "{e}");
+    assert!(cancelling.polls.load(Ordering::Relaxed) > polls, "the search never started");
+}

@@ -1,0 +1,503 @@
+{
+ "commands": [
+  {
+   "command": "sketch.create",
+   "params": {
+    "plane": "XY",
+    "name": "Sole"
+   }
+  },
+  {
+   "command": "sketch.spline.fit_point",
+   "params": {
+    "points": [
+     [
+      -28,
+      34
+     ],
+     [
+      -25,
+      22
+     ],
+     [
+      -15,
+      12
+     ],
+     [
+      0,
+      6
+     ],
+     [
+      20,
+      4.5
+     ],
+     [
+      38,
+      4
+     ],
+     [
+      50,
+      4.5
+     ],
+     [
+      59,
+      7
+     ],
+     [
+      61,
+      11
+     ],
+     [
+      57,
+      16
+     ],
+     [
+      48,
+      21
+     ],
+     [
+      57,
+      27
+     ],
+     [
+      67,
+      30
+     ],
+     [
+      70,
+      34
+     ],
+     [
+      67,
+      38
+     ],
+     [
+      57,
+      41
+     ],
+     [
+      48,
+      47
+     ],
+     [
+      57,
+      52
+     ],
+     [
+      61,
+      57
+     ],
+     [
+      59,
+      61
+     ],
+     [
+      50,
+      63.5
+     ],
+     [
+      38,
+      64
+     ],
+     [
+      20,
+      63.5
+     ],
+     [
+      0,
+      62
+     ],
+     [
+      -15,
+      56
+     ],
+     [
+      -25,
+      46
+     ]
+    ],
+    "periodic": true
+   }
+  },
+  {
+   "command": "sketch.finish",
+   "params": {}
+  },
+  {
+   "command": "solid.extrude",
+   "params": {
+    "sketch": "Sole",
+    "distance": 5,
+    "body_name": "Foot"
+   }
+  },
+  {
+   "command": "solid.box",
+   "params": {
+    "corner": [
+     30.125,
+     22,
+     0
+    ],
+    "length": 3,
+    "width": 24,
+    "height": 43.5,
+    "operation": "join",
+    "targets": [
+     "Foot"
+    ]
+   }
+  },
+  {
+   "command": "sketch.create",
+   "params": {
+    "plane": {
+     "origin": [
+      0,
+      26,
+      0
+     ],
+     "x_dir": [
+      1,
+      0,
+      0
+     ],
+     "y_dir": [
+      0,
+      0,
+      1
+     ]
+    },
+    "name": "Gusset1"
+   }
+  },
+  {
+   "command": "sketch.line",
+   "params": {
+    "points": [
+     [
+      33.125,
+      5
+     ],
+     [
+      52,
+      5
+     ],
+     [
+      33.125,
+      36.5
+     ]
+    ],
+    "closed": true
+   }
+  },
+  {
+   "command": "sketch.finish",
+   "params": {}
+  },
+  {
+   "command": "solid.extrude",
+   "params": {
+    "sketch": "Gusset1",
+    "distance": 3,
+    "operation": "join",
+    "targets": [
+     "Foot"
+    ]
+   }
+  },
+  {
+   "command": "sketch.create",
+   "params": {
+    "plane": {
+     "origin": [
+      0,
+      45,
+      0
+     ],
+     "x_dir": [
+      1,
+      0,
+      0
+     ],
+     "y_dir": [
+      0,
+      0,
+      1
+     ]
+    },
+    "name": "Gusset2"
+   }
+  },
+  {
+   "command": "sketch.line",
+   "params": {
+    "points": [
+     [
+      33.125,
+      5
+     ],
+     [
+      52,
+      5
+     ],
+     [
+      33.125,
+      36.5
+     ]
+    ],
+    "closed": true
+   }
+  },
+  {
+   "command": "sketch.finish",
+   "params": {}
+  },
+  {
+   "command": "solid.extrude",
+   "params": {
+    "sketch": "Gusset2",
+    "distance": 3,
+    "operation": "join",
+    "targets": [
+     "Foot"
+    ]
+   }
+  },
+  {
+   "command": "sketch.create",
+   "params": {
+    "plane": {
+     "origin": [
+      0,
+      0,
+      5
+     ],
+     "x_dir": [
+      1,
+      0,
+      0
+     ],
+     "y_dir": [
+      0,
+      1,
+      0
+     ]
+    },
+    "name": "Ridges"
+   }
+  },
+  {
+   "command": "sketch.spline.fit_point",
+   "params": {
+    "points": [
+     [
+      40,
+      34
+     ],
+     [
+      50,
+      30.5
+     ],
+     [
+      62,
+      32
+     ],
+     [
+      65,
+      34
+     ],
+     [
+      62,
+      36
+     ],
+     [
+      50,
+      37.5
+     ]
+    ],
+    "periodic": true
+   }
+  },
+  {
+   "command": "sketch.spline.fit_point",
+   "params": {
+    "points": [
+     [
+      38,
+      22
+     ],
+     [
+      47,
+      16
+     ],
+     [
+      55,
+      11
+     ],
+     [
+      58,
+      12.5
+     ],
+     [
+      49,
+      19.5
+     ],
+     [
+      40,
+      24.5
+     ]
+    ],
+    "periodic": true
+   }
+  },
+  {
+   "command": "sketch.spline.fit_point",
+   "params": {
+    "points": [
+     [
+      38,
+      46
+     ],
+     [
+      47,
+      52
+     ],
+     [
+      55,
+      57
+     ],
+     [
+      58,
+      55.5
+     ],
+     [
+      49,
+      48.5
+     ],
+     [
+      40,
+      43.5
+     ]
+    ],
+    "periodic": true
+   }
+  },
+  {
+   "command": "sketch.finish",
+   "params": {}
+  },
+  {
+   "command": "solid.extrude",
+   "params": {
+    "sketch": "Ridges",
+    "distance": 2,
+    "taper": "-20 deg",
+    "operation": "join",
+    "targets": [
+     "Foot"
+    ]
+   }
+  },
+  {
+   "command": "solid.fillet",
+   "params": {
+    "body": "Foot",
+    "edges": [
+     [
+      33.125,
+      22.0,
+      21.75
+     ],
+     [
+      30.125,
+      22.0,
+      21.75
+     ],
+     [
+      33.125,
+      46.0,
+      21.75
+     ],
+     [
+      33.125,
+      24.4999,
+      5.0002
+     ],
+     [
+      30.125,
+      46.0,
+      21.75
+     ],
+     [
+      42.5626,
+      25.9999,
+      20.7503
+     ],
+     [
+      42.5626,
+      25.9999,
+      5.0002
+     ],
+     [
+      35.8147,
+      22.9999,
+      5.0002
+     ],
+     [
+      52.0001,
+      24.4999,
+      5.0002
+     ],
+     [
+      48.4247,
+      22.9999,
+      5.0002
+     ],
+     [
+      42.5626,
+      22.9999,
+      20.7503
+     ],
+     [
+      41.5772,
+      22.9999,
+      7.0
+     ],
+     [
+      35.8148,
+      44.9999,
+      5.0002
+     ],
+     [
+      42.5626,
+      44.9999,
+      20.7503
+     ],
+     [
+      48.4246,
+      44.9999,
+      5.0002
+     ],
+     [
+      52.0001,
+      43.4999,
+      5.0002
+     ],
+     [
+      42.5626,
+      41.9999,
+      5.0002
+     ],
+     [
+      42.5626,
+      41.9999,
+      20.7503
+     ]
+    ],
+    "radius": 0.3,
+    "fit": "reduce"
+   }
+  }
+ ]
+}
