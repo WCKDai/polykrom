@@ -174,22 +174,60 @@ fn deviation_json(d: &compare::Deviation) -> Value {
     json!({"max_mm": d.max, "mean_mm": d.mean, "at": d.at, "area_beyond_mm2": d.beyond_area, "area_mm2": d.area, "points": d.points})
 }
 
+/// How two bodies are compared: the parameters of `inspect.compare`, with its defaults.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(super) struct Options {
+    /// Surfaces closer than this (mm) agree.
+    pub tolerance: f64,
+    /// The largest piece of a face sampled as one point (mm).
+    pub spacing: f64,
+    /// Coarser sampling for a body that would need more samples than this.
+    pub max_points: usize,
+    /// Regions listed and measured; beyond it the IoU is not known.
+    pub max_regions: usize,
+}
+
+impl Default for Options {
+    fn default() -> Self {
+        Options { tolerance: 0.01, spacing: 0.5, max_points: 8_000_000, max_regions: 50 }
+    }
+}
+
 fn compare_bodies(s: &mut Session, p: &Value) -> Result<Value> {
     let cmd = "inspect.compare";
-    let tolerance = number(cmd, p, "tolerance", 0.01, 0.001..=10.0)?;
-    let spacing = number(cmd, p, "spacing", 0.5, 0.01..=1000.0)?;
-    let max_points = number(cmd, p, "max_points", 8e6, 1e4..=5e7)? as usize;
-    let max_regions = number(cmd, p, "max_regions", 50.0, 1.0..=1000.0)? as usize;
+    let options = Options {
+        tolerance: number(cmd, p, "tolerance", 0.01, 0.001..=10.0)?,
+        spacing: number(cmd, p, "spacing", 0.5, 0.01..=1000.0)?,
+        max_points: number(cmd, p, "max_points", 8e6, 1e4..=5e7)? as usize,
+        max_regions: number(cmd, p, "max_regions", 50.0, 1.0..=1000.0)? as usize,
+    };
     let colors = colours(cmd, p)?;
     let st = s.world_state();
     let (na, nb) = pair(s, &st, p, cmd)?;
     let (Some(ba), Some(bb)) = (st.body(&na), st.body(&nb)) else { return Err(bad(cmd, "no such body")) };
+    let (mut out, c) = compare_pair(cmd, (&na, ba), (&nb, bb), &options)?;
+    if let Some(colors) = colors {
+        out["colored_faces"] = json!(color_regions(s, &c, [&na, &nb], colors)?);
+    }
+    Ok(out)
+}
+
+/// Two bodies compared as `inspect.compare` reports it (everything but the colouring), and the
+/// comparison itself. The bodies may come from different designs (a proposal's scratch copy
+/// against the current design): only their names and geometry are used.
+pub(super) fn compare_pair(
+    cmd: &str,
+    a: (&str, &polykrom_doc::ModelBody),
+    b: (&str, &polykrom_doc::ModelBody),
+    options: &Options,
+) -> Result<(Value, compare::Comparison)> {
+    let Options { tolerance, spacing, max_points, max_regions } = *options;
+    let ((na, ba), (nb, bb)) = (a, b);
     // Meshed within a quarter of the tolerance (the kernel goes no finer than a millionth of a
     // body's size), so two meshes of one surface agree well within it.
     let chord = tolerance / 4.0;
-    let mut done = polycore::map_on_threads(&[ba, bb], 2, |b| (super::inspect::measure_json(b), b.body.tessellate_with(chord, true)))
-        .into_iter()
-        .zip([&na, &nb]);
+    let mut done =
+        polycore::map_on_threads(&[ba, bb], 2, |b| (super::inspect::measure_json(b), b.body.tessellate_with(chord, true))).into_iter().zip([na, nb]);
     let mut next = || -> Result<(Value, polycore_geom::Mesh)> {
         let Some((r, name)) = done.next() else { return Err(bad(cmd, "no such body")) };
         let (m, mesh) = r.ok_or_else(|| bad(cmd, format!("`{name}`: measuring it failed")))?;
@@ -215,7 +253,7 @@ fn compare_bodies(s: &mut Session, p: &Value) -> Result<Value> {
             json!({
                 "index": i + 1,
                 "side": side_name(r.side),
-                "material_of": if r.side == Side::OnlyInA { &na } else { &nb },
+                "material_of": if r.side == Side::OnlyInA { na } else { nb },
                 "volume_mm3": r.volume,
                 "area_mm2": r.area_a + r.area_b,
                 "area_a_mm2": r.area_a,
@@ -241,7 +279,7 @@ fn compare_bodies(s: &mut Session, p: &Value) -> Result<Value> {
     let overlap = measure_a["volume_mm3"].as_f64().filter(|_| every_region_measured).and_then(|volume_a| iou(volume_a, va, vb));
     let worst = c.a_to_b.max.max(c.b_to_a.max);
     let identical = c.regions.is_empty() && c.unlisted == 0;
-    let warnings = warnings([(na.as_str(), &measure_a, &mesh_a), (nb.as_str(), &measure_b, &mesh_b)], chord, &c);
+    let warnings = warnings([(na, &measure_a, &mesh_a), (nb, &measure_b, &mesh_b)], chord, &c);
     let mut verdict = if identical {
         format!("identical within {tolerance} mm (largest deviation {worst:.4} mm)")
     } else {
@@ -255,7 +293,7 @@ fn compare_bodies(s: &mut Session, p: &Value) -> Result<Value> {
     if !warnings.is_empty() {
         verdict += &format!(" ({} warning{})", warnings.len(), if warnings.len() == 1 { "" } else { "s" });
     }
-    let mut out = json!({
+    let out = json!({
         "a": measure_a,
         "b": measure_b,
         "difference": difference(&measure_a, &measure_b),
@@ -273,10 +311,7 @@ fn compare_bodies(s: &mut Session, p: &Value) -> Result<Value> {
         "warnings": warnings,
         "sampling": {"spacing_mm": c.spacing, "chord_mm": chord, "triangles_a": mesh_a.triangles.len(), "triangles_b": mesh_b.triangles.len()},
     });
-    if let Some(colors) = colors {
-        out["colored_faces"] = json!(color_regions(s, &c, [&na, &nb], colors)?);
-    }
-    Ok(out)
+    Ok((out, c))
 }
 
 /// A face is coloured for a region when at least this share of it deviates there.

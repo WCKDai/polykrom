@@ -731,6 +731,7 @@
   "cmd.engine_describe": "描述命令",
   "cmd.engine_drop_proposal": "丢弃提案",
   "cmd.engine_propose": "提议更改",
+  "cmd.engine_propose_candidates": "提议候选方案",
   "cmd.explode_create": "爆炸图",
   "cmd.explode_delete": "删除爆炸图",
   "cmd.explode_list": "列出爆炸图",
