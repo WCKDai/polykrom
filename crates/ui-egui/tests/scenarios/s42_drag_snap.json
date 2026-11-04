@@ -11,6 +11,17 @@
   }
  },
  {
+  "call": "ui.camera",
+  "params": {
+   "target": [
+    30,
+    25,
+    0
+   ]
+  },
+  "note": "Centre the sketch in the open viewport: the AI review's prompt row under the ribbon covers the view's top band."
+ },
+ {
   "call": "engine.execute",
   "params": {
    "command": "sketch.line",

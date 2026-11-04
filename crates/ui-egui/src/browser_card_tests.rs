@@ -64,7 +64,10 @@ fn browser_card_shrinks_and_scrolls_without_covering_history() {
     let history = rect_of("history:card").unwrap();
     assert_eq!(short.left(), SHELL_GAP);
     assert_eq!(short.width(), 250.0);
-    assert_eq!(short.top(), rect_of("ribbon:card").unwrap().bottom() + SHELL_GAP);
+    // The AI review's prompt row sits under the ribbon card; the Browser card starts under it.
+    let prompt = rect_of("review:prompt_row").unwrap();
+    assert_eq!(prompt.top(), rect_of("ribbon:card").unwrap().bottom() + SHELL_GAP);
+    assert_eq!(short.top(), prompt.bottom() + SHELL_GAP);
     assert!(short.bottom() < history.top() - SHELL_GAP);
     assert!(drawn_rows().iter().all(|(_, rect, _, _)| rect.height() == 26.0));
 

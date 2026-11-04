@@ -476,6 +476,10 @@ impl AgentChat {
     fn notice(&mut self, text: impl Into<String>, error: bool) {
         self.push(Item::Notice { text: text.into(), error });
     }
+    /// The agent's design edit waits in the Review changes panel (review before apply).
+    pub(crate) fn notice_review_pending(&mut self) {
+        self.notice(tr("ui.review_pending_notice"), false);
+    }
     /// Requests waiting for Allow or Deny.
     pub fn waiting(&self) -> usize {
         self.held.len() + self.items.iter().filter(|i| matches!(i, Item::Permission { answer: None, .. })).count()
@@ -1274,10 +1278,17 @@ fn approve_with(app: &mut SolveApp, id: u64, allow: bool, why: &str) {
         }
     }
     if allow {
-        app.control_held.push_back(h.req);
+        if let Some(req) = crate::review::divert(app, h.req) {
+            app.control_held.push_back(req);
+        }
     } else {
         let _ = h.req.reply.send(json!({"ok": false, "error": format!("not run: {why}")}));
     }
+}
+
+/// The message being answered (its first line), for the label of what it changes.
+pub(crate) fn turn_label(app: &SolveApp) -> Option<String> {
+    app.agent_chat.turn.as_ref().map(|t| t.label.clone()).filter(|l| !l.trim().is_empty())
 }
 
 /// The message is answered: its changes become one undo step, and what still waits is declined.
@@ -1370,7 +1381,10 @@ fn pump_tools(app: &mut SolveApp) {
                     }
                     turn.changes += 1;
                 }
-                app.control_held.push_back(req);
+                // Review before apply: a design edit is proposed and the panel opens on it.
+                if let Some(req) = crate::review::divert(app, req) {
+                    app.control_held.push_back(req);
+                }
             }
             gate::Verdict::Ask(title) => {
                 let chat = &mut app.agent_chat;

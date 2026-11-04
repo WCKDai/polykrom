@@ -88,7 +88,8 @@ pub fn selected_bodies(app: &SolveApp) -> Vec<String> {
 pub fn show(app: &mut SolveApp, ui: &mut egui::Ui) {
     app.inspector.rect = None;
     let bodies = selected_bodies(app);
-    if bodies.is_empty() || app.session.active_sketch.is_some() {
+    // While a proposal is under review, its panel stands here (design kit view 04).
+    if bodies.is_empty() || app.session.active_sketch.is_some() || app.review.open.is_some() {
         app.inspector.dismissed = None;
         return;
     }

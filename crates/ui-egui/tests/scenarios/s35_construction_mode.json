@@ -2,6 +2,7 @@
   {"note": "With nothing selected, X or the palette Construction icon sets the drawing mode until switched back. With a selection, X converts it. The four Line Type icon segments use named handles."},
   {"start": "sketch.create"},
   {"click": {"plane": "XY"}},
+  {"call": "ui.camera", "params": {"target": [20, 20, 0]}, "note": "Centre the sketch in the open viewport: the AI review's prompt row under the ribbon covers the view's top band."},
   {"expect": {"dialog": null}},
   {"key": "X"},
   {"expect": {"tool": null}},

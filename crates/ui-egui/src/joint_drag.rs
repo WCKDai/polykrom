@@ -140,7 +140,9 @@ mod tests {
         let at = |o: &str| json!({"occurrence": o, "point": [0, 0, 5], "z": [0, 0, 1]});
         run(&mut h, "joint.create", json!({"type": "revolute", "a": at("Base"), "b": at("Arm"), "flip": true, "name": "Hinge"}));
         h.call("ui.view", json!({"view": "top"}));
-        h.app.cam.distance = 200.0;
+        // Far enough back that the quarter turn's end (55 mm up) stays in the open viewport, below
+        // the ribbon and the AI review's prompt row (a drag over the chrome is blocked).
+        h.app.cam.distance = 260.0;
         h.frames(3);
         let end = Vec3::new(55.0, 0.0, 10.0);
         let (a, b) = (screen(&mut h, end), screen(&mut h, Vec3::new(0.0, 55.0, 10.0)));

@@ -43,7 +43,10 @@ fn both_modes_keep_their_geometry_and_fit_clear_of_covered_rects() {
             assert!(covered(&h.app, ribbon.center()));
         } else {
             assert_eq!(toolbar.top(), toolbar::APP_BAR_HEIGHT);
-            assert_eq!(viewport.top(), toolbar.bottom());
+            // The AI review's prompt row sits between the ribbon and the viewport (design kit).
+            let prompt = rect_of("review:prompt_row").unwrap();
+            assert_eq!(prompt.top(), toolbar.bottom());
+            assert_eq!(viewport.top(), prompt.bottom());
             assert_eq!(toolbar.height(), toolbar::RIBBON_HEIGHT);
             assert_eq!(workspace.left(), 0.0);
             assert_eq!(covered_rects(&h.app), vec![h.app.shell.history.unwrap(), rect_of("browser:card").unwrap()]);
@@ -92,7 +95,9 @@ fn cards_block_model_hover_wheel_and_drag_but_the_gap_remains_viewport() {
 #[test]
 fn floating_sketch_palette_and_compass_share_measured_clearance() {
     for style in crate::prefs::NavigatorStyle::ALL {
-        for (width, height, scale) in [(1400.0, 900.0, 1.0), (700.0, 720.0, 2.0)] {
+        // The short window keeps 43 points more than it did for the AI review's prompt row under
+        // the ribbon, so it is as short as before relative to the controls.
+        for (width, height, scale) in [(1400.0, 900.0, 1.0), (700.0, 770.0, 2.0)] {
             let mut h = Harness::new();
             h.app.preferences.navigator_style = style;
             h.call("ui.resize", json!({"width":width,"height":height}));
@@ -587,7 +592,11 @@ fn compact_chrome_is_flush_and_browser_hugs_content_in_both_themes() {
         assert_eq!(workspace.top(), bar.top());
         assert_eq!(h.app.shell.cards.get(1).unwrap().left(), workspace.right(), "one joined top bar");
         assert_eq!(browser.left(), 0.0);
-        assert_eq!(browser.top(), bar.bottom(), "square, flush Browser/ribbon join");
+        // The AI review's prompt row joins the ribbon; the Browser joins it, square and flush.
+        let prompt = rect_of("review:prompt_row").unwrap();
+        assert_eq!(prompt.top(), bar.bottom(), "square, flush prompt row/ribbon join");
+        assert_eq!(prompt.left(), 0.0);
+        assert_eq!(browser.top(), prompt.bottom(), "square, flush Browser/prompt row join");
         assert!(browser.height() < h.app.viewport.rect.unwrap().height() / 2.0, "Browser hugs its contents");
         let compact = crate::ui_kit::Container::new(&h.ctx, crate::ui_kit::Surface::Panel);
         assert_eq!(compact.gap(), 0.0);

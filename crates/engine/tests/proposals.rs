@@ -177,6 +177,34 @@ fn a_proposal_that_cannot_run_or_is_not_an_edit_holds_nothing() {
     assert_eq!(r["code"], "unknown_proposal");
 }
 
+/// Cancel in the Review panel: the proposal is dropped, nothing in the design moves, and the id
+/// can't be applied afterwards.
+#[test]
+fn dropping_a_proposal_changes_nothing_and_retires_its_id() {
+    let mut s = sample_session();
+    let (doc, revision, undo, redo, volume0) = (s.doc.clone(), s.revision, s.undo.len(), s.redo.len(), volume(&mut s));
+    let p = run(&mut s, "engine.propose", thicker());
+    let id = p["proposal"].clone();
+    assert_eq!(p["held"], 1);
+
+    let d = run(&mut s, "engine.drop_proposal", json!({"proposal": id}));
+    assert_eq!(d["dropped"], true, "{d}");
+    assert_eq!(d["held"], 0);
+    assert!(Arc::ptr_eq(&doc, &s.doc));
+    assert_eq!((s.revision, s.undo.len(), s.redo.len()), (revision, undo, redo));
+    assert_eq!(volume(&mut s), volume0);
+
+    // Dropped: applying it is refused as stale, and dropping it again reports it already gone.
+    let r = refusal(s.execute("engine.apply_proposal", &json!({"proposal": id})));
+    assert_eq!(r["code"], "stale_proposal", "{r}");
+    let d = run(&mut s, "engine.drop_proposal", json!({"proposal": id}));
+    assert_eq!(d["dropped"], false, "{d}");
+    // An id never held is refused.
+    let r = refusal(s.execute("engine.drop_proposal", &json!({"proposal": "prop-9999"})));
+    assert_eq!(r["code"], "unknown_proposal", "{r}");
+    assert!(s.execute("engine.drop_proposal", &json!({})).is_err(), "the id is required");
+}
+
 #[test]
 fn a_proposal_can_remove_and_add_bodies() {
     let mut s = sample_session();

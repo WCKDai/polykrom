@@ -3572,7 +3572,7 @@ const STATUS_TOAST_MS: f64 = 6000.0;
 fn transient_messages(app: &mut SolveApp, ui: &egui::Ui, viewport: Rect) -> Vec<Rect> {
     // Nothing to show or time: an idle window skips the layout. The offer is checked too, as its clock
     // runs from the frames `due` sees.
-    if app.status.is_none() && app.computing_since().is_none() && crate::space_mouse_offer::offerable(app).is_none() {
+    if app.status.is_none() && app.computing_since().is_none() && crate::space_mouse_offer::offerable(app).is_none() && app.review.receipt.is_none() {
         return Vec::new();
     }
     let t = Tokens::get();
@@ -3622,6 +3622,18 @@ fn transient_messages(app: &mut SolveApp, ui: &egui::Ui, viewport: Rect) -> Vec<
             ui.ctx().request_repaint_after(std::time::Duration::from_secs_f64(left_ms / 1000.0 + 0.01));
         } else {
             app.status = None;
+        }
+    }
+    // The receipt of an applied proposal (design kit view 05): what was updated, with Undo.
+    if let Some(text) = crate::review::receipt_text_shown(app) {
+        let undo = crate::i18n::tr_label("Undo");
+        if let Some((r, clicked)) = paint_toast_with(ui, free, text, ToastLead::Dot(false), &[(undo, ToastKind::Primary)]) {
+            crate::scenario::publish_rect("toast:review", r);
+            free.max.y = r.top() - t.space_8;
+            shown.push(r);
+            if clicked == Some(0) {
+                let _ = crate::review::undo_receipt(app);
+            }
         }
     }
     if let Some(since) = app.computing_since() {
@@ -4179,6 +4191,15 @@ fn overlays(app: &SolveApp, painter: &egui::Painter, proj: &Proj) {
         if let Some(sp) = proj.to_screen(p) {
             painter.rect_filled(Rect::from_center_size(sp, vec2(4.0, 4.0)), 0.0, t.sketch);
         }
+    }
+    // The AI review's status line (the kit's status bar): while a proposal is open or just applied.
+    if let Some(line) = crate::review::status_line(app)
+        && let Some(r) = app.viewport.layout.as_ref().map(|l| l.content)
+    {
+        let galley = painter.layout_no_wrap(line, FontId::proportional(t.font_button), t.accent);
+        let at = pos2(r.left() + 12.0, r.top() + 12.0);
+        crate::scenario::publish_rect("review:status", Rect::from_min_size(at, galley.size()));
+        painter.galley(at, galley, t.accent);
     }
     let Some(sid) = app.session.active_sketch else { return };
     let Some(ss) = st.sketch(sid) else { return };

@@ -121,6 +121,12 @@ pub(crate) fn covered_rects(app: &SolveApp) -> Vec<Rect> {
     }
     rects.extend(app.shell.browser.filter(|_| app.ui.show_browser));
     rects.extend(app.inspector.rect);
+    // The AI review's prompt row and panel cover the viewport only as floating cards; docked,
+    // they are edge panels beside it.
+    if Container::for_layout(app.ui.layout, Surface::Panel).floating() {
+        rects.extend(app.review.rect);
+        rects.extend(app.review.prompt_rect);
+    }
     rects.extend(app.viewport.palette_rect.filter(|_| app.session.active_sketch.is_some()));
     rects.extend(app.viewport.dialog_rect.filter(|_| app.dialog.is_some() || app.tree.redefine.is_some()));
     rects.retain(|r| r.is_finite() && r.is_positive());

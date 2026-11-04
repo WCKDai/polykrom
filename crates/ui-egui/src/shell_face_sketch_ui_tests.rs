@@ -31,6 +31,13 @@ fn assert_attached(h: &Harness) {
     assert!(h.app.session.model.result(id).unwrap().error.is_none());
 }
 
+/// A click on open viewport just under the chrome (the ribbon and the AI review's prompt row),
+/// right of the Browser: it clears the selection.
+fn click_empty(h: &mut Harness) {
+    let content = h.app.shell.content.expect("the workspace content rect");
+    h.call("ui.click", json!({"x": content.left() + 36.0, "y": content.top() + 8.0}));
+}
+
 fn selected_wall(h: &Harness) -> usize {
     assert_eq!(h.app.session.selection.len(), 1, "the exterior wall is one physical face, not a grouped lower strip");
     let Sel::Face { body, index, .. } = &h.app.session.selection[0] else {
@@ -43,7 +50,7 @@ fn selected_wall(h: &Harness) -> usize {
 fn assert_one_physical_wall(h: &mut Harness) -> usize {
     h.step(&json!({"click":{"world":[20,0,1]}})).unwrap();
     let lower = selected_wall(h);
-    h.call("ui.click", json!({"x":300,"y":200}));
+    click_empty(h);
     assert!(h.app.session.selection.is_empty());
     h.step(&json!({"click":{"world":[20,0,10]}})).unwrap();
     assert_eq!(selected_wall(h), lower, "below and above the floor height must hit the same BRep face index");
@@ -65,7 +72,7 @@ fn selected_shell_wall_patch_still_creates_a_certified_sketch() {
 fn pending_create_sketch_accepts_an_actual_shell_wall_patch_click() {
     let mut h = shell();
     assert_one_physical_wall(&mut h);
-    h.call("ui.click", json!({"x":300,"y":200}));
+    click_empty(&mut h);
     assert!(h.app.session.selection.is_empty());
     let undo = h.app.session.undo.len();
     h.step(&json!({"start":"sketch.create"})).unwrap();
@@ -93,7 +100,7 @@ fn rounded_shell_corner_is_one_physical_face_above_and_below_the_floor() {
     let redo = h.app.session.redo.len();
     h.step(&json!({"click":{"world":[38.242640687,-28.242640687,1]}})).unwrap();
     let lower = selected_wall(&h);
-    h.call("ui.click", json!({"x":300,"y":200}));
+    click_empty(&mut h);
     assert!(h.app.session.selection.is_empty());
     h.step(&json!({"click":{"world":[38.242640687,-28.242640687,15]}})).unwrap();
     assert_eq!(selected_wall(&h), lower, "lower and upper corner clicks hit the same actual face, not two grouped pieces");
