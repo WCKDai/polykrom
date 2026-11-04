@@ -756,6 +756,7 @@
   "cmd.inspect_curvature_map": "Curvature Map Analysis",
   "cmd.inspect_draft": "Draft Analysis",
   "cmd.inspect_environment_map": "Environment Map Analysis",
+  "cmd.inspect_features": "Recognise Features",
   "cmd.inspect_fit_reference": "Fit Reference",
   "cmd.inspect_interference": "Interference",
   "cmd.inspect_isocurve": "Isocurve Analysis",

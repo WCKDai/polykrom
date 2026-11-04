@@ -53,6 +53,7 @@ mod config;
 mod file;
 mod frame;
 pub(crate) mod inspect;
+mod inspect_features;
 mod interference;
 pub(crate) mod joints;
 mod libraries;
@@ -312,6 +313,7 @@ pub fn command_specs() -> Vec<&'static CommandSpec> {
     v.extend(file::COMMANDS.iter());
     v.extend(metadata::COMMANDS.iter());
     v.extend(inspect::COMMANDS.iter());
+    v.extend(inspect_features::COMMANDS.iter());
     v.extend(analysis::COMMANDS.iter());
     v.extend(sim::COMMANDS.iter());
     v.extend(compare::COMMANDS.iter());
