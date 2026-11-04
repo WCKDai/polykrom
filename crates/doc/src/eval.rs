@@ -290,8 +290,18 @@ impl ModelBody {
 
     /// The chord tolerance of [`ModelBody::mesh`] (mm): 1/1000 of the definition's size, at least
     /// 1 µm. Proper rigid placements retain that tolerance along with the reference triangles.
+    /// So does a body showing another body's display placed (an instance of a part a STEP
+    /// assembly places many times, or a copy a model cache restored): the kernel meshes the
+    /// shown body once, when the first copy asks, at the tolerance that copy asks with, and
+    /// every copy then shows that mesh placed. Asked with its own size (a rotated copy spans a
+    /// larger box), the mesh depended on which copy asked first, and with it everything read
+    /// from the meshes of every body: an unscoped cut's tool shaped around them (#250).
     pub fn display_tol(&self) -> f64 {
-        self.mesh_placement.as_ref().map(|placed| placed.tolerance).unwrap_or_else(|| (self.body.size() * 1e-3).max(1e-3))
+        if let Some(placed) = &self.mesh_placement {
+            return placed.tolerance;
+        }
+        let size = self.body.display_share().map_or_else(|| self.body.size(), |(share, _)| share.original().size());
+        (size * 1e-3).max(1e-3)
     }
 
     /// Already computed display geometry; saving must not trigger cold tessellation.
@@ -8157,6 +8167,127 @@ mod coplanar_growth_tests {
         let (old_alone, old_beside) = (socket_tool_top(false, false), socket_tool_top(false, true));
         assert_eq!(old_alone.to_bits(), alone.to_bits());
         assert!((old_beside - old_alone).abs() > 1e-6, "{old_beside} vs {old_alone}");
+    }
+
+    /// A STEP assembly placing one screw (a Ø5 × 10 shank under a Ø8.5 × 5 head) three times:
+    /// upright at the origin, and two copies turned by odd angles, whose placed boxes span more
+    /// than the upright one's. Every instance of the part shows the first one's display mesh,
+    /// placed (the kernel's shared display). Over a megabyte: the kernel then keeps the import
+    /// only while someone holds it, so each evaluation of a fresh model imports the file again,
+    /// with fresh shared display cells (a smaller text's import is kept for the whole process).
+    fn placed_screws_step() -> String {
+        let shank = kernel::cylinder(Vec3::ZERO, Vec3::Z, 2.5, 10.0).unwrap();
+        let head = kernel::cylinder(Vec3::new(0.0, 0.0, 10.0), Vec3::Z, 4.25, 5.0).unwrap();
+        let screw = kernel::boolean(&shank, &head, BoolOp::Union).unwrap().unwrap();
+        let placements = [
+            crate::rigid(Vec3::ZERO, Vec3::ZERO, Vec3::Z, 0.0),
+            crate::rigid(Vec3::new(30.0, 0.0, 0.0), Vec3::ZERO, Vec3::X, 37f64.to_radians()),
+            crate::rigid(Vec3::new(60.0, 0.0, 0.0), Vec3::ZERO, Vec3::Y, -61f64.to_radians()),
+        ];
+        let part = kernel::ExportProduct {
+            name: "Screw".into(),
+            bodies: vec![kernel::ExportBody { name: "SHCS".into(), body: &screw, color: None }],
+            children: vec![],
+        };
+        let assembly = kernel::ExportProduct {
+            name: "Assembly".into(),
+            bodies: vec![],
+            children: placements.iter().enumerate().map(|(k, m)| (0, *m, format!("Screw:{}", k + 1))).collect(),
+        };
+        let text = kernel::step_export_products(&[part, assembly], 1, &kernel::StepHeader::default()).unwrap();
+        let pad = format!("/* {} */\n", "x".repeat(1 << 20));
+        text.replacen("ISO-10303-21;\n", &format!("ISO-10303-21;\n{pad}"), 1)
+    }
+
+    /// The screws imported (every instance a body: `A` upright, `B` and `C` turned), and a cut
+    /// naming no target as designs saved before #219 made it: a hexagon drawn on the plane of
+    /// `A`'s head top, 3 mm deep, with its edges a hair outside the head's round face (apothem
+    /// 4.29 mm against the head's 4.25 mm radius). The cut's tool is shaped around every body's
+    /// display mesh, and whether an edge grows out there is decided by probing the head's mesh
+    /// at 0.05 mm inside the edge, where the head's facets lie: within the chord of a mesh made
+    /// at a turned copy's tolerance, outside the chord of one made at `A`'s own.
+    fn screws_with_an_unscoped_cut(step: &str) -> Document {
+        let mut doc = Document::new("screws");
+        let import = FeatureKind::Import { file: "screws.step".into(), step: step.into(), components: Vec::new(), skip: Vec::new() };
+        let id = doc.add_feature(import, None).unwrap();
+        doc.feature_mut(id).unwrap().body_names = vec!["A".into(), "B".into(), "C".into()];
+        let mut sk = polykrom_sketch::Sketch::new();
+        let radius = 4.29 / 30f64.to_radians().cos();
+        let pts: Vec<usize> = (0..6).map(|k| sk.add_point(Vec2::from_angle((60.0 * k as f64 - 16.0).to_radians()) * radius, None).unwrap()).collect();
+        for k in 0..6 {
+            sk.add_line_pts(pts[k], pts[(k + 1) % 6], None).unwrap();
+        }
+        let top = PlaneRef::Offset { base: Box::new(PlaneRef::Origin { name: "XY".into() }), distance: "15".into() };
+        let sketch = doc.add_feature(FeatureKind::Sketch { plane: top, sketch: sk }, None).unwrap();
+        let extent = crate::Extent {
+            convention: crate::ExtrudeConvention::LegacyPerSide,
+            distance: "3".into(),
+            direction: crate::Direction::Negative,
+            distance2: None,
+            start_offset: None,
+            through_all: false,
+            taper: None,
+            to: None,
+            to_offset: None,
+            from: None,
+        };
+        let kind = FeatureKind::Extrude {
+            thin: None,
+            sketch: crate::SketchId(sketch),
+            profiles: ProfileSel::All,
+            extent,
+            operation: Operation::Cut,
+            targets: vec![],
+        };
+        let cut = doc.add_feature(kind, None).unwrap();
+        let f = doc.feature_mut(cut).unwrap();
+        f.body_names.clear();
+        f.scoped_surroundings = false;
+        doc
+    }
+
+    /// [`screws_with_an_unscoped_cut`] evaluated: every body's exact B-rep encoding and the
+    /// triangles of its display mesh. With `meshed_first`, that body of the import's model is
+    /// meshed before the rest of the timeline is evaluated, as a worker thread drawing or naming
+    /// it may (the import's cells are the same ones the cut then reads: the import is held for
+    /// the whole evaluation).
+    fn evaluated(step: &str, meshed_first: Option<usize>) -> (Vec<Vec<u8>>, Vec<usize>) {
+        let mut doc = screws_with_an_unscoped_cut(step);
+        let _held = kernel::step_import_shared(step).unwrap();
+        let mut model = Model::new();
+        if let Some(i) = meshed_first {
+            doc.marker = Some(1);
+            model.evaluate(&doc);
+            let _ = model.state().bodies[i].mesh();
+            doc.marker = None;
+        }
+        model.evaluate(&doc);
+        assert!(model.results.iter().all(|r| r.error.is_none()), "{:?}", model.results.iter().find(|r| r.error.is_some()));
+        let st = model.state();
+        (
+            st.bodies.iter().map(|b| kernel::encode_native_body(&b.body).unwrap()).collect(),
+            st.bodies.iter().map(|b| b.mesh().triangles.len()).collect(),
+        )
+    }
+
+    /// Opening a design twice gave different bodies for an old design's cuts naming no target
+    /// (#250): such a cut is shaped around every body's display mesh, and the mesh of a part an
+    /// assembly places many times is made once, at the tolerance of whichever copy asks first
+    /// (a turned copy asks for a coarser one, as its box spans more). Which copy asks first is
+    /// whichever thread meshes one first. Every copy now asks with the shown part's tolerance:
+    /// the cut's bodies are the same bits whichever copy was meshed first.
+    #[test]
+    fn an_unscoped_cut_is_the_same_bits_whichever_placed_copy_is_meshed_first() {
+        let step = placed_screws_step();
+        let (plain, plain_tris) = evaluated(&step, None);
+        assert_eq!(plain.len(), 3);
+        for copy in [1, 2] {
+            let (bytes, tris) = evaluated(&step, Some(copy));
+            for (i, (a, b)) in plain.iter().zip(&bytes).enumerate() {
+                assert!(a == b, "body {i}'s B-rep differs with copy {copy} meshed first");
+            }
+            assert_eq!(tris, plain_tris, "the shared mesh, with copy {copy} meshed first");
+        }
     }
 }
 
