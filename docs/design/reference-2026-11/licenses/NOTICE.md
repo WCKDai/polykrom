@@ -1,1 +1,0 @@
-Third-party fonts and the applicable Lucide/Feather icon sources retain their bundled licenses. Custom brand and UI artwork is supplied for the owner's implementation handoff. This export does not assign a new license to the custom design assets.
