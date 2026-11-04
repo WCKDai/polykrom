@@ -239,8 +239,11 @@ face is outside and which faces an edge joins. Per body (`bodies[]`, `body_count
 - `patterns`: alike features (same type, sizes and direction) on a lattice or a circle, three or
   more: `type` `linear` (`count1`, `pitch1`, `direction1`, and `count2`, `pitch2`, `direction2`
   for a grid) or `circular` (`count`, `angle_step_deg`, `full_circle`, `radius`,
-  `axis: {origin, direction}`), with `feature_type`, `members` (indices into `features`), their
-  `faces` and `member_direction`. Two alike features are two features.
+  `axis: {origin, direction}`; the members are equally stepped around the circle, with one
+  larger gap on a partial arc: three holes at 0°, 60° and 120° are a 60° pattern with
+  `full_circle: false`, read the same whatever order the members come in), with `feature_type`,
+  `members` (indices into `features`), their `faces` and `member_direction`. Two alike features
+  are two features.
 - `unrecognised`: every face no feature covers, with its `index`, `surface` (`plane`,
   `cylinder`, `cone`, `sphere`, `torus` or `free-form`) and a `reason`. The face a hole is
   drilled into, a pocket cut into or a boss stands on is not part of that feature. A free-form
