@@ -217,6 +217,16 @@ pub fn weld_tagged(positions: &[Vec3], triangles: &[[u32; 3]], tags: &[u32], eps
         }
         let mut next = Vec::with_capacity(tris.len() + splits.len() * 2);
         let mut next_tags = Vec::with_capacity(next.capacity());
+        // A piece whose corners are not three vertices is left out: a sliver whose own corner
+        // lies on its open side (within the weld's reach) is split at that corner, and such a
+        // piece has no area, while its two real edges twin each other, so leaving it out
+        // keeps every edge's balance. Written, it would use its edge twice more (PK-89).
+        let mut keep = |piece: [u32; 3], tag: u32| {
+            if piece[0] != piece[1] && piece[1] != piece[2] && piece[2] != piece[0] {
+                next.push(piece);
+                next_tags.push(tag);
+            }
+        };
         for (t, tag) in tris.iter().zip(&tags) {
             // Rotate so the split side (if any) is (t0, t1); split one side per pass.
             let rot = [[t[0], t[1], t[2]], [t[1], t[2], t[0]], [t[2], t[0], t[1]]];
@@ -224,19 +234,15 @@ pub fn weld_tagged(positions: &[Vec3], triangles: &[[u32; 3]], tags: &[u32], eps
                 Some((r, s)) => {
                     let mut prev = r[0];
                     for (_, v) in s {
-                        next.push([prev, *v, r[2]]);
-                        next_tags.push(*tag);
+                        keep([prev, *v, r[2]], *tag);
                         prev = *v;
                     }
-                    next.push([prev, r[1], r[2]]);
-                    next_tags.push(*tag);
+                    keep([prev, r[1], r[2]], *tag);
                 }
-                None => {
-                    next.push(*t);
-                    next_tags.push(*tag);
-                }
+                None => keep(*t, *tag),
             }
         }
+        drop(keep);
         tris = next;
         tags = next_tags;
     }
@@ -1562,5 +1568,38 @@ pub(crate) mod tests {
         let triangles = [[0, 2, 1], [0, 1, 3], [1, 2, 3], [2, 0, 3]];
         let (v, t) = weld(&positions, &triangles, 1e-7);
         assert_eq!((v.len(), t.len()), (4, 4));
+    }
+
+    /// A face's thin triangle whose corner lies on its own open side, within the weld's reach
+    /// (an intersection curve sample a few ten-thousandths of a millimetre off both surfaces):
+    /// the T-junction pass splits that side at the corner, and the pieces, with two corners
+    /// each, are left out. Kept, each would use the edge it stands on twice more and the
+    /// exported file would not be closed (PK-89).
+    #[test]
+    fn weld_leaves_out_a_sliver_split_at_its_own_corner() {
+        // A tetrahedron b, g, d, e. The face b-g-d is one triangle; the face b-g-e meets it
+        // along b-g with two vertices, c and a, on that line (a T-junction), and holds a thin
+        // triangle c-a-b besides, c a little off the line.
+        let positions = [
+            Vec3::new(0.0, 0.0, 0.0),  // 0: b
+            Vec3::new(10.0, 0.0, 0.0), // 1: g
+            Vec3::new(5.0, 5.0, 0.0),  // 2: d
+            Vec3::new(5.0, 2.0, 5.0),  // 3: e
+            Vec3::new(3.0, 0.0, 2e-7), // 4: c
+            Vec3::new(7.0, 0.0, 0.0),  // 5: a
+        ];
+        let triangles = [[0, 2, 1], [0, 4, 3], [4, 5, 3], [5, 1, 3], [4, 5, 0], [2, 0, 3], [3, 1, 2]];
+        let (v, t) = weld(&positions, &triangles, 1e-7);
+        assert_eq!(v.len(), 6);
+        assert!(t.iter().all(|t| t[0] != t[1] && t[1] != t[2] && t[2] != t[0]), "{t:?}");
+        let mut uses: HashMap<(u32, u32), u32> = HashMap::new();
+        for t in &t {
+            for (a, b) in [(t[0], t[1]), (t[1], t[2]), (t[2], t[0])] {
+                *uses.entry((a.min(b), a.max(b))).or_default() += 1;
+            }
+        }
+        assert!(uses.values().all(|n| *n == 2), "{t:?}");
+        // b-g-d split at a and c (three pieces), the thin triangle gone.
+        assert_eq!(t.len(), 8, "{t:?}");
     }
 }
