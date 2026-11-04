@@ -266,7 +266,9 @@ face is outside and which faces an edge joins. Per body (`bodies[]`, `body_count
     entry plane), `depth`, `faces`, and `diameter` (`angle_deg` for a countersink, `radius` for a
     round). A counterbore or countersink is one hole with its steps; a fillet on a hole's mouth or
     floor is a `round` step of the hole and also the fillet it is. A through hole's entry is the
-    wider end, else the end facing up most; alike ends are noted.
+    wider end, else the end facing up most; alike ends are noted. A hole that breaks out through
+    a curved face (a cross-hole through a round post) keeps its exact diameter; its rims are no
+    circles, so its depth is read from the mesh and the hole is marked `approximate`.
   - `boss`: `diameter`, `height`, `axis` (the base centre, pointing at the cap), `cap_face`,
     `base_face`. Its faces are the wall and the cap; a chamfer or round on its edge is its own
     feature. A plain cylinder with two caps is no boss.
