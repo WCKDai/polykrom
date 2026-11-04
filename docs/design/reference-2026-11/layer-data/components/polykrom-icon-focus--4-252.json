@@ -1,0 +1,159 @@
+{
+  "source": {
+    "id": "4:252",
+    "name": "Polykrom / Icon / Focus",
+    "fileKey": "s7EddZNQds492PBiNVbcYs",
+    "pageId": "2:5",
+    "category": "components"
+  },
+  "paintIndexNote": "node.fill and node.stroke are indices into paints",
+  "nodes": [
+    {
+      "id": "4:252",
+      "parent": "4:60",
+      "type": "COMPONENT",
+      "name": "Polykrom / Icon / Focus",
+      "x": 840,
+      "y": 288,
+      "width": 24,
+      "height": 24,
+      "sizing": [
+        "FIXED",
+        "FIXED"
+      ]
+    },
+    {
+      "id": "35:99",
+      "parent": "4:252",
+      "type": "FRAME",
+      "name": "Focus / Optical geometry",
+      "x": 0,
+      "y": 0,
+      "width": 24,
+      "height": 24,
+      "fill": 0,
+      "sizing": [
+        "FIXED",
+        "FIXED"
+      ]
+    },
+    {
+      "id": "35:100",
+      "parent": "35:99",
+      "type": "VECTOR",
+      "name": "Vector",
+      "x": 3,
+      "y": 3,
+      "width": 18,
+      "height": 18,
+      "stroke": 1,
+      "strokeWeight": 1.5,
+      "sizing": [
+        "FIXED",
+        "FIXED"
+      ]
+    },
+    {
+      "id": "35:101",
+      "parent": "35:99",
+      "type": "VECTOR",
+      "name": "Vector",
+      "x": 10,
+      "y": 10,
+      "width": 4,
+      "height": 4,
+      "fill": 2,
+      "sizing": [
+        "FIXED",
+        "FIXED"
+      ]
+    }
+  ],
+  "paints": [
+    [
+      {
+        "type": "SOLID",
+        "visible": false,
+        "opacity": 1,
+        "blendMode": "NORMAL",
+        "color": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "boundVariables": {}
+      }
+    ],
+    [
+      {
+        "type": "SOLID",
+        "visible": true,
+        "opacity": 1,
+        "blendMode": "NORMAL",
+        "color": {
+          "r": 0.8078431487083435,
+          "g": 0.8274509906768799,
+          "b": 0.8470588326454163
+        },
+        "boundVariables": {
+          "color": {
+            "type": "VARIABLE_ALIAS",
+            "id": "VariableID:4:17"
+          }
+        }
+      }
+    ],
+    [
+      {
+        "type": "GRADIENT_LINEAR",
+        "visible": true,
+        "opacity": 1,
+        "blendMode": "NORMAL",
+        "gradientStops": [
+          {
+            "color": {
+              "r": 0.8784313797950745,
+              "g": 1,
+              "b": 0.1882352977991104,
+              "a": 1
+            },
+            "position": 0,
+            "boundVariables": {}
+          },
+          {
+            "color": {
+              "r": 0.43921568989753723,
+              "g": 0.8705882430076599,
+              "b": 0.09019608050584793,
+              "a": 1
+            },
+            "position": 0.5,
+            "boundVariables": {}
+          },
+          {
+            "color": {
+              "r": 0,
+              "g": 0.7529411911964417,
+              "b": 0.6000000238418579,
+              "a": 1
+            },
+            "position": 1,
+            "boundVariables": {}
+          }
+        ],
+        "gradientTransform": [
+          [
+            0.5,
+            -0.5,
+            0.5
+          ],
+          [
+            0.5,
+            0.5,
+            0
+          ]
+        ]
+      }
+    ]
+  ]
+}

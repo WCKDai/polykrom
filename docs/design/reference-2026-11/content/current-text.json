@@ -1,0 +1,2787 @@
+[
+  {
+    "viewId": "10:1103",
+    "nodeId": "10:1112",
+    "text": "Actuator mount"
+  },
+  {
+    "viewId": "10:1103",
+    "nodeId": "10:1113",
+    "text": "Local model · v12"
+  },
+  {
+    "viewId": "10:1103",
+    "nodeId": "10:1121",
+    "text": "⌘K"
+  },
+  {
+    "viewId": "10:1103",
+    "nodeId": "10:1124",
+    "text": "Save"
+  },
+  {
+    "viewId": "10:1103",
+    "nodeId": "10:1127",
+    "text": "Export"
+  },
+  {
+    "viewId": "10:1103",
+    "nodeId": "10:1130",
+    "text": "Model"
+  },
+  {
+    "viewId": "10:1103",
+    "nodeId": "10:1133",
+    "text": "Sketch"
+  },
+  {
+    "viewId": "10:1103",
+    "nodeId": "10:1135",
+    "text": "Surface"
+  },
+  {
+    "viewId": "10:1103",
+    "nodeId": "10:1137",
+    "text": "Assembly"
+  },
+  {
+    "viewId": "10:1103",
+    "nodeId": "10:1139",
+    "text": "Drawing"
+  },
+  {
+    "viewId": "10:1103",
+    "nodeId": "10:1141",
+    "text": "Inspect"
+  },
+  {
+    "viewId": "10:1103",
+    "nodeId": "10:1143",
+    "text": "Manufacture"
+  },
+  {
+    "viewId": "10:1103",
+    "nodeId": "10:1145",
+    "text": "Automate"
+  },
+  {
+    "viewId": "10:1103",
+    "nodeId": "10:1152",
+    "text": "Select"
+  },
+  {
+    "viewId": "10:1103",
+    "nodeId": "10:1155",
+    "text": "Move"
+  },
+  {
+    "viewId": "10:1103",
+    "nodeId": "10:1159",
+    "text": "Copy"
+  },
+  {
+    "viewId": "10:1103",
+    "nodeId": "10:1162",
+    "text": "Rotate"
+  },
+  {
+    "viewId": "10:1103",
+    "nodeId": "10:1163",
+    "text": "Selection"
+  },
+  {
+    "viewId": "10:1103",
+    "nodeId": "10:1170",
+    "text": "Sketch"
+  },
+  {
+    "viewId": "10:1103",
+    "nodeId": "10:1173",
+    "text": "Extrude"
+  },
+  {
+    "viewId": "10:1103",
+    "nodeId": "10:1176",
+    "text": "Revolve"
+  },
+  {
+    "viewId": "10:1103",
+    "nodeId": "10:1181",
+    "text": "Sweep"
+  },
+  {
+    "viewId": "10:1103",
+    "nodeId": "10:1184",
+    "text": "Loft"
+  },
+  {
+    "viewId": "10:1103",
+    "nodeId": "10:1188",
+    "text": "Hole"
+  },
+  {
+    "viewId": "10:1103",
+    "nodeId": "10:1191",
+    "text": "Shell"
+  },
+  {
+    "viewId": "10:1103",
+    "nodeId": "10:1192",
+    "text": "Create"
+  },
+  {
+    "viewId": "10:1103",
+    "nodeId": "10:1199",
+    "text": "Fillet"
+  },
+  {
+    "viewId": "10:1103",
+    "nodeId": "10:1202",
+    "text": "Chamfer"
+  },
+  {
+    "viewId": "10:1103",
+    "nodeId": "10:1205",
+    "text": "Pattern"
+  },
+  {
+    "viewId": "10:1103",
+    "nodeId": "10:1208",
+    "text": "Mirror"
+  },
+  {
+    "viewId": "10:1103",
+    "nodeId": "10:1212",
+    "text": "Move face"
+  },
+  {
+    "viewId": "10:1103",
+    "nodeId": "10:1215",
+    "text": "Offset face"
+  },
+  {
+    "viewId": "10:1103",
+    "nodeId": "10:1218",
+    "text": "Combine"
+  },
+  {
+    "viewId": "10:1103",
+    "nodeId": "10:1221",
+    "text": "Split body"
+  },
+  {
+    "viewId": "10:1103",
+    "nodeId": "10:1222",
+    "text": "Modify"
+  },
+  {
+    "viewId": "10:1103",
+    "nodeId": "10:1229",
+    "text": "Plane"
+  },
+  {
+    "viewId": "10:1103",
+    "nodeId": "10:1232",
+    "text": "Axis"
+  },
+  {
+    "viewId": "10:1103",
+    "nodeId": "10:1236",
+    "text": "Point"
+  },
+  {
+    "viewId": "10:1103",
+    "nodeId": "10:1239",
+    "text": "Project"
+  },
+  {
+    "viewId": "10:1103",
+    "nodeId": "10:1240",
+    "text": "Construct"
+  },
+  {
+    "viewId": "10:1103",
+    "nodeId": "10:1247",
+    "text": "Measure"
+  },
+  {
+    "viewId": "10:1103",
+    "nodeId": "10:1250",
+    "text": "Section"
+  },
+  {
+    "viewId": "10:1103",
+    "nodeId": "10:1254",
+    "text": "Parameters"
+  },
+  {
+    "viewId": "10:1103",
+    "nodeId": "10:1257",
+    "text": "History"
+  },
+  {
+    "viewId": "10:1103",
+    "nodeId": "10:1258",
+    "text": "Inspect"
+  },
+  {
+    "viewId": "10:1103",
+    "nodeId": "10:1262",
+    "text": "Increase the mounting holes to Ø10. Keep the 84 × 44 pattern."
+  },
+  {
+    "viewId": "10:1103",
+    "nodeId": "10:1263",
+    "text": "Scope: Hole 02 / 4 holes ▾"
+  },
+  {
+    "viewId": "10:1103",
+    "nodeId": "10:1264",
+    "text": "⌘J"
+  },
+  {
+    "viewId": "10:1103",
+    "nodeId": "10:1266",
+    "text": "Preview ready"
+  },
+  {
+    "viewId": "10:1103",
+    "nodeId": "10:1270",
+    "text": "Design Browser"
+  },
+  {
+    "viewId": "10:1103",
+    "nodeId": "10:1275",
+    "text": "Actuator mount"
+  },
+  {
+    "viewId": "10:1103",
+    "nodeId": "10:1276",
+    "text": "1 component · 1 body"
+  },
+  {
+    "viewId": "10:1103",
+    "nodeId": "10:1280",
+    "text": "Filter features…"
+  },
+  {
+    "viewId": "10:1103",
+    "nodeId": "10:1283",
+    "text": "Origin"
+  },
+  {
+    "viewId": "10:1103",
+    "nodeId": "10:1286",
+    "text": "Bodies (1)"
+  },
+  {
+    "viewId": "10:1103",
+    "nodeId": "10:1289",
+    "text": "Mount"
+  },
+  {
+    "viewId": "10:1103",
+    "nodeId": "10:1293",
+    "text": "Sketches (3)"
+  },
+  {
+    "viewId": "10:1103",
+    "nodeId": "10:1296",
+    "text": "Base profile"
+  },
+  {
+    "viewId": "10:1103",
+    "nodeId": "10:1300",
+    "text": "Boss profile"
+  },
+  {
+    "viewId": "10:1103",
+    "nodeId": "10:1304",
+    "text": "Mounting pattern"
+  },
+  {
+    "viewId": "10:1103",
+    "nodeId": "10:1308",
+    "text": "Features (5)"
+  },
+  {
+    "viewId": "10:1103",
+    "nodeId": "10:1311",
+    "text": "Extrude 01 — Base"
+  },
+  {
+    "viewId": "10:1103",
+    "nodeId": "10:1314",
+    "text": "Extrude 02 — Boss"
+  },
+  {
+    "viewId": "10:1103",
+    "nodeId": "10:1317",
+    "text": "Hole 01 — Bore"
+  },
+  {
+    "viewId": "10:1103",
+    "nodeId": "10:1320",
+    "text": "Hole 02 — Mounting holes"
+  },
+  {
+    "viewId": "10:1103",
+    "nodeId": "10:1323",
+    "text": "Fillet 01 — Edge finish"
+  },
+  {
+    "viewId": "10:1103",
+    "nodeId": "10:1326",
+    "text": "Parameters"
+  },
+  {
+    "viewId": "10:1103",
+    "nodeId": "10:1333",
+    "text": "Actuator mount   ×"
+  },
+  {
+    "viewId": "10:1103",
+    "nodeId": "10:1334",
+    "text": "+"
+  },
+  {
+    "viewId": "10:1103",
+    "nodeId": "10:1336",
+    "text": "Isometric ▾"
+  },
+  {
+    "viewId": "10:1103",
+    "nodeId": "10:1337",
+    "text": "Shaded + edges ▾"
+  },
+  {
+    "viewId": "10:1103",
+    "nodeId": "10:1338",
+    "text": "Selection: feature ▾"
+  },
+  {
+    "viewId": "10:1103",
+    "nodeId": "10:1339",
+    "text": "Selected hidden edges"
+  },
+  {
+    "viewId": "10:1103",
+    "nodeId": "10:1399",
+    "text": "TOP"
+  },
+  {
+    "viewId": "10:1103",
+    "nodeId": "10:1400",
+    "text": "X"
+  },
+  {
+    "viewId": "10:1103",
+    "nodeId": "10:1401",
+    "text": "Y"
+  },
+  {
+    "viewId": "10:1103",
+    "nodeId": "10:1402",
+    "text": "Z"
+  },
+  {
+    "viewId": "10:1103",
+    "nodeId": "10:1403",
+    "text": "Hole 02 · 4 mounting holes selected"
+  },
+  {
+    "viewId": "10:1103",
+    "nodeId": "10:1735",
+    "text": "Review changes"
+  },
+  {
+    "viewId": "10:1103",
+    "nodeId": "10:1737",
+    "text": "MODEL COMMAND"
+  },
+  {
+    "viewId": "10:1103",
+    "nodeId": "10:1738",
+    "text": "Resize mounting holes"
+  },
+  {
+    "viewId": "10:1103",
+    "nodeId": "10:1739",
+    "text": "Hole 02 / 4 instances"
+  },
+  {
+    "viewId": "10:1103",
+    "nodeId": "10:1741",
+    "text": "Proposed change"
+  },
+  {
+    "viewId": "10:1103",
+    "nodeId": "10:1743",
+    "text": "Diameter"
+  },
+  {
+    "viewId": "10:1103",
+    "nodeId": "10:1745",
+    "text": "Ø8 → Ø10 mm"
+  },
+  {
+    "viewId": "10:1103",
+    "nodeId": "10:1747",
+    "text": "Pitch X"
+  },
+  {
+    "viewId": "10:1103",
+    "nodeId": "10:1749",
+    "text": "84.00 mm"
+  },
+  {
+    "viewId": "10:1103",
+    "nodeId": "10:1751",
+    "text": "Pitch Y"
+  },
+  {
+    "viewId": "10:1103",
+    "nodeId": "10:1753",
+    "text": "44.00 mm"
+  },
+  {
+    "viewId": "10:1103",
+    "nodeId": "10:1755",
+    "text": "Extent"
+  },
+  {
+    "viewId": "10:1103",
+    "nodeId": "10:1757",
+    "text": "Through all"
+  },
+  {
+    "viewId": "10:1103",
+    "nodeId": "10:1759",
+    "text": "Scope & dependencies"
+  },
+  {
+    "viewId": "10:1103",
+    "nodeId": "10:1760",
+    "text": "1 feature / 4 holes\n1 dependent feature / Fillet 01"
+  },
+  {
+    "viewId": "10:1103",
+    "nodeId": "10:1761",
+    "text": "References are preserved. Geometry and downstream features rebuild on apply."
+  },
+  {
+    "viewId": "10:1103",
+    "nodeId": "10:1763",
+    "text": "Apply & rebuild"
+  },
+  {
+    "viewId": "10:1103",
+    "nodeId": "10:1765",
+    "text": "Cancel command"
+  },
+  {
+    "viewId": "10:1103",
+    "nodeId": "10:1767",
+    "text": "No model changes applied yet"
+  },
+  {
+    "viewId": "10:1103",
+    "nodeId": "10:1450",
+    "text": "DESIGN HISTORY"
+  },
+  {
+    "viewId": "10:1103",
+    "nodeId": "10:1454",
+    "text": "Sketch 01"
+  },
+  {
+    "viewId": "10:1103",
+    "nodeId": "10:1457",
+    "text": "Extrude 01"
+  },
+  {
+    "viewId": "10:1103",
+    "nodeId": "10:1460",
+    "text": "Sketch 02"
+  },
+  {
+    "viewId": "10:1103",
+    "nodeId": "10:1463",
+    "text": "Extrude 02"
+  },
+  {
+    "viewId": "10:1103",
+    "nodeId": "10:1466",
+    "text": "Hole 01"
+  },
+  {
+    "viewId": "10:1103",
+    "nodeId": "10:1469",
+    "text": "Sketch 03"
+  },
+  {
+    "viewId": "10:1103",
+    "nodeId": "10:1472",
+    "text": "Hole 02"
+  },
+  {
+    "viewId": "10:1103",
+    "nodeId": "10:1475",
+    "text": "Fillet 01"
+  },
+  {
+    "viewId": "10:1103",
+    "nodeId": "10:1479",
+    "text": "End of history"
+  },
+  {
+    "viewId": "10:1103",
+    "nodeId": "10:1481",
+    "text": "AI review / Hole 02 / Proposed geometry shown"
+  },
+  {
+    "viewId": "10:1103",
+    "nodeId": "10:1482",
+    "text": "Model units / mm"
+  },
+  {
+    "viewId": "10:1103",
+    "nodeId": "10:1485",
+    "text": "Polykrom by WCKD"
+  },
+  {
+    "viewId": "10:1790",
+    "nodeId": "10:1799",
+    "text": "Actuator mount"
+  },
+  {
+    "viewId": "10:1790",
+    "nodeId": "10:1800",
+    "text": "Local model · v13"
+  },
+  {
+    "viewId": "10:1790",
+    "nodeId": "10:1808",
+    "text": "⌘K"
+  },
+  {
+    "viewId": "10:1790",
+    "nodeId": "10:1811",
+    "text": "Save"
+  },
+  {
+    "viewId": "10:1790",
+    "nodeId": "10:1814",
+    "text": "Export"
+  },
+  {
+    "viewId": "10:1790",
+    "nodeId": "10:1817",
+    "text": "Model"
+  },
+  {
+    "viewId": "10:1790",
+    "nodeId": "10:1820",
+    "text": "Sketch"
+  },
+  {
+    "viewId": "10:1790",
+    "nodeId": "10:1822",
+    "text": "Surface"
+  },
+  {
+    "viewId": "10:1790",
+    "nodeId": "10:1824",
+    "text": "Assembly"
+  },
+  {
+    "viewId": "10:1790",
+    "nodeId": "10:1826",
+    "text": "Drawing"
+  },
+  {
+    "viewId": "10:1790",
+    "nodeId": "10:1828",
+    "text": "Inspect"
+  },
+  {
+    "viewId": "10:1790",
+    "nodeId": "10:1830",
+    "text": "Manufacture"
+  },
+  {
+    "viewId": "10:1790",
+    "nodeId": "10:1832",
+    "text": "Automate"
+  },
+  {
+    "viewId": "10:1790",
+    "nodeId": "10:1839",
+    "text": "Select"
+  },
+  {
+    "viewId": "10:1790",
+    "nodeId": "10:1842",
+    "text": "Move"
+  },
+  {
+    "viewId": "10:1790",
+    "nodeId": "10:1846",
+    "text": "Copy"
+  },
+  {
+    "viewId": "10:1790",
+    "nodeId": "10:1849",
+    "text": "Rotate"
+  },
+  {
+    "viewId": "10:1790",
+    "nodeId": "10:1850",
+    "text": "Selection"
+  },
+  {
+    "viewId": "10:1790",
+    "nodeId": "10:1857",
+    "text": "Sketch"
+  },
+  {
+    "viewId": "10:1790",
+    "nodeId": "10:1860",
+    "text": "Extrude"
+  },
+  {
+    "viewId": "10:1790",
+    "nodeId": "10:1863",
+    "text": "Revolve"
+  },
+  {
+    "viewId": "10:1790",
+    "nodeId": "10:1868",
+    "text": "Sweep"
+  },
+  {
+    "viewId": "10:1790",
+    "nodeId": "10:1871",
+    "text": "Loft"
+  },
+  {
+    "viewId": "10:1790",
+    "nodeId": "10:1875",
+    "text": "Hole"
+  },
+  {
+    "viewId": "10:1790",
+    "nodeId": "10:1878",
+    "text": "Shell"
+  },
+  {
+    "viewId": "10:1790",
+    "nodeId": "10:1879",
+    "text": "Create"
+  },
+  {
+    "viewId": "10:1790",
+    "nodeId": "10:1886",
+    "text": "Fillet"
+  },
+  {
+    "viewId": "10:1790",
+    "nodeId": "10:1889",
+    "text": "Chamfer"
+  },
+  {
+    "viewId": "10:1790",
+    "nodeId": "10:1892",
+    "text": "Pattern"
+  },
+  {
+    "viewId": "10:1790",
+    "nodeId": "10:1895",
+    "text": "Mirror"
+  },
+  {
+    "viewId": "10:1790",
+    "nodeId": "10:1899",
+    "text": "Move face"
+  },
+  {
+    "viewId": "10:1790",
+    "nodeId": "10:1902",
+    "text": "Offset face"
+  },
+  {
+    "viewId": "10:1790",
+    "nodeId": "10:1905",
+    "text": "Combine"
+  },
+  {
+    "viewId": "10:1790",
+    "nodeId": "10:1908",
+    "text": "Split body"
+  },
+  {
+    "viewId": "10:1790",
+    "nodeId": "10:1909",
+    "text": "Modify"
+  },
+  {
+    "viewId": "10:1790",
+    "nodeId": "10:1916",
+    "text": "Plane"
+  },
+  {
+    "viewId": "10:1790",
+    "nodeId": "10:1919",
+    "text": "Axis"
+  },
+  {
+    "viewId": "10:1790",
+    "nodeId": "10:1923",
+    "text": "Point"
+  },
+  {
+    "viewId": "10:1790",
+    "nodeId": "10:1926",
+    "text": "Project"
+  },
+  {
+    "viewId": "10:1790",
+    "nodeId": "10:1927",
+    "text": "Construct"
+  },
+  {
+    "viewId": "10:1790",
+    "nodeId": "10:1934",
+    "text": "Measure"
+  },
+  {
+    "viewId": "10:1790",
+    "nodeId": "10:1937",
+    "text": "Section"
+  },
+  {
+    "viewId": "10:1790",
+    "nodeId": "10:1941",
+    "text": "Parameters"
+  },
+  {
+    "viewId": "10:1790",
+    "nodeId": "10:1944",
+    "text": "History"
+  },
+  {
+    "viewId": "10:1790",
+    "nodeId": "10:1945",
+    "text": "Inspect"
+  },
+  {
+    "viewId": "10:1790",
+    "nodeId": "10:1949",
+    "text": "Ask Polykrom to change the model…"
+  },
+  {
+    "viewId": "10:1790",
+    "nodeId": "10:1950",
+    "text": "Scope: Hole 02 / 4 holes ▾"
+  },
+  {
+    "viewId": "10:1790",
+    "nodeId": "10:1951",
+    "text": "⌘J"
+  },
+  {
+    "viewId": "10:1790",
+    "nodeId": "10:1953",
+    "text": "Preview changes"
+  },
+  {
+    "viewId": "10:1790",
+    "nodeId": "10:1957",
+    "text": "Design Browser"
+  },
+  {
+    "viewId": "10:1790",
+    "nodeId": "10:1962",
+    "text": "Actuator mount"
+  },
+  {
+    "viewId": "10:1790",
+    "nodeId": "10:1963",
+    "text": "1 component · 1 body"
+  },
+  {
+    "viewId": "10:1790",
+    "nodeId": "10:1967",
+    "text": "Filter features…"
+  },
+  {
+    "viewId": "10:1790",
+    "nodeId": "10:1970",
+    "text": "Origin"
+  },
+  {
+    "viewId": "10:1790",
+    "nodeId": "10:1973",
+    "text": "Bodies (1)"
+  },
+  {
+    "viewId": "10:1790",
+    "nodeId": "10:1976",
+    "text": "Mount"
+  },
+  {
+    "viewId": "10:1790",
+    "nodeId": "10:1980",
+    "text": "Sketches (3)"
+  },
+  {
+    "viewId": "10:1790",
+    "nodeId": "10:1983",
+    "text": "Base profile"
+  },
+  {
+    "viewId": "10:1790",
+    "nodeId": "10:1987",
+    "text": "Boss profile"
+  },
+  {
+    "viewId": "10:1790",
+    "nodeId": "10:1991",
+    "text": "Mounting pattern"
+  },
+  {
+    "viewId": "10:1790",
+    "nodeId": "10:1995",
+    "text": "Features (5)"
+  },
+  {
+    "viewId": "10:1790",
+    "nodeId": "10:1998",
+    "text": "Extrude 01 — Base"
+  },
+  {
+    "viewId": "10:1790",
+    "nodeId": "10:2001",
+    "text": "Extrude 02 — Boss"
+  },
+  {
+    "viewId": "10:1790",
+    "nodeId": "10:2004",
+    "text": "Hole 01 — Bore"
+  },
+  {
+    "viewId": "10:1790",
+    "nodeId": "10:2007",
+    "text": "Hole 02 — Mounting holes"
+  },
+  {
+    "viewId": "10:1790",
+    "nodeId": "10:2010",
+    "text": "Fillet 01 — Edge finish"
+  },
+  {
+    "viewId": "10:1790",
+    "nodeId": "10:2013",
+    "text": "Parameters"
+  },
+  {
+    "viewId": "10:1790",
+    "nodeId": "10:2020",
+    "text": "Actuator mount   ×"
+  },
+  {
+    "viewId": "10:1790",
+    "nodeId": "10:2021",
+    "text": "+"
+  },
+  {
+    "viewId": "10:1790",
+    "nodeId": "10:2023",
+    "text": "Isometric ▾"
+  },
+  {
+    "viewId": "10:1790",
+    "nodeId": "10:2024",
+    "text": "Shaded + edges ▾"
+  },
+  {
+    "viewId": "10:1790",
+    "nodeId": "10:2025",
+    "text": "Selection: feature ▾"
+  },
+  {
+    "viewId": "10:1790",
+    "nodeId": "10:2026",
+    "text": "Selected hidden edges"
+  },
+  {
+    "viewId": "10:1790",
+    "nodeId": "10:2086",
+    "text": "TOP"
+  },
+  {
+    "viewId": "10:1790",
+    "nodeId": "10:2087",
+    "text": "X"
+  },
+  {
+    "viewId": "10:1790",
+    "nodeId": "10:2088",
+    "text": "Y"
+  },
+  {
+    "viewId": "10:1790",
+    "nodeId": "10:2089",
+    "text": "Z"
+  },
+  {
+    "viewId": "10:1790",
+    "nodeId": "10:2090",
+    "text": "Hole 02 · 4 mounting holes selected"
+  },
+  {
+    "viewId": "10:1790",
+    "nodeId": "10:2425",
+    "text": "4 mounting holes updated / Ø10.00 mm"
+  },
+  {
+    "viewId": "10:1790",
+    "nodeId": "10:2427",
+    "text": "Undo"
+  },
+  {
+    "viewId": "10:1790",
+    "nodeId": "10:2093",
+    "text": "Properties"
+  },
+  {
+    "viewId": "10:1790",
+    "nodeId": "10:2096",
+    "text": "HOLE 02"
+  },
+  {
+    "viewId": "10:1790",
+    "nodeId": "10:2097",
+    "text": "Mounting holes"
+  },
+  {
+    "viewId": "10:1790",
+    "nodeId": "10:2098",
+    "text": "Mount / 4 instances"
+  },
+  {
+    "viewId": "10:1790",
+    "nodeId": "10:2100",
+    "text": "Parameters"
+  },
+  {
+    "viewId": "10:1790",
+    "nodeId": "10:2102",
+    "text": "Diameter"
+  },
+  {
+    "viewId": "10:1790",
+    "nodeId": "10:2104",
+    "text": "Ø10.00 mm"
+  },
+  {
+    "viewId": "10:1790",
+    "nodeId": "10:2106",
+    "text": "Extent"
+  },
+  {
+    "viewId": "10:1790",
+    "nodeId": "10:2108",
+    "text": "Through all"
+  },
+  {
+    "viewId": "10:1790",
+    "nodeId": "10:2110",
+    "text": "Instances"
+  },
+  {
+    "viewId": "10:1790",
+    "nodeId": "10:2112",
+    "text": "4"
+  },
+  {
+    "viewId": "10:1790",
+    "nodeId": "10:2114",
+    "text": "Reference"
+  },
+  {
+    "viewId": "10:1790",
+    "nodeId": "10:2116",
+    "text": "Sketch 03"
+  },
+  {
+    "viewId": "10:1790",
+    "nodeId": "10:2118",
+    "text": "Body"
+  },
+  {
+    "viewId": "10:1790",
+    "nodeId": "10:2120",
+    "text": "Mount"
+  },
+  {
+    "viewId": "10:1790",
+    "nodeId": "10:2123",
+    "text": "Edit feature"
+  },
+  {
+    "viewId": "10:1790",
+    "nodeId": "10:2125",
+    "text": "Edit sketch"
+  },
+  {
+    "viewId": "10:1790",
+    "nodeId": "10:2126",
+    "text": "Edit the feature or its driving sketch.\nDependent features rebuild automatically."
+  },
+  {
+    "viewId": "10:1790",
+    "nodeId": "10:2128",
+    "text": "Dependent feature"
+  },
+  {
+    "viewId": "10:1790",
+    "nodeId": "10:2131",
+    "text": "Fillet 01 / R2"
+  },
+  {
+    "viewId": "10:1790",
+    "nodeId": "10:2133",
+    "text": "Model updated / Rebuild complete"
+  },
+  {
+    "viewId": "10:1790",
+    "nodeId": "10:2137",
+    "text": "DESIGN HISTORY"
+  },
+  {
+    "viewId": "10:1790",
+    "nodeId": "10:2141",
+    "text": "Sketch 01"
+  },
+  {
+    "viewId": "10:1790",
+    "nodeId": "10:2144",
+    "text": "Extrude 01"
+  },
+  {
+    "viewId": "10:1790",
+    "nodeId": "10:2147",
+    "text": "Sketch 02"
+  },
+  {
+    "viewId": "10:1790",
+    "nodeId": "10:2150",
+    "text": "Extrude 02"
+  },
+  {
+    "viewId": "10:1790",
+    "nodeId": "10:2153",
+    "text": "Hole 01"
+  },
+  {
+    "viewId": "10:1790",
+    "nodeId": "10:2156",
+    "text": "Sketch 03"
+  },
+  {
+    "viewId": "10:1790",
+    "nodeId": "10:2159",
+    "text": "Hole 02"
+  },
+  {
+    "viewId": "10:1790",
+    "nodeId": "10:2162",
+    "text": "Fillet 01"
+  },
+  {
+    "viewId": "10:1790",
+    "nodeId": "10:2166",
+    "text": "End of history"
+  },
+  {
+    "viewId": "10:1790",
+    "nodeId": "10:2168",
+    "text": "Hole 02 updated / Ø10.00 mm / Pattern preserved"
+  },
+  {
+    "viewId": "10:1790",
+    "nodeId": "10:2169",
+    "text": "Model units / mm"
+  },
+  {
+    "viewId": "10:1790",
+    "nodeId": "10:2172",
+    "text": "Polykrom by WCKD"
+  },
+  {
+    "viewId": "10:410",
+    "nodeId": "10:419",
+    "text": "Actuator mount"
+  },
+  {
+    "viewId": "10:410",
+    "nodeId": "10:420",
+    "text": "Local model · v12"
+  },
+  {
+    "viewId": "10:410",
+    "nodeId": "10:428",
+    "text": "⌘K"
+  },
+  {
+    "viewId": "10:410",
+    "nodeId": "10:431",
+    "text": "Save"
+  },
+  {
+    "viewId": "10:410",
+    "nodeId": "10:434",
+    "text": "Export"
+  },
+  {
+    "viewId": "10:410",
+    "nodeId": "10:437",
+    "text": "Model"
+  },
+  {
+    "viewId": "10:410",
+    "nodeId": "10:440",
+    "text": "Sketch"
+  },
+  {
+    "viewId": "10:410",
+    "nodeId": "10:442",
+    "text": "Surface"
+  },
+  {
+    "viewId": "10:410",
+    "nodeId": "10:444",
+    "text": "Assembly"
+  },
+  {
+    "viewId": "10:410",
+    "nodeId": "10:446",
+    "text": "Drawing"
+  },
+  {
+    "viewId": "10:410",
+    "nodeId": "10:448",
+    "text": "Inspect"
+  },
+  {
+    "viewId": "10:410",
+    "nodeId": "10:450",
+    "text": "Manufacture"
+  },
+  {
+    "viewId": "10:410",
+    "nodeId": "10:452",
+    "text": "Automate"
+  },
+  {
+    "viewId": "10:410",
+    "nodeId": "10:459",
+    "text": "Select"
+  },
+  {
+    "viewId": "10:410",
+    "nodeId": "10:462",
+    "text": "Move"
+  },
+  {
+    "viewId": "10:410",
+    "nodeId": "10:466",
+    "text": "Copy"
+  },
+  {
+    "viewId": "10:410",
+    "nodeId": "10:469",
+    "text": "Rotate"
+  },
+  {
+    "viewId": "10:410",
+    "nodeId": "10:470",
+    "text": "Selection"
+  },
+  {
+    "viewId": "10:410",
+    "nodeId": "10:477",
+    "text": "Sketch"
+  },
+  {
+    "viewId": "10:410",
+    "nodeId": "10:480",
+    "text": "Extrude"
+  },
+  {
+    "viewId": "10:410",
+    "nodeId": "10:483",
+    "text": "Revolve"
+  },
+  {
+    "viewId": "10:410",
+    "nodeId": "10:488",
+    "text": "Sweep"
+  },
+  {
+    "viewId": "10:410",
+    "nodeId": "10:491",
+    "text": "Loft"
+  },
+  {
+    "viewId": "10:410",
+    "nodeId": "10:495",
+    "text": "Hole"
+  },
+  {
+    "viewId": "10:410",
+    "nodeId": "10:498",
+    "text": "Shell"
+  },
+  {
+    "viewId": "10:410",
+    "nodeId": "10:499",
+    "text": "Create"
+  },
+  {
+    "viewId": "10:410",
+    "nodeId": "10:506",
+    "text": "Fillet"
+  },
+  {
+    "viewId": "10:410",
+    "nodeId": "10:509",
+    "text": "Chamfer"
+  },
+  {
+    "viewId": "10:410",
+    "nodeId": "10:512",
+    "text": "Pattern"
+  },
+  {
+    "viewId": "10:410",
+    "nodeId": "10:515",
+    "text": "Mirror"
+  },
+  {
+    "viewId": "10:410",
+    "nodeId": "10:519",
+    "text": "Move face"
+  },
+  {
+    "viewId": "10:410",
+    "nodeId": "10:522",
+    "text": "Offset face"
+  },
+  {
+    "viewId": "10:410",
+    "nodeId": "10:525",
+    "text": "Combine"
+  },
+  {
+    "viewId": "10:410",
+    "nodeId": "10:528",
+    "text": "Split body"
+  },
+  {
+    "viewId": "10:410",
+    "nodeId": "10:529",
+    "text": "Modify"
+  },
+  {
+    "viewId": "10:410",
+    "nodeId": "10:536",
+    "text": "Plane"
+  },
+  {
+    "viewId": "10:410",
+    "nodeId": "10:539",
+    "text": "Axis"
+  },
+  {
+    "viewId": "10:410",
+    "nodeId": "10:543",
+    "text": "Point"
+  },
+  {
+    "viewId": "10:410",
+    "nodeId": "10:546",
+    "text": "Project"
+  },
+  {
+    "viewId": "10:410",
+    "nodeId": "10:547",
+    "text": "Construct"
+  },
+  {
+    "viewId": "10:410",
+    "nodeId": "10:554",
+    "text": "Measure"
+  },
+  {
+    "viewId": "10:410",
+    "nodeId": "10:557",
+    "text": "Section"
+  },
+  {
+    "viewId": "10:410",
+    "nodeId": "10:561",
+    "text": "Parameters"
+  },
+  {
+    "viewId": "10:410",
+    "nodeId": "10:564",
+    "text": "History"
+  },
+  {
+    "viewId": "10:410",
+    "nodeId": "10:565",
+    "text": "Inspect"
+  },
+  {
+    "viewId": "10:410",
+    "nodeId": "10:569",
+    "text": "Feature preview: Hole 02 / Ø8.00 → Ø10.00 mm"
+  },
+  {
+    "viewId": "10:410",
+    "nodeId": "10:570",
+    "text": "Scope: Hole 02 / 4 holes ▾"
+  },
+  {
+    "viewId": "10:410",
+    "nodeId": "10:571",
+    "text": "⌘J"
+  },
+  {
+    "viewId": "10:410",
+    "nodeId": "10:573",
+    "text": "Preview changes"
+  },
+  {
+    "viewId": "10:410",
+    "nodeId": "10:577",
+    "text": "Design Browser"
+  },
+  {
+    "viewId": "10:410",
+    "nodeId": "10:582",
+    "text": "Actuator mount"
+  },
+  {
+    "viewId": "10:410",
+    "nodeId": "10:583",
+    "text": "1 component · 1 body"
+  },
+  {
+    "viewId": "10:410",
+    "nodeId": "10:587",
+    "text": "Filter features…"
+  },
+  {
+    "viewId": "10:410",
+    "nodeId": "10:590",
+    "text": "Origin"
+  },
+  {
+    "viewId": "10:410",
+    "nodeId": "10:593",
+    "text": "Bodies (1)"
+  },
+  {
+    "viewId": "10:410",
+    "nodeId": "10:596",
+    "text": "Mount"
+  },
+  {
+    "viewId": "10:410",
+    "nodeId": "10:600",
+    "text": "Sketches (3)"
+  },
+  {
+    "viewId": "10:410",
+    "nodeId": "10:603",
+    "text": "Base profile"
+  },
+  {
+    "viewId": "10:410",
+    "nodeId": "10:607",
+    "text": "Boss profile"
+  },
+  {
+    "viewId": "10:410",
+    "nodeId": "10:611",
+    "text": "Mounting pattern"
+  },
+  {
+    "viewId": "10:410",
+    "nodeId": "10:615",
+    "text": "Features (5)"
+  },
+  {
+    "viewId": "10:410",
+    "nodeId": "10:618",
+    "text": "Extrude 01 — Base"
+  },
+  {
+    "viewId": "10:410",
+    "nodeId": "10:621",
+    "text": "Extrude 02 — Boss"
+  },
+  {
+    "viewId": "10:410",
+    "nodeId": "10:624",
+    "text": "Hole 01 — Bore"
+  },
+  {
+    "viewId": "10:410",
+    "nodeId": "10:627",
+    "text": "Hole 02 — Mounting holes"
+  },
+  {
+    "viewId": "10:410",
+    "nodeId": "10:630",
+    "text": "Fillet 01 — Edge finish"
+  },
+  {
+    "viewId": "10:410",
+    "nodeId": "10:633",
+    "text": "Parameters"
+  },
+  {
+    "viewId": "10:410",
+    "nodeId": "10:640",
+    "text": "Actuator mount   ×"
+  },
+  {
+    "viewId": "10:410",
+    "nodeId": "10:641",
+    "text": "+"
+  },
+  {
+    "viewId": "10:410",
+    "nodeId": "10:643",
+    "text": "Isometric ▾"
+  },
+  {
+    "viewId": "10:410",
+    "nodeId": "10:644",
+    "text": "Shaded + edges ▾"
+  },
+  {
+    "viewId": "10:410",
+    "nodeId": "10:645",
+    "text": "Selection: feature ▾"
+  },
+  {
+    "viewId": "10:410",
+    "nodeId": "10:646",
+    "text": "Selected hidden edges"
+  },
+  {
+    "viewId": "10:410",
+    "nodeId": "10:706",
+    "text": "TOP"
+  },
+  {
+    "viewId": "10:410",
+    "nodeId": "10:707",
+    "text": "X"
+  },
+  {
+    "viewId": "10:410",
+    "nodeId": "10:708",
+    "text": "Y"
+  },
+  {
+    "viewId": "10:410",
+    "nodeId": "10:709",
+    "text": "Z"
+  },
+  {
+    "viewId": "10:410",
+    "nodeId": "10:710",
+    "text": "Hole 02 · 4 mounting holes selected"
+  },
+  {
+    "viewId": "10:410",
+    "nodeId": "10:1042",
+    "text": "Edit feature"
+  },
+  {
+    "viewId": "10:410",
+    "nodeId": "10:1044",
+    "text": "HOLE 02"
+  },
+  {
+    "viewId": "10:410",
+    "nodeId": "10:1045",
+    "text": "Mounting holes"
+  },
+  {
+    "viewId": "10:410",
+    "nodeId": "10:1046",
+    "text": "4 instances / Sketch 03"
+  },
+  {
+    "viewId": "10:410",
+    "nodeId": "10:1048",
+    "text": "Parameters"
+  },
+  {
+    "viewId": "10:410",
+    "nodeId": "10:1050",
+    "text": "Diameter"
+  },
+  {
+    "viewId": "10:410",
+    "nodeId": "10:1052",
+    "text": "Ø10.00 mm"
+  },
+  {
+    "viewId": "10:410",
+    "nodeId": "10:1054",
+    "text": "Extent"
+  },
+  {
+    "viewId": "10:410",
+    "nodeId": "10:1056",
+    "text": "Through all ▾"
+  },
+  {
+    "viewId": "10:410",
+    "nodeId": "10:1058",
+    "text": "Instances"
+  },
+  {
+    "viewId": "10:410",
+    "nodeId": "10:1060",
+    "text": "4"
+  },
+  {
+    "viewId": "10:410",
+    "nodeId": "10:1062",
+    "text": "Reference"
+  },
+  {
+    "viewId": "10:410",
+    "nodeId": "10:1064",
+    "text": "Sketch 03"
+  },
+  {
+    "viewId": "10:410",
+    "nodeId": "10:1066",
+    "text": "Body"
+  },
+  {
+    "viewId": "10:410",
+    "nodeId": "10:1068",
+    "text": "Mount"
+  },
+  {
+    "viewId": "10:410",
+    "nodeId": "10:1072",
+    "text": "✓"
+  },
+  {
+    "viewId": "10:410",
+    "nodeId": "10:1073",
+    "text": "Preview"
+  },
+  {
+    "viewId": "10:410",
+    "nodeId": "10:1074",
+    "text": "The bolt pattern stays 84 × 44 mm.\nFillet 01 will rebuild after this change."
+  },
+  {
+    "viewId": "10:410",
+    "nodeId": "10:1076",
+    "text": "Apply change"
+  },
+  {
+    "viewId": "10:410",
+    "nodeId": "10:1078",
+    "text": "Cancel edit"
+  },
+  {
+    "viewId": "10:410",
+    "nodeId": "10:1080",
+    "text": "Preview / Not applied"
+  },
+  {
+    "viewId": "10:410",
+    "nodeId": "10:757",
+    "text": "DESIGN HISTORY"
+  },
+  {
+    "viewId": "10:410",
+    "nodeId": "10:761",
+    "text": "Sketch 01"
+  },
+  {
+    "viewId": "10:410",
+    "nodeId": "10:764",
+    "text": "Extrude 01"
+  },
+  {
+    "viewId": "10:410",
+    "nodeId": "10:767",
+    "text": "Sketch 02"
+  },
+  {
+    "viewId": "10:410",
+    "nodeId": "10:770",
+    "text": "Extrude 02"
+  },
+  {
+    "viewId": "10:410",
+    "nodeId": "10:773",
+    "text": "Hole 01"
+  },
+  {
+    "viewId": "10:410",
+    "nodeId": "10:776",
+    "text": "Sketch 03"
+  },
+  {
+    "viewId": "10:410",
+    "nodeId": "10:779",
+    "text": "Hole 02"
+  },
+  {
+    "viewId": "10:410",
+    "nodeId": "10:782",
+    "text": "Fillet 01"
+  },
+  {
+    "viewId": "10:410",
+    "nodeId": "10:786",
+    "text": "End of history"
+  },
+  {
+    "viewId": "10:410",
+    "nodeId": "10:788",
+    "text": "Edit Hole 02 / Preview active / Esc cancels"
+  },
+  {
+    "viewId": "10:410",
+    "nodeId": "10:789",
+    "text": "Model units / mm"
+  },
+  {
+    "viewId": "10:410",
+    "nodeId": "10:792",
+    "text": "Polykrom by WCKD"
+  },
+  {
+    "viewId": "6:2",
+    "nodeId": "6:30",
+    "text": "Actuator mount"
+  },
+  {
+    "viewId": "6:2",
+    "nodeId": "6:31",
+    "text": "Local model · v12"
+  },
+  {
+    "viewId": "6:2",
+    "nodeId": "6:48",
+    "text": "⌘K"
+  },
+  {
+    "viewId": "6:2",
+    "nodeId": "6:55",
+    "text": "Save"
+  },
+  {
+    "viewId": "6:2",
+    "nodeId": "6:62",
+    "text": "Export"
+  },
+  {
+    "viewId": "6:2",
+    "nodeId": "6:65",
+    "text": "Model"
+  },
+  {
+    "viewId": "6:2",
+    "nodeId": "6:68",
+    "text": "Sketch"
+  },
+  {
+    "viewId": "6:2",
+    "nodeId": "6:70",
+    "text": "Surface"
+  },
+  {
+    "viewId": "6:2",
+    "nodeId": "6:72",
+    "text": "Assembly"
+  },
+  {
+    "viewId": "6:2",
+    "nodeId": "6:74",
+    "text": "Drawing"
+  },
+  {
+    "viewId": "6:2",
+    "nodeId": "6:76",
+    "text": "Inspect"
+  },
+  {
+    "viewId": "6:2",
+    "nodeId": "6:78",
+    "text": "Manufacture"
+  },
+  {
+    "viewId": "6:2",
+    "nodeId": "6:80",
+    "text": "Automate"
+  },
+  {
+    "viewId": "6:2",
+    "nodeId": "6:89",
+    "text": "Select"
+  },
+  {
+    "viewId": "6:2",
+    "nodeId": "6:97",
+    "text": "Move"
+  },
+  {
+    "viewId": "6:2",
+    "nodeId": "6:105",
+    "text": "Copy"
+  },
+  {
+    "viewId": "6:2",
+    "nodeId": "6:112",
+    "text": "Rotate"
+  },
+  {
+    "viewId": "6:2",
+    "nodeId": "6:113",
+    "text": "Selection"
+  },
+  {
+    "viewId": "6:2",
+    "nodeId": "6:122",
+    "text": "Sketch"
+  },
+  {
+    "viewId": "6:2",
+    "nodeId": "6:127",
+    "text": "Extrude"
+  },
+  {
+    "viewId": "6:2",
+    "nodeId": "6:132",
+    "text": "Revolve"
+  },
+  {
+    "viewId": "6:2",
+    "nodeId": "6:139",
+    "text": "Sweep"
+  },
+  {
+    "viewId": "6:2",
+    "nodeId": "6:144",
+    "text": "Loft"
+  },
+  {
+    "viewId": "6:2",
+    "nodeId": "6:150",
+    "text": "Hole"
+  },
+  {
+    "viewId": "6:2",
+    "nodeId": "6:155",
+    "text": "Shell"
+  },
+  {
+    "viewId": "6:2",
+    "nodeId": "6:156",
+    "text": "Create"
+  },
+  {
+    "viewId": "6:2",
+    "nodeId": "6:165",
+    "text": "Fillet"
+  },
+  {
+    "viewId": "6:2",
+    "nodeId": "6:170",
+    "text": "Chamfer"
+  },
+  {
+    "viewId": "6:2",
+    "nodeId": "6:175",
+    "text": "Pattern"
+  },
+  {
+    "viewId": "6:2",
+    "nodeId": "6:180",
+    "text": "Mirror"
+  },
+  {
+    "viewId": "6:2",
+    "nodeId": "6:189",
+    "text": "Move face"
+  },
+  {
+    "viewId": "6:2",
+    "nodeId": "6:194",
+    "text": "Offset face"
+  },
+  {
+    "viewId": "6:2",
+    "nodeId": "6:199",
+    "text": "Combine"
+  },
+  {
+    "viewId": "6:2",
+    "nodeId": "6:204",
+    "text": "Split body"
+  },
+  {
+    "viewId": "6:2",
+    "nodeId": "6:205",
+    "text": "Modify"
+  },
+  {
+    "viewId": "6:2",
+    "nodeId": "6:214",
+    "text": "Plane"
+  },
+  {
+    "viewId": "6:2",
+    "nodeId": "6:223",
+    "text": "Axis"
+  },
+  {
+    "viewId": "6:2",
+    "nodeId": "6:230",
+    "text": "Point"
+  },
+  {
+    "viewId": "6:2",
+    "nodeId": "6:239",
+    "text": "Project"
+  },
+  {
+    "viewId": "6:2",
+    "nodeId": "6:240",
+    "text": "Construct"
+  },
+  {
+    "viewId": "6:2",
+    "nodeId": "6:256",
+    "text": "Measure"
+  },
+  {
+    "viewId": "6:2",
+    "nodeId": "6:261",
+    "text": "Section"
+  },
+  {
+    "viewId": "6:2",
+    "nodeId": "6:275",
+    "text": "Parameters"
+  },
+  {
+    "viewId": "6:2",
+    "nodeId": "6:282",
+    "text": "History"
+  },
+  {
+    "viewId": "6:2",
+    "nodeId": "6:283",
+    "text": "Inspect"
+  },
+  {
+    "viewId": "6:2",
+    "nodeId": "6:292",
+    "text": "Ask Polykrom to change the model…"
+  },
+  {
+    "viewId": "6:2",
+    "nodeId": "6:293",
+    "text": "Scope: Hole 02 / 4 holes ▾"
+  },
+  {
+    "viewId": "6:2",
+    "nodeId": "6:294",
+    "text": "⌘J"
+  },
+  {
+    "viewId": "6:2",
+    "nodeId": "6:296",
+    "text": "Preview changes"
+  },
+  {
+    "viewId": "6:2",
+    "nodeId": "6:300",
+    "text": "Design Browser"
+  },
+  {
+    "viewId": "6:2",
+    "nodeId": "6:311",
+    "text": "Actuator mount"
+  },
+  {
+    "viewId": "6:2",
+    "nodeId": "6:312",
+    "text": "1 component · 1 body"
+  },
+  {
+    "viewId": "6:2",
+    "nodeId": "6:319",
+    "text": "Filter features…"
+  },
+  {
+    "viewId": "6:2",
+    "nodeId": "6:324",
+    "text": "Origin"
+  },
+  {
+    "viewId": "6:2",
+    "nodeId": "6:329",
+    "text": "Bodies (1)"
+  },
+  {
+    "viewId": "6:2",
+    "nodeId": "6:336",
+    "text": "Mount"
+  },
+  {
+    "viewId": "6:2",
+    "nodeId": "6:345",
+    "text": "Sketches (3)"
+  },
+  {
+    "viewId": "6:2",
+    "nodeId": "6:350",
+    "text": "Base profile"
+  },
+  {
+    "viewId": "6:2",
+    "nodeId": "6:359",
+    "text": "Boss profile"
+  },
+  {
+    "viewId": "6:2",
+    "nodeId": "6:368",
+    "text": "Mounting pattern"
+  },
+  {
+    "viewId": "6:2",
+    "nodeId": "6:377",
+    "text": "Features (5)"
+  },
+  {
+    "viewId": "6:2",
+    "nodeId": "6:382",
+    "text": "Extrude 01 — Base"
+  },
+  {
+    "viewId": "6:2",
+    "nodeId": "6:387",
+    "text": "Extrude 02 — Boss"
+  },
+  {
+    "viewId": "6:2",
+    "nodeId": "6:392",
+    "text": "Hole 01 — Bore"
+  },
+  {
+    "viewId": "6:2",
+    "nodeId": "6:397",
+    "text": "Hole 02 — Mounting holes"
+  },
+  {
+    "viewId": "6:2",
+    "nodeId": "6:402",
+    "text": "Fillet 01 — Edge finish"
+  },
+  {
+    "viewId": "6:2",
+    "nodeId": "6:415",
+    "text": "Parameters"
+  },
+  {
+    "viewId": "6:2",
+    "nodeId": "6:422",
+    "text": "Actuator mount   ×"
+  },
+  {
+    "viewId": "6:2",
+    "nodeId": "6:423",
+    "text": "+"
+  },
+  {
+    "viewId": "6:2",
+    "nodeId": "6:425",
+    "text": "Isometric ▾"
+  },
+  {
+    "viewId": "6:2",
+    "nodeId": "6:426",
+    "text": "Shaded + edges ▾"
+  },
+  {
+    "viewId": "6:2",
+    "nodeId": "6:427",
+    "text": "Selection: feature ▾"
+  },
+  {
+    "viewId": "6:2",
+    "nodeId": "6:428",
+    "text": "Selected hidden edges"
+  },
+  {
+    "viewId": "6:2",
+    "nodeId": "6:488",
+    "text": "TOP"
+  },
+  {
+    "viewId": "6:2",
+    "nodeId": "6:489",
+    "text": "X"
+  },
+  {
+    "viewId": "6:2",
+    "nodeId": "6:490",
+    "text": "Y"
+  },
+  {
+    "viewId": "6:2",
+    "nodeId": "6:491",
+    "text": "Z"
+  },
+  {
+    "viewId": "6:2",
+    "nodeId": "6:492",
+    "text": "Hole 02 · 4 mounting holes selected"
+  },
+  {
+    "viewId": "6:2",
+    "nodeId": "6:495",
+    "text": "Properties"
+  },
+  {
+    "viewId": "6:2",
+    "nodeId": "6:500",
+    "text": "HOLE 02"
+  },
+  {
+    "viewId": "6:2",
+    "nodeId": "6:501",
+    "text": "Mounting holes"
+  },
+  {
+    "viewId": "6:2",
+    "nodeId": "6:502",
+    "text": "Mount / 4 instances"
+  },
+  {
+    "viewId": "6:2",
+    "nodeId": "6:504",
+    "text": "Parameters"
+  },
+  {
+    "viewId": "6:2",
+    "nodeId": "6:506",
+    "text": "Diameter"
+  },
+  {
+    "viewId": "6:2",
+    "nodeId": "6:508",
+    "text": "Ø8.00 mm"
+  },
+  {
+    "viewId": "6:2",
+    "nodeId": "6:510",
+    "text": "Extent"
+  },
+  {
+    "viewId": "6:2",
+    "nodeId": "6:512",
+    "text": "Through all"
+  },
+  {
+    "viewId": "6:2",
+    "nodeId": "6:514",
+    "text": "Instances"
+  },
+  {
+    "viewId": "6:2",
+    "nodeId": "6:516",
+    "text": "4"
+  },
+  {
+    "viewId": "6:2",
+    "nodeId": "6:518",
+    "text": "Reference"
+  },
+  {
+    "viewId": "6:2",
+    "nodeId": "6:520",
+    "text": "Sketch 03"
+  },
+  {
+    "viewId": "6:2",
+    "nodeId": "6:522",
+    "text": "Body"
+  },
+  {
+    "viewId": "6:2",
+    "nodeId": "6:524",
+    "text": "Mount"
+  },
+  {
+    "viewId": "6:2",
+    "nodeId": "6:527",
+    "text": "Edit feature"
+  },
+  {
+    "viewId": "6:2",
+    "nodeId": "6:529",
+    "text": "Edit sketch"
+  },
+  {
+    "viewId": "6:2",
+    "nodeId": "6:530",
+    "text": "Edit the feature or its driving sketch.\nDependent features rebuild automatically."
+  },
+  {
+    "viewId": "6:2",
+    "nodeId": "6:532",
+    "text": "Dependent feature"
+  },
+  {
+    "viewId": "6:2",
+    "nodeId": "6:537",
+    "text": "Fillet 01 / R2"
+  },
+  {
+    "viewId": "6:2",
+    "nodeId": "6:539",
+    "text": "No pending edits"
+  },
+  {
+    "viewId": "6:2",
+    "nodeId": "6:547",
+    "text": "DESIGN HISTORY"
+  },
+  {
+    "viewId": "6:2",
+    "nodeId": "6:553",
+    "text": "Sketch 01"
+  },
+  {
+    "viewId": "6:2",
+    "nodeId": "6:558",
+    "text": "Extrude 01"
+  },
+  {
+    "viewId": "6:2",
+    "nodeId": "6:563",
+    "text": "Sketch 02"
+  },
+  {
+    "viewId": "6:2",
+    "nodeId": "6:568",
+    "text": "Extrude 02"
+  },
+  {
+    "viewId": "6:2",
+    "nodeId": "6:573",
+    "text": "Hole 01"
+  },
+  {
+    "viewId": "6:2",
+    "nodeId": "6:578",
+    "text": "Sketch 03"
+  },
+  {
+    "viewId": "6:2",
+    "nodeId": "6:583",
+    "text": "Hole 02"
+  },
+  {
+    "viewId": "6:2",
+    "nodeId": "6:588",
+    "text": "Fillet 01"
+  },
+  {
+    "viewId": "6:2",
+    "nodeId": "6:594",
+    "text": "End of history"
+  },
+  {
+    "viewId": "6:2",
+    "nodeId": "6:596",
+    "text": "4 circular edges selected"
+  },
+  {
+    "viewId": "6:2",
+    "nodeId": "6:597",
+    "text": "Model units / mm"
+  },
+  {
+    "viewId": "6:2",
+    "nodeId": "6:600",
+    "text": "Polykrom by WCKD"
+  },
+  {
+    "viewId": "8:218",
+    "nodeId": "8:227",
+    "text": "Actuator mount"
+  },
+  {
+    "viewId": "8:218",
+    "nodeId": "8:228",
+    "text": "Local model · v12"
+  },
+  {
+    "viewId": "8:218",
+    "nodeId": "8:236",
+    "text": "⌘K"
+  },
+  {
+    "viewId": "8:218",
+    "nodeId": "8:239",
+    "text": "Save"
+  },
+  {
+    "viewId": "8:218",
+    "nodeId": "8:242",
+    "text": "Export"
+  },
+  {
+    "viewId": "8:218",
+    "nodeId": "8:245",
+    "text": "Model"
+  },
+  {
+    "viewId": "8:218",
+    "nodeId": "8:248",
+    "text": "Sketch"
+  },
+  {
+    "viewId": "8:218",
+    "nodeId": "8:250",
+    "text": "Surface"
+  },
+  {
+    "viewId": "8:218",
+    "nodeId": "8:252",
+    "text": "Assembly"
+  },
+  {
+    "viewId": "8:218",
+    "nodeId": "8:254",
+    "text": "Drawing"
+  },
+  {
+    "viewId": "8:218",
+    "nodeId": "8:256",
+    "text": "Inspect"
+  },
+  {
+    "viewId": "8:218",
+    "nodeId": "8:258",
+    "text": "Manufacture"
+  },
+  {
+    "viewId": "8:218",
+    "nodeId": "8:260",
+    "text": "Automate"
+  },
+  {
+    "viewId": "8:218",
+    "nodeId": "8:646",
+    "text": "Line"
+  },
+  {
+    "viewId": "8:218",
+    "nodeId": "8:651",
+    "text": "Rectangle"
+  },
+  {
+    "viewId": "8:218",
+    "nodeId": "8:656",
+    "text": "Circle"
+  },
+  {
+    "viewId": "8:218",
+    "nodeId": "8:661",
+    "text": "Arc"
+  },
+  {
+    "viewId": "8:218",
+    "nodeId": "8:667",
+    "text": "Slot"
+  },
+  {
+    "viewId": "8:218",
+    "nodeId": "8:674",
+    "text": "Spline"
+  },
+  {
+    "viewId": "8:218",
+    "nodeId": "8:680",
+    "text": "Point"
+  },
+  {
+    "viewId": "8:218",
+    "nodeId": "8:689",
+    "text": "Project"
+  },
+  {
+    "viewId": "8:218",
+    "nodeId": "8:690",
+    "text": "Create"
+  },
+  {
+    "viewId": "8:218",
+    "nodeId": "8:699",
+    "text": "Trim"
+  },
+  {
+    "viewId": "8:218",
+    "nodeId": "8:704",
+    "text": "Extend"
+  },
+  {
+    "viewId": "8:218",
+    "nodeId": "8:709",
+    "text": "Offset"
+  },
+  {
+    "viewId": "8:218",
+    "nodeId": "8:715",
+    "text": "Mirror"
+  },
+  {
+    "viewId": "8:218",
+    "nodeId": "8:720",
+    "text": "Pattern"
+  },
+  {
+    "viewId": "8:218",
+    "nodeId": "8:728",
+    "text": "Move"
+  },
+  {
+    "viewId": "8:218",
+    "nodeId": "8:729",
+    "text": "Modify"
+  },
+  {
+    "viewId": "8:218",
+    "nodeId": "8:738",
+    "text": "Coincident"
+  },
+  {
+    "viewId": "8:218",
+    "nodeId": "8:743",
+    "text": "Parallel"
+  },
+  {
+    "viewId": "8:218",
+    "nodeId": "8:748",
+    "text": "Perpendicular"
+  },
+  {
+    "viewId": "8:218",
+    "nodeId": "8:753",
+    "text": "Concentric"
+  },
+  {
+    "viewId": "8:218",
+    "nodeId": "8:759",
+    "text": "Equal"
+  },
+  {
+    "viewId": "8:218",
+    "nodeId": "8:764",
+    "text": "Symmetric"
+  },
+  {
+    "viewId": "8:218",
+    "nodeId": "8:769",
+    "text": "Tangent"
+  },
+  {
+    "viewId": "8:218",
+    "nodeId": "8:774",
+    "text": "Fix"
+  },
+  {
+    "viewId": "8:218",
+    "nodeId": "8:775",
+    "text": "Constrain"
+  },
+  {
+    "viewId": "8:218",
+    "nodeId": "8:779",
+    "text": "Finish sketch"
+  },
+  {
+    "viewId": "8:218",
+    "nodeId": "8:781",
+    "text": "Cancel sketch"
+  },
+  {
+    "viewId": "8:218",
+    "nodeId": "8:377",
+    "text": "Ask Polykrom to change the model…"
+  },
+  {
+    "viewId": "8:218",
+    "nodeId": "8:378",
+    "text": "Scope: Sketch 03 ▾"
+  },
+  {
+    "viewId": "8:218",
+    "nodeId": "8:379",
+    "text": "⌘J"
+  },
+  {
+    "viewId": "8:218",
+    "nodeId": "8:381",
+    "text": "Preview changes"
+  },
+  {
+    "viewId": "8:218",
+    "nodeId": "8:385",
+    "text": "Design Browser"
+  },
+  {
+    "viewId": "8:218",
+    "nodeId": "8:390",
+    "text": "Actuator mount"
+  },
+  {
+    "viewId": "8:218",
+    "nodeId": "8:391",
+    "text": "1 component · 1 body"
+  },
+  {
+    "viewId": "8:218",
+    "nodeId": "8:395",
+    "text": "Filter features…"
+  },
+  {
+    "viewId": "8:218",
+    "nodeId": "8:398",
+    "text": "Origin"
+  },
+  {
+    "viewId": "8:218",
+    "nodeId": "8:401",
+    "text": "Bodies (1)"
+  },
+  {
+    "viewId": "8:218",
+    "nodeId": "8:404",
+    "text": "Mount"
+  },
+  {
+    "viewId": "8:218",
+    "nodeId": "8:408",
+    "text": "Sketches (3)"
+  },
+  {
+    "viewId": "8:218",
+    "nodeId": "8:411",
+    "text": "Base profile"
+  },
+  {
+    "viewId": "8:218",
+    "nodeId": "8:415",
+    "text": "Boss profile"
+  },
+  {
+    "viewId": "8:218",
+    "nodeId": "8:419",
+    "text": "Mounting pattern"
+  },
+  {
+    "viewId": "8:218",
+    "nodeId": "8:423",
+    "text": "Features (5)"
+  },
+  {
+    "viewId": "8:218",
+    "nodeId": "8:426",
+    "text": "Extrude 01 — Base"
+  },
+  {
+    "viewId": "8:218",
+    "nodeId": "8:429",
+    "text": "Extrude 02 — Boss"
+  },
+  {
+    "viewId": "8:218",
+    "nodeId": "8:432",
+    "text": "Hole 01 — Bore"
+  },
+  {
+    "viewId": "8:218",
+    "nodeId": "8:435",
+    "text": "Hole 02 — Mounting holes"
+  },
+  {
+    "viewId": "8:218",
+    "nodeId": "8:438",
+    "text": "Fillet 01 — Edge finish"
+  },
+  {
+    "viewId": "8:218",
+    "nodeId": "8:441",
+    "text": "Parameters"
+  },
+  {
+    "viewId": "8:218",
+    "nodeId": "8:448",
+    "text": "Sketch 03 / Mounting pattern   ×"
+  },
+  {
+    "viewId": "8:218",
+    "nodeId": "8:449",
+    "text": "+"
+  },
+  {
+    "viewId": "8:218",
+    "nodeId": "8:451",
+    "text": "Top / Orthographic ▾"
+  },
+  {
+    "viewId": "8:218",
+    "nodeId": "8:452",
+    "text": "Sketch geometry"
+  },
+  {
+    "viewId": "8:218",
+    "nodeId": "8:453",
+    "text": "Constraints visible"
+  },
+  {
+    "viewId": "8:218",
+    "nodeId": "8:454",
+    "text": "Projected body edges"
+  },
+  {
+    "viewId": "8:218",
+    "nodeId": "8:940",
+    "text": "84.00"
+  },
+  {
+    "viewId": "8:218",
+    "nodeId": "8:941",
+    "text": "44.00"
+  },
+  {
+    "viewId": "8:218",
+    "nodeId": "8:942",
+    "text": "120.00  REF"
+  },
+  {
+    "viewId": "8:218",
+    "nodeId": "8:943",
+    "text": "4 × Ø8.00"
+  },
+  {
+    "viewId": "8:218",
+    "nodeId": "8:944",
+    "text": "Origin"
+  },
+  {
+    "viewId": "8:218",
+    "nodeId": "8:957",
+    "text": "="
+  },
+  {
+    "viewId": "8:218",
+    "nodeId": "8:958",
+    "text": "="
+  },
+  {
+    "viewId": "8:218",
+    "nodeId": "8:960",
+    "text": "Sketch"
+  },
+  {
+    "viewId": "8:218",
+    "nodeId": "8:965",
+    "text": "SKETCH 03"
+  },
+  {
+    "viewId": "8:218",
+    "nodeId": "8:966",
+    "text": "Mounting pattern"
+  },
+  {
+    "viewId": "8:218",
+    "nodeId": "8:967",
+    "text": "Top face / Mount"
+  },
+  {
+    "viewId": "8:218",
+    "nodeId": "8:969",
+    "text": "Fully constrained"
+  },
+  {
+    "viewId": "8:218",
+    "nodeId": "8:970",
+    "text": "0 degrees of freedom"
+  },
+  {
+    "viewId": "8:218",
+    "nodeId": "8:972",
+    "text": "Dimensions"
+  },
+  {
+    "viewId": "8:218",
+    "nodeId": "8:974",
+    "text": "Pitch X"
+  },
+  {
+    "viewId": "8:218",
+    "nodeId": "8:976",
+    "text": "84.00 mm"
+  },
+  {
+    "viewId": "8:218",
+    "nodeId": "8:978",
+    "text": "Pitch Y"
+  },
+  {
+    "viewId": "8:218",
+    "nodeId": "8:980",
+    "text": "44.00 mm"
+  },
+  {
+    "viewId": "8:218",
+    "nodeId": "8:982",
+    "text": "Diameter"
+  },
+  {
+    "viewId": "8:218",
+    "nodeId": "8:984",
+    "text": "Ø8.00 mm"
+  },
+  {
+    "viewId": "8:218",
+    "nodeId": "8:986",
+    "text": "Relationships"
+  },
+  {
+    "viewId": "8:218",
+    "nodeId": "8:991",
+    "text": "Coincident"
+  },
+  {
+    "viewId": "8:218",
+    "nodeId": "8:992",
+    "text": "4"
+  },
+  {
+    "viewId": "8:218",
+    "nodeId": "8:997",
+    "text": "Equal radii"
+  },
+  {
+    "viewId": "8:218",
+    "nodeId": "8:998",
+    "text": "3"
+  },
+  {
+    "viewId": "8:218",
+    "nodeId": "8:1003",
+    "text": "Symmetry"
+  },
+  {
+    "viewId": "8:218",
+    "nodeId": "8:1004",
+    "text": "2"
+  },
+  {
+    "viewId": "8:218",
+    "nodeId": "8:1006",
+    "text": "Downstream features are rolled back\nwhile this sketch is being edited."
+  },
+  {
+    "viewId": "8:218",
+    "nodeId": "8:565",
+    "text": "DESIGN HISTORY"
+  },
+  {
+    "viewId": "8:218",
+    "nodeId": "8:569",
+    "text": "Sketch 01"
+  },
+  {
+    "viewId": "8:218",
+    "nodeId": "8:572",
+    "text": "Extrude 01"
+  },
+  {
+    "viewId": "8:218",
+    "nodeId": "8:575",
+    "text": "Sketch 02"
+  },
+  {
+    "viewId": "8:218",
+    "nodeId": "8:578",
+    "text": "Extrude 02"
+  },
+  {
+    "viewId": "8:218",
+    "nodeId": "8:581",
+    "text": "Hole 01"
+  },
+  {
+    "viewId": "8:218",
+    "nodeId": "8:584",
+    "text": "Sketch 03"
+  },
+  {
+    "viewId": "8:218",
+    "nodeId": "8:587",
+    "text": "Hole 02"
+  },
+  {
+    "viewId": "8:218",
+    "nodeId": "8:590",
+    "text": "Fillet 01"
+  },
+  {
+    "viewId": "8:218",
+    "nodeId": "8:594",
+    "text": "Editing Sketch 03"
+  },
+  {
+    "viewId": "8:218",
+    "nodeId": "8:596",
+    "text": "Sketch 03 / Fully constrained / 0 DOF"
+  },
+  {
+    "viewId": "8:218",
+    "nodeId": "8:597",
+    "text": "Model units / mm"
+  },
+  {
+    "viewId": "8:218",
+    "nodeId": "8:600",
+    "text": "Polykrom by WCKD"
+  }
+]
