@@ -1,6 +1,7 @@
 //! `inspect.features` reads features off the exact B-rep: parts built here, exact values checked,
 //! every feature naming its faces, and nothing about the design touched.
 
+use polycore_geom::Vec3;
 use serde_json::{Value, json};
 
 use crate::Session;
@@ -349,6 +350,48 @@ fn a_circular_pattern_of_six_holes() {
     // The disc's own wall is not a boss (it has two caps) and not a blend: reported as such.
     let unrec: Vec<String> = list(&b["unrecognised"]).iter().map(|u| format!("{}", u["surface"])).collect();
     assert_eq!(unrec.iter().filter(|s| s.as_str() == "\"cylinder\"").count(), 2, "{b}");
+}
+
+/// Three holes at 0°, 60° and 120° on one radius are a partial circular pattern (the wrap-around
+/// gap is the one larger step), read the same whichever order the members come in; a full
+/// circle stays full.
+#[test]
+fn a_partial_circular_pattern_of_three_holes_in_any_member_order() {
+    for order in [[0.0, 60.0, 120.0], [0.0, 120.0, 60.0], [120.0, 0.0, 60.0], [60.0, 120.0, 0.0]] {
+        let mut s = Session::default();
+        run(&mut s, "solid.cylinder", json!({"base": [0, 0, 0], "diameter": 100, "height": 10, "body_name": "Disc"}));
+        for a in order.map(|a: f64| a.to_radians()) {
+            run(&mut s, "solid.hole", json!({"position": [30.0 * a.cos(), 30.0 * a.sin(), 10], "diameter": 6}));
+        }
+        let b = features(&mut s, "Disc");
+        assert_eq!(of_type(&b, "hole").len(), 3, "{order:?}: {b}");
+        let patterns = list(&b["patterns"]);
+        assert_eq!(patterns.len(), 1, "{order:?}: {b}");
+        let p = &patterns[0];
+        assert_eq!(p["type"], "circular", "{order:?}: {p}");
+        assert_eq!(p["count"], 3, "{order:?}: {p}");
+        exact(&p["angle_step_deg"], 60.0);
+        assert_eq!(p["full_circle"], false, "{order:?}: {p}");
+        exact(&p["radius"], 30.0);
+        exact3(&p["axis"]["origin"], [0.0, 0.0, 10.0]);
+        exact3(&p["axis"]["direction"], [0.0, 0.0, -1.0]);
+        assert_eq!(p["members"], json!([0, 1, 2]), "{order:?}: {p}");
+    }
+    // The fit itself, on bare points: any order, and the wrap step counted.
+    let pts = |degs: &[f64]| -> Vec<Vec3> { degs.iter().map(|d| Vec3::new(30.0 * d.to_radians().cos(), 30.0 * d.to_radians().sin(), 0.0)).collect() };
+    for degs in [[0.0, 60.0, 120.0], [120.0, 0.0, 60.0], [60.0, 0.0, 120.0]] {
+        let c = super::circle(&pts(&degs), Some(Vec3::new(0.0, 0.0, 1.0)), 1e-6).unwrap_or_else(|| panic!("{degs:?}"));
+        assert!((c.step - 60.0_f64.to_radians()).abs() < 1e-9, "{degs:?}: {}", c.step);
+        assert!(!c.full && (c.radius - 30.0).abs() < 1e-9 && c.center.dist(Vec3::ZERO) < 1e-9, "{degs:?}");
+    }
+    for degs in [[0.0, 120.0, 240.0], [240.0, 0.0, 120.0]] {
+        let c = super::circle(&pts(&degs), None, 1e-6).unwrap_or_else(|| panic!("{degs:?}"));
+        assert!(c.full && (c.step - 120.0_f64.to_radians()).abs() < 1e-9, "{degs:?}");
+        assert!(c.axis.z > 0.0, "the axis of a fit with no given direction is the same whatever the order: {degs:?} {:?}", c.axis);
+    }
+    // Unequal steps are no pattern, and two larger gaps are none.
+    assert!(super::circle(&pts(&[0.0, 60.0, 150.0]), None, 1e-6).is_none());
+    assert!(super::circle(&pts(&[0.0, 60.0, 180.0, 240.0]), None, 1e-6).is_none());
 }
 
 #[test]
