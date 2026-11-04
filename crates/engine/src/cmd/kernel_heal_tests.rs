@@ -59,7 +59,8 @@ fn offset_torus_face() {
     run(&mut s, "solid.torus", json!({"major": 20, "minor": 5}));
     let v0 = volume(&mut s);
     assert!((v0 - 2.0 * PI * PI * 20.0 * 25.0).abs() < 1e-3 * v0, "{v0}");
-    run(&mut s, "solid.offset_face", json!({"faces": [[25, 0, 0]], "distance": 1}));
+    // By name: the point [25, 0, 0] lies where the torus's patches meet, an ambiguous pick (#297).
+    run(&mut s, "solid.offset_face", json!({"faces": ["F1:face:1"], "distance": 1}));
     let v = volume(&mut s);
     assert!((v - 2.0 * PI * PI * 20.0 * 36.0).abs() < 1e-3 * v, "{v}");
 }

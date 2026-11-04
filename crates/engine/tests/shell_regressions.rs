@@ -86,3 +86,175 @@ fn sound(s: &Session) {
         assert!(b.body.validity().is_empty(), "{:?}", b.body.validity());
     }
 }
+
+/// A 60 × 40 × 30 box, the design of #297.
+fn box_60_40_30() -> Session {
+    let mut s = Session::default();
+    run(&mut s, "solid.box", json!({"length": 60.0, "width": 40.0, "height": 30.0}));
+    s
+}
+
+/// The volume of the box shelled 2 mm thick with the faces whose extents are given left open:
+/// the cavity reaches the open faces and stops 2 mm short of the closed ones.
+fn shell_volume_open(open: &[&str]) -> f64 {
+    let side = |lo: &str, hi: &str, len: f64| len - if open.contains(&lo) { 0.0 } else { 2.0 } - if open.contains(&hi) { 0.0 } else { 2.0 };
+    60.0 * 40.0 * 30.0 - side("-x", "+x", 60.0) * side("-y", "+y", 40.0) * side("-z", "+z", 30.0)
+}
+
+/// #297: picks on the bottom edges of the back and left walls lie on two faces each. The shell
+/// used to open the bottom as well (10 288 mm³ instead of 14 696 mm³) and say nothing; now the
+/// command refuses the pick, naming both faces, and the design is as it was.
+#[test]
+fn shell_picks_on_edges_are_refused_as_ambiguous() {
+    let mut s = box_60_40_30();
+    let features = s.doc.features.len();
+    let err = s.execute("solid.shell", &json!({"faces": [[30.0, 40.0, 0.0], [0.0, 20.0, 0.0]], "thickness": 2.0})).unwrap_err().to_string();
+    assert!(err.contains("ambiguous pick at [30, 40, 0]"), "{err}");
+    assert!(err.contains("`F1:+y`") && err.contains("`F1:-z`") && err.contains("`Body1`"), "{err}");
+    assert_eq!(s.doc.features.len(), features, "no feature was added");
+    sound(&s);
+    let got = volume(&s);
+    assert!((got - 72_000.0).abs() < 1e-9, "the box is untouched: {got}");
+}
+
+/// The same shell picked inside the back and left faces: 14 696 mm³ as before, and the reply
+/// names the faces it used.
+#[test]
+fn shell_interior_picks_keep_their_volume_and_name_the_faces_used() {
+    let mut s = box_60_40_30();
+    let reply =
+        s.execute("solid.shell", &json!({"faces": [[30.0, 40.0, 15.0], [0.0, 20.0, 15.0]], "thickness": 2.0})).unwrap_or_else(|e| panic!("{e}"));
+    assert_eq!(reply["faces_used"], json!(["F1:+y", "F1:-x"]), "{reply}");
+    assert_eq!(reply["warning"], json!(null), "{reply}");
+    sound(&s);
+    let (got, want) = (volume(&s), shell_volume_open(&["+y", "-x"]));
+    assert!((got - want).abs() < 1e-9 && (want - 14_696.0).abs() < 1e-9, "shell volume {got}, want {want}");
+}
+
+/// Two picks on one face are not deduplicated in silence: the reply says so, and the face is
+/// opened once.
+#[test]
+fn shell_two_picks_on_one_face_warn() {
+    let mut s = box_60_40_30();
+    let reply =
+        s.execute("solid.shell", &json!({"faces": [[30.0, 40.0, 15.0], [10.0, 40.0, 5.0]], "thickness": 2.0})).unwrap_or_else(|e| panic!("{e}"));
+    assert_eq!(reply["faces_used"], json!(["F1:+y", "F1:+y"]), "{reply}");
+    let warning = reply["warning"].as_str().unwrap_or_default();
+    assert!(warning.contains("faces 1 and 2") && warning.contains("`F1:+y`"), "{reply}");
+    sound(&s);
+    let (got, want) = (volume(&s), shell_volume_open(&["+y"]));
+    assert!((got - want).abs() < 1e-9, "shell volume {got}, want {want}");
+}
+
+/// An edge pick with a `normal` is the face facing that way: the same shell as the interior
+/// picks make.
+#[test]
+fn shell_edge_picks_with_a_normal_are_unambiguous() {
+    let mut s = box_60_40_30();
+    let faces = json!([{"point": [30.0, 40.0, 0.0], "normal": [0.0, 1.0, 0.0]}, {"point": [0.0, 20.0, 0.0], "normal": [-1.0, 0.0, 0.0]}]);
+    let reply = s.execute("solid.shell", &json!({"faces": faces, "thickness": 2.0})).unwrap_or_else(|e| panic!("{e}"));
+    assert_eq!(reply["faces_used"], json!(["F1:+y", "F1:-x"]), "{reply}");
+    assert_eq!(reply["warning"], json!(null), "{reply}");
+    sound(&s);
+    let (got, want) = (volume(&s), shell_volume_open(&["+y", "-x"]));
+    assert!((got - want).abs() < 1e-9, "shell volume {got}, want {want}");
+    // A normal that tells the two faces apart no better than the point did is still refused.
+    let mut s = box_60_40_30();
+    let err = s
+        .execute("solid.shell", &json!({"faces": [{"point": [30.0, 40.0, 0.0], "normal": [0.0, 1.0, -1.0]}], "thickness": 2.0}))
+        .unwrap_err()
+        .to_string();
+    assert!(err.contains("ambiguous pick at [30, 40, 0]"), "{err}");
+}
+
+/// Faces given by name are never ambiguous, and the reply lists the names it used.
+#[test]
+fn shell_by_face_names_lists_the_faces_used() {
+    let mut s = box_60_40_30();
+    let reply = s.execute("solid.shell", &json!({"faces": ["F1:+y", "F1:-x"], "thickness": 2.0})).unwrap_or_else(|e| panic!("{e}"));
+    assert_eq!(reply["faces_used"], json!(["F1:+y", "F1:-x"]), "{reply}");
+    sound(&s);
+    let (got, want) = (volume(&s), shell_volume_open(&["+y", "-x"]));
+    assert!((got - want).abs() < 1e-9, "shell volume {got}, want {want}");
+}
+
+/// A base plate with a wall standing on it, the wall's bottom flush with the plate's top (the
+/// tray of examples/render-studio.json, whose action-matrix drafts and shells pick such faces).
+fn tray() -> Session {
+    let mut s = Session::default();
+    run(&mut s, "solid.box", json!({"body_name": "Base", "corner": [-32, -22, 0], "length": 64, "width": 44, "height": 4}));
+    run(&mut s, "solid.box", json!({"body_name": "LeftWall", "corner": [-32, -22, 4], "length": 3, "width": 44, "height": 19}));
+    s
+}
+
+/// The tray's volume with the wall shelled 1 mm thick and the wall faces whose extents are
+/// given left open; the plate is untouched.
+fn tray_volume_open(open: &[&str]) -> f64 {
+    let side = |lo: &str, hi: &str, len: f64| len - if open.contains(&lo) { 0.0 } else { 1.0 } - if open.contains(&hi) { 0.0 } else { 1.0 };
+    64.0 * 44.0 * 4.0 + 3.0 * 44.0 * 19.0 - side("-x", "+x", 3.0) * side("-y", "+y", 44.0) * side("-z", "+z", 19.0)
+}
+
+fn tray_sound(s: &Session) {
+    let errors: Vec<_> = s.model.results.iter().filter_map(|r| r.error.clone()).collect();
+    assert!(errors.is_empty(), "{errors:?}");
+    let st = s.model.state();
+    assert_eq!(st.bodies.len(), 2, "the plate and the wall");
+    for b in &st.bodies {
+        assert!(b.body.validity().is_empty(), "{}: {:?}", b.name, b.body.validity());
+    }
+}
+
+/// A pick inside the wall's bottom face, which is flush with the plate's top, opens the wall's
+/// bottom when the command names the body, when the entry does, or when the command's other
+/// picks lie on the wall: a pick is only ambiguous between faces the operation can act on. The
+/// feature then keeps the wall as its body, so the kernel does not take the plate (first in the
+/// design, and as near by its bounds) instead.
+#[test]
+fn shell_pick_inside_a_face_flush_with_another_body_goes_to_the_operations_body() {
+    use polykrom_engine::doc::FeatureKind;
+    let bottom = json!([-30.5, 0.0, 4.0]);
+    let cases = [
+        (json!({"faces": [bottom], "thickness": 1.0, "body": "LeftWall"}), vec!["-z"]),
+        (json!({"faces": [{"point": bottom, "body": "LeftWall"}], "thickness": 1.0}), vec!["-z"]),
+        (json!({"faces": [bottom, [-30.5, 0.0, 23.0]], "thickness": 1.0}), vec!["-z", "+z"]),
+    ];
+    for (params, open) in cases {
+        let mut s = tray();
+        let reply = s.execute("solid.shell", &params).unwrap_or_else(|e| panic!("{params}: {e}"));
+        let used: Vec<String> = open.iter().map(|x| format!("F2:{x}")).collect();
+        assert_eq!(reply["faces_used"], json!(used), "{params}: {reply}");
+        assert_eq!(reply["warning"], json!(null), "{params}: {reply}");
+        match &s.doc.features.last().map(|f| &f.kind) {
+            Some(FeatureKind::Shell { body: Some(body), .. }) => assert_eq!(body.0, "LeftWall", "{params}"),
+            other => panic!("{params}: {other:?}"),
+        }
+        tray_sound(&s);
+        let (got, want) = (volume(&s), tray_volume_open(&open));
+        assert!((got - want).abs() < 1e-6, "{params}: shell volume {got}, want {want}");
+    }
+}
+
+/// The same pick alone, with no body: the operation could act on either body, so it is refused
+/// naming both bodies' faces, and the design is as it was. A pick on the wall's own edge stays
+/// ambiguous however the body is given (#297).
+#[test]
+fn shell_pick_on_a_flush_face_alone_is_ambiguous_between_the_bodies() {
+    let mut s = tray();
+    let err = s.execute("solid.shell", &json!({"faces": [[-30.5, 0.0, 4.0]], "thickness": 1.0})).unwrap_err().to_string();
+    assert!(err.contains("ambiguous pick at [-30.5, 0, 4]"), "{err}");
+    assert!(err.contains("`F1:+z` of `Base`") && err.contains("`F2:-z` of `LeftWall`"), "{err}");
+    assert_eq!(s.doc.features.len(), 2, "no feature was added");
+    let edge = json!([-32.0, 0.0, 23.0]);
+    for params in [
+        json!({"faces": [edge], "thickness": 1.0, "body": "LeftWall"}),
+        json!({"faces": [{"point": edge, "body": "LeftWall"}], "thickness": 1.0}),
+        json!({"faces": [edge, [-30.5, 0.0, 4.0]], "thickness": 1.0}),
+    ] {
+        let err = s.execute("solid.shell", &params).unwrap_err().to_string();
+        assert!(err.contains("ambiguous pick at [-32, 0, 23]") && err.contains("`F2:-x`") && err.contains("`F2:+z`"), "{params}: {err}");
+        assert!(!err.contains("`Base`"), "{params}: only the wall's faces are listed: {err}");
+    }
+    let err = s.execute("solid.shell", &json!({"faces": [{"point": [-30.5, 0.0, 4.0], "body": "Lid"}], "thickness": 1.0})).unwrap_err().to_string();
+    assert!(err.contains("no body `Lid`"), "{err}");
+    assert_eq!(s.doc.features.len(), 2, "no feature was added");
+}

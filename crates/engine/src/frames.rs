@@ -22,6 +22,12 @@ enum K {
     Pick,
     /// A list of picks: `[[x,y,z]…]` or `[{point|face|edge: [x,y,z], body?}…]`.
     Picks,
+    /// A list of face picks (`faces` of the commands that take faces, #297): as `Picks`, and a
+    /// plain point on a body becomes `{point, body, world}`: the point in the frame of the body
+    /// it lies on, that body's own name, and the point as given, so the command resolves the
+    /// face on that body alone (another component's body may coincide with it in its own frame)
+    /// and names the point as given in its errors. An entry's `normal` turns with its point.
+    Faces,
     /// A point that places new geometry: into the active component's frame.
     Make,
     /// A direction: turned with the command's frame.
@@ -55,12 +61,12 @@ fn table(id: &str) -> &'static [(&'static str, K)] {
         "solid.fillet" | "solid.chamfer" => &[("edges", Picks), ("body", Body)],
         "solid.hole" => &[("position", Pick), ("direction", Dir), ("body", Body)],
         "solid.scale" => &[("origin", Make), ("bodies", Body)],
-        "solid.offset_face" | "solid.shell" => &[("faces", Picks), ("body", Body)],
+        "solid.offset_face" | "solid.shell" => &[("faces", Faces), ("body", Body)],
         "solid.thread" => &[("face", Pick)],
         "solid.emboss" => &[("face", Make)],
-        "solid.draft" => &[("faces", Picks), ("neutral", Plane), ("pull", Dir), ("body", Body)],
+        "solid.draft" => &[("faces", Faces), ("neutral", Plane), ("pull", Dir), ("body", Body)],
         "solid.press_pull" => &[("face", Pick), ("edges", Picks)],
-        "solid.replace_face" => &[("faces", Picks), ("target_face", Pick), ("target", Plane), ("body", Body)],
+        "solid.replace_face" => &[("faces", Faces), ("target_face", Pick), ("target", Plane), ("body", Body)],
         "solid.align" => &[("from", Pick), ("from_face", Pick), ("to", Pick), ("to_face", Pick), ("bodies", Body)],
         // A mirror keeps the placement its bodies were picked at (`cmd::features::placed_bodies`);
         // its plane is in the active component, where the copies go.
@@ -131,17 +137,18 @@ fn pt(p: Vec3) -> Value {
     serde_json::json!([p.x, p.y, p.z])
 }
 
-/// The frame of the body a world point lies on (the nearest), or of the named body.
-fn frame_at(s: &Session, f: &Frames, p: Vec3, body: Option<&str>) -> Option<Mat> {
+/// The frame of the body a world point lies on (the nearest), or of the named body, with the
+/// body's own name.
+fn frame_at(s: &Session, f: &Frames, p: Vec3, body: Option<&str>) -> Option<(String, Mat)> {
     if let Some(b) = body
-        && let Some((_, _, m)) = f.bodies.iter().find(|(w, _, _)| w == b)
+        && let Some((_, own, m)) = f.bodies.iter().find(|(w, _, _)| w == b)
     {
-        return Some(*m);
+        return Some((own.clone(), *m));
     }
     let world = s.world_state();
-    let mut best: Option<(f64, Mat)> = None;
+    let mut best: Option<(f64, String, Mat)> = None;
     for wb in &world.bodies {
-        let Some((_, _, m)) = f.bodies.iter().find(|(w, _, _)| *w == wb.name) else { continue };
+        let Some((_, own, m)) = f.bodies.iter().find(|(w, _, _)| *w == wb.name) else { continue };
         let mesh = wb.mesh();
         let bb = mesh.bounds();
         let tol = (bb.diagonal() * 1e-3).max(1e-3);
@@ -155,11 +162,11 @@ fn frame_at(s: &Session, f: &Frames, p: Vec3, body: Option<&str>) -> Option<Mat>
             continue;
         }
         let d = mesh.triangles.iter().filter_map(|t| mesh.tri(t)).map(|[a, b, c]| tri_dist(p, a, b, c)).fold(f64::INFINITY, f64::min);
-        if d <= tol && best.as_ref().is_none_or(|(bd, _)| d < *bd) {
-            best = Some((d, *m));
+        if d <= tol && best.as_ref().is_none_or(|(bd, _, _)| d < *bd) {
+            best = Some((d, own.clone(), *m));
         }
     }
-    best.map(|(_, m)| m)
+    best.map(|(_, own, m)| (own, m))
 }
 
 fn tri_dist(p: Vec3, a: Vec3, b: Vec3, c: Vec3) -> f64 {
@@ -182,11 +189,42 @@ struct Mapper<'a> {
 }
 
 impl Mapper<'_> {
+    /// The frame a pick `p` maps through, with the own name of the body it lies on (when one does).
+    fn pick_frame(&mut self, p: Vec3, body: Option<&str>) -> (Option<String>, Mat) {
+        let (own, m) = if self.here {
+            (None, self.f.sketch)
+        } else {
+            frame_at(self.s, &self.f, p, body).map_or((None, self.f.active), |(own, m)| (Some(own), m))
+        };
+        self.first.get_or_insert(m);
+        (own, m)
+    }
+
     fn pick(&mut self, v: &Value, body: Option<&str>) -> Option<Value> {
         let p = vec3(v)?;
-        let m = if self.here { self.f.sketch } else { frame_at(self.s, &self.f, p, body).unwrap_or(self.f.active) };
-        self.first.get_or_insert(m);
+        let (_, m) = self.pick_frame(p, body);
         self.local_point(&m, p)
+    }
+
+    /// A plain face pick as `{point, body, world}` (see [`K::Faces`]); unchanged where no body
+    /// is under it.
+    fn face_pick(&mut self, v: &Value, body: Option<&str>) -> Option<Value> {
+        let p = vec3(v)?;
+        let (own, m) = self.pick_frame(p, body);
+        let own = own?;
+        let mut o = Map::new();
+        match self.local_point(&m, p) {
+            Some(local) => {
+                o.insert("point".into(), local);
+                o.insert("world".into(), v.clone());
+            }
+            None => {
+                o.insert("point".into(), v.clone());
+            }
+        }
+        o.insert("body".into(), Value::String(own));
+        self.changed = true;
+        Some(Value::Object(o))
     }
 
     fn local_point(&mut self, m: &Mat, p: Vec3) -> Option<Value> {
@@ -222,33 +260,69 @@ impl Mapper<'_> {
         Some(serde_json::json!(p))
     }
 
-    fn dir(&mut self, v: &Value) -> Option<Value> {
-        let d = vec3(v)?;
-        let m = self.first.unwrap_or(self.f.active);
-        if is_identity(&m) {
+    /// A direction turned into the frame `m` (no translation).
+    fn local_dir(&mut self, m: &Mat, d: Vec3) -> Option<Value> {
+        if is_identity(m) {
             return None;
         }
-        let inv = mat_inverse(&m)?;
+        let inv = mat_inverse(m)?;
         self.changed = true;
         Some(pt(apply_vector(&inv, d)))
     }
 
-    /// A list of picks (points, or objects holding one).
-    fn picks(&mut self, v: &Value, body: Option<&str>) -> Option<Value> {
+    fn dir(&mut self, v: &Value) -> Option<Value> {
+        let d = vec3(v)?;
+        let m = self.first.unwrap_or(self.f.active);
+        self.local_dir(&m, d)
+    }
+
+    /// A list of picks (points, or objects holding one). With `faces`, a plain point becomes
+    /// `{point, body, world}` and an object names its body too (see [`K::Faces`]).
+    fn picks(&mut self, v: &Value, body: Option<&str>, faces: bool) -> Option<Value> {
         match v {
-            Value::Array(a) if vec3(v).is_some() && a.iter().all(Value::is_number) => self.pick(v, body),
+            Value::Array(a) if vec3(v).is_some() && a.iter().all(Value::is_number) => {
+                if faces {
+                    self.face_pick(v, body)
+                } else {
+                    self.pick(v, body)
+                }
+            }
             Value::Array(a) => {
-                let out: Vec<Value> = a.iter().map(|x| self.picks(x, body).unwrap_or_else(|| x.clone())).collect();
+                let out: Vec<Value> = a.iter().map(|x| self.picks(x, body, faces).unwrap_or_else(|| x.clone())).collect();
                 Some(Value::Array(out))
             }
             Value::Object(o) => {
                 let b = o.get("body").and_then(Value::as_str).map(str::to_string);
                 let mut m = o.clone();
+                // The frame of the object's point (its first), with the own name of the body under it.
+                let mut frame: Option<(Option<String>, Mat)> = None;
                 for k in ["point", "face", "edge", "vertex", "at"] {
                     if let Some(x) = o.get(k)
-                        && let Some(y) = self.pick(x, b.as_deref().or(body))
+                        && let Some(p) = vec3(x)
                     {
-                        m.insert(k.into(), y);
+                        let (own, mat) = self.pick_frame(p, b.as_deref().or(body));
+                        if let Some(y) = self.local_point(&mat, p) {
+                            m.insert(k.into(), y);
+                            if faces && k == "point" {
+                                m.insert("world".into(), x.clone());
+                            }
+                        }
+                        frame.get_or_insert((own, mat));
+                    }
+                }
+                if let Some((own, mat)) = &frame {
+                    // A face's `normal` turns with its point: a direction, so no translation.
+                    if let Some(n) = o.get("normal").and_then(vec3)
+                        && let Some(y) = self.local_dir(mat, n)
+                    {
+                        m.insert("normal".into(), y);
+                    }
+                    if faces
+                        && b.is_none()
+                        && let Some(own) = own
+                    {
+                        m.insert("body".into(), Value::String(own.clone()));
+                        self.changed = true;
                     }
                 }
                 if let Some(bn) = &b
@@ -423,13 +497,14 @@ pub fn to_local(s: &Session, id: &str, params: &Value) -> Option<Value> {
     for pass in [true, false] {
         for (k, kind) in keys {
             let Some(v) = obj.get(*k) else { continue };
-            let is_pick = matches!(kind, Pick | Picks | Plane | Here | HerePlane);
+            let is_pick = matches!(kind, Pick | Picks | Faces | Plane | Here | HerePlane);
             if is_pick != pass {
                 continue;
             }
             let new = match kind {
                 Pick => m.pick(v, body.as_deref()),
-                Picks => m.picks(v, body.as_deref()),
+                Picks => m.picks(v, body.as_deref(), false),
+                Faces => m.picks(v, body.as_deref(), true),
                 Make => m.make(v),
                 Dir => m.dir(v),
                 Axis => {
@@ -460,7 +535,7 @@ pub fn to_local(s: &Session, id: &str, params: &Value) -> Option<Value> {
                     }
                     m.here = true;
                     // Body names stay: the sketch's view of the model keeps them.
-                    let r = if *kind == HerePlane { m.plane(v) } else { m.picks(v, None) };
+                    let r = if *kind == HerePlane { m.plane(v) } else { m.picks(v, None, false) };
                     m.here = false;
                     m.f.sketch = keep;
                     r

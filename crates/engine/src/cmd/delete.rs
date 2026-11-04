@@ -320,9 +320,12 @@ mod tests {
     fn faces_alone_are_refused_and_hostile_input_too() {
         let (mut s, _) = part();
         let b = s.model.state().bodies[0].name.clone();
-        let e = s.execute("selection.delete", &json!({"items": [{"type": "face", "body": b, "index": 0, "point": [0, 0, 0]}]})).unwrap_err();
+        let e = s.execute("selection.delete", &json!({"items": [{"type": "face", "body": b, "index": 0, "point": [5, 0, 2.5]}]})).unwrap_err();
         // A side of the part its neighbours can't close: Delete Face refuses it.
         assert!(e.to_string().contains("Delete Face"), "{e}");
+        // A corner, where three faces meet, is an ambiguous pick (#297).
+        let e = s.execute("selection.delete", &json!({"items": [{"type": "face", "body": b, "index": 0, "point": [0, 0, 0]}]})).unwrap_err();
+        assert!(e.to_string().contains("ambiguous pick at [0, 0, 0]"), "{e}");
         for p in [
             json!({}),
             json!({"items": "x"}),

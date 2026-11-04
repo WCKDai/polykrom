@@ -90,6 +90,7 @@ fn feature_result_serializes_like_the_old_reply() {
             ms,
             param_warnings: vec![],
             warnings: vec![],
+            faces_used: None,
         };
         assert_eq!(serde_json::to_value(&new).ok(), Some(old));
     }
@@ -109,6 +110,7 @@ fn warnings_with_a_kind_serialize_for_programs() {
         warning: Some("Hole1 has no effect: `Plate` is unchanged".into()),
         ms: None,
         param_warnings: vec![],
+        faces_used: None,
         warnings: vec![super::FeatureWarning {
             kind: super::WarningKind::NoEffect,
             feature: "Hole1".into(),

@@ -37,7 +37,7 @@ pub static COMMANDS: &[CommandSpec] = &[
     CommandSpec::new("solid.replace_face", "Replace Face", replace_face)
         .at("SOLID", "MODIFY")
         .icon("replace_face")
-        .params("faces: [[x,y,z] points on planar faces, or face names from model.faces]; target: plane (XY|XZ|YZ|construction plane|{origin, normal}) | target_face: [x,y,z] on a parallel planar face; body?"),
+        .params("faces: [[x,y,z] points on planar faces, {point: [x,y,z], normal?: [x,y,z] (the face's outward normal, settling a point on an edge), body?: name (the body whose face it is, where bodies touch flush)}, or face names from model.faces]; target: plane (XY|XZ|YZ|construction plane|{origin, normal}) | target_face: [x,y,z] on a parallel planar face; body?"),
     CommandSpec::new("solid.align", "Align", align)
         .at("SOLID", "MODIFY")
         .icon("align")
@@ -345,17 +345,20 @@ fn infer_emboss_selection(
     }
     Ok(chosen)
 }
-fn face_points(s: &Session, p: &Value, k: &str, cmd: &str) -> Result<Vec<Vec3>> {
+/// A command's face list `k` (1…1000 points or face names), resolved to faces before the
+/// feature is added (#297): the reply then lists `faces_used`.
+fn face_points(s: &Session, p: &Value, k: &str, cmd: &str) -> Result<super::face::PickedFaces> {
     let a = p.get(k).and_then(Value::as_array).ok_or_else(|| bad(cmd, format!("`{k}` must list points [x, y, z] or face names")))?;
     if a.is_empty() || a.len() > 1000 {
         return Err(bad(cmd, format!("`{k}` must list 1…1000 points")));
     }
-    a.iter().map(|v| super::face::face_ref(s, v, str_(p, "body"), cmd)).collect()
+    super::face::picked_faces(s, a, str_(p, "body"), cmd)
 }
 
 fn replace_face(s: &mut Session, p: &Value) -> Result<Value> {
     let cmd = "solid.replace_face";
-    let faces = face_points(s, p, "faces", cmd)?;
+    let picked = face_points(s, p, "faces", cmd)?;
+    let faces = picked.points.clone();
     for f in &faces {
         if super::face::face_normal(s, *f).is_none() {
             return Err(bad(cmd, "not supported yet: replacing a face that is not planar"));
@@ -369,8 +372,8 @@ fn replace_face(s: &mut Session, p: &Value) -> Result<Value> {
         }
         None => plane_param(s, p.get("target"), cmd)?,
     };
-    let body = str_(p, "body").map(str::to_string);
-    add_feature(s, p, FeatureKind::ReplaceFace { faces: faces.into_iter().map(FacePick).collect(), target, body: body.map(BodyName) })
+    let body = picked.feature_body(str_(p, "body"));
+    picked.into_reply(add_feature(s, p, FeatureKind::ReplaceFace { faces: faces.into_iter().map(FacePick).collect(), target, body }))
 }
 
 fn align(s: &mut Session, p: &Value) -> Result<Value> {

@@ -2317,3 +2317,105 @@ fn combine_takes_bodies_clicked_in_the_browser_in(layout: &str, control: bool) {
     assert_eq!(d.inputs[0].items, vec![Sel::Body { name: "Block".into() }], "{layout} control={control} target: {:?}", d.inputs);
     assert_eq!(d.inputs[1].items, vec![Sel::Body { name: "Cutter".into() }], "{layout} control={control} tools: {:?}", d.inputs);
 }
+
+/// Two blocks side by side, and A's +x face, where B touches it: inside it, B's -x face is as
+/// near.
+fn touching_blocks() -> (crate::scenario::Harness, Sel) {
+    let mut h = crate::scenario::Harness::new();
+    h.app.run("solid.box", json!({"body_name": "A", "length": 20, "width": 20, "height": 20})).unwrap();
+    h.app.run("solid.box", json!({"body_name": "B", "corner": [20, 0, 0], "length": 20, "width": 20, "height": 20})).unwrap();
+    let c = Vec3::new(20.0, 10.0, 10.0);
+    let st = h.app.session.world_state();
+    let f = st.body("A").unwrap().body.faces(0.01).unwrap().into_iter().find(|f| f.centroid.dist(c) < 1e-6).unwrap();
+    (h, Sel::Face { body: "A".into(), index: f.index, point: c })
+}
+
+fn press_ok(h: &mut crate::scenario::Harness) {
+    h.frames(2);
+    h.step(&json!({"widget": "OK"})).unwrap();
+    for _ in 0..200 {
+        if h.app.dialog.is_none() {
+            break;
+        }
+        h.frames(1);
+    }
+    assert!(h.app.dialog.is_none(), "{:?} {:?}", h.app.preview.error, h.app.dialog.as_ref().map(|d| (&d.error, &d.inputs)));
+}
+
+fn body_volume(h: &crate::scenario::Harness, body: &str) -> f64 {
+    polykrom_engine::doc::kernel::measure(&h.app.session.model.state().body(body).unwrap().body).unwrap().volume
+}
+
+/// (#297) Shell and Draft send each picked face with its body: a face flush with another body's
+/// face is the selection's body's, not an ambiguous pick, and the feature acts on that body.
+#[test]
+fn shell_and_draft_send_each_picked_face_with_its_body() {
+    use polykrom_engine::doc::FeatureKind;
+    let (mut h, side) = touching_blocks();
+    start(&mut h.app, vec![side.clone()], "solid.shell");
+    if let Some(Kind::Shell { thickness }) = h.app.dialog.as_mut().map(|d| &mut d.kind) {
+        *thickness = "2".into();
+    }
+    let (cmd, p) = apply_commands(&h.app, h.app.dialog.as_ref().unwrap()).unwrap().remove(0);
+    assert_eq!((cmd.as_str(), &p["faces"]), ("solid.shell", &json!([{"point": [20.0, 10.0, 10.0], "body": "A"}])));
+    press_ok(&mut h);
+    assert!(h.app.session.model.results.iter().all(|r| r.error.is_none()), "{:?}", h.app.session.model.results);
+    match &h.app.session.doc.features.last().unwrap().kind {
+        FeatureKind::Shell { body, .. } => assert_eq!(body.as_ref().map(|b| b.0.as_str()), Some("A")),
+        k => panic!("{k:?}"),
+    }
+    // A's +x face open, 2 mm walls; B untouched.
+    assert!((body_volume(&h, "A") - (8000.0 - 16.0 * 16.0 * 18.0)).abs() < 1e-6, "{}", body_volume(&h, "A"));
+    assert!((body_volume(&h, "B") - 8000.0).abs() < 1e-6);
+
+    let (mut h, side) = touching_blocks();
+    start(&mut h.app, vec![side], "solid.draft");
+    if let Some(d) = h.app.dialog.as_mut() {
+        d.inputs[1].items = vec![Sel::Plane { name: "XY".into() }];
+        if let Kind::Draft { angle } = &mut d.kind {
+            *angle = "5".into();
+        }
+    }
+    let (cmd, p) = apply_commands(&h.app, h.app.dialog.as_ref().unwrap()).unwrap().remove(0);
+    assert_eq!((cmd.as_str(), &p["faces"], &p["neutral"]), ("solid.draft", &json!([{"point": [20.0, 10.0, 10.0], "body": "A"}]), &json!("XY")));
+    press_ok(&mut h);
+    assert!(h.app.session.model.results.iter().all(|r| r.error.is_none()), "{:?}", h.app.session.model.results);
+    match &h.app.session.doc.features.last().unwrap().kind {
+        FeatureKind::Draft { body, .. } => assert_eq!(body.as_ref().map(|b| b.0.as_str()), Some("A")),
+        k => panic!("{k:?}"),
+    }
+    assert!((body_volume(&h, "A") - 8000.0).abs() > 1.0, "A's side was drafted: {}", body_volume(&h, "A"));
+    assert!((body_volume(&h, "B") - 8000.0).abs() < 1e-6);
+}
+
+/// (#297) Offset Face, Delete Face and Replace Face send each picked face with its body too: a
+/// face flush with another body's is not refused as an ambiguous pick from the desktop.
+#[test]
+fn offset_delete_and_replace_face_send_each_picked_face_with_its_body() {
+    let picked = json!([{"point": [20.0, 10.0, 10.0], "body": "A"}]);
+    let (mut h, side) = touching_blocks();
+    start(&mut h.app, vec![side.clone()], "solid.offset_face");
+    if let Some(Kind::OffsetFaces { distance }) = h.app.dialog.as_mut().map(|d| &mut d.kind) {
+        *distance = "-2".into();
+    }
+    let (cmd, p) = apply_commands(&h.app, h.app.dialog.as_ref().unwrap()).unwrap().remove(0);
+    assert_eq!((cmd.as_str(), &p["faces"]), ("solid.offset_face", &picked));
+    press_ok(&mut h);
+    assert!(h.app.session.model.results.iter().all(|r| r.error.is_none()), "{:?}", h.app.session.model.results);
+    // A's +x face moved in by 2 mm; B untouched.
+    assert!((body_volume(&h, "A") - (8000.0 - 2.0 * 400.0)).abs() < 1e-6, "{}", body_volume(&h, "A"));
+    assert!((body_volume(&h, "B") - 8000.0).abs() < 1e-6);
+
+    let (mut h, side) = touching_blocks();
+    start(&mut h.app, vec![side.clone()], "face.delete");
+    let (cmd, p) = apply_commands(&h.app, h.app.dialog.as_ref().unwrap()).unwrap().remove(0);
+    assert_eq!((cmd.as_str(), &p["faces"]), ("face.delete", &picked));
+
+    let (mut h, side) = touching_blocks();
+    start(&mut h.app, vec![side], "solid.replace_face");
+    if let Some(d) = h.app.dialog.as_mut() {
+        d.inputs[1].items = vec![Sel::Plane { name: "YZ".into() }];
+    }
+    let (cmd, p) = apply_commands(&h.app, h.app.dialog.as_ref().unwrap()).unwrap().remove(0);
+    assert_eq!((cmd.as_str(), &p["faces"], &p["target"]), ("solid.replace_face", &picked, &json!("YZ")));
+}
