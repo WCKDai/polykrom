@@ -3262,6 +3262,17 @@ fn dialog_commands(app: &SolveApp, d: &Dialog) -> Result<Vec<(String, Value)>, S
         (ps.first().map(|x| json!(x.0)).unwrap_or(Value::Null), json!(ps.iter().map(|x| x.1).collect::<Vec<_>>()))
     };
     let face_points = |i: usize| -> Vec<Value> { sels(d, i).face_points().into_iter().map(pt).collect() };
+    // Each picked face with its body (#297): a face flush with another body's face is the
+    // selection's body's, not an ambiguous pick.
+    let face_picks = |i: usize| -> Vec<Value> {
+        sels(d, i)
+            .iter()
+            .filter_map(|x| match x {
+                Sel::Face { body, point, .. } => Some(json!({"point": pt(*point), "body": body})),
+                _ => None,
+            })
+            .collect()
+    };
     let (cmd, params): (&str, Value) = match &d.kind {
         Kind::Extrude {
             distance,
@@ -3465,13 +3476,13 @@ fn dialog_commands(app: &SolveApp, d: &Dialog) -> Result<Vec<(String, Value)>, S
         }
         Kind::Shell { .. } => {
             need(0, "faces to remove")?;
-            ("solid.shell", json!({"faces": face_points(0)}))
+            ("solid.shell", json!({"faces": face_picks(0)}))
         }
         Kind::Draft { .. } => {
             need(0, "faces")?;
             need(1, "the neutral plane")?;
             let neutral = plane_value(s, sels(d, 1).first()).ok_or("the neutral plane must be a plane or a planar face")?;
-            ("solid.draft", json!({"faces": face_points(0), "neutral": neutral}))
+            ("solid.draft", json!({"faces": face_picks(0), "neutral": neutral}))
         }
         Kind::Mirror => {
             need(0, "objects")?;
