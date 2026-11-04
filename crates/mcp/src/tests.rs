@@ -158,6 +158,7 @@ fn handshake_and_tools_list() {
         "undo",
         "redo",
         "propose",
+        "propose_candidates",
         "apply_proposal",
         "crash_reports",
         "skill_reference",
@@ -3126,4 +3127,95 @@ fn applying_a_stale_proposal_is_refused() {
     }
     assert_eq!(raw_tool(&mut s, "apply_proposal", json!({"proposal": "nope"}))["result"]["isError"], json!(true));
     assert_eq!(volume(&mut s), v);
+}
+
+/// Several candidates for one intent, proposed through the tool layer, come back exactly as the
+/// engine commands report them (ids, volumes, masses, boxes, IoUs); applying one is one undo
+/// step and drops the others.
+#[test]
+fn propose_candidates_then_apply_matches_the_engine_commands() {
+    let plate = json!({"length": 40, "width": 30, "height": 10, "body_name": "Plate"});
+    let hole = |d: f64| json!({"command": "solid.cylinder", "params": {"diameter": d, "height": 10, "base": [20, 15, 0], "operation": "cut", "targets": ["Plate"]}});
+    let candidates = json!({"label": "Centre hole", "candidates": [
+        // A tool's name works as a step, as in `batch` and `propose`.
+        {"label": "Ø4", "commands": [{"command": "execute", "params": hole(4.0)}]},
+        {"label": "Ø6", "commands": [hole(6.0)]},
+        {"label": "Ø8", "commands": [hole(8.0)]},
+    ]});
+    // The engine commands on a session of their own.
+    let mut e = polykrom_engine::Session::default();
+    e.execute("solid.box", &plate).unwrap();
+    let engine_candidates = {
+        let mut set = candidates.clone();
+        set["candidates"][0]["commands"] = json!([hole(4.0)]);
+        set
+    };
+    let want = e.execute("engine.propose_candidates", &engine_candidates).unwrap();
+
+    let mut s = server();
+    tool(&mut s, "execute", json!({"command": "solid.box", "params": plate}));
+    let v0 = volume(&mut s);
+    let undo0 = tool(&mut s, "inspect_design", json!({}))["undo"].clone();
+    let got = tool(&mut s, "propose_candidates", candidates);
+    assert_eq!(got["set"], want["set"]);
+    assert_eq!(got["label"], "Centre hole");
+    assert_eq!(got["current"], want["current"]);
+    // The same candidates, but for the evaluation times (each candidate's `ms`, each step reply's).
+    fn without_ms(v: &mut Value) {
+        match v {
+            Value::Object(o) => {
+                o.remove("ms");
+                o.values_mut().for_each(without_ms);
+            }
+            Value::Array(a) => a.iter_mut().for_each(without_ms),
+            _ => {}
+        }
+    }
+    let strip = |v: &Value| -> Vec<Value> {
+        let mut cs = v["candidates"].clone();
+        without_ms(&mut cs);
+        cs.as_array().expect("candidates").clone()
+    };
+    let (got_cs, want_cs) = (strip(&got), strip(&want));
+    assert_eq!(got_cs.len(), 3);
+    assert_eq!(got_cs, want_cs);
+    for c in &got_cs {
+        assert_eq!(c["valid"], true, "{c}");
+        assert!(c["proposal"].as_str().is_some_and(|id| id.starts_with("prop-")), "{c}");
+        assert!(c["compare"]["iou"].as_f64().is_some_and(|iou| iou > 0.9 && iou < 1.0), "{c}");
+        assert!(c["totals"]["mass_g"].as_f64().is_some_and(|m| m > 0.0), "{c}");
+        let top = c["bodies"][0]["bbox"]["max"].as_array().expect("a box");
+        assert!(top.iter().zip([40.0, 30.0, 10.0]).all(|(v, want)| (v.as_f64().unwrap() - want).abs() < 1e-9), "{c}");
+    }
+    // Nothing happened to the design.
+    assert_eq!(volume(&mut s), v0);
+    assert_eq!(tool(&mut s, "inspect_design", json!({}))["undo"], undo0);
+
+    // Apply the middle one: one undo step, the others dropped, as the engine does it.
+    let chosen = got_cs[1]["proposal"].clone();
+    let a = tool(&mut s, "apply_proposal", json!({"proposal": chosen}));
+    let want_a = e.execute("engine.apply_proposal", &json!({"proposal": chosen})).unwrap();
+    assert_eq!(a, want_a, "{a}");
+    assert_eq!(a["applied"], true);
+    assert_eq!(a["dropped"], json!([got_cs[0]["proposal"], got_cs[2]["proposal"]]));
+    assert_eq!(volume(&mut s), got_cs[1]["totals"]["volume_mm3"].as_f64().unwrap());
+    assert_eq!(tool(&mut s, "inspect_design", json!({}))["undo"].as_u64().unwrap(), undo0.as_u64().unwrap() + 1);
+    let r = raw_tool(&mut s, "apply_proposal", json!({"proposal": got_cs[0]["proposal"]}));
+    assert_eq!(r["result"]["isError"], json!(true), "{r}");
+    let err: Value = serde_json::from_str(r["result"]["content"][0]["text"].as_str().unwrap()).expect("a JSON object");
+    assert_eq!(err["code"], "stale_proposal", "{err}");
+    tool(&mut s, "undo", json!({}));
+    assert_eq!(volume(&mut s), v0);
+
+    // A set needs two candidates, each a design edit; a set is not a batch step.
+    for args in [
+        json!({"candidates": [{"commands": [hole(6.0)]}]}),
+        json!({"candidates": [{"commands": [hole(6.0)]}, {"commands": [{"command": "measure"}]}]}),
+        json!({"candidates": [{"commands": [hole(6.0)]}, {"commands": [{"command": "inspect.measure"}]}]}),
+    ] {
+        assert_eq!(raw_tool(&mut s, "propose_candidates", args.clone())["result"]["isError"], json!(true), "{args}");
+    }
+    let r = raw_tool(&mut s, "batch", json!({"commands": [{"command": "propose_candidates", "params": {"candidates": []}}]}));
+    assert_eq!(r["result"]["isError"], json!(true), "{r}");
+    assert_eq!(volume(&mut s), v0);
 }
