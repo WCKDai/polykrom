@@ -1764,7 +1764,8 @@ fn circle(points: &[Vec3], axis_dir: Option<Vec3>, tol: f64) -> Option<Circle> {
             }
             d
         }
-        None => normal,
+        // The three points' normal depends on their order; the same circle gets the same axis.
+        None => upward(normal),
     };
     let center = a + (v * u.len2() - u * v.len2()).cross(w) / (2.0 * w.len2());
     let radius = center.dist(a);
@@ -1782,15 +1783,33 @@ fn circle(points: &[Vec3], axis_dir: Option<Vec3>, tol: f64) -> Option<Circle> {
         })
         .collect();
     angles.sort_by(f64::total_cmp);
-    let steps: Vec<f64> = angles.windows(2).filter_map(|w| w.first().zip(w.get(1)).map(|(a, b)| b - a)).collect();
-    let step = *steps.first()?;
+    // The steps between neighbours around the circle, the one from the last member back to the
+    // first included: the members are equally stepped, with at most one larger gap (a partial
+    // arc; none on a full circle), whichever member the angles were measured from.
+    let mut steps: Vec<f64> = angles.windows(2).filter_map(|w| w.first().zip(w.get(1)).map(|(a, b)| b - a)).collect();
+    steps.push(TAU - (angles.last()? - angles.first()?));
+    let step = steps.iter().copied().fold(f64::INFINITY, f64::min);
     let ang_tol = tol / radius.max(tol);
-    if steps.iter().any(|s| (s - step).abs() > ang_tol) {
+    if !(step > ang_tol) {
         return None;
     }
-    let wrap = TAU - (angles.last()? - angles.first()?);
-    let full = (wrap - step).abs() < ang_tol;
-    Some(Circle { center, axis, radius, step, full })
+    let larger = steps.iter().filter(|s| (*s - step).abs() > ang_tol).count();
+    if larger > 1 {
+        return None;
+    }
+    Some(Circle { center, axis, radius, step, full: larger == 0 })
+}
+
+/// `v` or its reverse, whichever points up (+z; then +y, then +x when level).
+fn upward(v: Vec3) -> Vec3 {
+    let up = if v.z.abs() > ANG {
+        v.z > 0.0
+    } else if v.y.abs() > ANG {
+        v.y > 0.0
+    } else {
+        v.x >= 0.0
+    };
+    if up { v } else { -v }
 }
 
 fn patterns(t: &Topo, features: &[Feature]) -> Vec<Value> {
