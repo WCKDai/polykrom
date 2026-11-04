@@ -1,0 +1,696 @@
+{
+  "source": {
+    "id": "4:40",
+    "name": "Polykrom / Brand / Supplied icon",
+    "fileKey": "s7EddZNQds492PBiNVbcYs",
+    "pageId": "2:5",
+    "category": "components"
+  },
+  "paintIndexNote": "node.fill and node.stroke are indices into paints",
+  "nodes": [
+    {
+      "id": "4:40",
+      "parent": "2:5",
+      "type": "COMPONENT",
+      "name": "Polykrom / Brand / Supplied icon",
+      "x": 80,
+      "y": 80,
+      "width": 64,
+      "height": 64,
+      "sizing": [
+        "FIXED",
+        "FIXED"
+      ]
+    },
+    {
+      "id": "4:41",
+      "parent": "4:40",
+      "type": "FRAME",
+      "name": "Frame",
+      "x": 0,
+      "y": 0,
+      "width": 64,
+      "height": 64,
+      "fill": 0,
+      "sizing": [
+        "FIXED",
+        "FIXED"
+      ]
+    },
+    {
+      "id": "4:42",
+      "parent": "4:41",
+      "type": "GROUP",
+      "name": "Group",
+      "x": 0,
+      "y": 0,
+      "width": 54.64,
+      "height": 58.15,
+      "sizing": [
+        "FIXED",
+        "FIXED"
+      ]
+    },
+    {
+      "id": "4:43",
+      "parent": "4:42",
+      "type": "GROUP",
+      "name": "Group",
+      "x": 0,
+      "y": 0,
+      "width": 0,
+      "height": 0,
+      "sizing": [
+        "FIXED",
+        "FIXED"
+      ]
+    },
+    {
+      "id": "4:44",
+      "parent": "4:43",
+      "type": "VECTOR",
+      "name": "Vector",
+      "x": 0,
+      "y": 0,
+      "width": 63.96,
+      "height": 63.96,
+      "visible": false,
+      "fill": 1,
+      "sizing": [
+        "FIXED",
+        "FIXED"
+      ]
+    },
+    {
+      "id": "4:45",
+      "parent": "4:42",
+      "type": "GROUP",
+      "name": "Polykrom",
+      "x": 9.32,
+      "y": 5.81,
+      "width": 45.32,
+      "height": 52.33,
+      "sizing": [
+        "FIXED",
+        "FIXED"
+      ]
+    },
+    {
+      "id": "4:46",
+      "parent": "4:45",
+      "type": "GROUP",
+      "name": "Group",
+      "x": 24.43,
+      "y": 5.81,
+      "width": 15.11,
+      "height": 17.44,
+      "sizing": [
+        "FIXED",
+        "FIXED"
+      ]
+    },
+    {
+      "id": "4:47",
+      "parent": "4:46",
+      "type": "VECTOR",
+      "name": "Vector",
+      "x": 24.43,
+      "y": 5.81,
+      "width": 15.11,
+      "height": 17.44,
+      "fill": 2,
+      "sizing": [
+        "FIXED",
+        "FIXED"
+      ]
+    },
+    {
+      "id": "4:48",
+      "parent": "4:45",
+      "type": "GROUP",
+      "name": "Group",
+      "x": 24.43,
+      "y": 23.26,
+      "width": 15.11,
+      "height": 17.44,
+      "sizing": [
+        "FIXED",
+        "FIXED"
+      ]
+    },
+    {
+      "id": "4:49",
+      "parent": "4:48",
+      "type": "VECTOR",
+      "name": "Vector",
+      "x": 24.43,
+      "y": 23.26,
+      "width": 15.11,
+      "height": 17.44,
+      "fill": 3,
+      "sizing": [
+        "FIXED",
+        "FIXED"
+      ]
+    },
+    {
+      "id": "4:50",
+      "parent": "4:45",
+      "type": "GROUP",
+      "name": "Group",
+      "x": 24.43,
+      "y": 40.7,
+      "width": 15.11,
+      "height": 17.44,
+      "sizing": [
+        "FIXED",
+        "FIXED"
+      ]
+    },
+    {
+      "id": "4:51",
+      "parent": "4:50",
+      "type": "VECTOR",
+      "name": "Vector",
+      "x": 24.43,
+      "y": 40.7,
+      "width": 15.11,
+      "height": 17.44,
+      "fill": 4,
+      "sizing": [
+        "FIXED",
+        "FIXED"
+      ]
+    },
+    {
+      "id": "4:52",
+      "parent": "4:45",
+      "type": "GROUP",
+      "name": "Group",
+      "x": 39.53,
+      "y": 14.54,
+      "width": 15.11,
+      "height": 17.44,
+      "sizing": [
+        "FIXED",
+        "FIXED"
+      ]
+    },
+    {
+      "id": "4:53",
+      "parent": "4:52",
+      "type": "VECTOR",
+      "name": "Vector",
+      "x": 39.53,
+      "y": 14.54,
+      "width": 15.11,
+      "height": 17.44,
+      "fill": 5,
+      "sizing": [
+        "FIXED",
+        "FIXED"
+      ]
+    },
+    {
+      "id": "4:54",
+      "parent": "4:45",
+      "type": "GROUP",
+      "name": "Group",
+      "x": 39.53,
+      "y": 31.98,
+      "width": 15.11,
+      "height": 17.44,
+      "sizing": [
+        "FIXED",
+        "FIXED"
+      ]
+    },
+    {
+      "id": "4:55",
+      "parent": "4:54",
+      "type": "VECTOR",
+      "name": "Vector",
+      "x": 39.53,
+      "y": 31.98,
+      "width": 15.11,
+      "height": 17.44,
+      "fill": 6,
+      "sizing": [
+        "FIXED",
+        "FIXED"
+      ]
+    },
+    {
+      "id": "4:56",
+      "parent": "4:45",
+      "type": "GROUP",
+      "name": "Group",
+      "x": 9.32,
+      "y": 31.98,
+      "width": 15.11,
+      "height": 17.44,
+      "sizing": [
+        "FIXED",
+        "FIXED"
+      ]
+    },
+    {
+      "id": "4:57",
+      "parent": "4:56",
+      "type": "VECTOR",
+      "name": "Vector",
+      "x": 9.32,
+      "y": 31.98,
+      "width": 15.11,
+      "height": 17.44,
+      "fill": 7,
+      "sizing": [
+        "FIXED",
+        "FIXED"
+      ]
+    },
+    {
+      "id": "4:58",
+      "parent": "4:45",
+      "type": "GROUP",
+      "name": "Group",
+      "x": 9.32,
+      "y": 14.54,
+      "width": 15.11,
+      "height": 17.44,
+      "sizing": [
+        "FIXED",
+        "FIXED"
+      ]
+    },
+    {
+      "id": "4:59",
+      "parent": "4:58",
+      "type": "VECTOR",
+      "name": "Vector",
+      "x": 9.32,
+      "y": 14.54,
+      "width": 15.11,
+      "height": 17.44,
+      "fill": 8,
+      "sizing": [
+        "FIXED",
+        "FIXED"
+      ]
+    }
+  ],
+  "paints": [
+    [
+      {
+        "type": "SOLID",
+        "visible": false,
+        "opacity": 1,
+        "blendMode": "NORMAL",
+        "color": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "boundVariables": {}
+      }
+    ],
+    [
+      {
+        "type": "SOLID",
+        "visible": true,
+        "opacity": 1,
+        "blendMode": "NORMAL",
+        "color": {
+          "r": 1,
+          "g": 1,
+          "b": 1
+        },
+        "boundVariables": {}
+      }
+    ],
+    [
+      {
+        "type": "GRADIENT_LINEAR",
+        "visible": true,
+        "opacity": 1,
+        "blendMode": "NORMAL",
+        "gradientStops": [
+          {
+            "color": {
+              "r": 0.8784313797950745,
+              "g": 1,
+              "b": 0.1882352977991104,
+              "a": 1
+            },
+            "position": 0,
+            "boundVariables": {}
+          },
+          {
+            "color": {
+              "r": 0.43921568989753723,
+              "g": 0.8705882430076599,
+              "b": 0.09019608050584793,
+              "a": 1
+            },
+            "position": 0.5,
+            "boundVariables": {}
+          },
+          {
+            "color": {
+              "r": 0,
+              "g": 0.7529411911964417,
+              "b": 0.6000000238418579,
+              "a": 1
+            },
+            "position": 1,
+            "boundVariables": {}
+          }
+        ],
+        "gradientTransform": [
+          [
+            -0.21428565680980682,
+            0.2857142686843872,
+            0.17857131361961365
+          ],
+          [
+            -0.2474357634782791,
+            -0.2474358230829239,
+            0.9948714971542358
+          ]
+        ]
+      }
+    ],
+    [
+      {
+        "type": "GRADIENT_LINEAR",
+        "visible": true,
+        "opacity": 1,
+        "blendMode": "NORMAL",
+        "gradientStops": [
+          {
+            "color": {
+              "r": 0.8784313797950745,
+              "g": 1,
+              "b": 0.1882352977991104,
+              "a": 1
+            },
+            "position": 0,
+            "boundVariables": {}
+          },
+          {
+            "color": {
+              "r": 0.43921568989753723,
+              "g": 0.8705882430076599,
+              "b": 0.09019608050584793,
+              "a": 1
+            },
+            "position": 0.5,
+            "boundVariables": {}
+          },
+          {
+            "color": {
+              "r": 0,
+              "g": 0.7529411911964417,
+              "b": 0.6000000238418579,
+              "a": 1
+            },
+            "position": 1,
+            "boundVariables": {}
+          }
+        ],
+        "gradientTransform": [
+          [
+            -0.21428565680980682,
+            0.2857142686843872,
+            0.46428561210632324
+          ],
+          [
+            -0.2474357634782791,
+            -0.2474358230829239,
+            0.7474356889724731
+          ]
+        ]
+      }
+    ],
+    [
+      {
+        "type": "GRADIENT_LINEAR",
+        "visible": true,
+        "opacity": 1,
+        "blendMode": "NORMAL",
+        "gradientStops": [
+          {
+            "color": {
+              "r": 0.8784313797950745,
+              "g": 1,
+              "b": 0.1882352977991104,
+              "a": 1
+            },
+            "position": 0,
+            "boundVariables": {}
+          },
+          {
+            "color": {
+              "r": 0.43921568989753723,
+              "g": 0.8705882430076599,
+              "b": 0.09019608050584793,
+              "a": 1
+            },
+            "position": 0.5,
+            "boundVariables": {}
+          },
+          {
+            "color": {
+              "r": 0,
+              "g": 0.7529411911964417,
+              "b": 0.6000000238418579,
+              "a": 1
+            },
+            "position": 1,
+            "boundVariables": {}
+          }
+        ],
+        "gradientTransform": [
+          [
+            -0.21428565680980682,
+            0.2857142686843872,
+            0.7499998807907104
+          ],
+          [
+            -0.2474357634782791,
+            -0.2474358230829239,
+            0.49999985098838806
+          ]
+        ]
+      }
+    ],
+    [
+      {
+        "type": "GRADIENT_LINEAR",
+        "visible": true,
+        "opacity": 1,
+        "blendMode": "NORMAL",
+        "gradientStops": [
+          {
+            "color": {
+              "r": 0.8784313797950745,
+              "g": 1,
+              "b": 0.1882352977991104,
+              "a": 1
+            },
+            "position": 0,
+            "boundVariables": {}
+          },
+          {
+            "color": {
+              "r": 0.43921568989753723,
+              "g": 0.8705882430076599,
+              "b": 0.09019608050584793,
+              "a": 1
+            },
+            "position": 0.5,
+            "boundVariables": {}
+          },
+          {
+            "color": {
+              "r": 0,
+              "g": 0.7529411911964417,
+              "b": 0.6000000238418579,
+              "a": 1
+            },
+            "position": 1,
+            "boundVariables": {}
+          }
+        ],
+        "gradientTransform": [
+          [
+            -0.21428565680980682,
+            0.2857142686843872,
+            0.10714274644851685
+          ],
+          [
+            -0.2474357634782791,
+            -0.2474358230829239,
+            0.6237177848815918
+          ]
+        ]
+      }
+    ],
+    [
+      {
+        "type": "GRADIENT_LINEAR",
+        "visible": true,
+        "opacity": 1,
+        "blendMode": "NORMAL",
+        "gradientStops": [
+          {
+            "color": {
+              "r": 0.8784313797950745,
+              "g": 1,
+              "b": 0.1882352977991104,
+              "a": 1
+            },
+            "position": 0,
+            "boundVariables": {}
+          },
+          {
+            "color": {
+              "r": 0.43921568989753723,
+              "g": 0.8705882430076599,
+              "b": 0.09019608050584793,
+              "a": 1
+            },
+            "position": 0.5,
+            "boundVariables": {}
+          },
+          {
+            "color": {
+              "r": 0,
+              "g": 0.7529411911964417,
+              "b": 0.6000000238418579,
+              "a": 1
+            },
+            "position": 1,
+            "boundVariables": {}
+          }
+        ],
+        "gradientTransform": [
+          [
+            -0.21428565680980682,
+            0.2857142686843872,
+            0.39285704493522644
+          ],
+          [
+            -0.2474357634782791,
+            -0.2474358230829239,
+            0.3762819468975067
+          ]
+        ]
+      }
+    ],
+    [
+      {
+        "type": "GRADIENT_LINEAR",
+        "visible": true,
+        "opacity": 1,
+        "blendMode": "NORMAL",
+        "gradientStops": [
+          {
+            "color": {
+              "r": 0.8784313797950745,
+              "g": 1,
+              "b": 0.1882352977991104,
+              "a": 1
+            },
+            "position": 0,
+            "boundVariables": {}
+          },
+          {
+            "color": {
+              "r": 0.43921568989753723,
+              "g": 0.8705882430076599,
+              "b": 0.09019608050584793,
+              "a": 1
+            },
+            "position": 0.5,
+            "boundVariables": {}
+          },
+          {
+            "color": {
+              "r": 0,
+              "g": 0.7529411911964417,
+              "b": 0.6000000238418579,
+              "a": 1
+            },
+            "position": 1,
+            "boundVariables": {}
+          }
+        ],
+        "gradientTransform": [
+          [
+            -0.21428565680980682,
+            0.2857142686843872,
+            0.8214284777641296
+          ],
+          [
+            -0.2474357634782791,
+            -0.2474358230829239,
+            0.8711535930633545
+          ]
+        ]
+      }
+    ],
+    [
+      {
+        "type": "GRADIENT_LINEAR",
+        "visible": true,
+        "opacity": 1,
+        "blendMode": "NORMAL",
+        "gradientStops": [
+          {
+            "color": {
+              "r": 0.8784313797950745,
+              "g": 1,
+              "b": 0.1882352977991104,
+              "a": 1
+            },
+            "position": 0,
+            "boundVariables": {}
+          },
+          {
+            "color": {
+              "r": 0.43921568989753723,
+              "g": 0.8705882430076599,
+              "b": 0.09019608050584793,
+              "a": 1
+            },
+            "position": 0.5,
+            "boundVariables": {}
+          },
+          {
+            "color": {
+              "r": 0,
+              "g": 0.7529411911964417,
+              "b": 0.6000000238418579,
+              "a": 1
+            },
+            "position": 1,
+            "boundVariables": {}
+          }
+        ],
+        "gradientTransform": [
+          [
+            -0.21428565680980682,
+            0.2857142686843872,
+            0.5357141494750977
+          ],
+          [
+            -0.2474357634782791,
+            -0.2474358230829239,
+            1.1185894012451172
+          ]
+        ]
+      }
+    ]
+  ]
+}
