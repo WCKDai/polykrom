@@ -1,145 +1,54 @@
 //! Stable UI rendering boundary for the icon artwork. Compiled only at L5.
 //!
-//! Command, menu, browser and timeline icons are the design kit's drawings where the kit has one
-//! ([`KIT_ICONS`]) and otherwise the SVG masters in `assets/icons/ui/design/svg`, both rendered by
-//! [`crate::icon_svg`]: colours come from the default `palette.toml` roles/accents and optional
-//! active-theme overrides, never arbitrary caller tints. An icon with no master yet draws the
-//! placeholder. The glyph, marker, navigation and pointer sources below are not command icons.
+//! Command, menu, browser and timeline icons are the SVG masters in `assets/icons/ui/design/svg`
+//! rendered by [`crate::icon_svg`]: the owner-supplied masters (`svg/supplied`, the design kit's
+//! exact vectors) where the kit has one, and the Facet drawings otherwise. Colours come from the
+//! default `palette.toml` roles/accents and optional active-theme overrides, never arbitrary
+//! caller tints. An icon with no master yet draws the placeholder. The glyph, marker, navigation
+//! and pointer sources below are not command icons.
 //!
-//! # Design-kit icons
+//! # Owner-supplied masters
 //!
-//! [`KIT_ICONS`] is the one table that maps an app icon id to a kit file in
-//! `assets/design-kit/2026-11-02/components/svg` (embedded at build time, so a missing file fails
-//! the build and `tests/kit_icons.rs` holds that every entry parses and draws). A mapped id draws
-//! the kit vector as shipped; the kit set is authoritative: Undo and Redo are the mirrored pair,
+//! `svg/supplied/<id>.svg` is the design kit's drawing for the app icon id `<id>`, byte-identical
+//! to its kit file and recorded with its source in `design/review.json` (`supplied`); the resolver
+//! gives it precedence over a Facet master of the same id, which stays as the fallback
+//! ([`icon_svg::doc_of`]). The kit set is authoritative: Undo and Redo are the mirrored pair,
 //! Rectangle and Circle the full gradient outlines, Spline and Shell the current drawings.
-//! [`KIT_FALLBACKS`] lists the ids that have a kit relative but keep their master, with the
-//! reason, and an id in neither table is unchanged: an unmapped command never changes silently.
+//! [`KIT_FALLBACKS`] lists the ids that have a supplied relative but keep their Facet drawing,
+//! with the reason (the Surface and Mesh accent variants through `facet = true` aliases); an id in
+//! neither place is unchanged. `tests/kit_icons.rs` lists the mapping from the kit's 69 glyphs and
+//! logo to the app ids and holds it.
 //!
 //! The kit's colours. The lime/green/mint gradient (`#E0FF30`, `#70DE17`, `#00C099`) marks the
 //! action, profile or control point of a drawing and is painted as shipped in every theme, finish
 //! and colour-vision mode; the geometry around it stays neutral, so the semantic accents and the
-//! tab ramps that recolour masters (`paint_accented`) never touch a kit icon. The kit's three
-//! neutral hexes are read as palette roles so themes apply: the outline `#CED3D8` is the `line`
-//! role, the face `#42474D` is `passive-2`, and the shell tone `#181B1F` is a knockout, so the
-//! surface the icon sits on shows through its cavities. On the dark theme (the kit's graphite
-//! shell) the outline and face keep the kit's exact hexes unless a theme file overrides those
-//! roles; the light theme draws them in the palette's light values. The finishes:
+//! tab ramps that recolour masters (`paint_accented`) never touch a supplied master. The kit's
+//! three neutral hexes are read as the palette roles `palette.toml`'s `[supplied-roles]` names:
+//! the outline `#CED3D8` is the `line` role, the face `#42474D` is `passive-2`, and the shell tone
+//! `#181B1F` is a knockout, so the surface the icon sits on shows through its cavities. On the dark
+//! theme (the kit's graphite shell) the outline and face keep the kit's exact hexes unless a theme
+//! file overrides those roles; the light theme draws them in the palette's light values. The
+//! finishes:
 //!
 //! - artwork (`paint_icon`, `paint_on`, `paint_accented`): as above;
 //! - ink (`paint_ink`, `paint_app_bar`, hot menu rows): outline and faces take the ink and the
 //!   gradient stays, so the application bar shows the kit's Undo, Redo and Save in its text token
-//!   with their gradient marks, as a master is flattened to the ink there;
-//! - danger (`paint_danger`): the faces shade through the constraint (red) ramp as a master's
-//!   passive faces do; outline and gradient stay.
+//!   with their gradient marks, as a Facet master is flattened to the ink there;
+//! - danger (`paint_danger`): the faces shade through the constraint (red) ramp as a Facet
+//!   master's passive faces do; outline and gradient stay.
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex, OnceLock};
+use std::sync::{Arc, Mutex};
 
 use egui::{Color32, Painter, Rect, TextureHandle, TextureOptions, pos2};
 
-use crate::icon_svg::{self, Doc, Look};
+use crate::icon_svg::{self, Look};
 
-/// A design-kit drawing for an app icon id.
-pub struct KitIcon {
-    /// The app icon id (a command, menu, browser or timeline icon name).
-    pub name: &'static str,
-    /// The kit file stem under `assets/design-kit/2026-11-02/components/svg`.
-    pub file: &'static str,
-    src: &'static str,
-}
-
-/// The kit's own colours: the outline, the face tone and the graphite shell its cavities show.
-const KIT_OUTLINE: [u8; 3] = [0xce, 0xd3, 0xd8];
-const KIT_FACE: [u8; 3] = [0x42, 0x47, 0x4d];
-const KIT_SHELL: [u8; 3] = [0x18, 0x1b, 0x1f];
-
-macro_rules! kit {
-    ($($name:literal => $file:literal),* $(,)?) => {
-        &[$(KitIcon {
-            name: $name,
-            file: $file,
-            src: include_str!(concat!("../../../assets/design-kit/2026-11-02/components/svg/", $file, ".svg")),
-        }),*]
-    };
-}
-
-/// App icon id to kit file. One entry per id that draws a kit icon; nothing else is remapped.
-pub const KIT_ICONS: &[KitIcon] = kit! {
-    // Application bar and File menu.
-    "undo" => "polykrom-icon-undo--4-62",
-    "redo" => "polykrom-icon-redo--4-67",
-    "save" => "polykrom-icon-save--4-77",
-    "open" => "polykrom-icon-open--4-192",
-    "export" => "polykrom-icon-export--4-83",
-    "settings" => "polykrom-icon-settings--4-196",
-    "assistant" => "polykrom-icon-ai-command--4-218",
-    "close" => "polykrom-icon-close--4-213",
-    "sketch_cancel" => "polykrom-icon-close--4-213",
-    "finish" => "polykrom-icon-confirm--4-209",
-    // Solid creation and modification.
-    "sketch" => "polykrom-icon-sketch--4-276",
-    "extrude" => "polykrom-icon-extrude--4-280",
-    "revolve" => "polykrom-icon-revolve--4-284",
-    "sweep" => "polykrom-icon-sweep--4-292",
-    "loft" => "polykrom-icon-loft--4-288",
-    "hole" => "polykrom-icon-hole--4-304",
-    "fillet" => "polykrom-icon-fillet--4-296",
-    "chamfer" => "polykrom-icon-chamfer--4-300",
-    "shell" => "polykrom-icon-shell--4-308",
-    "combine" => "polykrom-icon-boolean--4-324",
-    "split_body" => "polykrom-icon-split-body--20-47",
-    "split" => "polykrom-icon-split-body--20-47",
-    "offset_face" => "polykrom-icon-offset-face--20-39",
-    "move" => "polykrom-icon-move--4-93",
-    "sketch_move" => "polykrom-icon-move--4-93",
-    "copy" => "polykrom-icon-copy--20-25",
-    "mirror" => "polykrom-icon-mirror--4-316",
-    "sketch_mirror" => "polykrom-icon-mirror--4-316",
-    "pattern_rect" => "polykrom-icon-pattern--4-312",
-    "sketch_rect_pattern" => "polykrom-icon-pattern--4-312",
-    "select" => "polykrom-icon-select--4-89",
-    "measure" => "polykrom-icon-measure--4-132",
-    "section" => "polykrom-icon-section--4-336",
-    "params" => "polykrom-icon-parameters--4-120",
-    "joint" => "polykrom-icon-joint--4-320",
-    // Construction geometry.
-    "plane" => "polykrom-icon-plane--4-332",
-    "axis" => "polykrom-icon-axis--20-55",
-    "point" => "polykrom-icon-point--4-225",
-    "project" => "polykrom-icon-project--20-62",
-    // Sketch tools and constraints.
-    "line" => "polykrom-icon-line--7-2",
-    "rect" => "polykrom-icon-rectangle--4-116",
-    "circle" => "polykrom-icon-circle--4-112",
-    "arc3" => "polykrom-icon-arc--7-6",
-    "slot" => "polykrom-icon-slot--7-10",
-    "spline" => "polykrom-icon-spline--4-106",
-    "trim" => "polykrom-icon-trim--7-14",
-    "extend" => "polykrom-icon-extend--7-18",
-    "offset" => "polykrom-icon-offset--4-328",
-    "c_coincident" => "polykrom-icon-coincident--4-340",
-    "c_concentric" => "polykrom-icon-concentric--4-352",
-    "c_equal" => "polykrom-icon-equal--4-356",
-    "c_fix" => "polykrom-icon-fix--4-368",
-    "ground" => "polykrom-icon-fix--4-368",
-    "c_parallel" => "polykrom-icon-parallel--4-344",
-    "c_perpendicular" => "polykrom-icon-perpendicular--4-348",
-    "c_symmetry" => "polykrom-icon-symmetric--4-360",
-    "c_tangent" => "polykrom-icon-tangent--4-364",
-    // Browser rows, the timeline and the view.
-    "body" => "polykrom-icon-body--4-166",
-    "component" => "polykrom-icon-assembly--4-151",
-    "folder" => "polykrom-icon-folder--4-172",
-    "eye" => "polykrom-icon-visible--4-176",
-    "suppress" => "polykrom-icon-hidden--4-181",
-    "rollback" => "polykrom-icon-history--4-203",
-    "camera" => "polykrom-icon-camera--4-260",
-    "fit" => "polykrom-icon-focus--4-252",
-};
-
-/// App icon ids with a kit relative that keep their master, and why. The kit icons with no app
-/// counterpart at all (Code, Grid, Rotate, Scan, Sidebar, Move face, Link, Search, Drawing,
-/// Expand) are not drawn; see the entries below for the ids one could expect them on.
+/// App icon ids with an owner-supplied relative that keep their Facet master, and why: an alias
+/// flagged `facet = true` in `aliases.toml` draws the Facet drawing beneath the supplied master in
+/// its accent, any other id here is a Facet master of its own. The supplied glyphs with no app
+/// counterpart yet (Code, Grid, Rotate, Scan, Sidebar, Move face, Link, Drawing, Expand) are
+/// masters of their own name, reserved for the window layout; the entries below name the ids one
+/// could expect them on.
 pub const KIT_FALLBACKS: &[(&str, &str)] = &[
     ("arc_center", "the kit has one Arc; it draws the promoted three-point tool, the centre-point variant keeps its master"),
     ("arc_tangent", "the kit has one Arc; the tangent variant keeps its master"),
@@ -191,14 +100,14 @@ pub const KIT_FALLBACKS: &[(&str, &str)] = &[
     ("offset_one_side", "the Offset dialog's side choices stay one matched trio of masters"),
     ("offset_two_sides", "the Offset dialog's side choices stay one matched trio of masters"),
     ("offset_symmetric", "the Offset dialog's side choices stay one matched trio of masters"),
-    ("surface_extrude", "the Surface workspace's accent variant keeps its master until the kit covers that workspace"),
-    ("surface_revolve", "the Surface workspace's accent variant keeps its master until the kit covers that workspace"),
-    ("surface_sweep", "the Surface workspace's accent variant keeps its master until the kit covers that workspace"),
-    ("surface_loft", "the Surface workspace's accent variant keeps its master until the kit covers that workspace"),
-    ("surface_fillet", "the Surface workspace's accent variant keeps its master until the kit covers that workspace"),
-    ("surface_extend", "the Surface workspace's accent variant keeps its master until the kit covers that workspace"),
-    ("surface_trim", "the Surface workspace's accent variant keeps its master until the kit covers that workspace"),
-    ("mesh_export", "Save As Mesh keeps the mesh accent that tells it from Export"),
+    ("surface_extrude", "the Surface workspace's accent variant draws the Facet drawing (facet = true) until the kit covers that workspace"),
+    ("surface_revolve", "the Surface workspace's accent variant draws the Facet drawing (facet = true) until the kit covers that workspace"),
+    ("surface_sweep", "the Surface workspace's accent variant draws the Facet drawing (facet = true) until the kit covers that workspace"),
+    ("surface_loft", "the Surface workspace's accent variant draws the Facet drawing (facet = true) until the kit covers that workspace"),
+    ("surface_fillet", "the Surface workspace's accent variant draws the Facet drawing (facet = true) until the kit covers that workspace"),
+    ("surface_extend", "the Surface workspace's accent variant draws the Facet drawing (facet = true) until the kit covers that workspace"),
+    ("surface_trim", "the Surface workspace's accent variant draws the Facet drawing (facet = true) until the kit covers that workspace"),
+    ("mesh_export", "Save As Mesh keeps the mesh accent that tells it from Export (facet = true)"),
     ("presspull", "Press Pull extrudes a face; the kit Move face translates one, so neither drawing is exact"),
     ("replace_face", "no kit drawing; a sibling of Offset face"),
     ("delete_face", "no kit drawing; a sibling of Offset face"),
@@ -216,7 +125,7 @@ pub const KIT_FALLBACKS: &[(&str, &str)] = &[
     ("checkpoint", "the kit History goes to Roll back; checkpoints keep their master"),
     ("restore", "the kit History goes to Roll back; restore keeps its master"),
     ("revert", "the kit History goes to Roll back; revert keeps its master"),
-    ("zoom", "the navigation Zoom tool and the search field share this magnifier; the kit Search is not a zoom"),
+    ("zoom", "the navigation Zoom tool keeps its magnifier; the search fields draw the kit Search"),
     ("chain", "the kit Link could mean chain selection, a motion link or the agent link; none is mapped until the kit says"),
     ("motion_link", "the kit Link could mean chain selection, a motion link or the agent link; none is mapped until the kit says"),
     ("agent_link", "the kit Link could mean chain selection, a motion link or the agent link; none is mapped until the kit says"),
@@ -230,79 +139,27 @@ pub const KIT_FALLBACKS: &[(&str, &str)] = &[
     ("orbit", "viewport navigation keeps its glyphs; the kit Rotate is a tool, not a camera"),
 ];
 
-/// The kit file an app icon id draws, if it has one.
-pub fn kit_file(name: &str) -> Option<&'static str> {
-    KIT_ICONS.iter().find(|k| k.name == name).map(|k| k.file)
-}
-
-/// The kit source with its neutral hexes read as palette roles: outline `line`, face
-/// `passive-2`, shell knockout. The gradient stops keep their hexes.
-pub fn kit_source(src: &str) -> String {
-    let source = |role: &str| icon_svg::ROLE_NAMES.iter().position(|r| *r == role).and_then(|i| icon_svg::ROLE_SOURCE_HEX.get(i).copied());
-    let hex = |[r, g, b]: [u8; 3]| format!("#{r:02X}{g:02X}{b:02X}");
-    let mut out = src.to_owned();
-    for (from, to) in [
-        (hex(KIT_OUTLINE), "currentColor".to_owned()),
-        (hex(KIT_FACE), source("passive-2").unwrap_or("#b8c3cf").to_owned()),
-        (hex(KIT_SHELL), source("gap").unwrap_or("#ffffff").to_owned()),
-    ] {
-        out = out.replace(&from, &to).replace(&from.to_ascii_lowercase(), &to);
-    }
-    out
-}
-
-/// The parsed kit drawings by app icon id. A kit file that fails to parse is logged and its id
-/// draws the master, as a broken master draws the placeholder.
-fn kit_table() -> &'static HashMap<&'static str, (&'static str, Doc)> {
-    static T: OnceLock<HashMap<&'static str, (&'static str, Doc)>> = OnceLock::new();
-    T.get_or_init(|| {
-        let mut map = HashMap::new();
-        for k in KIT_ICONS {
-            // Two ids on one file (Close and Cancel, Move and Sketch Move) each parse it: the
-            // documents are small and the textures are cached by file.
-            match Doc::parse(&kit_source(k.src)) {
-                Ok(doc) => drop(map.insert(k.name, (k.file, doc))),
-                Err(e) => log::warn!("kit icon {} ({}): {e}", k.name, k.file),
-            }
-        }
-        map
-    })
-}
-
-/// The kit drawing for `name`: its file stem and parsed document.
-fn kit_doc(name: &str) -> Option<(&'static str, &'static Doc)> {
-    kit_table().get(name).map(|(file, doc)| (*file, doc))
-}
-
-/// The look a kit icon is drawn with for `finish`: no accent (its geometry is neutral), the kit's
-/// own outline and face hexes on the dark theme unless the theme overrides those roles, and the
-/// ink in both roles under an ink finish. The gradient is not a role and stays as shipped.
-fn kit_look(look: Look, finish: Finish) -> Look {
-    let role = |name: &str| icon_svg::ROLE_NAMES.iter().position(|r| *r == name);
-    let (Some(line), Some(face)) = (role("line"), role("passive-2")) else { return look };
+/// The look an owner-supplied master is drawn with for `finish`: no accent (its geometry is
+/// neutral), the kit's own hexes for its roles on the dark theme unless the theme overrides them,
+/// and the ink in every supplied role but the knockout under an ink finish. The gradient is not a
+/// role and stays as shipped.
+fn supplied_look(look: Look, finish: Finish) -> Look {
+    let gap = icon_svg::ROLE_NAMES.iter().position(|r| *r == "gap");
     let mut palette = look.palette.unwrap_or_default();
-    match finish {
-        Finish::Ink(ink) => {
-            let rgb = [ink.r(), ink.g(), ink.b()];
-            palette.roles[line] = Some(rgb);
-            palette.roles[face] = Some(rgb);
+    for (hex, role) in icon_svg::SUPPLIED_ROLES {
+        if Some(*role) == gap {
+            continue;
         }
-        Finish::Artwork | Finish::Danger if look.dark => {
-            palette.roles[line].get_or_insert(KIT_OUTLINE);
-            palette.roles[face].get_or_insert(KIT_FACE);
+        let Some(slot) = palette.roles.get_mut(*role) else { continue };
+        match finish {
+            Finish::Ink(ink) => *slot = Some([ink.r(), ink.g(), ink.b()]),
+            Finish::Artwork | Finish::Danger if look.dark => {
+                slot.get_or_insert(*hex);
+            }
+            Finish::Artwork | Finish::Danger => {}
         }
-        Finish::Artwork | Finish::Danger => {}
     }
     Look { accent: if finish == Finish::Danger { look.accent } else { None }, palette: Some(palette), ..look }
-}
-
-/// The master for `name`, with the audit told which kit file replaces it on screen.
-fn resolve(name: &str) -> icon_svg::Resolved {
-    let resolved = icon_svg::resolve(name);
-    if let Some((file, _)) = kit_doc(name) {
-        icon_svg::audit::record_kit(name, file);
-    }
-    resolved
 }
 
 #[path = "../../../assets/icons/ui/source/glyphs.rs"]
@@ -328,7 +185,7 @@ struct Cache(Arc<Mutex<CacheEntries>>);
 #[derive(Default)]
 struct CacheEntries {
     palette: Option<icon_svg::Palette>,
-    textures: HashMap<(&'static str, Look, u32, Finish), TextureHandle>,
+    textures: HashMap<(&'static str, Look, u32, Finish, bool), TextureHandle>,
 }
 
 /// Draw palette-owned icon artwork with an explicit opacity (0 to 1).
@@ -371,34 +228,34 @@ enum Mirror {
 
 fn paint_with_ink(p: &Painter, r: Rect, name: &str, dark: Option<bool>, opacity: f32, ink: Option<Color32>, mirror: Mirror) {
     let ctx = p.ctx();
-    let resolved = resolve(name);
+    let resolved = icon_svg::resolve(name);
     let look = Look::themed(dark.unwrap_or_else(|| ctx.global_style().visuals.dark_mode), resolved.accent, crate::theme::vision());
-    paint_resolved(p, r, name, resolved, look, opacity, ink.map_or(Finish::Artwork, Finish::Ink), mirror);
+    paint_resolved(p, r, resolved, look, opacity, ink.map_or(Finish::Artwork, Finish::Ink), mirror);
 }
 
 /// Draw with a named palette ramp, preserving outlines, passive faces and transparency.
 /// `None` explicitly selects base blue; an unknown name retains the icon's own accent.
 /// Existing painters continue to select the icon's semantic accent.
 pub fn paint_accented(p: &Painter, r: Rect, name: &str, accent: Option<&str>, opacity: f32) {
-    let resolved = resolve(name);
+    let resolved = icon_svg::resolve(name);
     let accent = match accent {
         Some(name) => icon_svg::accent_index(name).or(resolved.accent),
         None => None,
     };
     let look = Look::themed(p.ctx().global_style().visuals.dark_mode, accent, crate::theme::vision());
-    paint_resolved(p, r, name, resolved, look, opacity, Finish::Artwork, Mirror::None);
+    paint_resolved(p, r, resolved, look, opacity, Finish::Artwork, Mirror::None);
 }
 
 /// Shared destructive-action artwork: red shaded faces, normal outlines and cutouts.
 /// Unlike a single-colour mask, this also tints a master's passive faces through
 /// the constraint ramp without flattening the lid, handle or other details.
 pub(crate) fn paint_danger(p: &Painter, r: Rect, name: &str, opacity: f32) {
-    let resolved = resolve(name);
+    let resolved = icon_svg::resolve(name);
     let look = Look::themed(p.ctx().global_style().visuals.dark_mode, icon_svg::accent_index("constraint"), crate::theme::vision());
-    paint_resolved(p, r, name, resolved, look, opacity, Finish::Danger, Mirror::None);
+    paint_resolved(p, r, resolved, look, opacity, Finish::Danger, Mirror::None);
 }
 
-fn paint_resolved(p: &Painter, r: Rect, name: &str, resolved: icon_svg::Resolved, look: Look, opacity: f32, finish: Finish, mirror: Mirror) {
+fn paint_resolved(p: &Painter, r: Rect, resolved: icon_svg::Resolved, look: Look, opacity: f32, finish: Finish, mirror: Mirror) {
     let ctx = p.ctx();
     let ppp = ctx.pixels_per_point().max(0.5);
     let side = r.width().min(r.height());
@@ -411,25 +268,21 @@ fn paint_resolved(p: &Painter, r: Rect, name: &str, resolved: icon_svg::Resolved
         entries.palette = palette;
     }
     let map = &mut entries.textures;
-    // A kit drawing replaces the master: its own look, and its file as the cache key.
-    let kit = kit_doc(name);
-    let look = kit.map_or(look, |_| kit_look(look, finish));
-    let master = kit.map_or(resolved.master, |(file, _)| file);
-    let key = (master, look, px, finish);
+    // An owner-supplied master has its own look; a `facet = true` alias draws the Facet drawing
+    // beneath one, so the cache key tells the two apart.
+    let supplied = resolved.supplied;
+    let look = if supplied { supplied_look(look, finish) } else { look };
+    let master = resolved.master;
+    let key = (master, look, px, finish, supplied);
     if let std::collections::hash_map::Entry::Vacant(slot) = map.entry(key) {
-        let doc = match kit {
-            Some((_, doc)) => doc,
-            None => match icon_svg::doc_for(resolved.master, px) {
-                Some(doc) => doc,
-                None => return,
-            },
-        };
+        let Some(doc) = icon_svg::doc_of(resolved, px) else { return };
         let pm = if finish == Finish::Danger { icon_svg::render_tinted(doc, look, px) } else { icon_svg::render(doc, look, px) };
         let Some(pm) = pm else { return };
         let mut image = egui::ColorImage::from_rgba_premultiplied([px as usize, px as usize], pm.data());
-        // A master is flattened to the ink; a kit drawing was painted in it (and keeps its gradient).
+        // A Facet master is flattened to the ink; a supplied master was painted in it (and keeps
+        // its gradient).
         if let Finish::Ink(ink) = finish
-            && kit.is_none()
+            && !supplied
         {
             for pixel in &mut image.pixels {
                 *pixel = ink.gamma_multiply(f32::from(pixel.a()) / 255.0);
@@ -441,9 +294,10 @@ fn paint_resolved(p: &Painter, r: Rect, name: &str, resolved: icon_svg::Resolved
     // Snap the image to whole physical pixels so it stays crisp.
     let size = px as f32 / ppp;
     let min = pos2(((r.center().x - size / 2.0) * ppp).round() / ppp, ((r.center().y - size / 2.0) * ppp).round() / ppp);
-    // A translucent ink dims a flattened master in its pixels; a kit drawing takes it as opacity.
-    let opacity = match (kit, finish) {
-        (Some(_), Finish::Ink(ink)) => opacity * f32::from(ink.a()) / 255.0,
+    // A translucent ink dims a flattened Facet master in its pixels; a supplied master takes it
+    // as opacity.
+    let opacity = match (supplied, finish) {
+        (true, Finish::Ink(ink)) => opacity * f32::from(ink.a()) / 255.0,
         _ => opacity,
     };
     let tint = Color32::from_white_alpha((opacity.clamp(0.0, 1.0) * 255.0).round() as u8);
@@ -459,6 +313,11 @@ fn paint_resolved(p: &Painter, r: Rect, name: &str, resolved: icon_svg::Resolved
 mod tests {
     use super::*;
     use crate::theme::{self, ColorVision};
+
+    /// The kit's own colours: the outline, the face tone and the graphite shell its cavities show.
+    const KIT_OUTLINE: [u8; 3] = [0xce, 0xd3, 0xd8];
+    const KIT_FACE: [u8; 3] = [0x42, 0x47, 0x4d];
+    const KIT_SHELL: [u8; 3] = [0x18, 0x1b, 0x1f];
 
     #[test]
     fn theme_icon_palettes_change_uploaded_pixels_and_reuse_only_matching_textures() {
@@ -709,20 +568,20 @@ mod tests {
     fn kit_icons_draw_at_every_ui_size_in_both_themes_with_their_gradient() {
         let previous = theme::is_dark();
         for dark in [true, false] {
-            for k in KIT_ICONS {
+            for name in icon_svg::supplied_ids() {
                 for side in [16usize, 24, 32] {
                     let ctx = crate::fonts::test_context();
                     theme::set_dark(dark);
                     ctx.set_visuals(if dark { egui::Visuals::dark() } else { egui::Visuals::light() });
                     let (_, image) = uploaded(&ctx, side, |ui| {
-                        paint_icon(ui.painter(), Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(side as f32, side as f32)), k.name, 1.0);
+                        paint_icon(ui.painter(), Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(side as f32, side as f32)), name, 1.0);
                     });
                     let covered = image.pixels.iter().filter(|p| p.a() > 0).count();
-                    assert!(covered > side, "{} ({}) at {side} px, dark={dark}: blank", k.name, k.file);
+                    assert!(covered > side, "{name} at {side} px, dark={dark}: blank");
                     // At 16 px a thin gradient stroke is one anti-aliased pixel wide; from 24 px
                     // the mark is unmistakable.
-                    assert!(side < 24 || image.pixels.iter().any(gradient), "{} at {side} px, dark={dark}: the gradient mark is missing", k.name);
-                    assert!(!icon_svg::resolve(k.name).placeholder, "{}: a mapped id also has a master to fall back on", k.name);
+                    assert!(side < 24 || image.pixels.iter().any(gradient), "{name} at {side} px, dark={dark}: the gradient mark is missing");
+                    assert!(icon_svg::resolve(name).supplied, "{name}: an owner-supplied master");
                 }
             }
         }
@@ -816,34 +675,28 @@ mod tests {
         }
         // An id outside the table draws exactly its master.
         for (name, _) in KIT_FALLBACKS.iter().take(6).chain(std::iter::once(&("presspull", ""))) {
-            assert!(kit_doc(name).is_none(), "{name} is a fallback");
+            assert!(!icon_svg::resolve(name).supplied, "{name} is a fallback");
             let resolved = icon_svg::resolve(name);
             assert!(!resolved.placeholder, "{name}");
             let (_, image) = uploaded(&ctx, 24, |ui| {
                 paint_icon(ui.painter(), Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(24.0, 24.0)), name, 1.0);
             });
             let look = Look::themed(true, resolved.accent, theme::vision());
-            let expected = icon_svg::render(icon_svg::doc_for(resolved.master, 24).unwrap(), look, 24).unwrap();
+            let expected = icon_svg::render(icon_svg::doc_of(resolved, 24).unwrap(), look, 24).unwrap();
             assert_eq!(image, egui::ColorImage::from_rgba_premultiplied([24, 24], expected.data()), "{name} draws its master unchanged");
         }
     }
 
     #[test]
     fn redo_is_the_mirror_of_undo_and_the_authoritative_drawings_are_mapped() {
-        for (name, file) in [
-            ("undo", "polykrom-icon-undo--4-62"),
-            ("redo", "polykrom-icon-redo--4-67"),
-            ("rect", "polykrom-icon-rectangle--4-116"),
-            ("circle", "polykrom-icon-circle--4-112"),
-            ("spline", "polykrom-icon-spline--4-106"),
-            ("shell", "polykrom-icon-shell--4-308"),
-        ] {
-            assert_eq!(kit_file(name), Some(file));
+        for name in ["undo", "redo", "rect", "circle", "spline", "shell"] {
+            let resolved = icon_svg::resolve(name);
+            assert!(resolved.supplied && resolved.master == name, "{name}: an owner-supplied master");
         }
         let look = Look::themed(true, None, theme::vision());
         let px = 48;
-        let undo = icon_svg::render(kit_doc("undo").unwrap().1, look, px).unwrap();
-        let redo = icon_svg::render(kit_doc("redo").unwrap().1, look, px).unwrap();
+        let undo = icon_svg::render(icon_svg::doc_for("undo", px).unwrap(), look, px).unwrap();
+        let redo = icon_svg::render(icon_svg::doc_for("redo", px).unwrap(), look, px).unwrap();
         let mut off = 0usize;
         for y in 0..px {
             for x in 0..px {
@@ -857,7 +710,7 @@ mod tests {
         // The full-outline Rectangle and Circle are gradient all round: no neutral outline pixel.
         let outline = Color32::from_rgb(KIT_OUTLINE[0], KIT_OUTLINE[1], KIT_OUTLINE[2]);
         for name in ["rect", "circle"] {
-            let pm = icon_svg::render(kit_doc(name).unwrap().1, kit_look(look, Finish::Artwork), 32).unwrap();
+            let pm = icon_svg::render(icon_svg::doc_for(name, 32).unwrap(), supplied_look(look, Finish::Artwork), 32).unwrap();
             let image = egui::ColorImage::from_rgba_premultiplied([32, 32], pm.data());
             assert!(!image.pixels.contains(&outline), "{name}: a full gradient outline");
             assert!(image.pixels.iter().filter(|p| gradient(p)).count() > 32, "{name}: the outline is the gradient");

@@ -159,12 +159,27 @@ fn icon_data() -> Result<(), String> {
         }
     }
     let _ = writeln!(out, "pub(crate) const ACCENT_VARIANTS: &[(&str, usize, usize, [u8; 3], [u8; 3])] = &[{}];", variants.join(", "));
-    // The masters, by family.
+    // The owner-supplied masters (svg/supplied) carry the design kit's own neutral hexes; the
+    // renderer reads each as the palette role named here, so themes apply (see icon_svg.rs).
+    let mut supplied_roles = Vec::new();
+    if let Some(table) = palette.get("supplied-roles").and_then(toml::Value::as_table) {
+        for (hex_value, role) in table {
+            let role = role.as_str().ok_or_else(|| format!("supplied-roles {hex_value}: expected a role name"))?;
+            let idx = names.iter().position(|n| *n == role).ok_or_else(|| format!("supplied-roles {hex_value}: unknown role {role}"))?;
+            let h = hex(Some(&toml::Value::String(hex_value.clone())), &format!("supplied-roles {hex_value}"))?;
+            supplied_roles.push(format!("({}, {idx})", rgb(&h)));
+        }
+    }
+    let _ = writeln!(out, "pub(crate) const SUPPLIED_ROLES: &[([u8; 3], usize)] = &[{}];", supplied_roles.join(", "));
+    // The masters, by family. Facet drawings first; the owner-supplied masters last, so that a
+    // supplied master takes precedence over a Facet drawing of the same id (its fallback).
     let mut svgs = Vec::new();
     let mut ids = std::collections::BTreeSet::new();
+    let mut supplied_ids = std::collections::BTreeSet::new();
+    let mut facet_ids = std::collections::BTreeSet::new();
     let svg_dir = root.join("svg");
     println!("cargo:rerun-if-changed={}", root.display());
-    for fam in ["model", "small", "flat", "workspace"] {
+    for fam in ["model", "small", "flat", "workspace", "supplied"] {
         let dir = svg_dir.join(fam);
         // Small optical variants are optional: the set may have none.
         if fam == "small" && !dir.exists() {
@@ -175,6 +190,11 @@ fn icon_data() -> Result<(), String> {
         files.sort();
         for f in files.iter().filter(|f| f.extension().is_some_and(|e| e == "svg")) {
             let id = f.file_stem().and_then(|s| s.to_str()).ok_or("bad file name")?;
+            if fam == "supplied" {
+                supplied_ids.insert(id.to_owned());
+            } else if fam != "small" {
+                facet_ids.insert(id.to_owned());
+            }
             if fam != "small" {
                 ids.insert(id.to_owned());
             }
@@ -188,11 +208,13 @@ fn icon_data() -> Result<(), String> {
     let mut al = Vec::new();
     if let Some(t) = aliases.get("alias").and_then(toml::Value::as_table) {
         for (alias, v) in t {
-            let (master, accent) = match v {
-                toml::Value::String(m) => (m.clone(), String::new()),
+            // `facet = true`: the alias draws the Facet drawing beneath an owner-supplied master.
+            let (master, accent, facet) = match v {
+                toml::Value::String(m) => (m.clone(), String::new(), false),
                 toml::Value::Table(t) => (
                     t.get("master").and_then(toml::Value::as_str).ok_or_else(|| format!("alias {alias}: no master"))?.to_string(),
                     t.get("accent").and_then(toml::Value::as_str).unwrap_or("").to_string(),
+                    t.get("facet").and_then(toml::Value::as_bool).unwrap_or(false),
                 ),
                 _ => return Err(format!("alias {alias}: expected a string or a table")),
             };
@@ -202,10 +224,13 @@ fn icon_data() -> Result<(), String> {
             if !ids.contains(&master) {
                 return Err(format!("alias {alias}: unknown master {master}"));
             }
-            al.push(format!("({alias:?}, {master:?}, {accent:?})"));
+            if facet && !(supplied_ids.contains(&master) && facet_ids.contains(&master)) {
+                return Err(format!("alias {alias}: facet = true needs a Facet drawing beneath an owner-supplied master {master}"));
+            }
+            al.push(format!("({alias:?}, {master:?}, {accent:?}, {facet})"));
         }
     }
-    let _ = writeln!(out, "pub(crate) const ALIASES: &[(&str, &str, &str)] = &[{}];", al.join(", "));
+    let _ = writeln!(out, "pub(crate) const ALIASES: &[(&str, &str, &str, bool)] = &[{}];", al.join(", "));
     if let Some(t) = aliases.get("alias").and_then(toml::Value::as_table) {
         ids.extend(t.keys().cloned());
     }

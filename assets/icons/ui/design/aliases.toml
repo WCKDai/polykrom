@@ -1,21 +1,24 @@
 # App icon ids that reuse another master instead of carrying a copy.
 #   alias = "master"                              same artwork, default (Solid) colours
 #   alias = { master = "m", accent = "surface" }  same artwork in another accent (palette.toml)
+#   alias = { master = "m", accent = "surface", facet = true }
+#       the Facet drawing beneath the owner-supplied master "m", in that accent (an owner-supplied
+#       master is neutral geometry with the kit's gradient: no accent recolours it)
 # Icons that mean the same operation in another workspace belong here, so they stay identical.
 [alias]
 sketch_rect_pattern = { master = "pattern_rect", accent = "sketch" }
 sketch_circ_pattern = { master = "pattern_circ", accent = "sketch" }
-surface_extrude = { master = "extrude", accent = "surface" }
-surface_revolve = { master = "revolve", accent = "surface" }
-surface_sweep = { master = "sweep", accent = "surface" }
-surface_loft = { master = "loft", accent = "surface" }
-surface_fillet = { master = "fillet", accent = "surface" }
+surface_extrude = { master = "extrude", accent = "surface", facet = true }
+surface_revolve = { master = "revolve", accent = "surface", facet = true }
+surface_sweep = { master = "sweep", accent = "surface", facet = true }
+surface_loft = { master = "loft", accent = "surface", facet = true }
+surface_fillet = { master = "fillet", accent = "surface", facet = true }
 surface_patch = { master = "patch", accent = "surface" }
 surface_stitch = { master = "stitch", accent = "surface" }
 surface_unstitch = { master = "unstitch", accent = "surface" }
 surface_thicken = { master = "thicken", accent = "surface" }
-surface_extend = { master = "extend", accent = "surface" }
-surface_trim = { master = "trim", accent = "surface" }
+surface_extend = { master = "extend", accent = "surface", facet = true }
+surface_trim = { master = "trim", accent = "surface", facet = true }
 surface_untrim = { master = "untrim", accent = "surface" }
 surface_offset = { master = "offset_surface", accent = "surface" }
 surface_ruled = { master = "ruled", accent = "surface" }
@@ -31,11 +34,12 @@ ground = "c_fix"
 sketch_break = { master = "break", accent = "sketch" }
 sketch_cancel = { master = "close", accent = "sketch" }
 sketch_dxf = { master = "dxf", accent = "sketch" }
+sketch_mirror = { master = "mirror", accent = "sketch" }
 sketch_move = { master = "move", accent = "sketch" }
 sketch_scale = { master = "scale", accent = "sketch" }
 sketch_text = { master = "text", accent = "sketch" }
 surface_fair = { master = "spline_cv", accent = "surface" }
-mesh_export = { master = "export", accent = "mesh" }
+mesh_export = { master = "export", accent = "mesh", facet = true }
 
 # Legacy feature-history id for the same Split Body operation.
 split = "split_body"
@@ -43,5 +47,5 @@ split = "split_body"
 # Sketch dialog choices share the corresponding finished tool artwork.
 sketch_chamfer_equal = { master = "sketch_chamfer", accent = "sketch" }
 sketch_chamfer_two = { master = "sketch_chamfer_two_distances", accent = "sketch" }
-offset_one_side = { master = "offset", accent = "sketch" }
+offset_one_side = { master = "offset", accent = "sketch", facet = true }
 bom = "list"

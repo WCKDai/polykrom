@@ -1,15 +1,31 @@
-# Polykrom UI icon specification: Facet
+# Polykrom UI icon specification: owner-supplied masters and Facet
 
-> **Superseded as the icon authority (owner decision 2026-11-02).** The design kit in
-> `assets/design-kit/2026-11-02/` (component SVGs, `AGENT_BRIEF.md`) is now authoritative. The
-> Facet masters below stay in the app until the kit icons are wired in (the renderer in
-> `crates/ui-egui/src/icon_svg.rs` does not yet support the kit's gradients); do not draw new Facet
-> icons. The review tool and lint keep working for the existing masters during the transition.
+> **The design kit is the icon authority (owner decision 2026-11-02).** Its 69-icon set and logo
+> are the **owner-supplied masters** in `design/svg/supplied/`: the kit's exact vectors, never
+> drawn to this guide and never edited (see [AGENTS.md](AGENTS.md), "Two kinds of master"). This
+> guide binds the **Facet** masters, which remain for every id the kit does not cover. Do not draw
+> a Facet icon for an operation the kit covers; when the kit grows, bring its glyph in as a
+> supplied master instead.
 
-This is the binding specification for new and revised icons. Facet is Polykrom's own icon
-language; it replaced the set inherited from SolidCraft. Every master is drawn from code in
+Facet is Polykrom's own icon language for the ids the kit does not cover; it replaced the set
+inherited from SolidCraft. Every Facet master is drawn from code in
 `design/tools/author/facet_icons.py` with the primitives in `facet.py`; read both before drawing.
-`http://127.0.0.1:8770/guide` shows the references when the local review server is running.
+`http://127.0.0.1:8770/guide` shows the references when the local review server is running: the
+owner-supplied references first, then the Facet categories.
+
+## Owner-supplied masters
+
+An owner-supplied master is a kit component moved into `svg/supplied/<id>.svg` unchanged: 24
+grid, `width`/`height`, `fill="none"` on the root, `<linearGradient>`/`<stop>` definitions with
+their ids, hex colours, `H`/`V` path commands, `stroke-dasharray`, `fill-rule` and `opacity` as
+exported. The lint (`tools/lint_icons.py`) does not apply the Facet rules below to this family;
+it holds that the file hashes as `review.json` records (`supplied`), equals its kit source, has a
+`viewBox`, uses only `svg`, `title`, `path`, `circle`, `g`, `defs`, `mask`, `clipPath`,
+`linearGradient` and `stop`, and carries no `style`, `class`, `transform`, `href` or event
+attribute. Colour comes from `palette.toml`'s `[supplied-roles]`: the kit's outline, face and
+shell hexes are read as the `line`, `passive-2` and knockout roles, the gradient is painted as
+shipped, and no accent recolours it. On the review page a supplied master is accepted by
+provenance and cannot be reopened.
 
 ## The idea
 
@@ -69,10 +85,13 @@ construction, surface, mesh and form have their own ramps. Never recolour an SVG
 
 ## SVG subset and source ownership
 
-The application parser supports `path`, `circle`, `g`, `defs`, `clipPath`, `mask` and `title`.
+The application parser supports `path`, `circle`, `g`, `defs`, `clipPath`, `mask` and `title`
+(and, for the owner-supplied masters only, `linearGradient`/`stop`, hex colours and `H`/`V`).
 Use paths for ellipses (`lib.ell`); native `<ellipse>` is unsupported. Paths use absolute
 M/L/C/Q/A/Z. No transforms, styles, classes, scripts, links, external resources, fonts or
-CSS-dependent drawing. Keep clip ids unique inside each SVG. One id has one master.
+CSS-dependent drawing. Keep clip ids unique inside each SVG. One id has one Facet master; an
+owner-supplied master of the same id supersedes it and the Facet drawing stays as its fallback
+(an alias with `facet = true` in `aliases.toml` draws that fallback in its accent).
 
 The functions in `facet_icons.py` are the source of the masters: change a drawing there and
 write it with `python3 -B facet_icons.py write ID`, so the code and the SVG never disagree.
@@ -86,10 +105,12 @@ write it with `python3 -B facet_icons.py write ID`, so the code and the SVG neve
 3. Preview at 64, 24 and 16 px in **both themes**. At 16 px the operation must stay distinct.
 4. Run `cargo xtask icons` and `cargo test --profile ci -p polykrom-ui-egui --lib icon_svg::tests`.
 5. Leave the icon Open. The owner accepts artwork on the review page; never add acceptance
-   hashes yourself or copy another icon's hash.
+   hashes yourself or copy another icon's hash. (A `supplied` record in `review.json` is not an
+   acceptance you set: it is written, with the kit's checksum, by the change that brings an
+   owner glyph in.)
 
-All artwork must be original Polykrom work. Commercial CAD artwork, screenshots and extracted
-assets are forbidden even as hidden references.
+All artwork must be original Polykrom work or the owner's supplied kit. Commercial CAD artwork,
+screenshots and extracted assets are forbidden even as hidden references.
 
 Runtime discovery is also checked by `crates/ui-egui/tests/icon_audit.rs`. New menu surfaces
 must extend that Harness traversal. Regenerate the committed `design/requested_icons.txt` with

@@ -1765,7 +1765,9 @@ fn confirm_radial_and_history_rows_keep_multitone_artwork() {
             let resolved = crate::icon_svg::resolve(icon);
             assert!(!resolved.placeholder, "{icon} needs a master");
             let look = crate::icon_svg::Look::themed(dark, ramp.and_then(crate::icon_svg::accent_index), crate::theme::vision());
-            let doc = crate::icon_svg::doc_for(resolved.master, side as u32).unwrap();
+            // What the painter draws: `surface_extrude` (facet = true) paints the Facet drawing
+            // beneath the owner-supplied Extrude.
+            let doc = crate::icon_svg::doc_of(resolved, side as u32).unwrap();
             let expected = if matches!(surface, "danger" | "danger_menu") {
                 crate::icon_svg::render_tinted(doc, look, side as u32)
             } else {

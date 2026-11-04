@@ -174,3 +174,12 @@ constraint = [
 construction = [
   "centerline", "construction", "infinite",
 ]
+
+# Owner-supplied masters (svg/supplied, the design kit's exact vectors) carry the kit's own
+# neutral hexes. Each is read as the palette role named here, so themes and the ink finish apply;
+# the lime/green/mint gradient stops are no role and are painted as shipped. Dark theme keeps
+# these exact hexes unless a theme file overrides the role (crates/ui-egui/src/icons.rs).
+[supplied-roles]
+"#ced3d8" = "line"       # outline
+"#42474d" = "passive-2"  # face
+"#181b1f" = "gap"        # shell tone: a knockout, the surface shows through

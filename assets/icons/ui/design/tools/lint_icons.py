@@ -7,10 +7,37 @@ d = sys.argv[1] if len(sys.argv) > 1 else os.path.dirname(os.path.dirname(os.pat
 pal = tomllib.load(open(d + '/palette.toml', 'rb'))
 light = {r.get('source', r['light']) for r in pal['roles'].values()}
 OK_TAGS = {'svg', 'title', 'path', 'circle', 'defs', 'mask', 'clipPath', 'g'}
-FAMILIES = {'model', 'small', 'flat', 'workspace'}
+# Owner-supplied masters (svg/supplied) are the design kit's exact vectors: gradients and hex colours too.
+SUPPLIED_TAGS = OK_TAGS | {'linearGradient', 'stop'}
+FAMILIES = {'model', 'small', 'flat', 'workspace', 'supplied'}
 bad = []
 def err(f, m): bad.append('%s: %s' % (os.path.relpath(f, d), m))
 files = sorted(glob.glob(d + '/svg/*/*.svg'))
+import json, review_state
+supplied = review_state.supplied(d)
+ROOT = os.path.abspath(os.path.join(d, '..', '..', '..', '..'))
+def lint_supplied(f, name, t, ns):
+    """An owner-supplied master is never edited: it hashes as review.json records it and equals its source."""
+    rec = supplied.get(name)
+    if rec is None:
+        err(f, 'owner-supplied master without a review.json "supplied" record (label, source, sha256)'); return
+    if review_state.supplied_hash(name, d) != rec.get('sha256'):
+        err(f, 'owner-supplied master changed: never edit it, replace it with a newer owner snapshot (and its record)')
+    source = os.path.join(ROOT, rec.get('source', ''))
+    if rec.get('source') and os.path.exists(source):
+        with open(source, 'rb') as a, open(f, 'rb') as b:
+            if review_state.lf(a.read()) != review_state.lf(b.read()): err(f, 'differs from its source ' + rec['source'])
+    if not t.get('viewBox'): err(f, 'viewBox required')
+    ids = []
+    for e in t.iter():
+        tag = e.tag.replace(ns, '')
+        if tag not in SUPPLIED_TAGS: err(f, 'element <%s> not allowed' % tag)
+        for a in e.attrib:
+            if a.startswith('on') or a.endswith('href') or a in ('style', 'class', 'transform'): err(f, '%s attribute on <%s>' % (a, tag))
+        if e.get('id'): ids.append(e.get('id'))
+    if len(ids) != len(set(ids)): err(f, 'duplicate ids')
+for name in supplied:
+    if not os.path.exists(d + '/svg/supplied/' + name + '.svg'): err(d + '/review.json', 'supplied %s: no master svg/supplied/%s.svg' % (name, name))
 # Keep the collection free of generated previews, reports and authoring snapshots.
 for path in Path(d).rglob('*'):
     if not path.is_file(): continue
@@ -26,6 +53,7 @@ for f in files:
     if fam not in FAMILIES: err(f, 'unknown family'); continue
     if not re.fullmatch(r'[a-z][a-z0-9_]*', name): err(f, 'file name must be an app icon id (lower_snake_case)')
     t = ET.parse(f).getroot(); ns = '{http://www.w3.org/2000/svg}'
+    if fam == 'supplied': lint_supplied(f, name, t, ns); continue
     if t.get('viewBox') != '0 0 64 64': err(f, 'viewBox must be 0 0 64 64')
     for a in ('width', 'height'):
         if t.get(a): err(f, a + ' attribute on svg')
@@ -59,18 +87,23 @@ names = {os.path.basename(f)[:-4] for f in files if '/small/' not in f}
 for f in files:
     if '/small/' in f and os.path.basename(f)[:-4] not in names: err(f, 'small variant without a master')
 al = tomllib.load(open(d + '/aliases.toml', 'rb')).get('alias', {})
-for a, t in al.items():
-    if isinstance(t, dict):
-        if t.get('accent') not in pal.get('accents', {}): err(d + '/aliases.toml', '%s: unknown accent %s' % (a, t.get('accent')))
-        t = t.get('master')
-    if t not in names: err(d + '/aliases.toml', '%s -> %s: no such master' % (a, t))
-    if a in names: err(d + '/aliases.toml', '%s is both an alias and a master' % a)
 primary = {}
 for file in files:
     family, name = Path(file).parent.name, Path(file).stem
     if family != 'small': primary.setdefault(name, set()).add(family)
+for a, t in al.items():
+    if isinstance(t, dict):
+        if t.get('accent') not in pal.get('accents', {}): err(d + '/aliases.toml', '%s: unknown accent %s' % (a, t.get('accent')))
+        # facet = true: the alias draws the Facet drawing beneath an owner-supplied master.
+        if t.get('facet') and not ('supplied' in primary.get(t.get('master'), set()) and primary.get(t.get('master'), set()) - {'supplied'}):
+            err(d + '/aliases.toml', '%s: facet = true needs a Facet drawing beneath an owner-supplied master %s' % (a, t.get('master')))
+        t = t.get('master')
+    if t not in names: err(d + '/aliases.toml', '%s -> %s: no such master' % (a, t))
+    if a in names: err(d + '/aliases.toml', '%s is both an alias and a master' % a)
+# One id has one Facet master; an owner-supplied master may supersede it (the Facet drawing stays as its fallback).
 for name, families in primary.items():
-    if len(families) > 1 and not (name == 'folder' and families == {'flat', 'model'}):
+    facet = families - {'supplied'}
+    if len(facet) > 1 and not (name == 'folder' and facet == {'flat', 'model'}):
         err(d + '/svg', name + ': duplicate primary master across families')
 references = d + '/references.toml'
 if os.path.exists(references):
@@ -110,7 +143,6 @@ if os.path.exists(css_path):
     except (OSError, ValueError) as e:
         err(css_path, 'cannot compare with palettes.rs: %s' % e)
 # an icon accepted as final on the review page must not change (un-accept it there to work on it again)
-import json, review_state
 rp = d + '/review.json'
 if os.path.exists(rp):
     fin = json.load(open(rp, encoding='utf-8')).get('final', {})
