@@ -547,6 +547,17 @@ pub(crate) fn command_done(
     }
 }
 
+/// A batch ran journaled deletes again, one at a time (`crate::batch`): the design they made is
+/// the one replaying the journal makes, not a change outside commands.
+pub(crate) fn rerun(s: &Session) {
+    let Some(state) = STATE.get() else { return };
+    if s.crash_journal
+        && let Ok(mut j) = state.journal.lock()
+    {
+        j.last_doc = std::sync::Arc::as_ptr(&s.doc) as usize;
+    }
+}
+
 /// An autosave just wrote the design to `file` (or found nothing unsaved: `file` is then the
 /// design's own file, or `None` for a new design or one that cannot be named): replays start
 /// from there.
