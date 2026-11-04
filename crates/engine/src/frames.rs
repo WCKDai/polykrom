@@ -22,11 +22,14 @@ enum K {
     Pick,
     /// A list of picks: `[[x,y,z]…]` or `[{point|face|edge: [x,y,z], body?}…]`.
     Picks,
-    /// A list of face picks (`faces` of the commands that take faces, #297): as `Picks`, and a
-    /// plain point on a body becomes `{point, body, world}`: the point in the frame of the body
-    /// it lies on, that body's own name, and the point as given, so the command resolves the
-    /// face on that body alone (another component's body may coincide with it in its own frame)
-    /// and names the point as given in its errors. An entry's `normal` turns with its point.
+    /// A list of face picks (`faces` of the commands that take faces, and `sheet.convert`'s
+    /// `face`, #297): as `Picks`, and a plain point on a body becomes `{point, body, world}`:
+    /// the point in the frame of the body it lies on, that body's own name, and the point as
+    /// given, so the command resolves the face on that body alone (another component's body may
+    /// coincide with it in its own frame) and names the point as given in its errors. A point on
+    /// no body (a hair off a face: within a pick's reach, beyond the body's) goes into the active
+    /// component's frame, as every pick does, without a body. An entry's `normal` turns with its
+    /// point.
     Faces,
     /// A point that places new geometry: into the active component's frame.
     Make,
@@ -61,7 +64,8 @@ fn table(id: &str) -> &'static [(&'static str, K)] {
         "solid.fillet" | "solid.chamfer" => &[("edges", Picks), ("body", Body)],
         "solid.hole" => &[("position", Pick), ("direction", Dir), ("body", Body)],
         "solid.scale" => &[("origin", Make), ("bodies", Body)],
-        "solid.offset_face" | "solid.shell" => &[("faces", Faces), ("body", Body)],
+        "solid.offset_face" | "solid.shell" | "face.delete" => &[("faces", Faces), ("body", Body)],
+        "solid.split_face" => &[("faces", Faces), ("tool", Picks), ("plane", Plane), ("body", Body)],
         "solid.thread" => &[("face", Pick)],
         "solid.emboss" => &[("face", Make)],
         "solid.draft" => &[("faces", Faces), ("neutral", Plane), ("pull", Dir), ("body", Body)],
@@ -76,7 +80,7 @@ fn table(id: &str) -> &'static [(&'static str, K)] {
             &[("position", Pick), ("direction", Dir), ("hook", Dir), ("along", Dir), ("body", Body)]
         }
         "plastic.lip" => &[("face", Pick), ("body", Body)],
-        "sheet.convert" => &[("face", Pick), ("bends", Picks), ("body", Body)],
+        "sheet.convert" => &[("face", Faces), ("bends", Picks), ("body", Body)],
         "sheet.flange" | "sheet.hem" => &[("edges", Picks), ("body", Body)],
         "sheet.fold" => &[("points", Picks), ("fixed", Pick), ("body", Body)],
         "sheet.perforate" => &[("body", Body)],
@@ -206,14 +210,18 @@ impl Mapper<'_> {
         self.local_point(&m, p)
     }
 
-    /// A plain face pick as `{point, body, world}` (see [`K::Faces`]); unchanged where no body
-    /// is under it.
+    /// A plain face pick as `{point, body, world}` (see [`K::Faces`]). A point on no body goes
+    /// into the active component's frame, as a plain pick does, without a `body`; it is
+    /// unchanged where that frame is the identity.
     fn face_pick(&mut self, v: &Value, body: Option<&str>) -> Option<Value> {
         let p = vec3(v)?;
         let (own, m) = self.pick_frame(p, body);
-        let own = own?;
+        let local = self.local_point(&m, p);
+        if own.is_none() && local.is_none() {
+            return None;
+        }
         let mut o = Map::new();
-        match self.local_point(&m, p) {
+        match local {
             Some(local) => {
                 o.insert("point".into(), local);
                 o.insert("world".into(), v.clone());
@@ -222,7 +230,9 @@ impl Mapper<'_> {
                 o.insert("point".into(), v.clone());
             }
         }
-        o.insert("body".into(), Value::String(own));
+        if let Some(own) = own {
+            o.insert("body".into(), Value::String(own));
+        }
         self.changed = true;
         Some(Value::Object(o))
     }

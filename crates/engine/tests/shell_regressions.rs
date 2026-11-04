@@ -178,6 +178,24 @@ fn shell_by_face_names_lists_the_faces_used() {
     assert!((got - want).abs() < 1e-9, "shell volume {got}, want {want}");
 }
 
+/// A pick within reach of a face but off it (0.1 mm out from the 40 × 30 × 20 box's +x face)
+/// resolves to that face, and the shell opens it. The kernel opens only faces within a
+/// ten-thousandth of the body's size of a point and used to drop the pick without a word, so
+/// `faces_used` named a face that stayed closed and the volume was the one-face shell's
+/// (7 872 mm³, not 6 976 mm³); now the feature keeps a point inside the face it resolved.
+#[test]
+fn shell_pick_off_a_face_within_reach_opens_the_face_it_names() {
+    let mut s = Session::default();
+    run(&mut s, "solid.box", json!({"length": 40.0, "width": 30.0, "height": 20.0}));
+    let reply =
+        s.execute("solid.shell", &json!({"faces": [[20.0, 30.0, 10.0], [40.1, 15.0, 10.0]], "thickness": 2.0})).unwrap_or_else(|e| panic!("{e}"));
+    assert_eq!(reply["faces_used"], json!(["F1:+y", "F1:+x"]), "{reply}");
+    assert_eq!(reply["warning"], json!(null), "{reply}");
+    sound(&s);
+    let got = volume(&s);
+    assert!((got - 6_976.0).abs() < 1e-9, "shell volume {got}: both faces open (6 976), not the one-face shell (7 872)");
+}
+
 /// A base plate with a wall standing on it, the wall's bottom flush with the plate's top (the
 /// tray of examples/render-studio.json, whose action-matrix drafts and shells pick such faces).
 fn tray() -> Session {
