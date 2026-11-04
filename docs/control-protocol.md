@@ -272,12 +272,20 @@ face is outside and which faces an edge joins. Per body (`bodies[]`, `body_count
   - `boss`: `diameter`, `height`, `axis` (the base centre, pointing at the cap), `cap_face`,
     `base_face`. Its faces are the wall and the cap; a chamfer or round on its edge is its own
     feature. A plain cylinder with two caps is no boss.
-  - `pocket`: `depth`, `floor_face`, `walls`, `opening_face` (`opening_faces` when the walls reach
-    several coplanar faces). A hole or boss in the floor leaves the pocket a pocket. A recess open
-    at a side, or whose walls reach faces at two heights, is reported under `uncertain` instead.
+  - `pocket`: `depth`, `floor_face`, `walls`, `floor_rounds`, `opening_face` (`opening_faces`
+    when the walls reach several coplanar faces). A hole or boss in the floor leaves the pocket a
+    pocket. The rounds along the floor's edges (a milled pocket's cutter radius) are
+    `floor_rounds`, among the pocket's faces, with the walls the upright faces beyond them; a
+    round on a vertical corner of the pocket is one of its `walls`. Either is also the fillet it
+    is. A recess open at a side, or whose walls reach faces at two heights, is reported under
+    `uncertain` instead.
   - `fillet`: `radius`, `convex` (`true`: a round that removed material, `false`: one that
     added it, `null`: a chain of both), `joins` (the faces it is tangent to). Blends of one
-    radius that meet (a tangent chain, or mitred at a corner) are one fillet.
+    radius that meet (a tangent chain, or mitred at a corner) are one fillet. A fillet replaces
+    an edge, so the faces it joins must be ones that could have met: a half-round between two
+    parallel faces (a through slot's end, a full round on a plate's edge) is no fillet and is
+    reported as `unrecognised`, saying so. A bore's or boss's wall tangent to the rounds at its
+    ends is a wall, not a fillet.
   - `chamfer`: `joins` (two faces; the first is the one facing up most, as `solid.chamfer` takes
     it), `distance` along the first of `joins`, `distance2` along the second, `angle_deg` between
     the chamfer and the first face. A conical chamfer on a round edge joins the flat face and the
@@ -293,7 +301,10 @@ face is outside and which faces an edge joins. Per body (`bodies[]`, `body_count
   larger gap on a partial arc: three holes at 0°, 60° and 120° are a 60° pattern with
   `full_circle: false`, read the same whatever order the members come in), with `feature_type`,
   `members` (indices into `features`), their `faces` and `member_direction`. Two alike features
-  are two features.
+  are two features. Alike features that are not one lattice or one circle are read as the rows
+  and rings that explain the most of them with the fewest patterns, the largest first: six holes
+  on a ring about a seventh of the same size at its centre are the ring of six and a lone hole,
+  not a row of three through the centre.
 - `unrecognised`: every face no feature covers, with its `index`, `surface` (`plane`,
   `cylinder`, `cone`, `sphere`, `torus` or `free-form`) and a `reason`. The face a hole is
   drilled into, a pocket cut into or a boss stands on is not part of that feature. A free-form

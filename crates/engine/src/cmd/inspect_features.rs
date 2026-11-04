@@ -524,6 +524,8 @@ enum Kind {
         floor: usize,
         opening: Vec<usize>,
         walls: Vec<usize>,
+        /// The rounds along the floor's edges (a cutter-radius fillet), between it and the walls.
+        rounds: Vec<usize>,
         normal: Vec3,
     },
     Fillet {
@@ -564,6 +566,9 @@ struct Recognised {
     uncertain: Vec<Uncertain>,
     /// Faces a hole or boss owns as its wall, cap, step or floor (blends may still be blends).
     owned: BTreeSet<usize>,
+    /// The cylinders that are a bore's or a boss's wall: tangent to the rounds at their ends,
+    /// they are never blends themselves.
+    walls: BTreeSet<usize>,
 }
 
 impl Recognised {
@@ -670,9 +675,10 @@ impl Feature {
                 "type": "boss", "diameter": r9(*diameter), "height": r9(*height), "axis": axis(*origin, *direction),
                 "cap_face": t.name(*cap), "base_face": name(*base),
             }),
-            Kind::Pocket { depth, floor, opening, walls, .. } => json!({
+            Kind::Pocket { depth, floor, opening, walls, rounds, .. } => json!({
                 "type": "pocket", "depth": r9(*depth), "floor_face": t.name(*floor),
                 "opening_face": opening.first().map(|f| t.name(*f)), "opening_faces": t.names_of(opening), "walls": t.names_of(walls),
+                "floor_rounds": t.names_of(rounds),
             }),
             Kind::Fillet { radius, convex, joins, .. } => {
                 json!({"type": "fillet", "radius": r9(*radius), "convex": convex, "joins": t.names_of(joins)})
@@ -1096,6 +1102,7 @@ fn holes_and_bosses(t: &Topo, r: &mut Recognised) {
                 Elem::Wall { seg: i, lo, hi } => {
                     let Some(w) = walls.get(*i) else { continue };
                     approximate |= w.approximate;
+                    r.walls.extend(w.faces.iter().copied());
                     let (near, far) = if entry_hi { (*hi, *lo) } else { (*lo, *hi) };
                     // A wall followed (further in) by a narrower one is a counterbore.
                     let narrower_follows = ordered
@@ -1240,6 +1247,7 @@ fn holes_and_bosses(t: &Topo, r: &mut Recognised) {
             notes.push("the base is not a flat face across the axis, so the height is read from the wall's mesh".into());
         }
         r.claim(&faces);
+        r.walls.extend(seg.faces.iter().copied());
         let origin = o + a * base_h;
         r.features.push(Feature {
             kind: Kind::Boss { diameter: seg.radius * 2.0, height, origin, direction: dir, cap, base },
@@ -1272,12 +1280,66 @@ enum Floor {
     No,
 }
 
+/// Whether face `g` stands upright on a floor whose outward normal is `n`: a plane along `n`
+/// or a cylinder about it.
+fn upright(t: &Topo, g: usize, n: Vec3) -> bool {
+    match t.surface(g) {
+        Some(FaceSurface::Plane { normal, .. }) => normal.vec().dot(n).abs() < ANG,
+        Some(FaceSurface::Cylinder { axis, .. }) => parallel_either_way(axis.vec(), n),
+        _ => false,
+    }
+}
+
+/// Follows the round `g` on the edge of the floor `fi` (outward normal `n`) through tangent
+/// edges to the upright faces beyond it: a cutter-radius fillet along a pocket's floor, and the
+/// corner patches where such rounds meet. The round's faces go to `rounds`, the upright faces
+/// it reaches to `walls`. `false` when `g` is no concave round lying on the floor.
+fn round_to_walls(t: &Topo, r: &Recognised, fi: usize, g: usize, n: Vec3, rounds: &mut Vec<usize>, walls: &mut Vec<usize>) -> bool {
+    let is_round =
+        |f: usize| t.faces.get(f).is_some_and(|x| x.sign < 0.0 && x.surface.as_ref().and_then(blend_radius).is_some()) && !upright(t, f, n);
+    if !is_round(g) {
+        return false;
+    }
+    let mut queue = vec![g];
+    let mut seen: BTreeSet<usize> = BTreeSet::from([fi]);
+    while let Some(f) = queue.pop() {
+        if !seen.insert(f) {
+            continue;
+        }
+        if !rounds.contains(&f) {
+            rounds.push(f);
+        }
+        let Some(face) = t.faces.get(f) else { continue };
+        for &ei in &face.edges {
+            let Some(e) = t.edges.get(ei) else { continue };
+            if !e.tangent() {
+                continue;
+            }
+            let Some(h) = e.other(f) else { continue };
+            if seen.contains(&h) || r.owns(h) {
+                continue;
+            }
+            if upright(t, h, n) {
+                seen.insert(h);
+                if !walls.contains(&h) {
+                    walls.push(h);
+                }
+            } else if is_round(h) {
+                queue.push(h);
+            }
+        }
+    }
+    true
+}
+
 /// Reads face `fi` as a pocket floor: every edge of it concave to an upright wall (or to a hole
-/// or boss in the floor), every wall rising at a convex edge to one flat opening face above.
+/// or boss in the floor), or tangent to a round that leads to one, every wall rising at a convex
+/// edge to one flat opening face above.
 fn floor(t: &Topo, r: &Recognised, fi: usize) -> Floor {
     let Some(face) = t.faces.get(fi) else { return Floor::No };
     let Some((n, p)) = t.plane(fi) else { return Floor::No };
     let mut walls: Vec<usize> = Vec::new();
+    let mut rounds: Vec<usize> = Vec::new();
     let mut open_sides: Vec<usize> = Vec::new();
     for &ei in &face.edges {
         let Some(e) = t.edges.get(ei) else { continue };
@@ -1285,11 +1347,15 @@ fn floor(t: &Topo, r: &Recognised, fi: usize) -> Floor {
         if r.owns(g) {
             continue;
         }
-        let upright = match t.surface(g) {
-            Some(FaceSurface::Plane { normal, .. }) => normal.vec().dot(n).abs() < ANG,
-            Some(FaceSurface::Cylinder { axis, .. }) => parallel_either_way(axis.vec(), n),
-            _ => false,
-        };
+        if e.tangent() {
+            // A round along the floor's edge (the commonest milled pocket has its cutter's
+            // radius there): the walls are the upright faces beyond it.
+            if !round_to_walls(t, r, fi, g, n, &mut rounds, &mut walls) {
+                return Floor::No;
+            }
+            continue;
+        }
+        let upright = upright(t, g, n);
         match (e.convex, upright) {
             (Some(false), true) => {
                 if !walls.contains(&g) {
@@ -1312,7 +1378,7 @@ fn floor(t: &Topo, r: &Recognised, fi: usize) -> Floor {
         for &ei in &wf.edges {
             let Some(e) = t.edges.get(ei) else { continue };
             let Some(g) = e.other(w) else { continue };
-            if g == fi || walls.contains(&g) || open_sides.contains(&g) || r.owns(g) || e.tangent() {
+            if g == fi || walls.contains(&g) || rounds.contains(&g) || open_sides.contains(&g) || r.owns(g) || e.tangent() {
                 continue;
             }
             let Some((gn, gp)) = t.plane(g) else { return Floor::No };
@@ -1344,6 +1410,7 @@ fn floor(t: &Topo, r: &Recognised, fi: usize) -> Floor {
     }
     let mut faces = vec![fi];
     faces.extend(walls.iter().copied());
+    faces.extend(rounds.iter().copied());
     if !open_sides.is_empty() {
         return Floor::Nearly(
             faces,
@@ -1355,7 +1422,7 @@ fn floor(t: &Topo, r: &Recognised, fi: usize) -> Floor {
     }
     let Some(depth) = depth else { return Floor::No };
     Floor::Pocket(Feature {
-        kind: Kind::Pocket { depth, floor: fi, opening, walls, normal: n },
+        kind: Kind::Pocket { depth, floor: fi, opening, walls, rounds, normal: n },
         faces,
         position: face.centroid,
         approximate: false,
@@ -1399,34 +1466,55 @@ fn blend_radius(s: &FaceSurface) -> Option<f64> {
     }
 }
 
+/// The surfaces face `i` is tangent to (its own pieces not counted, pieces of one neighbouring
+/// surface once), each with the body's outward normal where they meet.
+fn tangent_neighbours(t: &Topo, i: usize) -> Vec<(usize, Vec3)> {
+    let Some(f) = t.faces.get(i) else { return Vec::new() };
+    let mut out: Vec<(usize, Vec3)> = Vec::new();
+    for &ei in &f.edges {
+        let Some(e) = t.edges.get(ei) else { continue };
+        if !e.tangent() {
+            continue;
+        }
+        let Some(&p) = e.pts.get(e.pts.len() / 2) else { continue };
+        for &g in &e.faces {
+            if f.group.contains(&g) {
+                continue;
+            }
+            let key = t.faces.get(g).and_then(|x| x.group.first().copied()).unwrap_or(g);
+            if out.iter().any(|(k, _)| *k == key) {
+                continue;
+            }
+            let Some(n) = t.normal(i, p) else { continue };
+            out.push((key, n));
+        }
+    }
+    out
+}
+
+/// Whether the faces a round is tangent to could have met at an edge the round replaces: two of
+/// them turn toward each other across it. A half-round between two parallel faces (a slot's end,
+/// a full round on a plate's edge) joins faces that never meet, so it is no blend.
+fn joins_could_meet(neighbours: &[(usize, Vec3)]) -> bool {
+    neighbours.iter().enumerate().any(|(i, (_, a))| neighbours.iter().skip(i + 1).any(|(_, b)| !parallel_either_way(*a, *b)))
+}
+
 fn blends(t: &Topo, r: &mut Recognised) {
-    // A blend face is tangent to at least two other surfaces (its own pieces not counted).
+    // A blend face is tangent to at least two other surfaces (its own pieces not counted) that
+    // could have met at the edge it replaces. A bore or boss wall tangent to the rounds at its
+    // ends is not a blend; any other face a feature owns (a pocket's corner round, a hole's
+    // mouth round) is also the fillet it is.
     let is_blend: Vec<bool> = t
         .faces
         .iter()
         .enumerate()
         .map(|(i, f)| {
             blend_radius(f.surface.as_ref()?)?;
-            let mut tangent_to: Vec<usize> = Vec::new();
-            for &ei in &f.edges {
-                let e = t.edges.get(ei)?;
-                if !e.tangent() {
-                    continue;
-                }
-                for &g in &e.faces {
-                    if f.group.contains(&g) {
-                        continue;
-                    }
-                    // Pieces of one neighbouring surface count once.
-                    let key = t.faces.get(g).and_then(|x| x.group.first().copied()).unwrap_or(g);
-                    if !tangent_to.contains(&key) {
-                        tangent_to.push(key);
-                    }
-                }
+            if r.walls.contains(&i) {
+                return Some(false);
             }
-            // A bore or boss wall tangent to one round is not a blend; a face tangent to two
-            // surfaces is.
-            Some(tangent_to.len() >= 2 && !(r.owns(i) && matches!(f.surface, Some(FaceSurface::Cylinder { .. }))))
+            let neighbours = tangent_neighbours(t, i);
+            Some(neighbours.len() >= 2 && joins_could_meet(&neighbours))
         })
         .map(|b| b.unwrap_or(false))
         .collect();
@@ -1878,7 +1966,7 @@ fn patterns(t: &Topo, features: &[Feature]) -> Vec<Value> {
             taken.extend(members.iter().copied());
             continue;
         }
-        // Rows: every pair's direction and pitch, the members on that row, largest first.
+        // Rows: every pair's direction and pitch, the members on that row.
         let mut rows: Vec<Vec<usize>> = Vec::new();
         for i in 0..members.len() {
             for j in i + 1..members.len() {
@@ -1914,32 +2002,18 @@ fn patterns(t: &Topo, features: &[Feature]) -> Vec<Value> {
                 }
             }
         }
-        rows.sort_by_key(|r| std::cmp::Reverse(r.len()));
-        for row in rows {
-            if row.iter().any(|m| taken.contains(m)) {
-                continue;
-            }
-            let rp: Vec<Vec3> = row.iter().filter_map(|m| features.get(*m)).map(|f| f.position).collect();
-            if let Some(l) = lattice(&rp, t.tol) {
-                out.push(emit(&row, first, Some(&l), None));
-                taken.extend(row.iter().copied());
-            }
-        }
         // Rings: every triple's circle, the members on it.
-        let free: Vec<usize> = (0..members.len()).filter(|k| members.get(*k).is_some_and(|m| !taken.contains(m))).collect();
         let mut rings: Vec<Vec<usize>> = Vec::new();
-        for (ai, &i) in free.iter().enumerate() {
-            for (bi, &j) in free.iter().enumerate().skip(ai + 1) {
-                for &k in free.iter().skip(bi + 1) {
+        for i in 0..members.len() {
+            for j in i + 1..members.len() {
+                for k in j + 1..members.len() {
                     let (Some(&pi), Some(&pj), Some(&pk)) = (pts.get(i), pts.get(j), pts.get(k)) else { continue };
                     let Some(c) = circle(&[pi, pj, pk], dir, t.tol) else { continue };
-                    let mut on: Vec<usize> = free
+                    let mut on: Vec<usize> = pts
                         .iter()
-                        .copied()
-                        .filter(|&m| {
-                            pts.get(m).is_some_and(|p| (p.dist(c.center) - c.radius).abs() < t.tol && (*p - c.center).dot(c.axis).abs() < t.tol)
-                        })
-                        .filter_map(|m| members.get(m).copied())
+                        .enumerate()
+                        .filter(|(_, p)| (p.dist(c.center) - c.radius).abs() < t.tol && (**p - c.center).dot(c.axis).abs() < t.tol)
+                        .filter_map(|(m, _)| members.get(m).copied())
                         .collect();
                     on.sort_unstable();
                     if on.len() >= MIN_PATTERN && !rings.contains(&on) {
@@ -1948,15 +2022,25 @@ fn patterns(t: &Topo, features: &[Feature]) -> Vec<Value> {
                 }
             }
         }
-        rings.sort_by_key(|r| std::cmp::Reverse(r.len()));
-        for ring in rings {
-            if ring.iter().any(|m| taken.contains(m)) {
+        // The reading that explains the most members with the fewest patterns: rows and rings
+        // together, the largest first (a row before a ring of the same size), each taken when
+        // none of its members is in a pattern already. A ring of six holes about a seventh at
+        // its centre is the ring and a lone hole, not a row of three through the centre.
+        let mut candidates: Vec<(Vec<usize>, bool)> = rows.into_iter().map(|r| (r, false)).chain(rings.into_iter().map(|r| (r, true))).collect();
+        candidates.sort_by_key(|(c, _)| std::cmp::Reverse(c.len()));
+        for (set, ring) in candidates {
+            if set.iter().any(|m| taken.contains(m)) {
                 continue;
             }
-            let rp: Vec<Vec3> = ring.iter().filter_map(|m| features.get(*m)).map(|f| f.position).collect();
-            if let Some(c) = circle(&rp, dir, t.tol) {
-                out.push(emit(&ring, first, None, Some(&c)));
-                taken.extend(ring.iter().copied());
+            let sp: Vec<Vec3> = set.iter().filter_map(|m| features.get(*m)).map(|f| f.position).collect();
+            if ring {
+                if let Some(c) = circle(&sp, dir, t.tol) {
+                    out.push(emit(&set, first, None, Some(&c)));
+                    taken.extend(set.iter().copied());
+                }
+            } else if let Some(l) = lattice(&sp, t.tol) {
+                out.push(emit(&set, first, Some(&l), None));
+                taken.extend(set.iter().copied());
             }
         }
     }
@@ -1985,11 +2069,16 @@ fn unrecognised(t: &Topo, r: &Recognised) -> Vec<Value> {
                 }
                 Some(FaceSurface::Cylinder { .. }) => {
                     let concave = face.is_some_and(|x| x.sign < 0.0);
+                    let neighbours = tangent_neighbours(t, f);
                     match (concave, tangent_count) {
                         (true, 0) => {
                             "a concave cylindrical face that is not a bore: its ends do not meet a rim, step or floor about its axis".to_string()
                         }
                         (false, 0) => "a convex cylindrical face that is not a boss: it has no flat cap at one end and base at the other".to_string(),
+                        _ if neighbours.len() >= 2 && !joins_could_meet(&neighbours) => {
+                            "a half-round between parallel faces (a slot's end, a full round on an edge): the faces it joins never meet, so it is no fillet"
+                                .to_string()
+                        }
                         _ => "a cylindrical face tangent to a neighbour but not a constant-radius blend between two faces".to_string(),
                     }
                 }

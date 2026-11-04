@@ -567,6 +567,132 @@ fn a_hole_with_a_rounded_mouth_is_read_from_the_mouth() {
     assert!(names(&fillets[0]["joins"]).contains(&"F1:+z".to_string()), "{b}");
 }
 
+/// A through slot's half-round ends join two parallel walls, which never meet: they are no
+/// fillets (nor anything else, so they are reported unrecognised, with why).
+#[test]
+fn a_through_slots_ends_are_not_fillets() {
+    let mut s = Session::default();
+    run(&mut s, "solid.box", json!({"length": 100, "width": 50, "height": 6, "corner": [0, 0, 0], "body_name": "Plate"}));
+    run(&mut s, "sketch.create", json!({"plane": "XY"}));
+    run(&mut s, "sketch.slot.overall", json!({"p0": [30, 25], "p1": [70, 25], "width": 10}));
+    run(&mut s, "sketch.finish", json!({}));
+    run(&mut s, "solid.extrude", json!({"distance": 6, "operation": "cut", "targets": ["Plate"]}));
+    let b = features(&mut s, "Plate");
+    assert!(of_type(&b, "fillet").is_empty(), "a slot's end is not a fillet: {b}");
+    assert!(list(&b["features"]).is_empty(), "{b}");
+    assert!(list(&b["patterns"]).is_empty() && list(&b["uncertain"]).is_empty(), "{b}");
+    let ends: Vec<Value> = list(&b["unrecognised"]).into_iter().filter(|u| u["surface"] == "cylinder").collect();
+    assert_eq!(ends.len(), 2, "the two half-round ends: {b}");
+    for u in &ends {
+        assert!(u["face"].as_str().is_some_and(|f| f.starts_with("F3:side:a")), "{u}");
+        assert!(u["reason"].as_str().is_some_and(|r| r.contains("parallel") && r.contains("never meet")), "{u}");
+    }
+}
+
+fn block_with_pocket() -> Session {
+    let mut s = Session::default();
+    run(&mut s, "solid.box", json!({"length": 100, "width": 60, "height": 20, "corner": [0, 0, 0], "body_name": "Block"}));
+    run(&mut s, "solid.box", json!({"length": 60, "width": 30, "height": 8, "corner": [20, 15, 12], "operation": "cut", "targets": ["Block"]}));
+    s
+}
+
+/// A pocket whose floor edges carry the cutter's radius is a pocket still: the rounds are among
+/// its faces (`floor_rounds`), its walls are the upright faces beyond them, and the rounds are
+/// also the fillet they are.
+#[test]
+fn a_pocket_with_filleted_floor_edges_is_a_pocket_and_lists_the_fillet() {
+    let mut s = block_with_pocket();
+    run(&mut s, "solid.fillet", json!({"edges": [[50, 15, 12], [50, 45, 12], [20, 30, 12], [80, 30, 12]], "radius": 2}));
+    let b = features(&mut s, "Block");
+    let pockets = of_type(&b, "pocket");
+    assert_eq!(pockets.len(), 1, "{b}");
+    let p = pockets[0];
+    exact(&p["depth"], 8.0);
+    assert_eq!(p["floor_face"], "F2:-z", "{p}");
+    assert_eq!(p["opening_face"], "F1:+z", "{p}");
+    assert_eq!(names(&p["walls"]), vec!["F2:-x", "F2:-y", "F2:+x", "F2:+y"], "{p}");
+    let rounds = names(&p["floor_rounds"]);
+    assert_eq!(rounds.len(), 4, "{p}");
+    assert!(rounds.iter().all(|r| r.starts_with("F3:blend:") && r.ends_with("|F2:-z")), "{p}");
+    let faces = names(&p["faces"]);
+    assert_eq!(faces.len(), 9, "the floor, four walls and four rounds: {p}");
+    assert!(rounds.iter().all(|r| faces.contains(r)), "{p}");
+    let fillets = of_type(&b, "fillet");
+    assert_eq!(fillets.len(), 1, "the four floor rounds are one chain: {b}");
+    let f = fillets[0];
+    exact(&f["radius"], 2.0);
+    assert_eq!(f["convex"], false, "{f}");
+    assert_eq!(names(&f["faces"]), rounds, "{f}");
+    assert_eq!(names(&f["joins"]), vec!["F2:-x", "F2:-y", "F2:+x", "F2:+y", "F2:-z"], "{f}");
+    assert!(list(&b["uncertain"]).is_empty(), "{b}");
+    assert_eq!(list(&b["unrecognised"]).len(), 6, "the block's own faces: {b}");
+    // A plain pocket has no rounds.
+    let b = features(&mut block_with_pocket(), "Block");
+    assert_eq!(of_type(&b, "pocket")[0]["floor_rounds"], json!([]), "{b}");
+}
+
+/// A pocket's vertical corner rounds stay its walls and are listed as the fillets they are, as a
+/// hole's mouth round is both a step of the hole and a fillet.
+#[test]
+fn a_pockets_vertical_corner_rounds_are_fillets_too() {
+    let mut s = block_with_pocket();
+    run(&mut s, "solid.fillet", json!({"edges": [[20, 15, 16], [80, 15, 16], [20, 45, 16], [80, 45, 16]], "radius": 4}));
+    let b = features(&mut s, "Block");
+    let pockets = of_type(&b, "pocket");
+    assert_eq!(pockets.len(), 1, "{b}");
+    let p = pockets[0];
+    exact(&p["depth"], 8.0);
+    assert_eq!(p["floor_face"], "F2:-z", "{p}");
+    assert_eq!(names(&p["walls"]).len(), 8, "four flat walls and four corner rounds: {p}");
+    let fillets = of_type(&b, "fillet");
+    assert_eq!(fillets.len(), 4, "the corner rounds are fillets too: {b}");
+    assert_eq!(p["floor_rounds"], json!([]), "{p}");
+    for f in &fillets {
+        exact(&f["radius"], 4.0);
+        assert_eq!(f["convex"], false, "{f}");
+        let faces = names(&f["faces"]);
+        assert_eq!(faces.len(), 1, "{f}");
+        assert!(faces[0].starts_with("F3:blend:F2:"), "{f}");
+        assert!(names(&p["walls"]).contains(&faces[0]), "the round is a wall of the pocket too: {f}");
+        let joins = names(&f["joins"]);
+        assert_eq!(joins.len(), 2, "{f}");
+        assert!(joins.iter().all(|j| j.starts_with("F2:")), "two flat walls: {f}");
+    }
+    assert!(list(&b["uncertain"]).is_empty(), "{b}");
+    assert_eq!(list(&b["unrecognised"]).len(), 6, "{b}");
+}
+
+/// Six holes on a ring about a seventh of the same size at its centre: the ring of six and a
+/// lone hole, not a row of three through the centre (which would leave four holes unexplained).
+#[test]
+fn a_ring_of_six_holes_about_a_centre_hole_is_the_ring_and_a_lone_hole() {
+    let mut s = Session::default();
+    run(&mut s, "solid.cylinder", json!({"base": [600, 0, 0], "diameter": 100, "height": 10, "body_name": "Disc"}));
+    run(&mut s, "solid.hole", json!({"position": [635, 0, 10], "diameter": 6, "name": "Hole"}));
+    run(&mut s, "solid.pattern.circular", json!({"features": ["Hole"], "axis": {"origin": [600, 0, 0], "dir": [0, 0, 1]}, "count": 6}));
+    run(&mut s, "solid.hole", json!({"position": [600, 0, 10], "diameter": 6, "name": "Centre"}));
+    let b = features(&mut s, "Disc");
+    let holes = of_type(&b, "hole");
+    assert_eq!(holes.len(), 7, "{b}");
+    let centre = holes
+        .iter()
+        .position(|h| (num(&h["axis"]["origin"][0]) - 600.0).abs() < 1e-9 && num(&h["axis"]["origin"][1]).abs() < 1e-9)
+        .unwrap_or_else(|| panic!("{b}"));
+    let patterns = list(&b["patterns"]);
+    assert_eq!(patterns.len(), 1, "{b}");
+    let p = &patterns[0];
+    assert_eq!(p["type"], "circular", "{p}");
+    assert_eq!(p["count"], 6, "{p}");
+    exact(&p["angle_step_deg"], 60.0);
+    assert_eq!(p["full_circle"], true, "{p}");
+    exact(&p["radius"], 35.0);
+    exact3(&p["axis"]["origin"], [600.0, 0.0, 10.0]);
+    let members: Vec<usize> = list(&p["members"]).iter().map(|m| m.as_u64().unwrap() as usize).collect();
+    assert_eq!(members.len(), 6, "{p}");
+    assert!(!members.contains(&centre), "the centre hole stays alone: {p}");
+    assert_eq!(names(&p["faces"]).len(), 12, "{p}");
+}
+
 /// Two alike features are two features: a pattern needs three members.
 #[test]
 fn two_alike_fillets_or_chamfers_are_not_a_pattern() {
