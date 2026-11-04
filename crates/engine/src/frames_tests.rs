@@ -355,6 +355,25 @@ fn off_body_face_picks_in_a_moved_active_component_fall_back_to_its_frame() {
     assert!(s.model.results.iter().all(|r| r.error.is_none()), "{:?}", s.model.results);
 }
 
+/// (PK-95) An entry of a face list in a moved component that no face is within reach of is
+/// refused, and the error names the point as given, in the world, not the point in the
+/// component's frame.
+#[test]
+fn face_picks_out_of_reach_in_a_moved_component_report_the_given_point() {
+    let mut s = Session::default();
+    run(&mut s, "component.create", json!({"name": "Part", "grounded": false}));
+    run(&mut s, "solid.box", json!({"length": 40, "width": 30, "height": 20}));
+    run(&mut s, "occurrence.move", json!({"occurrence": "Part:1", "translate": [50, 0, 0]}));
+    let features = s.doc.features.len();
+    // The box spans world x 50…90: world [100, 15, 10] is 10 mm past its +x face, [50, 15, 10]
+    // in the component's frame.
+    let err = s.execute("solid.shell", &json!({"faces": [[70, 30, 10], [100, 15, 10]], "thickness": 2})).unwrap_err().to_string();
+    assert!(err.contains("face 2") && err.contains("[100, 15, 10]") && !err.contains("[50, 15, 10]"), "{err}");
+    assert_eq!(s.doc.features.len(), features, "nothing was added");
+    let v = volume(&mut s);
+    assert!((v - 24_000.0).abs() < 1e-6, "{v}");
+}
+
 /// (#297 review) Delete Face and Split Face picks on a moved component, given in the world with
 /// the root active, land on the component's body like every other face-taking command's.
 #[test]
