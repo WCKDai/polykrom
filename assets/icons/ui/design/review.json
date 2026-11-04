@@ -1,5 +1,357 @@
 {
  "version": 1,
  "final": {},
- "notes": {}
+ "notes": {},
+ "supplied": {
+  "arc3": {
+   "label": "Arc",
+   "source": "assets/design-kit/2026-11-02/components/svg/polykrom-icon-arc--7-6.svg",
+   "sha256": "abe728e57c59699141af5586dc6f143f77284e14befffa6064aede55f4a8809d"
+  },
+  "assistant": {
+   "label": "AI command",
+   "source": "assets/design-kit/2026-11-02/components/svg/polykrom-icon-ai-command--4-218.svg",
+   "sha256": "88bb0e3f7e72034d54f70899722f00975966c07ca768a1dc3cc6fe7ab2816656"
+  },
+  "axis": {
+   "label": "Axis",
+   "source": "assets/design-kit/2026-11-02/components/svg/polykrom-icon-axis--20-55.svg",
+   "sha256": "da96c511e0ceb0236c64fc9005508813b586847778b2535b29e01abfd6c57dd1"
+  },
+  "body": {
+   "label": "Body",
+   "source": "assets/design-kit/2026-11-02/components/svg/polykrom-icon-body--4-166.svg",
+   "sha256": "492e7d47d26e1abfff432ac679cbf6759eadbc4dc5908cacdb8a5b79888d0738"
+  },
+  "c_coincident": {
+   "label": "Coincident",
+   "source": "assets/design-kit/2026-11-02/components/svg/polykrom-icon-coincident--4-340.svg",
+   "sha256": "e5973418a11de1088a1b61f85ef9af252f5d82d4f0317c4f877d4efe2dfaad3f"
+  },
+  "c_concentric": {
+   "label": "Concentric",
+   "source": "assets/design-kit/2026-11-02/components/svg/polykrom-icon-concentric--4-352.svg",
+   "sha256": "87412ded320ecd673221393bf26d23349643f04c8ee8aced31f5f5c5dce7be21"
+  },
+  "c_equal": {
+   "label": "Equal",
+   "source": "assets/design-kit/2026-11-02/components/svg/polykrom-icon-equal--4-356.svg",
+   "sha256": "2251c1c239c17af751a399600eb4789e073933517e4d65d3419cd604e34c0459"
+  },
+  "c_fix": {
+   "label": "Fix",
+   "source": "assets/design-kit/2026-11-02/components/svg/polykrom-icon-fix--4-368.svg",
+   "sha256": "ad4409edcfad616502dc0d12869b2b76888694c37c040c4a8d956a61a2227b37"
+  },
+  "c_parallel": {
+   "label": "Parallel",
+   "source": "assets/design-kit/2026-11-02/components/svg/polykrom-icon-parallel--4-344.svg",
+   "sha256": "76ba7e687bace1c8e6d8f8c55c3a16b7f4b5d1ee5cdb9fa590c54243b9ced536"
+  },
+  "c_perpendicular": {
+   "label": "Perpendicular",
+   "source": "assets/design-kit/2026-11-02/components/svg/polykrom-icon-perpendicular--4-348.svg",
+   "sha256": "cca16e322820cbac4a1b89d96679457cc0e6fffdcb0889b8a50fe7a922d130ba"
+  },
+  "c_symmetry": {
+   "label": "Symmetric",
+   "source": "assets/design-kit/2026-11-02/components/svg/polykrom-icon-symmetric--4-360.svg",
+   "sha256": "dd98af480ffaef852d2a8faf05e7a0086c4f0e89d8a8236b14a47c594aa15e2f"
+  },
+  "c_tangent": {
+   "label": "Tangent",
+   "source": "assets/design-kit/2026-11-02/components/svg/polykrom-icon-tangent--4-364.svg",
+   "sha256": "769dd4e1f7e206472a7d7f8a6455a1e9d33d9d98e8bb0c7b8c436927655e4971"
+  },
+  "camera": {
+   "label": "Camera",
+   "source": "assets/design-kit/2026-11-02/components/svg/polykrom-icon-camera--4-260.svg",
+   "sha256": "d510f6e02e1b58d30943098fdc429b259c6b1b1988c96441154e84a60456d4c6"
+  },
+  "chamfer": {
+   "label": "Chamfer",
+   "source": "assets/design-kit/2026-11-02/components/svg/polykrom-icon-chamfer--4-300.svg",
+   "sha256": "72ce39699e07593df6db74684fbe0c721a6ed6d91b04c42a50dc1cc976d8e64e"
+  },
+  "circle": {
+   "label": "Circle",
+   "source": "assets/design-kit/2026-11-02/components/svg/polykrom-icon-circle--4-112.svg",
+   "sha256": "c67841c5f779c5b3ea6754e2657e4a1c4b88ae2bb50f1eacce9fbc52b428547b"
+  },
+  "close": {
+   "label": "Close",
+   "source": "assets/design-kit/2026-11-02/components/svg/polykrom-icon-close--4-213.svg",
+   "sha256": "cb3695548d51367879a4ea4484c360433d33b0dc42e94cb7de615bb91ad9da04"
+  },
+  "code": {
+   "label": "Code",
+   "source": "assets/design-kit/2026-11-02/components/svg/polykrom-icon-code--4-270.svg",
+   "sha256": "0a34d8ba24a78ca3411932778479ce0509ac70314574a18919581874869b7f9c"
+  },
+  "combine": {
+   "label": "Boolean",
+   "source": "assets/design-kit/2026-11-02/components/svg/polykrom-icon-boolean--4-324.svg",
+   "sha256": "deee3ae92d1760b5016ed2fb0c2ea9853c894e7b46a68decf2bc89a7ebc557aa"
+  },
+  "component": {
+   "label": "Assembly",
+   "source": "assets/design-kit/2026-11-02/components/svg/polykrom-icon-assembly--4-151.svg",
+   "sha256": "a1e57657977cb1bda9f882a8a427c66dccd8a79df881f59510c8bac73015d4ea"
+  },
+  "copy": {
+   "label": "Copy",
+   "source": "assets/design-kit/2026-11-02/components/svg/polykrom-icon-copy--20-25.svg",
+   "sha256": "0148ab8e42c96d2469ac485ee91e986e5d2d10324fd74fefb32fcfe0a34521f7"
+  },
+  "drawing": {
+   "label": "Drawing",
+   "source": "assets/design-kit/2026-11-02/components/svg/polykrom-icon-drawing--4-236.svg",
+   "sha256": "a32250aa341c84b633c7c70cdc050b7136ada28e91419c8aee3f1babd95c1521"
+  },
+  "expand": {
+   "label": "Expand",
+   "source": "assets/design-kit/2026-11-02/components/svg/polykrom-icon-expand--4-188.svg",
+   "sha256": "286a877def9a429767f0706a3be55dc79e0e45ab361ba65ddf81f5dea78bed60"
+  },
+  "export": {
+   "label": "Export",
+   "source": "assets/design-kit/2026-11-02/components/svg/polykrom-icon-export--4-83.svg",
+   "sha256": "f28fe3ce983375411115c6709f14c14faf5ad51c517976134152c36a1817c212"
+  },
+  "extend": {
+   "label": "Extend",
+   "source": "assets/design-kit/2026-11-02/components/svg/polykrom-icon-extend--7-18.svg",
+   "sha256": "d08452ecd3c5c6054103b5a5338e85ea8d28c8f9571dbfc3eb97ed67326df508"
+  },
+  "extrude": {
+   "label": "Extrude",
+   "source": "assets/design-kit/2026-11-02/components/svg/polykrom-icon-extrude--4-280.svg",
+   "sha256": "af17cfad18c0870b8c1160258a69eb3df05fc920aad7c2c600d4eb0651f38465"
+  },
+  "eye": {
+   "label": "Visible",
+   "source": "assets/design-kit/2026-11-02/components/svg/polykrom-icon-visible--4-176.svg",
+   "sha256": "a7cc6c42c6da4a5bc075958152cff6d08a69314523870b0c5e1c6a94a994c78f"
+  },
+  "fillet": {
+   "label": "Fillet",
+   "source": "assets/design-kit/2026-11-02/components/svg/polykrom-icon-fillet--4-296.svg",
+   "sha256": "641b2989c6401f5a27c53e5e02b7f3940a382b7a063f2e03c66f78254bc5470b"
+  },
+  "finish": {
+   "label": "Confirm",
+   "source": "assets/design-kit/2026-11-02/components/svg/polykrom-icon-confirm--4-209.svg",
+   "sha256": "97b8d17f4c3b16aa1d629bb1f6d97113b2d3efc578b5f7fd8913274fc1282f0c"
+  },
+  "fit": {
+   "label": "Focus",
+   "source": "assets/design-kit/2026-11-02/components/svg/polykrom-icon-focus--4-252.svg",
+   "sha256": "b542cdf9d7c3ddc5791d3f8e7ce06575cc4c56a55ae776764eb10d91d1894467"
+  },
+  "folder": {
+   "label": "Folder",
+   "source": "assets/design-kit/2026-11-02/components/svg/polykrom-icon-folder--4-172.svg",
+   "sha256": "6b473f457b1ba4e96bc0b904a2217763d89280c740a09073adc2b0aad4376c64"
+  },
+  "grid": {
+   "label": "Grid",
+   "source": "assets/design-kit/2026-11-02/components/svg/polykrom-icon-grid--4-143.svg",
+   "sha256": "4374dd759baaefa858e8f7dd4f463db6d2a7fc85393241244fe13ebb42f8bba3"
+  },
+  "hole": {
+   "label": "Hole",
+   "source": "assets/design-kit/2026-11-02/components/svg/polykrom-icon-hole--4-304.svg",
+   "sha256": "4a5424e5e7fbf8782112200f6ea006ec71a71327afbc92ea68a341f2dbe12914"
+  },
+  "joint": {
+   "label": "Joint",
+   "source": "assets/design-kit/2026-11-02/components/svg/polykrom-icon-joint--4-320.svg",
+   "sha256": "996e7d7f69a6cac4800f1b5c35181a0d69ecc1b7e9d98b3e5e1ec0473db61ec3"
+  },
+  "line": {
+   "label": "Line",
+   "source": "assets/design-kit/2026-11-02/components/svg/polykrom-icon-line--7-2.svg",
+   "sha256": "5c732d6526da2bc04889566a097f6816067640ec47dd299943a1959b5ed09db4"
+  },
+  "link": {
+   "label": "Link",
+   "source": "assets/design-kit/2026-11-02/components/svg/polykrom-icon-link--4-230.svg",
+   "sha256": "2fcf3e69efd0ddcdbc7999643be1d6d58066969ecafe472861a2449e5e0452a3"
+  },
+  "loft": {
+   "label": "Loft",
+   "source": "assets/design-kit/2026-11-02/components/svg/polykrom-icon-loft--4-288.svg",
+   "sha256": "0157c99a66a40bb0ab6f8305583c625870dcf12f8b9f81966ae57a4da87103fb"
+  },
+  "logo": {
+   "label": "Polykrom logo",
+   "source": "assets/design-kit/2026-11-02/brand/Polykrom-Logo.svg",
+   "sha256": "6580a10774c4c8f385e7eb1f8134a842bb11b03c1e41a78915710c2f53cddf3f"
+  },
+  "measure": {
+   "label": "Measure",
+   "source": "assets/design-kit/2026-11-02/components/svg/polykrom-icon-measure--4-132.svg",
+   "sha256": "5d8c67c426d8caa5813268b69dfb151a55db1c0757c61a1d6c764ebb5db1e31f"
+  },
+  "mirror": {
+   "label": "Mirror",
+   "source": "assets/design-kit/2026-11-02/components/svg/polykrom-icon-mirror--4-316.svg",
+   "sha256": "85ed7cf5e8de1710c9441e7fc167a329010cdd879599cb96692762e63eff953a"
+  },
+  "move": {
+   "label": "Move",
+   "source": "assets/design-kit/2026-11-02/components/svg/polykrom-icon-move--4-93.svg",
+   "sha256": "a83e8f0cfc349d7f502615bcc317f26b2f918edac693e43f699309732e838d1b"
+  },
+  "move_face": {
+   "label": "Move face",
+   "source": "assets/design-kit/2026-11-02/components/svg/polykrom-icon-move-face--20-32.svg",
+   "sha256": "be6eb46848bb57f2831f45a5185b842b15344dc171dced9ab3e019f59c8867a7"
+  },
+  "offset": {
+   "label": "Offset",
+   "source": "assets/design-kit/2026-11-02/components/svg/polykrom-icon-offset--4-328.svg",
+   "sha256": "d3e1b03d68ca8b34bc5dfc598c170ce69d161a61d11479415e07a76ffb886771"
+  },
+  "offset_face": {
+   "label": "Offset face",
+   "source": "assets/design-kit/2026-11-02/components/svg/polykrom-icon-offset-face--20-39.svg",
+   "sha256": "d03b342a485b451d55b872478e9a34d159e1678d5cd976209a86d454910a0d21"
+  },
+  "open": {
+   "label": "Open",
+   "source": "assets/design-kit/2026-11-02/components/svg/polykrom-icon-open--4-192.svg",
+   "sha256": "d51a505bdaeb6aa07296a3f9d6f2f3e86e3d3c5aa42433cc80fd395b442e9f95"
+  },
+  "params": {
+   "label": "Parameters",
+   "source": "assets/design-kit/2026-11-02/components/svg/polykrom-icon-parameters--4-120.svg",
+   "sha256": "95781348c63aa24785af5ddc5db22bd83f31cd49a8d14df6c3b375cbfb586a67"
+  },
+  "pattern_rect": {
+   "label": "Pattern",
+   "source": "assets/design-kit/2026-11-02/components/svg/polykrom-icon-pattern--4-312.svg",
+   "sha256": "0b1553a6540d2b9a048691502c8bdcdc3111763cb8879f9d2626f587e6ef2b9f"
+  },
+  "plane": {
+   "label": "Plane",
+   "source": "assets/design-kit/2026-11-02/components/svg/polykrom-icon-plane--4-332.svg",
+   "sha256": "361bd42ea84ccb4564bdb6751204afc985b83f16ef3c136c746f5e78df5b4086"
+  },
+  "point": {
+   "label": "Point",
+   "source": "assets/design-kit/2026-11-02/components/svg/polykrom-icon-point--4-225.svg",
+   "sha256": "b873fdfec24381517af7d3db433288ebd31ed9a49df9a732cff6450bf7c03039"
+  },
+  "project": {
+   "label": "Project",
+   "source": "assets/design-kit/2026-11-02/components/svg/polykrom-icon-project--20-62.svg",
+   "sha256": "7833e80f08541362b7bb1f4b6c8deeac015c2ae261d6d96e1f384eaceeb52575"
+  },
+  "rect": {
+   "label": "Rectangle",
+   "source": "assets/design-kit/2026-11-02/components/svg/polykrom-icon-rectangle--4-116.svg",
+   "sha256": "4c56505813fbb2697a5ba69db53b3d4433c0c3a02a4dc065ce89194d0b225a20"
+  },
+  "redo": {
+   "label": "Redo",
+   "source": "assets/design-kit/2026-11-02/components/svg/polykrom-icon-redo--4-67.svg",
+   "sha256": "5b29286f77cbe62ef13d5454c5b5343ff3352a1e83145eda7f5f25ca7003a7e6"
+  },
+  "revolve": {
+   "label": "Revolve",
+   "source": "assets/design-kit/2026-11-02/components/svg/polykrom-icon-revolve--4-284.svg",
+   "sha256": "71f9dc17e867252d2a204a07b76094f0075ed7802a978732bf3e3a49ce2408f6"
+  },
+  "rollback": {
+   "label": "History",
+   "source": "assets/design-kit/2026-11-02/components/svg/polykrom-icon-history--4-203.svg",
+   "sha256": "6b6799068d5d789de700034382212e833127c30fadcb99a207ffd7c622f12b01"
+  },
+  "rotate": {
+   "label": "Rotate",
+   "source": "assets/design-kit/2026-11-02/components/svg/polykrom-icon-rotate--4-100.svg",
+   "sha256": "ca6c9fab8841194ae6a69a53513aba637732aeafd49888b52dcf7c73454bd635"
+  },
+  "save": {
+   "label": "Save",
+   "source": "assets/design-kit/2026-11-02/components/svg/polykrom-icon-save--4-77.svg",
+   "sha256": "47b19572ac7f960a4d74d6f135c927e005d916e6fc2fbb7b39b8acbdf0b4a7a5"
+  },
+  "scan": {
+   "label": "Scan",
+   "source": "assets/design-kit/2026-11-02/components/svg/polykrom-icon-scan--4-244.svg",
+   "sha256": "98b7f1bf90a47805de69bb8dff796fe83b2ed0cacf63d103a72fe3c34f7d07af"
+  },
+  "search": {
+   "label": "Search",
+   "source": "assets/design-kit/2026-11-02/components/svg/polykrom-icon-search--4-72.svg",
+   "sha256": "6b710766bfd4e410a7a8c96b481aa43896fe8162c065e048b028a99fdff88429"
+  },
+  "section": {
+   "label": "Section",
+   "source": "assets/design-kit/2026-11-02/components/svg/polykrom-icon-section--4-336.svg",
+   "sha256": "46068166154ebbeea404d8d2afe714fac502f7905eb666add3470bab62ab6a76"
+  },
+  "select": {
+   "label": "Select",
+   "source": "assets/design-kit/2026-11-02/components/svg/polykrom-icon-select--4-89.svg",
+   "sha256": "8e209961ff8d56e32b5055a104a816a6dff21ece1b621ff798bc022e5cf7b547"
+  },
+  "settings": {
+   "label": "Settings",
+   "source": "assets/design-kit/2026-11-02/components/svg/polykrom-icon-settings--4-196.svg",
+   "sha256": "1afe7dba222b199bf827972cebde73dcc647a7d61f3660def81fd2553abae9d7"
+  },
+  "shell": {
+   "label": "Shell",
+   "source": "assets/design-kit/2026-11-02/components/svg/polykrom-icon-shell--4-308.svg",
+   "sha256": "72b6196a268125d6d2d58a7c7eed79c5be4e827641724f2411c941d2b4373c49"
+  },
+  "sidebar": {
+   "label": "Sidebar",
+   "source": "assets/design-kit/2026-11-02/components/svg/polykrom-icon-sidebar--4-265.svg",
+   "sha256": "998c3fca40cac86fea07981aeee2f4528460351e53177e3d668cf417d173bdfd"
+  },
+  "sketch": {
+   "label": "Sketch",
+   "source": "assets/design-kit/2026-11-02/components/svg/polykrom-icon-sketch--4-276.svg",
+   "sha256": "cc9131b9e1bc475c3e92f66832f0ae2b3d983ab2e963f34bbf32b5df73a854ac"
+  },
+  "slot": {
+   "label": "Slot",
+   "source": "assets/design-kit/2026-11-02/components/svg/polykrom-icon-slot--7-10.svg",
+   "sha256": "a32a4791a7f71ddd5ab9445bae459b711e9b9fbf6bf4c18b75199474bbb41874"
+  },
+  "spline": {
+   "label": "Spline",
+   "source": "assets/design-kit/2026-11-02/components/svg/polykrom-icon-spline--4-106.svg",
+   "sha256": "a02634619469bea4aa848da0ec4f2c75c5a3be21cf30221ca10063e67c3f5ba0"
+  },
+  "split_body": {
+   "label": "Split body",
+   "source": "assets/design-kit/2026-11-02/components/svg/polykrom-icon-split-body--20-47.svg",
+   "sha256": "cc3718bb2890d95f460a78c20ebd74a5c7190c21786d203953fd0f945219d978"
+  },
+  "suppress": {
+   "label": "Hidden",
+   "source": "assets/design-kit/2026-11-02/components/svg/polykrom-icon-hidden--4-181.svg",
+   "sha256": "0ec3a685e2c68542f9fb81ea435615ac939c9423cd1e42316f1bc2eff5589aa3"
+  },
+  "sweep": {
+   "label": "Sweep",
+   "source": "assets/design-kit/2026-11-02/components/svg/polykrom-icon-sweep--4-292.svg",
+   "sha256": "c8df184ce786a453bfe3c56ee1c8a5faca0456db51bb323977b7185dd356d606"
+  },
+  "trim": {
+   "label": "Trim",
+   "source": "assets/design-kit/2026-11-02/components/svg/polykrom-icon-trim--7-14.svg",
+   "sha256": "d797aed29f41fb91f5281df22f2d46645bf7f728aa022af6ad20e25f9c3441a8"
+  },
+  "undo": {
+   "label": "Undo",
+   "source": "assets/design-kit/2026-11-02/components/svg/polykrom-icon-undo--4-62.svg",
+   "sha256": "e841d892c6a3d13b86246925fdd422013486c4dbd3f75fb3b43011ec34a0a661"
+  }
+ }
 }

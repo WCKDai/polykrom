@@ -1,25 +1,29 @@
 # Finished visual references, not a list that controls discovery or review status.
+[category.supplied]
+label = "Owner-supplied masters (design kit 2026-11-02)"
+rule = "The kit's exact vectors on a 24 grid: neutral outline and faces as palette roles, the lime/green/mint gradient marks the action, profile or control point. Never redrawn or edited; a newer owner snapshot replaces them whole."
+icons = ["undo", "extrude", "shell", "rect", "c_parallel", "folder", "logo"]
 [category.model]
-label = "Features and solids"
+label = "Features and solids (Facet)"
 rule = "A part from frame() in 2:1 dimetric line art; the face the command makes is the one facet; one action arrow."
-icons = ["extrude", "fillet", "shell", "hole"]
+icons = ["thread", "boss", "rib", "draft"]
 [category.construct]
-label = "Construction"
+label = "Construction (Facet)"
 rule = "Defining geometry in ink; the plane (pale facet, accent edge), axis (accent line, end dots) or point (accent ring) is the result."
 icons = ["plane_midplane", "axis_two_planes", "point_vertex"]
 [category.sketch]
-label = "Sketch and constraints"
+label = "Sketch and constraints (Facet)"
 rule = "Flat geometry as a bold accent stroke with ringed points; constraints draw the related geometry in ink and the relation in the accent."
-icons = ["rect", "circle3", "slot", "sketch_fillet", "c_parallel", "c_tangent"]
+icons = ["rect_center", "circle3", "slot_center", "sketch_fillet", "c_collinear", "c_midpoint"]
 [category.utility]
-label = "Documents and utilities"
+label = "Documents and utilities (Facet)"
 rule = "A compact object outlined at action weight with one facet."
-icons = ["new", "copy", "delete", "export"]
+icons = ["new", "paste", "delete", "import"]
 [category.flat]
-label = "Application bar and navigation"
+label = "Application bar and navigation (Facet)"
 rule = "currentColor outlines at action weight; a facet only where it names the thing."
-icons = ["save", "orbit", "settings"]
+icons = ["home", "orbit", "nav_settings"]
 [category.workspace]
-label = "Workspace marks"
+label = "Workspace marks (Facet)"
 rule = "One large, simple mark."
 icons = ["ws_design", "ws_render"]

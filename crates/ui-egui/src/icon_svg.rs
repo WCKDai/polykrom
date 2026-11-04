@@ -10,15 +10,19 @@
 //! roles. GAP instead erases preceding artwork to transparency; it never paints a background.
 //! `palette.toml` owns defaults; theme files may override display roles and semantic ramps.
 //!
-//! The design kit (`assets/design-kit/<date>/components/svg`) is drawn by the same renderer and
-//! uses a little more: `<linearGradient>` with `<stop>`s referenced as `url(#id)` for fill and
-//! stroke (`gradientUnits`, `x1 y1 x2 y2`, `offset`, `stop-color`, `stop-opacity`), literal hex
+//! The owner-supplied masters (`svg/supplied`: the design kit's exact vectors, byte-identical to
+//! `assets/design-kit/<date>`) are drawn by the same renderer and use a little more:
+//! `<linearGradient>` with `<stop>`s referenced as `url(#id)` for fill and stroke
+//! (`gradientUnits`, `x1 y1 x2 y2`, `offset`, `stop-color`, `stop-opacity`), literal hex
 //! colours, `H` and `V` path commands, any square or rectangular `viewBox` (the kit draws on a
-//! 24 grid, the masters on 64), `stroke-dasharray`, `fill-rule`, `clip-rule` and `opacity`. A hex
-//! colour that is a palette source identifier still names its role, whether written long or
-//! short; any other hex is a fixed colour that no theme recolours. Fill and stroke default to
-//! none, strokes always get round caps and joins, and a gradient whose ends coincide paints its
-//! last stop (the SVG rule).
+//! 24 grid, the Facet masters on 64), `stroke-dasharray`, `fill-rule`, `clip-rule` and `opacity`.
+//! A hex colour that is a palette source identifier still names its role, whether written long
+//! or short; the kit's neutral hexes are read as the roles `palette.toml`'s `[supplied-roles]`
+//! names ([`supplied_source`]); any other hex is a fixed colour that no theme recolours. Fill and
+//! stroke default to none, strokes always get round caps and joins, and a gradient whose ends
+//! coincide paints its last stop (the SVG rule). A supplied master takes precedence over a Facet
+//! master of the same id, which stays as its fallback; an alias flagged `facet = true` in
+//! `aliases.toml` draws that fallback in its accent.
 //!
 //! Nothing here panics on bad artwork: a document that does not parse is logged and drawn as the
 //! placeholder, and `every_master_parses` holds that no master fails. The parser rejects what
@@ -79,18 +83,6 @@ pub mod audit {
                     master: resolved.master.to_owned(),
                     placeholder: resolved.placeholder,
                 });
-            });
-        }
-    }
-
-    /// The design-kit drawing `crate::icons` chose for `name` replaces the recorded master, so
-    /// the audit reports what is actually drawn.
-    pub(crate) fn record_kit(name: &str, file: &str) {
-        if ACTIVE.get() {
-            REQUESTS.with(|requests| {
-                if let Some(request) = requests.borrow_mut().get_mut(name) {
-                    request.master = file.to_owned();
-                }
             });
         }
     }
@@ -878,23 +870,71 @@ fn render_with_look(doc: &Doc, look: PaintLook, px: u32) -> Option<sk::Pixmap> {
 
 struct Entry {
     doc: Doc,
+    /// An owner-supplied master (`svg/supplied`): the design kit's vector, drawn as shipped.
+    supplied: bool,
 }
 
-fn table() -> &'static (HashMap<&'static str, Entry>, HashMap<&'static str, Entry>) {
-    static T: OnceLock<(HashMap<&'static str, Entry>, HashMap<&'static str, Entry>)> = OnceLock::new();
+/// The masters: the primary table (an owner-supplied master, else the Facet drawing), the small
+/// optical variants, and the Facet drawings an owner-supplied master displaced (their fallbacks).
+struct Table {
+    big: HashMap<&'static str, Entry>,
+    small: HashMap<&'static str, Entry>,
+    facet: HashMap<&'static str, Entry>,
+}
+
+/// The owner-supplied masters keep the design kit's own neutral hexes; `palette.toml`'s
+/// `[supplied-roles]` names the palette role each stands for (the outline is the `line` role,
+/// the face `passive-2`, the shell tone the knockout), so the renderer reads them as roles and
+/// themes apply. The gradient stops are no role and stay as shipped.
+pub fn supplied_source(src: &str) -> String {
+    let mut out = src.to_owned();
+    for ([r, g, b], role) in SUPPLIED_ROLES {
+        let to = match ROLE_NAMES.get(*role) {
+            Some(&"line") => "currentColor",
+            Some(_) => ROLE_SOURCE_HEX.get(*role).copied().unwrap_or_default(),
+            None => "",
+        };
+        if to.is_empty() {
+            continue;
+        }
+        let hex = format!("#{r:02X}{g:02X}{b:02X}");
+        out = out.replace(&hex, to).replace(&hex.to_ascii_lowercase(), to);
+    }
+    out
+}
+
+fn table() -> &'static Table {
+    static T: OnceLock<Table> = OnceLock::new();
     T.get_or_init(|| {
-        let (mut big, mut small) = (HashMap::new(), HashMap::new());
+        let mut t = Table { big: HashMap::new(), small: HashMap::new(), facet: HashMap::new() };
         for (id, fam, src) in SVGS {
+            let supplied = *fam == "supplied";
+            let source;
+            let src: &str = if supplied {
+                source = supplied_source(src);
+                &source
+            } else {
+                src
+            };
             match Doc::parse(src) {
                 Ok(doc) => {
-                    let map = if *fam == "small" { &mut small } else { &mut big };
-                    // Model masters precede flat glyphs: keep the reviewed command artwork.
-                    map.entry(*id).or_insert(Entry { doc });
+                    if *fam == "small" {
+                        t.small.entry(*id).or_insert(Entry { doc, supplied });
+                    } else if supplied {
+                        // The owner's drawing supersedes a Facet master of the same id, which
+                        // stays as the fallback (`facet = true` aliases, a withdrawn glyph).
+                        if let Some(previous) = t.big.insert(*id, Entry { doc, supplied }) {
+                            t.facet.insert(*id, previous);
+                        }
+                    } else {
+                        // Model masters precede flat glyphs: keep the reviewed command artwork.
+                        t.big.entry(*id).or_insert(Entry { doc, supplied });
+                    }
                 }
                 Err(e) => log::warn!("icon {fam}/{id}: {e}"),
             }
         }
-        (big, small)
+        t
     })
 }
 
@@ -904,6 +944,9 @@ pub struct Resolved {
     pub master: &'static str,
     pub accent: Option<usize>,
     pub placeholder: bool,
+    /// The drawing is an owner-supplied master (the design kit's vector): neutral geometry with
+    /// the kit's gradient, which no accent recolours.
+    pub supplied: bool,
 }
 
 pub(crate) fn accent_index(name: &str) -> Option<usize> {
@@ -939,33 +982,62 @@ pub fn resolve(name: &str) -> Resolved {
 }
 
 fn resolve_master(name: &str) -> Resolved {
-    let (big, _) = table();
-    let placeholder = Resolved { master: PLACEHOLDER, accent: None, placeholder: true };
-    if let Some((_, master, accent)) = ALIASES.iter().find(|(a, _, _)| *a == name) {
-        return match big.get_key_value(master) {
-            Some((k, _)) => Resolved { master: k, accent: accent_index(accent).or_else(|| default_accent(name)), placeholder: false },
+    let t = table();
+    let placeholder = Resolved { master: PLACEHOLDER, accent: None, placeholder: true, supplied: false };
+    if let Some((_, master, accent, facet)) = ALIASES.iter().find(|(a, _, _, _)| *a == name) {
+        // A `facet = true` alias draws the Facet drawing beneath an owner-supplied master.
+        let entry = if *facet { t.facet.get_key_value(master) } else { None }.or_else(|| t.big.get_key_value(master));
+        return match entry {
+            Some((k, e)) => {
+                Resolved { master: k, accent: accent_index(accent).or_else(|| default_accent(name)), placeholder: false, supplied: e.supplied }
+            }
             None => placeholder,
         };
     }
-    match big.get_key_value(name) {
-        Some((k, _)) if name != PLACEHOLDER => Resolved { master: k, accent: default_accent(name), placeholder: false },
+    match t.big.get_key_value(name) {
+        Some((k, e)) if name != PLACEHOLDER => Resolved { master: k, accent: default_accent(name), placeholder: false, supplied: e.supplied },
         _ => placeholder,
     }
 }
 
 /// The master to draw at `px` pixels: the small-slot variant where one exists.
 pub fn doc_for(master: &str, px: u32) -> Option<&'static Doc> {
-    let (big, small) = table();
-    if let Some(e) = small.get(master).filter(|_| px <= 24) {
+    let t = table();
+    let primary = t.big.get(master);
+    if let Some(e) = t.small.get(master).filter(|_| px <= 24 && !primary.is_some_and(|p| p.supplied)) {
         return Some(&e.doc);
     }
-    big.get(master).or_else(|| big.get(PLACEHOLDER)).map(|e| &e.doc)
+    primary.or_else(|| t.big.get(PLACEHOLDER)).map(|e| &e.doc)
+}
+
+/// The drawing a resolved icon paints at `px` pixels: a `facet = true` alias of an owner-supplied
+/// master paints the Facet drawing beneath it, everything else what [`doc_for`] gives.
+pub fn doc_of(resolved: Resolved, px: u32) -> Option<&'static Doc> {
+    let t = table();
+    if !resolved.supplied && t.big.get(resolved.master).is_some_and(|e| e.supplied) {
+        return t.facet.get(resolved.master).map(|e| &e.doc);
+    }
+    doc_for(resolved.master, px)
+}
+
+/// The owner-supplied master ids (`svg/supplied`), sorted.
+pub fn supplied_ids() -> Vec<&'static str> {
+    let mut v: Vec<_> = table().big.iter().filter(|(_, e)| e.supplied).map(|(k, _)| *k).collect();
+    v.sort_unstable();
+    v
+}
+
+/// The ids whose Facet drawing an owner-supplied master displaced, sorted.
+pub fn facet_fallback_ids() -> Vec<&'static str> {
+    let mut v: Vec<_> = table().facet.keys().copied().collect();
+    v.sort_unstable();
+    v
 }
 
 /// Every master id (not the small variants), for tests and tooling.
 #[cfg(test)]
 pub fn master_ids() -> Vec<&'static str> {
-    let mut v: Vec<_> = table().0.keys().copied().collect();
+    let mut v: Vec<_> = table().big.keys().copied().collect();
     v.sort_unstable();
     v
 }
@@ -981,13 +1053,14 @@ mod tests {
                 panic!("{fam}/{id}: {e}");
             }
         }
-        assert!(table().0.contains_key(PLACEHOLDER), "the placeholder master exists");
+        assert!(table().big.contains_key(PLACEHOLDER), "the placeholder master exists");
     }
 
     #[test]
     fn aliases_point_at_masters_and_known_accents() {
-        for (alias, master, accent) in ALIASES {
-            assert!(table().0.contains_key(master), "{alias} -> {master}");
+        for (alias, master, accent, facet) in ALIASES {
+            assert!(table().big.contains_key(master), "{alias} -> {master}");
+            assert!(!facet || table().facet.contains_key(master), "{alias}: facet = true needs a Facet drawing beneath {master}");
             assert!(accent.is_empty() || ACCENT_NAMES.contains(accent), "{alias}: accent {accent}");
             assert!(!resolve(alias).placeholder);
         }
@@ -1217,14 +1290,19 @@ mod tests {
     }
 
     #[test]
-    fn reviewed_model_folder_is_also_the_folder_drawn_in_the_app() {
-        let source = SVGS.iter().find(|(id, fam, _)| *id == "folder" && *fam == "model").unwrap().2;
-        let expected = Doc::parse(source).unwrap();
+    fn supplied_folder_is_the_folder_drawn_in_the_app_and_the_facet_folder_its_fallback() {
+        let supplied = SVGS.iter().find(|(id, fam, _)| *id == "folder" && *fam == "supplied").unwrap().2;
+        let expected = Doc::parse(&supplied_source(supplied)).unwrap();
+        let facet = SVGS.iter().find(|(id, fam, _)| *id == "folder" && *fam == "model").unwrap().2;
+        let fallback = Doc::parse(facet).unwrap();
+        assert!(resolve("folder").supplied);
+        assert!(facet_fallback_ids().contains(&"folder"));
         for dark in [false, true] {
             let look = Look { dark, accent: None, vision: crate::theme::ColorVision::Off, palette: None };
             let actual = render(doc_for("folder", 64).unwrap(), look, 64).unwrap();
-            let reviewed = render(&expected, look, 64).unwrap();
-            assert_eq!(actual.data(), reviewed.data());
+            assert_eq!(actual.data(), render(&expected, look, 64).unwrap().data(), "the owner-supplied Folder is drawn");
+            let kept = render(&table().facet["folder"].doc, look, 64).unwrap();
+            assert_eq!(kept.data(), render(&fallback, look, 64).unwrap().data(), "the reviewed Facet folder is the fallback");
         }
     }
 
@@ -1296,14 +1374,16 @@ mod tests {
 
     #[test]
     fn dark_theme_and_accents_change_colour_not_shape() {
-        let doc = doc_for("extrude", 64).unwrap_or_else(|| panic!("extrude"));
+        // `surface_extrude` (facet = true) draws the Facet drawing beneath the owner-supplied Extrude.
+        let r = resolve("surface_extrude");
+        assert_eq!(r.master, "extrude");
+        assert!(!r.supplied && resolve("extrude").supplied);
+        let doc = doc_of(r, 64).unwrap_or_else(|| panic!("the Facet drawing beneath extrude"));
         let light = render(doc, Look { dark: false, accent: None, vision: crate::theme::ColorVision::Off, palette: None }, 64)
             .unwrap_or_else(|| panic!("render"));
         let dark = render(doc, Look { dark: true, accent: None, vision: crate::theme::ColorVision::Off, palette: None }, 64)
             .unwrap_or_else(|| panic!("render"));
         assert_ne!(rgba(&light), rgba(&dark));
-        let r = resolve("surface_extrude");
-        assert_eq!(r.master, "extrude");
         let surface = render(doc, Look { dark: false, accent: r.accent, vision: crate::theme::ColorVision::Off, palette: None }, 64)
             .unwrap_or_else(|| panic!("render"));
         assert!(r.accent.is_some());
@@ -1311,6 +1391,12 @@ mod tests {
         // Same silhouette: the alpha channel is identical.
         let alpha = |pm: &sk::Pixmap| pm.pixels().iter().map(|p| p.alpha()).collect::<Vec<_>>();
         assert_eq!(alpha(&light), alpha(&surface));
+        // The owner-supplied master follows the theme too, and its drawing is not the Facet one.
+        let supplied = doc_for("extrude", 64).unwrap_or_else(|| panic!("extrude"));
+        let supplied_light = render(supplied, Look { dark: false, accent: None, vision: crate::theme::ColorVision::Off, palette: None }, 64).unwrap();
+        let supplied_dark = render(supplied, Look { dark: true, accent: None, vision: crate::theme::ColorVision::Off, palette: None }, 64).unwrap();
+        assert_ne!(rgba(&supplied_light), rgba(&supplied_dark));
+        assert_ne!(alpha(&supplied_light), alpha(&light));
     }
 
     #[test]

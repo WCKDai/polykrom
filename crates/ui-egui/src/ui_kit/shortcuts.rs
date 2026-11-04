@@ -71,7 +71,7 @@ fn search_with_icon(ui: &mut Ui, id: egui::Id, value: &mut String, hint: &str) -
         egui::StrokeKind::Inside,
     );
     let icon = Rect::from_center_size(pos2(r.left() + t.space_8 + t.space_16 * 0.5, r.center().y), vec2(t.space_16, t.space_16));
-    icons::paint_ink(ui.painter(), icon, "zoom", t.form_dim);
+    icons::paint_ink(ui.painter(), icon, "search", t.form_dim);
     let editor = Rect::from_min_max(pos2((icon.right() + t.space_6).min(r.right()), r.top()), r.right_bottom());
     let response = ui
         .scope_builder(egui::UiBuilder::new().max_rect(editor), |ui| {
