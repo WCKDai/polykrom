@@ -217,8 +217,8 @@ picks before the kernel sees them:
   ```
 
   A pick is only ambiguous between faces the operation can act on. The command's `body`, or an
-  entry's own `body` (`{"point": [x, y, z], "body": "LeftWall"}`, what the desktop's Shell and
-  Draft dialogs send with every picked face), keeps the pick to that body: a face flush with
+  entry's own `body` (`{"point": [x, y, z], "body": "LeftWall"}`, what the desktop's Shell, Draft,
+  Offset Face, Delete Face and Replace Face dialogs send with every picked face), keeps the pick to that body: a face flush with
   another body's face is then found as before, and the feature keeps that body as its `body`,
   so it acts on it and not on whichever body the kernel would take by its bounds. Without one,
   the faces of a command all belong to one body, so an entry inside a face that is flush with

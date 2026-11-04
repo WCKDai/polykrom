@@ -2387,3 +2387,35 @@ fn shell_and_draft_send_each_picked_face_with_its_body() {
     assert!((body_volume(&h, "A") - 8000.0).abs() > 1.0, "A's side was drafted: {}", body_volume(&h, "A"));
     assert!((body_volume(&h, "B") - 8000.0).abs() < 1e-6);
 }
+
+/// (#297) Offset Face, Delete Face and Replace Face send each picked face with its body too: a
+/// face flush with another body's is not refused as an ambiguous pick from the desktop.
+#[test]
+fn offset_delete_and_replace_face_send_each_picked_face_with_its_body() {
+    let picked = json!([{"point": [20.0, 10.0, 10.0], "body": "A"}]);
+    let (mut h, side) = touching_blocks();
+    start(&mut h.app, vec![side.clone()], "solid.offset_face");
+    if let Some(Kind::OffsetFaces { distance }) = h.app.dialog.as_mut().map(|d| &mut d.kind) {
+        *distance = "-2".into();
+    }
+    let (cmd, p) = apply_commands(&h.app, h.app.dialog.as_ref().unwrap()).unwrap().remove(0);
+    assert_eq!((cmd.as_str(), &p["faces"]), ("solid.offset_face", &picked));
+    press_ok(&mut h);
+    assert!(h.app.session.model.results.iter().all(|r| r.error.is_none()), "{:?}", h.app.session.model.results);
+    // A's +x face moved in by 2 mm; B untouched.
+    assert!((body_volume(&h, "A") - (8000.0 - 2.0 * 400.0)).abs() < 1e-6, "{}", body_volume(&h, "A"));
+    assert!((body_volume(&h, "B") - 8000.0).abs() < 1e-6);
+
+    let (mut h, side) = touching_blocks();
+    start(&mut h.app, vec![side.clone()], "face.delete");
+    let (cmd, p) = apply_commands(&h.app, h.app.dialog.as_ref().unwrap()).unwrap().remove(0);
+    assert_eq!((cmd.as_str(), &p["faces"]), ("face.delete", &picked));
+
+    let (mut h, side) = touching_blocks();
+    start(&mut h.app, vec![side], "solid.replace_face");
+    if let Some(d) = h.app.dialog.as_mut() {
+        d.inputs[1].items = vec![Sel::Plane { name: "YZ".into() }];
+    }
+    let (cmd, p) = apply_commands(&h.app, h.app.dialog.as_ref().unwrap()).unwrap().remove(0);
+    assert_eq!((cmd.as_str(), &p["faces"], &p["target"]), ("solid.replace_face", &picked, &json!("YZ")));
+}
