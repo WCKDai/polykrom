@@ -977,7 +977,11 @@ fn combine_of_a_piece_a_cut_used_to_split_off_takes_the_body_it_is_part_of() {
 
     let mut s = posts_cut();
     s.execute("solid.combine", &json!({"target": "Posts", "tools": ["Posts (1)"], "operation": "join"})).unwrap();
-    assert_eq!(s.model.results.last().unwrap().warning.as_deref(), piece);
+    // The piece is already part of the target, so this combine changes nothing: it says so too
+    // (PK-78), since an agent reading the reply would otherwise take the join as done.
+    let name = s.doc.features.last().map(|f| f.name.clone()).unwrap();
+    let unchanged = format!("{}; {name} has no effect: `Posts` is unchanged", piece.unwrap());
+    assert_eq!(s.model.results.last().unwrap().warning.as_deref(), Some(unchanged.as_str()));
     close(volume(&s, "Posts"), posts);
 
     // A slab through both posts, 10 mm of each, cut by both pieces.

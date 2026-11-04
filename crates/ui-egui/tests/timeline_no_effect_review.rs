@@ -27,6 +27,18 @@ fn crop(shot: &image::RgbaImage, bounds: Rect, ppp: f32) -> image::RgbaImage {
     image::imageops::crop_imm(shot, bounds.left() as u32, bounds.top() as u32, bounds.width() as u32, bounds.height() as u32).to_image()
 }
 
+/// Every text a shape paints, one per line.
+fn texts(shape: &egui::Shape, out: &mut String) {
+    match shape {
+        egui::Shape::Text(t) => {
+            out.push_str(&t.galley.job.text);
+            out.push('\n');
+        }
+        egui::Shape::Vec(shapes) => shapes.iter().for_each(|s| texts(s, out)),
+        _ => {}
+    }
+}
+
 #[test]
 fn a_hole_in_the_air_on_the_timeline() {
     let stage = std::env::var("NO_EFFECT_REVIEW_STAGE").unwrap_or_else(|_| "after".into());
@@ -53,14 +65,24 @@ fn a_hole_in_the_air_on_the_timeline() {
     for _ in 0..8 {
         raster::paint_sized(&mut h, &mut textures, vec![], WINDOW);
     }
-    // The pointer rests on the hole's chip in the timeline until its tooltip shows.
+    // The pointer moves onto the hole's chip in the timeline and rests there (tooltips show
+    // only once the pointer is still) until its tooltip shows.
     let centre = scenario::handles("timeline:").into_iter().find(|(name, _)| name == "timeline:AirHole").map(|(_, at)| at);
     let chip = Rect::from_center_size(centre.expect("the timeline shows AirHole"), egui::vec2(28.0, 28.0));
-    let hover = vec![egui::Event::PointerMoved(chip.center())];
-    for _ in 0..20 {
-        raster::paint_sized(&mut h, &mut textures, hover.clone(), WINDOW);
+    raster::paint_sized(&mut h, &mut textures, vec![egui::Event::PointerMoved(chip.center())], WINDOW);
+    for _ in 0..30 {
+        raster::paint_sized(&mut h, &mut textures, vec![], WINDOW);
     }
-    let output = raster::paint_sized(&mut h, &mut textures, hover, WINDOW);
+    let output = raster::paint_sized(&mut h, &mut textures, vec![], WINDOW);
+    // The tooltip is in the picture: the feature's name and type, and (after the change) its
+    // warning.
+    let mut painted = String::new();
+    for clipped in &output.shapes {
+        texts(&clipped.shape, &mut painted);
+    }
+    assert!(painted.contains("AirHole  ("), "the tooltip of AirHole is painted: {painted}");
+    let warned = painted.contains("AirHole has no effect: `Plate` is unchanged");
+    assert_eq!(warned, reply["warning"].is_string(), "the tooltip says what the reply says: {painted}");
     let ppp = output.pixels_per_point;
     let shot = raster::raster_sized(&mut h, &textures, output, WINDOW);
     shot.save(dir.join(format!("window-{stage}.png"))).unwrap();
