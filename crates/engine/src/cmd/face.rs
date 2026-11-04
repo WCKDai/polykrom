@@ -69,7 +69,9 @@ pub(super) fn face_is_planar(s: &Session, p: Vec3) -> Option<bool> {
 /// point as given as `world`), else the world's.
 pub(super) struct PickedFaces {
     /// The point the feature stores for each entry, in the frame of the command's picks: the
-    /// point as given, or a point inside the face for a name or a `normal`-resolved pick.
+    /// point as given where it lies on the face it resolved to, else a point inside that face
+    /// (a name, a `normal`-resolved pick, a pick within reach of the face but off it; see
+    /// [`settled_point`]).
     pub points: Vec<Vec3>,
     /// The persistent name (`model.faces`) of each entry's face, for the reply's `faces_used`;
     /// empty where no face is within the pick tolerance (the kernel reports that itself).
@@ -218,8 +220,10 @@ fn point_text(p: Vec3) -> String {
 /// the kernel would take whichever face comes first), is refused as ambiguous, with the faces
 /// named, unless `normal` picks the one facing that way (within 45°). The tolerance is a tie
 /// tolerance, not a reach: the top of a plate a thousand times longer than it is thick is not
-/// confused with its bottom. Points of unambiguous picks are kept as given, so their features
-/// build exactly as before.
+/// confused with its bottom. Points of unambiguous picks that lie on their face are kept as
+/// given, so their features build exactly as before; a pick within reach of a face but off it
+/// becomes a point inside the face, so the kernel acts on the face `faces_used` names (see
+/// [`settled_point`]).
 ///
 /// A pick is only ambiguous between faces the operation can act on. The command's `body` and an
 /// entry's own `body` keep the pick to that body, so a face flush with another body's face does
@@ -336,7 +340,7 @@ fn picked_faces_within(s: &Session, list: &[Value], body: Option<&str>, cmd: &st
                         name_of(one.body, one.face)
                     ));
                 }
-                (e.point, Some((one.body, one.face)))
+                (settled_point(&st, e.point, one, cmd)?, Some((one.body, one.face)))
             }
             _ => {
                 let Some(one) = e.normal.and_then(|n| facing(&near, n)) else {
@@ -373,6 +377,31 @@ fn picked_faces_within(s: &Session, list: &[Value], body: Option<&str>, cmd: &st
         out.body = Some(body_name(*one));
     }
     Ok(out)
+}
+
+/// The point the feature keeps for a pick `p` settled on the face `c`: `p` where it lies on the
+/// face, else a point inside the face (`naming::face_spot`, as for a face given by name).
+///
+/// The pick tolerance reaches 5 % of the body's size from a face, but a kernel finds the face
+/// it is given by a far tighter test of its own (a shell opens the planar faces within a
+/// ten-thousandth of the body's size of a point, `polycore::shell`) and used to drop a point
+/// that passed neither without a word: `faces_used` named a face that stayed as it was (#297
+/// review). On the face means on its analytic surface (within a millionth of the body's size),
+/// and within the display mesh's chord tolerance of the mesh (so not out over a hole in the
+/// face); a face of no analytic surface is read by its mesh alone, as the kernel reads it.
+fn settled_point(st: &polykrom_doc::ModelState, p: Vec3, c: &Candidate, cmd: &str) -> Result<Vec3> {
+    let Some(b) = st.bodies.get(c.body) else { return Ok(p) };
+    let size = b.body.size();
+    let mesh_tol = (size * 1e-3).max(1e-3);
+    let on_face = match polycore::face_surface(&b.body, c.face).and_then(|s| s.nearest(p)) {
+        Some(q) => q.dist(p) <= (size * 1e-6).max(1e-6) && c.distance <= mesh_tol,
+        None => c.distance <= mesh_tol,
+    };
+    if on_face {
+        return Ok(p);
+    }
+    let spot = polykrom_doc::naming::face_spot(b, c.face).ok_or_else(|| bad(cmd, "the picked face has no surface to pick"))?;
+    Ok(spot.point)
 }
 
 /// Of the faces a pick may mean, the one facing `n` (within 45°), when one faces it clearly

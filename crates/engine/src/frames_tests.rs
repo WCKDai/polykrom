@@ -313,3 +313,69 @@ fn face_picks_on_a_turned_component_take_a_world_normal_and_report_the_given_poi
     assert!((v - (24_000.0 - 36.0 * 26.0 * 18.0)).abs() < 1e-6, "{v}");
     assert!(s.model.results.iter().all(|r| r.error.is_none()), "{:?}", s.model.results);
 }
+
+/// (#297 review) `sheet.convert`'s `face` is a face pick like the others: on a turned component
+/// its ambiguous-pick error names the point as given, in the world, not the point in the
+/// component's frame; inside the face the plate converts, and the reply names the face.
+#[test]
+fn sheet_convert_on_a_turned_component_reports_the_given_point() {
+    let mut s = Session::default();
+    run(&mut s, "component.create", json!({"name": "C", "grounded": false}));
+    run(&mut s, "solid.box", json!({"length": 100, "width": 60, "height": 2, "body_name": "Plate"}));
+    run(&mut s, "component.activate", json!({"component": "root"}));
+    run(&mut s, "occurrence.move", json!({"occurrence": "C:1", "axis": [0, 0, 1], "angle": "90 deg", "origin": [0, 0, 0]}));
+    // The plate (100 x 60 x 2) now spans world x -60…0, y 0…100: the top face's edge along its
+    // +y side is at x = -60. In the component's frame that pick is [50, 60, 2].
+    let err = s.execute("sheet.convert", &json!({"body": "Plate", "face": [-60, 50, 2]})).unwrap_err().to_string();
+    assert!(err.contains("ambiguous pick at [-60, 50, 2]"), "{err}");
+    assert!(err.contains(":+y` of `Plate`") && err.contains(":+z` of `Plate`"), "{err}");
+    assert_eq!(s.doc.features.len(), 1, "nothing was added");
+    let reply = run(&mut s, "sheet.convert", json!({"body": "Plate", "face": [-30, 50, 2]}));
+    assert!(reply["faces_used"][0].as_str().unwrap_or_default().ends_with(":+z"), "{reply}");
+    assert!(s.model.results.iter().all(|r| r.error.is_none()), "{:?}", s.model.results);
+}
+
+/// (#297 review) In a moved active component, an entry of a face list that lies off the body
+/// (0.1 mm out from a face: within a pick's reach of the face, beyond the body's own) is read in
+/// the active component's frame, as every pick was before face lists were mapped by body, and
+/// resolves to its face: the shell opens both faces, and `faces_used` names both.
+#[test]
+fn off_body_face_picks_in_a_moved_active_component_fall_back_to_its_frame() {
+    let mut s = Session::default();
+    run(&mut s, "component.create", json!({"name": "Part", "grounded": false}));
+    run(&mut s, "solid.box", json!({"length": 40, "width": 30, "height": 20}));
+    run(&mut s, "occurrence.move", json!({"occurrence": "Part:1", "translate": [50, 0, 0]}));
+    // The box spans world x 50…90, y 0…30, z 0…20.
+    let reply = run(&mut s, "solid.shell", json!({"faces": [[70, 30, 10], [90.1, 15, 10]], "thickness": 2}));
+    let used: Vec<&str> = reply["faces_used"].as_array().map(|a| a.iter().filter_map(Value::as_str).collect()).unwrap_or_default();
+    assert!(used.len() == 2 && used[0].ends_with(":+y") && used[1].ends_with(":+x"), "{reply}");
+    // Both faces open: a 38 x 28 x 16 cavity in the 24 000 mm³ box.
+    let v = volume(&mut s);
+    assert!((v - 6_976.0).abs() < 1e-6, "{v}");
+    assert!(s.model.results.iter().all(|r| r.error.is_none()), "{:?}", s.model.results);
+}
+
+/// (#297 review) Delete Face and Split Face picks on a moved component, given in the world with
+/// the root active, land on the component's body like every other face-taking command's.
+#[test]
+fn delete_face_and_split_face_picks_land_on_a_moved_component() {
+    let mut s = block_in_component();
+    run(&mut s, "occurrence.move", json!({"occurrence": "C:1", "translate": [100, 0, 0]}));
+    // The block (40 x 30 x 20) spans world x 100…140, y 0…30, z 0…20.
+    let reply = run(&mut s, "solid.split_face", json!({"faces": [[120, 15, 20]], "plane": {"origin": [120, 15, 20], "normal": [1, 0, 0]}}));
+    assert!(reply["faces_used"][0].as_str().unwrap_or_default().ends_with(":+z"), "{reply}");
+    let m = run(&mut s, "inspect.measure", json!({}));
+    assert_eq!(m["bodies"][0]["kernel"]["faces"].as_u64(), Some(7), "the top is split in two: {m}");
+    let v = volume(&mut s);
+    assert!((v - 24_000.0).abs() < 1e-6, "{v}");
+    run(&mut s, "edit.undo", json!({}));
+    run(&mut s, "solid.fillet", json!({"edges": [[140, 15, 20]], "radius": 5}));
+    assert!(volume(&mut s) < 24_000.0 - 1.0, "the fillet cut material");
+    // A point on the fillet's surface: 45° round from its axis (world (135, ·, 15)).
+    let h = 5.0 * std::f64::consts::FRAC_1_SQRT_2;
+    let reply = run(&mut s, "face.delete", json!({"faces": [[135.0 + h, 15.0, 15.0 + h]]}));
+    assert!(reply["faces_used"][0].as_str().is_some_and(|n| !n.is_empty()), "{reply}");
+    let v = volume(&mut s);
+    assert!((v - 24_000.0).abs() < 1e-3 * 24_000.0, "the fillet is gone and the block healed: {v}");
+    assert!(s.model.results.iter().all(|r| r.error.is_none()), "{:?}", s.model.results);
+}

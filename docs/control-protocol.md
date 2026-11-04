@@ -228,12 +228,17 @@ picks before the kernel sees them:
   body (a point on an edge): of the faces equally near, the one whose outward normal at the
   point is nearest it (within 45°) is taken, and the feature keeps a point inside that face, as
   it does for a face given by name. `{"point": [30, 40, 0], "normal": [0, 1, 0]}` is the back
-  face. Picks that are not ambiguous are kept exactly as given, so their features build as
-  before. On a moved or turned component, point and normal are given in the world, as every
-  pick is, and the error reports the point as given.
+  face. Picks that are not ambiguous and lie on their face are kept exactly as given, so their
+  features build as before. A pick within reach of a face (5 % of the body's size) but off it,
+  0.1 mm out from a box's side, say, is kept as a point inside that face: the kernel finds the
+  face it is given by a far tighter test of its own and used to leave such a face as it was
+  without a word, while `faces_used` named it. On a moved or turned component, point and normal
+  are given in the world, as every pick is (`sheet.convert`'s `face`, `face.delete`'s and
+  `solid.split_face`'s `faces` too), and the error reports the point as given.
 - The reply carries `faces_used`: the persistent name of the face each entry resolved to, in the
-  order given (`""` where no face is within reach of the point; the command then fails as it did
-  before). `{"faces":[[30,40,15],[0,20,15]],"thickness":2}` on a 60 × 40 × 30 box replies
+  order given, which is exactly the faces the operation acted on (`""` where no face is within
+  reach of the point; the command then fails as it did before).
+  `{"faces":[[30,40,15],[0,20,15]],"thickness":2}` on a 60 × 40 × 30 box replies
   `"faces_used": ["F1:+y", "F1:-x"]`. A body of more than 50 000 faces or 2 000 000 display
   triangles is too big for the tie check: its nearest face is taken, `faces_used` names it, and
   the reply's `warning` says the pick was not checked for ties.
