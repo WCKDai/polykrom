@@ -110,6 +110,7 @@ fn warnings_with_a_kind_serialize_for_programs() {
         warning: Some("Hole1 has no effect: `Plate` is unchanged".into()),
         ms: None,
         param_warnings: vec![],
+        faces_used: None,
         warnings: vec![super::FeatureWarning {
             kind: super::WarningKind::NoEffect,
             feature: "Hole1".into(),
