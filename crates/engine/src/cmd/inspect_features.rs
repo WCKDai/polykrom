@@ -865,20 +865,30 @@ fn walk(t: &Topo, walls: &[Segment], s: usize, dir: f64, want_concave: bool) -> 
     let (o, a) = (seg.origin, seg.axis);
     let mut elems = Vec::new();
     let mut visited: BTreeSet<usize> = seg.faces.iter().copied().collect();
-    // The current element's faces and the axial position of its far end.
+    // The current element's faces and the axial positions of its far end (`at`) and its near
+    // end (`back`) along the walk.
     let mut current: Vec<usize> = seg.faces.clone();
-    let mut at = if dir > 0.0 { seg.hi } else { seg.lo };
+    let (mut at, mut back) = if dir > 0.0 { (seg.hi, seg.lo) } else { (seg.lo, seg.hi) };
     let mut approx = seg.approximate;
     for _ in 0..64 {
         // The faces beyond the current element at its far end: across the edges lying in the
-        // plane there (an edge along the axis, a seam, is no end edge).
+        // plane there (an edge along the axis, a seam, is no end edge). An exact rim (a circle
+        // or a line about the axis) lies in that plane; a rim read from its polyline (where the
+        // bore breaks out through a curved face: two perpendicular cylinders meet along a curve
+        // spanning about r²/2R along the bore) reaches the far end and stays short of the near
+        // one, and makes the reading approximate.
         let mut next: Vec<usize> = Vec::new();
         let mut rim_approx = approx;
         for (ei, g) in t.boundary(&current) {
             let Some(e) = t.edges.get(ei) else { continue };
             let (lo, hi, exact) = edge_extent(e, o, a);
-            let slack = if exact { t.tol } else { t.tol * 100.0 };
-            if (lo - at).abs() > slack || (hi - at).abs() > slack {
+            let (far, near) = if dir > 0.0 { (hi, lo) } else { (lo, hi) };
+            let rim = if exact {
+                (lo - at).abs() <= t.tol && (hi - at).abs() <= t.tol
+            } else {
+                (far - at).abs() <= t.tol * 100.0 && (near - back) * dir > t.tol
+            };
+            if !rim {
                 continue;
             }
             if !exact {
@@ -947,7 +957,7 @@ fn walk(t: &Topo, walls: &[Segment], s: usize, dir: f64, want_concave: bool) -> 
                 visited.extend(w.faces.iter().copied());
                 current = w.faces.clone();
                 approx = ap;
-                at = if dir > 0.0 { hi } else { lo };
+                (at, back) = if dir > 0.0 { (hi, lo) } else { (lo, hi) };
             }
             FaceSurface::Cone { apex, axis, half_angle } => {
                 // Concave for a hole (countersink, drill point), convex for a boss (chamfer):
@@ -958,7 +968,7 @@ fn walk(t: &Topo, walls: &[Segment], s: usize, dir: f64, want_concave: bool) -> 
                 let (lo, hi, ap) = span(t, &group, o, a);
                 let apex_h = along(o, a, apex);
                 // Does it end at its apex (a drill point) rather than at another circle?
-                let far = if dir > 0.0 { hi } else { lo };
+                let (far, near) = if dir > 0.0 { (hi, lo) } else { (lo, hi) };
                 let tip = (far - apex_h).abs() < t.tol && axis.vec().dot(a * dir) < 0.0;
                 visited.extend(group.iter().copied());
                 elems.push(Elem::Cone { faces: group.clone(), half: half_angle, tip, apex: apex_h, lo, hi });
@@ -967,7 +977,7 @@ fn walk(t: &Topo, walls: &[Segment], s: usize, dir: f64, want_concave: bool) -> 
                 }
                 current = group;
                 approx = ap;
-                at = far;
+                (at, back) = (far, near);
             }
             FaceSurface::Torus { minor, .. } => {
                 let (lo, hi, ap) = span(t, &group, o, a);
@@ -975,7 +985,7 @@ fn walk(t: &Topo, walls: &[Segment], s: usize, dir: f64, want_concave: bool) -> 
                 elems.push(Elem::Round { faces: group.clone(), minor, lo, hi });
                 current = group;
                 approx = ap;
-                at = if dir > 0.0 { hi } else { lo };
+                (at, back) = if dir > 0.0 { (hi, lo) } else { (lo, hi) };
             }
             FaceSurface::Cylinder { .. } => {
                 // Another wall straight on (a hole whose bore changes without a step is not
