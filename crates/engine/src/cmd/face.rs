@@ -61,11 +61,12 @@ pub(super) fn face_is_planar(s: &Session, p: Vec3) -> Option<bool> {
 /// kernel takes the face nearest each point, so a point on an edge used to open whichever of
 /// the two faces came first, in silence.
 ///
-/// A face given to a command is a point `[x, y, z]` on it (or `{point, normal?}`), or its name
-/// as `model.faces` lists it, looked up on `body` (any body without one). A name becomes a point
-/// on that face, which the feature keeps like a picked one, so it also keeps the face's name.
-/// The point is in the frame of the command's other picks: the component's own when they were
-/// mapped into it, else the world's.
+/// A face given to a command is a point `[x, y, z]` on it (or `{point, normal?, body?}`), or
+/// its name as `model.faces` lists it, looked up on `body` (any body without one). A name
+/// becomes a point on that face, which the feature keeps like a picked one, so it also keeps the
+/// face's name. The point is in the frame of the command's other picks: the component's own when
+/// they were mapped into it (`crate::frames` then names the body under each point and keeps the
+/// point as given as `world`), else the world's.
 pub(super) struct PickedFaces {
     /// The point the feature stores for each entry, in the frame of the command's picks: the
     /// point as given, or a point inside the face for a name or a `normal`-resolved pick.
@@ -73,11 +74,22 @@ pub(super) struct PickedFaces {
     /// The persistent name (`model.faces`) of each entry's face, for the reply's `faces_used`;
     /// empty where no face is within the pick tolerance (the kernel reports that itself).
     pub names: Vec<String>,
-    /// Entries that resolved to one face, for the reply's `warning`.
+    /// Entries that resolved to one face, and bodies too big for the tie check, for the reply's
+    /// `warning`.
     pub warning: Option<String>,
+    /// The body the picks settled on where an entry lay on faces of several bodies (bodies
+    /// touching flush) or named its body, and the command named none: the feature keeps it, so
+    /// it acts on that body and not on whichever body the kernel would take by its bounds.
+    /// `None` otherwise: the feature then finds the body as before.
+    pub body: Option<String>,
 }
 
 impl PickedFaces {
+    /// The feature's `body`: the command's `given` one, else [`PickedFaces::body`].
+    pub fn feature_body(&self, given: Option<&str>) -> Option<polykrom_doc::BodyName> {
+        given.map(polykrom_doc::BodyName::from).or_else(|| self.body.clone().map(polykrom_doc::BodyName))
+    }
+
     /// `reply`, a feature command's, with the `faces_used` names and the picks' warning joined
     /// to the evaluation's.
     pub fn into_reply(self, reply: Result<Value>) -> Result<Value> {
@@ -96,20 +108,25 @@ impl PickedFaces {
     }
 }
 
+/// The biggest body the tie check takes on: (display triangles, faces). A bigger one is not
+/// checked (see [`FaceTriangles::new`]).
+const PICK_CHECK_LIMIT: (usize, usize) = (2_000_000, 50_000);
+
 /// A face's triangles with their bounds, for the distance from a point to each face of a body.
 struct FaceTriangles {
-    size: f64,
     faces: Vec<(polycore_geom::Aabb3, Vec<[Vec3; 3]>)>,
 }
 
 impl FaceTriangles {
-    fn new(b: &polykrom_doc::ModelBody) -> Option<Self> {
+    /// The faces of `b`, or `None` for a mesh body or one bigger than `limit` (its triangles
+    /// are not copied; the pick takes its nearest face unchecked, and the reply says so).
+    fn new(b: &polykrom_doc::ModelBody, limit: (usize, usize)) -> Option<Self> {
         if b.body.is_mesh() {
             return None;
         }
         let m = b.mesh();
         let count = m.tri_face.iter().map(|f| *f as usize + 1).max().unwrap_or(0);
-        if m.triangles.len() > 2_000_000 || count > 50_000 {
+        if m.triangles.len() > limit.0 || count > limit.1 {
             return None;
         }
         let mut faces = vec![(polycore_geom::Aabb3::EMPTY, Vec::new()); count];
@@ -119,7 +136,7 @@ impl FaceTriangles {
                 slot.1.push(tri);
             }
         }
-        Some(Self { size: b.body.size(), faces })
+        Some(Self { faces })
     }
 
     /// Each face within `reach` of `p`: (distance, face index, the outward normal of its nearest triangle).
@@ -146,12 +163,48 @@ impl FaceTriangles {
     }
 }
 
-/// One face a pick may mean: how far, which body and face, the face's outward normal there.
+/// One face a pick may mean: how far, which body and face, the face's outward normal there,
+/// and whether the body was checked for other faces as near (a body too big for the check is
+/// not: its nearest face is taken).
 struct Candidate {
     distance: f64,
     body: usize,
     face: usize,
     normal: Vec3,
+    checked: bool,
+}
+
+/// The face of `b` (body `body`) nearest `p`, within `reach`, without the check for other faces
+/// as near: for a body too big for [`FaceTriangles`].
+fn nearest_face_unchecked(b: &polykrom_doc::ModelBody, body: usize, p: Vec3, reach: f64) -> Option<Candidate> {
+    let (distance, face) = polykrom_doc::appearance::nearest_face(b, p)?;
+    if distance > reach {
+        return None;
+    }
+    let m = b.mesh();
+    let normal = m
+        .triangles
+        .iter()
+        .zip(&m.tri_face)
+        .filter(|(_, f)| **f as usize == face)
+        .filter_map(|(t, _)| m.tri(t))
+        .find_map(|[a, b, c]| (b - a).cross(c - a).normalized())
+        .unwrap_or(Vec3::ZERO);
+    Some(Candidate { distance, body, face, normal, checked: false })
+}
+
+/// An entry of a command's face list, read: what the feature stores, what the caller gave, and
+/// the faces it may mean.
+struct Entry {
+    /// The point the feature stores: the point as given, or a point inside the face for a name.
+    point: Vec3,
+    /// The point as the caller gave it (in the world, where the command's picks were mapped into
+    /// a component's frame), for the error.
+    given: Vec3,
+    normal: Option<Vec3>,
+    /// The faces the entry may mean, nearest first: one for a name, none where no face is within
+    /// reach of the point.
+    near: Vec<Candidate>,
 }
 
 /// `[x, y, z]` as the error names a pick, without needless decimals.
@@ -159,70 +212,141 @@ fn point_text(p: Vec3) -> String {
     format!("[{}, {}, {}]", p.x, p.y, p.z)
 }
 
-/// The command's `faces` entries resolved: each a point `[x, y, z]`, `{point, normal?}` or a
-/// face name. A point that two or more faces are equally near to, within the pick tolerance (a
-/// millionth of the body's size, at least 1 nm: a point on an edge, a seam or a corner, where
+/// The command's `faces` entries resolved: each a point `[x, y, z]`, `{point, normal?, body?}`
+/// or a face name. A point that two or more faces are equally near to, within the pick tolerance
+/// (a millionth of the body's size, at least 1 nm: a point on an edge, a seam or a corner, where
 /// the kernel would take whichever face comes first), is refused as ambiguous, with the faces
 /// named, unless `normal` picks the one facing that way (within 45°). The tolerance is a tie
 /// tolerance, not a reach: the top of a plate a thousand times longer than it is thick is not
 /// confused with its bottom. Points of unambiguous picks are kept as given, so their features
 /// build exactly as before.
+///
+/// A pick is only ambiguous between faces the operation can act on. The command's `body` and an
+/// entry's own `body` keep the pick to that body, so a face flush with another body's face does
+/// not compete with it. Without one, the faces of a command all belong to one body: an entry on
+/// faces of several bodies is settled by the body the other entries lie on, and only when every
+/// entry lies on faces of the same several bodies are those faces listed as ambiguous.
 pub(super) fn picked_faces(s: &Session, list: &[Value], body: Option<&str>, cmd: &str) -> Result<PickedFaces> {
+    picked_faces_within(s, list, body, cmd, PICK_CHECK_LIMIT)
+}
+
+/// [`picked_faces`] with the tie check's limit on a body's size given (tests lower it).
+fn picked_faces_within(s: &Session, list: &[Value], body: Option<&str>, cmd: &str, limit: (usize, usize)) -> Result<PickedFaces> {
     let st = if crate::frames::mapped() { s.model.state() } else { s.world_state() };
-    // The bodies a point may pick: the named one (by either of its names), else every solid.
-    let mut bodies: Vec<usize> = (0..st.bodies.len()).filter(|i| st.bodies.get(*i).is_some_and(|b| !b.body.is_mesh())).collect();
-    if let Some(name) = body {
-        let named: Vec<usize> =
-            bodies.iter().copied().filter(|i| st.bodies.get(*i).is_some_and(|b| b.name == name || b.definition_name() == name)).collect();
-        if !named.is_empty() {
-            bodies = named;
-        }
-    }
+    let solids: Vec<usize> = (0..st.bodies.len()).filter(|i| st.bodies.get(*i).is_some_and(|b| !b.body.is_mesh())).collect();
+    // The solids called `name` (by either of a body's names).
+    let named = |name: &str| -> Vec<usize> {
+        solids.iter().copied().filter(|i| st.bodies.get(*i).is_some_and(|b| b.name == name || b.definition_name() == name)).collect()
+    };
+    // The bodies the command's `body` keeps the picks to: every solid without one (or with one
+    // no body is called: the evaluation reports that).
+    let commands: Vec<usize> = body.map(named).filter(|named| !named.is_empty()).unwrap_or_else(|| solids.clone());
     let triangles: Vec<std::cell::OnceCell<Option<FaceTriangles>>> = st.bodies.iter().map(|_| std::cell::OnceCell::new()).collect();
-    let mut out = PickedFaces { points: Vec::with_capacity(list.len()), names: Vec::with_capacity(list.len()), warning: None };
-    let mut seen: Vec<((usize, usize), usize)> = Vec::new();
-    let mut doubled: Vec<String> = Vec::new();
+    let mut entries: Vec<Entry> = Vec::with_capacity(list.len());
+    // Did an entry name its body? The body is then kept with the feature, as when an entry lay
+    // on faces of several bodies.
+    let mut pinned = false;
     for (k, v) in list.iter().enumerate() {
-        let (point, hit) = match face_ref_form(v).map_err(|why| bad(cmd, why))? {
+        let entry = match face_ref_form(v).map_err(|why| bad(cmd, why))? {
             FaceRefForm::Name(name) => {
                 let hit = polykrom_doc::naming::locate_one(&st, body, name).map_err(|why| bad(cmd, why))?;
                 let b = st.bodies.get(hit.body).ok_or_else(|| bad(cmd, format!("no face is named `{name}`")))?;
                 let spot = polykrom_doc::naming::face_spot(b, hit.face).ok_or_else(|| bad(cmd, format!("face `{name}` has no surface to pick")))?;
-                (spot.point, Some((hit.body, hit.face)))
+                let one = Candidate { distance: 0.0, body: hit.body, face: hit.face, normal: Vec3::ZERO, checked: true };
+                Entry { point: spot.point, given: spot.point, normal: None, near: vec![one] }
             }
             FaceRefForm::Point(p) => {
                 let normal = match v.get("normal") {
                     None | Some(Value::Null) => None,
                     Some(n) => Some(vec3(n).and_then(|n| n.normalized()).ok_or_else(|| bad(cmd, "a face's `normal` must be a direction [x, y, z]"))?),
                 };
+                // The point as the caller gave it, kept by the frame mapper (`crate::frames`).
+                let given = v.get("world").and_then(vec3).unwrap_or(p);
+                let bodies: Vec<usize> = match v.get("body") {
+                    None | Some(Value::Null) => commands.clone(),
+                    Some(b) => {
+                        let name = b.as_str().ok_or_else(|| bad(cmd, format!("face {}: `body` must be a body name", k + 1)))?;
+                        let named = named(name);
+                        if named.is_empty() {
+                            return Err(bad(cmd, format!("face {}: no body `{name}`", k + 1)));
+                        }
+                        pinned = true;
+                        named
+                    }
+                };
                 let mut candidates: Vec<Candidate> = Vec::new();
                 for &i in &bodies {
                     let Some(b) = st.bodies.get(i) else { continue };
-                    let Some(tris) = triangles.get(i).and_then(|cell| cell.get_or_init(|| FaceTriangles::new(b)).as_ref()) else { continue };
                     let reach = polykrom_doc::appearance::pick_tolerance(b);
-                    candidates.extend(tris.near(p, reach).into_iter().map(|(distance, face, normal)| Candidate { distance, body: i, face, normal }));
+                    match triangles.get(i).and_then(|cell| cell.get_or_init(|| FaceTriangles::new(b, limit)).as_ref()) {
+                        Some(tris) => candidates.extend(tris.near(p, reach).into_iter().map(|(distance, face, normal)| Candidate {
+                            distance,
+                            body: i,
+                            face,
+                            normal,
+                            checked: true,
+                        })),
+                        None => candidates.extend(nearest_face_unchecked(b, i, p, reach)),
+                    }
                 }
                 candidates.sort_by(|a, b| a.distance.total_cmp(&b.distance));
-                let Some(nearest) = candidates.first() else {
-                    out.points.push(p);
-                    out.names.push(String::new());
-                    continue;
+                let near = match candidates.first() {
+                    Some(nearest) => {
+                        let tol = st.bodies.get(nearest.body).map(|b| b.body.size() * 1e-6).unwrap_or(1e-6).max(1e-6);
+                        let within = nearest.distance + tol;
+                        candidates.into_iter().take_while(|c| c.distance <= within).collect()
+                    }
+                    None => Vec::new(),
                 };
-                let tol =
-                    triangles.get(nearest.body).and_then(|c| c.get()).and_then(Option::as_ref).map(|t| (t.size * 1e-6).max(1e-6)).unwrap_or(1e-6);
-                let within = nearest.distance + tol;
-                let near: Vec<&Candidate> = candidates.iter().take_while(|c| c.distance <= within).collect();
-                if let [one] = near.as_slice() {
-                    (p, Some((one.body, one.face)))
-                } else if let Some(one) = normal.and_then(|n| facing(&near, n)) {
-                    // Settled by `normal`: the stored point moves inside that face, as a named
-                    // face's does, so the kernel finds the same face.
-                    let b = st.bodies.get(one.body).ok_or_else(|| bad(cmd, "the picked body disappeared"))?;
-                    let spot = polykrom_doc::naming::face_spot(b, one.face).ok_or_else(|| bad(cmd, "the picked face has no surface to pick"))?;
-                    (spot.point, Some((one.body, one.face)))
-                } else {
-                    return Err(bad(cmd, ambiguous_text(&st, p, &near)));
+                Entry { point: p, given, normal, near }
+            }
+        };
+        entries.push(entry);
+    }
+    // The faces a command acts on belong to one body: the bodies every entry may lie on.
+    let mut common: Option<std::collections::BTreeSet<usize>> = None;
+    for e in entries.iter().filter(|e| !e.near.is_empty()) {
+        let bodies: std::collections::BTreeSet<usize> = e.near.iter().map(|c| c.body).collect();
+        common = Some(match common {
+            None => bodies,
+            Some(c) => c.intersection(&bodies).copied().collect(),
+        });
+    }
+    let common = common.unwrap_or_default();
+    // Did an entry lie on faces of several bodies? Its body is then kept with the feature.
+    let spanned = entries.iter().any(|e| e.near.iter().any(|c| c.body != e.near.first().map_or(c.body, |n| n.body)));
+    let mut out = PickedFaces { points: Vec::with_capacity(list.len()), names: Vec::with_capacity(list.len()), warning: None, body: None };
+    let mut seen: Vec<((usize, usize), usize)> = Vec::new();
+    let mut warnings: Vec<String> = Vec::new();
+    let name_of =
+        |body: usize, face: usize| st.bodies.get(body).and_then(|b| polykrom_doc::naming::face_names(b).get(face).cloned()).unwrap_or_default();
+    let body_name = |body: usize| st.bodies.get(body).map(|b| b.name.clone()).unwrap_or_default();
+    for (k, e) in entries.iter().enumerate() {
+        // The faces of the operation's body, where that settles which body the entry means.
+        let own: Vec<&Candidate> = e.near.iter().filter(|c| common.contains(&c.body)).collect();
+        let near: Vec<&Candidate> = if own.is_empty() { e.near.iter().collect() } else { own };
+        let (point, hit) = match near.as_slice() {
+            [] => (e.point, None),
+            [one] => {
+                if !one.checked {
+                    warnings.push(format!(
+                        "face {}: `{}` is too big for the pick check; its nearest face `{}` was taken without checking for other faces as near",
+                        k + 1,
+                        body_name(one.body),
+                        name_of(one.body, one.face)
+                    ));
                 }
+                (e.point, Some((one.body, one.face)))
+            }
+            _ => {
+                let Some(one) = e.normal.and_then(|n| facing(&near, n)) else {
+                    return Err(bad(cmd, ambiguous_text(&st, e.given, &near)));
+                };
+                // Settled by `normal`: the stored point moves inside that face, as a named
+                // face's does, so the kernel finds the same face.
+                let b = st.bodies.get(one.body).ok_or_else(|| bad(cmd, "the picked body disappeared"))?;
+                let spot = polykrom_doc::naming::face_spot(b, one.face).ok_or_else(|| bad(cmd, "the picked face has no surface to pick"))?;
+                (spot.point, Some((one.body, one.face)))
             }
         };
         out.points.push(point);
@@ -230,17 +354,23 @@ pub(super) fn picked_faces(s: &Session, list: &[Value], body: Option<&str>, cmd:
             out.names.push(String::new());
             continue;
         };
-        let name = st.bodies.get(key.0).and_then(|b| polykrom_doc::naming::face_names(b).get(key.1).cloned()).unwrap_or_default();
+        let name = name_of(key.0, key.1);
         if let Some((_, first)) = seen.iter().find(|(k, _)| *k == key) {
-            let body = st.bodies.get(key.0).map(|b| b.name.clone()).unwrap_or_default();
-            doubled.push(format!("faces {} and {} are the same face (`{name}` of `{body}`)", first + 1, k + 1));
+            warnings.push(format!("faces {} and {} are the same face (`{name}` of `{}`)", first + 1, k + 1, body_name(key.0)));
         } else {
             seen.push((key, k));
         }
         out.names.push(name);
     }
-    if !doubled.is_empty() {
-        out.warning = Some(doubled.join("; "));
+    if !warnings.is_empty() {
+        out.warning = Some(warnings.join("; "));
+    }
+    let bodies: std::collections::BTreeSet<usize> = seen.iter().map(|((body, _), _)| *body).collect();
+    if body.is_none()
+        && (spanned || pinned)
+        && let [one] = bodies.into_iter().collect::<Vec<_>>().as_slice()
+    {
+        out.body = Some(body_name(*one));
     }
     Ok(out)
 }

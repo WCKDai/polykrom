@@ -415,3 +415,20 @@ fn face_taking_commands_refuse_edge_picks_and_list_the_faces_used() {
     let e = s.execute("sheet.convert", &json!({"body": "Plate", "face": [50, 60, 2]})).unwrap_err().to_string();
     assert!(e.contains("ambiguous pick at [50, 60, 2]"), "{e}");
 }
+
+/// A body too big for the tie check (here: the limit lowered to nothing) is not refused: its
+/// nearest face is taken, `faces_used` names it, and the warning says it was not checked for
+/// other faces as near.
+#[test]
+fn bodies_too_big_for_the_pick_check_take_their_nearest_face_and_say_so() {
+    let mut s = Session::default();
+    run(&mut s, "solid.box", json!({"length": 60, "width": 40, "height": 30}));
+    let list = [json!([30, 20, 30])];
+    let picked = super::picked_faces_within(&s, &list, None, "solid.shell", (0, 0)).unwrap_or_else(|e| panic!("{e}"));
+    assert_eq!(picked.names, vec!["F1:+z".to_string()]);
+    let warning = picked.warning.as_deref().unwrap_or_default();
+    assert!(warning.contains("face 1: `Body1` is too big for the pick check") && warning.contains("`F1:+z`"), "{warning}");
+    assert!(picked.body.is_none());
+    let picked = super::picked_faces_within(&s, &list, None, "solid.shell", super::PICK_CHECK_LIMIT).unwrap_or_else(|e| panic!("{e}"));
+    assert_eq!((picked.names, picked.warning), (vec!["F1:+z".to_string()], None));
+}

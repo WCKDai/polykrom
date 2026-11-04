@@ -177,8 +177,8 @@ Commands never open dialogs when run this way. `polykrom-cli commands` prints th
 The commands that take faces (`solid.shell`, `solid.draft`, `solid.offset_face`,
 `solid.split_face`, `solid.replace_face`, `face.delete`: `faces: [...]`; `sheet.convert`:
 `face`) read each entry as a point `[x, y, z]` on the face, as `{"point": [x, y, z],
-"normal": [x, y, z]}`, or as the face's name from `model.faces`. They resolve the picks before
-the kernel sees them:
+"normal"?: [x, y, z], "body"?: name}`, or as the face's name from `model.faces`. They resolve the
+picks before the kernel sees them:
 
 - A point that two or more faces are equally near to, within the pick tolerance (a millionth of
   the body's size, at least 1 nm): a point on an edge, a seam or a corner, is refused, and nothing
@@ -191,15 +191,27 @@ the kernel sees them:
   → error: invalid parameters for `solid.shell`: ambiguous pick at [30, 40, 0]: it lies on faces `F1:+y` of `Body1` and `F1:-z` of `Body1`; pick a point inside one face, give its name from model.faces, or give {"point": [x, y, z], "normal": [x, y, z]} with the face's outward normal
   ```
 
-  Where bodies touch flush, the faces of both are listed; `body` keeps the pick to one body. A
-  `normal` settles such a pick: of the faces equally near, the one whose outward normal at the
-  point is nearest it (within 45°) is taken, and the feature keeps a point inside that face, as it
-  does for a face given by name. `{"point": [30, 40, 0], "normal": [0, 1, 0]}` is the back face.
-  Picks that are not ambiguous are kept exactly as given, so their features build as before.
+  A pick is only ambiguous between faces the operation can act on. The command's `body`, or an
+  entry's own `body` (`{"point": [x, y, z], "body": "LeftWall"}`, what the desktop's Shell and
+  Draft dialogs send with every picked face), keeps the pick to that body: a face flush with
+  another body's face is then found as before, and the feature keeps that body as its `body`,
+  so it acts on it and not on whichever body the kernel would take by its bounds. Without one,
+  the faces of a command all belong to one body, so an entry inside a face that is flush with
+  another body's is settled by the body the other entries lie on (and the feature keeps that
+  body); only when every entry lies on faces of both bodies (a single pick on the flush face) is
+  it refused, and the faces of both bodies are listed. A `normal` settles a true tie within that
+  body (a point on an edge): of the faces equally near, the one whose outward normal at the
+  point is nearest it (within 45°) is taken, and the feature keeps a point inside that face, as
+  it does for a face given by name. `{"point": [30, 40, 0], "normal": [0, 1, 0]}` is the back
+  face. Picks that are not ambiguous are kept exactly as given, so their features build as
+  before. On a moved or turned component, point and normal are given in the world, as every
+  pick is, and the error reports the point as given.
 - The reply carries `faces_used`: the persistent name of the face each entry resolved to, in the
   order given (`""` where no face is within reach of the point; the command then fails as it did
   before). `{"faces":[[30,40,15],[0,20,15]],"thickness":2}` on a 60 × 40 × 30 box replies
-  `"faces_used": ["F1:+y", "F1:-x"]`.
+  `"faces_used": ["F1:+y", "F1:-x"]`. A body of more than 50 000 faces or 2 000 000 display
+  triangles is too big for the tie check: its nearest face is taken, `faces_used` names it, and
+  the reply's `warning` says the pick was not checked for ties.
 - Two entries that resolve to one face are not deduplicated in silence: the reply's `warning`
   says `faces 1 and 3 are the same face (`F1:+y` of `Body1`)`, joined to the evaluation's own
   warning when there is one.

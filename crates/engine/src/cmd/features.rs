@@ -84,11 +84,11 @@ pub static COMMANDS: &[CommandSpec] = &[
     CommandSpec::new("face.delete", "Delete Face", delete_face)
         .at("SOLID", "MODIFY")
         .icon("delete_face")
-        .params("faces: [[x,y,z] points on the faces, or face names from model.faces]; body?; heal?: bool (default true: the neighbouring planes close the gap, as when a rounded edge, hole or boss is taken off; false: the gap stays open and the faces left are a surface body)"),
+        .params("faces: [[x,y,z] points on the faces, {point: [x,y,z], normal?: [x,y,z] (the face's outward normal, settling a point on an edge), body?: name (the body whose face it is, where bodies touch flush)}, or face names from model.faces]; body?; heal?: bool (default true: the neighbouring planes close the gap, as when a rounded edge, hole or boss is taken off; false: the gap stays open and the faces left are a surface body)"),
     CommandSpec::new("solid.offset_face", "Offset Face", offset_face)
         .at("SOLID", "MODIFY")
         .icon("offset_face")
-        .params("faces: [[x,y,z] points on planar faces, or face names from model.faces]; distance: expr (positive: outward); body?"),
+        .params("faces: [[x,y,z] points on planar faces, {point: [x,y,z], normal?: [x,y,z] (the face's outward normal, settling a point on an edge), body?: name (the body whose face it is, where bodies touch flush)}, or face names from model.faces]; distance: expr (positive: outward); body?"),
     CommandSpec::new("solid.thread", "Thread", thread)
         .at("SOLID", "CREATE")
         .icon("thread")
@@ -96,11 +96,11 @@ pub static COMMANDS: &[CommandSpec] = &[
     CommandSpec::new("solid.shell", "Shell", shell)
         .at("SOLID", "MODIFY")
         .icon("shell")
-        .params("faces: [[x,y,z] points on the faces to remove, or face names from model.faces]; thickness: expr; direction?: inside|outside|both; tangent_chain?: bool (also open faces joined smoothly to the picked ones); body?"),
+        .params("faces: [[x,y,z] points on the faces to remove, {point: [x,y,z], normal?: [x,y,z] (the face's outward normal, settling a point on an edge), body?: name (the body whose face it is, where bodies touch flush)}, or face names from model.faces]; thickness: expr; direction?: inside|outside|both; tangent_chain?: bool (also open faces joined smoothly to the picked ones); body?"),
     CommandSpec::new("solid.draft", "Draft", draft)
         .at("SOLID", "MODIFY")
         .icon("draft")
-        .params("faces: [[x,y,z] points, or face names from model.faces]; angle: expr; neutral: XY|XZ|YZ|plane name|{origin, normal}; pull?: [x,y,z] (default: neutral plane normal); body?"),
+        .params("faces: [[x,y,z] points on the faces, {point: [x,y,z], normal?: [x,y,z] (the face's outward normal, settling a point on an edge), body?: name (the body whose face it is, where bodies touch flush)}, or face names from model.faces]; angle: expr; neutral: XY|XZ|YZ|plane name|{origin, normal}; pull?: [x,y,z] (default: neutral plane normal); body?"),
     CommandSpec::new("construct.plane.offset", "Offset Plane", plane_offset)
         .at("SOLID", "CONSTRUCT")
         .icon("plane")
@@ -113,7 +113,7 @@ pub static COMMANDS: &[CommandSpec] = &[
         .at("SOLID", "MODIFY")
         .icon("split_face")
         .params(
-            "faces: [[x,y,z] points on the faces to split, or face names from model.faces]; body?; and the splitting tool: plane: XY|XZ|YZ|plane name|{origin, normal} — or tool: {body, point} (a face of a body, its surface extended) — or sketch: id or name (its curves, along the sketch's normal)",
+            "faces: [[x,y,z] points on the faces to split, {point: [x,y,z], normal?: [x,y,z] (the face's outward normal, settling a point on an edge), body?: name (the body whose face it is, where bodies touch flush)}, or face names from model.faces]; body?; and the splitting tool: plane: XY|XZ|YZ|plane name|{origin, normal} — or tool: {body, point} (a face of a body, its surface extended) — or sketch: id or name (its curves, along the sketch's normal)",
         ),
     CommandSpec::new("solid.split_body", "Split Body", split_body)
         .at("SOLID", "MODIFY")
@@ -1779,7 +1779,7 @@ fn plane_angle(s: &mut Session, p: &Value) -> Result<Value> {
 fn split_face(s: &mut Session, p: &Value) -> Result<Value> {
     let cmd = "solid.split_face";
     let faces = face_points(s, p, cmd)?;
-    let body = str_(p, "body").map(str::to_string);
+    let body = faces.feature_body(str_(p, "body")).map(|b| b.0);
     let xy = || polykrom_doc::PlaneRef::Origin { name: "XY".into() };
     let kind = if let Some(t) = p.get("tool").filter(|t| !t.is_null()) {
         let tb = t.get("body").and_then(Value::as_str).ok_or_else(|| bad(cmd, "`tool.body` must name a body"))?.to_string();
@@ -2161,7 +2161,7 @@ fn shell(s: &mut Session, p: &Value) -> Result<Value> {
     let kind = FeatureKind::Shell {
         faces: faces.points.iter().copied().map(FacePick).collect(),
         thickness,
-        body: str_(p, "body").map(BodyName::from),
+        body: faces.feature_body(str_(p, "body")),
         direction: if direction == "inside" { String::new() } else { direction },
         tangent_chain: bool_(p, "tangent_chain").unwrap_or(false),
     };
@@ -2182,7 +2182,7 @@ fn draft(s: &mut Session, p: &Value) -> Result<Value> {
         angle,
         neutral,
         pull: Dir(pull),
-        body: str_(p, "body").map(BodyName::from),
+        body: faces.feature_body(str_(p, "body")),
     };
     faces.into_reply(add_feature(s, p, kind))
 }
@@ -2450,7 +2450,7 @@ fn delete_face(s: &mut Session, p: &Value) -> Result<Value> {
     let faces = face_points(s, p, "face.delete")?;
     let heal = bool_(p, "heal").unwrap_or(true);
     let kind =
-        FeatureKind::DeleteFace { faces: faces.points.iter().copied().map(FacePick).collect(), body: str_(p, "body").map(BodyName::from), heal };
+        FeatureKind::DeleteFace { faces: faces.points.iter().copied().map(FacePick).collect(), body: faces.feature_body(str_(p, "body")), heal };
     faces.into_reply(add_feature(s, p, kind))
 }
 
@@ -2460,7 +2460,7 @@ fn offset_face(s: &mut Session, p: &Value) -> Result<Value> {
     let distance = req_expr(cmd, p, "distance")?;
     check_expr(s, &distance, Kind::Length, cmd, "distance")?;
     let kind =
-        FeatureKind::OffsetFace { faces: faces.points.iter().copied().map(FacePick).collect(), distance, body: str_(p, "body").map(BodyName::from) };
+        FeatureKind::OffsetFace { faces: faces.points.iter().copied().map(FacePick).collect(), distance, body: faces.feature_body(str_(p, "body")) };
     faces.into_reply(add_feature(s, p, kind))
 }
 

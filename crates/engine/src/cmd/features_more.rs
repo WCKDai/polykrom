@@ -37,7 +37,7 @@ pub static COMMANDS: &[CommandSpec] = &[
     CommandSpec::new("solid.replace_face", "Replace Face", replace_face)
         .at("SOLID", "MODIFY")
         .icon("replace_face")
-        .params("faces: [[x,y,z] points on planar faces, or face names from model.faces]; target: plane (XY|XZ|YZ|construction plane|{origin, normal}) | target_face: [x,y,z] on a parallel planar face; body?"),
+        .params("faces: [[x,y,z] points on planar faces, {point: [x,y,z], normal?: [x,y,z] (the face's outward normal, settling a point on an edge), body?: name (the body whose face it is, where bodies touch flush)}, or face names from model.faces]; target: plane (XY|XZ|YZ|construction plane|{origin, normal}) | target_face: [x,y,z] on a parallel planar face; body?"),
     CommandSpec::new("solid.align", "Align", align)
         .at("SOLID", "MODIFY")
         .icon("align")
@@ -372,12 +372,8 @@ fn replace_face(s: &mut Session, p: &Value) -> Result<Value> {
         }
         None => plane_param(s, p.get("target"), cmd)?,
     };
-    let body = str_(p, "body").map(str::to_string);
-    picked.into_reply(add_feature(
-        s,
-        p,
-        FeatureKind::ReplaceFace { faces: faces.into_iter().map(FacePick).collect(), target, body: body.map(BodyName) },
-    ))
+    let body = picked.feature_body(str_(p, "body"));
+    picked.into_reply(add_feature(s, p, FeatureKind::ReplaceFace { faces: faces.into_iter().map(FacePick).collect(), target, body }))
 }
 
 fn align(s: &mut Session, p: &Value) -> Result<Value> {
