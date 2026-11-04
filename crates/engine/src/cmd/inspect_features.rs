@@ -442,6 +442,23 @@ impl Topo {
         }
     }
 
+    /// How far the planar face `f` reaches across the direction `dir` lying in it: the extent of
+    /// its edges' points along the in-plane direction perpendicular to `dir`.
+    fn extent_across(&self, f: usize, dir: Vec3) -> Option<f64> {
+        let (n, _) = self.plane(f)?;
+        let u = n.cross(dir).normalized()?;
+        let face = self.faces.get(f)?;
+        let (mut lo, mut hi) = (f64::INFINITY, f64::NEG_INFINITY);
+        for &ei in &face.edges {
+            for p in self.edges.get(ei).map(|e| e.pts.as_slice()).unwrap_or(&[]) {
+                let h = p.dot(u);
+                lo = lo.min(h);
+                hi = hi.max(h);
+            }
+        }
+        (hi >= lo).then_some(hi - lo)
+    }
+
     /// The edges of a group of faces that lead out of it, with the face they lead to.
     fn boundary(&self, group: &[usize]) -> Vec<(usize, usize)> {
         let mut out = Vec::new();
@@ -1498,7 +1515,8 @@ fn blends(t: &Topo, r: &mut Recognised) {
 }
 
 // ---------------------------------------------------------------------------------------------
-// Chamfers: a flat (or conical) face cutting a convex edge at an angle to both its faces.
+// Chamfers: a flat (or conical) face cutting a convex edge at an angle to both its faces, and
+// narrower than the faces it joins: a bevel in place of the edge, not a face of its own.
 
 /// A planar chamfer candidate: its two joined faces, the lines of its two long edges, its width
 /// across.
@@ -1568,6 +1586,15 @@ fn chamfers(t: &Topo, r: &mut Recognised) {
         let d_along = |p_on: Vec3, n_other: Vec3, p_other: Vec3| ((p_on - p_other).dot(n_other)).abs() / sin_ab;
         let d_a = d_along(c.lines[0].0, n_b, p_b);
         let d_b = d_along(c.lines[1].0, n_a, p_a);
+        // A chamfer is a narrow bevel in place of the edge where the two faces would meet: it
+        // reaches less far along each face than the face keeps beyond it. A face as wide as
+        // what its neighbours would reach is a face of its own (a hexagonal prism's sides turn
+        // 60° to each other across parallel edges, a drafted box's top turns 80° to its sides).
+        let Some(along) = (c.lines[0].1 - c.lines[0].0).normalized() else { continue };
+        let (Some(keep_a), Some(keep_b)) = (t.extent_across(c.joins[0], along), t.extent_across(c.joins[1], along)) else { continue };
+        if d_a >= keep_a - t.tol || d_b >= keep_b - t.tol {
+            continue;
+        }
         // The first face is the one facing up most (as solid.chamfer takes it); ties by name.
         let first_is_a = match n_a.z.partial_cmp(&n_b.z) {
             Some(std::cmp::Ordering::Greater) => true,
@@ -1577,7 +1604,7 @@ fn chamfers(t: &Topo, r: &mut Recognised) {
         let (joins, distance, distance2, n_first) =
             if first_is_a { (vec![c.joins[0], c.joins[1]], d_a, d_b, n_a) } else { (vec![c.joins[1], c.joins[0]], d_b, d_a, n_b) };
         let angle_deg = deg(n_c.dot(n_first).clamp(-1.0, 1.0).acos());
-        let along = (c.lines[0].1 - c.lines[0].0).normalized();
+        let along = Some(along);
         r.claim(&[c.face]);
         let position = t.faces.get(c.face).map_or(Vec3::ZERO, |f| f.centroid);
         r.features.push(Feature {

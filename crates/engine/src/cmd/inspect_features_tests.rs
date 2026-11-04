@@ -401,6 +401,62 @@ fn two_chamfers_leave_the_face_between_them_unrecognised() {
     }
 }
 
+/// A chamfer is a narrow bevel between two faces that would otherwise meet: a face as wide as
+/// what its neighbours would reach is a face of its own. A hexagonal prism's sides turn 60° to
+/// each other across parallel edges, but none is a chamfer; a drafted box's top turns 80° to its
+/// four sides and is no chamfer either; a wedge has no chamfer.
+#[test]
+fn a_hex_prism_a_drafted_box_and_a_wedge_have_no_chamfer() {
+    let mut s = Session::default();
+    run(&mut s, "sketch.create", json!({"plane": "XY"}));
+    run(&mut s, "sketch.polygon.inscribed", json!({"center": [0, 0], "radius": 20, "sides": 6}));
+    run(&mut s, "sketch.finish", json!({}));
+    run(&mut s, "solid.extrude", json!({"distance": 10, "body_name": "Hex"}));
+    let b = features(&mut s, "Hex");
+    assert!(of_type(&b, "chamfer").is_empty(), "a hexagonal prism's sides are not chamfers: {b}");
+    assert!(list(&b["features"]).is_empty(), "{b}");
+    let unrecognised = list(&b["unrecognised"]);
+    assert_eq!(unrecognised.len(), 8, "{b}");
+    assert!(unrecognised.iter().all(|u| u["surface"] == "plane"), "{b}");
+    assert_eq!(unrecognised.iter().filter(|u| u["face"].as_str().is_some_and(|n| n.contains(":side:"))).count(), 6, "six side planes: {b}");
+
+    let mut s = Session::default();
+    run(&mut s, "solid.box", json!({"length": 100, "width": 100, "height": 30, "corner": [0, 0, 0], "body_name": "Box"}));
+    run(&mut s, "solid.draft", json!({"faces": [[100, 50, 15], [0, 50, 15], [50, 0, 15], [50, 100, 15]], "angle": "10 deg", "neutral": "XY"}));
+    let b = features(&mut s, "Box");
+    assert!(of_type(&b, "chamfer").is_empty(), "a drafted box's top is not a chamfer: {b}");
+    assert!(list(&b["features"]).is_empty(), "{b}");
+    assert_eq!(list(&b["unrecognised"]).len(), 6, "{b}");
+
+    let mut s = Session::default();
+    run(&mut s, "sketch.create", json!({"plane": "XZ"}));
+    run(&mut s, "sketch.line", json!({"points": [[0, 0], [60, 0], [60, 20], [0, 0]]}));
+    run(&mut s, "sketch.finish", json!({}));
+    run(&mut s, "solid.extrude", json!({"distance": 30, "body_name": "Wedge"}));
+    let b = features(&mut s, "Wedge");
+    assert!(list(&b["features"]).is_empty(), "{b}");
+    assert_eq!(list(&b["unrecognised"]).len(), 5, "{b}");
+
+    // A real chamfer still is one, however it is given: a distance, a distance and an angle, a
+    // conical chamfer on a boss's rim.
+    let mut s = base_with_boss_and_pocket();
+    run(&mut s, "solid.chamfer", json!({"edges": [[62, 40, 18]], "distance": 1.5}));
+    run(&mut s, "solid.chamfer", json!({"edges": [[60, 0, 8]], "distance": 1, "angle": "30 deg"}));
+    let b = features(&mut s, "Base");
+    let chamfers = of_type(&b, "chamfer");
+    assert_eq!(chamfers.len(), 2, "{b}");
+    let rim = chamfers.iter().find(|c| c["joins"][0] == "F2:top").unwrap_or_else(|| panic!("{b}"));
+    exact(&rim["distance"], 1.5);
+    exact(&rim["distance2"], 1.5);
+    exact(&rim["angle_deg"], 45.0);
+    assert_eq!(names(&rim["faces"]).len(), 2, "{rim}");
+    let edge = chamfers.iter().find(|c| c["joins"][0] == "F1:+z").unwrap_or_else(|| panic!("{b}"));
+    assert_eq!(edge["joins"], json!(["F1:+z", "F1:-y"]), "{edge}");
+    exact(&edge["distance"], 1.0);
+    assert!((num(&edge["distance2"]) - 30.0_f64.to_radians().tan()).abs() < 1e-9, "{edge}");
+    exact(&edge["angle_deg"], 30.0);
+}
+
 /// A through hole with a rounded mouth is read from the mouth: the round is its first step,
 /// the entry face the one beyond the round, and the round is also the fillet it is.
 #[test]

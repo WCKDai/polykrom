@@ -229,8 +229,11 @@ face is outside and which faces an edge joins. Per body (`bodies[]`, `body_count
   - `chamfer`: `joins` (two faces; the first is the one facing up most, as `solid.chamfer` takes
     it), `distance` along the first of `joins`, `distance2` along the second, `angle_deg` between
     the chamfer and the first face. A conical chamfer on a round edge joins the flat face and the
-    cylinder. A face whose neighbour is a narrower chamfer is the face that chamfer cuts into,
-    not a chamfer (a plate's top between two chamfers stays a plain face).
+    cylinder. A chamfer is a narrow bevel in place of the edge where its two faces would meet:
+    it reaches less far along each face than that face keeps beyond it, so a hexagonal prism's
+    sides and a drafted box's top are plain faces however they turn to their neighbours. A face
+    whose neighbour is a narrower chamfer is the face that chamfer cuts into, not a chamfer (a
+    plate's top between two chamfers stays a plain face).
 - `patterns`: alike features (same type, sizes and direction) on a lattice or a circle, three or
   more: `type` `linear` (`count1`, `pitch1`, `direction1`, and `count2`, `pitch2`, `direction2`
   for a grid) or `circular` (`count`, `angle_step_deg`, `full_circle`, `radius`,
