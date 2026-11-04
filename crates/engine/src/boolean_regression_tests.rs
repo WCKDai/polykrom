@@ -965,26 +965,30 @@ fn combine_of_a_piece_a_cut_used_to_split_off_takes_the_body_it_is_part_of() {
     };
     let (case, posts) = (60.0 * 40.0 * 10.0, 2.0 * 10.0 * 10.0 * 25.0);
     let close = |got: f64, want: f64| assert!((got - want).abs() < 1e-6 * want, "{got} vs {want}");
-    let piece = Some("`Posts (1)` is part of `Posts` now");
+    let piece = "`Posts (1)` is part of `Posts` now";
 
     let mut s = posts_cut();
     s.execute("solid.combine", &json!({"target": "Case", "tools": ["Posts", "Posts (1)"], "operation": "join"})).unwrap();
     let reopened = Session::new(polykrom_doc::Document::from_json(&s.doc.to_json()).unwrap());
     let join = reopened.model.results.last().unwrap();
-    assert_eq!((join.error.as_deref(), join.warning.as_deref()), (None, piece));
+    assert_eq!((join.error.as_deref(), join.warning.as_deref()), (None, Some(piece)));
     assert_eq!(reopened.model.state().bodies.iter().map(|b| b.name.as_str()).collect::<Vec<_>>(), ["Case"]);
     close(volume(&reopened, "Case"), case + posts);
 
     let mut s = posts_cut();
     s.execute("solid.combine", &json!({"target": "Posts", "tools": ["Posts (1)"], "operation": "join"})).unwrap();
-    assert_eq!(s.model.results.last().unwrap().warning.as_deref(), piece);
+    // The piece is already part of the target, so this combine changes nothing: it says so too
+    // (PK-78), since an agent reading the reply would otherwise take the join as done.
+    let name = s.doc.features.last().map(|f| f.name.clone()).unwrap();
+    let unchanged = format!("{piece}; {name} has no effect: `Posts` is unchanged");
+    assert_eq!(s.model.results.last().unwrap().warning.as_deref(), Some(unchanged.as_str()));
     close(volume(&s, "Posts"), posts);
 
     // A slab through both posts, 10 mm of each, cut by both pieces.
     let mut s = posts_cut();
     s.execute("solid.box", &json!({"length": 80, "width": 20, "height": 10, "center": [0, 0, 25], "operation": "new", "body_name": "Slab"})).unwrap();
     s.execute("solid.combine", &json!({"target": "Slab", "tools": ["Posts", "Posts (1)"], "operation": "cut"})).unwrap();
-    assert_eq!(s.model.results.last().unwrap().warning.as_deref(), piece);
+    assert_eq!(s.model.results.last().unwrap().warning.as_deref(), Some(piece));
     close(volume(&s, "Slab"), 80.0 * 20.0 * 10.0 - 2.0 * 10.0 * 10.0 * 10.0);
 
     for (target, tools, operation) in [

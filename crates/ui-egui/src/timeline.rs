@@ -848,6 +848,40 @@ mod tests {
         }
     }
 
+    /// A feature that changed nothing (a hole drilled into the air beside the boxes, #309) gets
+    /// the warning mark like any feature with a warning, and its tooltip and Copy Warning Message
+    /// say which bodies it left as they were. In both timelines.
+    #[test]
+    fn a_feature_with_no_effect_shows_its_warning_like_any_other() {
+        for left in [false, true] {
+            let mut h = two_boxes(left);
+            let reply = h
+                .app
+                .run("solid.hole", json!({"position": [50, 5, 10], "direction": [0, 0, -1], "diameter": 4, "depth": 5, "name": "AirHole"}))
+                .unwrap();
+            assert_eq!(reply["warnings"][0]["kind"], json!("no_effect"), "left: {left}: {reply}");
+            h.frames(4);
+            let id = h.app.session.doc.features.last().map(|f| f.id).unwrap();
+            let expected = "AirHole has no effect: `One` and `Two` are unchanged";
+            assert_eq!(h.app.session.model.result(id).and_then(|r| r.warning.as_deref()), Some(expected), "left: {left}");
+            let message = super::feature_message(&h.app, id).unwrap_or_default();
+            assert!(message.starts_with("AirHole  (") && message.ends_with(&format!("\nWarning: {expected}")), "left: {left}: {message}");
+            h.step(&json!({"click": {"handle": "timeline:AirHole"}, "button": "right"})).unwrap();
+            let [x, y] = h.widget("Copy Warning Message").unwrap();
+            let (request, _reply) = crate::control::ControlRequest::new("ui.click", json!({"x": x, "y": y}));
+            crate::control::handle(&mut h.app, &h.ctx, &request);
+            let mut copied = Vec::new();
+            for _ in 0..8 {
+                h.frame();
+                copied.extend(h.output.commands.iter().filter_map(|c| match c {
+                    egui::OutputCommand::CopyText(text) => Some(text.clone()),
+                    _ => None,
+                }));
+            }
+            assert!(copied.iter().any(|t| t.contains(&format!("Warning: {expected}"))), "left: {left}: {copied:?}");
+        }
+    }
+
     /// Copy on a feature outside the selection copies that feature alone.
     #[test]
     fn copy_on_an_unselected_feature_copies_only_it() {

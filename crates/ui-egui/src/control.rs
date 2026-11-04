@@ -1336,6 +1336,37 @@ mod tests {
         h.call("engine.batch", params)
     }
 
+    /// A batch step that changed nothing (a hole drilled into the air, #309) carries the
+    /// `no_effect` warning in its own reply, as `engine.execute` would; the steps that did
+    /// something carry none, and the batch goes through.
+    #[test]
+    fn a_batch_step_that_has_no_effect_carries_the_warning() {
+        let mut h = crate::scenario::Harness::new();
+        let v = batch(
+            &mut h,
+            json!({"commands": [
+                {"command": "solid.box", "params": {"length": 20, "width": 20, "height": 20, "body_name": "Block"}},
+                {"command": "solid.hole", "params": {"position": [50, 10, 20], "direction": [0, 0, -1], "diameter": 4, "depth": 5, "name": "AirHole"}},
+                {"command": "solid.hole", "params": {"position": [10, 10, 20], "direction": [0, 0, -1], "diameter": 4, "depth": 5, "name": "Bore"}},
+            ]}),
+        );
+        assert_eq!(v["ok"], true, "{v}");
+        assert_eq!(v["result"]["completed"], 3, "{v}");
+        assert!(v["result"].get("failed").is_none(), "{v}");
+        let results = v["result"]["results"].as_array().cloned().unwrap_or_default();
+        assert_eq!(results.len(), 3, "{v}");
+        assert!(results[0].get("warnings").is_none(), "{v}");
+        assert_eq!(
+            results[1]["warnings"],
+            json!([{"kind": "no_effect", "feature": "AirHole", "bodies": ["Block"], "message": "AirHole has no effect: `Block` is unchanged"}]),
+            "{v}"
+        );
+        assert_eq!(results[1]["warning"], json!("AirHole has no effect: `Block` is unchanged"), "{v}");
+        assert_eq!(results[1]["changed_bodies"], json!([]), "{v}");
+        assert!(results[2].get("warnings").is_none(), "{v}");
+        assert_eq!(results[2]["changed_bodies"], json!(["Block"]), "{v}");
+    }
+
     fn inspect(h: &mut crate::scenario::Harness) -> serde_json::Value {
         h.call("document.inspect", json!({}))["result"].clone()
     }

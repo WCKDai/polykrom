@@ -183,6 +183,33 @@ pub struct FeatureResult {
     /// In the warn parameter-check mode: what the call's parameters got wrong.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub param_warnings: Vec<String>,
+    /// Warnings with a kind, for programs (each is also part of `warning`, in words). Left out
+    /// when there are none.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub warnings: Vec<FeatureWarning>,
+}
+
+/// A warning a program can act on without reading `warning`: what kind of thing happened, the
+/// feature it happened to, the bodies concerned, and the words `warning` carries for it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
+pub struct FeatureWarning {
+    pub kind: WarningKind,
+    /// The feature's name.
+    pub feature: String,
+    /// The bodies concerned, in the model's order.
+    pub bodies: Vec<String>,
+    /// The warning in words.
+    pub message: String,
+}
+
+/// What a [`FeatureWarning`] is about.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum WarningKind {
+    /// A material-changing feature (a cut, hole, fillet, chamfer, shell, draft, combine or
+    /// split) that evaluated and left every body it targets exactly as it was: `bodies` names
+    /// them (polykrom#309).
+    NoEffect,
 }
 
 #[cfg(test)]

@@ -11,7 +11,7 @@ use serde_json::{Value, json};
 
 use super::{CommandSpec, not_in_sketch};
 use crate::params::{bad, bool_, expr, req_expr, str_, string_list, vec2, vec3};
-use crate::schema::features::{BoxParams, ExtrudeParams, FeatureResult};
+use crate::schema::features::{BoxParams, ExtrudeParams, FeatureResult, FeatureWarning, WarningKind};
 use crate::schema::{TypedContract, output_schema_for};
 use crate::{EngineError, Result, Session};
 
@@ -626,13 +626,26 @@ fn add_feature_in(s: &mut Session, p: &Value, kind: FeatureKind, world: bool) ->
     // and the pieces a cut left of a body made earlier, which keep that body's feature.
     let created: Vec<&str> = st.bodies.iter().filter(|b| b.feature == id || !old.contains_key(b.name.as_str())).map(|b| b.name.as_str()).collect();
     let now: std::collections::HashSet<&str> = st.bodies.iter().map(|b| b.name.as_str()).collect();
-    let changed: Vec<&str> =
-        st.bodies.iter().filter(|b| b.feature != id && old.get(b.name.as_str()).is_some_and(|o| !o.same(&b.body))).map(|b| b.name.as_str()).collect();
+    // A material-changing feature that changed none of its bodies (a hole in the air, #309):
+    // judged from the states around its evaluation, which the model keeps (nothing is evaluated
+    // again). Those bodies keep their shape, so they are not `changed_bodies` either, whatever
+    // else the operation noted on them.
+    let no_effect = s.doc.feature(id).and_then(|f| polykrom_doc::no_effect(f, &s.model.state_before(id), &st));
+    let kept = |name: &str| no_effect.as_ref().is_some_and(|n| n.bodies.iter().any(|b| b == name));
+    let changed: Vec<&str> = st
+        .bodies
+        .iter()
+        .filter(|b| b.feature != id && !kept(&b.name) && old.get(b.name.as_str()).is_some_and(|o| !o.same(&b.body)))
+        .map(|b| b.name.as_str())
+        .collect();
     let removed: Vec<&str> = before.bodies.iter().map(|b| b.name.as_str()).filter(|n| !now.contains(n)).collect();
     let fname = s.doc.feature(id).map(|f| f.name.clone()).unwrap_or_default();
     // A warning (a Boolean that needed a retry, a reference found again elsewhere) is part of
     // the reply: a script or an agent sees it without asking the timeline (#616).
     let warning = r.as_ref().and_then(|r| r.warning.clone());
+    let warnings = no_effect
+        .map(|n| vec![FeatureWarning { kind: WarningKind::NoEffect, message: n.message(), feature: n.feature, bodies: n.bodies }])
+        .unwrap_or_default();
     let owned = |names: Vec<&str>| names.into_iter().map(str::to_string).collect();
     let reply = FeatureResult {
         feature: id,
@@ -644,6 +657,7 @@ fn add_feature_in(s: &mut Session, p: &Value, kind: FeatureKind, world: bool) ->
         warning,
         ms: r.map(|r| r.ms),
         param_warnings: Vec::new(),
+        warnings,
     };
     serde_json::to_value(reply).map_err(|e| EngineError::Other(e.to_string()))
 }
@@ -2527,6 +2541,10 @@ mod move_in_sketch_tests;
 #[cfg(test)]
 #[path = "thin_extrude_tests.rs"]
 mod thin_extrude_tests;
+
+#[cfg(test)]
+#[path = "no_effect_tests.rs"]
+mod no_effect_tests;
 
 #[cfg(test)]
 #[path = "extrude_convention_tests.rs"]

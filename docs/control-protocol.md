@@ -173,6 +173,29 @@ an open, a new design or a tab switch of its own answers with.
 
 Commands never open dialogs when run this way. `polykrom-cli commands` prints the same registry.
 
+### Warnings with a kind
+
+A feature command's reply says what it did: `created_bodies`, `changed_bodies`,
+`removed_bodies`, and `warning` (words from the evaluation: a Boolean that needed a retry, a
+reference found again elsewhere, or `null`). What a program should act on without reading the
+words also comes as `warnings`, a list of `{kind, feature, bodies, message}`, left out when
+there is none. Each is also part of `warning`. The kinds:
+
+| `kind` | When | `bodies` |
+|---|---|---|
+| `no_effect` | A material-changing feature (a cut, extrude or revolve cut, hole, fillet, chamfer, shell, draft, combine or split, and what Press Pull makes) evaluated and left every body it targets exactly as it was: a hole drilled into the air, a cut clear of the part, a tool that only touches a face (polykrom#309). Not an error: the feature is in the timeline, with the warning mark and this message, and `edit.undo` takes it back. Those bodies are not in `changed_bodies`. | The bodies it targeted and left as they were |
+
+```text
+{"id":9,"method":"engine.execute","params":{"command":"solid.hole","params":{"sketch":"Air","diameter":5,"depth":5,"name":"AirHole"}}}
+→ {"feature":31,"name":"AirHole","bodies":["Plate"],"created_bodies":[],"changed_bodies":[],"removed_bodies":[],
+   "warning":"AirHole has no effect: `Plate` is unchanged","ms":1.2,
+   "warnings":[{"kind":"no_effect","feature":"AirHole","bodies":["Plate"],"message":"AirHole has no effect: `Plate` is unchanged"}]}
+```
+
+The steps of `engine.batch` and `engine.script` are answered with the same replies, so a step
+that had no effect carries its `warnings` in `results` at its index. The check reads the model
+states around the feature's one evaluation; nothing is evaluated twice.
+
 ### Slow commands and the window (#1989)
 
 With the preference **Preferences > AI > Keep the window responsive while agents run commands**

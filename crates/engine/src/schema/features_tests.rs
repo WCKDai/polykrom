@@ -89,9 +89,43 @@ fn feature_result_serializes_like_the_old_reply() {
             warning: warning.clone(),
             ms,
             param_warnings: vec![],
+            warnings: vec![],
         };
         assert_eq!(serde_json::to_value(&new).ok(), Some(old));
     }
+}
+
+/// A warning with a kind is written with its kind in snake case, its feature, its bodies and its
+/// words; the output schema requires neither it nor `param_warnings`.
+#[test]
+fn warnings_with_a_kind_serialize_for_programs() {
+    let reply = FeatureResult {
+        feature: 7,
+        name: "Hole1".into(),
+        bodies: vec!["Plate".into()],
+        created_bodies: vec![],
+        changed_bodies: vec![],
+        removed_bodies: vec![],
+        warning: Some("Hole1 has no effect: `Plate` is unchanged".into()),
+        ms: None,
+        param_warnings: vec![],
+        warnings: vec![super::FeatureWarning {
+            kind: super::WarningKind::NoEffect,
+            feature: "Hole1".into(),
+            bodies: vec!["Plate".into()],
+            message: "Hole1 has no effect: `Plate` is unchanged".into(),
+        }],
+    };
+    let v = serde_json::to_value(&reply).unwrap_or_default();
+    assert_eq!(
+        v["warnings"],
+        json!([{"kind": "no_effect", "feature": "Hole1", "bodies": ["Plate"], "message": "Hole1 has no effect: `Plate` is unchanged"}])
+    );
+    let schema = output_schema_for::<FeatureResult>();
+    let schema = schema.as_value();
+    assert!(conforms(schema, schema, &v), "{v} doesn't match {schema}");
+    let required: Vec<&str> = schema.get("required").and_then(Value::as_array).into_iter().flatten().filter_map(Value::as_str).collect();
+    assert!(!required.contains(&"warnings"));
 }
 
 #[test]
