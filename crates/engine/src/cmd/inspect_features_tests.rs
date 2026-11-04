@@ -457,6 +457,39 @@ fn a_hex_prism_a_drafted_box_and_a_wedge_have_no_chamfer() {
     exact(&edge["angle_deg"], 30.0);
 }
 
+/// A cross-hole through a round post breaks out through the post's curved side: its rims are the
+/// curves where two cylinders meet, not circles, so the hole is read with its exact diameter and
+/// marked approximate (the depth along the axis comes from the mesh), not reported as a cavity.
+#[test]
+fn a_cross_hole_through_a_round_post_is_an_approximate_through_hole() {
+    let mut s = Session::default();
+    run(&mut s, "solid.cylinder", json!({"base": [0, 0, 0], "diameter": 40, "height": 30, "body_name": "Post"}));
+    run(&mut s, "solid.hole", json!({"position": [-20, 0, 15], "direction": [1, 0, 0], "diameter": 6}));
+    let b = features(&mut s, "Post");
+    assert!(list(&b["uncertain"]).is_empty(), "not a closed cavity: {b}");
+    let holes = of_type(&b, "hole");
+    assert_eq!(holes.len(), 1, "{b}");
+    let h = holes[0];
+    assert_eq!(h["through"], true, "{h}");
+    exact(&h["diameter"], 6.0);
+    assert_eq!(h["approximate"], true, "{h}");
+    assert!(h["note"].as_str().is_some_and(|n| n.contains("mesh")), "{h}");
+    assert!((num(&h["axis"]["direction"][0]).abs() - 1.0).abs() < 1e-9, "along x: {h}");
+    exact(&h["axis"]["origin"][1], 0.0);
+    exact(&h["axis"]["origin"][2], 15.0);
+    // From one side of the post to the other, within the sag of the rim curves.
+    let depth = num(&h["depth"]);
+    assert!(depth > 39.5 && depth <= 40.0 + 1e-9, "{h}");
+    assert_eq!(names(&h["faces"]).len(), 2, "the bore's halves: {h}");
+    assert_eq!(list(&h["steps"]).len(), 1, "{h}");
+    exact(&h["steps"][0]["diameter"], 6.0);
+    assert!(h["entry_face"].as_str().is_some_and(|f| f.starts_with("F1:side")), "{h}");
+    assert!(h["exit_face"].as_str().is_some_and(|f| f.starts_with("F1:side")), "{h}");
+    // An approximate hole joins no pattern; the post's own faces are reported as before.
+    assert!(list(&b["patterns"]).is_empty(), "{b}");
+    assert_eq!(list(&b["unrecognised"]).len(), 4, "{b}");
+}
+
 /// A through hole with a rounded mouth is read from the mouth: the round is its first step,
 /// the entry face the one beyond the round, and the round is also the fillet it is.
 #[test]
