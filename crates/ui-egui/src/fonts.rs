@@ -1,37 +1,70 @@
-//! Bundled Atkinson Hyperlegible interface faces, user overrides, and language-specific system fallbacks.
-//! The same definitions are used on desktop and web; the web shell adds Japanese on demand.
+//! The design kit's interface faces (Inter for the interface, IBM Plex Mono for numeric values
+//! and code; `assets/design-kit/2026-11-02/fonts`, OFL), user overrides, and language-specific
+//! system fallbacks. The faces are compiled into the binary from the kit itself (no second copy),
+//! so the same definitions serve desktop and web; the web shell adds Japanese on demand.
 
 use std::sync::Arc;
 
 use egui::{FontDefinitions, FontFamily, FontId, RichText};
 
-const UI_SANS: &[u8] =
-    include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/../../assets/fonts/atkinson-hyperlegible-next/AtkinsonHyperlegibleNext-Variable.ttf"));
-const UI_MONO: &[u8] =
-    include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/../../assets/fonts/atkinson-hyperlegible-mono/AtkinsonHyperlegibleMono-Regular.ttf"));
-const WEIGHTS: [(&str, f32); 4] = [("ui-sans", 400.0), ("ui-medium", 500.0), ("ui-semibold", 600.0), ("ui-bold", 700.0)];
+/// A font file of the design kit, by its name there.
+macro_rules! kit_font {
+    ($file:literal) => {
+        include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/../../assets/design-kit/2026-11-02/fonts/", $file))
+    };
+}
+
+/// The interface family the kit names (`tokens/figma-text-styles.json`).
+pub const INTERFACE_FAMILY: &str = "Inter";
+/// The family of numeric values and code the kit names (`Polykrom / CAD / Number`).
+pub const NUMERIC_FAMILY: &str = "IBM Plex Mono";
+
+/// Inter at 400, 500, 600 and 700: the entry name of each face and its bytes, in the order of
+/// [`sans_families`].
+const UI_SANS: [(&str, &[u8]); 4] = [
+    ("ui-sans", kit_font!("Inter-400.ttf")),
+    ("ui-medium", kit_font!("Inter-500.ttf")),
+    ("ui-semibold", kit_font!("Inter-600.ttf")),
+    ("ui-bold", kit_font!("Inter-700.ttf")),
+];
+/// IBM Plex Mono at 400, 500 and 600, in the order of [`mono_families`].
+const UI_MONO: [(&str, &[u8]); 3] = [
+    ("ui-mono", kit_font!("IBM-Plex-Mono-400.ttf")),
+    ("ui-mono-medium", kit_font!("IBM-Plex-Mono-500.ttf")),
+    ("ui-mono-semibold", kit_font!("IBM-Plex-Mono-600.ttf")),
+];
+/// The weight each face of [`UI_SANS`] and [`UI_MONO`] carries (its OS/2 weight class).
+#[cfg(test)]
+const SANS_WEIGHTS: [u16; 4] = [400, 500, 600, 700];
+#[cfg(test)]
+const MONO_WEIGHTS: [u16; 3] = [400, 500, 600];
 
 fn sans_families() -> [FontFamily; 4] {
     [FontFamily::Proportional, medium_family(), semibold_family(), bold_family()]
 }
 
-fn all_families() -> impl Iterator<Item = FontFamily> {
-    sans_families().into_iter().chain([FontFamily::Monospace])
+fn mono_families() -> [FontFamily; 3] {
+    [FontFamily::Monospace, mono_medium_family(), mono_semibold_family()]
 }
 
-/// Atkinson Hyperlegible Next at 400/500/600/700 and Atkinson Hyperlegible Mono Regular, followed by egui's symbol/emoji
-/// fallbacks. Each variable instance shares the embedded bytes and selects a real weight.
+fn all_families() -> impl Iterator<Item = FontFamily> {
+    sans_families().into_iter().chain(mono_families())
+}
+
+/// Inter at 400/500/600/700 and IBM Plex Mono at 400/500/600, each a static face of the kit,
+/// followed by egui's symbol/emoji fallbacks.
 pub fn base_font_definitions() -> FontDefinitions {
     let mut fonts = FontDefinitions::default();
-    let fallbacks = fonts.families.get(&FontFamily::Proportional).cloned().unwrap_or_default();
-    for ((name, weight), family) in WEIGHTS.into_iter().zip(sans_families()) {
-        let mut data = egui::FontData::from_static(UI_SANS);
-        data.tweak.coords = egui::epaint::text::VariationCoords::new([(b"wght", weight)]);
-        fonts.font_data.insert(name.to_owned(), Arc::new(data));
-        fonts.families.insert(family, std::iter::once(name.to_owned()).chain(fallbacks.iter().cloned()).collect());
+    let sans_fallbacks = fonts.families.get(&FontFamily::Proportional).cloned().unwrap_or_default();
+    let mono_fallbacks = fonts.families.get(&FontFamily::Monospace).cloned().unwrap_or_default();
+    for ((name, bytes), family) in UI_SANS.into_iter().zip(sans_families()) {
+        fonts.font_data.insert(name.to_owned(), Arc::new(egui::FontData::from_static(bytes)));
+        fonts.families.insert(family, std::iter::once(name.to_owned()).chain(sans_fallbacks.iter().cloned()).collect());
     }
-    fonts.font_data.insert("ui-mono".to_owned(), Arc::new(egui::FontData::from_static(UI_MONO)));
-    fonts.families.entry(FontFamily::Monospace).or_default().insert(0, "ui-mono".to_owned());
+    for ((name, bytes), family) in UI_MONO.into_iter().zip(mono_families()) {
+        fonts.font_data.insert(name.to_owned(), Arc::new(egui::FontData::from_static(bytes)));
+        fonts.families.insert(family, std::iter::once(name.to_owned()).chain(mono_fallbacks.iter().cloned()).collect());
+    }
     with_symbol_fallback(fonts)
 }
 
@@ -45,6 +78,24 @@ fn semibold_family() -> FontFamily {
 
 fn bold_family() -> FontFamily {
     FontFamily::Name("ui-bold".into())
+}
+
+fn mono_medium_family() -> FontFamily {
+    FontFamily::Name("ui-mono-medium".into())
+}
+
+fn mono_semibold_family() -> FontFamily {
+    FontFamily::Name("ui-mono-semibold".into())
+}
+
+/// Medium (500) numeric or code text, retaining the language fallbacks.
+pub fn mono_medium(size: f32) -> FontId {
+    FontId::new(size, mono_medium_family())
+}
+
+/// Semibold (600) numeric or code text, retaining the language fallbacks.
+pub fn mono_semibold(size: f32) -> FontId {
+    FontId::new(size, mono_semibold_family())
 }
 
 /// Medium (500) interface text, retaining the language fallbacks and user override.
@@ -989,23 +1040,51 @@ mod tests {
         assert_eq!(again.families[&FontFamily::Monospace], defaults.families[&FontFamily::Monospace]);
     }
 
+    /// The family a face names (its typographic family, else its family name) and its weight class.
+    fn family_and_weight(bytes: &[u8]) -> (String, u16) {
+        let face = ttf_parser::Face::parse(bytes, 0).unwrap();
+        let name = |id: u16| face.names().into_iter().find(|n| n.name_id == id && n.is_unicode()).and_then(|n| n.to_string());
+        (name(ttf_parser::name_id::TYPOGRAPHIC_FAMILY).or_else(|| name(ttf_parser::name_id::FAMILY)).unwrap(), face.weight().to_number())
+    }
+
+    /// The interface is set in the kit's Inter (400/500/600/700) and its numbers and code in the
+    /// kit's IBM Plex Mono (400/500/600), on the desktop and in the web build alike: each face
+    /// leads its family, with egui's symbol and emoji fallbacks behind it.
     #[test]
-    fn bundled_faces_lead_every_family_and_keep_egui_fallbacks() {
+    fn the_kit_faces_lead_every_family_on_desktop_and_web() {
         let defaults = with_symbol_fallback(FontDefinitions::default());
-        let fonts = base_font_definitions();
-        for ((name, weight), family) in WEIGHTS.into_iter().zip(sans_families()) {
-            let list = &fonts.families[&family];
-            assert_eq!(list[0], name);
-            assert_eq!(&list[1..], defaults.families[&FontFamily::Proportional]);
-            let data = &fonts.font_data[name];
-            assert_eq!(data.font.as_ref(), UI_SANS);
-            assert_eq!(data.tweak.coords.as_ref()[0].1, weight);
-            assert!(data.variation_axes().iter().any(|a| a.tag == *b"wght"));
+        for fonts in [base_font_definitions(), web_font_definitions("", None)] {
+            for (((name, bytes), family), weight) in UI_SANS.into_iter().zip(sans_families()).zip(SANS_WEIGHTS) {
+                let list = &fonts.families[&family];
+                assert_eq!(list[0], name);
+                assert_eq!(&list[1..], defaults.families[&FontFamily::Proportional]);
+                assert_eq!(fonts.font_data[name].font.as_ref(), bytes);
+                let (family, class) = family_and_weight(bytes);
+                assert!(family.starts_with(INTERFACE_FAMILY), "{name}: {family}");
+                assert_eq!(class, weight, "{name}");
+            }
+            for (((name, bytes), family), weight) in UI_MONO.into_iter().zip(mono_families()).zip(MONO_WEIGHTS) {
+                let list = &fonts.families[&family];
+                assert_eq!(list[0], name);
+                assert_eq!(&list[1..], defaults.families[&FontFamily::Monospace]);
+                assert_eq!(fonts.font_data[name].font.as_ref(), bytes);
+                let (family, class) = family_and_weight(bytes);
+                assert!(family.starts_with(NUMERIC_FAMILY), "{name}: {family}");
+                assert_eq!(class, weight, "{name}");
+            }
         }
-        let mono = &fonts.families[&FontFamily::Monospace];
-        assert_eq!(mono[0], "ui-mono");
-        assert_eq!(&mono[1..], defaults.families[&FontFamily::Monospace]);
-        assert_eq!(fonts.font_data["ui-mono"].font.as_ref(), UI_MONO);
+        // Installed in a context (the desktop's way, with the system fallbacks), the faces lay
+        // the text out.
+        let ctx = egui::Context::default();
+        setup_fonts_for(&ctx, "en", "");
+        ctx.run_ui(egui::RawInput::default(), |_| {}).textures_delta.clear();
+        let installed = ctx.fonts(|f| f.definitions().clone());
+        assert_eq!(installed.families[&FontFamily::Proportional][0], "ui-sans");
+        assert_eq!(installed.families[&semibold_family()][0], "ui-semibold");
+        assert_eq!(installed.families[&FontFamily::Monospace][0], "ui-mono");
+        assert_eq!(installed.families[&mono_medium_family()][0], "ui-mono-medium");
+        assert_eq!(installed.families[&mono_semibold_family()][0], "ui-mono-semibold");
+        assert!(ctx.fonts_mut(|f| f.has_glyphs(&mono_semibold(12.0), "Ø8.00 mm")));
     }
 
     #[test]
@@ -1049,7 +1128,7 @@ mod tests {
             assert_eq!(installed.families[&family].get(1).map(String::as_str), Some(CJK_FALLBACK));
         }
         let reset = web_font_definitions("", Some(installed));
-        for ((name, _), family) in WEIGHTS.into_iter().zip(sans_families()) {
+        for ((name, _), family) in UI_SANS.into_iter().zip(sans_families()) {
             assert_eq!(reset.families[&family][0], name);
             let list = &reset.families[&family];
             assert_eq!(list.get(list.len() - 2).map(String::as_str), Some(CJK_FALLBACK));
@@ -1169,7 +1248,7 @@ mod tests {
             assert!(list.contains(&defaults.families[&family][0]), "the bundled weight remains available");
         }
         assert_eq!(fonts.families[&FontFamily::Monospace][0], "ui-mono");
-        let chosen = egui::FontData::from_static(UI_SANS);
+        let chosen = egui::FontData::from_static(UI_SANS[0].1);
         let mut fonts = with_ui_font(fonts, chosen);
         promote_font_to_front(&mut fonts, CJK_FALLBACK);
         for family in sans_families() {

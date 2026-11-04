@@ -1,4 +1,6 @@
-//! Original light and dark palette values. Compiled by the UI theme boundary.
+//! The light and dark palettes, compiled by the UI theme boundary. The dark palette is the design
+//! kit's graphite shell (`assets/design-kit/2026-11-02/tokens`); the light palette keeps the
+//! same accent hue, deepened so text on it and of it reads at WCAG AA.
 use crate::theme::{AnalysisColors, IconColors, Tokens};
 use egui::Color32;
 
@@ -24,8 +26,8 @@ impl Tokens {
             file_rail_ink: Color32::WHITE,
             file_rail_hover: Color32::from_rgb(48, 48, 52),
             file_primary: Color32::from_rgb(240, 252, 204),
-            file_primary_ink: Color32::from_rgb(54, 84, 8),
-            file_primary_border: Color32::from_rgb(77, 124, 15),
+            file_primary_ink: Color32::from_rgb(67, 78, 7),
+            file_primary_border: Color32::from_rgb(99, 114, 5),
             file_recovery: Color32::from_rgb(255, 246, 229),
             file_recovery_ink: Color32::from_rgb(122, 74, 5),
             file_recovery_border: Color32::from_rgb(240, 210, 154),
@@ -73,7 +75,7 @@ impl Tokens {
             form_ink: Color32::from_rgb(35, 35, 39),
             form_dim: Color32::from_rgb(78, 82, 72),
             // Polykrom's accent (light): a primary button is the brand's, as in the dark theme.
-            form_primary: Color32::from_rgb(77, 124, 15),
+            form_primary: Color32::from_rgb(99, 114, 5),
             form_error: Color32::from_rgb(161, 52, 44),
             form_error_fill: Color32::from_rgb(252, 239, 237),
             form_success: Color32::from_rgb(39, 107, 44),
@@ -107,10 +109,11 @@ impl Tokens {
             border: Color32::from_rgb(211, 211, 217),
             text: Color32::from_rgb(41, 41, 46),
             text_dim: Color32::from_rgb(115, 115, 120),
-            // Polykrom's lime (#CCFF00) can't be text or a line on a light surface (about 1.1:1),
-            // so the light palette's accent is the deep lime that stays legible there (#91).
-            accent: Color32::from_rgb(77, 124, 15),
-            accent_soft: Color32::from_rgb(160, 206, 44),
+            // The kit's lime (#E0FF30) can't be text or a line on a light surface (about 1.1:1),
+            // so the light palette's accent keeps its hue (OKLCH 118.5°) and deepens until text
+            // of it and on it reads at WCAG AA (#91; `kit_tokens_tests` measures both).
+            accent: Color32::from_rgb(99, 114, 5),
+            accent_soft: Color32::from_rgb(179, 204, 31),
             sketch_accent: icon_primary(crate::icon_svg::SKETCH_PRIMARY[0]),
             // Icon palette active-3 ramps; these accents have no compiled constants yet.
             surface_accent: Color32::from_rgb(164, 80, 0),
@@ -150,9 +153,9 @@ impl Tokens {
             hover_edge_halo: Color32::from_rgb(203, 203, 203),
             hover_face_lift: 40,
             sel_profile: Color32::from_rgb(6, 99, 108),
-            sel_profile_edge: Color32::from_rgb(77, 124, 15),
+            sel_profile_edge: Color32::from_rgb(99, 114, 5),
             hover_profile: Color32::from_rgba_unmultiplied_const(75, 129, 253, 48),
-            hover_profile_edge: Color32::from_rgb(104, 160, 20),
+            hover_profile_edge: Color32::from_rgb(138, 158, 4),
             sel_vertex: Color32::from_rgb(20, 124, 134),
             origin_plane: Color32::from_rgba_unmultiplied_const(249, 184, 134, 94),
             origin_plane_edge: Color32::from_rgba_unmultiplied_const(214, 140, 84, 200),
@@ -189,7 +192,7 @@ impl Tokens {
             section_cap: Color32::from_rgb(214, 128, 72),
             dialog_bg: Color32::from_rgb(251, 251, 251),
             dialog_border: Color32::from_rgb(218, 218, 224),
-            chip: Color32::from_rgb(77, 124, 15),
+            chip: Color32::from_rgb(99, 114, 5),
             profile_fill: Color32::from_rgba_unmultiplied_const(255, 196, 120, 70),
             glyph_bg: Color32::WHITE,
             glyph_edge: Color32::from_rgb(190, 110, 100),
@@ -208,7 +211,7 @@ impl Tokens {
             control_fill: Color32::from_rgb(255, 255, 255),
             control_border: Color32::from_rgb(201, 202, 207),
             dialog_label: Color32::from_rgb(51, 74, 76),
-            selected_ink: Color32::from_rgb(54, 84, 8),
+            selected_ink: Color32::from_rgb(67, 78, 7),
             selected_bg: Color32::from_rgb(240, 252, 204),
             timeline_item: Color32::WHITE,
             timeline_item_error: Color32::from_rgb(250, 220, 220),
@@ -271,33 +274,48 @@ impl Tokens {
         t.sketch_mode_tint = 0.12;
         t.sketch_footer_icon_size = 15.0;
         t.font_section_tracking = 0.04;
-        t.file_dim = Color32::from_rgb(186, 186, 192);
+        // The design kit's dark graphite shell (`assets/design-kit/2026-11-02/tokens`: the
+        // declared primitives in figma-tokens.json, their places in observed-current.json and the
+        // views' layer data; `kit_tokens_tests` holds each role to its token):
+        //   base #202225 (the window: document toolbar, workspace tabs, timeline, dialog footers),
+        //   surface #292C2F (the ribbon, panels, cards), field #34383D (buttons and inputs),
+        //   border #42474D, viewport #181B1F, text #ECEEF0, muted #A9B0B7, icon #CED3D8,
+        //   selection #374126 (a selected row, muted olive) and the accent trio lime #E0FF30
+        //   (primary actions, the active tab, selected profiles), green #70DE17 and mint #00C099.
+        t.file_dim = Color32::from_rgb(169, 176, 183);
         t.file_recovery_well = Color32::from_rgb(92, 68, 32);
-        t.file_background = Color32::from_rgb(34, 34, 39);
-        t.file_surface = Color32::from_rgb(42, 43, 47);
-        t.file_border = Color32::from_rgb(68, 68, 73);
-        t.file_rail = Color32::from_rgb(24, 24, 27);
-        t.file_rail_hover = Color32::from_rgb(44, 44, 49);
-        t.file_primary = Color32::from_rgb(38, 47, 10);
-        t.file_primary_ink = Color32::from_rgb(220, 255, 120);
-        t.file_primary_border = Color32::from_rgb(204, 255, 0);
+        t.file_background = Color32::from_rgb(32, 34, 37);
+        t.file_surface = Color32::from_rgb(41, 44, 47);
+        t.file_border = Color32::from_rgb(66, 71, 77);
+        t.file_rail = Color32::from_rgb(24, 27, 31);
+        t.file_rail_hover = Color32::from_rgb(41, 44, 47);
+        t.file_primary = Color32::from_rgb(55, 65, 38);
+        t.file_primary_ink = Color32::from_rgb(224, 255, 48);
+        t.file_primary_border = Color32::from_rgb(224, 255, 48);
         t.file_recovery = Color32::from_rgb(67, 51, 28);
         t.file_recovery_ink = Color32::from_rgb(245, 204, 137);
         t.file_recovery_border = Color32::from_rgb(115, 88, 43);
-        t.app_bar = Color32::from_rgb(31, 31, 35);
-        t.toolbar = Color32::from_rgb(42, 43, 47);
-        t.panel = Color32::from_rgb(42, 43, 47);
-        t.panel_header = Color32::from_rgb(51, 51, 56);
-        t.border = Color32::from_rgb(68, 68, 73);
-        t.text = Color32::from_rgb(225, 225, 231);
-        t.text_dim = Color32::from_rgb(154, 154, 160);
-        // Polykrom's lime, with ink on it (#91).
-        t.accent = Color32::from_rgb(204, 255, 0);
-        t.on_accent = Color32::from_rgb(17, 17, 17);
-        t.sel_profile_edge = Color32::from_rgb(204, 255, 0);
-        t.hover_profile_edge = Color32::from_rgb(222, 255, 110);
-        t.body_selected = Color32::from_rgb(204, 255, 0);
-        t.accent_soft = Color32::from_rgb(100, 120, 0);
+        t.app_bar = Color32::from_rgb(32, 34, 37);
+        // The kit's border is too faint on the window for a divider (1.7:1): the mid grey of the
+        // views' model edges (#64737D, 3.2:1) divides the application bar's groups.
+        t.app_bar_separator = Color32::from_rgb(100, 115, 125);
+        t.app_bar_tab_active = Color32::from_rgb(41, 44, 47);
+        t.app_bar_text = Color32::from_rgb(236, 238, 240);
+        t.toolbar = Color32::from_rgb(41, 44, 47);
+        t.panel = Color32::from_rgb(41, 44, 47);
+        t.panel_header = Color32::from_rgb(52, 56, 61);
+        t.border = Color32::from_rgb(66, 71, 77);
+        t.text = Color32::from_rgb(236, 238, 240);
+        t.text_dim = Color32::from_rgb(169, 176, 183);
+        // The kit's lime, with the window's graphite as ink on it (the Edit feature button).
+        t.accent = Color32::from_rgb(224, 255, 48);
+        t.on_accent = Color32::from_rgb(32, 34, 37);
+        t.sel_profile_edge = Color32::from_rgb(224, 255, 48);
+        t.hover_profile_edge = Color32::from_rgb(112, 222, 23);
+        t.body_selected = Color32::from_rgb(224, 255, 48);
+        t.accent_soft = Color32::from_rgb(55, 65, 38);
+        t.agent_ok = Color32::from_rgb(112, 222, 23);
+        t.agent_busy = Color32::from_rgb(0, 192, 153);
         t.sketch_accent = icon_primary(crate::icon_svg::SKETCH_PRIMARY[1]);
         t.surface_accent = Color32::from_rgb(149, 104, 45);
         t.mesh_accent = Color32::from_rgb(133, 113, 0);
@@ -321,54 +339,55 @@ impl Tokens {
         t.render_ink = Color32::from_rgb(224, 116, 174);
         t.render_soft = Color32::from_rgb(64, 35, 54);
         t.tab_on_fill_dark = Color32::BLACK;
-        t.dialog_body = Color32::from_rgb(42, 43, 47);
-        t.dialog_footer = Color32::from_rgb(51, 51, 56);
-        t.dialog_rule = Color32::from_rgb(58, 58, 63);
-        t.control_fill = Color32::from_rgb(31, 31, 35);
-        t.control_border = Color32::from_rgb(81, 81, 86);
+        t.dialog_body = Color32::from_rgb(41, 44, 47);
+        t.dialog_footer = Color32::from_rgb(32, 34, 37);
+        t.dialog_rule = Color32::from_rgb(66, 71, 77);
+        t.control_fill = Color32::from_rgb(52, 56, 61);
+        t.control_border = Color32::from_rgb(66, 71, 77);
         t.dialog_label = t.text;
-        t.selected_ink = Color32::from_rgb(235, 255, 180);
-        t.selected_bg = Color32::from_rgb(44, 55, 10);
+        // A selected row: the kit's muted olive, its label in the lime (the timeline's Hole 02).
+        t.selected_ink = Color32::from_rgb(224, 255, 48);
+        t.selected_bg = Color32::from_rgb(55, 65, 38);
         t.construction_geom = icon_primary(crate::icon_svg::CONSTRUCTION_PRIMARY[1]);
         t.error = Color32::from_rgb(240, 100, 96);
         t.warning = Color32::from_rgb(236, 170, 70);
-        t.icon = Color32::from_rgb(213, 213, 219);
-        t.timeline = Color32::from_rgb(36, 36, 41);
-        t.hover = Color32::from_rgb(60, 60, 65);
+        t.icon = Color32::from_rgb(206, 211, 216);
+        t.timeline = Color32::from_rgb(32, 34, 37);
+        t.hover = Color32::from_rgb(66, 71, 77);
         t.hover_edge_halo = Color32::from_rgb(203, 203, 203);
         t.origin_point = Color32::from_rgb(215, 215, 218);
-        t.viewport_top = Color32::from_rgb(51, 51, 56);
-        t.viewport_bottom = Color32::from_rgb(51, 51, 56);
-        t.grid = Color32::from_rgb(64, 64, 69);
-        t.grid_major = Color32::from_rgb(78, 78, 83);
+        t.viewport_top = Color32::from_rgb(24, 27, 31);
+        t.viewport_bottom = Color32::from_rgb(24, 27, 31);
+        t.grid = Color32::from_rgb(37, 45, 51);
+        t.grid_major = Color32::from_rgb(41, 48, 56);
         t.body = Color32::from_rgb(155, 155, 161);
         t.body_edge = Color32::from_rgb(16, 16, 18);
         t.sketch = Color32::from_rgb(25, 173, 186);
-        t.sketch_fixed = Color32::from_rgb(233, 233, 238);
-        t.sketch_point = Color32::from_rgb(233, 233, 238);
+        t.sketch_fixed = Color32::from_rgb(236, 238, 240);
+        t.sketch_point = Color32::from_rgb(236, 238, 240);
         t.sketch_locked = Color32::from_rgb(96, 204, 116);
-        t.dimension = Color32::from_rgb(227, 227, 233);
-        t.dimension_driven = Color32::from_rgb(149, 149, 154);
+        t.dimension = Color32::from_rgb(236, 238, 240);
+        t.dimension_driven = Color32::from_rgb(169, 176, 183);
         t.sketch_point_free = Color32::from_rgb(25, 173, 186);
         t.profile_fill = Color32::from_rgba_unmultiplied_const(120, 150, 200, 40);
-        t.dialog_bg = Color32::from_rgb(42, 43, 47);
-        t.dialog_border = Color32::from_rgb(68, 68, 73);
-        t.chip = Color32::from_rgb(170, 214, 0);
-        t.glyph_bg = Color32::from_rgb(49, 49, 54);
+        t.dialog_bg = Color32::from_rgb(41, 44, 47);
+        t.dialog_border = Color32::from_rgb(66, 71, 77);
+        t.chip = Color32::from_rgb(224, 255, 48);
+        t.glyph_bg = Color32::from_rgb(52, 56, 61);
         t.glyph_edge = Color32::from_rgb(200, 130, 120);
         t.glyph_text = icon_primary(crate::icon_svg::CONSTRAINT_PRIMARY[1]);
-        t.overlay = Color32::from_rgba_unmultiplied_const(34, 38, 46, 240);
+        t.overlay = Color32::from_rgba_unmultiplied_const(32, 34, 37, 240);
         t.rubber_band = Color32::from_rgb(23, 180, 194);
-        t.timeline_item = Color32::from_rgb(57, 57, 62);
+        t.timeline_item = Color32::from_rgb(52, 56, 61);
         t.timeline_item_error = Color32::from_rgb(152, 61, 66);
-        t.timeline_marker = Color32::from_rgb(177, 177, 183);
-        t.field = Color32::from_rgb(33, 33, 38);
+        t.timeline_marker = Color32::from_rgb(206, 211, 216);
+        t.field = Color32::from_rgb(52, 56, 61);
         t.box_window = Color32::from_rgb(22, 170, 183);
         t.box_crossing = Color32::from_rgb(80, 200, 120);
         t.bend_up = Color32::from_rgb(110, 200, 120);
         t.bend_down = Color32::from_rgb(240, 150, 80);
         t.form_ink = t.text;
-        t.form_dim = Color32::from_rgb(186, 186, 192);
+        t.form_dim = Color32::from_rgb(169, 176, 183);
         t.form_primary = t.accent;
         t.form_error = t.error;
         // Its own fill: the timeline's error red is too close to the error text to read on (#131).
@@ -402,6 +421,9 @@ impl Tokens {
         // red sense: a deeper lime keeps them apart (#91).
         if dark {
             t.body_selected = Color32::from_rgb(120, 170, 0);
+            // The failed item's red and the kit's olive selection both turn brown to a weak red
+            // sense (7.9 apart): a lighter red keeps them apart by lightness.
+            t.timeline_item_error = Color32::from_rgb(196, 86, 96);
         }
         t.construction_geom = icon_primary(crate::icon_svg::CONSTRUCTION_RED_GREEN[dark as usize]);
         t.glyph_text = icon_primary(crate::icon_svg::CONSTRAINT_RED_GREEN[dark as usize]);
@@ -438,6 +460,12 @@ impl Tokens {
         if dark {
             t.sketch_locked = Color32::from_rgb(140, 225, 110);
             t.box_crossing = Color32::from_rgb(240, 110, 170);
+            // The kit's olive selection differs from the field and hover greys along the
+            // blue-yellow axis a tritan eye lacks (2.2 and 3.4 apart): a warmer olive keeps the
+            // selected row and the active tab apart from them by its red, which that eye keeps
+            // (12.2 and 13.4), and muted text still reads on it (5.2:1).
+            t.accent_soft = Color32::from_rgb(66, 58, 14);
+            t.selected_bg = Color32::from_rgb(66, 58, 14);
         } else {
             t.sketch_locked = Color32::from_rgb(20, 165, 70);
             t.box_crossing = Color32::from_rgb(200, 60, 120);

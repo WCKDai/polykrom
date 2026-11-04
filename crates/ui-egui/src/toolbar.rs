@@ -818,9 +818,11 @@ fn ribbon_button_lines(painter: &egui::Painter, label: &str, width: f32) -> Vec<
     lines
 }
 
+/// Ribbon command labels are set at the kit's small size (11 pt: `Polykrom / UI / Small`, the
+/// size of every command label in its ribbon).
 fn ribbon_label_width(painter: &egui::Painter, text: &str) -> f32 {
     let mut job =
-        egui::text::LayoutJob::simple(text.to_owned(), FontId::proportional(crate::theme::Tokens::get().font_body), Color32::WHITE, f32::INFINITY);
+        egui::text::LayoutJob::simple(text.to_owned(), FontId::proportional(crate::theme::Tokens::get().font_small), Color32::WHITE, f32::INFINITY);
     job.halign = egui::Align::Center;
     painter.layout_job(job).size().x
 }
@@ -856,7 +858,7 @@ fn ribbon_label_lines(painter: &egui::Painter, label: &str, width: f32) -> Vec<S
 fn ribbon_button_galley(painter: &egui::Painter, label: &str, width: f32, color: Color32) -> std::sync::Arc<egui::Galley> {
     let lines = ribbon_button_lines(painter, label, width);
     // Explicit newlines only: egui must never split an oversized word.
-    let mut job = egui::text::LayoutJob::simple(lines.join("\n"), FontId::proportional(crate::theme::Tokens::get().font_body), color, f32::INFINITY);
+    let mut job = egui::text::LayoutJob::simple(lines.join("\n"), FontId::proportional(crate::theme::Tokens::get().font_small), color, f32::INFINITY);
     job.halign = egui::Align::Center;
     painter.layout_job(job)
 }
@@ -973,7 +975,9 @@ fn ribbon_tabs(app: &mut SolveApp, ui: &mut egui::Ui, row: Rect) {
                     );
                     if ui.clip_rect().contains(tr.center()) {
                         crate::scenario::publish_target(&format!("tab:{tab}"), tr);
-                        crate::scenario::publish_rect(&format!("toolbar_tab:{tab}"), tr);
+                        // The part of the tab on screen: the strip scrolls, and its last visible
+                        // tab may be cut by the strip's edge before the search field.
+                        crate::scenario::publish_rect(&format!("toolbar_tab:{tab}"), tr.intersect(ui.clip_rect()));
                         let aliases: &[&str] = match tab {
                             "MODEL" => &["SOLID", "PLASTIC"],
                             "SURFACE" => &["MESH"],
@@ -2466,8 +2470,8 @@ mod header_report_tests {
             2.0 * (1400.0 - crate::titlebar::WIDTH - RIGHT_GROUP - center.x)
         };
         let (en, ru) = (width_in("en"), width_in("ru"));
-        assert!((en - 114.21875).abs() < 0.05, "Atkinson Hyperlegible Next report button width: {en}");
-        // "Сообщить об ошибке" needs more than the English button's 114 px.
+        assert!((en - 119.09375).abs() < 0.05, "Inter report button width: {en}");
+        // "Сообщить об ошибке" needs more than the English button's 119 px.
         assert!(ru > en + 10.0, "{ru}");
     }
 
@@ -2898,7 +2902,10 @@ mod ribbon_label_tests {
                         let width = ribbon_button_width(&painter, label) - BUTTON_LABEL_PADDING;
                         let galley = ribbon_button_galley(&painter, label, width, Color32::WHITE);
                         assert!(galley.rows.len() <= 2, "{}: {label}", command.id);
-                        assert!(galley.size().x <= width + 0.01, "{}: {label}: {} > {width}", command.id, galley.size().x);
+                        // Centred rows are each rounded to the pixel grid, so two rows of
+                        // different widths can span up to a pixel more than the widest one
+                        // measured alone (Vietnamese "Tập hợp tiếp xúc" in Inter: half a pixel).
+                        assert!(galley.size().x <= width + 1.0, "{}: {label}: {} > {width}", command.id, galley.size().x);
                         let first = galley.rows.first().unwrap().text();
                         let visible = first.strip_suffix('…').unwrap_or(&first);
                         assert!(label.starts_with(visible), "{}: {label} -> {first}", command.id);
