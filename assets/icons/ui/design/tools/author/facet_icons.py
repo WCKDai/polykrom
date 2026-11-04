@@ -593,13 +593,7 @@ def sketch_chamfer_two_distances():
     return ic
 
 
-@icon('model', 'Sketch Mirror')
-def sketch_mirror():
-    ic = sk('sketch_mirror', 'Sketch Mirror')
-    ic.stroke('M32 8V56', LINE, WG, dash=DASH)
-    ic.stroke('M26 16L10 26L22 46', LINE, W)
-    ic.stroke('M38 16L54 26L42 46', A3, WA)
-    return ic
+# sketch_mirror is an alias of the owner-supplied Mirror (aliases.toml); it has no Facet drawing.
 
 
 @icon('model', 'Project')

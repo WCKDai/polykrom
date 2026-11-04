@@ -204,6 +204,7 @@ rollback	false
 save	false
 scale	false
 screw	false
+search	false
 section	false
 select	false
 send	false

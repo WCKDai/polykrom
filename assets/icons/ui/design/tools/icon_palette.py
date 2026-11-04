@@ -233,7 +233,20 @@ def transparent_knockouts(svg, source):
     return ET.tostring(root, encoding='unicode')
 
 
+def supplied_source(svg, palette):
+    """An owner-supplied master keeps the design kit's neutral hexes; `[supplied-roles]` names the
+    palette role each stands for (the renderer in crates/ui-egui/src/icon_svg.rs reads them the same way).
+    The gradient stops are no role and stay as shipped."""
+    for hex_value, role in palette.get('supplied-roles', {}).items():
+        value = palette['roles'].get(role)
+        if value is None: continue
+        target = 'currentColor' if role == 'line' else value.get('source', value['light'])
+        svg = re.sub(re.escape(hex_value), target, svg, flags=re.IGNORECASE)
+    return svg
+
+
 def themed(svg, palette, theme, accent='', vision='off', live=False, namespace=''):
+    svg = supplied_source(svg, palette)
     gap = palette['roles'].get('gap')
     if gap: svg = transparent_knockouts(svg, gap.get('source', gap['light']))
     values = role_values(palette, theme, accent, vision)

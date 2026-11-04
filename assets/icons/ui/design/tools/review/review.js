@@ -193,7 +193,8 @@ for (const card of cards) {
   pop.appendChild(textarea); card.appendChild(pop);
   textarea.oninput = () => { notes[id] = textarea.value; run(); scheduleSave(); };
   card.querySelector('.ck').onclick = () => {
-    if (card.dataset.missing === 'true') return;
+    // Missing artwork cannot be accepted; an owner-supplied master is accepted by provenance.
+    if (card.dataset.missing === 'true' || card.dataset.supplied === 'true') return;
     fin.has(id) ? fin.delete(id) : fin.add(id);
     card.classList.remove('open'); run(); scheduleSave();
   };

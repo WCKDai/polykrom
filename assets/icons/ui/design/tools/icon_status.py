@@ -86,12 +86,16 @@ def scan():
     """Everything derived from the repo: rows, summary."""
     pal = tomllib.load(open(D + '/palette.toml', 'rb'))
     alias_raw = tomllib.load(open(D + '/aliases.toml', 'rb')).get('alias', {})
-    global unassigned
+    global unassigned, facet_masters
     unassigned = []
     masters = {}
+    facet_masters = {}   # the Facet drawing beneath an owner-supplied master of the same id
     for f in sorted(glob.glob(D + '/svg/*/*.svg')):
         fam = os.path.basename(os.path.dirname(f)); n = os.path.basename(f)[:-4]
-        if fam != 'small': masters[n] = (fam, f)
+        if fam == 'small': continue
+        # An owner-supplied master (svg/supplied) supersedes a Facet drawing of its id.
+        if fam == 'supplied' or n not in masters: masters[n] = (fam, f)
+        if fam != 'supplied': facet_masters.setdefault(n, f)
     uses = collections.defaultdict(list)   # id -> command ids and "ui:<file>"
     where = collections.defaultdict(list)  # id -> [(tab, panel, command)]
     for f in glob.glob(ROOT + '/crates/engine/src/**/*.rs', recursive=True):
@@ -125,9 +129,12 @@ def scan():
         if m in masters and n != 'placeholder' and not runtime.get(n, False): status = 'done'
         else: status, m = 'placeholder', 'placeholder'
         cmds = [u for u in uses.get(n, []) if not u.startswith('ui:')]
+        raw = alias_raw.get(n)
+        facet = bool(isinstance(raw, dict) and raw.get('facet') and m in facet_masters)
         rows.append(dict(id=n, status=status, master=m, accent=acc, commands=len(cmds), example=cmds[0] if cmds else '',
                          ui=sorted({u[3:] for u in uses.get(n, []) if u.startswith('ui:')}), unused=not uses.get(n),
-                         where=where.get(n, []), alias_target=n in targets))
+                         where=where.get(n, []), alias_target=n in targets, facet=facet,
+                         supplied=masters.get(m, ('',))[0] == 'supplied' and not facet))
     cnt = collections.Counter(r['status'] for r in rows if r['id'] != 'placeholder')
     cmd_cnt = collections.Counter()
     for r in rows:
@@ -195,6 +202,7 @@ def build_page(serving):
     rows, masters, pal, summary = scan()
     rv = load_review()
     valid = review_state.valid_final(rv)
+    owner = review_state.supplied()
     shown = [r for r in rows if r['id'] != 'placeholder']
     shown.sort(key=lambda r: (group_of(r), r['id']))
     cards = []; last = None; tabs_seen = []
@@ -209,7 +217,8 @@ def build_page(serving):
             cards.append('<i class="gm%s" data-tab="%s" title="%s">%s</i>' % (' tab' if first_of_tab else '', html.escape(g[2]), html.escape(g[2] + ' ▸ ' + g[3]), html.escape(txt)))
         last = g
         missing = r['status'] == 'placeholder'
-        svg_f = open(masters[r['master']][1], encoding='utf-8').read() if r['master'] in masters else '<svg viewBox="0 0 64 64"><title>Missing artwork</title><path d="M10 10L54 10L54 54L10 54Z" fill="none" stroke="currentColor" stroke-width="2.55" stroke-dasharray="3 5"/></svg>'
+        art_path = facet_masters[r['master']] if r['facet'] else masters[r['master']][1] if r['master'] in masters else None
+        svg_f = open(art_path, encoding='utf-8').read() if art_path else '<svg viewBox="0 0 64 64"><title>Missing artwork</title><path d="M10 10L54 10L54 54L10 54Z" fill="none" stroke="currentColor" stroke-width="2.55" stroke-dasharray="3 5"/></svg>'
         small = glob.glob(D + '/svg/small/' + r['master'] + '.svg')
         small_svg = open(small[0], encoding='utf-8').read() if small else None
         inner = ''
@@ -227,10 +236,16 @@ def build_page(serving):
         if r['id'] not in valid and protected[r['master']]:
             extra += ' <span class="shared" title="Accepted as ' + html.escape(', '.join(protected[r['master']])) + '; reopen that alias before requesting a redraw">shared artwork accepted</span>'
         if r['id'] in rv['final'] and r['id'] not in valid: extra += ' <i class="st">changed since acceptance</i>'
-        cards.append('<div class="card" data-id="%s" data-accent="%s" data-tab="%s" data-k="%s" title="%s" data-missing="%s"><div class="art%s">%s</div><div class="meta"><b>%s</b>%s%s<br><small>%s</small></div>'
-                     '<button class="ck" title="Accept as final" aria-label="Accept %s as final" %s>✓</button><button class="nt" title="Notes">✎</button></div>' % (
-            html.escape(r['id']), html.escape(r['accent']), html.escape(g[2]), html.escape(r['id'] + ' ' + r['example'] + ' ' + r['accent'] + ' ' + g[3].lower()), html.escape(tip), 'true' if missing else 'false',
-            ' hs' if small_svg else '', inner, html.escape(r['id']), ('<span class="src"> ' + html.escape(src) + '</span>') if src else '', extra, html.escape(r['example'] or ', '.join(r['ui']) or ''), html.escape(r['id']), 'disabled' if missing else ''))
+        # An owner-supplied master is accepted by provenance (review.json "supplied"); the page cannot reopen it.
+        if r['supplied']:
+            label = owner.get(r['master'], {}).get('label', '')
+            extra += ' <i class="st" title="%s">owner-supplied%s</i>' % (html.escape(owner.get(r['master'], {}).get('source', '')), (' · ' + html.escape(label)) if label else '')
+        elif r['facet']: extra += ' <i class="st">Facet drawing beneath the owner-supplied master</i>'
+        cards.append('<div class="card" data-id="%s" data-accent="%s" data-tab="%s" data-k="%s" title="%s" data-missing="%s" data-supplied="%s"><div class="art%s">%s</div><div class="meta"><b>%s</b>%s%s<br><small>%s</small></div>'
+                     '<button class="ck" title="%s" aria-label="%s" %s>✓</button><button class="nt" title="Notes">✎</button></div>' % (
+            html.escape(r['id']), html.escape(r['accent']), html.escape(g[2]), html.escape(r['id'] + ' ' + r['example'] + ' ' + r['accent'] + ' ' + g[3].lower()), html.escape(tip), 'true' if missing else 'false', 'true' if r['supplied'] else 'false',
+            ' hs' if small_svg else '', inner, html.escape(r['id']), ('<span class="src"> ' + html.escape(src) + '</span>') if src else '', extra, html.escape(r['example'] or ', '.join(r['ui']) or ''),
+            'Owner-supplied: accepted by provenance' if r['supplied'] else 'Accept as final', html.escape(('Owner-supplied ' + r['id']) if r['supplied'] else ('Accept ' + r['id'] + ' as final')), 'disabled' if missing or r['supplied'] else ''))
     tabchips = ''.join('<button class="chip" data-tab="%s">%s</button>' % (html.escape(t), html.escape(t.title())) for t in tabs_seen)
     state = json.dumps({'final': sorted(valid), 'notes': rv['notes'], 'serving': serving, 'rev': art_rev(), 'palette': palette_state(), 'hashes': {r['id']: master_hash(r['master']) for r in shown if r['status'] != 'placeholder'}}).replace('<', r'\u003c')
     return load_template().replace('@@PALETTE_CSS@@', icon_palette.palette_css(pal) + '\n' + icon_palette.review_css(pal, live=True)).replace('@@GUIDE@@', '/guide' if serving else os.path.basename(out_path) + '.guide.html').replace('@@WARNINGS@@', ('Unassigned commands: ' + html.escape(', '.join(unassigned))) if unassigned else '').replace('@@SUMMARY@@', html.escape(summary)).replace('@@CARDS@@', ''.join(cards)).replace('@@TABS@@', tabchips).replace('@@STATE@@', state)
@@ -254,7 +269,7 @@ def build_guide():
     for category in catalogue['category'].values():
         sections += '<h2>' + html.escape(category['label']) + '</h2><p>' + html.escape(category['rule']) + '</p><div class="examples">'
         for name in category['icons']:
-            row = by_id[name]; svg = open(masters[row['master']][1], encoding='utf-8').read()
+            row = by_id[name]; svg = open(facet_masters[row['master']] if row['facet'] else masters[row['master']][1], encoding='utf-8').read()
             sections += '<article><b>' + name + '</b><div class="light">' + themed(svg, 'light', row['accent'], pal, namespace='guide-' + category['label'].replace(' ', '-') + '-' + name + '-light') + '</div><div class="dark">' + themed(svg, 'dark', row['accent'], pal, namespace='guide-' + category['label'].replace(' ', '-') + '-' + name + '-dark') + '</div></article>'
         sections += '</div>'
     template = open(os.path.join(WEB, 'guide.html'), encoding='utf-8').read()

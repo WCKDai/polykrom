@@ -116,7 +116,7 @@ impl CommandSearch {
         icons::paint_icon(
             ui.painter(),
             Rect::from_center_size(r.left_center() + vec2((spacing.left + t.space_16 / 2.0).min(r.width() / 2.0), 0.0), vec2(t.space_16, t.space_16)),
-            "zoom",
+            "search",
             1.0,
         );
         let cap = if open { "Esc" } else { "S" };

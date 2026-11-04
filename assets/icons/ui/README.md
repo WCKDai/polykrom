@@ -1,8 +1,11 @@
 # UI icons and review tool
 
 **Authors start with [AGENTS.md](AGENTS.md) and [STYLE_GUIDE.md](STYLE_GUIDE.md).**
-No chat history is required. The palette, Facet bases and named finished
-references define the style. The SVGs are the application's editable masters.
+No chat history is required. Two kinds of master live here: the **owner-supplied** masters in
+`design/svg/supplied/` (the design kit's 69 glyphs and logo, exact vectors recorded with their
+source in `design/review.json`, never edited) and the **Facet-drawn** masters for every other id,
+whose style the palette, Facet bases and named finished references define. The SVGs are the
+application's masters; only the Facet ones are editable here.
 
 ## Review all existing and new icons
 
@@ -34,6 +37,10 @@ available. The Style guide link shows the bases and finished references.
   before editing a final master or any of its variants. Missing artwork cannot be
   accepted. Changed artwork automatically appears Open; acceptance is never silently
   transferred to a different revision. Lint still reports an unauthorized final edit.
+  An owner-supplied master (badge "owner-supplied · <glyph>") is accepted by provenance
+  while its file hashes as its `supplied` record says; the page cannot reopen it, and lint
+  reports an edited one. An alias that draws the Facet drawing beneath a supplied master
+  (`facet = true`) is reviewed like any Facet master.
 - **✎** autosaves artwork notes. Notes alone do not request a redraw.
 - **Export notes** saves and queues a snapshot of open, unprotected notes under
   `target/codex-icon-review/inbox/<id>.json`. An agent must process that local inbox;
@@ -76,11 +83,12 @@ Palette changes preserve accepted artwork and never update review hashes.
 
 | Path | Authority / purpose |
 | --- | --- |
-| `design/svg/model/` | Modelling, construction, Sketch, analysis and utility masters |
-| `design/svg/flat/`, `workspace/` | Monochrome controls and workspace masters |
-| `design/svg/small/` | Optical variants of the same ids, used at 24 px and below |
-| `design/palette.toml`, `aliases.toml` | Shared theme roles, weights and semantic aliases |
-| `design/review.json` | Owner acceptance hashes and current notes |
+| `design/svg/supplied/` | Owner-supplied masters: the design kit's 69 glyphs and the logo, byte-identical to `assets/design-kit/2026-11-02/`, one per app icon id; they supersede a Facet master of the same id |
+| `design/svg/model/` | Facet modelling, construction, Sketch, analysis and utility masters |
+| `design/svg/flat/`, `workspace/` | Facet monochrome controls and workspace masters |
+| `design/svg/small/` | Optical variants of the same Facet ids, used at 24 px and below |
+| `design/palette.toml`, `aliases.toml` | Shared theme roles, weights, `[supplied-roles]` for the kit's hexes, and semantic aliases (`facet = true` draws the Facet fallback) |
+| `design/review.json` | Owner acceptance hashes, current notes, and the `supplied` records (label, kit source, SHA-256) of the owner-supplied masters |
 | `design/references.toml` | Curated style references; does not control discovery |
 | `design/requested_icons.txt` | Sorted runtime requests and placeholder flags, checked by the Harness audit |
 | `design/tools/author/{lib,facet,bases}.py` | Facet geometry: dimetric projection, parts, cues and the standard part/plate |
@@ -94,6 +102,7 @@ Palette changes preserve accepted artwork and never update review hashes.
 `crates/ui-egui/build.rs` embeds SVGs, palette and aliases. `icon_svg.rs` parses and
 rasterises them for `icons::paint_icon`; adding an icon still requires its registry or
 UI assignment and an application rebuild. Review status never controls rendering.
+`crates/ui-egui/tests/kit_icons.rs` holds the mapping from the kit's glyphs to the app ids.
 
 ## Checks and reports
 
