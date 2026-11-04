@@ -197,6 +197,67 @@ The steps of `engine.batch` and `engine.script` are answered with the same repli
 that had no effect carries its `warnings` in `results` at its index. The check reads the model
 states around the feature's one evaluation; nothing is evaluated twice.
 
+### Feature recognition (`inspect.features`)
+
+`engine.execute` `inspect.features {body?, bodies?}` reads what a body is made of from its exact
+B-rep (PolyCore's planes, cylinders, cones, spheres and tori) and the body's persistent face
+names. It is read-only: the design, its revision, its selection and its undo history are as they
+were. Every value comes from the surfaces and the exact edge curves (a cylinder's radius, the
+distance between two planes), never from the display mesh; the mesh only says which side of a
+face is outside and which faces an edge joins. Per body (`bodies[]`, `body_count`, `total`):
+
+- `features`: each with `id`, `type`, the persistent `faces` it covers (what `face.delete`,
+  `appearance.assign`, `solid.shell` and the other face commands take in place of a point) and,
+  when a reading had to fall back on the mesh, `approximate: true` and a `note` saying why.
+  - `hole`: `through`, `diameter` (of the bore), `depth` (from the entry plane to the floor, the
+    drill shoulder or the exit), `axis: {origin, direction}` (the entry centre, pointing into the
+    material), `entry_face`, then `exit_face` (through), `floor_face` (flat bottom) or
+    `tip: {angle_deg, depth, faces}` (a drill point), and `steps` from the entry inward, each
+    with `kind` (`counterbore`, `countersink`, `bore`, `round`), `from` (along the axis below the
+    entry plane), `depth`, `faces`, and `diameter` (`angle_deg` for a countersink, `radius` for a
+    round). A counterbore or countersink is one hole with its steps; a fillet on a hole's mouth or
+    floor is a `round` step of the hole and also the fillet it is. A through hole's entry is the
+    wider end, else the end facing up most; alike ends are noted.
+  - `boss`: `diameter`, `height`, `axis` (the base centre, pointing at the cap), `cap_face`,
+    `base_face`. Its faces are the wall and the cap; a chamfer or round on its edge is its own
+    feature. A plain cylinder with two caps is no boss.
+  - `pocket`: `depth`, `floor_face`, `walls`, `opening_face` (`opening_faces` when the walls reach
+    several coplanar faces). A hole or boss in the floor leaves the pocket a pocket. A recess open
+    at a side, or whose walls reach faces at two heights, is reported under `uncertain` instead.
+  - `fillet`: `radius`, `convex` (`true`: a round that removed material, `false`: one that
+    added it, `null`: a chain of both), `joins` (the faces it is tangent to). Blends of one
+    radius that meet (a tangent chain, or mitred at a corner) are one fillet.
+  - `chamfer`: `joins` (two faces; the first is the one facing up most, as `solid.chamfer` takes
+    it), `distance` along the first of `joins`, `distance2` along the second, `angle_deg` between
+    the chamfer and the first face. A conical chamfer on a round edge joins the flat face and the
+    cylinder. A face whose neighbour is a narrower chamfer is the face that chamfer cuts into,
+    not a chamfer (a plate's top between two chamfers stays a plain face).
+- `patterns`: alike features (same type, sizes and direction) on a lattice or a circle, three or
+  more: `type` `linear` (`count1`, `pitch1`, `direction1`, and `count2`, `pitch2`, `direction2`
+  for a grid) or `circular` (`count`, `angle_step_deg`, `full_circle`, `radius`,
+  `axis: {origin, direction}`), with `feature_type`, `members` (indices into `features`), their
+  `faces` and `member_direction`. Two alike features are two features.
+- `unrecognised`: every face no feature covers, with its `index`, `surface` (`plane`,
+  `cylinder`, `cone`, `sphere`, `torus` or `free-form`) and a `reason`. The face a hole is
+  drilled into, a pocket cut into or a boss stands on is not part of that feature. A free-form
+  (spline) face is never read as a feature.
+- `uncertain`: shapes that are nearly a feature, with `could_be`, their `faces` and the `reason`.
+
+```text
+{"id":7,"method":"engine.execute","params":{"command":"inspect.features","params":{"body":"Plate"}}}
+→ {"body_count":1,"bodies":[{"body":"Plate","face_count":14,
+   "features":[{"id":0,"type":"hole","through":true,"diameter":8.0,"depth":8.0,
+                "axis":{"origin":[18.0,18.0,8.0],"direction":[0.0,0.0,-1.0]},"entry_face":"F1:+z","exit_face":"F1:-z",
+                "steps":[{"kind":"bore","from":0.0,"depth":8.0,"diameter":8.0,"faces":["F2:bore:side:0","F2:bore:side:1"]}],
+                "faces":["F2:bore:side:0","F2:bore:side:1"]}, …],
+   "patterns":[{"type":"linear","feature_type":"hole","members":[0,1,2,3],"count":4,
+                "count1":2,"pitch1":84.0,"direction1":[1.0,0.0,0.0],"count2":2,"pitch2":44.0,"direction2":[0.0,1.0,0.0],
+                "member_direction":[0.0,0.0,-1.0],"faces":[…]}],
+   "unrecognised":[{"face":"F1:+z","index":7,"surface":"plane","reason":"a planar face no feature covers …"}, …],
+   "uncertain":[]}],
+   "total":{"features":4,"patterns":1,"unrecognised":6}}
+```
+
 ### Slow commands and the window (#1989)
 
 With the preference **Preferences > AI > Keep the window responsive while agents run commands**

@@ -120,7 +120,7 @@ pub fn tool_definitions() -> Vec<Value> {
              (as list_commands lists them). A step may also name one of these tools with that tool's arguments as params, \
              and runs the engine command it stands for: set_parameter (parameters.change; `value` or `expression`), \
              list_commands (engine.commands, with `filter`), describe_command (engine.describe), execute ({command, params}), \
-             measure (inspect.measure), \
+             measure (inspect.measure), features (inspect.features), \
              inspect_design (document.inspect), undo, redo, export, save, open, new_design, crash_reports; screenshot, \
              body_topology, batch and pending can't be steps. On an error the steps already run are undone (unless \
              rollback: false), so the batch is all-or-nothing; the reply names the failing step (index from 0), its error, \
@@ -175,6 +175,24 @@ pub fn tool_definitions() -> Vec<Value> {
                     "allow_open": {"type": "boolean", "description": "Treat open surface bodies as warnings instead of failures (default false)"},
                     "allow_underconstrained": {"type": "boolean", "description": "Treat under-constrained sketches as warnings instead of failures (default false)"},
                     "require_parameters": {"type": "boolean", "description": "Fail when the design has no user parameters (default false)"},
+                }),
+                &[],
+            ),
+            Effect::ReadOnly,
+        ),
+        tool(
+            "features",
+            "Recognise features",
+            "What a body is made of, read from its exact B-rep (`inspect.features`): holes (through or blind, with diameter, depth, axis, entry face and \
+             the steps of a counterbore, countersink, drill point or rounded mouth), bosses (diameter, height, axis, cap and base face), pockets (depth, floor, \
+             walls, opening face), fillets (radius, the faces they join) and chamfers (distance along the first of `joins`, distance2, angle), plus the linear \
+             and circular patterns they form (count, pitch or angle step, direction or axis). Every feature lists the persistent face names it covers, so a face \
+             command can take them; `unrecognised` lists the faces no feature covers, each with its surface and why, and `uncertain` the shapes that are nearly \
+             a feature. Values come from the surfaces, not the mesh (a reading that had to use the mesh says `approximate`). Read-only.",
+            obj(
+                json!({
+                    "body": string("Body name (default: all bodies)"),
+                    "bodies": {"type": "array", "items": {"type": "string"}, "description": "Several bodies by name"},
                 }),
                 &[],
             ),
@@ -795,6 +813,7 @@ fn dispatch(b: &mut dyn Backend, name: &str, a: &Map<String, Value>) -> Result<V
             Ok(selected(v, a.get("select")))
         }
         "quality" => exec(b, "inspect.quality", pick(a, &["bodies", "allow_open", "allow_underconstrained", "require_parameters"])),
+        "features" => exec(b, "inspect.features", pick(a, &["body", "bodies"])),
         // With no arguments, a summary (#266): the full design took 396 KB on a median stage.
         "inspect_design" if a.is_empty() => design_summary(b),
         "inspect_design" => {
@@ -1071,6 +1090,7 @@ fn batch_step(step: &Value) -> Result<(String, Value, Option<String>), String> {
             None => mapped("inspect.measure", str_arg(a, "body").map_or(json!({}), |body| json!({"bodies": [body]}))),
         },
         "inspect_design" => mapped("document.inspect", json!({"measure": a.get("measure").and_then(Value::as_bool).unwrap_or(true)})),
+        "features" => mapped("inspect.features", pick(a, &["body", "bodies"])),
         "undo" => mapped("edit.undo", pick(a, &["steps", "to"])),
         "redo" => mapped("edit.redo", pick(a, &["steps"])),
         "export" => {
@@ -1105,6 +1125,7 @@ const TOOL_STEPS: &[&str] = &[
     "describe_command",
     "execute",
     "export",
+    "features",
     "inspect_design",
     "list_commands",
     "measure",
