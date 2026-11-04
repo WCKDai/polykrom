@@ -65,6 +65,7 @@ pub use assembly::{
 };
 pub use document::*;
 pub use eval::KeptResults;
+pub use eval::no_effect::{NoEffect, no_effect};
 pub use eval::{
     EdgeRef, FeatureResult, Model, ModelBody, ModelState, PlacedBodies, RevolveExtent, SavedModel, SolvedSketch, ThreadInfo, captured_tool_frames,
     curve_pick_error, edge_names_for, edge_refs, face_point_names, face_point_state, hole_direction_at, import_body_names, metric_thread_sizes,

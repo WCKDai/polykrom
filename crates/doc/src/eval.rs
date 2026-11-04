@@ -2174,6 +2174,11 @@ fn evaluate_feature(
         }
         track_altered_sheets(state, &mut next, f, &mut warning);
         note_join_apart(state, &next, f, &mut warning);
+        // A feature meant to change material that changed none (a hole in the air, #309) says
+        // so, judged from the states around this one evaluation.
+        if let Some(n) = no_effect::no_effect(f, state, &next) {
+            append_warning(&mut warning, n.message());
+        }
     } else {
         boolean_diagnostics = Default::default();
     }
@@ -6013,6 +6018,8 @@ mod lanes;
 mod model_cache;
 #[path = "eval_more.rs"]
 mod more;
+#[path = "eval_no_effect.rs"]
+pub mod no_effect;
 #[path = "eval_rebase.rs"]
 mod rebase;
 pub use model_cache::SavedModel;
