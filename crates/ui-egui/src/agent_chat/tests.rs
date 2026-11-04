@@ -65,6 +65,9 @@ fn app_in_a_turn() -> (SolveApp, Sender<ControlRequest>) {
     let mut app = SolveApp::new(polykrom_engine::Session::default(), crate::Services::default());
     // The default mode: modelling runs, files ask.
     assert_eq!(app.preferences.ai_permissions, agents::Mode::Edits);
+    // The live path, as before the Review panel: with review before apply (the default) the
+    // agent's design edits are proposed instead (`with_review_before_apply_the_agents_edit_waits_in_the_panel`).
+    app.preferences.agent_review_before_apply = false;
     let (tx, rx) = channel();
     app.agent_chat.tools_rx = Some(rx);
     app.agent_chat.state = Some(State::Busy);
@@ -110,6 +113,60 @@ fn a_messages_changes_undo_as_one_step() {
     undo_changes(&mut app, n);
     assert!(Arc::ptr_eq(&app.session.doc, &before), "back to the design before the message");
     assert!(matches!(app.agent_chat.items[n], Item::Changes { undone: true, .. }));
+}
+
+/// With review before apply on (the default), the agent's design edits are proposed, not run: the
+/// Review changes panel opens on them and nothing in the design moves until Apply & rebuild. The
+/// edits of one message join one proposal; reads run live; off, the edits run as before.
+#[test]
+fn with_review_before_apply_the_agents_edit_waits_in_the_panel() {
+    let (mut app, tx) = app_in_a_turn();
+    app.preferences.agent_review_before_apply = true;
+    assert!(SolveApp::new(polykrom_engine::Session::default(), crate::Services::default()).preferences.agent_review_before_apply, "the default");
+    let before = app.session.doc.clone();
+    let (depth, revision) = (app.session.undo.len(), app.session.revision);
+
+    let r = ask(&tx, "engine.execute", boxed(0.0));
+    frame(&mut app);
+    let v = r.recv_timeout(std::time::Duration::from_secs(30)).unwrap();
+    assert_eq!(v["ok"], true, "{v}");
+    assert_eq!(v["result"]["proposed"], true, "{v}");
+    assert!(v["result"]["proposal"].as_str().is_some_and(|p| p.starts_with("prop-")));
+    assert_eq!(v["result"]["preview"]["bodies"]["created"].as_array().map(Vec::len), Some(1), "{v}");
+    let open = app.review.open.as_ref().expect("the panel has the proposal");
+    assert_eq!((open.commands.len(), open.source), (1, crate::review::Source::Agent));
+    assert_eq!(open.label, "two boxes", "named after the message");
+    assert!(Arc::ptr_eq(&before, &app.session.doc), "the design is unchanged");
+    assert_eq!((app.session.undo.len(), app.session.revision), (depth, revision));
+    assert!(app.session.world_state().bodies.is_empty());
+    assert!(app.agent_chat.items.iter().any(|i| matches!(i, Item::Notice { text, error: false } if text.contains("Review changes"))));
+
+    // A second edit joins the same proposal; a read runs live, on the unchanged design.
+    let r = ask(&tx, "engine.execute", boxed(20.0));
+    frame(&mut app);
+    assert_eq!(r.recv_timeout(std::time::Duration::from_secs(30)).unwrap()["result"]["proposed"], true);
+    assert_eq!(app.review.open.as_ref().map(|o| o.commands.len()), Some(2));
+    let r = ask(&tx, "engine.execute", json!({"command": "inspect.measure", "params": {}}));
+    frame(&mut app);
+    let v = r.recv_timeout(std::time::Duration::from_secs(30)).unwrap();
+    assert_eq!(v["ok"], true, "{v}");
+    assert!(v["result"].get("proposed").is_none(), "{v}");
+    assert!(Arc::ptr_eq(&before, &app.session.doc));
+
+    // Apply & rebuild: both boxes, one undo step.
+    crate::review::apply(&mut app).unwrap();
+    assert_eq!(app.session.world_state().bodies.len(), 2);
+    assert_eq!(app.session.undo.len(), depth + 1);
+    assert!(app.review.open.is_none());
+    assert!(app.review.receipt.is_some());
+
+    // The setting off: the edit runs at once, as before.
+    let (mut app, tx) = app_in_a_turn();
+    let r = ask(&tx, "engine.execute", boxed(0.0));
+    frame(&mut app);
+    assert_eq!(r.recv_timeout(std::time::Duration::from_secs(30)).unwrap()["ok"], true);
+    assert_eq!(app.session.world_state().bodies.len(), 1);
+    assert!(app.review.open.is_none());
 }
 
 /// Saving waits for Allow or Deny; Deny answers the agent without running it, Allow runs it.
@@ -460,6 +517,8 @@ impl ChatBackend for Script {
 /// An app whose agent is scripted and ready.
 fn app_with_script() -> (SolveApp, Script, egui::Context) {
     let mut app = SolveApp::new(polykrom_engine::Session::default(), crate::Services::default());
+    // The live path (see `app_in_a_turn`).
+    app.preferences.agent_review_before_apply = false;
     let script = Script::default();
     app.agent_chat.backend = Some(Box::new(script.clone()));
     app.agent_chat.state = Some(State::Ready);

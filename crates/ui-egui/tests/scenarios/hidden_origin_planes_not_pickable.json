@@ -75,10 +75,11 @@
   "click": {
    "world": [
     0,
-    3,
-    3
+    6,
+    6
    ]
-  }
+  },
+  "note": "Beside the hidden Origin on its YZ plane, off the squares the planes are drawn as at any sketch zoom (the open viewport's height sets it)."
  },
  {
   "expect": {

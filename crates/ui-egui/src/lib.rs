@@ -186,6 +186,7 @@ mod primitive_units_tests;
 pub mod recovery_ui;
 pub mod ref_images;
 pub mod render_workspace;
+pub mod review;
 #[cfg(test)]
 mod revolve_edit_tests;
 #[cfg(test)]
@@ -523,6 +524,8 @@ pub struct SolveApp {
     pub agent_chat: agent_chat::AgentChat,
     /// The selection's properties and checks.
     pub inspector: inspector::Inspector,
+    /// The AI review flow: the prompt row, the Review changes panel and the receipt after Apply.
+    pub review: review::Review,
     pending_shots: Vec<(u64, Option<String>, std::sync::mpsc::Sender<Value>, f64)>,
     queued_shots: Vec<(u64, f64, u32)>,
     shot_token: u64,
@@ -635,6 +638,7 @@ impl SolveApp {
             control_rx: None,
             agent_chat: Default::default(),
             inspector: Default::default(),
+            review: Default::default(),
             control_held: Default::default(),
             control_job: None,
             control_answering: Vec::new(),
@@ -1724,6 +1728,7 @@ impl SolveApp {
         timeline_left::animate_folds(self, ui.ctx());
         if !floating {
             toolbar::toolbar(self, ui);
+            review::prompt_row(self, ui);
         }
         theme::TabAccent::publish(self, ui.ctx());
         if !floating {
@@ -1770,6 +1775,7 @@ impl SolveApp {
             shell::paint_top_corners(ui.painter(), full, theme::Tokens::get().app_bar);
             toolbar::toolbar(self, ui);
             theme::TabAccent::publish(self, ui.ctx());
+            review::prompt_row(self, ui);
         }
         if floating && show_timeline && !left_timeline {
             timeline::timeline(self, ui);
@@ -1786,6 +1792,7 @@ impl SolveApp {
         if floating {
             agent_chat::show(self, ui);
         }
+        review::panel(self, ui);
         inspector::show(self, ui);
         Container::new(ui.ctx(), Surface::Viewport)
             .central()

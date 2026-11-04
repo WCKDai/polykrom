@@ -30,6 +30,13 @@ pub static COMMANDS: &[CommandSpec] = &[
              Refused with a structured error (the error text is a JSON object {code, message, …}) when the design changed since the proposal (`stale_proposal`) or \
              the id is not held (`unknown_proposal`); a command failing leaves the design as it was",
         ),
+    CommandSpec::new("engine.drop_proposal", "Drop Proposal", drop_proposal)
+        .icon("delete")
+        .noundo()
+        .params(
+            "proposal: id from engine.propose → {dropped: bool, proposal}. The Review panel's Cancel command: the proposal is forgotten and the design is \
+             untouched. `dropped` is false for a proposal already gone (stale or applied); an id never held is refused (`unknown_proposal`)",
+        ),
 ];
 
 /// Proposals held at once; the oldest is dropped for a new one.
@@ -347,4 +354,23 @@ fn apply(s: &mut Session, p: &Value) -> Result<Value> {
         })
         .collect();
     Ok(json!({"applied": true, "proposal": id, "label": held.label, "commands": held.commands.len(), "bodies": bodies}))
+}
+
+fn drop_proposal(s: &mut Session, p: &Value) -> Result<Value> {
+    let cmd = "engine.drop_proposal";
+    let id =
+        p.get("proposal").or_else(|| p.get("id")).and_then(Value::as_str).ok_or_else(|| bad(cmd, "`proposal` must be an id from engine.propose"))?;
+    if let Some(i) = s.proposals.held.iter().position(|h| h.id == id) {
+        if let Some(gone) = s.proposals.held.remove(i) {
+            s.proposals.stale.push_back((gone.id, gone.revision));
+            while s.proposals.stale.len() > MAX_RETIRED {
+                s.proposals.stale.pop_front();
+            }
+        }
+        return Ok(json!({"dropped": true, "proposal": id, "held": s.proposals.len()}));
+    }
+    if s.proposals.stale.iter().any(|(k, _)| k == id) {
+        return Ok(json!({"dropped": false, "proposal": id, "held": s.proposals.len()}));
+    }
+    Err(refused("unknown_proposal", format!("no proposal {id} is held (the last {MAX_PROPOSALS} are kept)"), json!({"proposal": id})))
 }

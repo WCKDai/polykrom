@@ -391,7 +391,9 @@ mod tests {
         h.app.run("sketch.create", json!({"plane":"XY"})).unwrap();
         let result = h.app.run("sketch.text", json!({"text":"II","at":[0,0],"height":10})).unwrap();
         h.call("ui.view", json!({"view":"top"}));
-        h.app.cam.distance = 60.0;
+        // Far enough back that the handles and the drags' ends stay in the open viewport, below the
+        // ribbon and the AI review's prompt row (a drag over the chrome is blocked).
+        h.app.cam.distance = 80.0;
         h.app.session.selection = vec![Sel::SketchCurve { id: result["curves"][0].as_str().unwrap().into() }];
         h.frames(3);
         (h, result["link"].as_str().unwrap().into())

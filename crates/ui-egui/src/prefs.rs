@@ -647,6 +647,9 @@ preference_settings! {
     agent_chat_window: Option<[f32; 4]> = None, PAGE_AI;
     /// Changes the agent may make for one message.
     agent_chat_turn_limit: u32 = crate::agent_chat::gate::DEFAULT_TURN_LIMIT, PAGE_AI;
+    /// The agent's design edits open as a proposal in the Review changes panel (`review`), and
+    /// apply only on Apply & rebuild (design kit view 04). Off: they apply at once, as before.
+    agent_review_before_apply: bool = true, PAGE_AI;
 
     // ---- Sketch / selection modifier bindings (classic defaults; alternate mapping is opt-in) ----
     /// Modifier that suppresses sketch auto-snap while drawing or dragging a sketch point.

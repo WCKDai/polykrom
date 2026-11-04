@@ -193,6 +193,9 @@ fn permissions_section(app: &mut SolveApp, ui: &mut egui::Ui) {
         if app.preferences.ai_permissions == Mode::All {
             ui_kit::text(ui, tr("ui.ai_mode_all_warning"), ui_kit::Text::Report("permissions_warning", true));
         }
+        let response = ui_kit::checkbox(ui, tr("ai.prefs.review_before_apply"), &mut app.preferences.agent_review_before_apply)
+            .on_hover_text(tr("ai.prefs.review_before_apply_note"));
+        crate::scenario::publish_handle("prefs:agent_review_before_apply", response.rect.center());
         ui_kit::text(ui, tr("ai.prefs.permission_scope"), ui_kit::Text::Hint("scope")).on_hover_text(tr("ui.ai_modes_scope"));
         let remembered: Vec<_> = app
             .preferences

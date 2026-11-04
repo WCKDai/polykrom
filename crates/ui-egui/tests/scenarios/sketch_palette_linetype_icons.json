@@ -4,6 +4,7 @@
   },
   {"start": "sketch.create"},
   {"click": {"plane": "XY"}},
+  {"call": "ui.camera", "params": {"target": [15, 30, 0]}, "note": "Centre the sketch in the open viewport: the AI review's prompt row under the ribbon covers the view's top band."},
   {"expect": {"dialog": null}},
   {"click": {"handle": "dialog:Line Type:centerline"}},
   {"start": "sketch.rectangle.two_point"},

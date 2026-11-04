@@ -330,6 +330,7 @@ fn dispatch(app: &mut SolveApp, ctx: &egui::Context, method: &str, p: &Value) ->
         "ui.messages" => ok(crate::messages::control(app, p)),
         "ui.inspect" => ok(json!({
             "ui": serde_json::to_value(&app.ui).unwrap_or_default(),
+            "review": crate::review::status(app),
             "visibility": app.session.visibility,
             "viewport": app.viewport.rect.map(|r| json!([r.left(), r.top(), r.width(), r.height()])),
             "camera": app.cam,
@@ -789,6 +790,7 @@ fn dispatch(app: &mut SolveApp, ctx: &egui::Context, method: &str, p: &Value) ->
         },
         "ui.prefs" => wrap(crate::prefs::control(app, p)),
         "ui.agent_chat" => wrap(crate::agent_chat::control(app, ctx, p)),
+        "ui.review" => wrap(crate::review::control(app, ctx, p)),
         "ui.help" => match s("item") {
             Some(i @ ("about" | "shortcuts" | "report" | "crashes")) => {
                 crate::help::run(app, ctx, i);
