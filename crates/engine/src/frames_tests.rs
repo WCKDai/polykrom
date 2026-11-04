@@ -286,3 +286,30 @@ fn root_picks_on_a_moved_component_build_where_it_is_shown() {
     let across = crate::view::construction_planes(&s).into_iter().find(|(_, n, _)| n == "Across").unwrap().2;
     assert!((across.origin.y - 40.0).abs() < 1e-6, "{across:?}");
 }
+
+/// (#297) Face picks on a component turned 90° about Z are given in the world, a `normal` too:
+/// it turns with its pick and settles an edge pick. Without one the error names the point as
+/// given, not the point in the component's frame.
+#[test]
+fn face_picks_on_a_turned_component_take_a_world_normal_and_report_the_given_point() {
+    let mut s = block_in_component();
+    run(&mut s, "occurrence.move", json!({"occurrence": "C:1", "axis": [0, 0, 1], "angle": "90 deg", "origin": [0, 0, 0]}));
+    // The block (40 x 30 x 20) now spans world x -30…0, y 0…40, z 0…20: its +y face faces -x.
+    let edge = json!([-30, 20, 20]);
+    let err = s.execute("solid.shell", &json!({"faces": [edge], "thickness": 2})).unwrap_err().to_string();
+    assert!(err.contains("ambiguous pick at [-30, 20, 20]"), "{err}");
+    assert!(err.contains(":+y` of `Body1`") && err.contains(":+z` of `Body1`"), "{err}");
+    assert_eq!(s.doc.features.len(), 1, "nothing was added");
+    let used = |reply: &Value| reply["faces_used"][0].as_str().unwrap_or_default().to_string();
+    let reply = run(&mut s, "solid.shell", json!({"faces": [{"point": edge, "normal": [-1, 0, 0]}], "thickness": 2}));
+    assert!(used(&reply).ends_with(":+y"), "{reply}");
+    // The +y face open: a 36 x 28 x 16 cavity in the 24 000 mm³ block.
+    let v = volume(&mut s);
+    assert!((v - (24_000.0 - 36.0 * 28.0 * 16.0)).abs() < 1e-6, "{v}");
+    run(&mut s, "edit.undo", json!({}));
+    let reply = run(&mut s, "solid.shell", json!({"faces": [{"point": edge, "normal": [0, 0, 1]}], "thickness": 2}));
+    assert!(used(&reply).ends_with(":+z"), "{reply}");
+    let v = volume(&mut s);
+    assert!((v - (24_000.0 - 36.0 * 26.0 * 18.0)).abs() < 1e-6, "{v}");
+    assert!(s.model.results.iter().all(|r| r.error.is_none()), "{:?}", s.model.results);
+}
