@@ -4,7 +4,8 @@
 //! - `engine.execute {command, params}`: run any command with JSON parameters (no dialogs)
 //! - `engine.script {commands: [...]}`: run a command script
 //! - `engine.batch {commands: [...], rollback?}`: the steps in one request, each as
-//!   `engine.execute` runs it; stops at the first failure and goes back to the checkpoint
+//!   `engine.execute` runs it, with the design evaluated once (at the end, or when a step needs
+//!   the model: `polykrom_engine::batch`); stops at the first failure and goes back to the checkpoint
 //!   (per-step results, `failed`, `undone`, `rolled_back`). Refused (`engine.batch unavailable: …`)
 //!   when a step loads a file; with the agent cursor shown, the pointer acts out a short summary
 //!   of it first
@@ -45,7 +46,6 @@ use std::sync::mpsc::Sender;
 
 use polykrom_engine::io::vfs;
 use polykrom_engine::render::StandardView;
-use polykrom_engine::timing;
 use serde_json::{Value, json};
 
 use crate::SolveApp;
@@ -128,21 +128,11 @@ fn command(step: &Value) -> Option<&str> {
 /// Most steps in one `engine.batch` (as in the MCP `batch` tool).
 const MAX_BATCH: usize = 10_000;
 
-/// Commands that load a file: through `engine.execute` they go to the app's file loader
-/// (`file_load::control`: off the window thread, with progress and Cancel), which a batch would
-/// bypass.
-const LOADS_A_FILE: [&str; 3] = ["doc.open", "file.insert_step", "file.insert_mesh"];
-
-/// Why `engine.batch` refuses these steps before running any: a step loads a file (send such
-/// steps one by one).
+/// Why `engine.batch` refuses these steps before running any: a step loads a file (through
+/// `engine.execute` it goes to the app's file loader, `file_load::control`: off the window
+/// thread, with progress and Cancel, which a batch would bypass). Send such steps one by one.
 pub(crate) fn batch_refusal(steps: &[Value]) -> Option<String> {
-    let (i, c) = steps.iter().enumerate().find_map(|(i, step)| command(step).filter(|c| LOADS_A_FILE.contains(c)).map(|c| (i, c)))?;
-    Some(format!("engine.batch unavailable: step {i} ({c}) loads a file"))
-}
-
-/// The first step naming a command the engine doesn't have, as `(index, command)` (#269).
-fn unknown_step(steps: &[Value]) -> Option<(usize, &str)> {
-    steps.iter().enumerate().find_map(|(i, s)| command(s).filter(|id| polykrom_engine::find_command(id).is_none()).map(|id| (i, id)))
+    polykrom_engine::batch::refusal(steps)
 }
 
 /// A batch step's command id (the agent cursor points at its toolbar button).
@@ -151,13 +141,15 @@ pub(crate) fn batch_step_command(step: &Value) -> Option<&str> {
 }
 
 /// `engine.batch {commands, rollback?, timings?, profile?}`: the steps in one request, so in one
-/// frame (#743). With `timings` the reply adds each step's time and `total_ms`, with `profile`
-/// each step's kernel share too (`polykrom_engine::timing`, #1833). Each
+/// frame (#743), through [`polykrom_engine::batch::run`]: the design is evaluated once, at the end
+/// or when a step needs the model (#253). With `timings` the reply adds each step's time and
+/// `total_ms`, with `profile` each step's kernel share too (`polykrom_engine::timing`, #1833). Each
 /// step runs as `engine.execute` runs it; the first failure stops the batch and, with
 /// `rollback` (the default), the design goes back to its checkpoint. Step failures are part of
 /// the reply; refusals (`engine.batch unavailable: …`) come before anything runs, so the client
 /// can send the steps one by one instead. A step naming an unknown command fails the batch before
-/// anything runs (`failed.kind: "unknown_command"`).
+/// anything runs (`failed.kind: "unknown_command"`, #269); a batch that went through is one undo
+/// step (#270).
 fn batch(app: &mut SolveApp, p: &Value) -> Outcome {
     let Some(steps) = p.get("commands").and_then(Value::as_array).filter(|s| s.len() <= MAX_BATCH) else {
         return err(format!("engine.batch: commands must be an array of at most {MAX_BATCH} steps"));
@@ -167,58 +159,8 @@ fn batch(app: &mut SolveApp, p: &Value) -> Outcome {
     if let Some(why) = batch_refusal(steps) {
         return err(why);
     }
-    let rollback = p.get("rollback").and_then(Value::as_bool).unwrap_or(true);
-    let profile = p.get("profile").and_then(Value::as_bool).unwrap_or(false);
-    let timed = profile || p.get("timings").and_then(Value::as_bool).unwrap_or(false);
-    // A step naming a command the engine doesn't have fails the batch before anything runs (#269),
-    // not after the steps before it ran and were taken back. The reply has the usual shape.
-    if let Some((i, id)) = unknown_step(steps) {
-        let error = polykrom_engine::EngineError::UnknownCommand(id.to_string()).to_string();
-        let failed = json!({"index": i, "command": id, "error": error, "kind": "unknown_command"});
-        let reply = json!({"completed": 0, "results": [], "failed": failed, "undone": 0, "rolled_back": false});
-        return ok(with_timings(reply, timed, Vec::new(), 0.0));
-    }
-    let mut rows = Vec::new();
-    let clock = timing::Clock::start();
-    let checkpoint = if rollback { app.run("edit.checkpoint", json!({})).ok().and_then(|v| v["checkpoint"].as_u64()) } else { None };
-    let mut results = Vec::with_capacity(steps.len());
-    for (i, step) in steps.iter().enumerate() {
-        let (r, took) = timing::time(profile, || match command(step) {
-            Some(id) => execute(app, id, step.get("params").cloned().filter(|v| !v.is_null()).unwrap_or(json!({}))),
-            None => Err("missing `command`".to_string()),
-        });
-        if timed {
-            rows.push(took.to_json(i, command(step).unwrap_or_default()));
-        }
-        match r {
-            Ok(v) => results.push(v),
-            Err(e) => {
-                let restored = checkpoint.is_some_and(|id| app.run("edit.restore_checkpoint", json!({"checkpoint": id})).is_ok());
-                let failed = json!({"index": i, "command": command(step), "error": e});
-                // `rolled_back`: the design really is back at its checkpoint.
-                let reply =
-                    json!({"completed": i, "results": results, "failed": failed, "undone": if restored { i } else { 0 }, "rolled_back": restored});
-                return ok(with_timings(reply, timed, rows, clock.ms()));
-            }
-        }
-    }
-    // A batch that went through is one undo step (#270); a batch of one keeps its command's label.
-    if let Some(id) = checkpoint {
-        let squashed = results.len() > 1 && app.run("edit.squash_checkpoint", json!({"checkpoint": id, "label": "Batch"})).is_ok();
-        if !squashed {
-            let _ = app.run("edit.restore_checkpoint", json!({"checkpoint": id, "forget": true}));
-        }
-    }
-    ok(with_timings(json!({"completed": results.len(), "results": results, "undone": 0}), timed, rows, clock.ms()))
-}
-
-/// A batch reply with `timings` and `total_ms` when they were asked for.
-fn with_timings(mut reply: Value, timed: bool, rows: Vec<Value>, total_ms: f64) -> Value {
-    if timed && let Some(o) = reply.as_object_mut() {
-        o.insert("timings".into(), Value::Array(rows));
-        o.insert("total_ms".into(), json!(timing::round_ms(total_ms)));
-    }
-    reply
+    let opts = polykrom_engine::batch::Options::of(p);
+    ok(polykrom_engine::batch::run(app, steps, opts, |app| &mut app.session, execute))
 }
 
 /// A request from an MCP server carries the folders its agent may use (`allow_paths`); every
@@ -1057,39 +999,21 @@ fn on_session(s: &mut polykrom_engine::Session, method: &str, p: &Value) -> Resu
             if let Some(why) = batch_refusal(steps) {
                 return Err(why);
             }
-            if let Some((i, id)) = unknown_step(steps) {
-                let failed = json!({"index": i, "command": id, "error": polykrom_engine::EngineError::UnknownCommand(id.to_string()).to_string(), "kind": "unknown_command"});
-                return Ok(json!({"completed": 0, "results": [], "failed": failed, "undone": 0, "rolled_back": false}));
-            }
+            // The same batch as on the shown design (an unknown command refused first, one undo
+            // step, the design evaluated once), without timings; a step that replaces the design
+            // fails where it stands.
             let rollback = p.get("rollback").and_then(Value::as_bool).unwrap_or(true);
-            let checkpoint = rollback.then(|| s.checkpoint());
-            let mut results = Vec::with_capacity(steps.len());
-            for (i, step) in steps.iter().enumerate() {
-                let r = match command(step) {
-                    Some(id) if matches!(id, "doc.open" | "file.new" | "doc.recover") => {
-                        Err(format!("`{id}` replaces the design: it needs it shown"))
-                    }
-                    Some(id) => s.execute(id, &params(step.get("params"))).map_err(|e| e.to_string()),
-                    None => Err("missing `command`".to_string()),
-                };
-                match r {
-                    Ok(v) => results.push(v),
-                    Err(e) => {
-                        let restored = checkpoint.is_some_and(|id| s.restore_checkpoint(id).is_ok());
-                        let failed = json!({"index": i, "command": command(step), "error": e});
-                        return Ok(
-                            json!({"completed": i, "results": results, "failed": failed, "undone": if restored { i } else { 0 }, "rolled_back": restored}),
-                        );
-                    }
-                }
-            }
-            // One undo step, as in the shown design.
-            if let Some(id) = checkpoint
-                && (results.len() < 2 || s.squash_checkpoint(id, "Batch").is_err())
-            {
-                s.drop_checkpoint(id);
-            }
-            Ok(json!({"completed": results.len(), "results": results, "undone": 0}))
+            let opts = polykrom_engine::batch::Options { rollback, timed: false, profile: false };
+            Ok(polykrom_engine::batch::run(
+                s,
+                steps,
+                opts,
+                |s| s,
+                |s, id, params| match id {
+                    "doc.open" | "file.new" | "doc.recover" => Err(format!("`{id}` replaces the design: it needs it shown")),
+                    _ => s.execute(id, &params).map_err(|e| e.to_string()),
+                },
+            ))
         }
         _ => Err(format!("`{method}` can't run on a design that isn't shown")),
     }

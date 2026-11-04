@@ -7,6 +7,7 @@
 #![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::unimplemented, clippy::todo, clippy::unreachable)]
 #![forbid(unsafe_code)]
 
+pub mod batch;
 pub mod cancel;
 pub mod capture;
 pub mod cmd;
@@ -343,6 +344,8 @@ pub struct Session {
     pub(crate) evaluations: usize,
     /// Resolved associative trace inputs, independent of the document revision and view state.
     pub(crate) motion_traces: cmd::motion::associative::Cache,
+    /// A batch in progress: what waits for an evaluation (see [`batch`]).
+    pub(crate) batch: Option<Box<batch::Deferral>>,
 }
 
 /// A sketch changed by one frame of an interactive gesture (`live: true`).
@@ -533,6 +536,7 @@ impl Session {
             motion_traces: Default::default(),
             crash_journal: false,
             proposals: Default::default(),
+            batch: None,
         }
     }
 
@@ -737,6 +741,7 @@ impl Session {
             assert_eq!(polykrom_doc::rebase_shadow_mismatches(), 0, "a rebased result differed from evaluating the feature");
         }
         self.revision += 1;
+        self.batch_evaluated();
         self.prune_occurrence_state();
         // Joints follow the geometry their origins snap to.
         if !self.doc.assembly.joints.is_empty() {
@@ -931,7 +936,10 @@ impl Session {
         let host_viewport = self.render_viewport.clone();
         let host_jobs = self.render_jobs.host.clone();
         let live = spec.live.filter(|_| params.get("live").and_then(Value::as_bool) == Some(true));
-        if live.is_none() && spec.reads_model && self.model.is_stale() {
+        // In a batch, a delete leaves the evaluation for later; a command that reads the model
+        // first evaluates what waited (#253).
+        let deferred = self.batch_before(spec, params, live.is_some(), !frames::running());
+        if live.is_none() && spec.reads_model && !deferred && self.model.is_stale() {
             self.refresh();
         }
         (spec.enabled)(self).map_err(|why| EngineError::Disabled(spec.id.to_string(), why))?;
@@ -990,6 +998,9 @@ impl Session {
             crash::command_done(self.crash_journal, changed, &before.doc, after, spec.id, given, failed.map_or(Ok(()), Err));
         }
         let changed = !Arc::ptr_eq(&self.doc, &before.doc);
+        if outermost {
+            self.batch_after(spec.id, params, r.is_ok());
+        }
         match r {
             Ok((v, live_edit)) => {
                 let v = if changed { self.with_created(spec.id, params, &before, v) } else { v };
@@ -1007,6 +1018,8 @@ impl Session {
                     }
                     match live_edit {
                         Some(edit) => self.refresh_live(edit),
+                        // In a batch, a change that only reads the design waits for its evaluation.
+                        None if outermost && self.batch_defers(spec, deferred, &previous_doc, render_only) => {}
                         None if render_only => self.refresh_render(&previous_doc),
                         None => self.refresh_from(&previous_doc),
                     }
@@ -1018,7 +1031,9 @@ impl Session {
                     self.doc = before.doc;
                     self.active_sketch = before.active_sketch;
                     self.pending_moves = before.pending_moves;
-                    self.refresh();
+                    if !(outermost && self.batch_failed()) {
+                        self.refresh();
+                    }
                 }
                 Err(self.with_body_hint(e))
             }
@@ -1157,6 +1172,11 @@ impl Session {
         }
     }
 
+    /// [`Session::mark`] with the undo history: going back to it takes back the commands since.
+    pub(crate) fn mark_with_history(&self) -> Checkpoint {
+        Checkpoint { undo: self.undo.clone(), redo: self.redo.clone(), ..self.mark() }
+    }
+
     /// Go back to `mark` (from [`Session::mark`]), keeping the undo history and the selection as
     /// they are: a change taken back inside a command isn't the user's step back.
     pub(crate) fn go_back(&mut self, mut mark: Checkpoint) {
@@ -1293,6 +1313,7 @@ impl Session {
             motion_traces: self.motion_traces.clone(),
             crash_journal: false,
             proposals: Default::default(),
+            batch: None,
         }
     }
 

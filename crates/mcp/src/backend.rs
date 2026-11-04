@@ -649,6 +649,24 @@ impl Headless {
                 s.execute(id, &params).map_err(|e| e.to_string())
             }
             "engine.script" => s.run_script(&p).map(Value::from).map_err(|e| e.to_string()),
+            // The steps in one call, as the app runs them, so the design is evaluated once (#253).
+            // A step that loads a file or replaces the design is refused before anything runs:
+            // the server then sends the steps one by one, through `engine.execute`, where the
+            // autosave entry follows the design (`Headless::call`).
+            "engine.batch" => {
+                let steps = p.get("commands").and_then(Value::as_array).ok_or("`commands` must be an array of {command, params}")?;
+                if let Some(why) = polykrom_engine::batch::refusal(steps) {
+                    return Err(why);
+                }
+                let command = |st: &Value| st.get("command").or_else(|| st.get("id")).and_then(Value::as_str).map(str::to_string);
+                if let Some((i, c)) =
+                    steps.iter().enumerate().find_map(|(i, st)| command(st).filter(|c| REPLACES_DESIGN.contains(&c.as_str())).map(|c| (i, c)))
+                {
+                    return Err(format!("engine.batch unavailable: step {i} ({c}) replaces the design"));
+                }
+                let opts = polykrom_engine::batch::Options::of(&p);
+                Ok(polykrom_engine::batch::run(s, steps, opts, |s| s, |s, id, params| s.execute(id, &params).map_err(|e| e.to_string())))
+            }
             "engine.commands" => s.execute("engine.commands", &json!({})).map_err(|e| e.to_string()),
             "document.inspect" => s.execute("document.inspect", &p).map_err(|e| e.to_string()),
             "ui.view" => {
