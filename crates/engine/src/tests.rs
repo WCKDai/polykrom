@@ -4036,6 +4036,56 @@ fn a_pattern_of_a_reduced_fillet_rounds_each_copy_alike() {
     assert!(rel(volume(&mut s), expect) < 2e-4, "{} vs {expect}", volume(&mut s));
 }
 
+/// Cancelling a running evaluation (#264) stops a long fillet promptly, in its size search too:
+/// the pillow of #3779, its eight spline spans at 0.1 mm with `fit: reduce`, is refused at that
+/// radius and then searched at a dozen smaller ones (seconds). Cancelled a moment after the fillet
+/// starts, the kernel stops at its next step and the fillet reports the cancel, not its size.
+#[test]
+fn cancelling_a_running_evaluation_stops_a_long_fillet() {
+    use polykrom_doc::progress::{Progress, watch};
+    use std::time::{Duration, Instant};
+    let mut s = Session::default();
+    run(&mut s, "sketch.create", json!({"plane": "XY"}));
+    run(&mut s, "sketch.spline.fit_point", json!({"points": [[0, 0], [10, -3], [20, 0]]}));
+    run(&mut s, "sketch.spline.fit_point", json!({"points": [[20, 0], [23, 10], [20, 20]]}));
+    run(&mut s, "sketch.spline.fit_point", json!({"points": [[20, 20], [10, 23], [0, 20]]}));
+    run(&mut s, "sketch.spline.fit_point", json!({"points": [[0, 20], [-3, 10], [0, 0]]}));
+    run(&mut s, "sketch.finish", json!({}));
+    run(&mut s, "solid.extrude", json!({"distance": 10, "body_name": "Pillow"}));
+    let fillet = s.doc.features.len();
+    let edges = json!([
+        [4.8592, -2.0044, 10],
+        [15.1408, -2.0044, 10],
+        [22.0044, 4.8592, 10],
+        [22.0044, 15.1408, 10],
+        [15.1408, 22.0044, 10],
+        [4.8592, 22.0044, 10],
+        [-2.0044, 15.1408, 10],
+        [-2.0044, 4.8592, 10]
+    ]);
+    // Cancel from another thread once the evaluation has reached the fillet, a moment into it.
+    let progress = std::sync::Arc::new(Progress::default());
+    let canceller = {
+        let progress = progress.clone();
+        std::thread::spawn(move || {
+            while progress.features().0 < fillet {
+                std::thread::yield_now();
+            }
+            std::thread::sleep(Duration::from_millis(100));
+            progress.cancel();
+            Instant::now()
+        })
+    };
+    let r = watch(progress.clone(), || s.execute("solid.fillet", &json!({"edges": edges, "radius": 0.1, "fit": "reduce"})));
+    let returned = Instant::now();
+    let cancelled_at = canceller.join().unwrap();
+    let err = r.unwrap_err().to_string();
+    assert!(err.contains("cancelled"), "{err}");
+    let after = returned.saturating_duration_since(cancelled_at);
+    assert!(after < Duration::from_secs(5), "the fillet went on {after:?} after the cancel");
+    assert_eq!(s.doc.features.len(), fillet, "the cancelled fillet is taken back");
+}
+
 /// A taper on a profile of lines and an arc (#546). The D profile (back 9.2, sides 7.4, a
 /// half-round front R 4.6 tangent to them) grows by d = z · tan 5° with mitred corners:
 /// A(d) = A₀ + P·d + (2 + π/2)·d², integrated over the 10 mm height.

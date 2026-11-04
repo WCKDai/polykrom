@@ -661,6 +661,22 @@ fn thread_turn(t: &ThreadInfo, cyl: &kernel::CylinderFace, mb: &ModelBody) -> Re
     Ok(Some(Traced::made(ring, roles)))
 }
 
+/// The work a fillet's first attempt at the radius asked for may spend, in the kernel's work
+/// units ([`kernel::with_work_budget`]: one per edge order and per edge tried, per boolean stage
+/// and per intersection). The slowest fillet the kernel cases build takes 33; the eighteen edges
+/// of #243 (a box and two gussets on a spline sole, which no construction rounds at any size)
+/// take over 90 before they are refused, and a size search would try them at a dozen radii more,
+/// each as costly. See [`fillet_work`].
+pub(crate) const FILLET_WORK: u64 = 64;
+/// Work units per edge above [`FILLET_WORK`]: an edge the first construction takes costs about
+/// one, so a fillet of many edges keeps building as before.
+const FILLET_WORK_PER_EDGE: u64 = 2;
+
+/// The work budget of a fillet's first attempt on `edges` (see [`FILLET_WORK`]).
+pub(crate) fn fillet_work(edges: &[Vec3]) -> u64 {
+    FILLET_WORK.max(FILLET_WORK_PER_EDGE.saturating_mul(edges.len() as u64))
+}
+
 /// A constant fillet of `edges`; with [`FilletFit::Reduce`](crate::FilletFit::Reduce), a radius too
 /// large for the geometry around them is reduced where it doesn't fit, to the largest that works
 /// for each group of edges sharing a face; the radius per edge is returned. With
@@ -671,15 +687,55 @@ fn fillet_fitted(
     r: f64,
     fit: crate::FilletFit,
 ) -> std::result::Result<(kernel::Body, Option<Vec<f64>>), kernel::KernelError> {
-    match kernel::fillet(body, edges, r) {
-        Err(kernel::KernelError::TooLarge(why)) if fit == crate::FilletFit::Reduce => match kernel::fillet_max_each(body, edges, r) {
-            // Built at the radius asked for after all (the groups apart): nothing reduced.
-            Some((used, b)) => Ok((b, used.iter().any(|u| *u < r).then_some(used))),
-            None => Err(kernel::KernelError::TooLarge(why)),
-        },
+    fillet_fitted_within(body, edges, r, fit, fillet_work(edges))
+}
+
+/// [`fillet_fitted`] with the first attempt at the radius asked for allowed `work` units (#243).
+/// An attempt that spends them is refused as too costly at that radius, with no search for a
+/// smaller one (each try of the search is a fillet as costly as the first); an attempt refused
+/// within them for its size is fitted as asked. A watcher that cancels the work (#264) stops the
+/// kernel at its next step, in the first attempt and in the search alike.
+pub(crate) fn fillet_fitted_within(
+    body: &kernel::Body,
+    edges: &[Vec3],
+    r: f64,
+    fit: crate::FilletFit,
+    work: u64,
+) -> std::result::Result<(kernel::Body, Option<Vec<f64>>), kernel::KernelError> {
+    let mut spent = 0;
+    let first = kernel::with_work_budget(work, || {
+        let built = kernel::fillet(body, edges, r);
+        spent = kernel::work_spent().unwrap_or(0);
+        built
+    });
+    match first {
+        // Spent here, not by an outer budget that had less left: this fillet is the cost.
+        Err(kernel::KernelError::BudgetSpent { stage, limit }) if spent > work / 2 => Err(too_costly(edges.len(), r, fit, stage, limit)),
+        Err(kernel::KernelError::TooLarge(why)) if fit == crate::FilletFit::Reduce => {
+            let found = kernel::fillet_max_each(body, edges, r);
+            // Cancelled during the search: its tries were stopped, not refused for their size.
+            if kernel::watch::is_cancelled() {
+                return Err(kernel::KernelError::Failed("fillet cancelled".into()));
+            }
+            match found {
+                // Built at the radius asked for after all (the groups apart): nothing reduced.
+                Some((used, b)) => Ok((b, used.iter().any(|u| *u < r).then_some(used))),
+                None => Err(kernel::KernelError::TooLarge(why)),
+            }
+        }
         Err(kernel::KernelError::TooLarge(_)) if fit == crate::FilletFit::Taper => kernel::fillet_tapered(body, edges, r).map(|(b, _)| (b, None)),
         other => other.map(|b| (b, None)),
     }
+}
+
+/// The refusal of a fillet whose first attempt spent its work budget (`limit` units, at the
+/// kernel's `stage`).
+fn too_costly(edges: usize, r: f64, fit: crate::FilletFit, stage: &str, limit: u64) -> kernel::KernelError {
+    let search = if fit == crate::FilletFit::Reduce { "; no smaller radius was tried, as each try would cost as much" } else { "" };
+    kernel::KernelError::Failed(format!(
+        "the fillet is too costly at {} mm on these {edges} edges: the first attempt spent its work budget ({limit} units, at the kernel's {stage} stage) without a round that fits{search}; try fewer edges or another radius",
+        show_mm(r)
+    ))
 }
 
 /// The warning of a fillet whose radius `asked` was reduced to `used` (per edge).

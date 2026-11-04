@@ -651,6 +651,34 @@ its inputs are not exactly the old ones. Oracle 59's first parameter edit fails 
 expression the bench's `* 1.02` can't scale) and is left out.
 
 
+## Fillet work budget and cancellation (#243, #264, 2026-11-04)
+
+A fillet of edges that no construction rounds was refused after most of an hour (#243: a box
+and two gussets standing on a foot sole with a spline outline, 18 edges at 0.3 mm with
+`fit: reduce`). The first attempt at the radius took a minute, and the size search then tried a
+dozen smaller radii, each a fillet as costly. PolyCore (PC-9) counts the kernel's work in units,
+one per edge order and per edge tried, per boolean stage and per intersection, the same on every
+machine and thread count; `polycore::with_work_budget` stops the work with
+`KernelError::BudgetSpent` once they are spent.
+
+`crates/doc/src/eval.rs` runs a constant fillet's first attempt at the radius asked for under a
+budget of max(64, 2 per edge) units (`FILLET_WORK`, `fillet_work`). An attempt that spends it is
+refused as too costly at that radius, naming the budget and the kernel stage it stopped at, and no
+smaller radius is searched; an attempt refused within it for its size is reduced or tapered as
+before, and a fillet that builds within it is the same body as without. Measured with the
+instrumented first attempt: the slowest of the 64 fillet kernel cases spends 33 units (2811's rib
+roots, 32 edges; 851's knife-edge corner, 3 edges), #243's first attempt 93. The kernel case
+`fillets/243-fillet-gussets-on-a-spline-sole-refused-within-budget` (time limit 600 s) took
+519 s on a loaded 8-core machine before (refused for its size after the whole search), 38 s
+after (the sole with its gussets and ridges takes about 25 s of that to build).
+
+Cancelling a watched evaluation (#264, `progress::watch`) reaches the kernel through its watch:
+PolyCore's `guard` and the blend's own checkpoints stop at the next step, in the first attempt
+and in the size search alike. A cancel during the search is reported as the fillet being
+cancelled, not as a refusal of its size (the search's tries were stopped, not refused). The test
+`cancelling_a_running_evaluation_stops_a_long_fillet` (crates/engine/src/tests.rs) cancels the
+reduce search of #3779's pillow a moment after it starts.
+
 ## Prism pairs, body measurements and the evaluation cache budget (2026-10-13)
 
 A design whose features repeat one shape (a hole pattern, a plate cut by many tools, a part built
