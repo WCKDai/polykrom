@@ -494,43 +494,63 @@ fn weld_eps(b: &polycore::Body) -> f64 {
     (b.size() * 1e-6).max(1e-7)
 }
 
+/// A mesh's facets as STL carries them: corner coordinates only, read back in single
+/// precision, so an edge is shared where its two corners' coordinates match. Vertices that
+/// round to one `f32` point (closer than that precision, which the weld in [`export`] does not
+/// reach for a part far from the origin) are one vertex, the first one's coordinates standing
+/// for all, and a triangle two of whose corners become one point is left out: it has no area
+/// at that precision, and written it would use its remaining edge twice more, so a closed body
+/// would read back open. A mesh whose vertices stay distinct in `f32` comes out as it is.
+fn stl_facets(m: &Mesh) -> impl Iterator<Item = [Vec3; 3]> + '_ {
+    let mut first: std::collections::HashMap<[u32; 3], u32> = std::collections::HashMap::new();
+    let remap: Vec<u32> = m
+        .positions
+        .iter()
+        .enumerate()
+        .map(|(i, p)| {
+            // `+ 0.0` turns -0 into 0, so both merge (as the 3MF writer does).
+            let key = p.to_f32().map(|x| (x + 0.0).to_bits());
+            *first.entry(key).or_insert(u32::try_from(i).unwrap_or(u32::MAX))
+        })
+        .collect();
+    m.triangles.iter().filter_map(move |t| {
+        let (a, b, c) = (*remap.get(t[0] as usize)?, *remap.get(t[1] as usize)?, *remap.get(t[2] as usize)?);
+        (a != b && b != c && c != a).then(|| m.tri(&[a, b, c]))?
+    })
+}
+
 /// Binary STL of several meshes (one solid).
 pub fn stl_binary(meshes: &[Mesh], name: &str) -> Vec<u8> {
-    let n: usize = meshes.iter().map(|m| m.triangles.len()).sum();
-    let mut out = Vec::with_capacity(84 + n * 50);
+    let facets: Vec<[Vec3; 3]> = meshes.iter().flat_map(stl_facets).collect();
+    let mut out = Vec::with_capacity(84 + facets.len() * 50);
     let mut header = format!("Polykrom STL {name}").into_bytes();
     header.resize(80, b' ');
     out.extend_from_slice(&header);
-    out.extend_from_slice(&u32::try_from(n).unwrap_or(u32::MAX).to_le_bytes());
-    for m in meshes {
-        for t in &m.triangles {
-            let Some([a, b, c]) = m.tri(t) else { continue };
-            let nrm = (b - a).cross(c - a).normalized().unwrap_or_default();
-            for v in [nrm, a, b, c] {
-                for x in v.to_f32() {
-                    out.extend_from_slice(&x.to_le_bytes());
-                }
+    out.extend_from_slice(&u32::try_from(facets.len()).unwrap_or(u32::MAX).to_le_bytes());
+    for [a, b, c] in facets {
+        let nrm = (b - a).cross(c - a).normalized().unwrap_or_default();
+        for v in [nrm, a, b, c] {
+            for x in v.to_f32() {
+                out.extend_from_slice(&x.to_le_bytes());
             }
-            out.extend_from_slice(&[0, 0]);
         }
+        out.extend_from_slice(&[0, 0]);
     }
     out
 }
 
-/// ASCII STL.
+/// ASCII STL. Coordinates are written in full, but welded as the binary form's are
+/// ([`stl_facets`]): readers take them in single precision.
 pub fn stl_ascii(meshes: &[Mesh], name: &str) -> String {
     let name: String = name.chars().filter(|c| c.is_ascii_graphic()).collect();
     let mut s = format!("solid {name}\n");
-    for m in meshes {
-        for t in &m.triangles {
-            let Some([a, b, c]) = m.tri(t) else { continue };
-            let n = (b - a).cross(c - a).normalized().unwrap_or_default();
-            s += &format!("  facet normal {:e} {:e} {:e}\n    outer loop\n", n.x, n.y, n.z);
-            for v in [a, b, c] {
-                s += &format!("      vertex {:e} {:e} {:e}\n", v.x, v.y, v.z);
-            }
-            s += "    endloop\n  endfacet\n";
+    for [a, b, c] in meshes.iter().flat_map(stl_facets) {
+        let n = (b - a).cross(c - a).normalized().unwrap_or_default();
+        s += &format!("  facet normal {:e} {:e} {:e}\n    outer loop\n", n.x, n.y, n.z);
+        for v in [a, b, c] {
+            s += &format!("      vertex {:e} {:e} {:e}\n", v.x, v.y, v.z);
         }
+        s += "    endloop\n  endfacet\n";
     }
     s += &format!("endsolid {name}\n");
     s
@@ -883,6 +903,86 @@ mod tests {
         assert_eq!(read_stl(&a).unwrap().len(), tris.len());
         let o = String::from_utf8(export(&m.state(), &[], Format::Obj, "t").unwrap()).unwrap();
         assert!(o.contains("o Body1") && o.contains("\nf "));
+    }
+
+    /// The edges (by vertex index) that are not used by exactly two triangles.
+    fn edges_not_used_twice(triangles: &[[u32; 3]]) -> Vec<((u32, u32), u32)> {
+        let mut uses: std::collections::HashMap<(u32, u32), u32> = std::collections::HashMap::new();
+        for t in triangles {
+            for (a, b) in [(t[0], t[1]), (t[1], t[2]), (t[2], t[0])] {
+                *uses.entry((a.min(b), a.max(b))).or_default() += 1;
+            }
+        }
+        uses.into_iter().filter(|(_, n)| *n != 2).collect()
+    }
+
+    /// A cube whose corner (10, 10, 10) is two vertices a nanometre apart (below `f32`
+    /// resolution there): half the fan around the corner on each, with two slivers between the
+    /// halves. Closed in `f64`; in `f32` the slivers have no area.
+    fn split_corner_cube() -> Mesh {
+        let c = |i: u32| Vec3::new((i & 1) as f64 * 10.0, ((i >> 1) & 1) as f64 * 10.0, ((i >> 2) & 1) as f64 * 10.0);
+        let mut positions: Vec<Vec3> = (0..8).map(c).collect();
+        positions.push(c(7) + Vec3::new(1e-9, 0.0, 0.0));
+        let triangles = vec![
+            [0, 2, 3],
+            [0, 3, 1],
+            [4, 5, 7],
+            [4, 7, 6],
+            [0, 1, 5],
+            [0, 5, 4],
+            [2, 6, 7],
+            [2, 8, 3],
+            [0, 4, 6],
+            [0, 6, 2],
+            [1, 3, 8],
+            [1, 8, 5],
+            [2, 7, 8],
+            [5, 8, 7],
+        ];
+        Mesh { positions, triangles, ..Mesh::default() }
+    }
+
+    /// Two vertices closer than `f32` tells apart are one point in an STL or a 3MF file: the
+    /// slivers between them, with no area at that precision, are left out, so the file is
+    /// closed (every edge used exactly twice) with no zero-area facet (PK-89).
+    #[test]
+    fn stl_and_3mf_weld_vertices_that_round_to_one_f32_point() {
+        let m = split_corner_cube();
+        assert_eq!(edges_not_used_twice(&m.triangles), Vec::new(), "closed in f64");
+        for (what, bytes) in [("binary", stl_binary(std::slice::from_ref(&m), "t")), ("ascii", stl_ascii(std::slice::from_ref(&m), "t").into_bytes())]
+        {
+            let facets = read_stl(&bytes).unwrap();
+            assert_eq!(facets.len(), 12, "{what}: the two slivers have no area in f32");
+            let mut index: std::collections::HashMap<[u32; 3], u32> = std::collections::HashMap::new();
+            let triangles: Vec<[u32; 3]> = facets
+                .iter()
+                .map(|t| {
+                    t.map(|p| {
+                        let n = index.len() as u32;
+                        *index.entry(p.map(f32::to_bits)).or_insert(n)
+                    })
+                })
+                .collect();
+            assert_eq!(index.len(), 8, "{what}");
+            for (t, f) in triangles.iter().zip(&facets) {
+                assert!(t[0] != t[1] && t[1] != t[2] && t[2] != t[0], "{what}: {f:?}");
+                let p = |k: usize| Vec3::new(f[k][0] as f64, f[k][1] as f64, f[k][2] as f64);
+                assert!((p(1) - p(0)).cross(p(2) - p(0)).len() > 1.0, "{what}: zero-area facet {f:?}");
+            }
+            assert_eq!(edges_not_used_twice(&triangles), Vec::new(), "{what}");
+        }
+        let object = MeshObject { name: "t".into(), positions: m.positions.clone(), triangles: m.triangles.clone(), ..Default::default() };
+        let (objects, _) = read_3mf(&write_3mf(&[object]).unwrap()).unwrap();
+        assert_eq!((objects.len(), objects[0].positions.len(), objects[0].triangles.len()), (1, 8, 12));
+        for t in &objects[0].triangles {
+            assert!(t[0] != t[1] && t[1] != t[2] && t[2] != t[0], "3MF: {t:?}");
+        }
+        assert_eq!(edges_not_used_twice(&objects[0].triangles), Vec::new(), "3MF");
+        // The same cube with one corner is written as it is: nothing merges, nothing is left out.
+        let triangles = m.triangles[..12].iter().map(|t| t.map(|i| i.min(7))).collect();
+        let whole = Mesh { positions: m.positions[..8].to_vec(), triangles, ..Mesh::default() };
+        assert_eq!(read_stl(&stl_binary(std::slice::from_ref(&whole), "t")).unwrap().len(), 12);
+        assert_eq!(stl_ascii(std::slice::from_ref(&whole), "t").matches("facet normal").count(), 12);
     }
 
     /// The design properties land in each format's own metadata (#1015): STEP and IGES headers,
