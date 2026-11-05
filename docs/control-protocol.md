@@ -246,7 +246,9 @@ picks before the kernel sees them:
   ```
 
   (On a 40 × 30 × 20 box. The shell used to open the back face alone and reply with success,
-  `"faces_used": ["F1:+y", ""]`, so the caller acted on fewer faces than it asked for.)
+  `"faces_used": ["F1:+y", ""]`, so the caller acted on fewer faces than it asked for.) A
+  command's `body` that no body is called is refused as `no body `<name>`` before the picks
+  are resolved, whatever they reach (an out-of-reach pick used to be reported instead).
 - The reply carries `faces_used`: the persistent name of the face each entry resolved to, in the
   order given, which is exactly the faces the operation acted on; it never holds an empty name.
   `{"faces":[[30,40,15],[0,20,15]],"thickness":2}` on a 60 × 40 × 30 box replies
@@ -256,6 +258,21 @@ picks before the kernel sees them:
 - Two entries that resolve to one face are not deduplicated in silence: the reply's `warning`
   says `faces 1 and 3 are the same face (`F1:+y` of `Body1`)`, joined to the evaluation's own
   warning when there is one.
+- `timeline.edit` on such a feature resolves the picks its `set` gives (`faces`; `face` for a
+  sheet conversion) the same way, through the same code, against the model before the feature:
+  the entries take the same forms (points, `{point, normal?, body?}`, face names) and are given
+  in the world on a moved component, as the command's are; an ambiguous pick, a pick that no face
+  is within reach of and an unknown `body` are refused with the same errors, in the name of
+  `timeline.edit`, and leave the document, its revision and the undo history unchanged; a pick
+  within reach of a face but off it is kept as a point inside that face, so the kernel acts on
+  it; and the reply carries `faces_used`. The edit used to store the points as given, so an
+  edited shell could take an ambiguous pick, keep an off-face point the kernel dropped without a
+  word, or keep a pick that reached no face.
+
+  ```text
+  {"command":"timeline.edit","params":{"feature":"Hollow","set":{"faces":[[40.1,15,10]]}}}
+  → {"feature": 2, "recomputed": 1, "restored": 0, "faces_used": ["F1:+x"]}
+  ```
 
 ### Slow commands and the window (#1989)
 
