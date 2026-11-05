@@ -86,7 +86,7 @@ pub fn two_sided(direction: usize) -> bool {
     direction == TWO_SIDES || direction == TWO_SIDES_REVERSED
 }
 /// Thin Extrude wall locations, as `solid.extrude` names them, and their labels.
-const WALL_SIDES: [&str; 4] = ["center", "inside", "outside", "two_sides"];
+pub(crate) const WALL_SIDES: [&str; 4] = ["center", "inside", "outside", "two_sides"];
 const WALL_LABELS: [&str; 4] = ["Center", "Inside", "Outside", "Two Sides"];
 /// What an extrude's first input picks: profiles or planar faces, or curves too when thin.
 const EXTRUDE_ACCEPT: Accept = PROFILES | PLANAR_FACES;
@@ -2191,7 +2191,7 @@ fn error_rows(app: &mut SolveApp, ctx: &egui::Context, d: &mut Dialog, ui: &mut 
 /// A refusal as the dialog shows it: without the engine's "invalid parameters for `id`: "
 /// prefix (the dialog already names the command), and in the interface language when the
 /// message is in the catalogs.
-fn shown_error(error: &str) -> String {
+pub(crate) fn shown_error(error: &str) -> String {
     let msg = error.strip_prefix("invalid parameters for `").and_then(|rest| rest.split_once("`: ")).map_or(error, |(_, msg)| msg);
     crate::i18n::tr_label(msg).to_string()
 }
@@ -2765,7 +2765,7 @@ fn object_on(inputs: &[SelInput], label: &str) -> bool {
     inputs.iter().any(|i| i.label == label)
 }
 
-fn to_object_on(inputs: &[SelInput]) -> bool {
+pub(crate) fn to_object_on(inputs: &[SelInput]) -> bool {
     inputs.iter().any(|i| i.label == TO_OBJECT)
 }
 

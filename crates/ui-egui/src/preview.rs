@@ -310,6 +310,8 @@ pub fn update(app: &mut SolveApp, ctx: &egui::Context) {
     let cmds = match app.dialog.as_ref().filter(|d| d.previews() && d.preview_enabled).map(|d| crate::dialogs::preview_commands(app, d)) {
         _ if review.is_some() => review.clone().unwrap_or_default(),
         Some(Ok(c)) if !c.is_empty() => c,
+        // A feature edited in place in the Properties panel (design kit view 03).
+        _ if crate::design_properties::preview_commands(app).is_some() => crate::design_properties::preview_commands(app).unwrap_or_default(),
         _ if crate::sketch_attachment_ui::commands(app).is_some() => crate::sketch_attachment_ui::commands(app).unwrap_or_default(),
         // A parameter being edited in Change Parameters.
         _ if app.params.as_ref().and_then(|p| p.preview_commands()).is_some() => {
@@ -324,7 +326,7 @@ pub fn update(app: &mut SolveApp, ctx: &egui::Context) {
     let colors = if review.is_some() {
         crate::review::preview_colors(&Tokens::get())
     } else {
-        Colors::for_tool(&Tokens::get(), &app.ui.tab, app.tool.is_some() || app.dialog.is_some())
+        Colors::for_tool(&Tokens::get(), &app.ui.tab, app.tool.is_some() || app.dialog.is_some() || crate::design_properties::editing(app))
     };
     let key = job_key(&cmds, app.session.revision, colors);
     let stream_key = stream_key(&cmds, app.session.revision, colors);

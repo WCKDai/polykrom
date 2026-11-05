@@ -386,7 +386,9 @@ fn assistant_floats_without_changing_projection_and_shields_the_model() {
             }
             h.call("ui.agent_chat", serde_json::json!({"open":false}));
             h.frames(3);
-            assert!(!covered(&h.app, card.center()), "closed chat leaves no stale obstruction");
+            // The Properties panel stands at the right once the chat is gone; nothing else may.
+            let others: Vec<egui::Rect> = covered_rects(&h.app).into_iter().filter(|r| Some(*r) != h.app.properties.rect).collect();
+            assert!(!others.iter().any(|r| r.contains(card.center())), "closed chat leaves no stale obstruction: {others:?}");
         }
     }
 }

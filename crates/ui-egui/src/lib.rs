@@ -413,6 +413,8 @@ pub struct SolveApp {
     pub params: Option<params_dialog::ParamsDialog>,
     /// The Design Properties window, when open.
     pub design_properties: Option<design_properties::DesignProperties>,
+    /// The Properties panel at the right of the workspace (design kit views 01 and 03).
+    pub properties: design_properties::Panel,
     /// The Bill of Materials window, when open.
     pub bom: Option<bom_panel::BomPanel>,
     material_card_review: Option<material_card_review::ReviewWindow>,
@@ -587,6 +589,7 @@ impl SolveApp {
             dialog: None,
             params: None,
             design_properties: None,
+            properties: Default::default(),
             bom: None,
             material_card_review: None,
             menu: context_menu::MenuState::default(),
@@ -1702,6 +1705,11 @@ impl SolveApp {
         scenario::clear_handles();
         self.poll_deferred(ui.ctx());
         self.poll_delete_check(ui.ctx());
+        // The floating Properties card goes under every window, including those the application
+        // bar opens (Help, Crash Reports): shown before them, it stays below in every frame order.
+        if !self.home.open && ui_kit::Container::new(ui.ctx(), ui_kit::Surface::Panel).floating() {
+            design_properties::panel(self, ui);
+        }
         toolbar::app_bar(self, ui);
         issue_report::CadInput::block(self, ui, report_input);
         file_load::show(self, ui.ctx());
@@ -1796,6 +1804,9 @@ impl SolveApp {
         }
         review::panel(self, ui);
         inspector::show(self, ui);
+        if !floating {
+            design_properties::panel(self, ui);
+        }
         Container::new(ui.ctx(), Surface::Viewport)
             .central()
             .frame(Container::new(ui.ctx(), Surface::Viewport).edge_frame(egui::Color32::TRANSPARENT))

@@ -2041,6 +2041,9 @@ pub fn shortcuts(app: &mut SolveApp, ctx: &egui::Context) {
                     crate::tools::finish(app);
                 } else if app.dialog.is_some() {
                     crate::dialogs::cancel(app);
+                } else if crate::design_properties::editing(app) {
+                    // A feature edited in place in the Properties panel: Esc cancels the edit.
+                    crate::design_properties::cancel(app);
                 } else if !app.session.selection.is_empty() || app.session.active_sketch.is_none() {
                     app.tree.picked_joints.clear();
                     let _ = app.run("select.clear", json!({}));
