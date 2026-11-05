@@ -4090,7 +4090,7 @@ fn cancelling_a_running_evaluation_stops_a_long_fillet() {
 /// budget: the measured margin") stay below half their first attempt's work budget, so a design
 /// like them builds as before and a budget stop means the fillet is far costlier than any known
 /// to build: 851's three edges at a knife-edge corner and 2811's 32 rib roots, replayed from
-/// their kernel cases, and the costliest robustness seed's attempt. Each is measured through
+/// their kernel cases. Each is measured through
 /// PolyCore's budget reporting around the fillet command: an outer budget no fillet can spend
 /// is charged what the attempt spent.
 #[test]

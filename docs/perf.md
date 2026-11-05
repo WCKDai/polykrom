@@ -682,7 +682,7 @@ reduce search of #3779's pillow a moment after it starts.
 
 ## Fillet work budget: the measured margin (PK-94, 2026-11-05)
 
-The 48 units above was the costliest fillet in the engine tests as the PK-86 change recorded it;
+PK-86's commit (#373, 572c28a8) gave 48 units as the costliest fillet in the engine tests;
 nobody had measured every corpus, so a real design whose fillet spends more than the budget
 would have been refused where it used to build. This section measures every fillet attempt and
 sets the budget from the distribution.
@@ -697,8 +697,8 @@ and the process arguments, which name the test, seed, case or script), and
 compiles none of it. The corpora ran with the budget set to 1 000 000, so every attempt shows
 its full cost: `cargo test -p polykrom-engine` (every target, the 96 robustness seeds among
 them) and `-p polykrom-doc`, the 401 kernel cases through `cargo xtask kernel-cases`, each of the
-84 oracle recipes through `polykrom-cli oracle`, and every script under `examples/` through
-`polykrom-cli run` (36; `demo/enclosure_steps.json` is not a command script). The six sample
+83 oracle recipes through `polykrom-cli oracle`, and every script under `examples/` through
+`polykrom-cli run` (30; `demo/enclosure_steps.json` is not a command script). The six sample
 designs of `assets/samples` are the engine's built-in sample scripts, built by the engine test
 `samples_build_cleanly`: two attempts, 5 units at most. Machine: 8 cores, 23 GiB, Linux,
 PolyCore 619f24b. PolyCore counts the units to be the same on every machine and thread count
@@ -714,8 +714,8 @@ refusal.
 | robustness seeds (96) | 78 | 42 | 8 | 28 | 48 | 36 | 6 |
 | doc tests | 11 | 6 | 2 | 3 | 6 | 6 | 5 |
 | kernel cases (401; 75 attempts) | 75 | 67 | 4 | 4 | 93 | 33 | 33 |
-| oracle recipes (84; 27 attempts) | 27 | 27 | 0 | 0 | 9 | 9 | 9 |
-| examples (36 scripts; 11 attempts) | 11 | 11 | 0 | 0 | 9 | 9 | 9 |
+| oracle recipes (83; 27 attempts) | 27 | 27 | 0 | 0 | 9 | 9 | 9 |
+| examples (30 scripts; 11 attempts) | 11 | 11 | 0 | 0 | 9 | 9 | 9 |
 | all | 3720 | 3642 | 31 | 47 | 93 | 8 | 33 |
 
 Of the 3720 attempts 3096 spend 1 unit, 365 spend 2 or 3, 218 spend 4 to 7, 30 spend 8 to 15,
