@@ -3,14 +3,21 @@
 Polykrom's interface faces are the design kit's (`assets/design-kit/2026-11-02/fonts`, PK-90):
 Inter for the interface and IBM Plex Mono for numeric values and code, on desktop and web.
 `crates/ui-egui/src/fonts.rs` compiles the kit's static faces into the application: Inter at
-regular (400), medium (500), semibold (600) and bold (700), and IBM Plex Mono at 400, 500 and
-600. Titles and selected labels use semibold; compass letters and the primary OK action use
-bold. Selection fields and status messages use medium. Numeric fields and sketch dimensions use
-IBM Plex Mono Regular.
+regular (400), medium (500), semibold (600) and bold (700), and IBM Plex Mono at 400. Titles and
+selected labels use semibold; compass letters and the primary OK action use bold. Selection
+fields and status messages use medium. Numeric fields and sketch dimensions use IBM Plex Mono
+Regular; the kit's Plex Mono 500 and 600 faces stay in the kit but are not compiled in (nothing
+uses them).
 
 Both fonts are licensed under the SIL Open Font License 1.1. Their licence texts are
 `assets/design-kit/2026-11-02/fonts/Inter-OFL.txt` and `IBM-Plex-Mono-OFL.txt` beside them;
-provenance is recorded in [ATTRIBUTION.md](../ATTRIBUTION.md).
+provenance is recorded in [ATTRIBUTION.md](../ATTRIBUTION.md). The "Bundled fonts" section of
+`THIRD-PARTY-LICENSES.txt` is not written by hand: `cargo xtask licences` finds every font the
+shipped crates name in their production sources (`include_bytes!` here and in `crates/sketch`,
+the web app's `index.html` copy), takes each font's copyright notice from the licence file beside
+it and its source from its ATTRIBUTION.md row, and appends each distinct licence text. A font
+without a licence file beside it or without an ATTRIBUTION.md row fails the command; the xtask
+tests fail when the notice omits a bundled font or names a file that does not exist.
 
 The `ui_font` preference puts the chosen font first in every sans family,
 including the three weighted families. A chosen static font retains its own
