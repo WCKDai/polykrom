@@ -95,6 +95,29 @@ pub fn show(app: &mut SolveApp, ui: &mut egui::Ui) {
             // Blank bar space owns its clicks (and is no stop for the keyboard).
             ui.interact(r, ui.id().with("status_bar_bg"), Sense::CLICK);
         });
+    // Report a bug freezes the CAD input at its click (`CadInput::block` follows this), so the
+    // click is taken here, before the viewport and the dialogs run, rather than where the
+    // button draws at the frame's end (`contents`): an open dimension edit stays open.
+    if report_clicked(ui.ctx()) {
+        crate::help::run(app, &ui.ctx().clone(), "report");
+    }
+}
+
+/// The Report a bug button's id, kept by [`contents`] for [`report_clicked`].
+const REPORT_BUTTON: &str = "sc_status_report_button";
+/// The pass in which [`show`] took the button's click, so [`contents`] leaves it.
+const REPORT_TAKEN: &str = "sc_status_report_taken";
+
+/// Whether this frame's click lands on the Report a bug button (as egui's own hit test reads it:
+/// the widget drawn last frame under a press and release). A click is marked taken for this pass.
+fn report_clicked(ctx: &egui::Context) -> bool {
+    let Some(id) = ctx.data(|d| d.get_temp::<egui::Id>(egui::Id::new(REPORT_BUTTON))) else { return false };
+    let clicked = ctx.input(|i| i.pointer.primary_clicked()) && ctx.viewport(|v| v.interact_widgets.clicked == Some(id));
+    if clicked {
+        let pass = ctx.cumulative_pass_nr();
+        ctx.data_mut(|d| d.insert_temp(egui::Id::new(REPORT_TAKEN), pass));
+    }
+    clicked
 }
 
 /// The bar's controls, over the panel [`show`] reserved this frame (nothing when the window is
@@ -155,7 +178,9 @@ pub fn contents(app: &mut SolveApp, ui: &mut egui::Ui) {
         true,
         &["titlebar:report", "status:report"],
     );
-    if clicked {
+    ui.ctx().data_mut(|d| d.insert_temp(egui::Id::new(REPORT_BUTTON), ui.id().with(("status", "titlebar:report"))));
+    let taken = ui.ctx().data(|d| d.get_temp::<u64>(egui::Id::new(REPORT_TAKEN))) == Some(ui.ctx().cumulative_pass_nr());
+    if clicked && !taken {
         crate::help::run(app, &ui.ctx().clone(), "report");
     }
     x = report.left() - 4.0;

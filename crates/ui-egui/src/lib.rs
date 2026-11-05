@@ -1736,6 +1736,9 @@ impl SolveApp {
         // title bar, the tabs and the ribbon.
         if !self.home.open {
             status_bar::show(self, ui);
+            // Its Report a bug (taken by `show` at the click) starts a draft, which blocks the
+            // CAD input from here on.
+            issue_report::CadInput::block(self, ui, report_input);
         }
         let show_timeline = self.ui.show_timeline && !render_workspace::active(self);
         let left_timeline = show_timeline && self.preferences.timeline_left;
