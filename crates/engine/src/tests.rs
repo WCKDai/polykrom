@@ -4086,6 +4086,38 @@ fn cancelling_a_running_evaluation_stops_a_long_fillet() {
     assert_eq!(s.doc.features.len(), fillet, "the cancelled fillet is taken back");
 }
 
+/// The costliest legitimate fillets measured over every corpus (docs/perf.md, "Fillet work
+/// budget: the measured margin") stay below half their first attempt's work budget, so a design
+/// like them builds as before and a budget stop means the fillet is far costlier than any known
+/// to build: 851's three edges at a knife-edge corner and 2811's 32 rib roots, replayed from
+/// their kernel cases, and the costliest robustness seed's attempt. Each is measured through
+/// PolyCore's budget reporting around the fillet command: an outer budget no fillet can spend
+/// is charged what the attempt spent.
+#[test]
+fn the_costliest_known_legitimate_fillets_stay_below_half_their_work_budget() {
+    use std::path::Path;
+    for case in ["851-fillet-three-edges-at-knife-edge-arc-corner", "2811-fillet-rib-roots"] {
+        let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/kernel-cases/fillets").join(case).join("recipe.json");
+        let script: Value = serde_json::from_slice(&std::fs::read(&path).unwrap_or_else(|e| panic!("{}: {e}", path.display()))).unwrap();
+        let commands = script["commands"].as_array().cloned().unwrap();
+        let at = commands.iter().position(|c| c["command"] == "solid.fillet").unwrap();
+        let mut s = Session::default();
+        s.run_script(&json!(commands[..at])).unwrap();
+        let fillet = &commands[at]["params"];
+        let edges = fillet["edges"].as_array().map_or(0, Vec::len);
+        let budget = doc::fillet_work_for(edges);
+        let (built, spent) = kernel::with_work_budget(u64::MAX, || {
+            let built = s.execute("solid.fillet", fillet);
+            (built, kernel::work_spent().unwrap_or(0))
+        });
+        built.unwrap_or_else(|e| panic!("{case}: {e}"));
+        println!("{case}: {edges} edges, the fillet spent {spent} of its {budget} units");
+        assert!(s.model.results.iter().all(|r| r.error.is_none()), "{case}: {:?}", s.model.results);
+        assert!(spent > 0, "{case}: the fillet's work was not counted");
+        assert!(spent * 2 < budget, "{case}: the fillet spent {spent} of its {budget} units, half or more; see docs/perf.md");
+    }
+}
+
 /// A taper on a profile of lines and an arc (#546). The D profile (back 9.2, sides 7.4, a
 /// half-round front R 4.6 tangent to them) grows by d = z · tan 5° with mitred corners:
 /// A(d) = A₀ + P·d + (2 + π/2)·d², integrated over the 10 mm height.
