@@ -96,7 +96,7 @@
     "toolbar:solid.draft"
    ],
    "hidden_handles": [
-    "toolbar:solid.revolve"
+    "button:solid.revolve"
    ]
   }
  },

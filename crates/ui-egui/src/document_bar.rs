@@ -14,15 +14,26 @@ const INSET: f32 = 16.0;
 /// Between the view bar's drop-downs (the kit's 24 px).
 const GAP: f32 = 24.0;
 
-/// The strip's place at the top of the viewport's content area, or None when the area is too
-/// short for it to leave a usable viewport.
+/// The strip's place at the top of the viewport's content area: the tabs and the view bar, or
+/// on a short view the tabs alone (the view settings stay on the VIEW tab and the view menu),
+/// or None when the area is too short for even the tabs to leave a usable viewport.
 pub(crate) fn strip(content: Rect) -> Option<Rect> {
-    (content.height() >= HEIGHT + MIN_SCENE_HEIGHT && content.width() >= 200.0).then(|| Rect::from_min_size(content.min, vec2(content.width(), HEIGHT)))
+    if content.width() < 200.0 {
+        return None;
+    }
+    let height = if content.height() >= HEIGHT + MIN_SCENE_HEIGHT {
+        HEIGHT
+    } else if content.height() >= TABS_HEIGHT + MIN_SCENE_HEIGHT {
+        TABS_HEIGHT
+    } else {
+        return None;
+    };
+    Some(Rect::from_min_size(content.min, vec2(content.width(), height)))
 }
 
-/// The scene keeps at least this much height under the strip; a shorter content area (a tiny
-/// window) leaves the strip out so the model keeps its room.
-const MIN_SCENE_HEIGHT: f32 = 260.0;
+/// The scene keeps at least this much height under the strip; a shorter content area (a small
+/// window) drops the view bar, then the tabs, so the model keeps its room.
+const MIN_SCENE_HEIGHT: f32 = 300.0;
 
 /// The standard views the orientation drop-down offers: (message id, `animate_view` name).
 const ORIENTATIONS: [(&str, &str); 9] = [
@@ -94,18 +105,21 @@ fn chip(ui: &mut egui::Ui, left: f32, cy: f32, label: &str, active: bool, handle
 /// The strip at `strip` (from [`strip`]): the document tabs, then the view bar.
 pub fn show(app: &mut SolveApp, ui: &mut egui::Ui, strip: Rect) {
     let t = Tokens::get();
-    let tabs = Rect::from_min_size(strip.min, vec2(strip.width(), TABS_HEIGHT));
+    let tabs = Rect::from_min_size(strip.min, vec2(strip.width(), TABS_HEIGHT.min(strip.height())));
     let view = Rect::from_min_max(tabs.left_bottom(), strip.max);
     // The strip owns its clicks: the viewport beneath never gets them.
     ui.interact(strip, ui.id().with("document_bar"), Sense::click_and_drag());
     ui.painter().rect_filled(tabs, 0.0, t.window);
-    ui.painter().rect_filled(view, 0.0, t.toolbar);
     crate::scenario::publish_rect("documents:strip", tabs);
-    crate::scenario::publish_rect("view:bar", view);
     let mut tabs_ui = ui.new_child(egui::UiBuilder::new().max_rect(tabs).id_salt("document_tabs"));
     tabs_ui.set_clip_rect(tabs.intersect(ui.clip_rect()));
     crate::documents::tabs(app, &mut tabs_ui, tabs, tabs.left() + INSET, tabs.right() - INSET);
-    view_bar(app, ui, view);
+    // A short view keeps the tabs alone.
+    if view.height() >= VIEW_BAR_HEIGHT {
+        ui.painter().rect_filled(view, 0.0, t.toolbar);
+        crate::scenario::publish_rect("view:bar", view);
+        view_bar(app, ui, view);
+    }
 }
 
 fn view_bar(app: &mut SolveApp, ui: &mut egui::Ui, r: Rect) {
