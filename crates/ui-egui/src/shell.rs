@@ -117,7 +117,9 @@ pub(crate) fn covered_rects(app: &SolveApp) -> Vec<Rect> {
         rects.extend(app.shell.history.map(|card| crate::ui_kit::HistorySeam::new(card).pill));
     }
     rects.extend(app.shell.browser.filter(|_| app.ui.show_browser));
-    rects.extend(app.shell.document_bar);
+    // The document bar abuts the scene at its bottom edge; that shared row belongs to the scene
+    // (a model point landing exactly on the scene's top must stay pickable), so the bar yields it.
+    rects.extend(app.shell.document_bar.map(|s| Rect::from_min_max(s.min, pos2(s.max.x, (s.max.y - 1.0).max(s.min.y)))));
     rects.extend(app.inspector.rect);
     // The AI review's prompt row and panel cover the viewport only as floating cards; docked,
     // they are edge panels beside it.

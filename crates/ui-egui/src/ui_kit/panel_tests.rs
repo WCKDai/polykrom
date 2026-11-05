@@ -452,6 +452,9 @@ fn confirm_routes_enter_escape_selected_answers_and_blocks_background_clicks() {
 fn save_prompt_frames_dont_save_and_clicking_it_discards_for_close_and_quit() {
     for quit in [false, true] {
         let mut h = crate::scenario::Harness::new();
+        // The confirm is rendered and clicked at the same 1600 x 1000 window, so the handle the
+        // click resolves matches the frame it lands in.
+        h.call("ui.resize", serde_json::json!({"width": 1600, "height": 1000}));
         h.app.home.open = false;
         h.app.run("solid.box", serde_json::json!({"length": 10, "width": 10, "height": 10})).unwrap();
         if quit {
@@ -943,3 +946,4 @@ fn bevel_lighting_reverses_for_fields_and_pressed_buttons_without_changing_geome
     let output = crate::test_support::frame(&ctx, egui::RawInput::default(), |ui| bevel.paint(ui.painter(), tiny, 0, false, true));
     assert!(!output.shapes.iter().any(|s| matches!(&s.shape, egui::Shape::LineSegment { .. })));
 }
+

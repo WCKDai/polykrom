@@ -56,6 +56,9 @@ fn actual_picked_face_and_noop_edit_preserve_exact_anchor_and_dimensions() {
 #[test]
 fn lost_attachment_ghost_rebind_preview_cancel_apply_and_undo_preserve_sketch() {
     let (mut h, sketch) = picked_sketch();
+    // Room for the redefine panel's full body under the design kit's shell (the document bar and
+    // status bar take the window's edges), so "Reattach selected face" stays in view.
+    h.call("ui.resize", json!({"width": 1600, "height": 1340}));
     h.app.run("solid.extrude", json!({"sketch":sketch,"distance":2,"operation":"new_body","body_name":"Boss"})).unwrap();
     h.app.run("timeline.suppress", json!({"feature":"Original","suppressed":true})).unwrap();
     assert!(h.app.session.model.result(sketch).unwrap().error.is_some());

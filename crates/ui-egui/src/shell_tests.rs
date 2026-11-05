@@ -55,10 +55,10 @@ fn both_modes_keep_their_geometry_and_fit_clear_of_covered_rects() {
             assert_eq!(viewport.top(), strip.bottom());
             assert_eq!(toolbar.height(), toolbar::RIBBON_HEIGHT);
             assert_eq!(toolbar.left(), 0.0);
-            assert_eq!(
-                covered_rects(&h.app),
-                vec![h.app.shell.history.unwrap(), browser, strip]
-            );
+            // The document bar yields its bottom row to the scene it abuts, so its covered rect is
+            // a pixel shorter than the drawn strip.
+            let strip_covered = egui::Rect::from_min_max(strip.min, pos2(strip.max.x, strip.max.y - 1.0));
+            assert_eq!(covered_rects(&h.app), vec![h.app.shell.history.unwrap(), browser, strip_covered]);
         }
         let _ = strip;
         h.app.fit_view();
@@ -711,6 +711,11 @@ fn ribbon_labels_are_saved_independently_and_icon_only_commands_remain_reachable
     }
     assert!(crate::prefs::lenient(&json!({})).ribbon_labels);
 }
+
+
+
+
+
 
 
 
