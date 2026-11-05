@@ -673,7 +673,9 @@ mod tests {
 
     #[test]
     fn palette_footer_and_scrolled_lower_option_remain_reachable_at_scale_and_resize() {
-        for (scale, height) in [(1.0, 900.0), (2.0, 900.0), (2.0, 720.0)] {
+        // The heights carry the design kit's shell (document tabs and view bar, the taller
+        // history strip and the status bar) on top of the room the palette needs.
+        for (scale, height) in [(1.0, 1024.0), (2.0, 1024.0), (2.0, 844.0)] {
             let mut h = crate::scenario::Harness::new();
             h.app.run("sketch.create", json!({"plane":"XY"})).unwrap();
             h.app.run("sketch.circle.center", json!({"center":[0,0],"radius":1})).unwrap();

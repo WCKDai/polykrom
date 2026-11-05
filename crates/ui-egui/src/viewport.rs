@@ -7062,6 +7062,9 @@ mod tests {
     #[test]
     fn immediate_wheel_zoom_applies_normalized_input_once() {
         let mut h = crate::scenario::Harness::new();
+        // A Page scroll converts to points against the window's height, so pin it (the design
+        // kit's taller default would change how many points 0.1 page is).
+        h.call("ui.resize", json!({"width":1600,"height":1000}));
         h.app.preferences.smooth_wheel_zoom = false;
         h.app.preferences.trackpad_pan = false;
         h.app.preferences.zoom_to_cursor = false;
@@ -8474,3 +8477,4 @@ mod standalone_point_tests {
         assert!(standalone_points(&app).is_empty(), "sketches hidden");
     }
 }
+

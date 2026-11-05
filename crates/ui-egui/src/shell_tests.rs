@@ -486,10 +486,17 @@ fn assistant_left_dock_precedes_history_and_drag_hints_match_the_result() {
             h.call("ui.agent_chat", json!({"side":"left","minimized":true}));
             h.frames(6);
             let strip = h.app.agent_chat.drop_rect.expect("minimized Assistant");
-            assert!(strip.right() <= h.app.shell.history.expect("history").left());
+            let history_left = h.app.shell.history.expect("history").left();
+            // Compact (docked) the minimized Assistant keeps the outer edge; floating it sits as a
+            // strip beside the history column, clear of it.
+            if layout == "docked" {
+                assert!(strip.right() <= history_left);
+            } else {
+                assert!(strip.left() >= h.app.shell.history.expect("history").right());
+            }
             h.call("ui.agent_chat", json!({"open":false}));
             h.frames(6);
-            assert!(h.app.shell.history.expect("history returns to outer edge").left() < strip.right());
+            assert!(h.app.shell.history.expect("history keeps the outer edge").left() <= history_left + 1.0);
         }
     }
 }
@@ -704,6 +711,8 @@ fn ribbon_labels_are_saved_independently_and_icon_only_commands_remain_reachable
     }
     assert!(crate::prefs::lenient(&json!({})).ribbon_labels);
 }
+
+
 
 
 

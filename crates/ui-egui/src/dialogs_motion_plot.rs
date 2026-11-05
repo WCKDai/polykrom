@@ -438,6 +438,9 @@ mod tests {
     #[test]
     fn the_study_dialog_charts_a_joint_and_finds_collisions() {
         let mut h = crate::scenario::Harness::new();
+        // Room for the full study dialog under the design kit's shell (the status bar and the
+        // document bar take the window's edges).
+        h.call("ui.resize", json!({"width": 1400, "height": 1224}));
         for (name, x) in [("A", 0), ("B", 20)] {
             h.app.run("component.activate", json!({"component": "root"})).unwrap();
             h.app.run("component.create", json!({ "name": name })).unwrap();
