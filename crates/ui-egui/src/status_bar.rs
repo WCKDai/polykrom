@@ -49,7 +49,8 @@ pub(crate) fn selection_summary(app: &SolveApp) -> String {
 fn icon_button(ui: &mut egui::Ui, right: f32, cy: f32, icon: &str, name: &str, tip: &str, enabled: bool, handles: &[&str]) -> (Rect, bool) {
     let t = Tokens::get();
     let rect = Rect::from_min_size(pos2(right - BUTTON, cy - BUTTON / 2.0), vec2(BUTTON, BUTTON));
-    let resp = ui.interact(rect, ui.id().with(("status", handles.first().copied().unwrap_or(icon))), if enabled { Sense::click() } else { Sense::hover() });
+    let resp =
+        ui.interact(rect, ui.id().with(("status", handles.first().copied().unwrap_or(icon))), if enabled { Sense::click() } else { Sense::hover() });
     resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, enabled, name));
     for handle in handles {
         crate::scenario::publish_target(handle, rect);
@@ -141,7 +142,11 @@ pub fn show(app: &mut SolveApp, ui: &mut egui::Ui) {
             }
             help_anchor = Some(help);
             x = help.left() - 4.0;
-            let prefs_tip = if cfg!(target_os = "macos") { format!("{} (Cmd+,)", app.tr("ui.preferences")) } else { format!("{} (Ctrl+,)", app.tr("ui.preferences")) };
+            let prefs_tip = if cfg!(target_os = "macos") {
+                format!("{} (Cmd+,)", app.tr("ui.preferences"))
+            } else {
+                format!("{} (Ctrl+,)", app.tr("ui.preferences"))
+            };
             let (prefs, clicked) =
                 icon_button(ui, x, cy, "settings", app.tr("ui.preferences"), &prefs_tip, true, &["titlebar:preferences", "status:preferences"]);
             crate::scenario::publish_handle("titlebar:preferences", prefs.center());
@@ -149,8 +154,16 @@ pub fn show(app: &mut SolveApp, ui: &mut egui::Ui) {
                 crate::prefs::open_at(app, 0);
             }
             x = prefs.left() - 4.0;
-            let (home, clicked) =
-                icon_button(ui, x, cy, "home", app.tr("ui.start_page"), app.tr("ui.start_page"), idle && design, &["titlebar:home", "appbar:home", "status:home"]);
+            let (home, clicked) = icon_button(
+                ui,
+                x,
+                cy,
+                "home",
+                app.tr("ui.start_page"),
+                app.tr("ui.start_page"),
+                idle && design,
+                &["titlebar:home", "appbar:home", "status:home"],
+            );
             // Compatibility for scenarios that used the former Home tab.
             crate::scenario::publish_target_as("tab:home", "titlebar:home", home);
             if clicked {

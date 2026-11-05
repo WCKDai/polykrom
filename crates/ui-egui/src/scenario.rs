@@ -1114,7 +1114,9 @@ pub fn check(h: &mut Harness, e: &Value) -> Result<(), String> {
                 for want in v.as_array().into_iter().flatten().filter_map(Value::as_str) {
                     // A folder's label carries its count (`Bodies (2)`): its bare name matches too.
                     let counted = |l: &str| {
-                        l.strip_suffix(')').and_then(|l| l.rsplit_once(" (")).is_some_and(|(base, n)| base == want && !n.is_empty() && n.chars().all(|c| c.is_ascii_digit()))
+                        l.strip_suffix(')')
+                            .and_then(|l| l.rsplit_once(" ("))
+                            .is_some_and(|(base, n)| base == want && !n.is_empty() && n.chars().all(|c| c.is_ascii_digit()))
                     };
                     let there = labels.iter().any(|l| l == want || counted(l));
                     if there != (k.as_str() == "browser_has") {

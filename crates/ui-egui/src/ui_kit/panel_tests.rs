@@ -946,4 +946,3 @@ fn bevel_lighting_reverses_for_fields_and_pressed_buttons_without_changing_geome
     let output = crate::test_support::frame(&ctx, egui::RawInput::default(), |ui| bevel.paint(ui.painter(), tiny, 0, false, true));
     assert!(!output.shapes.iter().any(|s| matches!(&s.shape, egui::Shape::LineSegment { .. })));
 }
-

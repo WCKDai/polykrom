@@ -202,12 +202,7 @@ fn shrink(panels: &[PanelSize], room: f32) -> Option<Vec<Plan>> {
     // 1. Narrow together in one-pixel steps, keeping each button's measured width until it
     // reaches its minimum. The gallery's minimum equals its full width; a small-button column
     // narrows further, so step as far as the widest button can.
-    let max_reduction = panels
-        .iter()
-        .flat_map(|p| p.buttons.iter())
-        .map(|b| (b.width - b.min_width).ceil() as usize)
-        .max()
-        .unwrap_or(0);
+    let max_reduction = panels.iter().flat_map(|p| p.buttons.iter()).map(|b| (b.width - b.min_width).ceil() as usize).max().unwrap_or(0);
     for reduction in 1..=max_reduction {
         for (plan, panel) in plans.iter_mut().zip(panels) {
             for (width, button) in plan.widths.iter_mut().zip(&panel.buttons) {
@@ -323,7 +318,8 @@ const SEARCH_MIN_WIDTH: f32 = 60.0;
 #[allow(clippy::too_many_arguments)]
 fn bar_button(ui: &mut egui::Ui, rect: Rect, icon: &str, label: Option<&str>, tip: &str, enabled: bool, handles: &[&str], menu_open: bool) -> bool {
     let t = Tokens::get();
-    let resp = ui.interact(rect, ui.id().with(("ab", handles.first().copied().unwrap_or(icon))), if enabled { Sense::click() } else { Sense::hover() });
+    let resp =
+        ui.interact(rect, ui.id().with(("ab", handles.first().copied().unwrap_or(icon))), if enabled { Sense::click() } else { Sense::hover() });
     let name = label.unwrap_or(tip);
     resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, enabled, name));
     for handle in handles {
@@ -332,7 +328,11 @@ fn bar_button(ui: &mut egui::Ui, rect: Rect, icon: &str, label: Option<&str>, ti
     let hot = enabled && (resp.hovered() || resp.has_focus() || menu_open);
     if label.is_some() {
         // Save and Export: the kit's filled buttons on the field surface.
-        ui.painter().rect_filled(rect, t.radius_sm, if hot { t.app_bar_hover_strong } else { t.app_bar_tab_active.lerp_to_gamma(t.app_bar_text, 0.08) });
+        ui.painter().rect_filled(
+            rect,
+            t.radius_sm,
+            if hot { t.app_bar_hover_strong } else { t.app_bar_tab_active.lerp_to_gamma(t.app_bar_text, 0.08) },
+        );
     } else if hot {
         ui.painter().rect_filled(rect, t.radius_sm, t.app_bar_hover_button);
     }
@@ -417,7 +417,8 @@ pub fn app_bar(app: &mut SolveApp, ui: &mut egui::Ui) {
         }
         // The right-hand group, from the edge: Export, Save, command search, Redo, Undo.
         let shown = design_shown(app) && idle;
-        let tip_for = |label: &str, key: &str| if shown { format!("{label} ({key})") } else { crate::i18n::format("ui.needs_design", &[("command", label)]) };
+        let tip_for =
+            |label: &str, key: &str| if shown { format!("{label} ({key})") } else { crate::i18n::format("ui.needs_design", &[("command", label)]) };
         let save_tip = tip_for(app.tr("ui.save"), "Ctrl+S");
         let undo_tip = tip_for(app.tr("ui.undo"), "Ctrl+Z");
         let redo_tip = tip_for(app.tr("ui.redo"), "Ctrl+Y");
@@ -425,7 +426,8 @@ pub fn app_bar(app: &mut SolveApp, ui: &mut egui::Ui) {
         let label_font = FontId::proportional(t.font_label);
         let text_width = |ui: &egui::Ui, text: &str| ui.painter().layout_no_wrap(text.to_string(), label_font.clone(), t.app_bar_text).size().x;
         let labelled_width = |ui: &egui::Ui, text: &str| if labelled { 31.0 + text_width(ui, text) + 14.0 } else { 32.0 };
-        let button_rect = |right: f32, width: f32| Rect::from_min_size(pos2(right - width, cy - BAR_BUTTON_HEIGHT / 2.0), vec2(width, BAR_BUTTON_HEIGHT));
+        let button_rect =
+            |right: f32, width: f32| Rect::from_min_size(pos2(right - width, cy - BAR_BUTTON_HEIGHT / 2.0), vec2(width, BAR_BUTTON_HEIGHT));
         let mut x = right;
         let export_label = app.tr("ui.export").to_string();
         let export = button_rect(x, labelled_width(ui, &export_label));
@@ -478,11 +480,15 @@ pub fn app_bar(app: &mut SolveApp, ui: &mut egui::Ui) {
         let controls_left = x;
         // The document identity: its name, then where it is stored and its revision.
         let identity_left = logo.right() + 14.0;
-        let (name, dirty) = crate::documents::tabs_info(app).get(app.docs.active.min(crate::documents::tabs_info(app).len().saturating_sub(1))).cloned().unwrap_or_default();
+        let (name, dirty) = crate::documents::tabs_info(app)
+            .get(app.docs.active.min(crate::documents::tabs_info(app).len().saturating_sub(1)))
+            .cloned()
+            .unwrap_or_default();
         let shown_name = crate::i18n::Locale::for_language(&app.preferences.language).given_name(&name);
         let title = format!("{shown_name}{}", if dirty { " •" } else { "" });
         let title_galley = ui.painter().layout_no_wrap(title, crate::fonts::semibold(t.font_heading), t.app_bar_text);
-        let subtitle_galley = ui.painter().layout_no_wrap(document_subtitle(app), FontId::proportional(t.font_small), t.app_bar_text.gamma_multiply(0.72));
+        let subtitle_galley =
+            ui.painter().layout_no_wrap(document_subtitle(app), FontId::proportional(t.font_small), t.app_bar_text.gamma_multiply(0.72));
         let identity_width = title_galley.size().x.max(subtitle_galley.size().x);
         let identity_right = (identity_left + identity_width).min(controls_left - 12.0);
         let identity = Rect::from_min_max(pos2(identity_left, r.top() + 6.0), pos2(identity_right.max(identity_left), r.bottom() - 6.0));
@@ -645,18 +651,19 @@ fn export_menu(app: &mut SolveApp, ctx: &egui::Context) {
     }
     let at = ctx.data(|d| d.get_temp::<egui::Pos2>(egui::Id::new("sc_export_menu_at"))).unwrap_or(pos2(100.0, APP_BAR_HEIGHT));
     let mut close = false;
-    let resp = Container::new(ctx, Surface::Popup).area(egui::Id::new("sc_export_area")).fixed_pos(at).constrain(true).order(egui::Order::Foreground).show(
-        ctx,
-        |ui| {
-            crate::ui_kit::Menu::show_frame(ui, crate::ui_kit::Menu::frame(), |ui| {
-                ui.set_min_width(190.0);
-                ui.visuals_mut().widgets.inactive.weak_bg_fill = Color32::TRANSPARENT;
-                ui.visuals_mut().widgets.inactive.bg_stroke = Stroke::NONE;
-                ui.visuals_mut().widgets.hovered.weak_bg_fill = Tokens::get().hover;
-                export_rows(app, ui, &mut close);
-            });
-        },
-    );
+    let resp =
+        Container::new(ctx, Surface::Popup).area(egui::Id::new("sc_export_area")).fixed_pos(at).constrain(true).order(egui::Order::Foreground).show(
+            ctx,
+            |ui| {
+                crate::ui_kit::Menu::show_frame(ui, crate::ui_kit::Menu::frame(), |ui| {
+                    ui.set_min_width(190.0);
+                    ui.visuals_mut().widgets.inactive.weak_bg_fill = Color32::TRANSPARENT;
+                    ui.visuals_mut().widgets.inactive.bg_stroke = Stroke::NONE;
+                    ui.visuals_mut().widgets.hovered.weak_bg_fill = Tokens::get().hover;
+                    export_rows(app, ui, &mut close);
+                });
+            },
+        );
     crate::scenario::publish_rect("appbar:export_menu", resp.response.rect);
     let just_opened = ctx.data(|d| d.get_temp::<u64>(egui::Id::new("sc_export_menu_opened"))) == Some(ctx.cumulative_pass_nr());
     if close || (!just_opened && resp.response.clicked_elsewhere()) || ctx.input(|i| i.key_pressed(egui::Key::Escape)) {
@@ -770,7 +777,9 @@ fn file_menu(app: &mut SolveApp, ctx: &egui::Context) {
             }
             // The browser can install Polykrom as an app (`install`): only while it offers to.
             if let Some(offer) = crate::install::offered(app)
-                && crate::context_menu::button(ui, crate::i18n::tr("install.menu"), "new").on_hover_text(crate::i18n::tr("install.button_tip")).clicked()
+                && crate::context_menu::button(ui, crate::i18n::tr("install.menu"), "new")
+                    .on_hover_text(crate::i18n::tr("install.button_tip"))
+                    .clicked()
             {
                 crate::install::start(app, offer);
                 close = true;
@@ -979,7 +988,8 @@ fn ribbon_tabs(app: &mut SolveApp, ui: &mut egui::Ui, row: Rect) {
     let tabs = crate::workspace::visible_tabs(app);
     let rendering = crate::render_workspace::active(app);
     let font = crate::fonts::semibold(t.font_body);
-    let widths: Vec<_> = tabs.iter().map(|tab| ui.painter().layout_no_wrap(ribbon_label(app, tab), font.clone(), t.text).size().x + 2.0 * TAB_PAD).collect();
+    let widths: Vec<_> =
+        tabs.iter().map(|tab| ui.painter().layout_no_wrap(ribbon_label(app, tab), font.clone(), t.text).size().x + 2.0 * TAB_PAD).collect();
     let tabs_width: f32 = widths.iter().sum::<f32>() + tabs.len().saturating_sub(1) as f32 * TAB_GAP;
     // The tab row sits on the window's base surface; the ribbon's groups are lifted from it.
     ui.painter().rect_filled(row, 0.0, t.window);
@@ -1023,7 +1033,10 @@ fn ribbon_tabs(app: &mut SolveApp, ui: &mut egui::Ui, row: Rect) {
                     ribbon_text(ui, pos2(tr.center().x, tr.top() + 16.0), &ribbon_label(app, tab), t.font_body, ink, active);
                     if active {
                         ui.painter().rect_filled(
-                            Rect::from_min_size(pos2(tr.left() + TAB_PAD - 1.0, tr.bottom() - TAB_UNDERLINE - 6.0), vec2(width - 2.0 * TAB_PAD + 2.0, TAB_UNDERLINE)),
+                            Rect::from_min_size(
+                                pos2(tr.left() + TAB_PAD - 1.0, tr.bottom() - TAB_UNDERLINE - 6.0),
+                                vec2(width - 2.0 * TAB_PAD + 2.0, TAB_UNDERLINE),
+                            ),
                             0.0,
                             accent.color,
                         );
@@ -1098,10 +1111,7 @@ fn small_label_galley(painter: &egui::Painter, label: &str, width: f32, color: C
 
 /// A small-button column's width: its widest label beside the icon, within the kit's bounds.
 fn small_column_width(app: &SolveApp, painter: &egui::Painter, column: &[&'static polykrom_engine::CommandSpec]) -> f32 {
-    let widest = column
-        .iter()
-        .map(|c| ribbon_label_width(painter, app.tr_label(crate::workspace::ribbon_button_label(c))))
-        .fold(0.0_f32, f32::max);
+    let widest = column.iter().map(|c| ribbon_label_width(painter, app.tr_label(crate::workspace::ribbon_button_label(c)))).fold(0.0_f32, f32::max);
     (SMALL_TEXT_X + widest + SMALL_PAD).clamp(SMALL_MIN_WIDTH, SMALL_MAX_WIDTH)
 }
 
@@ -1194,7 +1204,10 @@ pub fn toolbar(app: &mut SolveApp, ui: &mut egui::Ui) {
                         .filter(|c| crate::toolbar_custom::pinned_on(app, &tab, c.id).is_none() && !app.toolbar_custom.in_gallery(&tab, panel, c.id))
                         .filter(|c| !(tab == "SKETCH" && *panel == "CREATE" && crate::sketch_families::family(c.id).is_some()))
                         // A label too long for a small button stays in the drop-down (no wrap, no cut).
-                        .filter(|c| ribbon_label_width(&painter, app.tr_label(crate::workspace::ribbon_button_label(c))) + SMALL_TEXT_X + SMALL_PAD <= SMALL_MAX_WIDTH)
+                        .filter(|c| {
+                            ribbon_label_width(&painter, app.tr_label(crate::workspace::ribbon_button_label(c))) + SMALL_TEXT_X + SMALL_PAD
+                                <= SMALL_MAX_WIDTH
+                        })
                         .take(SMALL_MAX_COLUMNS * SMALL_ROWS)
                         .collect()
                 } else {
@@ -1415,7 +1428,8 @@ pub fn toolbar(app: &mut SolveApp, ui: &mut egui::Ui) {
                             } else if resp.hovered() && info.enabled {
                                 painter.rect_filled(br, t.radius_sm, t.hover);
                             }
-                            let icon_rect = Rect::from_center_size(pos2(br.left() + SMALL_PAD + SMALL_ICON / 2.0, br.center().y), vec2(SMALL_ICON, SMALL_ICON));
+                            let icon_rect =
+                                Rect::from_center_size(pos2(br.left() + SMALL_PAD + SMALL_ICON / 2.0, br.center().y), vec2(SMALL_ICON, SMALL_ICON));
                             icons::paint_icon(&painter, icon_rect, c.icon, if info.enabled { 1.0 } else { 0.35 });
                             let label = app.tr_label(crate::workspace::ribbon_button_label(c));
                             let color = if info.enabled { t.text } else { t.text_dim };
@@ -2550,8 +2564,20 @@ mod header_report_tests {
         // The application menu from the logo holds the start page, the File items, Workspaces,
         // Preferences, Keyboard Shortcuts, Help and Quit, with the version at its foot.
         h.step(&json!({"click":{"handle":"appbar:file"}})).unwrap();
-        for item in ["Start page", "New Design", "Open…", "Save", "Save As…", "Export STEP…", "Design Properties…", "Workspace…", "Preferences…", "Keyboard Shortcuts…", "Help", "Quit"]
-        {
+        for item in [
+            "Start page",
+            "New Design",
+            "Open…",
+            "Save",
+            "Save As…",
+            "Export STEP…",
+            "Design Properties…",
+            "Workspace…",
+            "Preferences…",
+            "Keyboard Shortcuts…",
+            "Help",
+            "Quit",
+        ] {
             assert!(h.widget(item).is_some(), "{item} in the application menu");
         }
         h.step(&json!({"widget":"Start page"})).unwrap();

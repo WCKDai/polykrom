@@ -475,7 +475,10 @@ fn timeline_contents(app: &mut SolveApp, ui: &mut egui::Ui) {
                 let chip_width = (p.layout_no_wrap(name.clone(), egui::FontId::proportional(t.font_small), t.text).size().x + t.space_16)
                     .clamp(CHIP_MIN_WIDTH, CHIP_MAX_WIDTH)
                     .round();
-                let br = Rect::from_min_size(pos2(x, r.center().y - crate::ui_kit::BOTTOM_CHIP_HEIGHT / 2.0), vec2(chip_width, crate::ui_kit::BOTTOM_CHIP_HEIGHT));
+                let br = Rect::from_min_size(
+                    pos2(x, r.center().y - crate::ui_kit::BOTTOM_CHIP_HEIGHT / 2.0),
+                    vec2(chip_width, crate::ui_kit::BOTTOM_CHIP_HEIGHT),
+                );
                 crate::scenario::publish_target(&format!("timeline:{name}"), br);
                 let resp = ui.interact(br, ui.id().with(("feat", *id)), Sense::click_and_drag());
                 let res = app.session.model.result(*id);

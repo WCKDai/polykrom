@@ -780,12 +780,7 @@ pub fn tabs(app: &mut SolveApp, ui: &mut egui::Ui, r: Rect, x0: f32, x1: f32) {
     if presp.hovered() {
         ui.painter().rect_filled(pr, t.radius_sm, t.hover);
     }
-    crate::icons::paint_icon(
-        ui.painter(),
-        Rect::from_center_size(pr.center(), vec2(16.0, 16.0)),
-        "plus",
-        if presp.hovered() { 1.0 } else { 0.55 },
-    );
+    crate::icons::paint_icon(ui.painter(), Rect::from_center_size(pr.center(), vec2(16.0, 16.0)), "plus", if presp.hovered() { 1.0 } else { 0.55 });
     // A file loading into the window keeps the tabs as they are (dragging still moves it).
     let idle = !app.file_load.busy();
     crate::scenario::publish_handle("tab:new", pr.center());

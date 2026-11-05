@@ -913,7 +913,8 @@ fn browser_identity(app: &SolveApp, ui: &mut egui::Ui) {
         if components == 1 { "ui.browser_components_one" } else { "ui.browser_components_other" },
         &[("count", &components.to_string())],
     );
-    let bodies = crate::i18n::format(if bodies == 1 { "ui.browser_bodies_one" } else { "ui.browser_bodies_other" }, &[("count", &bodies.to_string())]);
+    let bodies =
+        crate::i18n::format(if bodies == 1 { "ui.browser_bodies_one" } else { "ui.browser_bodies_other" }, &[("count", &bodies.to_string())]);
     let summary = ui.painter().layout_no_wrap(format!("{components} · {bodies}"), FontId::proportional(t.font_small), t.text_dim);
     crate::scenario::publish_rect("browser:summary", Rect::from_min_size(pos2(x, rect.top() + 24.0), summary.size()));
     ui.painter().galley(pos2(x, rect.top() + 24.0), summary, t.text_dim);
@@ -1230,7 +1231,10 @@ fn occurrence_rows(app: &mut SolveApp, ui: &mut egui::Ui, path: Vec<u64>, depth:
     );
     if let Some(rect) = r.rect.filter(|_| r.resp.is_some()) {
         OCCURRENCES.with(|d| d.borrow_mut().push((path.clone(), placement.name.clone(), rect, open)));
-        crate::scenario::publish_handle(&format!("row:occurrence:{}", key.trim_start_matches("o:")), pos2(rect.right() - 12.0 - EYE_SLOT, rect.center().y));
+        crate::scenario::publish_handle(
+            &format!("row:occurrence:{}", key.trim_start_matches("o:")),
+            pos2(rect.right() - 12.0 - EYE_SLOT, rect.center().y),
+        );
         let x = rect.left() + 2.0 + depth as f32 * INDENT;
         for (control, at) in [("fold", x + 6.0), ("eye", rect.right() - 2.0 - EYE_SLOT / 2.0), ("activate", x + 20.0)] {
             crate::scenario::publish_handle(&format!("{control}:occurrence:{}", key.trim_start_matches("o:")), pos2(at, rect.center().y));

@@ -130,11 +130,9 @@ fn selected_row_paints_tab_soft_fill_and_text_colour_in_both_layouts() {
                 assert_eq!(row_rect.height(), 26.0);
                 assert!(out.shapes.iter().any(|s| matches!(&s.shape, egui::Shape::Rect(r) if r.rect == row_rect && r.fill == accent.soft)));
                 // The label keeps the text colour on the tint (the kit's selected browser row).
-                assert!(
-                    out.shapes
-                        .iter()
-                        .any(|s| matches!(&s.shape, egui::Shape::Text(t) if t.galley.text() == "Selected body" && t.fallback_color == Tokens::get().text))
-                );
+                assert!(out.shapes.iter().any(
+                    |s| matches!(&s.shape, egui::Shape::Text(t) if t.galley.text() == "Selected body" && t.fallback_color == Tokens::get().text)
+                ));
             }
         }
     }

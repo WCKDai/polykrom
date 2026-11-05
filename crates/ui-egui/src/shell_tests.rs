@@ -135,7 +135,8 @@ fn floating_sketch_palette_and_compass_share_measured_clearance() {
                 h.app.start("solid.extrude");
                 h.settle();
                 let dialog = h.app.viewport.dialog_rect.unwrap();
-                let expected_top = (content.top() + crate::viewport::AXIS_VIEW_CLEARANCE).min((content.bottom() - PANEL_MIN_HEIGHT).max(content.top()));
+                let expected_top =
+                    (content.top() + crate::viewport::AXIS_VIEW_CLEARANCE).min((content.bottom() - PANEL_MIN_HEIGHT).max(content.top()));
                 assert!((dialog.left() - content.left()).abs() < 1.0);
                 assert!((dialog.top() - expected_top).abs() < 1.0, "left dialogs retain their existing top: {dialog:?}");
             }
@@ -711,13 +712,3 @@ fn ribbon_labels_are_saved_independently_and_icon_only_commands_remain_reachable
     }
     assert!(crate::prefs::lenient(&json!({})).ribbon_labels);
 }
-
-
-
-
-
-
-
-
-
-

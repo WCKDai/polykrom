@@ -8477,4 +8477,3 @@ mod standalone_point_tests {
         assert!(standalone_points(&app).is_empty(), "sketches hidden");
     }
 }
-

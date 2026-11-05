@@ -50,9 +50,9 @@ pub mod dialogs_sweep;
 mod dialogs_thread;
 pub mod dialogs_view_dxf;
 pub mod dim_view;
-pub mod document_bar;
 #[cfg(test)]
 mod dimension_create_ui_tests;
+pub mod document_bar;
 pub mod documents;
 pub mod drag_snap;
 pub mod edit_clipboard;
@@ -1842,7 +1842,8 @@ impl SolveApp {
                     preview::update(self, ui.ctx());
                     // The scene starts below the strip; the browser column beside it keeps its
                     // full height.
-                    let scene = strip.map_or(panel_content, |s| egui::Rect::from_min_max(egui::pos2(panel_content.left(), s.bottom()), panel_content.max));
+                    let scene =
+                        strip.map_or(panel_content, |s| egui::Rect::from_min_max(egui::pos2(panel_content.left(), s.bottom()), panel_content.max));
                     let mut scene_ui = ui.new_child(egui::UiBuilder::new().max_rect(scene).id_salt("docked_viewport"));
                     self.show_workspace(&mut scene_ui);
                 }

@@ -378,7 +378,10 @@ pub(crate) fn dock_drag(app: &mut SolveApp, ui: &egui::Ui, drag: &egui::Response
                     if Container::for_layout(app.ui.layout, Surface::Panel).floating() {
                         crate::timeline::floating_rect(available)
                     } else {
-                        Rect::from_min_max(pos2(available.left(), (available.bottom() - crate::timeline::HISTORY_HEIGHT).max(available.top())), available.max)
+                        Rect::from_min_max(
+                            pos2(available.left(), (available.bottom() - crate::timeline::HISTORY_HEIGHT).max(available.top())),
+                            available.max,
+                        )
                     }
                 }
                 Dock::Left => {

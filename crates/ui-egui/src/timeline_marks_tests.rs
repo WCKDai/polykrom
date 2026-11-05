@@ -76,7 +76,8 @@ fn a_failed_feature_is_marked_in_the_bottom_timeline() {
     // sketch and the feature it drives alike, and the first is the sketch.)
     let got = marked(&mut app, crate::timeline::timeline, |item, d| {
         let name = format!("timeline:{}", item.name);
-        let rect = crate::scenario::rects("timeline:").into_iter().find(|(n, _)| *n == name).map(|(_, r)| r).unwrap_or_else(|| panic!("{name} has no rect"));
+        let rect =
+            crate::scenario::rects("timeline:").into_iter().find(|(n, _)| *n == name).map(|(_, r)| r).unwrap_or_else(|| panic!("{name} has no rect"));
         (d.x - (rect.right() - 7.0)).abs() < 1.5 && (d.y - (rect.top() + 7.0)).abs() < 1.5
     });
     assert_eq!(got, want, "an error mark on each failed feature and on no other");

@@ -161,7 +161,8 @@ impl HistoryChip<'_> {
             p.line_segment([icon.left_bottom(), icon.right_top()], Stroke::new(1.5, t.text_dim));
         }
         let ink = if self.selected { self.accent.color } else { t.text_dim };
-        let mut job = egui::text::LayoutJob::simple(self.name.to_owned(), egui::FontId::proportional(t.font_small), ink, (rect.width() - t.space_8).max(1.0));
+        let mut job =
+            egui::text::LayoutJob::simple(self.name.to_owned(), egui::FontId::proportional(t.font_small), ink, (rect.width() - t.space_8).max(1.0));
         job.wrap.max_rows = 1;
         job.wrap.break_anywhere = true;
         job.wrap.overflow_character = Some('\u{2026}');
@@ -169,7 +170,12 @@ impl HistoryChip<'_> {
         p.galley(pos2(rect.center().x - galley.size().x / 2.0, rect.bottom() - t.space_6 - galley.size().y), galley, ink);
         if self.error || self.warning {
             let side = t.space_10;
-            icons::paint_icon(p, Rect::from_min_size(rect.right_top() + vec2(-side - t.space_2, t.space_2), vec2(side, side)), if self.error { "error" } else { "warning" }, 1.0);
+            icons::paint_icon(
+                p,
+                Rect::from_min_size(rect.right_top() + vec2(-side - t.space_2, t.space_2), vec2(side, side)),
+                if self.error { "error" } else { "warning" },
+                1.0,
+            );
         }
     }
 }

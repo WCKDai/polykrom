@@ -14,8 +14,11 @@ const TABS: [&str; 10] = ["MODEL", "SURFACE", "ASSEMBLE", "INSERT", "INSPECT", "
 #[test]
 fn every_registered_command_is_on_a_ribbon_group_or_found_by_search() {
     let h = Harness::new();
-    let on_ribbon: BTreeSet<&str> =
-        TABS.iter().flat_map(|tab| polykrom_ui_egui::toolbar_custom::panel_lists(tab)).flat_map(|(_, cmds, _)| cmds.into_iter().map(|c| c.id)).collect();
+    let on_ribbon: BTreeSet<&str> = TABS
+        .iter()
+        .flat_map(|tab| polykrom_ui_egui::toolbar_custom::panel_lists(tab))
+        .flat_map(|(_, cmds, _)| cmds.into_iter().map(|c| c.id))
+        .collect();
     let mut missing = Vec::new();
     let mut counted = 0;
     for spec in polykrom_engine::command_specs() {
