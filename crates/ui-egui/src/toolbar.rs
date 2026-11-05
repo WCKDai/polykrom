@@ -1040,9 +1040,11 @@ fn ribbon_tabs(app: &mut SolveApp, ui: &mut egui::Ui, row: Rect) {
                     response.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, ribbon_label(app, tab)));
                     let accent = crate::theme::TabAccent::for_tab(&t, tab);
                     // The active tab: its accent as text with a 2 px underline (the kit's lime on
-                    // the base colour), no filled pill; the others in the muted text colour.
+                    // the base colour), no filled pill; the others in the muted text colour. An
+                    // accent too faint for text on the row (dark Surface, Sheet Metal) keeps the
+                    // underline and writes its name in its ink.
                     let ink = if active {
-                        accent.color
+                        accent.text_on(&t, t.window)
                     } else if response.hovered() || response.has_focus() {
                         t.text
                     } else {

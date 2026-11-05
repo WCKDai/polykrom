@@ -317,6 +317,17 @@ impl TabAccent {
         }
     }
 
+    /// The accent as small text on `ground` (the tab row's window surface): the accent itself
+    /// where it reads at WCAG AA, else the accent's ink, else the plain text colour, else
+    /// whichever of black and white reads better. In the dark theme the Surface and Sheet Metal
+    /// fills are 3.8:1 and 3.6:1 on the window, so their active tabs take the lighter inks.
+    pub fn text_on(self, t: &Tokens, ground: Color32) -> Color32 {
+        [self.color, self.ink, t.text]
+            .into_iter()
+            .find(|ink| contrast_ratio(*ink, ground) >= 4.5)
+            .unwrap_or(if contrast_ratio(Color32::BLACK, ground) >= contrast_ratio(Color32::WHITE, ground) { Color32::BLACK } else { Color32::WHITE })
+    }
+
     pub fn current(ctx: &egui::Context) -> Self {
         ctx.data(|d| d.get_temp::<Self>(egui::Id::new("sc_tab_accent"))).unwrap_or_else(|| Self::for_tab(&Tokens::get(), "MODEL"))
     }
@@ -992,6 +1003,34 @@ mod tests {
                 assert!(ratio >= 4.5, "dark={dark} {mode:?}: {ratio:.2}:1");
             }
         }
+    }
+
+    /// The active workspace tab's name on the tab row (the window surface) reads at WCAG AA in
+    /// both themes and every colour-vision mode, for every tab the ribbon can show. The accent
+    /// stays the ink where it already reads (Model's lime in the dark theme); the dark theme's
+    /// Surface (3.8:1) and Sheet Metal (3.6:1) fills step up to their inks.
+    #[test]
+    fn active_tab_ink_reads_on_the_tab_row_in_both_themes() {
+        let tabs: Vec<&str> = crate::workspace::TABS.iter().copied().chain(["SKETCH", "SHEET METAL", "RENDER"]).collect();
+        for dark in [false, true] {
+            for vision in super::ColorVision::ALL {
+                let t = super::Tokens::themed(dark, vision);
+                for tab in &tabs {
+                    let accent = super::TabAccent::for_tab(&t, tab);
+                    let ink = accent.text_on(&t, t.window);
+                    let ratio = super::contrast_ratio(ink, t.window);
+                    assert!(ratio >= 4.5, "{tab} dark={dark} {vision:?}: the active tab's ink is {ratio:.2}:1 ({ink:?} on {:?})", t.window);
+                    if super::contrast_ratio(accent.color, t.window) >= 4.5 {
+                        assert_eq!(ink, accent.color, "{tab} dark={dark} {vision:?}: an accent that reads stays the ink");
+                    }
+                }
+            }
+        }
+        let t = super::Tokens::dark();
+        assert!(super::contrast_ratio(t.surface_fill, t.window) < 4.5 && super::contrast_ratio(t.sheet_fill, t.window) < 4.5);
+        assert_eq!(super::TabAccent::for_tab(&t, "SURFACE").text_on(&t, t.window), t.surface_ink);
+        assert_eq!(super::TabAccent::for_tab(&t, "SHEET METAL").text_on(&t, t.window), t.sheet_ink);
+        assert_eq!(super::TabAccent::for_tab(&t, "MODEL").text_on(&t, t.window), t.accent);
     }
 
     #[test]
