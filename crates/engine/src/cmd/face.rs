@@ -73,8 +73,8 @@ pub(super) struct PickedFaces {
     /// (a name, a `normal`-resolved pick, a pick within reach of the face but off it; see
     /// [`settled_point`]).
     pub points: Vec<Vec3>,
-    /// The persistent name (`model.faces`) of each entry's face, for the reply's `faces_used`;
-    /// empty where no face is within the pick tolerance (the kernel reports that itself).
+    /// The persistent name (`model.faces`) of each entry's face, for the reply's `faces_used`.
+    /// Never empty: an entry that no face is within the pick tolerance of is refused (PK-95).
     pub names: Vec<String>,
     /// Entries that resolved to one face, and bodies too big for the tie check, for the reply's
     /// `warning`.
@@ -204,8 +204,10 @@ struct Entry {
     /// a component's frame), for the error.
     given: Vec3,
     normal: Option<Vec3>,
+    /// The body the entry's `body` or the command's kept the search to, for the error.
+    scope: Option<String>,
     /// The faces the entry may mean, nearest first: one for a name, none where no face is within
-    /// reach of the point.
+    /// reach of the point (the entry is then refused).
     near: Vec<Candidate>,
 }
 
@@ -223,7 +225,9 @@ fn point_text(p: Vec3) -> String {
 /// confused with its bottom. Points of unambiguous picks that lie on their face are kept as
 /// given, so their features build exactly as before; a pick within reach of a face but off it
 /// becomes a point inside the face, so the kernel acts on the face `faces_used` names (see
-/// [`settled_point`]).
+/// [`settled_point`]). A point that no face is within reach of is refused, naming the entry and
+/// the point as given (PK-95): the command used to go on with the entries that resolved and
+/// reply with success, `""` in `faces_used` for the one it dropped.
 ///
 /// A pick is only ambiguous between faces the operation can act on. The command's `body` and an
 /// entry's own `body` keep the pick to that body, so a face flush with another body's face does
@@ -257,7 +261,7 @@ fn picked_faces_within(s: &Session, list: &[Value], body: Option<&str>, cmd: &st
                 let b = st.bodies.get(hit.body).ok_or_else(|| bad(cmd, format!("no face is named `{name}`")))?;
                 let spot = polykrom_doc::naming::face_spot(b, hit.face).ok_or_else(|| bad(cmd, format!("face `{name}` has no surface to pick")))?;
                 let one = Candidate { distance: 0.0, body: hit.body, face: hit.face, normal: Vec3::ZERO, checked: true };
-                Entry { point: spot.point, given: spot.point, normal: None, near: vec![one] }
+                Entry { point: spot.point, given: spot.point, normal: None, scope: None, near: vec![one] }
             }
             FaceRefForm::Point(p) => {
                 let normal = match v.get("normal") {
@@ -266,8 +270,8 @@ fn picked_faces_within(s: &Session, list: &[Value], body: Option<&str>, cmd: &st
                 };
                 // The point as the caller gave it, kept by the frame mapper (`crate::frames`).
                 let given = v.get("world").and_then(vec3).unwrap_or(p);
-                let bodies: Vec<usize> = match v.get("body") {
-                    None | Some(Value::Null) => commands.clone(),
+                let (bodies, scope): (Vec<usize>, Option<String>) = match v.get("body") {
+                    None | Some(Value::Null) => (commands.clone(), body.map(str::to_string)),
                     Some(b) => {
                         let name = b.as_str().ok_or_else(|| bad(cmd, format!("face {}: `body` must be a body name", k + 1)))?;
                         let named = named(name);
@@ -275,7 +279,7 @@ fn picked_faces_within(s: &Session, list: &[Value], body: Option<&str>, cmd: &st
                             return Err(bad(cmd, format!("face {}: no body `{name}`", k + 1)));
                         }
                         pinned = true;
-                        named
+                        (named, Some(name.to_string()))
                     }
                 };
                 let mut candidates: Vec<Candidate> = Vec::new();
@@ -302,7 +306,7 @@ fn picked_faces_within(s: &Session, list: &[Value], body: Option<&str>, cmd: &st
                     }
                     None => Vec::new(),
                 };
-                Entry { point: p, given, normal, near }
+                Entry { point: p, given, normal, scope, near }
             }
         };
         entries.push(entry);
@@ -329,8 +333,10 @@ fn picked_faces_within(s: &Session, list: &[Value], body: Option<&str>, cmd: &st
         // The faces of the operation's body, where that settles which body the entry means.
         let own: Vec<&Candidate> = e.near.iter().filter(|c| common.contains(&c.body)).collect();
         let near: Vec<&Candidate> = if own.is_empty() { e.near.iter().collect() } else { own };
-        let (point, hit) = match near.as_slice() {
-            [] => (e.point, None),
+        let (point, key) = match near.as_slice() {
+            // No face within reach: refused, so the command never acts on fewer faces than it
+            // was given (PK-95).
+            [] => return Err(bad(cmd, unresolved_text(k, e.given, e.scope.as_deref()))),
             [one] => {
                 if !one.checked {
                     warnings.push(format!(
@@ -340,7 +346,7 @@ fn picked_faces_within(s: &Session, list: &[Value], body: Option<&str>, cmd: &st
                         name_of(one.body, one.face)
                     ));
                 }
-                (settled_point(&st, e.point, one, cmd)?, Some((one.body, one.face)))
+                (settled_point(&st, e.point, one, cmd)?, (one.body, one.face))
             }
             _ => {
                 let Some(one) = e.normal.and_then(|n| facing(&near, n)) else {
@@ -350,14 +356,10 @@ fn picked_faces_within(s: &Session, list: &[Value], body: Option<&str>, cmd: &st
                 // face's does, so the kernel finds the same face.
                 let b = st.bodies.get(one.body).ok_or_else(|| bad(cmd, "the picked body disappeared"))?;
                 let spot = polykrom_doc::naming::face_spot(b, one.face).ok_or_else(|| bad(cmd, "the picked face has no surface to pick"))?;
-                (spot.point, Some((one.body, one.face)))
+                (spot.point, (one.body, one.face))
             }
         };
         out.points.push(point);
-        let Some(key) = hit else {
-            out.names.push(String::new());
-            continue;
-        };
         let name = name_of(key.0, key.1);
         if let Some((_, first)) = seen.iter().find(|(k, _)| *k == key) {
             warnings.push(format!("faces {} and {} are the same face (`{name}` of `{}`)", first + 1, k + 1, body_name(key.0)));
@@ -412,6 +414,14 @@ fn facing<'a>(near: &[&'a Candidate], n: Vec3) -> Option<&'a Candidate> {
     let (best, face) = dots.first().copied()?;
     let next = dots.get(1).map(|(d, _)| *d).unwrap_or(-1.0);
     (best >= std::f64::consts::FRAC_1_SQRT_2 - 1e-9 && best - next > 1e-6).then_some(face)
+}
+
+/// The error for entry `k` (counted from 0) of a face list that no face is within reach of: the
+/// entry's number, the point as given, the body the search was kept to (`scope`, when the
+/// command's or the entry's `body` named one) and the ways out.
+fn unresolved_text(k: usize, given: Vec3, scope: Option<&str>) -> String {
+    let of = scope.map(|b| format!(" of `{b}`")).unwrap_or_default();
+    format!("face {}: no face{of} is within reach of {}; pick a point on the face, or give its name from model.faces", k + 1, point_text(given))
 }
 
 /// The ambiguous-pick error: the faces (nearest first, with their body) and the ways out.

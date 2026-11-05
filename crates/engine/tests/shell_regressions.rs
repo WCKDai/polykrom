@@ -196,6 +196,30 @@ fn shell_pick_off_a_face_within_reach_opens_the_face_it_names() {
     assert!((got - 6_976.0).abs() < 1e-9, "shell volume {got}: both faces open (6 976), not the one-face shell (7 872)");
 }
 
+/// A pick that no face is within reach of (5 mm out from the 40 × 30 × 20 box's +x face, past the
+/// 5 % reach) is refused, naming the entry and the point as given, and the box is as it was. The
+/// shell used to open the other face alone and reply with success, `faces_used` `["F1:+y", ""]`
+/// and the one-face volume 7 872 mm³, so the caller acted on fewer faces than it asked for.
+#[test]
+fn shell_pick_out_of_reach_of_every_face_is_refused() {
+    let mut s = Session::default();
+    run(&mut s, "solid.box", json!({"length": 40.0, "width": 30.0, "height": 20.0}));
+    let features = s.doc.features.len();
+    let err = s.execute("solid.shell", &json!({"faces": [[20.0, 30.0, 10.0], [45.0, 15.0, 10.0]], "thickness": 2.0})).unwrap_err().to_string();
+    assert!(err.contains("face 2") && err.contains("[45, 15, 10]") && err.contains("no face"), "{err}");
+    assert_eq!(s.doc.features.len(), features, "no feature was added");
+    sound(&s);
+    let got = volume(&s);
+    assert!((got - 24_000.0).abs() < 1e-9, "the box is untouched: {got}");
+    // The command's `body` keeps the search to that body: the error says so.
+    let err = s
+        .execute("solid.shell", &json!({"faces": [[20.0, 30.0, 10.0], [45.0, 15.0, 10.0]], "thickness": 2.0, "body": "Body1"}))
+        .unwrap_err()
+        .to_string();
+    assert!(err.contains("face 2") && err.contains("[45, 15, 10]") && err.contains("`Body1`"), "{err}");
+    assert_eq!(s.doc.features.len(), features, "no feature was added");
+}
+
 /// A base plate with a wall standing on it, the wall's bottom flush with the plate's top (the
 /// tray of examples/render-studio.json, whose action-matrix drafts and shells pick such faces).
 fn tray() -> Session {

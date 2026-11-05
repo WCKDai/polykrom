@@ -235,9 +235,20 @@ picks before the kernel sees them:
   without a word, while `faces_used` named it. On a moved or turned component, point and normal
   are given in the world, as every pick is (`sheet.convert`'s `face`, `face.delete`'s and
   `solid.split_face`'s `faces` too), and the error reports the point as given.
+- An entry that no face is within reach of (5 % of the body's size, as above) is refused, and
+  nothing is added to the design: the command does not go on with the entries that did resolve.
+  The error names the entry (counted from 1), the point as given and, where the command's or the
+  entry's `body` kept the search to a body, that body:
+
+  ```text
+  {"command":"solid.shell","params":{"faces":[[20,30,10],[45,15,10]],"thickness":2}}
+  → error: invalid parameters for `solid.shell`: face 2: no face is within reach of [45, 15, 10]; pick a point on the face, or give its name from model.faces
+  ```
+
+  (On a 40 × 30 × 20 box. The shell used to open the back face alone and reply with success,
+  `"faces_used": ["F1:+y", ""]`, so the caller acted on fewer faces than it asked for.)
 - The reply carries `faces_used`: the persistent name of the face each entry resolved to, in the
-  order given, which is exactly the faces the operation acted on (`""` where no face is within
-  reach of the point; the command then fails as it did before).
+  order given, which is exactly the faces the operation acted on; it never holds an empty name.
   `{"faces":[[30,40,15],[0,20,15]],"thickness":2}` on a 60 × 40 × 30 box replies
   `"faces_used": ["F1:+y", "F1:-x"]`. A body of more than 50 000 faces or 2 000 000 display
   triangles is too big for the tie check: its nearest face is taken, `faces_used` names it, and
