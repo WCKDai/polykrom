@@ -4,12 +4,16 @@
 //! place with its diameter changed and Preview on (`properties-editor-…`), an invalid value
 //! (`properties-invalid-…`), and a counterbore hole selected with the agent activity list
 //! showing (`properties-counterbore-selected-…`) and edited in place (`properties-counterbore-…`:
-//! each value once, as a field). The raster draws the window's own shapes, not the viewport's GPU
-//! scene (nor the preview scene), so the model is rendered by the engine's headless picture
-//! path separately as `properties-model-<stage>.png`. Written to `target/review-media/`, where the stage is
-//! `REVIEW_MEDIA_STAGE` (default `after`); the same test on the base commit, where the panel does
-//! not exist, paints the app as it was (`before`). Nothing here is committed: the pictures are
-//! evidence for a review.
+//! each value once, as a field), and, in a 1366 × 768 window, the hole selected with the agent
+//! activity list and a status toast showing (`properties-toast-…`: a short one, and `…-long-…`
+//! an error as wide as a toast gets), where the list, the toast, the card and the viewport's
+//! controls must all stand clear of one another. The raster draws the window's own shapes, not
+//! the viewport's GPU scene (nor the preview scene), so the model is rendered by the engine's
+//! headless picture path separately as `properties-model-<stage>.png`. Written to
+//! `target/review-media/`, where the stage is `REVIEW_MEDIA_STAGE` (default `after`); the same
+//! test on the base commit, where the panel does not exist, paints the app as it was (`before`),
+//! so it reads the panel's state through the scenario API only, never through app fields the
+//! base commit lacks. Nothing here is committed: the pictures are evidence for a review.
 
 #[path = "support/raster.rs"]
 #[allow(dead_code)]
@@ -26,6 +30,13 @@ use polykrom_ui_egui::{
 use serde_json::json;
 
 const WINDOW: egui::Vec2 = egui::vec2(1600.0, 1000.0);
+/// A laptop window: the Properties card, the agent activity list and a toast share less room.
+const LAPTOP: egui::Vec2 = egui::vec2(1366.0, 768.0);
+/// The toasts shown in the laptop window: a status, and an error as long as they get.
+const SHORT_TOAST: &str = "Counterbored hole: 1 feature updated";
+const LONG_TOAST: &str = "Hole fillet failed: the R2 blend of the counterbored hole's top edge self-intersects where the edge \
+                          meets the Ø11 counterbore, so no fillet surface could be built for it. Reduce the radius to 1.5 mm or \
+                          less, or fillet the hole's bottom edge instead; the dependent features were left as they were.";
 /// The PR attaches pictures of at most 3 MB.
 const MAX_BYTES: u64 = 3 * 1024 * 1024;
 
@@ -63,10 +74,11 @@ fn crop(shot: &image::RgbaImage, bounds: Rect, ppp: f32) -> image::RgbaImage {
     image::imageops::crop_imm(shot, bounds.left() as u32, bounds.top() as u32, bounds.width() as u32, bounds.height() as u32).to_image()
 }
 
-/// Paint the window; the full picture as `<name>.png`, and the panel (or, without one, the
-/// right edge of the window where it would stand) as `<name>-panel.png`. With `focus`, the field
-/// of the row so labelled is clicked first, so it is painted with the keyboard (its lime border).
-fn paint(h: &mut Harness, dir: &Path, name: &str, focus: Option<&str>) {
+/// Paint the window, `window` large; the full picture as `<name>.png`, and the panel (or, without
+/// one, the right edge of the window where it would stand) as `<name>-panel.png`. With `focus`,
+/// the field of the row so labelled is clicked first, so it is painted with the keyboard (its
+/// lime border).
+fn paint(h: &mut Harness, dir: &Path, name: &str, focus: Option<&str>, window: egui::Vec2) {
     // A fresh context transfers every texture (fonts and icons) to the software renderer. It
     // keeps the accessibility tree the harness finds widgets by (`h.widget`), as the harness's
     // own context has it.
@@ -76,27 +88,27 @@ fn paint(h: &mut Harness, dir: &Path, name: &str, focus: Option<&str>) {
     theme::apply(&h.ctx);
     let mut textures: HashMap<TextureId, ColorImage> = HashMap::new();
     for _ in 0..8 {
-        raster::paint_sized(h, &mut textures, vec![], WINDOW);
+        raster::paint_sized(h, &mut textures, vec![], window);
     }
     if let Some(label) = focus
         && let Some(field) = scenario::rect_of(&format!("dialog:control:{label}"))
     {
         let at = field.center();
         let press = |pressed| egui::Event::PointerButton { pos: at, button: egui::PointerButton::Primary, pressed, modifiers: egui::Modifiers::NONE };
-        raster::paint_sized(h, &mut textures, vec![egui::Event::PointerMoved(at)], WINDOW);
-        raster::paint_sized(h, &mut textures, vec![press(true)], WINDOW);
-        raster::paint_sized(h, &mut textures, vec![press(false)], WINDOW);
-        raster::paint_sized(h, &mut textures, vec![], WINDOW);
+        raster::paint_sized(h, &mut textures, vec![egui::Event::PointerMoved(at)], window);
+        raster::paint_sized(h, &mut textures, vec![press(true)], window);
+        raster::paint_sized(h, &mut textures, vec![press(false)], window);
+        raster::paint_sized(h, &mut textures, vec![], window);
         assert!(h.ctx.memory(|m| m.focused().is_some()), "{name}: the {label} field has the keyboard");
     }
-    let output = raster::paint_sized(h, &mut textures, vec![], WINDOW);
+    let output = raster::paint_sized(h, &mut textures, vec![], window);
     let ppp = output.pixels_per_point;
-    let shot = raster::raster_sized(h, &textures, output, WINDOW);
+    let shot = raster::raster_sized(h, &textures, output, window);
     let full = dir.join(format!("{name}.png"));
     shot.save(&full).unwrap();
     let panel = scenario::rect_of("properties:panel")
         .map(|r| r.expand(8.0))
-        .unwrap_or_else(|| Rect::from_min_max(egui::pos2(WINDOW.x - 300.0, 200.0), egui::pos2(WINDOW.x, WINDOW.y)));
+        .unwrap_or_else(|| Rect::from_min_max(egui::pos2(window.x - 300.0, 200.0), egui::pos2(window.x, window.y)));
     let panel_file = dir.join(format!("{name}-panel.png"));
     crop(&shot, panel, ppp).save(&panel_file).unwrap();
     for file in [full, panel_file] {
@@ -114,6 +126,12 @@ fn render_model(h: &Harness, path: &Path) {
     let png = polykrom_ui_egui::control::view_png(&h.app, 1000, 700).unwrap();
     std::fs::write(path, png).unwrap();
     assert!(std::fs::metadata(path).unwrap().len() <= MAX_BYTES);
+}
+
+/// The hole is edited in place: the editor's Apply button is there. Read through the harness's
+/// widget tree, which the base commit (no panel, no editor) answers too.
+fn editing(h: &Harness) -> bool {
+    h.widget("Apply change").is_some()
 }
 
 /// Frames until the preview is up (it computes off the window thread).
@@ -160,23 +178,23 @@ fn properties_panel_pictures() {
         let hole = h.app.session.doc.find_feature("Mounting holes").unwrap().id;
         h.call("engine.execute", json!({"command": "select.set", "params": {"items": [{"type": "feature", "id": hole}]}}));
         h.frames(3);
-        paint(&mut h, &dir, &format!("properties-selected-{mode}-{stage}"), None);
+        paint(&mut h, &dir, &format!("properties-selected-{mode}-{stage}"), None, WINDOW);
         // View 03: Edit feature, Ø10, Preview on, the Diameter field focused (its lime border).
         let editor = h.widget("Edit feature").is_some();
         if editor {
             h.step(&json!({"widget": "Edit feature"})).unwrap();
             h.frames(3);
-            assert!(h.app.properties.editor.is_some(), "{mode}: the hole is edited in place");
+            assert!(editing(&h), "{mode}: the hole is edited in place");
             assert!(type_into(&mut h, "Diameter", "10 mm"), "{mode}: the Diameter field");
             settle_preview(&mut h);
             assert!(h.app.preview.active, "{mode}: the Ø10 holes are previewed: {:?}", h.app.preview.error);
         }
-        paint(&mut h, &dir, &format!("properties-editor-{mode}-{stage}"), editor.then_some("Diameter"));
+        paint(&mut h, &dir, &format!("properties-editor-{mode}-{stage}"), editor.then_some("Diameter"), WINDOW);
         // Validation: a value that is not a length.
         if editor {
             assert!(type_into(&mut h, "Diameter", "abc"));
         }
-        paint(&mut h, &dir, &format!("properties-invalid-{mode}-{stage}"), None);
+        paint(&mut h, &dir, &format!("properties-invalid-{mode}-{stage}"), None, WINDOW);
         if editor {
             h.step(&json!({"key": "Escape"})).unwrap();
             h.frames(2);
@@ -188,21 +206,34 @@ fn properties_panel_pictures() {
         h.call("engine.execute", json!({"command": "select.set", "params": {"items": [{"type": "feature", "id": counterbore}]}}));
         h.frames(3);
         assert!(!h.app.agent_feed.entries.is_empty(), "{mode}: the agent activity list shows");
-        paint(&mut h, &dir, &format!("properties-counterbore-selected-{mode}-{stage}"), None);
+        paint(&mut h, &dir, &format!("properties-counterbore-selected-{mode}-{stage}"), None, WINDOW);
         if let (Some(list), Some(panel)) = (scenario::rect_of("agent_activity"), scenario::rect_of("properties:panel")) {
             assert!(!list.intersect(panel).is_positive(), "{mode}: the activity list {list:?} is drawn under the card {panel:?}");
         }
         if editor {
             h.step(&json!({"widget": "Edit feature"})).unwrap();
             h.frames(3);
-            assert!(h.app.properties.editor.is_some(), "{mode}: the counterbore hole is edited in place");
+            assert!(editing(&h), "{mode}: the counterbore hole is edited in place");
             settle_preview(&mut h);
         }
-        paint(&mut h, &dir, &format!("properties-counterbore-{mode}-{stage}"), editor.then_some("Diameter"));
+        paint(&mut h, &dir, &format!("properties-counterbore-{mode}-{stage}"), editor.then_some("Diameter"), WINDOW);
         if editor {
             h.step(&json!({"key": "Escape"})).unwrap();
             h.frames(2);
         }
+        // A laptop window, the counterbore hole selected, the activity list showing and a toast
+        // up (`properties-toast-…`: a status; `…-long-…`: an error as wide as a toast gets). That
+        // the list, the toast, the card, the navigation bar and the compass stand clear of one
+        // another is the agent activity module's test; the pictures show it, before and after.
+        h.call("ui.resize", json!({"width": LAPTOP.x, "height": LAPTOP.y}));
+        h.frames(3);
+        for (name, text) in [("toast", SHORT_TOAST), ("toast-long", LONG_TOAST)] {
+            h.app.status = Some((text.to_string(), polykrom_ui_egui::now_ms(), text == LONG_TOAST));
+            paint(&mut h, &dir, &format!("properties-{name}-{mode}-{stage}"), None, LAPTOP);
+            assert!(scenario::rect_of("toast").is_some(), "{mode}: the {name} shows");
+            assert!(!h.app.agent_feed.entries.is_empty(), "{mode}: the agent activity list shows");
+        }
+        h.app.status = None;
     }
     theme::set_dark(previous);
 }

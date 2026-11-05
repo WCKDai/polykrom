@@ -226,19 +226,7 @@ pub fn paint(app: &SolveApp, ctx: &egui::Context) {
             }
         }
     }
-    let Some(last) = feed.entries.back() else { return };
-    let k = strength(app.now - last.at);
-    if k <= 0.0 {
-        return;
-    }
-    let font = FontId::proportional(t.font_label);
-    // In the viewport's bottom-right corner, beside whatever already stands there (the
-    // Properties card, the navigation bar): `frame_rect`.
-    let width = 320.0_f32.min(rect.width() - 24.0).max(120.0);
-    let rows = rows(ctx, feed, font.clone(), width - 20.0, k);
-    let body = rows.last().map_or(0.0, |(top, g)| top + g.size().y.max(LINE));
-    let size = vec2(width, LINE + body + 12.0);
-    let frame = frame_rect(app, rect, size);
+    let Some(Laid { frame, rows, k, font }) = laid_out(app, ctx) else { return };
     crate::scenario::publish_rect("agent_activity", frame);
     let at = frame.min;
     painter.rect_filled(frame, 6.0, t.panel.gamma_multiply(0.92 * k));
@@ -250,6 +238,44 @@ pub fn paint(app: &SolveApp, ctx: &egui::Context) {
         let pad = (LINE - galley.size().y).max(0.0) / 2.0;
         painter.galley(pos2(title.x, title.y + LINE + top + pad), galley, Color32::TRANSPARENT);
     }
+}
+
+/// The list laid out for this frame: where it stands, its rows and how strongly it shows.
+struct Laid {
+    frame: Rect,
+    rows: Vec<(f32, std::sync::Arc<egui::Galley>)>,
+    k: f32,
+    font: FontId,
+}
+
+/// Lay the list out as [`paint`] draws it this frame (None: nothing to show). It depends on the
+/// app's state alone, so the toasts, laid out earlier in the frame, see the same frame through
+/// [`frame`] that [`paint`] draws at the frame's end.
+fn laid_out(app: &SolveApp, ctx: &egui::Context) -> Option<Laid> {
+    let rect = app.viewport.rect?;
+    let feed = &app.agent_feed;
+    let last = feed.entries.back()?;
+    let k = strength(app.now - last.at);
+    if k <= 0.0 {
+        return None;
+    }
+    let font = FontId::proportional(Tokens::get().font_label);
+    // In the viewport's bottom-right corner, beside whatever already stands there (the
+    // Properties card, the navigation bar): `frame_rect`.
+    let width = 320.0_f32.min(rect.width() - 24.0).max(120.0);
+    let rows = rows(ctx, feed, font.clone(), width - 20.0, k);
+    let body = rows.last().map_or(0.0, |(top, g)| top + g.size().y.max(LINE));
+    let size = vec2(width, LINE + body + 12.0);
+    Some(Laid { frame: frame_rect(app, rect, size), rows, k, font })
+}
+
+/// Where the list stands this frame, when it shows: the toasts lay out against it (they are
+/// painted before it in the frame), so a toast is never drawn under the list, however wide.
+pub(crate) fn frame(app: &SolveApp, ctx: &egui::Context) -> Option<Rect> {
+    if app.home.open {
+        return None;
+    }
+    laid_out(app, ctx).map(|laid| laid.frame)
 }
 
 /// The height of a one-line row of the feed.
@@ -374,47 +400,83 @@ mod tests {
     /// The Properties card floats over the viewport's right edge, where the list stood: the list
     /// stands beside it, above the navigation bar and clear of the compass, whole inside the
     /// viewport, so none of it is drawn under the card or clipped. Docked, the card is an edge
-    /// panel beside the viewport and the list keeps the viewport's corner.
+    /// panel beside the viewport and the list keeps the viewport's corner. In either layout, at
+    /// 1600×1000, 1366×768 and 1280×720, with the card absent (a tool has the viewport,
+    /// floating), the design's card (nothing selected), a feature's card and the editor, and
+    /// with no toast, a short one and the longest (an error, as wide as a toast gets), no two of
+    /// the viewport's overlays are drawn one over another: the list, the toast, the navigation
+    /// bar, the compass and the card.
     #[test]
     fn the_list_stands_beside_the_properties_card_and_above_the_navigation_bar() {
         use crate::scenario::{Harness, rect_of};
-        for (width, height) in [(1600.0, 1000.0), (1280.0, 800.0)] {
-            let mut h = Harness::new();
-            h.app.home.open = false;
-            h.call("ui.resize", json!({"width": width, "height": height}));
-            h.frames(2);
-            // Commands over the control channel are what the list shows.
-            for (id, p) in [
-                ("sketch.create", json!({"plane": "XY"})),
-                ("sketch.rectangle.two_point", json!({"p0": [0, 0], "p1": [40, 30]})),
-                ("sketch.finish", json!({})),
-                ("solid.extrude", json!({"distance": 10})),
-                ("solid.hole", json!({"position": [20, 15, 10], "diameter": 6, "type": "counterbore", "cb_diameter": 11, "cb_depth": 3})),
-            ] {
-                let r = h.call("engine.execute", json!({"command": id, "params": p}));
-                assert_eq!(r["ok"], true, "{id}: {r}");
+        use crate::shell::LayoutMode;
+        const SHORT: &str = "Viewport message";
+        const LONG: &str = "Hole fillet failed: the R2 blend of the counterbored hole's top edge self-intersects where the edge \
+                            meets the Ø11 counterbore, so no fillet surface could be built for it. Reduce the radius to 1.5 mm or \
+                            less, or fillet the hole's bottom edge instead; the dependent features were left as they were.";
+        for layout in [LayoutMode::Floating, LayoutMode::Docked] {
+            for (width, height) in [(1600.0, 1000.0), (1366.0, 768.0), (1280.0, 720.0)] {
+                let mut h = Harness::new();
+                h.app.home.open = false;
+                h.call("ui.set", json!({"layout": layout}));
+                h.call("ui.resize", json!({"width": width, "height": height}));
+                h.frames(2);
+                // Commands over the control channel are what the list shows.
+                for (id, p) in [
+                    ("sketch.create", json!({"plane": "XY"})),
+                    ("sketch.rectangle.two_point", json!({"p0": [0, 0], "p1": [40, 30]})),
+                    ("sketch.finish", json!({})),
+                    ("solid.extrude", json!({"distance": 10})),
+                    ("solid.hole", json!({"position": [20, 15, 10], "diameter": 6, "type": "counterbore", "cb_diameter": 11, "cb_depth": 3})),
+                ] {
+                    let r = h.call("engine.execute", json!({"command": id, "params": p}));
+                    assert_eq!(r["ok"], true, "{id}: {r}");
+                }
+                let hole = h.app.session.doc.features.last().map(|f| f.id).unwrap_or_default();
+                let docked = layout == LayoutMode::Docked;
+                for state in ["absent", "design", "feature", "editor"] {
+                    // Docked, the panel is an edge panel that stays with a tool: it is never absent.
+                    if state == "absent" && docked {
+                        continue;
+                    }
+                    h.app.tool = (state == "absent").then(|| crate::tools::Tool::for_command("sketch.line")).flatten();
+                    let items = if state == "absent" || state == "design" { json!([]) } else { json!([{"type": "feature", "id": hole}]) };
+                    h.call("engine.execute", json!({"command": "select.set", "params": {"items": items}}));
+                    h.frames(2);
+                    if state == "editor" {
+                        crate::design_properties::begin_edit(&mut h.app, hole);
+                    }
+                    for toast in [None, Some(SHORT), Some(LONG)] {
+                        let case = format!("{layout:?} {width}×{height}, card {state}, toast {:?}", toast.map(str::len));
+                        h.app.status = toast.map(|text| (text.to_string(), crate::now_ms(), text == LONG));
+                        h.frames(4);
+                        assert!(!h.app.agent_feed.entries.is_empty(), "{case}: the agent's commands are listed");
+                        assert_eq!(h.app.properties.editor.is_some(), state == "editor", "{case}");
+                        let viewport = h.app.viewport.rect.expect("the viewport");
+                        let list = rect_of("agent_activity").expect("the list");
+                        assert!(viewport.contains_rect(list), "{case}: the list {list:?} is clipped by the viewport {viewport:?}");
+                        let card = rect_of("properties:panel");
+                        assert_eq!(card.is_some(), state != "absent", "{case}: the card {card:?}");
+                        let shown = rect_of("toast");
+                        assert_eq!(shown.is_some(), toast.is_some(), "{case}: the toast {shown:?}");
+                        let mut overlays = vec![("agent_activity", list)];
+                        overlays.extend(
+                            ["toast", "nav:outer", "axis_view:outer", "properties:panel"].into_iter().filter_map(|name| Some((name, rect_of(name)?))),
+                        );
+                        assert!(overlays.iter().any(|(name, _)| *name == "nav:outer"), "{case}: the navigation bar");
+                        for (i, (name, rect)) in overlays.iter().enumerate() {
+                            for (other, its) in &overlays[i + 1..] {
+                                assert!(!rect.intersect(*its).is_positive(), "{case}: {name} {rect:?} is drawn over {other} {its:?}");
+                            }
+                        }
+                        if docked {
+                            assert!((list.right() - (viewport.right() - CORNER.x)).abs() < 0.5, "{case}: in the corner: {list:?} {viewport:?}");
+                        } else if let Some(card) = card {
+                            assert!(list.right() < card.left(), "{case}: beside the card, not under it: {list:?} {card:?}");
+                        }
+                    }
+                }
             }
-            let hole = h.app.session.doc.features.last().map(|f| f.id).unwrap_or_default();
-            h.call("engine.execute", json!({"command": "select.set", "params": {"items": [{"type": "feature", "id": hole}]}}));
-            h.frames(4);
-            assert!(!h.app.agent_feed.entries.is_empty(), "the agent's commands are listed");
-            let viewport = h.app.viewport.rect.expect("the viewport");
-            let card = rect_of("properties:panel").expect("the Properties card");
-            let list = rect_of("agent_activity").expect("the list");
-            assert!(viewport.contains_rect(list), "{width}×{height}: the list {list:?} is clipped by the viewport {viewport:?}");
-            for name in ["properties:panel", "nav:outer", "axis_view:outer"] {
-                let other = rect_of(name).unwrap_or_else(|| panic!("{name}"));
-                assert!(!list.intersect(other).is_positive(), "{width}×{height}: the list {list:?} is drawn under {name} {other:?}");
-            }
-            assert!(list.right() < card.left(), "{width}×{height}: beside the card, not under it: {list:?} {card:?}");
-            h.call("ui.set", json!({"layout": "docked"}));
-            h.frames(4);
-            let viewport = h.app.viewport.rect.expect("the viewport");
-            let list = rect_of("agent_activity").expect("the list");
-            assert!(viewport.contains_rect(list), "{width}×{height} docked: {list:?} in {viewport:?}");
-            assert!((list.right() - (viewport.right() - CORNER.x)).abs() < 0.5, "{width}×{height} docked: in the corner: {list:?} {viewport:?}");
-            let bar = rect_of("nav:outer").expect("the navigation bar");
-            assert!(!list.intersect(bar).is_positive(), "{width}×{height} docked: {list:?} under the bar {bar:?}");
         }
     }
 

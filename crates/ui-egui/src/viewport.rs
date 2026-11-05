@@ -3581,6 +3581,10 @@ fn transient_messages(app: &mut SolveApp, ui: &egui::Ui, viewport: Rect) -> Vec<
     if let Some(layout) = &app.viewport.layout {
         obstacles.extend([layout.navigation, layout.axis_view]);
     }
+    // The agent activity list stands where the corner's cards leave it room (beside the
+    // Properties card, above the navigation bar), which can be the toasts' band: the toasts keep
+    // clear of it, the gap of the floating cards between.
+    obstacles.extend(crate::agent_activity::frame(app, ui.ctx()).map(|list| list.expand(crate::shell::SHELL_GAP)));
     let mut free = crate::viewport_layout::free_rect(crate::shell::content_rect(app, viewport), &obstacles).shrink(t.space_8);
     // The 3D mouse calibration offer: text and actions from its module, drawn by the shared toast.
     if let Some(offer) = crate::space_mouse_offer::due(app, ui.ctx()) {
