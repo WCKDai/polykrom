@@ -21,20 +21,29 @@ const BUTTON: f32 = 26.0;
 /// Below this window height the bar steps aside: a tiny window needs the room for the model.
 const MIN_WINDOW_HEIGHT: f32 = 480.0;
 
-/// What is selected, in a few words: `4 edges selected`, `2 bodies selected`, `Nothing selected`.
+/// What is selected, in a few words: `4 edges selected`, `1 body selected`, `Nothing selected`.
+/// A count of one takes the kind's singular message (`ui.sel_kind_bodies_one`), as the browser's
+/// counts do.
 pub(crate) fn selection_summary(app: &SolveApp) -> String {
     use polykrom_engine::Sel;
     let selection = &app.session.selection;
     if selection.is_empty() {
         return crate::i18n::tr("ui.status_nothing_selected").to_string();
     }
-    let kind = |s: &Sel| match s {
-        Sel::Body { .. } | Sel::Occurrence { .. } => "ui.sel_kind_bodies",
-        Sel::Face { .. } => "ui.sel_kind_faces",
-        Sel::Edge { .. } => "ui.sel_kind_edges",
-        Sel::Feature { .. } => "ui.sel_kind_features",
-        Sel::SketchCurve { .. } | Sel::SketchPoint { .. } | Sel::ExternalSketchCurve { .. } => "ui.sel_kind_sketch_items",
-        _ => "ui.sel_kind_items",
+    let one = selection.len() == 1;
+    let kind = |s: &Sel| match (s, one) {
+        (Sel::Body { .. } | Sel::Occurrence { .. }, false) => "ui.sel_kind_bodies",
+        (Sel::Body { .. } | Sel::Occurrence { .. }, true) => "ui.sel_kind_bodies_one",
+        (Sel::Face { .. }, false) => "ui.sel_kind_faces",
+        (Sel::Face { .. }, true) => "ui.sel_kind_faces_one",
+        (Sel::Edge { .. }, false) => "ui.sel_kind_edges",
+        (Sel::Edge { .. }, true) => "ui.sel_kind_edges_one",
+        (Sel::Feature { .. }, false) => "ui.sel_kind_features",
+        (Sel::Feature { .. }, true) => "ui.sel_kind_features_one",
+        (Sel::SketchCurve { .. } | Sel::SketchPoint { .. } | Sel::ExternalSketchCurve { .. }, false) => "ui.sel_kind_sketch_items",
+        (Sel::SketchCurve { .. } | Sel::SketchPoint { .. } | Sel::ExternalSketchCurve { .. }, true) => "ui.sel_kind_sketch_items_one",
+        (_, false) => "ui.sel_kind_items",
+        (_, true) => "ui.sel_kind_items_one",
     };
     let count = selection.len().to_string();
     let first = kind(&selection[0]);
@@ -198,7 +207,15 @@ mod tests {
         h.frames(3);
         assert_eq!(selection_summary(&h.app), "Nothing selected");
         h.app.run("select.set", json!({"items": [{"type": "body", "name": "Block"}]})).unwrap();
-        assert_eq!(selection_summary(&h.app), "1 bodies selected");
+        assert_eq!(selection_summary(&h.app), "1 body selected", "a count of one reads in the singular");
+        {
+            let _ja = crate::i18n::scope("ja");
+            assert_eq!(selection_summary(&h.app), "ボディ 1 個選択中");
+        }
+        {
+            let _zh = crate::i18n::scope("zh");
+            assert_eq!(selection_summary(&h.app), "已选择 1 个实体");
+        }
         h.frames(2);
         let bar = rect_of("status:bar").unwrap();
         assert_eq!(bar.height(), HEIGHT);
