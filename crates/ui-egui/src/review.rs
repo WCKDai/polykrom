@@ -781,7 +781,7 @@ fn prompt_contents(app: &mut SolveApp, ui: &mut egui::Ui) {
     let label = button_label(&state);
     let small = egui::FontId::proportional(t.font_small);
     let button_width = ui.painter().layout_no_wrap(label.to_string(), crate::fonts::medium(t.font_label), t.text).size().x + 2.0 * t.space_16;
-    let spinner_width = if state == PromptState::Pending { t.space_14 + t.space_8 } else { 0.0 };
+    let spinner_width = if state == PromptState::Pending { t.space_14 } else { 0.0 };
     let scope_text = trf("review.scope", &[("scope", &scope(app))]);
     let scope_width =
         (ui.painter().layout_no_wrap(scope_text.clone(), small.clone(), t.text_dim).size().x + 2.0 * t.space_8 + t.space_16).min(MAX_SCOPE_WIDTH);
@@ -912,10 +912,15 @@ pub fn panel(app: &mut SolveApp, ui: &mut egui::Ui) {
         if let Some(history) = app.shell.history.filter(|h| app.ui.show_timeline && h.right() > right - PANEL_WIDTH) {
             bottom = bottom.min(history.top() - gap);
         }
-        // Under the prompt row and below the view cube, where a feature dialog docks on the right
-        // (`shell::panel_top`): the cube and its home button stay visible and clickable.
+        // Under the prompt row and below the view cube's measured box (the top of the content
+        // while none is laid out), at every window size: the cube and its home button stay
+        // visible and clickable. A short window gives the card less height, and its body scrolls
+        // (`contents`); the card never moves up over the cube. A right-docked dialog takes
+        // `shell::panel_top` instead, whose clamp keeps 360 points for the dialog over the cube.
         let content = crate::shell::content_rect(app, app.viewport.rect.unwrap_or(available));
-        let top = under_row.max(crate::shell::panel_top(app, content, bottom, crate::frame::Side::Right));
+        let cube =
+            app.viewport.layout.as_ref().map_or(content.top(), |l| if l.axis_view.is_positive() { l.axis_view.bottom() } else { content.top() });
+        let top = under_row.max(cube).min(bottom);
         let frame = container.frame(ui.ctx(), t.panel, crate::frame::Side::Right).inner_margin(t.space_10 as i8);
         let inner = PANEL_WIDTH - frame.total_margin().sum().x;
         let height = (bottom - top - frame.total_margin().sum().y).max(0.0);
@@ -925,15 +930,8 @@ pub fn panel(app: &mut SolveApp, ui: &mut egui::Ui) {
                 container.show_frame(ui, frame, available, |ui| {
                     ui.set_width(inner);
                     ui.set_min_height(height);
-                    // A short window (less room between the cube and History than the card's
-                    // content takes): the content scrolls, as the sketch palette's does, rather
-                    // than the card moving up over the cube or running off the window.
-                    egui::ScrollArea::vertical()
-                        .id_salt("sc_review_card_content")
-                        .max_height(height)
-                        .min_scrolled_height(0.0)
-                        .auto_shrink([false, true])
-                        .show(ui, |ui| ui_kit::scope(ui, |ui| contents(app, ui, height)));
+                    ui.set_max_height(height);
+                    ui_kit::scope(ui, |ui| contents(app, ui, height));
                 });
             },
         );
@@ -955,18 +953,82 @@ pub fn panel(app: &mut SolveApp, ui: &mut egui::Ui) {
     }
 }
 
+/// The card's contents in `height` points: the body (the header down to the references note,
+/// the warnings and errors), then Apply & rebuild and Cancel command, then the footer line at the
+/// bottom. The actions and the footer are always in view: the body gets the height they leave,
+/// and scrolls when its content is taller, with a scroll bar that shows whenever it does.
 fn contents(app: &mut SolveApp, ui: &mut egui::Ui, height: f32) {
     let Some(open) = app.review.open.clone() else { return };
     let t = Tokens::get();
     let top = ui.cursor().top();
+    let gap = ui.spacing().item_spacing.y;
+    let footer_text = tr("review.none_applied");
+    let footer = ui.painter().layout(footer_text.to_string(), egui::FontId::proportional(t.font_small), t.text_dim, ui.available_width()).size().y
+        + 2.0 * t.space_4;
+    // What the body leaves: the space before the buttons, the two buttons, the footer line and
+    // the room under it, with the item spacing after the body and after each button.
+    let pinned = t.space_8 + 2.0 * t.form_button_height + footer + t.space_8 + 3.0 * gap;
+    let body_height = (height - pinned).max(0.0);
+    // A solid bar in the card's colours (the track the dividers' line, the handle the dim text):
+    // it shows in both themes whenever the body overflows, not only under the pointer. The bar
+    // alone takes these; the body's widgets and the buttons keep the card's style.
+    let style = ui.style().clone();
+    ui.spacing_mut().scroll = egui::style::ScrollStyle::solid();
+    let visuals = ui.visuals_mut();
+    visuals.extreme_bg_color = t.dialog_rule;
+    for state in [&mut visuals.widgets.inactive, &mut visuals.widgets.hovered, &mut visuals.widgets.active] {
+        state.bg_fill = t.text_dim;
+    }
     let mut close = false;
-    ui_kit::header(ui, "inspect", tr("review.title"), || close = true);
+    let scrolled = egui::ScrollArea::vertical()
+        .id_salt("sc_review_card_body")
+        .max_height(body_height)
+        .min_scrolled_height(0.0)
+        .auto_shrink([false, true])
+        .scroll_bar_visibility(egui::scroll_area::ScrollBarVisibility::VisibleWhenNeeded)
+        .show(ui, |ui| {
+            ui.set_style(style.clone());
+            body(app, ui, &open, &mut close)
+        });
+    ui.set_style(style);
+    crate::scenario::publish_rect("review:body", scrolled.inner_rect);
+    crate::scenario::publish_count("review:body_content_height", f64::from(scrolled.content_size.y));
+    ui.add_space(t.space_8);
+    // Apply & rebuild, Cancel command.
+    let apply_button = ui_kit::wide_primary_button(ui, tr("review.apply"));
+    crate::scenario::publish_target("review:apply", apply_button.rect);
+    let cancel_button = ui
+        .allocate_ui_with_layout(
+            vec2(ui.available_width(), t.form_button_height),
+            egui::Layout::centered_and_justified(egui::Direction::LeftToRight),
+            |ui| ui_kit::button(ui, tr("review.cancel"), ui_kit::Button::Normal),
+        )
+        .inner;
+    crate::scenario::publish_target("review:cancel", cancel_button.rect);
+    // The footer line sits at the bottom of the card, after the room the body left.
+    let spare = height - (ui.cursor().top() - top) - footer - t.space_8;
+    if spare > 0.0 {
+        ui.add_space(spare);
+    }
+    ui_kit::text(ui, footer_text, ui_kit::Text::Note("review_footer"));
+    if apply_button.clicked() {
+        let _ = apply(app);
+    } else if cancel_button.clicked() || close {
+        cancel(app);
+    }
+}
+
+/// The body of the card: the header, the command and its target, the proposed change's values,
+/// the scope and dependencies, the references note, the warnings and errors.
+fn body(app: &mut SolveApp, ui: &mut egui::Ui, open: &Open, close: &mut bool) {
+    let t = Tokens::get();
+    ui_kit::header(ui, "inspect", tr("review.title"), || *close = true);
     // MODEL COMMAND / title / target.
     ui.add_space(t.space_4);
     ui.label(egui::RichText::new(tr("review.model_command")).font(crate::fonts::medium(t.font_small)).color(t.accent));
-    ui.add(egui::Label::new(egui::RichText::new(title(&open)).font(crate::fonts::medium(t.font_heading)).color(t.text)).wrap());
-    let (target_name, _) = target(&open);
-    let deps = dependents(&open);
+    ui.add(egui::Label::new(egui::RichText::new(title(open)).font(crate::fonts::medium(t.font_heading)).color(t.text)).wrap());
+    let (target_name, _) = target(open);
+    let deps = dependents(open);
     let d = &open.described;
     let line = match (d.instances, deps.len()) {
         (Some(n), _) if n > 1 => trf("review.target_instances", &[("target", &target_name), ("count", &n.to_string())]),
@@ -1051,31 +1113,6 @@ fn contents(app: &mut SolveApp, ui: &mut egui::Ui, height: f32) {
     for e in r["errors"].as_array().into_iter().flatten() {
         let line = trf("review.warning", &[("name", e["name"].as_str().unwrap_or_default()), ("text", e["error"].as_str().unwrap_or_default())]);
         ui_kit::text(ui, &line, ui_kit::Text::Error("review_error"));
-    }
-    ui.add_space(t.space_8);
-    // Apply & rebuild, Cancel command.
-    let apply_button = ui_kit::wide_primary_button(ui, tr("review.apply"));
-    crate::scenario::publish_target("review:apply", apply_button.rect);
-    let cancel_button = ui
-        .allocate_ui_with_layout(
-            vec2(ui.available_width(), t.form_button_height),
-            egui::Layout::centered_and_justified(egui::Direction::LeftToRight),
-            |ui| ui_kit::button(ui, tr("review.cancel"), ui_kit::Button::Normal),
-        )
-        .inner;
-    crate::scenario::publish_target("review:cancel", cancel_button.rect);
-    // The footer line sits at the bottom of a panel that has the room.
-    let used = ui.cursor().top() - top;
-    let footer = ui.painter().layout_no_wrap(tr("review.none_applied").to_string(), egui::FontId::proportional(t.font_small), t.text_dim).size().y;
-    let spare = height - used - footer - 2.0 * t.space_8;
-    if spare > 0.0 {
-        ui.add_space(spare);
-    }
-    ui_kit::text(ui, tr("review.none_applied"), ui_kit::Text::Note("review_footer"));
-    if apply_button.clicked() {
-        let _ = apply(app);
-    } else if cancel_button.clicked() || close {
-        cancel(app);
     }
 }
 

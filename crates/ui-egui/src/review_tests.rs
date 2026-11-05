@@ -529,11 +529,17 @@ fn no_review_card_value_is_cut_short_at_either_window_size_in_any_language() {
     }
 }
 
+/// Every window size the app supports that the card's placement is checked at: the kit's, a
+/// laptop's, and two short ones, where the room between the cube and History is less than the
+/// card's content takes, so the card is shorter and its body scrolls.
+const SUPPORTED_WINDOWS: [(f64, f64); 4] = [(1600.0, 1000.0), (1366.0, 768.0), (1280.0, 720.0), (1024.0, 640.0)];
+
 /// The card stands under the prompt row and below the view cube, so the cube and its home button
-/// stay visible and clickable (the covered rects leave them out), at both window sizes.
+/// stay visible and clickable (the covered rects leave them out), at every supported window size:
+/// a short window shortens the card rather than moving it up over the cube.
 #[test]
 fn the_review_card_leaves_the_view_cube_and_its_home_button_clear() {
-    for (w, hgt) in WINDOWS {
+    for (w, hgt) in SUPPORTED_WINDOWS {
         let mut h = mount();
         h.call("ui.resize", json!({"width": w, "height": hgt}));
         h.frames(2);
@@ -550,6 +556,82 @@ fn the_review_card_leaves_the_view_cube_and_its_home_button_clear() {
         assert!(panel.top() >= cube.bottom() && panel.top() > row.bottom(), "{w}×{hgt}: below the cube and the row: {panel:?}");
         assert!((panel.right() - row.right()).abs() <= 1.0, "{w}×{hgt}: the same right edge as the row: {panel:?} {row:?}");
         assert!(crate::shell::covered(&h.app, panel.center()), "the card shields the viewport");
+    }
+}
+
+/// The opaque rectangles one more frame paints at the harness's window size.
+fn painted_rects(h: &mut Harness, size: (f64, f64)) -> Vec<egui::Rect> {
+    fn walk(shape: &egui::Shape, out: &mut Vec<egui::Rect>) {
+        match shape {
+            egui::Shape::Rect(r) if r.fill.a() > 0 => out.push(r.rect),
+            egui::Shape::Vec(shapes) => shapes.iter().for_each(|s| walk(s, out)),
+            _ => {}
+        }
+    }
+    let screen = egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(size.0 as f32, size.1 as f32));
+    let mut out = h.ctx.run_ui(egui::RawInput { screen_rect: Some(screen), focused: true, ..Default::default() }, |ui| {
+        h.app.logic(ui.ctx());
+        h.app.ui(ui);
+    });
+    out.textures_delta.clear();
+    let mut rects = Vec::new();
+    out.shapes.iter().for_each(|s| walk(&s.shape, &mut rects));
+    rects
+}
+
+/// In a short window (less room between the cube and History than the card's content takes)
+/// Apply & rebuild, Cancel command and the footer line stay in view at the bottom of the card,
+/// inside the card and the window, before any scrolling; only the body above them scrolls, with
+/// a bar that shows while it overflows, and it scrolls down to its last row (the references
+/// note). The buttons keep their place while the body scrolls, and Apply still applies.
+#[test]
+fn the_actions_and_the_footer_stay_in_view_while_the_body_scrolls_in_a_short_window() {
+    for (w, hgt) in [(1366.0, 768.0), (1280.0, 720.0)] {
+        let mut h = mount();
+        h.call("ui.resize", json!({"width": w, "height": hgt}));
+        h.frames(2);
+        super::propose(&mut h.app, resize_holes(), Some("Resize mounting holes"), Source::Control).unwrap();
+        h.frames(3);
+        let window = egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(w as f32, hgt as f32));
+        let panel = scenario::rect_of("review:panel").expect("the card");
+        let apply = scenario::rect_of("review:apply").expect("Apply & rebuild");
+        let cancel = scenario::rect_of("review:cancel").expect("Cancel command");
+        let footer = scenario::rect_of("dialog:note:review_footer").expect("the footer line");
+        for (name, r) in [("Apply & rebuild", apply), ("Cancel command", cancel), ("the footer line", footer)] {
+            assert!(panel.contains_rect(r), "{w}×{hgt}: {name} {r:?} is outside the card {panel:?}");
+            assert!(window.contains_rect(r), "{w}×{hgt}: {name} {r:?} is outside the window");
+        }
+        assert!(apply.bottom() <= cancel.top() && cancel.bottom() <= footer.top(), "{w}×{hgt}: Apply, Cancel, then the footer at the bottom");
+        assert!(panel.bottom() - footer.bottom() <= 24.0, "{w}×{hgt}: the footer line is at the bottom of the card: {footer:?} {panel:?}");
+        // The body ends above the buttons and overflows: its last row is below the body's viewport.
+        let body = scenario::rect_of("review:body").expect("the body");
+        let last = scenario::rect_of("dialog:note:review_references").expect("the references note, the body's last row");
+        assert!(panel.contains_rect(body) && body.bottom() <= apply.top(), "{w}×{hgt}: the body {body:?} ends above the buttons {apply:?}");
+        assert!(scenario::count_of("review:body_content_height").unwrap() > f64::from(body.height()), "{w}×{hgt}: the body does not overflow");
+        assert!(last.bottom() > body.bottom(), "{w}×{hgt}: the last row {last:?} is already in view in the body {body:?}: nothing to scroll");
+        // A visible scroll bar: an opaque, narrow, tall rectangle right of the body, inside the card.
+        let bar: Vec<egui::Rect> = painted_rects(&mut h, (w, hgt))
+            .into_iter()
+            .filter(|r| {
+                panel.contains_rect(*r) && r.left() >= body.right() - 1.0 && r.width() <= 8.0 && r.height() >= 12.0 && r.top() >= body.top() - 1.0
+            })
+            .collect();
+        assert!(!bar.is_empty(), "{w}×{hgt}: no scroll bar is painted beside the body {body:?}");
+        // The wheel over the body scrolls it down to its last row; the buttons stay where they are.
+        h.call("ui.scroll", json!({"x": body.center().x, "y": body.center().y, "delta": -2000}));
+        h.frames(20);
+        let body = scenario::rect_of("review:body").expect("the body");
+        let last = scenario::rect_of("dialog:note:review_references").expect("the references note");
+        assert!(body.expand(1.0).contains_rect(last), "{w}×{hgt}: the body {body:?} did not scroll to its last row {last:?}");
+        assert_eq!(scenario::rect_of("review:apply"), Some(apply), "{w}×{hgt}: Apply & rebuild moved");
+        assert_eq!(scenario::rect_of("review:cancel"), Some(cancel), "{w}×{hgt}: Cancel command moved");
+        assert!(
+            h.widget("Apply & rebuild").is_some() && h.widget("Cancel command").is_some(),
+            "{w}×{hgt}: the buttons are read by assistive technology"
+        );
+        h.step(&json!({"click": {"handle": "review:apply"}})).unwrap();
+        h.frames(2);
+        assert!(h.app.review.open.is_none() && h.app.review.receipt.is_some(), "{w}×{hgt}: Apply & rebuild applied the proposal");
     }
 }
 

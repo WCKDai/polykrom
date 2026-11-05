@@ -6,8 +6,9 @@
 //! changes card with the proposed Ø10 holes previewed, and the applied toast with Undo. The raster
 //! draws the window's own shapes, not the viewport's GPU scene, so the model itself is rendered by
 //! the engine's headless picture path as `review-model-before.png` (before Apply, the Ø8 holes)
-//! and `review-model-after.png` (after it, Ø10). The card is also painted in a 1366 × 768 window
-//! in Japanese and Chinese. Written to `target/review-media/<surface>-<mode>-<stage>.png`, where
+//! and `review-model-after.png` (after it, Ø10). The card is also painted in 1366 × 768 and
+//! 1280 × 720 windows, and at 1366 × 768 in Japanese and Chinese, where its body scrolls under
+//! the pinned actions. Written to `target/review-media/<surface>-<mode>-<stage>.png`, where
 //! the stage is `REVIEW_MEDIA_STAGE` (default `after`); the same test on the base commit paints
 //! the app as it was (`before`). Nothing here is committed: the pictures are evidence for a review.
 
@@ -218,15 +219,29 @@ fn review_flow_pictures() {
         if let Some(row) = scenario::rect_of("review:prompt_row") {
             crop(&shot, row, 4.0, ppp, &file("review-card-row", mode));
         }
-        // The same card in a 1366 × 768 window, in Japanese (dark) and Chinese (light): every
-        // value whole, the card below the view cube.
-        let (language, small) = (if dark { "ja" } else { "zh" }, egui::vec2(1366.0, 768.0));
-        h.call("ui.resize", json!({"width": small.x, "height": small.y}));
-        h.call("ui.prefs", json!({"language": language}));
-        h.frames(3);
-        let (shot, ppp) = paint_in(&mut h, &file(&format!("review-card-1366-{language}"), mode), small, language);
-        if let Some(card) = scenario::rect_of("review:panel") {
-            crop(&shot, card, 4.0, ppp, &file(&format!("review-card-only-1366-{language}"), mode));
+        // The same card in shorter windows: 1366 × 768 and 1280 × 720 in English, and 1366 × 768
+        // in Japanese (dark) and Chinese (light). Every value whole; the card below the view cube;
+        // its body scrolls while Apply & rebuild, Cancel command and the footer stay in view.
+        let cjk = if dark { "ja" } else { "zh" };
+        for (small, language) in [(egui::vec2(1366.0, 768.0), "en"), (egui::vec2(1280.0, 720.0), "en"), (egui::vec2(1366.0, 768.0), cjk)] {
+            h.call("ui.resize", json!({"width": small.x, "height": small.y}));
+            h.call("ui.prefs", json!({"language": language}));
+            h.frames(3);
+            let name = format!("review-card-{}-{language}", small.x as i32);
+            let (shot, ppp) = paint_in(&mut h, &file(&name, mode), small, language);
+            if after {
+                let window = Rect::from_min_size(egui::Pos2::ZERO, small);
+                let card = scenario::rect_of("review:panel").expect("the Review changes card");
+                let cube = scenario::rect_of("axis_view:outer").expect("the view cube");
+                assert!(card.top() >= cube.bottom(), "{mode} {name}: the card {card:?} covers the view cube {cube:?}");
+                for handle in ["review:apply", "review:cancel", "dialog:note:review_footer"] {
+                    let r = scenario::rect_of(handle).unwrap_or_else(|| panic!("{handle}"));
+                    assert!(card.contains_rect(r) && window.contains_rect(r), "{mode} {name}: {handle} {r:?} is not in view in the card {card:?}");
+                }
+            }
+            if let Some(card) = scenario::rect_of("review:panel") {
+                crop(&shot, card, 4.0, ppp, &file(&format!("review-card-only-{}-{language}", small.x as i32), mode));
+            }
         }
         h.call("ui.prefs", json!({"language": "en"}));
         h.call("ui.resize", json!({"width": WINDOW.x, "height": WINDOW.y}));
