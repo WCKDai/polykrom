@@ -461,3 +461,147 @@ fn the_keyboard_reaches_the_prompt_and_the_scope_is_a_choice() {
     super::apply(&mut h.app).unwrap();
     assert_eq!(h.app.review.scope, super::Scope::Selection);
 }
+
+// ---- The card's geometry (PK-90.ai-flow-r2) ---------------------------------------------------
+
+/// The window sizes the card is checked at.
+const WINDOWS: [(f64, f64); 2] = [(1600.0, 1000.0), (1366.0, 768.0)];
+
+/// The text shapes one more frame paints at the harness's window size, with whether each was
+/// cut short with an ellipsis.
+fn painted_texts(h: &mut Harness, size: (f64, f64)) -> Vec<(egui::Rect, String, bool)> {
+    fn walk(shape: &egui::Shape, out: &mut Vec<(egui::Rect, String, bool)>) {
+        match shape {
+            egui::Shape::Text(t) => out.push((shape.visual_bounding_rect(), t.galley.text().to_string(), t.galley.elided)),
+            egui::Shape::Vec(shapes) => shapes.iter().for_each(|s| walk(s, out)),
+            _ => {}
+        }
+    }
+    let screen = egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(size.0 as f32, size.1 as f32));
+    let mut out = h.ctx.run_ui(egui::RawInput { screen_rect: Some(screen), focused: true, ..Default::default() }, |ui| {
+        h.app.logic(ui.ctx());
+        h.app.ui(ui);
+    });
+    out.textures_delta.clear();
+    let mut texts = Vec::new();
+    out.shapes.iter().for_each(|s| walk(&s.shape, &mut texts));
+    texts
+}
+
+/// Every value of the card is painted whole, with its unit, at both window sizes in every
+/// language: a pair too wide for its column stacks before and after instead of ending in an
+/// ellipsis, and a body's volume reads `… mm³ → … mm³`.
+#[test]
+fn no_review_card_value_is_cut_short_at_either_window_size_in_any_language() {
+    for (w, hgt) in WINDOWS {
+        for language in ["en", "ja", "zh"] {
+            let mut h = mount();
+            h.call("ui.resize", json!({"width": w, "height": hgt}));
+            h.call("ui.prefs", json!({"language": language}));
+            h.frames(2);
+            super::propose(&mut h.app, resize_holes(), Some("Resize mounting holes"), Source::Control).unwrap();
+            h.frames(3);
+            let open = h.app.review.open.clone().unwrap();
+            let mut expected: Vec<String> = open.described.changes.iter().chain(&open.described.kept).map(super::Row::text).collect();
+            let body = &open.report["bodies"]["changed"][0];
+            let (before, after) =
+                super::volume_pair(&h.app, body["before"]["volume_mm3"].as_f64().unwrap(), body["after"]["volume_mm3"].as_f64().unwrap());
+            assert!(before.ends_with(" mm³") && after.ends_with(" mm³"), "{language} {w}×{hgt}: volumes in the design's units: {before} → {after}");
+            expected.push(format!("{before} → {after}"));
+            assert!(expected.iter().any(|t| t.contains("Ø8.00 mm → Ø10.00 mm")), "{expected:?}");
+            let panel = scenario::rect_of("review:panel").expect("the card");
+            let texts = painted_texts(&mut h, (w, hgt));
+            let in_card: Vec<&(egui::Rect, String, bool)> = texts.iter().filter(|(r, _, _)| panel.contains_rect(*r)).collect();
+            for value in &expected {
+                let painted: Vec<&&(egui::Rect, String, bool)> = in_card.iter().filter(|(_, text, _)| text.replace('\n', " ") == *value).collect();
+                assert!(!painted.is_empty(), "{language} {w}×{hgt}: `{value}` is not painted whole in the card: {in_card:?}");
+                assert!(painted.iter().all(|(_, _, elided)| !elided), "{language} {w}×{hgt}: `{value}` is cut short");
+            }
+            // A value takes at most two lines, and keeps to its column.
+            for (rect, text, _) in &in_card {
+                if expected.iter().any(|v| text.replace('\n', " ") == *v) {
+                    assert!(text.matches('\n').count() <= 1, "{language} {w}×{hgt}: `{text}` on more than two lines");
+                    assert!(rect.right() <= panel.right(), "{language} {w}×{hgt}: `{text}` runs out of the card");
+                }
+            }
+            h.call("ui.prefs", json!({"language": "en"}));
+        }
+    }
+}
+
+/// The card stands under the prompt row and below the view cube, so the cube and its home button
+/// stay visible and clickable (the covered rects leave them out), at both window sizes.
+#[test]
+fn the_review_card_leaves_the_view_cube_and_its_home_button_clear() {
+    for (w, hgt) in WINDOWS {
+        let mut h = mount();
+        h.call("ui.resize", json!({"width": w, "height": hgt}));
+        h.frames(2);
+        super::propose(&mut h.app, resize_holes(), Some("Resize mounting holes"), Source::Control).unwrap();
+        h.frames(3);
+        let panel = scenario::rect_of("review:panel").expect("the card");
+        let cube = scenario::rect_of("axis_view:outer").expect("the view cube");
+        let home = scenario::rect_of("axis_view:home").expect("the home button");
+        let row = scenario::rect_of("review:prompt_row").expect("the prompt row");
+        assert!(!panel.intersect(cube).is_positive(), "{w}×{hgt}: the card {panel:?} covers the view cube {cube:?}");
+        assert!(!panel.intersect(home).is_positive(), "{w}×{hgt}: the card {panel:?} covers the home button {home:?}");
+        assert!(!crate::shell::covered(&h.app, home.center()), "{w}×{hgt}: the home button is clickable");
+        assert!(!crate::shell::covered(&h.app, cube.center()), "{w}×{hgt}: the cube is clickable");
+        assert!(panel.top() >= cube.bottom() && panel.top() > row.bottom(), "{w}×{hgt}: below the cube and the row: {panel:?}");
+        assert!((panel.right() - row.right()).abs() <= 1.0, "{w}×{hgt}: the same right edge as the row: {panel:?} {row:?}");
+        assert!(crate::shell::covered(&h.app, panel.center()), "the card shields the viewport");
+    }
+}
+
+/// Pending: the spinner is an item of the row with the row's spacing on both sides, the key chip
+/// (its border included) before it, the button after it.
+#[test]
+fn the_pending_spinner_keeps_the_rows_item_spacing() {
+    let mut h = mount();
+    with_agent(&mut h);
+    h.app.review.waiting = Some("Increase the mounting holes to Ø10.".into());
+    h.app.agent_chat.state = Some(crate::agent_chat::State::Busy);
+    h.frames(2);
+    assert_eq!(super::prompt_state(&h.app), super::PromptState::Pending);
+    let t = crate::theme::Tokens::get();
+    let scope = scenario::rect_of("review:scope").expect("the scope chip");
+    let key = scenario::rect_of("review:key").expect("the key chip");
+    let spinner = scenario::rect_of("review:spinner").expect("the spinner");
+    let button = scenario::rect_of("review:preview").expect("the button");
+    let gaps = [key.left() - scope.right(), spinner.left() - key.right(), button.left() - spinner.right()];
+    assert!(gaps.iter().all(|g| (g - t.space_12).abs() <= 1.0), "the row's item spacing around the spinner: {gaps:?}");
+    assert!(h.widget("Ctrl+J").is_some() || h.widget("Cmd+J").is_some(), "the key is still read by assistive technology");
+}
+
+/// Ctrl+J is the window's: the keymap refuses it for a command, as the shortcut would never fire.
+#[test]
+fn the_prompt_rows_key_is_reserved_in_the_keymap() {
+    let mut h = mount();
+    assert!(crate::keymap::RESERVED.contains(&super::FOCUS_KEY));
+    assert_eq!(crate::keymap::key_name(egui::Key::J, egui::Modifiers::COMMAND), super::FOCUS_KEY);
+    let r = crate::keymap::bind(&mut h.app, "solid.box", super::FOCUS_KEY, true);
+    assert_eq!(r, Err("Ctrl+J is used by Polykrom itself".into()));
+    assert!(h.app.keymap.custom.is_empty(), "nothing was bound");
+}
+
+/// Ctrl+J while the prompt row is hidden (the Render workspace) asks nothing: the request is
+/// dropped, so the row does not take the keyboard later, unasked, when it shows again.
+#[test]
+fn a_focus_request_while_the_row_is_hidden_is_dropped() {
+    let mut h = mount();
+    with_agent(&mut h);
+    crate::render_workspace::enter(&mut h.app, true).unwrap();
+    h.frames(2);
+    assert!(scenario::rect_of("review:prompt_row").is_none(), "the row is hidden in Render");
+    h.step(&json!({"key": "J", "cmd": true})).unwrap();
+    h.frames(2);
+    assert!(!h.app.review.focus, "the request does not wait for the row");
+    crate::render_workspace::enter(&mut h.app, false).unwrap();
+    h.frames(3);
+    assert!(scenario::rect_of("review:prompt_row").is_some(), "the row is back");
+    assert!(!h.ctx.egui_wants_keyboard_input(), "the prompt did not take the keyboard unasked");
+    // Asked while the row shows, the keyboard goes to the prompt.
+    h.step(&json!({"key": "J", "cmd": true})).unwrap();
+    h.frames(2);
+    assert!(h.ctx.egui_wants_keyboard_input());
+}

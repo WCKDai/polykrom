@@ -40,8 +40,9 @@ const MAX_ROWS: usize = 40;
 const MAX_REASON_WIDTH: f32 = 320.0;
 /// The widest the scope chip gets before its text truncates.
 const MAX_SCOPE_WIDTH: f32 = 260.0;
-/// The key that focuses the prompt row (shown beside the scope chip as the kit does).
-const FOCUS_KEY: &str = "Ctrl+J";
+/// The key that focuses the prompt row (shown beside the scope chip as the kit does). The
+/// window takes it before any command shortcut, so the keymap reserves it (`keymap::RESERVED`).
+pub const FOCUS_KEY: &str = "Ctrl+J";
 /// Two sketch pitches within this are the same (mm).
 const PITCH_TOL: f64 = 1e-6;
 
@@ -723,6 +724,9 @@ pub fn prompt_row(app: &mut SolveApp, ui: &mut egui::Ui) {
     app.review.prompt_rect = None;
     settle_waiting(app);
     if !prompt_shown(app) || ui.available_rect_before_wrap().height() < PROMPT_MIN_ROOM {
+        // A focus request (Ctrl+J, `ui.review {focus}`) is for a row that is shown: made while
+        // the row is hidden, it is dropped, not kept for whenever the row next appears.
+        app.review.focus = false;
         return;
     }
     let t = Tokens::get();
@@ -782,7 +786,10 @@ fn prompt_contents(app: &mut SolveApp, ui: &mut egui::Ui) {
     let scope_width =
         (ui.painter().layout_no_wrap(scope_text.clone(), small.clone(), t.text_dim).size().x + 2.0 * t.space_8 + t.space_16).min(MAX_SCOPE_WIDTH);
     let key_text = crate::keymap::display(FOCUS_KEY);
-    let key_width = ui.painter().layout_no_wrap(key_text.clone(), small.clone(), t.text_dim).size().x + 2.0 * t.space_6;
+    let key_galley = ui.painter().layout_no_wrap(key_text.clone(), small.clone(), t.text_dim);
+    // The key chip's border is part of the chip, so its neighbours keep the row's item spacing.
+    let key_size = key_galley.size() + vec2(2.0 * t.space_4, 2.0 * t.space_2);
+    let key_width = key_size.x;
     let reason = if let PromptState::Blocked(why) = &state { Some(why.clone()) } else { None };
     let reason_width =
         reason.as_ref().map_or(0.0, |why| (ui.painter().layout_no_wrap(why.clone(), small.clone(), t.warning).size().x).min(MAX_REASON_WIDTH));
@@ -801,14 +808,12 @@ fn prompt_contents(app: &mut SolveApp, ui: &mut egui::Ui) {
     let submitted = response.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter));
     // The scope chip: a dropdown of what the request can be about.
     scope_chip(app, ui, &scope_text, scope_width);
-    // The key that brings the focus here.
-    let key = ui.add(egui::Label::new(egui::RichText::new(key_text).font(small.clone()).color(t.text_dim)).selectable(false));
-    ui.painter().rect_stroke(
-        key.rect.expand2(vec2(t.space_4, t.space_2)),
-        t.control_radius,
-        egui::Stroke::new(1.0, t.border),
-        egui::StrokeKind::Outside,
-    );
+    // The key that brings the focus here, a chip with its border inside its own space.
+    let (chip, key) = ui.allocate_exact_size(key_size, egui::Sense::hover());
+    ui.painter().rect_stroke(chip, t.control_radius, egui::Stroke::new(1.0, t.border), egui::StrokeKind::Inside);
+    ui.painter().galley(chip.min + vec2(t.space_4, t.space_2), key_galley, t.text_dim);
+    key.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Label, ui.is_enabled(), &key_text));
+    crate::scenario::publish_rect("review:key", chip);
     key.on_hover_text(tr("review.focus_note"));
     // Blocked: the reason, a widget of its own (read by assistive technology, whole on hover).
     if let Some(why) = &reason {
@@ -821,8 +826,10 @@ fn prompt_contents(app: &mut SolveApp, ui: &mut egui::Ui) {
         r.on_hover_text(why);
     }
     if state == PromptState::Pending {
+        // The spinner is an item of the row like the others, with the row's spacing on both sides.
         let (rect, _) = ui.allocate_exact_size(vec2(t.space_14, t.space_14), egui::Sense::hover());
         egui::Spinner::new().size(t.space_14).paint_at(ui, rect);
+        crate::scenario::publish_rect("review:spinner", rect);
         ui.ctx().request_repaint_after(std::time::Duration::from_millis(100));
     }
     let enabled = state == PromptState::Idle && !app.review.prompt.trim().is_empty();
@@ -900,11 +907,15 @@ pub fn panel(app: &mut SolveApp, ui: &mut egui::Ui) {
         {
             right = right.min(chat.left() - gap);
         }
-        let top = app.review.prompt_rect.map_or_else(|| app.shell.cards.last().map_or(available.top(), |c| c.bottom()), |r| r.bottom()) + gap;
+        let under_row = app.review.prompt_rect.map_or_else(|| app.shell.cards.last().map_or(available.top(), |c| c.bottom()), |r| r.bottom()) + gap;
         let mut bottom = available.bottom() - gap;
         if let Some(history) = app.shell.history.filter(|h| app.ui.show_timeline && h.right() > right - PANEL_WIDTH) {
             bottom = bottom.min(history.top() - gap);
         }
+        // Under the prompt row and below the view cube, where a feature dialog docks on the right
+        // (`shell::panel_top`): the cube and its home button stay visible and clickable.
+        let content = crate::shell::content_rect(app, app.viewport.rect.unwrap_or(available));
+        let top = under_row.max(crate::shell::panel_top(app, content, bottom, crate::frame::Side::Right));
         let frame = container.frame(ui.ctx(), t.panel, crate::frame::Side::Right).inner_margin(t.space_10 as i8);
         let inner = PANEL_WIDTH - frame.total_margin().sum().x;
         let height = (bottom - top - frame.total_margin().sum().y).max(0.0);
@@ -914,7 +925,15 @@ pub fn panel(app: &mut SolveApp, ui: &mut egui::Ui) {
                 container.show_frame(ui, frame, available, |ui| {
                     ui.set_width(inner);
                     ui.set_min_height(height);
-                    ui_kit::scope(ui, |ui| contents(app, ui, height));
+                    // A short window (less room between the cube and History than the card's
+                    // content takes): the content scrolls, as the sketch palette's does, rather
+                    // than the card moving up over the cube or running off the window.
+                    egui::ScrollArea::vertical()
+                        .id_salt("sc_review_card_content")
+                        .max_height(height)
+                        .min_scrolled_height(0.0)
+                        .auto_shrink([false, true])
+                        .show(ui, |ui| ui_kit::scope(ui, |ui| contents(app, ui, height)));
                 });
             },
         );
@@ -960,16 +979,15 @@ fn contents(app: &mut SolveApp, ui: &mut egui::Ui, height: f32) {
     // Proposed change: each changed value as before → after, then what the change keeps.
     ui_kit::text(ui, tr("review.proposed_change"), ui_kit::Text::Heading("review_proposed"));
     let r = &open.report;
+    // A value is never cut short: a pair too wide for its column stacks before and after.
     for p in r["parameters"].as_array().into_iter().flatten() {
         let name = p["name"].as_str().unwrap_or_default();
         let before = p["before"].as_str().unwrap_or("—");
         let after = p["after"].as_str().unwrap_or("—");
-        let shown = format!("{before} → {after}");
-        ui_kit::row(ui, name, |ui| ui_kit::text(ui, &shown, ui_kit::Text::MonoCell));
+        ui_kit::value_row(ui, name, Some(before), after);
     }
     for row in d.changes.iter().chain(&d.kept) {
-        let shown = row.text();
-        ui_kit::row(ui, tr_label(&row.label), |ui| ui_kit::text(ui, &shown, ui_kit::Text::MonoCell)).on_hover_text(&row.feature);
+        ui_kit::value_row(ui, tr_label(&row.label), row.before.as_deref(), &row.after).on_hover_text(&row.feature);
     }
     let described: Vec<&str> = d.changes.iter().map(|c| c.feature.as_str()).collect();
     for (list, change) in [("changed", "review.change.changed"), ("added", "review.change.added"), ("removed", "review.change.removed")] {
@@ -985,8 +1003,8 @@ fn contents(app: &mut SolveApp, ui: &mut egui::Ui, height: f32) {
         let name = b["name"].as_str().unwrap_or_default();
         if let (Some(before), Some(after)) = (b["before"]["volume_mm3"].as_f64(), b["after"]["volume_mm3"].as_f64()) {
             let label = trf("review.body_volume", &[("body", name)]);
-            let shown = volume_pair(app, before, after);
-            ui_kit::row(ui, &label, |ui| ui_kit::text(ui, &shown, ui_kit::Text::MonoCell));
+            let (before, after) = volume_pair(app, before, after);
+            ui_kit::value_row(ui, &label, Some(&before), &after);
         }
     }
     for b in r["bodies"]["created"].as_array().into_iter().flatten() {
@@ -1061,13 +1079,10 @@ fn contents(app: &mut SolveApp, ui: &mut egui::Ui, height: f32) {
     }
 }
 
-/// "before → after" of a body's volume, in the design's units.
-fn volume_pair(app: &SolveApp, before: f64, after: f64) -> String {
-    let (k, _) = crate::prefs::unit_scale(&app.session.doc.units);
-    let shown = crate::prefs::show_mm(app, after, 3);
-    // The "before" number alone, so the unit is written once.
-    let decimals = shown.split(' ').next().and_then(|n| n.split('.').nth(1)).map_or(0, str::len);
-    format!("{:.*} → {shown}", decimals, before * k.powi(3))
+/// A body's volume before and after, each in the design's units with its unit (mm³, in³), at
+/// the precision the Properties card shows a volume.
+fn volume_pair(app: &SolveApp, before: f64, after: f64) -> (String, String) {
+    (crate::prefs::show_mm(app, before, 3), crate::prefs::show_mm(app, after, 3))
 }
 
 // ---- The receipt toast ---------------------------------------------------------------------------
