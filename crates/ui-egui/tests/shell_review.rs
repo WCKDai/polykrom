@@ -78,3 +78,40 @@ fn main_window_and_shell_regions() {
     }
     theme::set_dark(previous);
 }
+
+/// A short window (1366 x 650, a laptop with the taskbar showing) in the docked and the
+/// floating layout, dark and light, with two designs open: the document tabs must stay on
+/// screen (PK-90.shell-r3 defect 1). Written to `target/review-media/short-window-<layout>-<mode>-<stage>.png`.
+#[test]
+fn short_window_keeps_the_document_tabs() {
+    const SHORT: egui::Vec2 = vec2(1366.0, 650.0);
+    let stage = std::env::var("SHELL_REVIEW_STAGE").unwrap_or_else(|_| "after".into());
+    let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../target/review-media");
+    std::fs::create_dir_all(&dir).unwrap();
+    let previous = theme::is_dark();
+    for layout in ["docked", "floating"] {
+        for dark in [true, false] {
+            let mode = if dark { "dark" } else { "light" };
+            let mut h = Harness::new();
+            h.app.home.open = false;
+            h.call("ui.set", json!({"dark": dark, "layout": layout}));
+            h.app.session.run_script(&polykrom_engine::sample::script()).unwrap();
+            h.call("ui.documents", json!({"action": "new"}));
+            h.app.run("solid.box", json!({"length": 40, "width": 30, "height": 20})).unwrap();
+            h.call("ui.documents", json!({"action": "switch", "index": 0}));
+            h.frames(3);
+            h.ctx = egui::Context::default();
+            polykrom_ui_egui::fonts::setup_fonts(&h.ctx);
+            theme::apply(&h.ctx);
+            let mut textures: HashMap<TextureId, ColorImage> = HashMap::new();
+            for _ in 0..8 {
+                raster::paint_sized(&mut h, &mut textures, vec![], SHORT);
+            }
+            let output = raster::paint_sized(&mut h, &mut textures, vec![], SHORT);
+            let shot = raster::raster_sized(&mut h, &textures, output, SHORT);
+            shot.save(dir.join(format!("short-window-{layout}-{mode}-{stage}.png"))).unwrap();
+            println!("{layout} {mode}: document tabs {:?}, strip {:?}", scenario::rect_of("tab:design:0"), scenario::rect_of("documents:strip"));
+        }
+    }
+    theme::set_dark(previous);
+}

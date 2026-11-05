@@ -15,25 +15,25 @@ const INSET: f32 = 16.0;
 const GAP: f32 = 24.0;
 
 /// The strip's place at the top of the viewport's content area: the tabs and the view bar, or
-/// on a short view the tabs alone (the view settings stay on the VIEW tab and the view menu),
-/// or None when the area is too short for even the tabs to leave a usable viewport.
+/// on a short view the tabs alone (the view settings stay on the VIEW tab and the view menu).
+/// None only when the area is too small for even the tabs to leave a usable scene (a window
+/// below the app's minimum size); the title bar's document name then lists the open designs
+/// instead (`toolbar::app_bar`), so they stay reachable.
 pub(crate) fn strip(content: Rect) -> Option<Rect> {
-    if content.width() < 200.0 {
+    if content.width() < 200.0 || content.height() < TABS_HEIGHT + MIN_SCENE_UNDER_TABS {
         return None;
     }
-    let height = if content.height() >= HEIGHT + MIN_SCENE_HEIGHT {
-        HEIGHT
-    } else if content.height() >= TABS_HEIGHT + MIN_SCENE_HEIGHT {
-        TABS_HEIGHT
-    } else {
-        return None;
-    };
+    let height = if content.height() >= HEIGHT + MIN_SCENE_HEIGHT { HEIGHT } else { TABS_HEIGHT };
     Some(Rect::from_min_size(content.min, vec2(content.width(), height)))
 }
 
-/// The scene keeps at least this much height under the strip; a shorter content area (a small
-/// window) drops the view bar, then the tabs, so the model keeps its room.
+/// The scene keeps at least this much height under the full strip; a shorter content area (a
+/// small window) drops the view bar, so the model keeps its room.
 const MIN_SCENE_HEIGHT: f32 = 300.0;
+/// The tabs themselves stay down to this much scene: at the app's minimum window size (960 x
+/// 600) the docked layout's content area is about 320 pt high, so the open documents never
+/// leave the window in a supported size.
+const MIN_SCENE_UNDER_TABS: f32 = 120.0;
 
 /// The standard views the orientation drop-down offers: (message id, `animate_view` name).
 const ORIENTATIONS: [(&str, &str); 9] = [
@@ -219,6 +219,54 @@ mod tests {
             h.step(&json!({"key": "Escape"})).unwrap();
             h.frames(2);
             assert!(h.widget("Selection: filtered").is_some(), "{layout}");
+        }
+    }
+
+    /// Two designs open, in both layouts, at every window height from the app's minimum (600)
+    /// up: the tabs stay on the strip and a click switches the design. Below the minimum, where
+    /// even the tabs would leave no scene, the title bar's document name lists the designs.
+    #[test]
+    fn document_tabs_stay_reachable_at_every_window_height() {
+        for layout in ["docked", "floating"] {
+            for height in [600, 620, 650, 660, 700, 800, 1000] {
+                let mut h = Harness::new();
+                h.app.home.open = false;
+                h.call("ui.set", json!({"layout": layout}));
+                h.call("ui.resize", json!({"width": 1366, "height": height}));
+                h.app.run("solid.box", json!({"length": 10, "width": 10, "height": 10})).unwrap();
+                crate::documents::open_tab(&mut h.app, polykrom_engine::Session::default()).unwrap();
+                crate::documents::switch(&mut h.app, 0);
+                h.frames(3);
+                let strip = rect_of("documents:strip").unwrap_or_else(|| panic!("{layout} at {height}: the strip is drawn"));
+                let content = h.ctx.content_rect();
+                assert!(strip.bottom() <= content.bottom() - crate::status_bar::HEIGHT, "{layout} at {height}: the strip is above the status bar");
+                let tab = rect_of("tab:design:1").unwrap_or_else(|| panic!("{layout} at {height}: the second tab is drawn"));
+                assert!(strip.contains_rect(tab), "{layout} at {height}: the tab is on the strip");
+                assert!(rect_of("appbar:documents").is_none(), "{layout} at {height}: no fallback while the tabs show");
+                h.step(&json!({"click": {"handle": "tab:design:1"}})).unwrap();
+                assert_eq!(h.app.docs.active, 1, "{layout} at {height}: the click switched the design");
+                // The scene keeps room under the strip.
+                let scene = h.app.shell.content.unwrap();
+                assert!(scene.height() >= MIN_SCENE_UNDER_TABS, "{layout} at {height}: scene {scene:?}");
+            }
+            // Below the supported minimum the strip has no room: the title bar's document name
+            // drops the list of designs.
+            let mut h = Harness::new();
+            h.app.home.open = false;
+            h.call("ui.set", json!({"layout": layout}));
+            h.call("ui.resize", json!({"width": 1366, "height": 240}));
+            h.app.run("solid.box", json!({"length": 10, "width": 10, "height": 10})).unwrap();
+            crate::documents::open_tab(&mut h.app, polykrom_engine::Session::default()).unwrap();
+            crate::documents::switch(&mut h.app, 0);
+            h.frames(3);
+            assert!(rect_of("documents:strip").is_none(), "{layout}: no room for the strip at 240");
+            assert!(rect_of("appbar:documents").is_some(), "{layout}: the document name lists the designs");
+            assert!(h.widget("All open designs").is_some(), "{layout}: the fallback has an accessible name");
+            h.step(&json!({"click": {"handle": "appbar:documents"}})).unwrap();
+            h.step(&json!({"click": {"handle": "document:1"}})).unwrap();
+            assert_eq!(h.app.docs.active, 1, "{layout}: the list switched the design");
+            h.frames(2);
+            assert!(handle_at("document:1").is_none(), "{layout}: the list closed");
         }
     }
 }

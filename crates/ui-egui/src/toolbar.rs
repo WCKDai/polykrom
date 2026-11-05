@@ -493,10 +493,28 @@ pub fn app_bar(app: &mut SolveApp, ui: &mut egui::Ui) {
         let identity_right = (identity_left + identity_width).min(controls_left - 12.0);
         let identity = Rect::from_min_max(pos2(identity_left, r.top() + 6.0), pos2(identity_right.max(identity_left), r.bottom() - 6.0));
         crate::scenario::publish_rect("appbar:document", identity);
+        // A window too small for the document strip (below the app's minimum size, where even
+        // the tabs would leave no scene): the name lists the open designs instead, so switching
+        // between them never depends on the strip.
+        let designs_here = design_shown(app) && idle && app.shell.document_bar.is_none() && identity.width() > 20.0;
+        let designs = designs_here.then(|| {
+            let resp = ui.interact(identity, ui.id().with("appbar_documents"), Sense::click());
+            resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, crate::i18n::tr_label("All open designs")));
+            crate::scenario::publish_target("appbar:documents", identity);
+            if resp.hovered() || resp.has_focus() {
+                ui.painter().rect_filled(identity.expand2(vec2(6.0, 2.0)), t.radius_sm, t.app_bar_hover_button);
+            }
+            resp.on_hover_text(crate::i18n::tr_label("All open designs"))
+        });
         if identity.width() > 20.0 {
             let clip = ui.painter().with_clip_rect(identity.intersect(ui.clip_rect()));
             clip.galley(pos2(identity.left(), r.top() + 7.0), title_galley, t.app_bar_text);
             clip.galley(pos2(identity.left(), r.top() + 27.0), subtitle_galley, t.app_bar_text.gamma_multiply(0.72));
+        }
+        if let Some(opener) = &designs
+            && let Some(i) = crate::documents::designs_list(app, ui.ctx(), egui::Id::new("sc_appbar_documents"), identity.left_bottom(), opener)
+        {
+            crate::documents::switch(app, i);
         }
         // A newer release: its Update pill sits in the free space before the right-hand group.
         let span = Rect::from_min_max(pos2(identity.right() + 12.0, cy - PILL_HEIGHT / 2.0), pos2(controls_left - 6.0, cy + PILL_HEIGHT / 2.0));

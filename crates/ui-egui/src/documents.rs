@@ -709,29 +709,9 @@ pub fn tabs(app: &mut SolveApp, ui: &mut egui::Ui, r: Rect, x0: f32, x1: f32) {
             FontId::proportional(crate::theme::Tokens::get().font_body),
             t.text,
         );
-        let id = egui::Id::new("sc_doc_more");
-        if mresp.clone().on_hover_text(crate::i18n::tr_label("All open designs")).clicked() {
-            ui.ctx().data_mut(|d| d.insert_temp(id, !d.get_temp::<bool>(id).unwrap_or(false)));
-        }
-        if ui.ctx().data(|d| d.get_temp::<bool>(id).unwrap_or(false)) {
-            let resp = Container::new(ui.ctx(), Surface::Popup)
-                .area(id.with("area"))
-                .fixed_pos(pos2(mr.left(), r.bottom()))
-                .order(egui::Order::Foreground)
-                .show(ui.ctx(), |ui| {
-                    crate::context_menu::menu_frame(ui, |ui| {
-                        for (i, (name, dirty)) in info.iter().enumerate() {
-                            let label = format!("{name}{}", if *dirty { " •" } else { "" });
-                            if ui_kit::list_picker(ui, &format!("document:{i}"), &label, i == app.docs.active).clicked() {
-                                pick = Some(i);
-                            }
-                        }
-                    })
-                });
-            let pressed_outside = ui.ctx().input(|i| i.pointer.any_pressed()) && !resp.response.contains_pointer() && !mresp.contains_pointer();
-            if pick.is_some() || pressed_outside {
-                ui.ctx().data_mut(|d| d.insert_temp(id, false));
-            }
+        let mresp = mresp.on_hover_text(crate::i18n::tr_label("All open designs"));
+        if let Some(i) = designs_list(app, ui.ctx(), egui::Id::new("sc_doc_more"), pos2(mr.left(), r.bottom()), &mresp) {
+            pick = Some(i);
         }
         x += 26.0;
     }
@@ -820,6 +800,39 @@ pub fn drop_slot(left: f32, x0: f32, widths: &[f32], first: usize, from: usize) 
 fn tab_shape(painter: &egui::Painter, t: &Tokens, r: Rect, active: bool, hovered: bool) {
     let fill = if hovered && !active { t.hover } else { egui::Color32::TRANSPARENT };
     painter.rect_filled(r, t.radius_md, fill);
+}
+
+/// The list of every open design, dropped from `at`: under the strip's » button when more tabs
+/// are open than fit, and under the title bar's document name when the strip itself has no room
+/// (`document_bar::strip`). It shows while the flag `id` is set, which a click on `opener`
+/// toggles; its rows are the `document:{i}` handles. Returns the design picked (the list closes
+/// then, and on a press outside it).
+pub(crate) fn designs_list(app: &SolveApp, ctx: &egui::Context, id: egui::Id, at: egui::Pos2, opener: &egui::Response) -> Option<usize> {
+    if opener.clicked() {
+        ctx.data_mut(|d| d.insert_temp(id, !d.get_temp::<bool>(id).unwrap_or(false)));
+    }
+    if !ctx.data(|d| d.get_temp::<bool>(id).unwrap_or(false)) {
+        return None;
+    }
+    let info = tabs_info(app);
+    let mut pick = None;
+    let resp = Container::new(ctx, Surface::Popup).area(id.with("area")).fixed_pos(at).order(egui::Order::Foreground).show(ctx, |ui| {
+        crate::context_menu::menu_frame(ui, |ui| {
+            for (i, (name, dirty)) in info.iter().enumerate() {
+                let label = format!("{name}{}", if *dirty { " •" } else { "" });
+                let row = ui_kit::list_picker(ui, &format!("document:{i}"), &label, i == app.docs.active);
+                crate::scenario::publish_handle(&format!("document:{i}"), row.rect.center());
+                if row.clicked() {
+                    pick = Some(i);
+                }
+            }
+        })
+    });
+    let pressed_outside = ctx.input(|i| i.pointer.any_pressed()) && !resp.response.contains_pointer() && !opener.contains_pointer();
+    if pick.is_some() || pressed_outside {
+        ctx.data_mut(|d| d.insert_temp(id, false));
+    }
+    pick
 }
 
 /// Which tabs the strip shows in `room` points: (first, how many, tab width). Tabs shrink to
