@@ -85,7 +85,7 @@ fn apply_and_rebuild_makes_the_proposed_design_and_the_receipts_undo_takes_it_ba
     assert_eq!(volume(&mut h), after, "the design is the proposal's after-state");
     assert_eq!(h.app.session.undo.len(), undo0 + 1, "one undo step");
     assert!(!h.app.preview.active, "the preview is gone with the proposal");
-    assert_eq!(super::status_line(&h.app).as_deref(), Some("Model updated / Rebuild complete"));
+    assert_eq!(super::status_line(&h.app).as_deref(), Some("thickness updated / 10 mm"), "the status bar: what was updated");
     assert!(scenario::rect_of("toast:review").is_some(), "the receipt toast");
     assert_eq!(super::status(&h.app)["receipt"]["text"], "thickness updated / 10 mm", "the receipt's text");
     assert!(h.widget("Undo").is_some(), "the receipt's Undo button");
@@ -176,4 +176,288 @@ fn preview_changes_without_an_agent_says_so_and_proposes_nothing() {
     assert!(h.app.status.as_ref().is_some_and(|(_, _, error)| *error), "{:?}", h.app.status);
     assert!(Arc::ptr_eq(&doc0, &h.app.session.doc));
     assert_eq!(h.app.session.revision, revision0);
+}
+
+// ---- Design kit views 04 and 05: the actuator mount's mounting holes ----------------------------
+
+/// The kit's actuator mount: a 120 × 80 × 8 base, a Ø44 boss with a Ø24 bore, four Ø8 mounting
+/// holes at the points of a sketch on an 84 × 44 pitch, and an R2 edge fillet after them.
+fn actuator_mount() -> Value {
+    json!({"commands": [
+        {"command": "sketch.create", "params": {"plane": "XY", "name": "Base profile"}},
+        {"command": "sketch.rectangle.two_point", "params": {"p0": [-60, -40], "p1": [60, 40]}},
+        {"command": "sketch.finish", "params": {}},
+        {"command": "solid.extrude", "params": {"distance": 8, "body_name": "Mount", "name": "Base"}},
+        {"command": "sketch.create", "params": {"plane": "XY", "offset": 8, "name": "Boss profile"}},
+        {"command": "sketch.circle.center", "params": {"center": [0, 0], "diameter": 44}},
+        {"command": "sketch.finish", "params": {}},
+        {"command": "solid.extrude", "params": {"distance": 14, "operation": "join", "name": "Boss"}},
+        {"command": "solid.hole", "params": {"position": [0, 0, 22], "diameter": 24, "name": "Bore"}},
+        {"command": "sketch.create", "params": {"plane": "XY", "offset": 8, "name": "Mounting pattern"}},
+        {"command": "sketch.point", "params": {"point": [-42, -22]}},
+        {"command": "sketch.point", "params": {"point": [42, -22]}},
+        {"command": "sketch.point", "params": {"point": [42, 22]}},
+        {"command": "sketch.point", "params": {"point": [-42, 22]}},
+        {"command": "sketch.finish", "params": {}},
+        {"command": "solid.hole", "params": {"sketch": "Mounting pattern", "diameter": 8, "name": "Mounting holes"}},
+        {"command": "solid.fillet", "params": {"edges": [[-60, -40, 4], [60, -40, 4], [60, 40, 4], [-60, 40, 4]], "radius": "2 mm", "name": "Edge finish"}},
+    ]})
+}
+
+fn mount() -> Harness {
+    let mut h = Harness::new();
+    h.app.home.open = false;
+    h.app.session.run_script(&actuator_mount()).unwrap();
+    h.frames(3);
+    h
+}
+
+fn feature_id(h: &Harness, name: &str) -> u64 {
+    h.app.session.doc.find_feature(name).unwrap_or_else(|| panic!("no feature {name}")).id
+}
+
+/// The resized holes: the kit's AI request, as one `timeline.edit` of the hole feature.
+fn resize_holes() -> Vec<(String, Value)> {
+    vec![("timeline.edit".into(), json!({"feature": "Mounting holes", "set": {"diameter": "10 mm"}}))]
+}
+
+#[test]
+fn a_hole_patterns_values_come_from_the_model_with_its_pitch_and_dependent_fillet_and_apply_says_what_changed() {
+    let mut h = mount();
+    let holes = feature_id(&h, "Mounting holes");
+    h.app.session.selection = vec![polykrom_engine::Sel::Feature { id: holes }];
+    h.frames(2);
+    assert_eq!(super::scope(&h.app), "Mounting holes / 4 holes", "the scope chip, from the selection");
+    assert!(h.widget("Scope: Mounting holes / 4 holes").is_some(), "the chip is a widget");
+    let volume0 = volume(&mut h);
+    let undo0 = h.app.session.undo.len();
+
+    super::propose(&mut h.app, resize_holes(), Some("Resize mounting holes"), Source::Control).unwrap();
+    h.frames(3);
+    let open = h.app.review.open.clone().expect("open");
+    let d = &open.described;
+    // Every row is read from the design before and after: the diameter changes, the extent, the
+    // pitch of the sketch points and the instances are kept.
+    assert_eq!(
+        d.changes,
+        vec![super::Row { feature: "Mounting holes".into(), label: "Diameter".into(), before: Some("Ø8.00 mm".into()), after: "Ø10.00 mm".into() }]
+    );
+    let kept: Vec<(&str, &str)> = d.kept.iter().map(|r| (r.label.as_str(), r.after.as_str())).collect();
+    assert_eq!(kept, vec![("Extent", "Through all"), ("Pitch X", "84.00 mm"), ("Pitch Y", "44.00 mm")]);
+    assert_eq!(d.instances, Some(4));
+    assert_eq!(d.pattern_preserved, Some(true));
+    assert_eq!(super::dependents(&open), vec!["Edge finish"], "the fillet after the holes rebuilds");
+    // The card.
+    assert!(shows(&h, "MODEL COMMAND"));
+    assert!(shows(&h, "Resize mounting holes"));
+    assert!(shows(&h, "Mounting holes / 4 instances"), "the subtitle");
+    assert!(h.widget("Ø8.00 mm → Ø10.00 mm").is_some(), "old → new in the value cell");
+    assert!(h.widget("84.00 mm").is_some() && h.widget("Through all").is_some(), "the kept values");
+    assert!(shows(&h, "1 feature / 4 holes\n1 dependent feature / Edge finish\nPattern preserved"), "scope & dependencies");
+    assert!(shows(&h, "References are preserved. Geometry and downstream features rebuild on apply."));
+    assert!(shows(&h, "No model changes applied yet"));
+    assert_eq!(super::status_line(&h.app).as_deref(), Some("AI review / Mounting holes / Proposed geometry shown"));
+    assert!(h.widget("Preview ready").is_some());
+    let s = super::status(&h.app);
+    assert_eq!(s["state"], "ready");
+    assert_eq!(s["open"]["changes"][0]["text"], "Ø8.00 mm → Ø10.00 mm");
+    assert_eq!(s["open"]["kept"][1]["label"], "Pitch X");
+    wait_for_preview(&mut h);
+    assert!(h.app.preview.replaced.iter().any(|b| b == "Mount"), "{:?}", h.app.preview.replaced);
+
+    // Apply & rebuild: exactly the previewed command, one undo step; the toast and the status.
+    h.step(&json!({"click": {"handle": "review:apply"}})).unwrap();
+    h.frames(3);
+    assert_eq!(h.app.session.undo.len(), undo0 + 1);
+    let f = h.app.session.doc.find_feature("Mounting holes").unwrap();
+    assert!(matches!(&f.kind, polykrom_engine::doc::FeatureKind::Hole { diameter, .. } if diameter.as_str() == "10 mm"), "{:?}", f.kind);
+    assert!(volume(&mut h) < volume0, "bigger holes, less material");
+    assert_eq!(super::status(&h.app)["receipt"]["text"], "4 mounting holes updated / Ø10.00 mm");
+    assert_eq!(super::status_line(&h.app).as_deref(), Some("4 mounting holes updated / Ø10.00 mm / Pattern preserved"));
+    assert!(scenario::rect_of("toast:review").is_some());
+    assert!(scenario::rect_of("review:panel").is_none(), "the right-hand area is free for the properties");
+    // The properties' footer, on the body's card.
+    h.app.session.selection = vec![polykrom_engine::Sel::Body { name: "Mount".into() }];
+    h.frames(2);
+    assert!(scenario::rect_of("inspector:card").is_some());
+    assert!(h.widget("Model updated / Rebuild complete").is_some(), "the properties footer");
+    // Undo undoes exactly that step.
+    h.step(&json!({"click": {"handle": "dialog:button:Undo"}})).unwrap();
+    h.frames(3);
+    assert_eq!(h.app.session.undo.len(), undo0);
+    assert_eq!(volume(&mut h), volume0);
+    let f = h.app.session.doc.find_feature("Mounting holes").unwrap();
+    assert!(matches!(&f.kind, polykrom_engine::doc::FeatureKind::Hole { diameter, .. } if diameter.as_str() == "8"), "{:?}", f.kind);
+}
+
+#[test]
+fn cancel_leaves_the_hole_pattern_its_revision_and_its_history_as_they_were() {
+    let mut h = mount();
+    let (doc0, revision0, undo0, redo0) = (h.app.session.doc.clone(), h.app.session.revision, h.app.session.undo.len(), h.app.session.redo.len());
+    let volume0 = volume(&mut h);
+    super::propose(&mut h.app, resize_holes(), Some("Resize mounting holes"), Source::Control).unwrap();
+    h.frames(3);
+    h.step(&json!({"click": {"handle": "review:cancel"}})).unwrap();
+    h.frames(3);
+    assert!(h.app.review.open.is_none() && h.app.review.receipt.is_none());
+    assert!(Arc::ptr_eq(&doc0, &h.app.session.doc), "the document is the same object");
+    assert_eq!((h.app.session.revision, h.app.session.undo.len(), h.app.session.redo.len()), (revision0, undo0, redo0));
+    assert_eq!(volume(&mut h), volume0);
+    assert_eq!(super::status_line(&h.app), None);
+}
+
+/// Each value keeps its kind: a length in the design's units, a count bare, an angle in degrees;
+/// nothing is scaled by the length unit that is not a length.
+#[test]
+fn values_keep_their_kinds_in_an_inch_design() {
+    let mut h = Harness::new();
+    h.app.home.open = false;
+    for (c, p) in [
+        ("document.units", json!({"units": "in"})),
+        // Lengths with their unit: a bare number in an inch design is inches.
+        ("solid.box", json!({"length": "60 mm", "width": "60 mm", "height": "10 mm", "corner": [0, 0, 0]})),
+        ("solid.hole", json!({"position": [10, 30, 10], "diameter": "8 mm", "depth": "6 mm", "name": "Pin"})),
+        (
+            "solid.pattern.circular",
+            json!({"features": ["Pin"], "axis": {"origin": [30, 30, 0], "dir": [0, 0, 1]}, "count": 3, "angle": "360 deg", "name": "Ring"}),
+        ),
+    ] {
+        h.app.run(c, p).unwrap();
+    }
+    h.frames(2);
+    let commands = vec![
+        ("timeline.edit".to_string(), json!({"feature": "Pin", "set": {"diameter": "10 mm"}})),
+        ("timeline.edit".to_string(), json!({"feature": "Ring", "set": {"pattern.count": "4"}})),
+    ];
+    super::propose(&mut h.app, commands, Some("Bigger pins, one more"), Source::Control).unwrap();
+    let d = h.app.review.open.as_ref().unwrap().described.clone();
+    let rows: Vec<(String, String)> = d.changes.iter().chain(&d.kept).map(|r| (r.label.clone(), r.text())).collect();
+    assert_eq!(
+        rows,
+        vec![
+            ("Diameter".to_string(), "Ø0.315 in → Ø0.3937 in".to_string()),
+            ("Quantity".to_string(), "3 → 4".to_string()),
+            ("Depth".to_string(), "0.2362 in".to_string()),
+            ("Total angle".to_string(), "360 deg".to_string()),
+        ]
+    );
+    assert_eq!(d.pattern_preserved, Some(false), "one more copy: the pattern changes");
+    assert_eq!(d.instances, None, "a single hole has no instances; the pattern is a dependent of its own");
+    h.frames(2);
+    assert!(h.widget("3 → 4").is_some());
+    assert!(h.widget("360 deg").is_some());
+    assert!(shows(&h, "Pattern changed"));
+}
+
+// ---- The prompt row's states and keys ----------------------------------------------------------
+
+/// An agent set up, as a person who installed one has (none runs here).
+fn with_agent(h: &mut Harness) {
+    let r = h.call("ui.agent_chat", json!({"add_agent": {"id": "test-agent", "name": "Test agent", "kind": "acp", "command": "true"}}));
+    assert_eq!(r["ok"], true, "{r}");
+    h.frames(2);
+}
+
+#[test]
+fn the_prompt_row_is_blocked_with_its_reason_pending_while_the_agent_works_and_ready_with_a_proposal() {
+    use super::PromptState;
+    let mut h = mount();
+    // No agent set up: blocked, and the reason is a widget of its own.
+    h.call("ui.review", json!({"prompt": "Increase the mounting holes to Ø10. Keep the 84 × 44 pattern."}));
+    h.frames(2);
+    assert_eq!(super::prompt_state(&h.app), PromptState::Blocked("No agent found: add one in the AI settings".into()));
+    assert!(h.widget("No agent found: add one in the AI settings").is_some(), "the reason is read by assistive technology");
+    assert!(scenario::rect_of("review:blocked").is_some());
+    assert_eq!(super::status(&h.app)["blocked"], "No agent found: add one in the AI settings");
+    assert!(h.widget("Preview changes").is_some());
+    assert!(h.widget("Increase the mounting holes to Ø10. Keep the 84 × 44 pattern.").is_some(), "the request stays visible");
+    // With an agent: idle, and the row can send.
+    with_agent(&mut h);
+    assert_eq!(super::prompt_state(&h.app), PromptState::Idle);
+    assert!(scenario::rect_of("review:blocked").is_none());
+    // A sketch being edited blocks it: a proposal is made on the model.
+    let sketch = feature_id(&h, "Mounting pattern");
+    h.app.run("sketch.edit", json!({"sketch": sketch})).unwrap();
+    h.frames(2);
+    assert_eq!(super::prompt_state(&h.app), PromptState::Blocked("Finish the sketch first: a change is proposed on the model".into()));
+    let r = h.call("ui.review", json!({"preview": true}));
+    assert_eq!(r["result"]["state"], "blocked", "{r}");
+    assert!(r["result"]["waiting"].is_null());
+    assert!(h.app.status.as_ref().is_some_and(|(s, _, error)| *error && s.contains("Finish the sketch")), "{:?}", h.app.status);
+    h.app.finish_sketch();
+    h.frames(2);
+    assert_eq!(super::prompt_state(&h.app), PromptState::Idle);
+    // Pending: the request is with the agent, which is working on it.
+    h.app.review.waiting = Some("Increase the mounting holes to Ø10.".into());
+    h.app.agent_chat.state = Some(crate::agent_chat::State::Busy);
+    h.frames(2);
+    assert_eq!(super::prompt_state(&h.app), PromptState::Pending);
+    assert!(h.widget("Preview pending").is_some());
+    assert_eq!(super::status(&h.app)["state"], "pending");
+    // The agent gone (stopped, exited) while a request waits: the row is free again.
+    h.app.agent_chat.state = Some(crate::agent_chat::State::Exited);
+    h.frames(2);
+    assert_eq!(super::prompt_state(&h.app), PromptState::Idle);
+    assert!(h.app.status.as_ref().is_some_and(|(s, _, _)| s.contains("without a change")), "{:?}", h.app.status);
+    h.app.review.waiting = Some("Increase the mounting holes to Ø10.".into());
+    h.app.agent_chat.state = Some(crate::agent_chat::State::Busy);
+    h.frames(2);
+    assert_eq!(super::prompt_state(&h.app), PromptState::Pending);
+    // Ready: the proposal is in.
+    super::propose(&mut h.app, resize_holes(), Some("Resize mounting holes"), Source::Prompt).unwrap();
+    h.frames(2);
+    assert_eq!(super::prompt_state(&h.app), PromptState::Ready);
+    assert!(h.app.review.waiting.is_none());
+    assert_eq!(h.app.review.open.as_ref().and_then(|o| o.request.clone()).as_deref(), Some("Increase the mounting holes to Ø10."));
+    // Applied: the request is done, the row is empty for the next one (view 05).
+    h.app.agent_chat.state = Some(crate::agent_chat::State::Ready);
+    h.call("ui.review", json!({"apply": true}));
+    h.frames(2);
+    assert_eq!(h.app.review.prompt, "");
+    assert_eq!(super::prompt_state(&h.app), PromptState::Idle);
+}
+
+#[test]
+fn the_keyboard_reaches_the_prompt_and_the_scope_is_a_choice() {
+    let mut h = mount();
+    with_agent(&mut h);
+    // Ctrl+J (Cmd+J) puts the keyboard in the prompt; Enter sends it.
+    h.step(&json!({"key": "J", "cmd": true})).unwrap();
+    h.frames(2);
+    h.step(&json!({"text": "Make the holes 10 mm"})).unwrap();
+    h.frames(2);
+    assert_eq!(h.app.review.prompt, "Make the holes 10 mm");
+    assert!(h.widget("Ctrl+J").is_some() || h.widget("Cmd+J").is_some(), "the key is shown beside the scope");
+    let sent = h.app.agent_chat.items.len();
+    h.step(&json!({"key": "Enter"})).unwrap();
+    h.frames(2);
+    // The message went to the chat with the scope (no agent runs here, so it waits to start).
+    assert!(h.app.agent_chat.items.len() > sent || h.app.review.waiting.is_some(), "{:?}", h.app.status);
+    // The scope: from the selection, or chosen.
+    h.app.review.waiting = None;
+    assert_eq!(super::scope(&h.app), "Whole design");
+    let holes = feature_id(&h, "Mounting holes");
+    h.app.session.selection = vec![polykrom_engine::Sel::Feature { id: holes }];
+    assert_eq!(super::scope(&h.app), "Mounting holes / 4 holes");
+    let r = h.call("ui.review", json!({"scope": "design"}));
+    assert_eq!(r["result"]["scope"], "Whole design", "{r}");
+    let r = h.call("ui.review", json!({"scope": {"feature": "Edge finish"}}));
+    assert_eq!(r["result"]["scope"], "Edge finish");
+    let r = h.call("ui.review", json!({"scope": {"body": "Mount"}}));
+    assert_eq!(r["result"]["scope"], "Mount");
+    let r = h.call("ui.review", json!({"scope": {"feature": "Nowhere"}}));
+    assert_eq!(r["ok"], false);
+    // The chip's menu offers them.
+    h.frames(2);
+    h.step(&json!({"click": {"handle": "review:scope"}})).unwrap();
+    h.frames(2);
+    assert!(h.widget("Mounting holes / 4 holes").is_some(), "a feature in the menu");
+    h.step(&json!({"click": {"handle": "review:scope:Whole design"}})).unwrap();
+    h.frames(2);
+    assert_eq!(h.app.review.scope, super::Scope::Design);
+    assert_eq!(super::scope(&h.app), "Whole design");
+    // Applying a proposal returns the chip to the selection.
+    super::propose(&mut h.app, resize_holes(), None, Source::Control).unwrap();
+    super::apply(&mut h.app).unwrap();
+    assert_eq!(h.app.review.scope, super::Scope::Selection);
 }

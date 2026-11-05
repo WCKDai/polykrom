@@ -192,6 +192,10 @@ fn contents(app: &mut SolveApp, ui: &mut egui::Ui, bodies: &[String]) {
         ui_kit::row(ui, crate::i18n::tr_label("Size"), |ui| ui_kit::text(ui, &size, ui_kit::Text::MonoCell));
     }
     ui_kit::section(ui, "sc_inspector_checks", crate::i18n::tr_label("Checks"), true, |ui| checks(app, ui, bodies));
+    // Just after an applied AI proposal (design kit view 05), the properties' footer says so.
+    if app.review.receipt.is_some() {
+        ui_kit::text(ui, crate::i18n::tr("review.status_applied"), ui_kit::Text::Note("review_applied"));
+    }
 }
 
 fn checks(app: &mut SolveApp, ui: &mut egui::Ui, bodies: &[String]) {

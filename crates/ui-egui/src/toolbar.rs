@@ -1988,6 +1988,8 @@ pub fn shortcuts(app: &mut SolveApp, ctx: &egui::Context) {
                     });
                 }
                 _ if !shown => {}
+                // The AI prompt row's key (design kit view 04): the keyboard goes to the prompt.
+                Key::J if !mods.shift && !mods.alt => app.review.focus = true,
                 Key::Z => drop(app.run("edit.undo", json!({}))),
                 Key::Y => drop(app.run("edit.redo", json!({}))),
                 // Copy, Cut and Paste (`edit_clipboard::handle`).
