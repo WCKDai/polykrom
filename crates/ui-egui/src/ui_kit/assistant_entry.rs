@@ -12,36 +12,22 @@ pub(crate) enum AssistantEntryState {
     Waiting(usize),
 }
 
-/// Where the entry point sits, which decides the ink of its sparkle and the chrome under it:
-/// the application bar (its text token and translucent hovers) or a panel on the window's base
-/// surface (the status bar: the icon ink and the panel hover, like the buttons beside it).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum AssistantHost {
-    AppBar,
-    Window,
-}
-
-/// Paint the compact entry point in its caller-owned target. The caller owns state and actions.
-/// Tokens: app_bar/window, app_bar_hover_button/strong or hover, app_bar_text or icon,
-/// agent_ok/busy, warning/error, radius_sm, font_badge.
-pub(crate) fn assistant_entry(ui: &egui::Ui, response: &Response, state: AssistantEntryState, open: bool, animate: bool, host: AssistantHost) {
+/// Paint the compact entry point in its caller-owned target, on the window's base surface (the
+/// status bar), with the chrome of the icon buttons beside it. The caller owns state and actions.
+/// Tokens: window, hover, icon, agent_ok/busy, warning/error, radius_sm, font_badge.
+pub(crate) fn assistant_entry(ui: &egui::Ui, response: &Response, state: AssistantEntryState, open: bool, animate: bool) {
     let t = Tokens::get();
     let at = response.rect;
     let mark = state;
-    let (surface, hover, hover_open, ink) = match host {
-        AssistantHost::AppBar => (t.app_bar, t.app_bar_hover_button, t.app_bar_hover_strong, t.app_bar_text),
-        AssistantHost::Window => (t.window, t.hover, t.hover, t.icon),
-    };
     // The highlight is a 26 px square, like the other icon buttons.
-    let mut ring = surface;
+    let mut ring = t.window;
     if open || response.hovered() || response.has_focus() {
-        let fill = if open { hover_open } else { hover };
-        ui.painter().rect_filled(at.shrink(t.space_3), t.radius_sm, fill);
-        ring = surface.blend(fill);
+        ui.painter().rect_filled(at.shrink(t.space_3), t.radius_sm, t.hover);
+        ring = t.window.blend(t.hover);
     }
-    // The sparkle, in the host's ink so it shows on a light bar as on a dark one; the status
-    // mark sits in the top-right corner, clear of the glyph's strokes.
-    icons::paint_ink(ui.painter(), Rect::from_center_size(at.center(), vec2(t.space_16, t.space_16)), "assistant", ink);
+    // The sparkle, in the icon ink (not the application bar's text, which vanished on the light
+    // status bar); the status mark sits in the top-right corner, clear of the glyph's strokes.
+    icons::paint_ink(ui.painter(), Rect::from_center_size(at.center(), vec2(t.space_16, t.space_16)), "assistant", t.icon);
     let c = pos2(at.right() - t.space_8 + 0.5, at.top() + t.space_8 - 0.5);
     match mark {
         AssistantEntryState::Quiet => {}
@@ -81,12 +67,4 @@ pub(crate) fn assistant_entry(ui: &egui::Ui, response: &Response, state: Assista
             ui.painter().galley(badge.center() - galley.size() / 2.0, galley, ink);
         }
     }
-}
-
-/// The sparkle's and the status mark's places in a 32 px entry (for the tests and pictures):
-/// (glyph, mark centre, mark radius).
-#[cfg(test)]
-pub(crate) fn geometry(at: Rect) -> (Rect, egui::Pos2, f32) {
-    let t = Tokens::get();
-    (Rect::from_center_size(at.center(), vec2(t.space_16, t.space_16)), pos2(at.right() - t.space_8 + 0.5, at.top() + t.space_8 - 0.5), 6.0)
 }

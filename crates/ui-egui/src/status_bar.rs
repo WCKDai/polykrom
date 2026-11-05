@@ -125,7 +125,6 @@ fn report_clicked(ctx: &egui::Context) -> bool {
 pub fn contents(app: &mut SolveApp, ui: &mut egui::Ui) {
     let t = Tokens::get();
     let Some(r) = app.shell.status_bar.filter(|_| ui.ctx().content_rect().height() >= MIN_WINDOW_HEIGHT) else { return };
-    let mut help_anchor: Option<Rect> = None;
     // On the start page the bar keeps only its right-hand controls (there is no selection).
     let design = !app.home.open;
     let mut bar = ui.new_child(egui::UiBuilder::new().max_rect(r).id_salt("status_bar_contents"));
@@ -189,7 +188,6 @@ pub fn contents(app: &mut SolveApp, ui: &mut egui::Ui) {
         app.help.menu = !app.help.menu;
         ui.ctx().data_mut(|d| d.insert_temp(egui::Id::new("sc_help_opened"), true));
     }
-    help_anchor = Some(help);
     x = help.left() - 4.0;
     let prefs_tip =
         if cfg!(target_os = "macos") { format!("{} (Cmd+,)", app.tr("ui.preferences")) } else { format!("{} (Ctrl+,)", app.tr("ui.preferences")) };
@@ -221,9 +219,7 @@ pub fn contents(app: &mut SolveApp, ui: &mut egui::Ui) {
         crate::toolbar::assistant_button(app, ui, at);
     }
     // The Help menu opens above its button.
-    if let Some(help) = help_anchor {
-        crate::help::show(app, &ui.ctx().clone(), pos2(help.left() - 160.0, help.top() - 8.0 - 6.0 * 30.0));
-    }
+    crate::help::show(app, &ui.ctx().clone(), pos2(help.left() - 160.0, help.top() - 8.0 - 6.0 * 30.0));
 }
 
 #[cfg(test)]

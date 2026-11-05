@@ -120,7 +120,8 @@ const ELEMENTS: &[Element] = &[
     }),
     element!("assistant_entry", |ui, _| {
         let t = Tokens::get();
-        egui::Frame::NONE.fill(t.app_bar).show(ui, |ui| {
+        // On the window's base surface, where the status bar keeps it.
+        egui::Frame::NONE.fill(t.window).show(ui, |ui| {
             ui.horizontal(|ui| {
                 for state in [
                     AssistantEntryState::Quiet,
@@ -131,7 +132,7 @@ const ELEMENTS: &[Element] = &[
                     AssistantEntryState::Waiting(3),
                 ] {
                     let (_, response) = ui.allocate_exact_size(vec2(t.space_24 + t.space_8, t.space_24 + t.space_8), egui::Sense::click());
-                    assistant_entry(ui, &response, state, false, false, AssistantHost::AppBar);
+                    assistant_entry(ui, &response, state, false, false);
                 }
             });
         });

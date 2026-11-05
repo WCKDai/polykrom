@@ -1761,15 +1761,7 @@ pub(crate) fn assistant_button(app: &mut SolveApp, ui: &mut egui::Ui, at: Rect) 
         AssistantMark::Stopped => crate::ui_kit::AssistantEntryState::Stopped,
         AssistantMark::Waiting(count) => crate::ui_kit::AssistantEntryState::Waiting(count),
     };
-    // The button sits in the status bar, on the window's surface.
-    crate::ui_kit::assistant_entry(
-        ui,
-        &resp,
-        state,
-        app.agent_chat.open,
-        ui.ctx().global_style().animation_time > 0.0,
-        crate::ui_kit::AssistantHost::Window,
-    );
+    crate::ui_kit::assistant_entry(ui, &resp, state, app.agent_chat.open, ui.ctx().global_style().animation_time > 0.0);
     if resp.on_hover_text(tip).clicked() {
         crate::agent_chat::toggle(app);
     }
