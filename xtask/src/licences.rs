@@ -288,8 +288,18 @@ fn url(text: &str) -> Option<&str> {
         .map(|w| w.trim_end_matches([')', '>', ',', ';', ':', '.']))
 }
 
-/// The licence file beside a font: the only `OFL`/`LICENSE`/`LICENCE`/`COPYING` file in its folder,
-/// or among several, the one named after the font (`Inter-OFL.txt` for `Inter-400.ttf`).
+/// The font a licence file is named for: `Inter-OFL.txt` → `Inter-`, the stem before the first
+/// `OFL`/`LICENSE`/`LICENCE`/`COPYING`; `None` for a generic `OFL.txt` or `LICENSE`.
+fn font_prefix(licence: &str) -> Option<&str> {
+    let stem = licence.rsplit_once('.').map_or(licence, |(s, _)| s);
+    let upper = stem.to_ascii_uppercase();
+    let at = ["OFL", "LICENSE", "LICENCE", "COPYING"].iter().filter_map(|k| upper.find(k)).min()?;
+    (at > 0).then(|| &stem[..at])
+}
+
+/// The licence file beside a font: the `OFL`/`LICENSE`/`LICENCE`/`COPYING` file in its folder. A
+/// file named for a font (`Inter-OFL.txt`) is only that font's (`Inter-400.ttf`), however many
+/// files the folder holds; among several, the font's own file wins over a generic `OFL.txt`.
 fn licence_beside(root: &Path, font: &str) -> Result<String, String> {
     let dir = Path::new(font).parent().unwrap_or(Path::new(""));
     let name = Path::new(font).file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
@@ -304,17 +314,12 @@ fn licence_beside(root: &Path, font: &str) -> Result<String, String> {
         })
         .collect();
     candidates.sort();
+    // Another font's file (`IBM-Plex-Mono-OFL.txt` for `Inter-400.ttf`) is never this font's, even
+    // when it is the only one there.
+    candidates.retain(|c| font_prefix(c).is_none_or(|prefix| name.starts_with(prefix)));
     if candidates.len() > 1 {
-        // `Inter-OFL.txt` → `Inter-`: the font's own file among several.
-        candidates.retain(|c| {
-            let stem = c.rsplit_once('.').map_or(c.as_str(), |(s, _)| s);
-            let upper = stem.to_ascii_uppercase();
-            ["OFL", "LICENSE", "LICENCE", "COPYING"]
-                .iter()
-                .filter_map(|k| upper.find(k))
-                .min()
-                .is_some_and(|at| at > 0 && name.starts_with(&stem[..at]))
-        });
+        // The font's own file among several.
+        candidates.retain(|c| font_prefix(c).is_some());
     }
     match candidates.as_slice() {
         [one] => Ok(relative(root, &dir.join(one))),
@@ -521,6 +526,16 @@ mod tests {
     }
 
     #[test]
+    fn the_notice_lists_exactly_the_fonts_the_programs_carry() {
+        // Both directions: a font the sources no longer name leaves the notice too (the Generated
+        // files workflow rewrites it on main; this test is what tells a pull request).
+        let listed: BTreeSet<String> = listed_paths(&font_list(&notice())).into_iter().filter(|p| font_ext(p)).collect();
+        let derived: BTreeSet<String> = fonts().into_iter().map(|f| f.path).collect();
+        assert!(!derived.is_empty());
+        assert_eq!(listed, derived, "{FILE}'s font list and the fonts the programs carry differ (run `cargo xtask licences`)");
+    }
+
+    #[test]
     fn the_notice_names_no_missing_file() {
         let listed = listed_paths(&font_list(&notice()));
         assert!(!listed.is_empty(), "{FILE} has no font list");
@@ -562,6 +577,23 @@ mod tests {
             Ok("assets/fonts/liberation-sans/OFL.txt")
         );
         assert!(licence_beside(&root, "assets/design-kit/2026-11-02/fonts/Other-400.ttf").is_err());
+        // A lone licence file named for another font is not this font's: the kit folder without
+        // Inter-OFL.txt must not hand Inter the IBM Plex notice.
+        let tree = std::env::temp_dir().join(format!("polykrom-xtask-licences-{}", std::process::id()));
+        let fonts = tree.join("fonts");
+        std::fs::create_dir_all(&fonts).unwrap_or_else(|e| panic!("{}: {e}", fonts.display()));
+        for name in ["Inter-400.ttf", "Inter-700.ttf", "IBM-Plex-Mono-400.ttf"] {
+            std::fs::write(fonts.join(name), b"font").unwrap_or_else(|e| panic!("{name}: {e}"));
+        }
+        let plex = "Copyright © 2017 IBM Corp. with Reserved Font Name \"Plex\"\n\nThis Font Software is licensed under the SIL Open Font License, Version 1.1.\n";
+        std::fs::write(fonts.join("IBM-Plex-Mono-OFL.txt"), plex).unwrap_or_else(|e| panic!("{e}"));
+        let inter = licence_beside(&tree, "fonts/Inter-400.ttf");
+        let inter_bold = licence_beside(&tree, "fonts/Inter-700.ttf");
+        let plex_mono = licence_beside(&tree, "fonts/IBM-Plex-Mono-400.ttf");
+        let _ = std::fs::remove_dir_all(&tree);
+        assert!(inter.as_ref().is_err_and(|e| e.contains("no licence file beside the bundled font fonts/Inter-400.ttf")), "{inter:?}");
+        assert!(inter_bold.is_err(), "{inter_bold:?}");
+        assert_eq!(plex_mono.as_deref(), Ok("fonts/IBM-Plex-Mono-OFL.txt"));
         let liberation = std::fs::read_to_string(root.join("assets/fonts/liberation-sans/OFL.txt")).unwrap_or_default();
         assert_eq!(copyright_lines(&liberation).len(), 2, "both the Red Hat and the Google notices");
         assert_eq!(url("https://github.com/IBM/plex, bundled with the kit"), Some("https://github.com/IBM/plex"));
