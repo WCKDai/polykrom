@@ -812,6 +812,13 @@ impl Tokens {
         }
     }
 
+    /// The ink of a count on a warning badge (the assistant's waiting approvals): black or
+    /// white, whichever reads better on the amber. (It was the application bar's colour, which
+    /// is light in the light theme now.)
+    pub fn warning_ink(&self) -> Color32 {
+        if contrast_ratio(Color32::BLACK, self.warning) >= contrast_ratio(Color32::WHITE, self.warning) { Color32::BLACK } else { Color32::WHITE }
+    }
+
     /// Fade idle cube colours into the viewport while retaining opaque facets.
     pub fn navigation_cube(self, active: bool) -> Tokens {
         if active {

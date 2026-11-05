@@ -1,6 +1,6 @@
 //! Assistant entry point and its status mark, shared by application chrome and previews.
 use crate::{icons, theme::Tokens};
-use egui::{Color32, FontId, Rect, Response, Stroke, pos2, vec2};
+use egui::{FontId, Rect, Response, Stroke, pos2, vec2};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum AssistantEntryState {
@@ -19,15 +19,6 @@ pub(crate) enum AssistantEntryState {
 pub(crate) enum AssistantHost {
     AppBar,
     Window,
-}
-
-/// The ink of the waiting count on its amber badge: black or white, whichever reads better.
-pub(crate) fn badge_ink(t: &Tokens) -> Color32 {
-    if crate::theme::contrast_ratio(Color32::BLACK, t.warning) >= crate::theme::contrast_ratio(Color32::WHITE, t.warning) {
-        Color32::BLACK
-    } else {
-        Color32::WHITE
-    }
 }
 
 /// Paint the compact entry point in its caller-owned target. The caller owns state and actions.
@@ -82,7 +73,7 @@ pub(crate) fn assistant_entry(ui: &egui::Ui, response: &Response, state: Assista
         AssistantEntryState::Waiting(count) => {
             let text = count.to_string();
             let font = FontId::proportional(t.font_badge);
-            let ink = badge_ink(&t);
+            let ink = t.warning_ink();
             let galley = ui.painter().layout_no_wrap(text, font, ink);
             let badge = Rect::from_center_size(c, vec2((galley.size().x + t.space_6).max(t.space_14), t.space_14));
             ui.painter().rect_filled(badge.expand(1.5), Tokens::outset_radius(f32::from(t.sketch_mode_radius), 1.5), ring);

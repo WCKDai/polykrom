@@ -3075,7 +3075,7 @@ mod app_bar_tests {
                     assert!(contrast(t.app_bar_text, bg) >= 4.5, "dark={dark}, {vision:?}, {fill:?}");
                 }
                 assert!(contrast(t.app_bar_separator, t.app_bar) >= 3.0);
-                assert!(contrast(crate::ui_kit::badge_ink(&t), t.warning) >= 4.5, "approval counts need readable ink on amber");
+                assert!(contrast(t.warning_ink(), t.warning) >= 4.5, "approval counts need readable ink on amber");
             }
         }
     }
