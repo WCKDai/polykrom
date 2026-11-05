@@ -465,6 +465,27 @@ mod tests {
     use super::*;
     use ttf_parser::name_id;
 
+    /// The built-in font is the one `assets/fonts/bundled.txt` (the one list of the fonts the
+    /// builds ship, which `cargo xtask licences` reads too) lists as `sketch`, byte for byte.
+    #[test]
+    fn the_built_in_font_is_the_listed_sketch_font() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let list = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/../../assets/fonts/bundled.txt"));
+        let listed: Vec<&str> = list
+            .lines()
+            .map(str::trim)
+            .filter(|l| !l.is_empty() && !l.starts_with('#'))
+            .filter_map(|l| {
+                let mut words = l.split_whitespace();
+                let path = words.next()?;
+                words.any(|w| w == "sketch").then_some(path)
+            })
+            .collect();
+        assert_eq!(listed, ["assets/fonts/liberation-sans/LiberationSans-Regular.ttf"]);
+        let bytes = std::fs::read(root.join(listed[0])).unwrap_or_else(|e| panic!("{}: {e}", listed[0]));
+        assert!(bytes.as_slice() == DEFAULT_FONT, "the built-in font is not {}", listed[0]);
+    }
+
     #[cfg(target_os = "linux")]
     #[test]
     fn font_dirs_include_flatpak_host_fonts() {

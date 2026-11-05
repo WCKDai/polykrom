@@ -7,52 +7,48 @@ use std::sync::Arc;
 
 use egui::{FontDefinitions, FontFamily, FontId, RichText};
 
-/// A font file of the design kit, by its name there.
-macro_rules! kit_font {
-    ($file:literal) => {
-        include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/../../assets/design-kit/2026-11-02/fonts/", $file))
-    };
-}
-
 /// The interface family the kit names (`tokens/figma-text-styles.json`).
 pub const INTERFACE_FAMILY: &str = "Inter";
 /// The family of numeric values and code the kit names (`Polykrom / CAD / Number`).
 pub const NUMERIC_FAMILY: &str = "IBM Plex Mono";
 
+// The faces are the ones `assets/fonts/bundled.txt` lists as `interface` (the one list of the
+// fonts the builds ship, which `cargo xtask licences` reads too): each `include_bytes!` names its
+// file in full so the bundled-font guard (xtask/src/fonts.rs) can read it, and a test below
+// compares the compiled-in bytes with the listed files.
+
 /// Inter at 400, 500, 600 and 700: the entry name of each face and its bytes, in the order of
 /// [`sans_families`].
 const UI_SANS: [(&str, &[u8]); 4] = [
-    ("ui-sans", kit_font!("Inter-400.ttf")),
-    ("ui-medium", kit_font!("Inter-500.ttf")),
-    ("ui-semibold", kit_font!("Inter-600.ttf")),
-    ("ui-bold", kit_font!("Inter-700.ttf")),
+    ("ui-sans", include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/../../assets/design-kit/2026-11-02/fonts/Inter-400.ttf"))),
+    ("ui-medium", include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/../../assets/design-kit/2026-11-02/fonts/Inter-500.ttf"))),
+    ("ui-semibold", include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/../../assets/design-kit/2026-11-02/fonts/Inter-600.ttf"))),
+    ("ui-bold", include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/../../assets/design-kit/2026-11-02/fonts/Inter-700.ttf"))),
 ];
-/// IBM Plex Mono at 400, 500 and 600, in the order of [`mono_families`].
-const UI_MONO: [(&str, &[u8]); 3] = [
-    ("ui-mono", kit_font!("IBM-Plex-Mono-400.ttf")),
-    ("ui-mono-medium", kit_font!("IBM-Plex-Mono-500.ttf")),
-    ("ui-mono-semibold", kit_font!("IBM-Plex-Mono-600.ttf")),
-];
+/// IBM Plex Mono at 400 (the only weight numbers and code use; the kit's 500 and 600 faces are
+/// not compiled in), in the order of [`mono_families`].
+const UI_MONO: [(&str, &[u8]); 1] =
+    [("ui-mono", include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/../../assets/design-kit/2026-11-02/fonts/IBM-Plex-Mono-400.ttf")))];
 /// The weight each face of [`UI_SANS`] and [`UI_MONO`] carries (its OS/2 weight class).
 #[cfg(test)]
 const SANS_WEIGHTS: [u16; 4] = [400, 500, 600, 700];
 #[cfg(test)]
-const MONO_WEIGHTS: [u16; 3] = [400, 500, 600];
+const MONO_WEIGHTS: [u16; 1] = [400];
 
 fn sans_families() -> [FontFamily; 4] {
     [FontFamily::Proportional, medium_family(), semibold_family(), bold_family()]
 }
 
-fn mono_families() -> [FontFamily; 3] {
-    [FontFamily::Monospace, mono_medium_family(), mono_semibold_family()]
+fn mono_families() -> [FontFamily; 1] {
+    [FontFamily::Monospace]
 }
 
 fn all_families() -> impl Iterator<Item = FontFamily> {
     sans_families().into_iter().chain(mono_families())
 }
 
-/// Inter at 400/500/600/700 and IBM Plex Mono at 400/500/600, each a static face of the kit,
-/// followed by egui's symbol/emoji fallbacks.
+/// Inter at 400/500/600/700 and IBM Plex Mono at 400, each a static face of the kit, followed by
+/// egui's symbol/emoji fallbacks.
 pub fn base_font_definitions() -> FontDefinitions {
     let mut fonts = FontDefinitions::default();
     let sans_fallbacks = fonts.families.get(&FontFamily::Proportional).cloned().unwrap_or_default();
@@ -78,24 +74,6 @@ fn semibold_family() -> FontFamily {
 
 fn bold_family() -> FontFamily {
     FontFamily::Name("ui-bold".into())
-}
-
-fn mono_medium_family() -> FontFamily {
-    FontFamily::Name("ui-mono-medium".into())
-}
-
-fn mono_semibold_family() -> FontFamily {
-    FontFamily::Name("ui-mono-semibold".into())
-}
-
-/// Medium (500) numeric or code text, retaining the language fallbacks.
-pub fn mono_medium(size: f32) -> FontId {
-    FontId::new(size, mono_medium_family())
-}
-
-/// Semibold (600) numeric or code text, retaining the language fallbacks.
-pub fn mono_semibold(size: f32) -> FontId {
-    FontId::new(size, mono_semibold_family())
 }
 
 /// Medium (500) interface text, retaining the language fallbacks and user override.
@@ -954,6 +932,44 @@ pub(crate) fn test_context() -> egui::Context {
 mod tests {
     use super::*;
 
+    /// The one list of the fonts the builds ship (`cargo xtask licences` reads it too), and the
+    /// repository-relative paths it lists as compiled into the interface.
+    const BUNDLED_FONTS: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/../../assets/fonts/bundled.txt"));
+
+    fn listed_interface_fonts() -> Vec<&'static str> {
+        BUNDLED_FONTS
+            .lines()
+            .map(str::trim)
+            .filter(|l| !l.is_empty() && !l.starts_with('#'))
+            .filter_map(|l| {
+                let mut words = l.split_whitespace();
+                let path = words.next()?;
+                words.any(|w| w == "interface").then_some(path)
+            })
+            .collect()
+    }
+
+    /// The compiled-in faces are exactly the fonts `assets/fonts/bundled.txt` lists as
+    /// `interface`, byte for byte: a face added here without a listing, or a listed font nothing
+    /// here carries, fails.
+    #[test]
+    fn the_compiled_in_faces_are_the_listed_interface_fonts() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let listed: Vec<(&str, Vec<u8>)> =
+            listed_interface_fonts().into_iter().map(|p| (p, std::fs::read(root.join(p)).unwrap_or_else(|e| panic!("{p}: {e}")))).collect();
+        assert_eq!(listed.len(), UI_SANS.len() + UI_MONO.len(), "{:?}", listed.iter().map(|(p, _)| p).collect::<Vec<_>>());
+        for (name, bytes) in UI_SANS.into_iter().chain(UI_MONO) {
+            let matches: Vec<&str> = listed.iter().filter(|(_, listed)| listed.as_slice() == bytes).map(|(p, _)| *p).collect();
+            assert_eq!(matches.len(), 1, "{name}: compiled-in bytes match {matches:?} in assets/fonts/bundled.txt");
+        }
+        for (path, bytes) in &listed {
+            assert!(
+                UI_SANS.into_iter().chain(UI_MONO).any(|(_, face)| face == bytes.as_slice()),
+                "{path} is listed as interface but not compiled in"
+            );
+        }
+    }
+
     /// `SOLIDCRAFT_FONT_DIRS` wins and may list several folders; `CRAFT_FONTS_DIR` is the fallback.
     #[cfg(not(target_arch = "wasm32"))]
     #[test]
@@ -1048,8 +1064,8 @@ mod tests {
     }
 
     /// The interface is set in the kit's Inter (400/500/600/700) and its numbers and code in the
-    /// kit's IBM Plex Mono (400/500/600), on the desktop and in the web build alike: each face
-    /// leads its family, with egui's symbol and emoji fallbacks behind it.
+    /// kit's IBM Plex Mono (400), on the desktop and in the web build alike: each face leads its
+    /// family, with egui's symbol and emoji fallbacks behind it.
     #[test]
     fn the_kit_faces_lead_every_family_on_desktop_and_web() {
         let defaults = with_symbol_fallback(FontDefinitions::default());
@@ -1082,9 +1098,10 @@ mod tests {
         assert_eq!(installed.families[&FontFamily::Proportional][0], "ui-sans");
         assert_eq!(installed.families[&semibold_family()][0], "ui-semibold");
         assert_eq!(installed.families[&FontFamily::Monospace][0], "ui-mono");
-        assert_eq!(installed.families[&mono_medium_family()][0], "ui-mono-medium");
-        assert_eq!(installed.families[&mono_semibold_family()][0], "ui-mono-semibold");
-        assert!(ctx.fonts_mut(|f| f.has_glyphs(&mono_semibold(12.0), "Ø8.00 mm")));
+        assert!(ctx.fonts_mut(|f| f.has_glyphs(&FontId::monospace(12.0), "Ø8.00 mm")));
+        // Only the faces above are compiled in: no second Plex Mono weight rides along unused.
+        let kit: Vec<&String> = installed.font_data.keys().filter(|k| k.starts_with("ui-")).collect();
+        assert_eq!(kit.len(), UI_SANS.len() + UI_MONO.len(), "{kit:?}");
     }
 
     #[test]
