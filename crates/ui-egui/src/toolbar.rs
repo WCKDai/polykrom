@@ -428,33 +428,14 @@ pub fn app_bar(app: &mut SolveApp, ui: &mut egui::Ui) {
         let labelled_width = |ui: &egui::Ui, text: &str| if labelled { 31.0 + text_width(ui, text) + 14.0 } else { 32.0 };
         let button_rect =
             |right: f32, width: f32| Rect::from_min_size(pos2(right - width, cy - BAR_BUTTON_HEIGHT / 2.0), vec2(width, BAR_BUTTON_HEIGHT));
+        // Their places are measured from the window's edge; the buttons themselves come after
+        // the document identity, left to right, so the keyboard walks the bar in reading order.
         let mut x = right;
         let export_label = app.tr("ui.export").to_string();
         let export = button_rect(x, labelled_width(ui, &export_label));
-        let export_open = ui.ctx().data(|d| d.get_temp::<bool>(egui::Id::new("sc_export_menu")).unwrap_or(false));
-        if bar_button(
-            ui,
-            export,
-            "export",
-            labelled.then_some(export_label.as_str()),
-            &export_tip,
-            shown,
-            &["titlebar:export", "appbar:export"],
-            export_open,
-        ) {
-            let pass = ui.ctx().cumulative_pass_nr();
-            ui.ctx().data_mut(|d| {
-                d.insert_temp(egui::Id::new("sc_export_menu"), !export_open);
-                d.insert_temp(egui::Id::new("sc_export_menu_opened"), pass);
-                d.insert_temp(egui::Id::new("sc_export_menu_at"), export.left_bottom());
-            });
-        }
         x = export.left() - BAR_GAP;
         let save_label = app.tr("ui.save").to_string();
         let save = button_rect(x, labelled_width(ui, &save_label));
-        if bar_button(ui, save, "save", labelled.then_some(save_label.as_str()), &save_tip, shown, &["titlebar:save", "appbar:save"], false) {
-            save_design(app);
-        }
         x = save.left() - BAR_GAP;
         // Command search with its shortcut (S), drawn on the foreground by `shortcut_box::show`
         // so it can grow over the ribbon; the bar only reserves its place.
@@ -465,18 +446,13 @@ pub fn app_bar(app: &mut SolveApp, ui: &mut egui::Ui) {
         x = search.left() - BAR_GAP;
         // Undo and Redo use the same actions as the application menu and the shortcuts; a native
         // menu bar (macOS) carries them itself.
-        if !app.native_file_menu {
+        let history = (!app.native_file_menu).then(|| {
             let redo = button_rect(x, 32.0);
-            if bar_button(ui, redo, "redo", None, &redo_tip, shown, &["appbar:redo", "titlebar:redo"], false) {
-                FileAction::Redo.run(app);
-            }
             x = redo.left() - BAR_GAP;
             let undo = button_rect(x, 32.0);
-            if bar_button(ui, undo, "undo", None, &undo_tip, shown, &["appbar:undo", "titlebar:undo"], false) {
-                FileAction::Undo.run(app);
-            }
             x = undo.left() - BAR_GAP;
-        }
+            (undo, redo)
+        });
         let controls_left = x;
         // The document identity: its name, then where it is stored and its revision.
         let identity_left = logo.right() + 14.0;
@@ -520,6 +496,36 @@ pub fn app_bar(app: &mut SolveApp, ui: &mut egui::Ui) {
         let span = Rect::from_min_max(pos2(identity.right() + 12.0, cy - PILL_HEIGHT / 2.0), pos2(controls_left - 6.0, cy + PILL_HEIGHT / 2.0));
         if span.width() > PILL_HEIGHT {
             crate::update::button(app, ui, span, labelled);
+        }
+        // The right-hand group, left to right: Undo, Redo, (the search field), Save, Export.
+        if let Some((undo, redo)) = history {
+            if bar_button(ui, undo, "undo", None, &undo_tip, shown, &["appbar:undo", "titlebar:undo"], false) {
+                FileAction::Undo.run(app);
+            }
+            if bar_button(ui, redo, "redo", None, &redo_tip, shown, &["appbar:redo", "titlebar:redo"], false) {
+                FileAction::Redo.run(app);
+            }
+        }
+        if bar_button(ui, save, "save", labelled.then_some(save_label.as_str()), &save_tip, shown, &["titlebar:save", "appbar:save"], false) {
+            save_design(app);
+        }
+        let export_open = ui.ctx().data(|d| d.get_temp::<bool>(egui::Id::new("sc_export_menu")).unwrap_or(false));
+        if bar_button(
+            ui,
+            export,
+            "export",
+            labelled.then_some(export_label.as_str()),
+            &export_tip,
+            shown,
+            &["titlebar:export", "appbar:export"],
+            export_open,
+        ) {
+            let pass = ui.ctx().cumulative_pass_nr();
+            ui.ctx().data_mut(|d| {
+                d.insert_temp(egui::Id::new("sc_export_menu"), !export_open);
+                d.insert_temp(egui::Id::new("sc_export_menu_opened"), pass);
+                d.insert_temp(egui::Id::new("sc_export_menu_at"), export.left_bottom());
+            });
         }
         if app.custom_titlebar {
             crate::titlebar::caption_buttons(app, ui, r);
@@ -1156,13 +1162,15 @@ pub fn toolbar(app: &mut SolveApp, ui: &mut egui::Ui) {
         if floating {
             let frame = Container::new(ui.ctx(), Surface::Chrome).frame(ui.ctx(), t.toolbar, crate::frame::Side::Left);
             ui.painter().add(frame.paint(cards.ribbon));
-            // Blank card space owns clicks as well as its buttons.
-            ui.interact(cards.ribbon, ui.id().with(("shell_card", cards.ribbon.left().to_bits())), Sense::click_and_drag());
+            // Blank card space owns clicks as well as its buttons (and is no stop for the keyboard).
+            ui.interact(cards.ribbon, ui.id().with(("shell_card", cards.ribbon.left().to_bits())), Sense::CLICK | Sense::DRAG);
             crate::scenario::publish_rect("ribbon:card", cards.ribbon);
         }
         app.shell.cards = vec![r];
         let painter = ui.painter().clone();
-        let bg = ui.interact(r, ui.id().with("toolbar_bg"), Sense::click());
+        // The ribbon's free space owns its clicks but takes no keyboard focus: Tab goes from the
+        // title bar to the tabs, then the buttons.
+        let bg = ui.interact(r, ui.id().with("toolbar_bg"), Sense::CLICK);
         if bg.secondary_clicked() {
             crate::context_menu::open_for(app, bg.interact_pointer_pos().unwrap_or(r.left_bottom()), crate::context_menu::Target::Toolbar);
         }
@@ -2973,6 +2981,70 @@ mod dropdown_toggle_tests {
 #[cfg(test)]
 mod app_bar_tests {
     use super::*;
+
+    /// Tab walks the window in reading order: the title bar left to right (the logo, Undo,
+    /// Redo, Save, Export, then the caption buttons), the workspace tabs left to right, then the
+    /// ribbon's buttons; the status bar's controls and the viewport's come after the ribbon.
+    /// Before, it walked the title bar right to left, then the status bar, then (floating) the
+    /// viewport, and only then the ribbon.
+    #[test]
+    fn tab_focus_follows_reading_order_in_both_layouts() {
+        for layout in ["docked", "floating"] {
+            let mut h = crate::scenario::Harness::new();
+            h.app.home.open = false;
+            h.app.custom_titlebar = true;
+            h.call("ui.set", json!({"layout": layout}));
+            h.call("ui.resize", json!({"width": 1400, "height": 800}));
+            h.app.run("solid.box", json!({"length": 10, "width": 10, "height": 10})).unwrap();
+            h.frames(3);
+            // The rect each Tab press lands on, in order.
+            let mut stops: Vec<Rect> = Vec::new();
+            for _ in 0..60 {
+                h.step(&json!({"key": "Tab"})).unwrap();
+                h.frames(1);
+                let focused = h.ctx.memory(|m| m.focused()).and_then(|id| h.ctx.read_response(id)).map(|r| r.rect);
+                stops.push(focused.unwrap_or_else(|| panic!("{layout}: Tab {} lands nowhere", stops.len())));
+            }
+            // The first stop that contains the handle's point (the bars' and the ribbon's
+            // backgrounds are no stops, so that is the control itself).
+            let stop_of = |name: &str| -> usize {
+                let p = crate::scenario::handle_at(name).unwrap_or_else(|| panic!("{layout}: {name} is drawn"));
+                stops.iter().position(|s| s.contains(p)).unwrap_or_else(|| panic!("{layout}: Tab never reaches {name} in {stops:?}"))
+            };
+            let close = h.ctx.read_response(crate::titlebar::caption_id(crate::titlebar::Caption::Close)).unwrap().rect;
+            let close_stop = stops.iter().position(|s| *s == close).unwrap_or_else(|| panic!("{layout}: Tab never reaches Close"));
+            let title = [
+                stop_of("appbar:logo"),
+                stop_of("appbar:undo"),
+                stop_of("appbar:redo"),
+                stop_of("titlebar:save"),
+                stop_of("titlebar:export"),
+                close_stop,
+            ];
+            assert_eq!(title[0], 0, "{layout}: the first Tab lands on the logo (no stop on the bar's empty space)");
+            assert!(title.windows(2).all(|w| w[0] < w[1]), "{layout}: the title bar reads left to right: {title:?}");
+            let tabs: Vec<usize> = crate::workspace::visible_tabs(&h.app).iter().map(|tab| stop_of(&format!("tab:{tab}"))).collect();
+            assert!(tabs.windows(2).all(|w| w[0] < w[1]), "{layout}: the tabs read left to right: {tabs:?}");
+            assert_eq!(tabs[0], close_stop + 1, "{layout}: the first tab follows the title bar");
+            let first_button = stop_of("button:sketch.create");
+            assert_eq!(first_button, tabs[tabs.len() - 1] + 1, "{layout}: the ribbon's first button follows the last tab");
+            // The ribbon's buttons stay together, and whatever comes next (the viewport's
+            // controls, the status bar) comes after all of them.
+            let ribbon: Vec<usize> =
+                crate::scenario::handles("button:").iter().chain(crate::scenario::handles("panel:").iter()).map(|(n, _)| stop_of(n)).collect();
+            let last_ribbon = ribbon.iter().copied().max().unwrap();
+            assert!(ribbon.iter().all(|i| *i >= first_button), "{layout}: the ribbon's buttons follow the tabs");
+            for name in ["titlebar:home", "titlebar:preferences", "appbar:help", "titlebar:report", "status:units"] {
+                let r = crate::scenario::rect_of(name).unwrap();
+                assert!(
+                    stops[..=last_ribbon].iter().all(|s| !s.contains_rect(r.shrink(0.5))),
+                    "{layout}: {name} comes before the ribbon in the Tab order"
+                );
+            }
+            let scene = h.app.shell.content.unwrap();
+            assert!(stops[..=last_ribbon].iter().all(|s| *s != scene), "{layout}: the scene is no Tab stop before the ribbon");
+        }
+    }
 
     #[test]
     fn bar_hover_inks_and_dividers_remain_readable_in_both_themes() {

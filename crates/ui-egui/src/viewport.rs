@@ -2818,7 +2818,9 @@ pub fn show(app: &mut SolveApp, ui: &mut egui::Ui) {
     let rect = ui.max_rect();
     app.viewport.rect = Some(rect);
     refresh_layout(app, ui.ctx().pixels_per_point());
-    let resp = ui.interact(rect, ui.id().with("viewport"), Sense::click_and_drag());
+    // Pointer only: the scene is no stop for Tab (the view keys work without focus, and are
+    // held back while anything has it).
+    let resp = ui.interact(rect, ui.id().with("viewport"), Sense::CLICK | Sense::DRAG);
     let flat = crate::dialogs_sheet::flat_active(app);
     if !flat {
         app.flat_view.fitted = false;

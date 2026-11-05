@@ -71,6 +71,10 @@ fn icon_button(ui: &mut egui::Ui, right: f32, cy: f32, icon: &str, name: &str, t
     (rect, enabled && resp.on_hover_text(tip).clicked())
 }
 
+/// The bar's panel along the window's bottom, reserved before the rest of the window so
+/// everything else stacks above it. Its controls are drawn by [`contents`] once the title bar
+/// and the ribbon have registered theirs, so keyboard focus walks the window in reading order
+/// and reaches the bar last.
 pub fn show(app: &mut SolveApp, ui: &mut egui::Ui) {
     let t = Tokens::get();
     if ui.ctx().content_rect().height() < MIN_WINDOW_HEIGHT {
@@ -78,9 +82,6 @@ pub fn show(app: &mut SolveApp, ui: &mut egui::Ui) {
         return;
     }
     let frame = egui::Frame::NONE.fill(t.window);
-    let mut help_anchor: Option<Rect> = None;
-    // On the start page the bar keeps only its right-hand controls (there is no selection).
-    let design = !app.home.open;
     Container::new(ui.ctx(), Surface::ApplicationBar)
         .edge("sc_status_bar", Edge::Bottom)
         .exact_size(HEIGHT)
@@ -91,99 +92,109 @@ pub fn show(app: &mut SolveApp, ui: &mut egui::Ui) {
             let r = ui.max_rect();
             app.shell.status_bar = Some(r);
             crate::scenario::publish_rect("status:bar", r);
-            // Blank bar space owns its clicks.
-            ui.interact(r, ui.id().with("status_bar_bg"), Sense::click());
-            let cy = r.center().y;
-            let font = FontId::proportional(t.font_small);
-            let painter = ui.painter().clone();
-            // Left: the selection, then the model units (a click changes them: Change Design Units).
-            if design {
-                let summary = painter.layout_no_wrap(selection_summary(app), font.clone(), t.text_dim);
-                let sel = Rect::from_min_size(pos2(r.left() + INSET, cy - summary.size().y / 2.0), summary.size());
-                painter.galley(sel.min, summary, t.text_dim);
-                crate::scenario::publish_rect("status:selection", sel);
-                let units_text = crate::i18n::format("ui.status_units", &[("units", &app.session.doc.units)]);
-                let units = painter.layout_no_wrap(units_text, font.clone(), t.text_dim);
-                let ur = Rect::from_min_size(pos2(sel.right() + 30.0, cy - units.size().y / 2.0), units.size());
-                let uresp = ui.interact(ur.expand2(vec2(6.0, 5.0)), ui.id().with("status_units"), Sense::click());
-                uresp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, crate::i18n::tr("ui.units")));
-                crate::scenario::publish_target("status:units", ur);
-                if uresp.hovered() || uresp.has_focus() {
-                    painter.rect_filled(ur.expand2(vec2(6.0, 5.0)), t.radius_sm, t.hover);
-                }
-                painter.galley(ur.min, units, t.text_dim);
-                if uresp.on_hover_text(crate::i18n::tr_label("Change Design Units")).clicked() {
-                    crate::context_menu::open_for(app, ur.left_top(), crate::context_menu::Target::Units);
-                }
-            }
-            // Right: the credit, then the version, then the controls from the title bar.
-            let credit = painter.layout_no_wrap(CREDIT.to_string(), font.clone(), t.text_dim);
-            let cr = Rect::from_min_size(pos2(r.right() - INSET - credit.size().x, cy - credit.size().y / 2.0), credit.size());
-            painter.galley(cr.min, credit, t.text_dim);
-            crate::scenario::publish_rect("status:credit", cr);
-            let version_text = crate::i18n::format("ui.version_label", &[("version", crate::update::current_version())]);
-            let version = painter.layout_no_wrap(version_text, font, t.text_dim.gamma_multiply(0.8));
-            let vr = Rect::from_min_size(pos2(cr.left() - 24.0 - version.size().x, cy - version.size().y / 2.0), version.size());
-            painter.galley(vr.min, version, t.text_dim.gamma_multiply(0.8));
-            crate::scenario::publish_rect("titlebar:version", vr);
-            crate::scenario::publish_rect("status:version", vr);
-            let idle = !app.file_load.busy();
-            let mut x = vr.left() - 18.0;
-            let report_name = crate::i18n::tr("ui.report_a_bug");
-            let (report, clicked) = icon_button(
-                ui,
-                x,
-                cy,
-                "bug_report",
-                report_name,
-                crate::i18n::tr_label("Report a bug — review a screenshot and open a GitHub draft"),
-                true,
-                &["titlebar:report", "status:report"],
-            );
-            if clicked {
-                crate::help::run(app, &ui.ctx().clone(), "report");
-            }
-            x = report.left() - 4.0;
-            let (help, clicked) = icon_button(ui, x, cy, "help", app.tr("ui.help"), app.tr("ui.help"), true, &["appbar:help", "status:help"]);
-            if clicked {
-                app.help.menu = !app.help.menu;
-                ui.ctx().data_mut(|d| d.insert_temp(egui::Id::new("sc_help_opened"), true));
-            }
-            help_anchor = Some(help);
-            x = help.left() - 4.0;
-            let prefs_tip = if cfg!(target_os = "macos") {
-                format!("{} (Cmd+,)", app.tr("ui.preferences"))
-            } else {
-                format!("{} (Ctrl+,)", app.tr("ui.preferences"))
-            };
-            let (prefs, clicked) =
-                icon_button(ui, x, cy, "settings", app.tr("ui.preferences"), &prefs_tip, true, &["titlebar:preferences", "status:preferences"]);
-            crate::scenario::publish_handle("titlebar:preferences", prefs.center());
-            if clicked {
-                crate::prefs::open_at(app, 0);
-            }
-            x = prefs.left() - 4.0;
-            let (home, clicked) = icon_button(
-                ui,
-                x,
-                cy,
-                "home",
-                app.tr("ui.start_page"),
-                app.tr("ui.start_page"),
-                idle && design,
-                &["titlebar:home", "appbar:home", "status:home"],
-            );
-            // Compatibility for scenarios that used the former Home tab.
-            crate::scenario::publish_target_as("tab:home", "titlebar:home", home);
-            if clicked {
-                app.home.show(app.session.revision);
-            }
-            x = home.left() - 4.0;
-            if design && crate::agent_chat::app_bar_button_shown(app) {
-                let at = Rect::from_min_size(pos2(x - 32.0, cy - 16.0), vec2(32.0, 32.0));
-                crate::toolbar::assistant_button(app, ui, at);
-            }
+            // Blank bar space owns its clicks (and is no stop for the keyboard).
+            ui.interact(r, ui.id().with("status_bar_bg"), Sense::CLICK);
         });
+}
+
+/// The bar's controls, over the panel [`show`] reserved this frame (nothing when the window is
+/// too short for the bar).
+pub fn contents(app: &mut SolveApp, ui: &mut egui::Ui) {
+    let t = Tokens::get();
+    let Some(r) = app.shell.status_bar.filter(|_| ui.ctx().content_rect().height() >= MIN_WINDOW_HEIGHT) else { return };
+    let mut help_anchor: Option<Rect> = None;
+    // On the start page the bar keeps only its right-hand controls (there is no selection).
+    let design = !app.home.open;
+    let mut bar = ui.new_child(egui::UiBuilder::new().max_rect(r).id_salt("status_bar_contents"));
+    bar.set_clip_rect(r.intersect(ui.clip_rect()));
+    let ui = &mut bar;
+    let cy = r.center().y;
+    let font = FontId::proportional(t.font_small);
+    let painter = ui.painter().clone();
+    // Left: the selection, then the model units (a click changes them: Change Design Units).
+    if design {
+        let summary = painter.layout_no_wrap(selection_summary(app), font.clone(), t.text_dim);
+        let sel = Rect::from_min_size(pos2(r.left() + INSET, cy - summary.size().y / 2.0), summary.size());
+        painter.galley(sel.min, summary, t.text_dim);
+        crate::scenario::publish_rect("status:selection", sel);
+        let units_text = crate::i18n::format("ui.status_units", &[("units", &app.session.doc.units)]);
+        let units = painter.layout_no_wrap(units_text, font.clone(), t.text_dim);
+        let ur = Rect::from_min_size(pos2(sel.right() + 30.0, cy - units.size().y / 2.0), units.size());
+        let uresp = ui.interact(ur.expand2(vec2(6.0, 5.0)), ui.id().with("status_units"), Sense::click());
+        uresp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, crate::i18n::tr("ui.units")));
+        crate::scenario::publish_target("status:units", ur);
+        if uresp.hovered() || uresp.has_focus() {
+            painter.rect_filled(ur.expand2(vec2(6.0, 5.0)), t.radius_sm, t.hover);
+        }
+        painter.galley(ur.min, units, t.text_dim);
+        if uresp.on_hover_text(crate::i18n::tr_label("Change Design Units")).clicked() {
+            crate::context_menu::open_for(app, ur.left_top(), crate::context_menu::Target::Units);
+        }
+    }
+    // Right: the credit, then the version, then the controls from the title bar.
+    let credit = painter.layout_no_wrap(CREDIT.to_string(), font.clone(), t.text_dim);
+    let cr = Rect::from_min_size(pos2(r.right() - INSET - credit.size().x, cy - credit.size().y / 2.0), credit.size());
+    painter.galley(cr.min, credit, t.text_dim);
+    crate::scenario::publish_rect("status:credit", cr);
+    let version_text = crate::i18n::format("ui.version_label", &[("version", crate::update::current_version())]);
+    let version = painter.layout_no_wrap(version_text, font, t.text_dim.gamma_multiply(0.8));
+    let vr = Rect::from_min_size(pos2(cr.left() - 24.0 - version.size().x, cy - version.size().y / 2.0), version.size());
+    painter.galley(vr.min, version, t.text_dim.gamma_multiply(0.8));
+    crate::scenario::publish_rect("titlebar:version", vr);
+    crate::scenario::publish_rect("status:version", vr);
+    let idle = !app.file_load.busy();
+    let mut x = vr.left() - 18.0;
+    let report_name = crate::i18n::tr("ui.report_a_bug");
+    let (report, clicked) = icon_button(
+        ui,
+        x,
+        cy,
+        "bug_report",
+        report_name,
+        crate::i18n::tr_label("Report a bug — review a screenshot and open a GitHub draft"),
+        true,
+        &["titlebar:report", "status:report"],
+    );
+    if clicked {
+        crate::help::run(app, &ui.ctx().clone(), "report");
+    }
+    x = report.left() - 4.0;
+    let (help, clicked) = icon_button(ui, x, cy, "help", app.tr("ui.help"), app.tr("ui.help"), true, &["appbar:help", "status:help"]);
+    if clicked {
+        app.help.menu = !app.help.menu;
+        ui.ctx().data_mut(|d| d.insert_temp(egui::Id::new("sc_help_opened"), true));
+    }
+    help_anchor = Some(help);
+    x = help.left() - 4.0;
+    let prefs_tip =
+        if cfg!(target_os = "macos") { format!("{} (Cmd+,)", app.tr("ui.preferences")) } else { format!("{} (Ctrl+,)", app.tr("ui.preferences")) };
+    let (prefs, clicked) =
+        icon_button(ui, x, cy, "settings", app.tr("ui.preferences"), &prefs_tip, true, &["titlebar:preferences", "status:preferences"]);
+    crate::scenario::publish_handle("titlebar:preferences", prefs.center());
+    if clicked {
+        crate::prefs::open_at(app, 0);
+    }
+    x = prefs.left() - 4.0;
+    let (home, clicked) = icon_button(
+        ui,
+        x,
+        cy,
+        "home",
+        app.tr("ui.start_page"),
+        app.tr("ui.start_page"),
+        idle && design,
+        &["titlebar:home", "appbar:home", "status:home"],
+    );
+    // Compatibility for scenarios that used the former Home tab.
+    crate::scenario::publish_target_as("tab:home", "titlebar:home", home);
+    if clicked {
+        app.home.show(app.session.revision);
+    }
+    x = home.left() - 4.0;
+    if design && crate::agent_chat::app_bar_button_shown(app) {
+        let at = Rect::from_min_size(pos2(x - 32.0, cy - 16.0), vec2(32.0, 32.0));
+        crate::toolbar::assistant_button(app, ui, at);
+    }
     // The Help menu opens above its button.
     if let Some(help) = help_anchor {
         crate::help::show(app, &ui.ctx().clone(), pos2(help.left() - 160.0, help.top() - 8.0 - 6.0 * 30.0));

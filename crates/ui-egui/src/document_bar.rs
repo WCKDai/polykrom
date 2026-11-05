@@ -111,7 +111,7 @@ pub fn show(app: &mut SolveApp, ui: &mut egui::Ui, strip: Rect) {
     // The strip owns its clicks, but yields its bottom edge to the scene below it so a model
     // point landing exactly on the scene's top row stays pickable (it abuts the strip there).
     let block = Rect::from_min_max(strip.min, pos2(strip.max.x, (strip.max.y - 1.0).max(strip.min.y)));
-    ui.interact(block, ui.id().with("document_bar"), Sense::click_and_drag());
+    ui.interact(block, ui.id().with("document_bar"), Sense::CLICK | Sense::DRAG);
     ui.painter().rect_filled(tabs, 0.0, t.window);
     crate::scenario::publish_rect("documents:strip", tabs);
     let mut tabs_ui = ui.new_child(egui::UiBuilder::new().max_rect(tabs).id_salt("document_tabs"));

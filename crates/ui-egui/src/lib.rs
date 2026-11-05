@@ -1719,6 +1719,7 @@ impl SolveApp {
             // The status bar's controls (Preferences, Help, Report a bug) stay reachable on the
             // start page too.
             status_bar::show(self, ui);
+            status_bar::contents(self, ui);
             home::show(self, ui);
             if self.home.open {
                 // Agent detection runs in the background and is only received by `agent_chat::poll`
@@ -1730,11 +1731,11 @@ impl SolveApp {
             }
         }
         let floating = ui_kit::Container::new(ui.ctx(), ui_kit::Surface::Panel).floating();
-        // The status bar along the bottom comes first, so everything else stacks above it. Its
-        // Report a bug starts a draft, which blocks the CAD input from here on (as the bar's did).
+        // The status bar's panel along the bottom comes first, so everything else stacks above
+        // it; its controls come last (`status_bar::contents`), so Tab reaches them after the
+        // title bar, the tabs and the ribbon.
         if !self.home.open {
             status_bar::show(self, ui);
-            issue_report::CadInput::block(self, ui, report_input);
         }
         let show_timeline = self.ui.show_timeline && !render_workspace::active(self);
         let left_timeline = show_timeline && self.preferences.timeline_left;
@@ -1786,6 +1787,15 @@ impl SolveApp {
             if scene != full {
                 ui.painter().rect_filled(full, 0.0, theme::Tokens::get().window);
             }
+            // The ribbon comes before the scene, so Tab reaches its tabs and buttons before the
+            // viewport's controls; the scene starts below the document strip, so it never paints
+            // over the card. Only a window too small for the strip keeps the old order (the scene
+            // then runs under the card, which must paint last).
+            let ribbon_first = scene.top() >= cards.bottom;
+            if ribbon_first {
+                toolbar::toolbar(self, ui);
+                theme::TabAccent::publish(self, ui.ctx());
+            }
             let mut viewport_ui = ui.new_child(egui::UiBuilder::new().max_rect(scene).id_salt("floating_viewport"));
             if blocked {
                 // Disabled only to shield the scene from input under a card or menu; it must
@@ -1795,8 +1805,10 @@ impl SolveApp {
             }
             self.show_workspace(&mut viewport_ui);
             shell::paint_top_corners(ui.painter(), scene, theme::Tokens::get().window);
-            toolbar::toolbar(self, ui);
-            theme::TabAccent::publish(self, ui.ctx());
+            if !ribbon_first {
+                toolbar::toolbar(self, ui);
+                theme::TabAccent::publish(self, ui.ctx());
+            }
             review::prompt_row(self, ui);
         }
         if floating && show_timeline && !left_timeline {
@@ -1854,6 +1866,10 @@ impl SolveApp {
                     document_bar::show(self, &mut strip_ui, strip);
                 }
             });
+        // The status bar's controls, last in the window's reading order. Its Report a bug starts
+        // a draft, which blocks the CAD input from here on (as the bar's did).
+        status_bar::contents(self, ui);
+        issue_report::CadInput::block(self, ui, report_input);
         dialogs::show(self, ui.ctx());
         issue_report::CadInput::block(self, ui, report_input);
         sketch_palette::show(self, ui.ctx());

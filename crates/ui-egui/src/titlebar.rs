@@ -77,7 +77,8 @@ pub fn window_action(app: &mut SolveApp, ctx: &egui::Context, action: &str) -> R
 /// their clicks.
 pub fn drag_area(ui: &Ui, rect: Rect) {
     let ctx = ui.ctx();
-    let resp = ui.interact(rect, Id::new("titlebar-drag"), Sense::click_and_drag());
+    // Pointer only: the bar's empty space is no stop for the keyboard.
+    let resp = ui.interact(rect, Id::new("titlebar-drag"), Sense::CLICK | Sense::DRAG);
     // egui hands a drag that starts on a click-only widget to the drag-sensing background below
     // it, so remember whether the press itself landed on bare background.
     if ctx.input(|i| i.pointer.any_pressed()) {
