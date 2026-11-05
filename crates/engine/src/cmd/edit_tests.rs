@@ -233,6 +233,97 @@ fn redefining_a_shell_replaces_persistent_face_selection() {
     assert_eq!(s.doc.find_feature("Hollow").unwrap().face_names, after);
 }
 
+/// `timeline.edit` resolves the face picks it gives a shell as `solid.shell` resolves a new
+/// shell's (PK-97): an ambiguous pick and a pick that no face is within reach of are refused with
+/// the command's errors and leave the document, its revision and the undo history as they were;
+/// a pick within reach of a face but off it is moved inside that face, so the shell opens it
+/// (the edit used to store the point as given and the kernel dropped it without a word); the
+/// reply lists `faces_used`; names and `{point, normal}` entries are taken as the command takes
+/// them; and a `body` no body is called is reported as unknown, whatever the pick reaches.
+#[test]
+fn editing_a_shells_faces_resolves_the_picks_as_a_new_shell_does() {
+    use polykrom_doc::FeatureKind;
+    let volume = |s: &Session| s.model.state().bodies.iter().map(|b| polycore::measure(&b.body).unwrap().volume).sum::<f64>();
+    let mut s = Session::default();
+    run(&mut s, "solid.box", json!({"length": 40, "width": 30, "height": 20, "name": "Base"}));
+    run(&mut s, "solid.shell", json!({"faces": [[20, 15, 20]], "thickness": 2, "name": "Hollow"}));
+    let top_open = volume(&s);
+    assert!((top_open - (24000.0 - 36.0 * 26.0 * 18.0)).abs() < 1e-6, "{top_open}");
+    // A new shell opening the +x face: the volume an edit opening that face must give.
+    let mut fresh = Session::default();
+    run(&mut fresh, "solid.box", json!({"length": 40, "width": 30, "height": 20}));
+    run(&mut fresh, "solid.shell", json!({"faces": [[40, 15, 10]], "thickness": 2}));
+    let side_open = volume(&fresh);
+    assert!((side_open - (24000.0 - 38.0 * 26.0 * 16.0)).abs() < 1e-6, "{side_open}");
+    // Refused: the edge between the +x and +y faces, and a point 40 mm past the +x face.
+    for (pick, text) in [
+        (json!([40, 30, 10]), "ambiguous pick at [40, 30, 10]: it lies on faces `F1:+x` of `Body1` and `F1:+y` of `Body1`"),
+        (json!([80, 15, 10]), "face 1: no face is within reach of [80, 15, 10]"),
+        (json!({"point": [80, 15, 10], "body": "Body1"}), "face 1: no face of `Body1` is within reach of [80, 15, 10]"),
+    ] {
+        let (doc, revision, undo, redo) = (s.doc.clone(), s.revision, s.undo.len(), s.redo.len());
+        let e = s.execute("timeline.edit", &json!({"feature": "Hollow", "set": {"faces": [pick]}})).unwrap_err().to_string();
+        assert!(e.contains("`timeline.edit`") && e.contains(text), "{pick}: {e}");
+        assert_eq!(*s.doc, *doc, "{pick}: the document is as it was");
+        assert_eq!((s.revision, s.undo.len(), s.redo.len()), (revision, undo, redo), "{pick}: revision and history are as they were");
+        assert!((volume(&s) - top_open).abs() < 1e-9, "{pick}: the shell still opens the top");
+    }
+    // A pick 0.1 mm out from the +x face: within reach, so the edit opens that face.
+    let reply = run(&mut s, "timeline.edit", json!({"feature": "Hollow", "set": {"faces": [[40.1, 15, 10]]}}));
+    assert_eq!(reply["faces_used"], json!(["F1:+x"]), "{reply}");
+    assert_eq!(reply["feature"], s.doc.find_feature("Hollow").unwrap().id);
+    assert!((volume(&s) - side_open).abs() < 1e-6, "{} vs {side_open}: the +x face is open", volume(&s));
+    let hollow = s.doc.find_feature("Hollow").unwrap();
+    let FeatureKind::Shell { faces, .. } = &hollow.kind else { panic!("shell") };
+    assert!(faces.len() == 1 && (faces[0].0.x - 40.0).abs() < 1e-9, "the stored point lies inside the face: {:?}", faces[0].0);
+    assert_eq!(hollow.face_names, vec!["F1:+x".to_string()]);
+    // A face by name, and `{point, normal}` settling an edge pick, as the command takes them.
+    let reply = run(&mut s, "timeline.edit", json!({"feature": "Hollow", "set": {"faces": ["F1:+z", {"point": [40, 30, 10], "normal": [0, 1, 0]}]}}));
+    assert_eq!(reply["faces_used"], json!(["F1:+z", "F1:+y"]), "{reply}");
+    assert_eq!(s.doc.find_feature("Hollow").unwrap().face_names, vec!["F1:+z".to_string(), "F1:+y".to_string()]);
+    assert!((volume(&s) - (24000.0 - 36.0 * 28.0 * 18.0)).abs() < 1e-6, "{}: top and back open", volume(&s));
+    // A `body` no body is called is unknown, not an out-of-reach pick.
+    let before = s.doc.clone();
+    let e = s.execute("timeline.edit", &json!({"feature": "Hollow", "set": {"body": "Nope", "faces": [[80, 15, 10]]}})).unwrap_err().to_string();
+    assert!(e.contains("no body `Nope`") && !e.contains("within reach"), "{e}");
+    assert_eq!(*s.doc, *before);
+    // An edit that leaves the faces alone resolves nothing and replies as before.
+    let reply = run(&mut s, "timeline.edit", json!({"feature": "Hollow", "set": {"thickness": "3"}}));
+    assert!(reply.get("faces_used").is_none(), "{reply}");
+    // Undo takes the edits back, one step each.
+    for _ in 0..3 {
+        run(&mut s, "edit.undo", json!({}));
+    }
+    assert!((volume(&s) - top_open).abs() < 1e-9, "{}", volume(&s));
+}
+
+/// On a moved component, `timeline.edit` reads a shell's new face picks in the world, as
+/// `solid.shell` reads a new shell's, and keeps them in the feature's frame (PK-97).
+#[test]
+fn editing_a_shells_faces_on_a_moved_component_reads_the_picks_in_the_world() {
+    use polykrom_doc::FeatureKind;
+    let mut s = Session::default();
+    let component = run(&mut s, "component.create", json!({"name": "Arm", "grounded": false}));
+    let occurrence = component["occurrence"].as_u64().unwrap();
+    let box_id = run(&mut s, "solid.box", json!({"length": 40, "width": 30, "height": 20, "body_name": "Stock"}))["feature"].as_u64().unwrap();
+    run(&mut s, "solid.shell", json!({"faces": [[20, 15, 20]], "thickness": 2, "name": "Hollow"}));
+    run(&mut s, "component.activate", json!({"component": 0}));
+    run(&mut s, "occurrence.move", json!({"occurrence": occurrence, "translate": [100, 0, 0], "capture": true}));
+    let world = s.world_state();
+    assert!(world.bodies.iter().any(|b| b.body.contains(polycore_geom::Vec3::new(101.0, 15.0, 10.0))), "the box moved");
+    // The +x face is at x = 140 in the world, x = 40 in the component.
+    let e = s.execute("timeline.edit", &json!({"feature": "Hollow", "set": {"faces": [[140, 30, 10]]}})).unwrap_err().to_string();
+    assert!(e.contains("ambiguous pick at [140, 30, 10]"), "the error names the point as given: {e}");
+    let reply = run(&mut s, "timeline.edit", json!({"feature": "Hollow", "set": {"faces": [[140, 15, 10]]}}));
+    assert_eq!(reply["faces_used"], json!([format!("F{box_id}:+x")]), "{reply}");
+    let FeatureKind::Shell { faces, .. } = &s.doc.find_feature("Hollow").unwrap().kind else { panic!("shell") };
+    assert!((faces[0].0.x - 40.0).abs() < 1e-9 && (faces[0].0.y - 15.0).abs() < 1e-9, "kept in the component's frame: {:?}", faces[0].0);
+    assert!(s.model.results.iter().all(|r| r.error.is_none()), "{:?}", s.model.results);
+    let world = s.world_state();
+    assert!(!world.bodies.iter().any(|b| b.body.contains(polycore_geom::Vec3::new(139.0, 15.0, 10.0))), "the +x face is open");
+    assert!(world.bodies.iter().any(|b| b.body.contains(polycore_geom::Vec3::new(120.0, 15.0, 19.0))), "the top is closed again");
+}
+
 #[test]
 fn redefine_rejects_sheet_exports_before_they_touch_any_files() {
     let mut s = Session::default();

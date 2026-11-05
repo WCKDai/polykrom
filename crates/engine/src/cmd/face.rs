@@ -235,20 +235,37 @@ fn point_text(p: Vec3) -> String {
 /// faces of several bodies is settled by the body the other entries lie on, and only when every
 /// entry lies on faces of the same several bodies are those faces listed as ambiguous.
 pub(super) fn picked_faces(s: &Session, list: &[Value], body: Option<&str>, cmd: &str) -> Result<PickedFaces> {
-    picked_faces_within(s, list, body, cmd, PICK_CHECK_LIMIT)
+    let st = if crate::frames::mapped() { s.model.state() } else { s.world_state() };
+    picked_faces_within(&st, list, body, cmd, PICK_CHECK_LIMIT)
 }
 
-/// [`picked_faces`] with the tie check's limit on a body's size given (tests lower it).
-fn picked_faces_within(s: &Session, list: &[Value], body: Option<&str>, cmd: &str, limit: (usize, usize)) -> Result<PickedFaces> {
-    let st = if crate::frames::mapped() { s.model.state() } else { s.world_state() };
+/// [`picked_faces`] read against `st` instead of the session's model now: for `timeline.edit`,
+/// which resolves the face picks it gives a feature against the model before that feature, in
+/// the frame the feature's points are kept in (PK-97). The same errors, the same points.
+pub(super) fn picked_faces_in(st: &polykrom_doc::ModelState, list: &[Value], body: Option<&str>, cmd: &str) -> Result<PickedFaces> {
+    picked_faces_within(st, list, body, cmd, PICK_CHECK_LIMIT)
+}
+
+/// [`picked_faces`] on the model `st` (in the frame of the picks), with the tie check's limit on
+/// a body's size given (tests lower it).
+fn picked_faces_within(st: &polykrom_doc::ModelState, list: &[Value], body: Option<&str>, cmd: &str, limit: (usize, usize)) -> Result<PickedFaces> {
     let solids: Vec<usize> = (0..st.bodies.len()).filter(|i| st.bodies.get(*i).is_some_and(|b| !b.body.is_mesh())).collect();
     // The solids called `name` (by either of a body's names).
     let named = |name: &str| -> Vec<usize> {
         solids.iter().copied().filter(|i| st.bodies.get(*i).is_some_and(|b| b.name == name || b.definition_name() == name)).collect()
     };
-    // The bodies the command's `body` keeps the picks to: every solid without one (or with one
-    // no body is called: the evaluation reports that).
-    let commands: Vec<usize> = body.map(named).filter(|named| !named.is_empty()).unwrap_or_else(|| solids.clone());
+    // The bodies the command's `body` keeps the picks to: every solid without one. A `body` no
+    // body is called is refused here, as a face name's lookup refuses it (PK-97): an
+    // out-of-reach pick used to be reported instead of the unknown body. A mesh body's name
+    // keeps the search to every solid; the evaluation reports that body.
+    let commands: Vec<usize> = match body {
+        None => solids.clone(),
+        Some(name) => match named(name) {
+            found if !found.is_empty() => found,
+            _ if st.bodies.iter().any(|b| b.name == name || b.definition_name() == name) => solids.clone(),
+            _ => return Err(bad(cmd, format!("no body `{name}`"))),
+        },
+    };
     let triangles: Vec<std::cell::OnceCell<Option<FaceTriangles>>> = st.bodies.iter().map(|_| std::cell::OnceCell::new()).collect();
     let mut entries: Vec<Entry> = Vec::with_capacity(list.len());
     // Did an entry name its body? The body is then kept with the feature, as when an entry lay
@@ -257,7 +274,7 @@ fn picked_faces_within(s: &Session, list: &[Value], body: Option<&str>, cmd: &st
     for (k, v) in list.iter().enumerate() {
         let entry = match face_ref_form(v).map_err(|why| bad(cmd, why))? {
             FaceRefForm::Name(name) => {
-                let hit = polykrom_doc::naming::locate_one(&st, body, name).map_err(|why| bad(cmd, why))?;
+                let hit = polykrom_doc::naming::locate_one(st, body, name).map_err(|why| bad(cmd, why))?;
                 let b = st.bodies.get(hit.body).ok_or_else(|| bad(cmd, format!("no face is named `{name}`")))?;
                 let spot = polykrom_doc::naming::face_spot(b, hit.face).ok_or_else(|| bad(cmd, format!("face `{name}` has no surface to pick")))?;
                 let one = Candidate { distance: 0.0, body: hit.body, face: hit.face, normal: Vec3::ZERO, checked: true };
@@ -346,11 +363,11 @@ fn picked_faces_within(s: &Session, list: &[Value], body: Option<&str>, cmd: &st
                         name_of(one.body, one.face)
                     ));
                 }
-                (settled_point(&st, e.point, one, cmd)?, (one.body, one.face))
+                (settled_point(st, e.point, one, cmd)?, (one.body, one.face))
             }
             _ => {
                 let Some(one) = e.normal.and_then(|n| facing(&near, n)) else {
-                    return Err(bad(cmd, ambiguous_text(&st, e.given, &near)));
+                    return Err(bad(cmd, ambiguous_text(st, e.given, &near)));
                 };
                 // Settled by `normal`: the stored point moves inside that face, as a named
                 // face's does, so the kernel finds the same face.
