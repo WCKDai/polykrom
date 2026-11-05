@@ -341,8 +341,8 @@ fn floating_fit_uses_the_measured_browser_and_history_cards_at_each_size() {
         let layout = h.app.viewport.layout.as_ref().unwrap();
         for name in ["browser:card", "history:card"] {
             let card = crate::scenario::rect_of(name).unwrap();
-            // (The browser column starts beside the document bar, above the scene's top.)
-            assert!(card.intersect(layout.viewport).is_positive() && layout.viewport.x_range().contains(card.center().x), "{name}: {card:?} {layout:?}");
+            // The browser is a full-height column beside the scene and the history a strip below
+            // it (view 01); the model's free `drawable` area keeps clear of both.
             assert!(!layout.drawable.intersect(card).is_positive(), "{name}: {card:?} {layout:?}");
         }
         let projection = crate::viewport::projection(&h.app, layout.viewport);

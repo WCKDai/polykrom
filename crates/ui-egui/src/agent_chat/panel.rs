@@ -136,19 +136,14 @@ pub fn show(app: &mut SolveApp, ui: &mut egui::Ui) {
     }
 }
 
-/// Horizontal room reserved before the history and browser when Assistant is on the left.
-pub(crate) fn left_inset(app: &SolveApp, available: Rect) -> f32 {
-    if Container::for_layout(app.ui.layout, Surface::Panel).floating()
-        && shown(app)
-        && app.agent_chat.open
-        && !app.preferences.agent_chat_popped
-        && app.preferences.agent_chat_side == "left"
-    {
-        let width = if app.preferences.agent_chat_minimized { STRIP } else { app.preferences.agent_chat_width.clamp(MIN_WIDTH, MAX_WIDTH) };
-        (width + crate::shell::SHELL_GAP).min(available.width().max(0.0))
-    } else {
-        0.0
-    }
+/// Horizontal room the floating Assistant reserves before the history and browser when it is on
+/// the left. In the design kit's shell the Design Browser is a full-height column and the
+/// Assistant floats over the scene beside it (view 01), rather than claiming the window's left
+/// edge, so a floating Assistant no longer pushes the browser or the vertical history aside: it
+/// overlays the scene and the model's projection stays put. A docked Assistant still reserves its
+/// edge through the shared container, not through this inset.
+pub(crate) fn left_inset(_app: &SolveApp, _available: Rect) -> f32 {
+    0.0
 }
 
 /// Assistant-specific precedence over tool sheets. Keep this out of the shared container:
@@ -176,6 +171,16 @@ fn floating_bounds(app: &SolveApp, available: Rect, left: bool) -> Rect {
     let mut bounds = available.shrink(gap);
     // The ribbon already supplies the top gap shared by browser and history cards.
     bounds.min.y = available.top();
+    // A left Assistant floats over the scene beside the Design Browser column (view 01), not
+    // over the column itself; a vertical history shares that left edge, so clear it too.
+    if left {
+        if let Some(browser) = app.shell.browser.filter(|_| crate::shell::browser_is_column(app)) {
+            bounds.min.x = (browser.right() + gap).clamp(bounds.left(), bounds.right());
+        }
+        if let Some(history) = app.shell.history.filter(|_| app.ui.show_timeline && app.preferences.timeline_left) {
+            bounds.min.x = bounds.min.x.max(history.right() + gap).min(bounds.right());
+        }
+    }
     if let Some(history) = app.shell.history.filter(|_| app.ui.show_timeline && !app.preferences.timeline_left) {
         bounds.max.y = (history.top() - gap).min(bounds.bottom()).max(bounds.top());
     }

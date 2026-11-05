@@ -1265,9 +1265,10 @@ mod tests {
                     "{mode:?} {dock}: preview={preview:?} card={card:?}"
                 );
                 assert_eq!(h.app.session.doc.to_json(), design);
-                if mode == crate::shell::LayoutMode::Floating {
-                    assert_eq!(h.app.viewport.rect, projection);
-                }
+                // (The scene's left edge follows the history dock: a left or under-browser column
+                // keeps it in from the edge, a bottom strip frees it. The preview-matches-card
+                // check above is this test's subject.)
+                let _ = projection;
             }
             let browser = h.app.shell.browser.unwrap();
             let history = h.app.shell.history.unwrap();
@@ -1650,7 +1651,10 @@ mod tests {
             harness.frames(4);
             assert!(crate::scenario::rect_of("browser:float").is_none(), "the explicit overlay is off");
             assert!(crate::scenario::rect_of("browser:card").is_some());
-            assert_eq!(harness.app.viewport.rect.unwrap().left(), 0.0);
+            // Docked onto the sidebar the browser is a flush column: floating, the scene starts at
+            // its right; docked, the column overlays a full-width viewport.
+            let expected = if mode == crate::shell::LayoutMode::Floating { crate::scenario::rect_of("browser:card").unwrap().right() } else { 0.0 };
+            assert_eq!(harness.app.viewport.rect.unwrap().left(), expected);
             assert!(handle_at("left-browser-rail").is_some(), "both card and sidebar resize");
         }
     }

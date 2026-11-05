@@ -80,7 +80,9 @@ fn browser_card_fills_its_column_and_scrolls_without_covering_history() {
     h.settle();
     let tall = rect_of("browser:card").unwrap();
     assert_eq!(tall, short, "the column keeps its height whatever it lists");
-    assert!(h.app.viewport.rect.unwrap().x_range().contains(tall.center().x) && tall.bottom() <= h.app.viewport.rect.unwrap().bottom());
+    // The browser is a full-height column at the left; the scene sits flush to its right.
+    assert_eq!(h.app.viewport.rect.unwrap().left(), tall.right());
+    assert!(tall.bottom() <= h.app.viewport.rect.unwrap().bottom());
     assert!(handle_at("row:Sketch34").is_none(), "last row starts below the scroll clip");
     let camera = h.app.cam;
     h.call("ui.scroll", json!({"x":tall.center().x,"y":tall.center().y,"delta":-1800}));
@@ -91,13 +93,20 @@ fn browser_card_fills_its_column_and_scrolls_without_covering_history() {
 
     h.call("ui.set", json!({"layout":"docked"}));
     h.settle();
+    // Docked, the column hugs the window's left edge; the viewport spans the width behind it and
+    // keeps its model clear of the column through `covered`.
     assert_eq!(rect_of("browser:card").unwrap().left(), 0.0);
     assert_eq!(h.app.viewport.rect.unwrap().left(), 0.0);
     assert!(drawn_rows().iter().all(|(_, rect, _, _)| rect.height() == 26.0));
     h.call("ui.set", json!({"layout":"floating"}));
+    // Folding the design's root empties the tree but the column keeps its full height; folding
+    // the card itself to its header is what shrinks it.
     h.app.tree.collapsed.insert("c0".into());
     h.settle();
-    assert!(rect_of("browser:card").unwrap().height() < short.height());
+    assert_eq!(rect_of("browser:card").unwrap().height(), short.height());
+    h.app.tree.panel_collapsed = true;
+    h.settle();
+    assert!(rect_of("browser:card").unwrap().height() < short.height() / 2.0);
 }
 
 #[test]
@@ -280,7 +289,10 @@ fn one_browser_keeps_its_resized_width_across_layouts_and_overlay_preferences() 
             assert_eq!(crate::scenario::handles("browser:header").len(), 1, "only one browser header");
             assert_eq!(drawn_rows().iter().filter(|(name, ..)| name == "Untitled").count(), 1, "only one tree");
             assert!((rect_of("browser:card").unwrap().width() - 310.0).abs() < 1.0);
-            assert_eq!(h.app.viewport.rect.unwrap().left(), 0.0);
+            // Floating, a browser column pushes the scene to its right; a floating overlay browser,
+            // and the docked layout (the column overlays a full-width viewport), leave it at 0.
+            let expected_left = if mode == LayoutMode::Floating && !overlay { rect_of("browser:card").unwrap().right() } else { 0.0 };
+            assert_eq!(h.app.viewport.rect.unwrap().left(), expected_left);
             let rail = handle_at("left-browser-rail").unwrap();
             h.call("ui.drag", json!({"x0":rail.x,"y0":rail.y,"x1":rail.x+60.0,"y1":rail.y,"steps":6}));
             h.settle();
@@ -336,7 +348,16 @@ fn resizing_browser_card_and_column_persists_width_including_floating_preference
         let width = h.app.preferences.browser_width;
         assert!(width > crate::prefs::DEFAULT_BROWSER_WIDTH + 40.0, "{mode:?}, float={float}, width={width}");
         assert!((rect_of("browser:card").unwrap().width() - width).abs() < 1.0);
-        assert_eq!(h.app.viewport.rect.unwrap(), before, "browser resizing leaves the projection intact");
+        // Floating, a browser column stays flush to the scene, so widening it moves the scene's
+        // left edge while its right, top and bottom hold. Docked (the column overlays a full-width
+        // viewport) and a floating overlay browser leave the projection intact.
+        let now = h.app.viewport.rect.unwrap();
+        if mode == LayoutMode::Floating && !float {
+            assert_eq!(now.left(), rect_of("browser:card").unwrap().right(), "the scene stays flush to the widened column");
+            assert_eq!((now.right(), now.top(), now.bottom()), (before.right(), before.top(), before.bottom()));
+        } else {
+            assert_eq!(now, before, "the projection is intact");
+        }
         let mut restored = SolveApp::new(Default::default(), Default::default());
         restored.load_prefs(&h.app.prefs());
         assert_eq!(restored.preferences.browser_width, width);

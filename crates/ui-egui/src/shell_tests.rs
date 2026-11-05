@@ -109,7 +109,9 @@ fn floating_sketch_palette_and_compass_share_measured_clearance() {
     for style in crate::prefs::NavigatorStyle::ALL {
         // The short window keeps 43 points more than it did for the AI review's prompt row under
         // the ribbon, so it is as short as before relative to the controls.
-        for (width, height, scale) in [(1400.0, 900.0, 1.0), (700.0, 770.0, 2.0)] {
+        // The heights carry the design kit's shell (the document tabs and the view bar, the
+        // taller history strip and the status bar) on top of the room the palette needs.
+        for (width, height, scale) in [(1400.0, 1080.0, 1.0), (700.0, 960.0, 2.0)] {
             let mut h = Harness::new();
             h.app.preferences.navigator_style = style;
             h.call("ui.resize", json!({"width":width,"height":height}));
@@ -219,14 +221,16 @@ fn floating_browser_clears_cards_shields_input_and_can_dock_again() {
             assert!(crate::scenario::handle_at("left-browser-rail").is_some());
             assert!(covered(&h.app, browser.center()));
             let viewport = h.app.viewport.rect.unwrap();
-            // A left-side history still takes a column in Docked mode.
-            if mode == LayoutMode::Floating || !timeline_left {
+            // A floating overlay browser leaves the scene its full width; a left-docked vertical
+            // history, in either layout, takes a column that pushes the scene right.
+            if !timeline_left {
                 assert_eq!(viewport.left(), 0.0);
             } else {
                 assert!(viewport.left() > 0.0);
             }
             if mode == LayoutMode::Floating {
-                assert_eq!(viewport.top(), toolbar::APP_BAR_HEIGHT);
+                // The scene starts below the document tabs and the view bar (view 01).
+                assert_eq!(viewport.top(), h.app.shell.document_bar.map_or(toolbar::APP_BAR_HEIGHT, |s| s.bottom()));
                 assert!(!browser.intersect(rect_of("ribbon:card").unwrap()).is_positive());
             }
             h.app.fit_view();
@@ -268,9 +272,12 @@ fn browser_and_history_cards_block_input_while_their_gaps_and_space_below_browse
     let browser = rect_of("browser:card").unwrap();
     let history = rect_of("history:card").unwrap();
     let viewport = h.app.viewport.rect.unwrap();
-    assert_eq!(history.left(), viewport.left() + SHELL_GAP);
+    // The history card spans the window's width below the scene, inset by the shell gap; the
+    // scene itself starts right of the full-height browser column.
+    assert_eq!(history.left(), SHELL_GAP);
     assert_eq!(history.right(), viewport.right() - SHELL_GAP);
     assert_eq!(history.bottom(), viewport.bottom() - SHELL_GAP);
+    assert_eq!(viewport.left(), browser.right());
     let layout = h.app.viewport.layout.as_ref().unwrap();
     assert!(layout.navigation.bottom() < history.top());
     assert!(layout.axis_view.top() >= rect_of("ribbon:card").unwrap().bottom());
@@ -287,8 +294,9 @@ fn browser_and_history_cards_block_input_while_their_gaps_and_space_below_browse
         h.call("ui.drag", json!({"x0":at.x,"y0":at.y,"x1":at.x+10.0,"y1":at.y+2.0,"button":"middle","steps":6}));
         assert_eq!(h.app.cam, camera);
     }
-    // (The browser is a full-height column: the gap beside it and beside the history stay viewport.)
-    for at in [pos2(3.0, browser.center().y), pos2(3.0, history.center().y)] {
+    // The open scene, right of the browser column and between the strip and the history, takes
+    // the pointer.
+    for at in [pos2(browser.right() + 40.0, viewport.center().y), pos2(viewport.center().x, history.top() - 20.0)] {
         assert!(!covered(&h.app, at));
         h.call("ui.move", json!({"x":at.x,"y":at.y}));
         assert_eq!(h.app.viewport.mouse, Some(at));
@@ -316,8 +324,11 @@ fn left_history_and_browser_share_the_left_edge_without_moving_right_controls() 
         assert!(crate::scenario::handle_at("timeline:First").is_some());
         let viewport = h.app.viewport.rect.unwrap();
         let content = content_rect(&h.app, viewport);
-        assert_eq!(viewport.left(), if mode == LayoutMode::Floating { 0.0 } else { crate::ui_kit::history_width(true) });
-        assert_eq!(content.left(), browser.right() + Container::for_layout(mode, Surface::Panel).gap());
+        // The vertical history and the browser share the left edge. Floating, the scene starts
+        // flush to the right of the browser column; docked, the viewport spans from the history
+        // column's right with the browser overlaying it, and the content area starts past both.
+        assert_eq!(viewport.left(), if mode == LayoutMode::Floating { browser.right() } else { history.right() });
+        assert!(content.left() >= history.right(), "the content area starts right of the vertical history");
         assert_eq!(content.bottom(), viewport.bottom());
         if mode == LayoutMode::Floating {
             assert!(covered(&h.app, history.center()));
@@ -359,9 +370,10 @@ fn assistant_floats_without_changing_projection_and_shields_the_model() {
                 assert!(layout.axis_view.right() < original_controls.axis_view.right(), "compass moves left");
                 assert!(layout.navigation.center().x < original_controls.navigation.center().x, "navigation moves left");
             } else {
+                // The left Assistant floats over the scene beside the full-height browser column
+                // (view 01), clear of it, without moving the model's projection.
                 let browser = h.app.shell.browser.expect("browser card");
-                assert!(card.right() < browser.left(), "left Assistant precedes browser");
-                assert!((card.top() - browser.top()).abs() < 1.0, "Assistant and browser share the top margin");
+                assert!(card.left() >= browser.right(), "left Assistant floats beside the browser column: {card:?} {browser:?}");
             }
             let camera = h.app.cam;
             let at = card.center();
@@ -396,12 +408,15 @@ fn assistant_floats_without_changing_projection_and_shields_the_model() {
             if side == "right" {
                 assert_eq!(folded_controls.navigation, original_controls.navigation);
             } else {
-                let shift = (folded.width() + SHELL_GAP) / 2.0;
-                assert!((folded_controls.navigation.center().x - original_controls.navigation.center().x - shift).abs() < 1.0);
+                // The minimized Assistant floats over the scene without reserving a column, so it
+                // leaves the navigation where it was (the model's controls do not move for it).
+                assert_eq!(folded_controls.navigation, original_controls.navigation);
             }
             h.call("ui.agent_chat", serde_json::json!({"open":false}));
             h.frames(3);
-            assert!(!covered(&h.app, card.center()), "closed chat leaves no stale obstruction");
+            // Probed beside the browser column, which keeps the card's inner edge when it closes.
+            let probe = if side == "right" { pos2(card.left() + 10.0, card.center().y) } else { pos2(card.right() - 10.0, card.center().y) };
+            assert!(!covered(&h.app, probe), "closed chat leaves no stale obstruction");
         }
     }
 }
@@ -451,7 +466,14 @@ fn assistant_left_dock_precedes_history_and_drag_hints_match_the_result() {
                 if left {
                     let history = h.app.shell.history.expect("vertical history");
                     let browser = h.app.shell.browser.expect("browser");
-                    assert!(card.right() <= history.left(), "Assistant precedes history: {card:?} {history:?}");
+                    // Compact (docked) the Assistant reserves the outer left edge, before the
+                    // vertical history and the browser column; floating it docks as a card beside
+                    // them, over the scene, clear of the history column.
+                    if layout == "docked" {
+                        assert!(card.right() <= history.left(), "Assistant precedes history: {card:?} {history:?}");
+                    } else {
+                        assert!(card.left() >= history.right(), "Assistant docks beside history: {card:?} {history:?}");
+                    }
                     if stacked {
                         assert!((history.left() - browser.left()).abs() < 1.0);
                         assert!((history.width() - browser.width()).abs() < 1.0);
@@ -530,9 +552,9 @@ fn tool_sheets_drag_over_browser_and_history_but_clear_protected_panels() {
             assert!(!sheet.intersect(chat).is_positive(), "{side}: {sheet:?} overlaps Assistant {chat:?}");
             assert!(!sheet.intersect(ribbon).is_positive(), "sheet clears ribbon");
             if target == browser.center() {
-                assert!(sheet.intersect(browser).is_positive(), "sheet can cover Browser");
-                let layer = h.ctx.layer_id_at(sheet.intersect(browser).center()).unwrap();
-                assert_eq!(layer.id, egui::Id::new(("sc_dialog", "CREATE SKETCH")), "sheet receives input above Browser");
+                // The browser is a full-height column beside the scene (view 01), not an overlay
+                // inside it, so a tool sheet dragged at it clamps to the scene and clears it.
+                assert!(!sheet.intersect(browser).is_positive(), "sheet clears the browser column");
             } else if target == history.center() {
                 assert!(sheet.intersect(history).is_positive(), "sheet can cover History");
             }
@@ -682,3 +704,6 @@ fn ribbon_labels_are_saved_independently_and_icon_only_commands_remain_reachable
     }
     assert!(crate::prefs::lenient(&json!({})).ribbon_labels);
 }
+
+
+

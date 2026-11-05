@@ -191,7 +191,10 @@ impl Harness {
             queue: None,
             time: 0.0,
             hidden: false,
-            size: egui::vec2(1600.0, 1000.0),
+            // 1000 points of viewport plus the design kit's shell along the edges (the document
+            // tabs and the view bar at the top, the taller history strip and the status bar at
+            // the bottom), so the scene keeps the free height the tests were written for.
+            size: egui::vec2(1600.0, 1124.0),
             cam_mark: None,
         };
         WIDTHS.with(|m| m.borrow_mut().clear());

@@ -155,10 +155,32 @@ pub(crate) fn bottom_overlay_rect(app: &SolveApp, mut viewport: Rect) -> Rect {
     viewport
 }
 
-/// The floating scene: the pickable viewport below the document tabs and the view bar and right
-/// of the browser (view 01), from last frame's shell rects (they move only with the window).
+/// Whether the Design Browser is a flush full-height column (view 01), rather than a floating
+/// overlay card (the `browser_float` preference) that the scene keeps its full width under.
+pub(crate) fn browser_is_column(app: &SolveApp) -> bool {
+    app.ui.show_browser && !app.preferences.browser_float
+}
+
+/// The floating scene: the pickable viewport below the document tabs and the view bar (view 01)
+/// and flush against the Design Browser column at its left, from last frame's shell rects (they
+/// move only with the window). A floating overlay browser leaves the scene its full width.
 pub(crate) fn scene_rect(app: &SolveApp, full: Rect) -> Rect {
-    let mut scene = workspace_content(app, full);
+    let mut scene = full;
+    let gap = Container::for_layout(app.ui.layout, Surface::Panel).gap();
+    // A left-docked history column pushes the scene (and the browser beside it) right.
+    if app.ui.show_timeline
+        && app.preferences.timeline_left
+        && !browser_is_column(app)
+        && let Some(history) = app.shell.history
+    {
+        scene.min.x = (history.right() + gap).clamp(full.left(), full.right());
+    }
+    // The browser column is flush against the scene (view 01): no gap between them.
+    if browser_is_column(app)
+        && let Some(browser) = app.shell.browser
+    {
+        scene.min.x = browser.right().clamp(full.left(), full.right());
+    }
     if let Some(strip) = app.shell.document_bar {
         scene.min.y = strip.bottom().clamp(scene.top(), scene.bottom());
     }
@@ -181,8 +203,12 @@ pub(crate) fn workspace_content(app: &SolveApp, mut content: Rect) -> Rect {
             content.max.y = (history.top() - gap).clamp(content.top(), content.bottom());
         }
     }
-    if let Some(browser) = app.shell.browser {
-        content.min.x = (browser.right() + gap).clamp(content.left(), content.right());
+    // The browser column is flush against the content area (view 01); a floating overlay browser
+    // reserves nothing.
+    if browser_is_column(app)
+        && let Some(browser) = app.shell.browser
+    {
+        content.min.x = browser.right().clamp(content.left(), content.right());
     }
     content
 }
@@ -205,13 +231,9 @@ pub(crate) const PANEL_MIN_HEIGHT: f32 = 350.0;
 pub(crate) fn panel_top(app: &SolveApp, viewport: Rect, bottom: f32, side: crate::frame::Side) -> f32 {
     let content = content_rect(app, viewport);
     if side == crate::frame::Side::Right {
-        // With the document bar (view 01), the right-hand properties/dialog column is level with
-        // the view bar, keeping its full height; the compass sits inside the viewport beside it
-        // (the viewport layout makes it avoid this column). Without the bar, fall back to docking
-        // below the measured compass, reclaiming space on short views.
-        if let Some(strip) = app.shell.document_bar.filter(|s| s.top().is_finite()) {
-            return strip.top().min((bottom - PANEL_MIN_HEIGHT).max(strip.top()));
-        }
+        // The right-hand properties and feature dialogs dock below the measured compass, as they
+        // did before the design kit shell (a later task restyles that column); on a short view
+        // they reclaim the compass's space rather than shrink below it.
         app.viewport
             .layout
             .as_ref()
