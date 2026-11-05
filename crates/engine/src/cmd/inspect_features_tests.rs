@@ -719,6 +719,191 @@ fn two_alike_fillets_or_chamfers_are_not_a_pattern() {
     assert!(patterns[0].get("count2").is_none(), "{b}");
 }
 
+/// A plate with `kind` (`hole` or `boss`) features at `centres`, as one sketch cut or join (far
+/// faster than one feature per member, for plates of hundreds).
+fn plate_with(kind: &str, centres: &[(f64, f64)]) -> Session {
+    let mut s = Session::default();
+    run(&mut s, "solid.box", json!({"length": 200, "width": 200, "height": 6, "corner": [0, 0, 0], "body_name": "Plate"}));
+    run(&mut s, "sketch.create", json!({"plane": {"origin": [0, 0, 6], "x_dir": [1, 0, 0], "y_dir": [0, 1, 0]}}));
+    for (x, y) in centres {
+        run(&mut s, "sketch.circle.center", json!({"center": [x, y], "radius": 2.5}));
+    }
+    run(&mut s, "sketch.finish", json!({}));
+    let (distance, operation) = if kind == "hole" { (-6, "cut") } else { (4, "join") };
+    run(&mut s, "solid.extrude", json!({"distance": distance, "operation": operation, "targets": ["Plate"]}));
+    s
+}
+
+/// The centres of a `c1` × `c2` grid from (20, 20) at `p1` along x and `p2` along y.
+fn grid_centres(c1: usize, c2: usize, p1: f64, p2: f64) -> Vec<(f64, f64)> {
+    (0..c1).flat_map(|i| (0..c2).map(move |j| (20.0 + p1 * i as f64, 20.0 + p2 * j as f64))).collect()
+}
+
+/// A `c1` × `c2` grid of holes or bosses made with `solid.pattern.rectangular`, whose fitted
+/// positions carry the kernel's noise.
+fn patterned_grid(kind: &str, c1: usize, c2: usize, p1: f64, p2: f64) -> Session {
+    let mut s = Session::default();
+    run(&mut s, "solid.box", json!({"length": 200, "width": 200, "height": 8, "corner": [0, 0, 0], "body_name": "Plate"}));
+    if kind == "hole" {
+        run(&mut s, "solid.hole", json!({"position": [20, 20, 8], "diameter": 6, "name": "Seed"}));
+    } else {
+        run(
+            &mut s,
+            "solid.cylinder",
+            json!({"base": [20, 20, 8], "diameter": 10, "height": 5, "operation": "join", "targets": ["Plate"], "name": "Seed"}),
+        );
+    }
+    run(
+        &mut s,
+        "solid.pattern.rectangular",
+        json!({"features": ["Seed"], "dir1": [1, 0, 0], "count1": c1, "spacing1": p1, "dir2": [0, 1, 0], "count2": c2, "spacing2": p2}),
+    );
+    s
+}
+
+/// The one pattern of `b` is a `c1` × `c2` lattice of `kind` at `p1` along +x and `p2` along +y.
+fn assert_one_grid(b: &Value, kind: &str, c1: usize, c2: usize, p1: f64, p2: f64) {
+    let patterns = list(&b["patterns"]);
+    assert_eq!(patterns.len(), 1, "{b}");
+    let p = &patterns[0];
+    assert_eq!(p["type"], "linear", "{p}");
+    assert_eq!(p["feature_type"], kind, "{p}");
+    assert_eq!(p["count"], c1 * c2, "{p}");
+    assert_eq!(p["count1"], c1, "{p}");
+    exact(&p["pitch1"], p1);
+    exact3(&p["direction1"], [1.0, 0.0, 0.0]);
+    assert_eq!(p["count2"], c2, "{p}");
+    exact(&p["pitch2"], p2);
+    exact3(&p["direction2"], [0.0, 1.0, 0.0]);
+    assert_eq!(list(&p["members"]).len(), c1 * c2, "{p}");
+}
+
+/// A rectangular grid of three or more rows and columns is one lattice, never rows of three nor
+/// a ring of four about its centre: the fitted positions carry noise of about 1e-14, so the
+/// lattice's origin must not depend on which member sorts lowest.
+#[test]
+fn grids_of_three_or_more_rows_and_columns_are_one_lattice() {
+    for (kind, c1, c2, p1, p2) in [
+        ("hole", 3, 3, 30.0, 40.0),
+        ("hole", 3, 3, 30.0, 30.0),
+        ("hole", 3, 4, 30.0, 30.0),
+        ("boss", 3, 3, 30.0, 40.0),
+        ("boss", 3, 3, 30.0, 30.0),
+        ("boss", 3, 4, 30.0, 40.0),
+    ] {
+        let mut s = patterned_grid(kind, c1, c2, p1, p2);
+        let b = features(&mut s, "Plate");
+        assert_eq!(of_type(&b, kind).len(), c1 * c2, "{kind} {c1}x{c2}: {b}");
+        assert_one_grid(&b, kind, c1, c2, p1, p2);
+    }
+    // The lattice fit itself, with the noise the kernel leaves: the member lowest in x is in the
+    // middle row, so counting cells from it would put the first row at a negative index.
+    let mut pts = Vec::new();
+    for i in 0..3 {
+        for j in 0..3 {
+            let x = 20.0 + 30.0 * i as f64 + if j == 1 { -2e-14 } else { 0.0 };
+            pts.push(Vec3::new(x, 20.0 + 30.0 * j as f64, 8.0));
+        }
+    }
+    let l = super::lattice(&pts, 1e-3).unwrap_or_else(|| panic!("no lattice through {pts:?}"));
+    assert_eq!((l.count1, l.count2), (3, 3));
+    assert!((l.v1 - Vec3::new(30.0, 0.0, 0.0)).len() < 1e-9 && (l.v2 - Vec3::new(0.0, 30.0, 0.0)).len() < 1e-9, "{:?} {:?}", l.v1, l.v2);
+}
+
+/// A grid beside a lone alike feature is the grid and the feature: the grid is read as a lattice
+/// among the rows and rings, and a whole grid beats a ring of four at a square's corners.
+#[test]
+fn a_grid_beside_a_lone_feature_is_the_grid_and_the_feature() {
+    for kind in ["hole", "boss"] {
+        let mut centres = grid_centres(3, 3, 30.0, 30.0);
+        centres.push((160.0, 160.0));
+        let mut s = plate_with(kind, &centres);
+        let b = features(&mut s, "Plate");
+        assert_eq!(of_type(&b, kind).len(), 10, "{b}");
+        assert_one_grid(&b, kind, 3, 3, 30.0, 30.0);
+        let lone = of_type(&b, kind).iter().position(|f| (num(&f["axis"]["origin"][0]) - 160.0).abs() < 1e-9).unwrap_or_else(|| panic!("{b}"));
+        assert!(!list(&b["patterns"][0]["members"]).contains(&json!(lone)), "{b}");
+    }
+    // Two grids on one plate are two lattices; a grid and a ring are the grid and the ring.
+    let mut centres = grid_centres(3, 4, 30.0, 30.0);
+    centres.extend(grid_centres(3, 3, 30.0, 40.0).into_iter().map(|(x, y)| (x + 110.0, y)));
+    let mut s = plate_with("hole", &centres);
+    let b = features(&mut s, "Plate");
+    let patterns = list(&b["patterns"]);
+    assert_eq!(patterns.len(), 2, "{b}");
+    let counts: Vec<(u64, u64)> = patterns.iter().map(|p| (p["count1"].as_u64().unwrap(), p["count2"].as_u64().unwrap())).collect();
+    assert_eq!(counts, vec![(3, 4), (3, 3)], "{b}");
+    let mut centres = grid_centres(3, 3, 30.0, 30.0);
+    centres.extend((0..6).map(|k| {
+        let a = std::f64::consts::PI / 3.0 * k as f64;
+        (150.0 + 30.0 * a.cos(), 150.0 + 30.0 * a.sin())
+    }));
+    let mut s = plate_with("hole", &centres);
+    let b = features(&mut s, "Plate");
+    let patterns = list(&b["patterns"]);
+    assert_eq!(patterns.len(), 2, "{b}");
+    assert_eq!((patterns[0]["type"].as_str(), patterns[0]["count"].as_u64()), (Some("linear"), Some(9)), "{b}");
+    assert_eq!((patterns[1]["type"].as_str(), patterns[1]["count"].as_u64()), (Some("circular"), Some(6)), "{b}");
+    exact(&patterns[1]["radius"], 30.0);
+}
+
+/// A blind hole with a rounded floor edge is as deep as its floor: the round is its last step,
+/// and the depth runs from the entry plane to the floor, not to the end of the wall.
+#[test]
+fn a_blind_hole_with_a_rounded_floor_is_as_deep_as_its_floor() {
+    let mut s = Session::default();
+    run(&mut s, "solid.box", json!({"length": 60, "width": 40, "height": 20, "corner": [0, 0, 0], "body_name": "Block"}));
+    run(&mut s, "solid.hole", json!({"position": [30, 20, 20], "diameter": 10, "depth": 12, "name": "H"}));
+    run(&mut s, "solid.fillet", json!({"edges": [[35, 20, 8]], "radius": 1}));
+    let b = features(&mut s, "Block");
+    let holes = of_type(&b, "hole");
+    assert_eq!(holes.len(), 1, "{b}");
+    let h = holes[0];
+    assert_eq!(h["through"], false, "{h}");
+    exact(&h["depth"], 12.0);
+    exact(&h["diameter"], 10.0);
+    assert_eq!(h["entry_face"], "F1:+z", "{h}");
+    assert_eq!(h["floor_face"], "F2:bore:base", "{h}");
+    let steps = list(&h["steps"]);
+    assert_eq!(steps.len(), 2, "{h}");
+    assert_eq!(steps[0]["kind"], "bore", "{h}");
+    exact(&steps[0]["from"], 0.0);
+    exact(&steps[0]["depth"], 11.0);
+    assert_eq!(steps[1]["kind"], "round", "{h}");
+    exact(&steps[1]["from"], 11.0);
+    exact(&steps[1]["depth"], 1.0);
+    exact(&steps[1]["radius"], 1.0);
+    assert_eq!(names(&h["faces"]).len(), 5, "the bore's halves, the floor and the round's halves: {h}");
+    assert!(h.get("approximate").is_none() && h.get("note").is_none(), "{h}");
+    // Rounded at the mouth as well: still the floor's depth.
+    run(&mut s, "solid.fillet", json!({"edges": [[35, 20, 20]], "radius": 1}));
+    let b = features(&mut s, "Block");
+    let h = of_type(&b, "hole")[0];
+    exact(&h["depth"], 12.0);
+    assert_eq!(list(&h["steps"]).len(), 3, "{h}");
+}
+
+/// A perforated plate of any number of holes is one lattice (that fit is linear in the holes);
+/// only the search for grids, rows and rings within a group stops at 256 members, and a group it
+/// skips is noted on the body.
+#[test]
+fn a_perforated_plate_is_one_lattice_and_a_larger_search_is_noted() {
+    let mut s = plate_with("hole", &grid_centres(17, 17, 10.0, 10.0));
+    let b = features(&mut s, "Plate");
+    assert_eq!(of_type(&b, "hole").len(), 289, "{}", b["face_count"]);
+    assert_one_grid(&b, "hole", 17, 17, 10.0, 10.0);
+    assert!(b.get("note").is_none(), "{}", b["note"]);
+    // 256 on a grid and one beside them: not one lattice, and one too many to search.
+    let mut centres = grid_centres(16, 16, 10.0, 10.0);
+    centres.push((190.0, 190.0));
+    let mut s = plate_with("hole", &centres);
+    let b = features(&mut s, "Plate");
+    assert_eq!(of_type(&b, "hole").len(), 257, "{}", b["face_count"]);
+    assert!(list(&b["patterns"]).is_empty(), "{}", b["patterns"]);
+    let note = b["note"].as_str().unwrap_or_else(|| panic!("no note: {}", b["note"]));
+    assert!(note.contains("257") && note.contains("256") && note.contains("hole") && note.contains("no pattern"), "{note}");
+}
+
 #[test]
 fn the_command_changes_nothing() {
     let mut s = plate_with_four_holes();

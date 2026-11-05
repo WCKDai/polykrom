@@ -40,7 +40,8 @@ const ANG: f64 = 1e-5;
 const CHAMFER_ANG: f64 = 1e-3;
 /// Fewest members of a pattern: two alike features are just two features.
 const MIN_PATTERN: usize = 3;
-/// Most members a pattern search looks at (the search is cubic).
+/// Most members of a group the search for the grids, rows and rings within it looks at (that
+/// search is cubic); a group of any size is still read as one lattice or one circle.
 const MAX_PATTERN_GROUP: usize = 256;
 
 fn features(s: &mut Session, p: &Value) -> Result<Value> {
@@ -92,17 +93,21 @@ fn body_features(b: &polykrom_doc::ModelBody) -> Value {
     pockets(&topo, &mut r);
     blends(&topo, &mut r);
     chamfers(&topo, &mut r);
-    let patterns = patterns(&topo, &r.features);
+    let (patterns, notes) = patterns(&topo, &r.features);
     let unrecognised = unrecognised(&topo, &r);
     let names = |fs: &[usize]| topo.names_of(fs);
-    json!({
+    let mut v = json!({
         "body": b.name,
         "face_count": topo.faces.len(),
         "features": r.features.iter().enumerate().map(|(i, f)| f.json(i, &topo)).collect::<Vec<_>>(),
         "patterns": patterns,
         "unrecognised": unrecognised,
         "uncertain": r.uncertain.iter().map(|u| json!({"could_be": u.could_be, "faces": names(&u.faces), "reason": u.reason})).collect::<Vec<_>>(),
-    })
+    });
+    if !notes.is_empty() {
+        v["note"] = json!(notes.join("; "));
+    }
+    v
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -1163,6 +1168,8 @@ fn holes_and_bosses(t: &Topo, r: &mut Recognised) {
                         angle_deg: None,
                         radius: Some(*minor),
                     });
+                    // A round at the floor reaches the floor: the depth goes with it.
+                    bottom_at = Some(far);
                 }
             }
         }
@@ -1772,45 +1779,51 @@ struct Lattice {
     v2: Vec3,
 }
 
+/// The points as one row (`count2` 1) or one grid, every cell filled, else `None`. Linear in the
+/// points.
 fn lattice(points: &[Vec3], tol: f64) -> Option<Lattice> {
     let n = points.len();
     if n < MIN_PATTERN {
         return None;
     }
-    let p0 = *points.iter().min_by(|a, b| (a.x, a.y, a.z).partial_cmp(&(b.x, b.y, b.z)).unwrap_or(std::cmp::Ordering::Equal))?;
+    // The vectors are the steps to the nearest member and the nearest one off that line, from
+    // any member (the first): the fitted positions carry noise of about 1e-14, so the member
+    // lowest in x, y, z may well lie mid-row, and the cells are counted from the least along
+    // each vector afterwards instead. The vectors point up (+z, then +y, then +x), the same
+    // whichever member they were taken from.
+    let p0 = *points.first()?;
     let mut by_dist: Vec<Vec3> = points.iter().filter(|p| p.dist(p0) > tol).map(|p| *p - p0).collect();
     by_dist.sort_by(|a, b| a.len().total_cmp(&b.len()));
-    let v1 = *by_dist.first()?;
+    let v1 = upward(*by_dist.first()?);
     let d1 = v1.normalized()?;
-    // One row?
     let collinear = points.iter().all(|p| dist_to_line(*p, p0, d1) < tol);
-    if collinear {
-        let mut ks: Vec<f64> = points.iter().map(|p| (*p - p0).dot(d1) / v1.len()).collect();
-        ks.sort_by(f64::total_cmp);
-        let integral = ks.iter().enumerate().all(|(i, k)| (k - i as f64).abs() * v1.len() < tol);
-        return integral.then_some(Lattice { count1: n, v1, count2: 1, v2: Vec3::ZERO });
-    }
-    let v2 = by_dist.iter().copied().find(|v| v.cross(d1).len() > tol)?;
-    let nrm = v1.cross(v2).normalized()?;
-    if points.iter().any(|p| (*p - p0).dot(nrm).abs() > tol) {
-        return None;
-    }
-    // Integer coordinates of each member in (v1, v2).
-    let det = v1.cross(v2).dot(nrm);
+    let v2 = if collinear { Vec3::ZERO } else { upward(by_dist.iter().copied().find(|v| v.cross(d1).len() > tol)?) };
+    let nrm = if collinear { None } else { Some(v1.cross(v2).normalized()?) };
+    // Integer coordinates of each member in (v1, v2); every member must sit on a cell.
     let mut cells: Vec<(i64, i64)> = Vec::with_capacity(n);
     for p in points {
         let w = *p - p0;
-        let i = w.cross(v2).dot(nrm) / det;
-        let j = v1.cross(w).dot(nrm) / det;
+        let (i, j) = match nrm {
+            Some(nrm) => {
+                let det = v1.cross(v2).dot(nrm);
+                (w.cross(v2).dot(nrm) / det, v1.cross(w).dot(nrm) / det)
+            }
+            None => (w.dot(d1) / v1.len(), 0.0),
+        };
         let (ri, rj) = (i.round(), j.round());
-        if (p0 + v1 * ri + v2 * rj).dist(*p) > tol || ri < 0.0 || rj < 0.0 {
+        if !(ri.is_finite() && rj.is_finite()) || (p0 + v1 * ri + v2 * rj).dist(*p) > tol {
             return None;
         }
         cells.push((ri as i64, rj as i64));
     }
+    let i0 = cells.iter().map(|c| c.0).min()?;
+    let j0 = cells.iter().map(|c| c.1).min()?;
+    for c in &mut cells {
+        *c = (c.0 - i0, c.1 - j0);
+    }
     let c1 = cells.iter().map(|c| c.0).max()? + 1;
     let c2 = cells.iter().map(|c| c.1).max()? + 1;
-    if c1 < 2 || c2 < 2 || (c1 * c2) as usize != n {
+    if c1.checked_mul(c2).and_then(|c| usize::try_from(c).ok()) != Some(n) {
         return None;
     }
     cells.sort_unstable();
@@ -1818,10 +1831,174 @@ fn lattice(points: &[Vec3], tol: f64) -> Option<Lattice> {
     if cells.len() != n {
         return None;
     }
+    if collinear {
+        return Some(Lattice { count1: n, v1, count2: 1, v2: Vec3::ZERO });
+    }
     // The first direction is the one nearest the x axis (then y).
     let key = |v: Vec3| (-(v.x.abs() / v.len()), -(v.y.abs() / v.len()));
     let (v1, c1, v2, c2) = if key(v1) <= key(v2) { (v1, c1, v2, c2) } else { (v2, c2, v1, c1) };
     Some(Lattice { count1: c1 as usize, v1, count2: c2 as usize, v2 })
+}
+
+/// Every maximal run of `min` or more points equally stepped along a line, from every pair's
+/// direction and pitch, as sorted indices into `points`. Cubic in the points.
+fn runs(points: &[Vec3], tol: f64, min: usize) -> Vec<Vec<usize>> {
+    let mut out: BTreeSet<Vec<usize>> = BTreeSet::new();
+    for i in 0..points.len() {
+        for j in i + 1..points.len() {
+            let (Some(&pi), Some(&pj)) = (points.get(i), points.get(j)) else { continue };
+            let v = pj - pi;
+            let Some(d) = v.normalized() else { continue };
+            // The points on the line at whole steps from `pi`, by step.
+            let mut on: Vec<(i64, usize)> = Vec::new();
+            for (k, pk) in points.iter().enumerate() {
+                if dist_to_line(*pk, pi, d) > tol {
+                    continue;
+                }
+                let m = (*pk - pi).dot(d) / v.len();
+                if (m - m.round()).abs() * v.len() < tol && m.round().is_finite() {
+                    on.push((m.round() as i64, k));
+                }
+            }
+            on.sort_unstable();
+            let mut run: Vec<usize> = Vec::new();
+            let mut prev: Option<i64> = None;
+            for (idx, &(m, k)) in on.iter().enumerate() {
+                if prev.is_some_and(|pm| pm + 1 != m) {
+                    run.clear();
+                }
+                run.push(k);
+                prev = Some(m);
+                let last = on.get(idx + 1).is_none_or(|(nm, _)| *nm != m + 1);
+                if last && run.len() >= min {
+                    let mut r = run.clone();
+                    r.sort_unstable();
+                    out.insert(r);
+                }
+            }
+        }
+    }
+    out.into_iter().collect()
+}
+
+/// A pattern read from part of a group.
+enum Fit {
+    Linear(Lattice),
+    Ring(Circle),
+}
+
+/// The grids, rows and rings in a group that is not one lattice or one circle, as sorted indices
+/// into `pts`: every row of three or more equally stepped on a line; every grid of such rows
+/// alike in direction, pitch and count whose starts are equally stepped themselves (two rows
+/// only when side by side, straight across their direction); every rectangle of four; and every
+/// circle through three with the members on it. The largest first, a grid or row before a ring
+/// of the same size. Cubic in the points.
+fn partial_patterns(pts: &[Vec3], dir: Option<Vec3>, tol: f64) -> Vec<(Vec<usize>, Fit)> {
+    let mut out: Vec<(Vec<usize>, Fit)> = Vec::new();
+    let mut seen: BTreeSet<Vec<usize>> = BTreeSet::new();
+    let at = |set: &[usize]| -> Vec<Vec3> { set.iter().filter_map(|k| pts.get(*k).copied()).collect() };
+    let rows = runs(pts, tol, MIN_PATTERN);
+    // Rows alike in count, direction and pitch, each with its start (the member lowest along
+    // the direction).
+    let mut alike: Vec<(usize, Vec3, f64, Vec<(usize, Vec3)>)> = Vec::new();
+    for (ri, row) in rows.iter().enumerate() {
+        let on = at(row);
+        let (Some(&a), Some(&b)) = (on.first(), on.get(1)) else { continue };
+        let Some(d) = upward(b - a).normalized() else { continue };
+        let Some(lo) = on.iter().copied().min_by(|p, q| p.dot(d).total_cmp(&q.dot(d))) else { continue };
+        let Some(hi) = on.iter().copied().max_by(|p, q| p.dot(d).total_cmp(&q.dot(d))) else { continue };
+        let pitch = (hi - lo).dot(d) / on.len().saturating_sub(1).max(1) as f64;
+        match alike.iter_mut().find(|(c, ad, ap, _)| *c == on.len() && parallel(*ad, d) && (*ap - pitch).abs() < tol) {
+            Some((_, _, _, rs)) => rs.push((ri, lo)),
+            None => alike.push((on.len(), d, pitch, vec![(ri, lo)])),
+        }
+    }
+    for (_, d, _, rs) in &alike {
+        if rs.len() < 2 {
+            continue;
+        }
+        let starts: Vec<Vec3> = rs.iter().map(|(_, s)| *s).collect();
+        for run in runs(&starts, tol, 2) {
+            if let [a, b] = run.as_slice()
+                && let (Some(sa), Some(sb)) = (starts.get(*a), starts.get(*b))
+                && (*sb - *sa).dot(*d).abs() > tol
+            {
+                // Two rows alone make a grid only straight across their direction: offset,
+                // they are two rows.
+                continue;
+            }
+            let mut set: Vec<usize> = run.iter().filter_map(|i| rs.get(*i)).flat_map(|(ri, _)| rows.get(*ri).cloned().unwrap_or_default()).collect();
+            set.sort_unstable();
+            set.dedup();
+            if let Some(l) = lattice(&at(&set), tol)
+                && l.count2 > 1
+                && seen.insert(set.clone())
+            {
+                out.push((set, Fit::Linear(l)));
+            }
+        }
+    }
+    // Rectangles: two members straight across from two others are a 2 × 2 grid (four alone
+    // are one lattice, so four among others are one too, before a ring of four).
+    for i in 0..pts.len() {
+        for j in 0..pts.len() {
+            let (Some(&pi), Some(&pj)) = (pts.get(i), pts.get(j)) else { continue };
+            let v = pj - pi;
+            let Some(d) = v.normalized() else { continue };
+            for k in j + 1..pts.len() {
+                let Some(&pk) = pts.get(k).filter(|_| k != i) else { continue };
+                let w = pk - pi;
+                if w.len() <= tol || w.dot(d).abs() > tol {
+                    continue;
+                }
+                let far = pi + v + w;
+                let Some(m) = pts.iter().position(|p| p.dist(far) < tol) else { continue };
+                let mut set = vec![i, j, k, m];
+                set.sort_unstable();
+                set.dedup();
+                if set.len() == 4
+                    && !seen.contains(&set)
+                    && let Some(l) = lattice(&at(&set), tol)
+                    && l.count2 > 1
+                    && seen.insert(set.clone())
+                {
+                    out.push((set, Fit::Linear(l)));
+                }
+            }
+        }
+    }
+    for row in rows {
+        if let Some(l) = lattice(&at(&row), tol)
+            && seen.insert(row.clone())
+        {
+            out.push((row, Fit::Linear(l)));
+        }
+    }
+    // Rings: every triple's circle, the members on it.
+    for i in 0..pts.len() {
+        for j in i + 1..pts.len() {
+            for k in j + 1..pts.len() {
+                let (Some(&pi), Some(&pj), Some(&pk)) = (pts.get(i), pts.get(j), pts.get(k)) else { continue };
+                let Some(c) = circle(&[pi, pj, pk], dir, tol) else { continue };
+                let on: Vec<usize> = pts
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, p)| (p.dist(c.center) - c.radius).abs() < tol && (**p - c.center).dot(c.axis).abs() < tol)
+                    .map(|(m, _)| m)
+                    .collect();
+                if on.len() < MIN_PATTERN || seen.contains(&on) {
+                    continue;
+                }
+                if let Some(c) = circle(&at(&on), dir, tol)
+                    && seen.insert(on.clone())
+                {
+                    out.push((on, Fit::Ring(c)));
+                }
+            }
+        }
+    }
+    out.sort_by_key(|(set, fit)| (std::cmp::Reverse(set.len()), matches!(fit, Fit::Ring(_))));
+    out
 }
 
 /// A circle fit about an axis parallel to `axis_dir`: centre, radius, angle step, full circle.
@@ -1900,8 +2077,10 @@ fn upward(v: Vec3) -> Vec3 {
     if up { v } else { -v }
 }
 
-fn patterns(t: &Topo, features: &[Feature]) -> Vec<Value> {
-    // Alike features: same type, sizes and direction.
+/// The body's patterns, and notes on what was not searched.
+fn patterns(t: &Topo, features: &[Feature]) -> (Vec<Value>, Vec<String>) {
+    // Alike features: same type, sizes and direction. An approximate feature (read partly from
+    // the mesh) joins none.
     let mut groups: BTreeMap<String, Vec<usize>> = BTreeMap::new();
     for (i, f) in features.iter().enumerate() {
         if f.approximate {
@@ -1910,30 +2089,32 @@ fn patterns(t: &Topo, features: &[Feature]) -> Vec<Value> {
         groups.entry(f.signature()).or_default().push(i);
     }
     let mut out = Vec::new();
-    let mut taken: BTreeSet<usize> = BTreeSet::new();
+    let mut notes = Vec::new();
     let faces_of = |members: &[usize]| -> Vec<String> {
         let fs: Vec<usize> = members.iter().filter_map(|m| features.get(*m)).flat_map(|f| f.faces.iter().copied()).collect();
         t.names_of(&fs)
     };
-    let emit = |members: &[usize], f: &Feature, l: Option<&Lattice>, c: Option<&Circle>| {
+    let emit = |members: &[usize], f: &Feature, fit: &Fit| {
         let mut v = json!({"feature_type": f.type_name(), "members": members, "count": members.len(), "faces": faces_of(members)});
-        if let Some(l) = l {
-            v["type"] = json!("linear");
-            v["count1"] = json!(l.count1);
-            v["pitch1"] = json!(r9(l.v1.len()));
-            v["direction1"] = v9(l.v1.normalized().unwrap_or(Vec3::ZERO));
-            if l.count2 > 1 {
-                v["count2"] = json!(l.count2);
-                v["pitch2"] = json!(r9(l.v2.len()));
-                v["direction2"] = v9(l.v2.normalized().unwrap_or(Vec3::ZERO));
+        match fit {
+            Fit::Linear(l) => {
+                v["type"] = json!("linear");
+                v["count1"] = json!(l.count1);
+                v["pitch1"] = json!(r9(l.v1.len()));
+                v["direction1"] = v9(l.v1.normalized().unwrap_or(Vec3::ZERO));
+                if l.count2 > 1 {
+                    v["count2"] = json!(l.count2);
+                    v["pitch2"] = json!(r9(l.v2.len()));
+                    v["direction2"] = v9(l.v2.normalized().unwrap_or(Vec3::ZERO));
+                }
             }
-        }
-        if let Some(c) = c {
-            v["type"] = json!("circular");
-            v["angle_step_deg"] = json!(r9(deg(c.step)));
-            v["full_circle"] = json!(c.full);
-            v["radius"] = json!(r9(c.radius));
-            v["axis"] = json!({"origin": v9(c.center), "direction": v9(c.axis)});
+            Fit::Ring(c) => {
+                v["type"] = json!("circular");
+                v["angle_step_deg"] = json!(r9(deg(c.step)));
+                v["full_circle"] = json!(c.full);
+                v["radius"] = json!(r9(c.radius));
+                v["axis"] = json!({"origin": v9(c.center), "direction": v9(c.axis)});
+            }
         }
         if let Some(d) = f.direction() {
             v["member_direction"] = v9(d);
@@ -1941,7 +2122,7 @@ fn patterns(t: &Topo, features: &[Feature]) -> Vec<Value> {
         v
     };
     for members in groups.values() {
-        if members.len() < MIN_PATTERN || members.len() > MAX_PATTERN_GROUP {
+        if members.len() < MIN_PATTERN {
             continue;
         }
         let Some(first) = members.first().and_then(|m| features.get(*m)) else { continue };
@@ -1955,96 +2136,42 @@ fn patterns(t: &Topo, features: &[Feature]) -> Vec<Value> {
             continue;
         }
         let pts: Vec<Vec3> = members.iter().filter_map(|m| features.get(*m)).map(|f| f.position).collect();
-        // The whole group as one pattern, else its largest rows and rings.
+        // The whole group as one lattice or one circle (linear in the members, so a plate of
+        // any number of holes is read), else its grids, rows and rings (cubic, so only up to
+        // MAX_PATTERN_GROUP members; a larger group is noted).
         if let Some(l) = lattice(&pts, t.tol) {
-            out.push(emit(members, first, Some(&l), None));
-            taken.extend(members.iter().copied());
+            out.push(emit(members, first, &Fit::Linear(l)));
             continue;
         }
         if let Some(c) = circle(&pts, dir, t.tol) {
-            out.push(emit(members, first, None, Some(&c)));
-            taken.extend(members.iter().copied());
+            out.push(emit(members, first, &Fit::Ring(c)));
             continue;
         }
-        // Rows: every pair's direction and pitch, the members on that row.
-        let mut rows: Vec<Vec<usize>> = Vec::new();
-        for i in 0..members.len() {
-            for j in i + 1..members.len() {
-                let (Some(&pi), Some(&pj)) = (pts.get(i), pts.get(j)) else { continue };
-                let v = pj - pi;
-                let Some(d) = v.normalized() else { continue };
-                let mut row: Vec<(i64, usize)> = Vec::new();
-                for (k, pk) in pts.iter().enumerate() {
-                    if dist_to_line(*pk, pi, d) > t.tol {
-                        continue;
-                    }
-                    let m = (*pk - pi).dot(d) / v.len();
-                    if (m - m.round()).abs() * v.len() < t.tol {
-                        row.push((m.round() as i64, k));
-                    }
-                }
-                row.sort_unstable();
-                // Contiguous from the lowest.
-                let mut run: Vec<usize> = Vec::new();
-                for (idx, (m, k)) in row.iter().enumerate() {
-                    if idx == 0 || row.get(idx - 1).is_some_and(|(pm, _)| pm + 1 == *m) {
-                        run.push(*k);
-                    } else {
-                        break;
-                    }
-                }
-                if run.len() >= MIN_PATTERN {
-                    let mut ms: Vec<usize> = run.iter().filter_map(|k| members.get(*k).copied()).collect();
-                    ms.sort_unstable();
-                    if !rows.contains(&ms) {
-                        rows.push(ms);
-                    }
-                }
-            }
+        if members.len() > MAX_PATTERN_GROUP {
+            notes.push(format!(
+                "{} alike `{}` features are not one lattice or one circle, and more than {MAX_PATTERN_GROUP} are too many to search for the grids, rows and rings among them, so they form no pattern",
+                members.len(),
+                first.type_name()
+            ));
+            continue;
         }
-        // Rings: every triple's circle, the members on it.
-        let mut rings: Vec<Vec<usize>> = Vec::new();
-        for i in 0..members.len() {
-            for j in i + 1..members.len() {
-                for k in j + 1..members.len() {
-                    let (Some(&pi), Some(&pj), Some(&pk)) = (pts.get(i), pts.get(j), pts.get(k)) else { continue };
-                    let Some(c) = circle(&[pi, pj, pk], dir, t.tol) else { continue };
-                    let mut on: Vec<usize> = pts
-                        .iter()
-                        .enumerate()
-                        .filter(|(_, p)| (p.dist(c.center) - c.radius).abs() < t.tol && (**p - c.center).dot(c.axis).abs() < t.tol)
-                        .filter_map(|(m, _)| members.get(m).copied())
-                        .collect();
-                    on.sort_unstable();
-                    if on.len() >= MIN_PATTERN && !rings.contains(&on) {
-                        rings.push(on);
-                    }
-                }
-            }
-        }
-        // The reading that explains the most members with the fewest patterns: rows and rings
-        // together, the largest first (a row before a ring of the same size), each taken when
-        // none of its members is in a pattern already. A ring of six holes about a seventh at
-        // its centre is the ring and a lone hole, not a row of three through the centre.
-        let mut candidates: Vec<(Vec<usize>, bool)> = rows.into_iter().map(|r| (r, false)).chain(rings.into_iter().map(|r| (r, true))).collect();
-        candidates.sort_by_key(|(c, _)| std::cmp::Reverse(c.len()));
-        for (set, ring) in candidates {
-            if set.iter().any(|m| taken.contains(m)) {
+        // The reading that explains the most members with the fewest patterns: grids, rows and
+        // rings together, the largest first (a grid or row before a ring of the same size), each
+        // taken when none of its members is in a pattern already. A 3 × 3 grid beside a lone
+        // hole is the grid and the hole, not a ring of four about its centre; a ring of six
+        // holes about a seventh at its centre is the ring and a lone hole, not a row of three
+        // through the centre.
+        let mut taken: BTreeSet<usize> = BTreeSet::new();
+        for (set, fit) in partial_patterns(&pts, dir, t.tol) {
+            let ms: Vec<usize> = set.iter().filter_map(|k| members.get(*k).copied()).collect();
+            if ms.len() != set.len() || ms.iter().any(|m| taken.contains(m)) {
                 continue;
             }
-            let sp: Vec<Vec3> = set.iter().filter_map(|m| features.get(*m)).map(|f| f.position).collect();
-            if ring {
-                if let Some(c) = circle(&sp, dir, t.tol) {
-                    out.push(emit(&set, first, None, Some(&c)));
-                    taken.extend(set.iter().copied());
-                }
-            } else if let Some(l) = lattice(&sp, t.tol) {
-                out.push(emit(&set, first, Some(&l), None));
-                taken.extend(set.iter().copied());
-            }
+            out.push(emit(&ms, first, &fit));
+            taken.extend(ms);
         }
     }
-    out
+    (out, notes)
 }
 
 // ---------------------------------------------------------------------------------------------

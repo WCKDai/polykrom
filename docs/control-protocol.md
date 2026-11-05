@@ -265,20 +265,23 @@ face is outside and which faces an edge joins. Per body (`bodies[]`, `body_count
     with `kind` (`counterbore`, `countersink`, `bore`, `round`), `from` (along the axis below the
     entry plane), `depth`, `faces`, and `diameter` (`angle_deg` for a countersink, `radius` for a
     round). A counterbore or countersink is one hole with its steps; a fillet on a hole's mouth or
-    floor is a `round` step of the hole and also the fillet it is. A through hole's entry is the
+    floor is a `round` step of the hole and also the fillet it is (a 10 mm hole 12 deep with an R1
+    round at its floor is 12 deep: a `bore` of 11, then a `round` of 1). A through hole's entry is the
     wider end, else the end facing up most; alike ends are noted. A hole that breaks out through
     a curved face (a cross-hole through a round post) keeps its exact diameter; its rims are no
     circles, so its depth is read from the mesh and the hole is marked `approximate`.
   - `boss`: `diameter`, `height`, `axis` (the base centre, pointing at the cap), `cap_face`,
     `base_face`. Its faces are the wall and the cap; a chamfer or round on its edge is its own
     feature. A plain cylinder with two caps is no boss.
-  - `pocket`: `depth`, `floor_face`, `walls`, `floor_rounds`, `opening_face` (`opening_faces`
-    when the walls reach several coplanar faces). A hole or boss in the floor leaves the pocket a
-    pocket. The rounds along the floor's edges (a milled pocket's cutter radius) are
-    `floor_rounds`, among the pocket's faces, with the walls the upright faces beyond them; a
-    round on a vertical corner of the pocket is one of its `walls`. Either is also the fillet it
-    is. A recess open at a side, or whose walls reach faces at two heights, is reported under
-    `uncertain` instead.
+  - `pocket`: `depth`, `floor_face`, `walls`, `floor_rounds`, `opening_faces` (every coplanar
+    face the walls rise to; usually one) and `opening_face` (the first of them); both are always
+    given. The walls are upright: planes along the floor's normal or cylinders about it, so a
+    drafted pocket is no pocket (its faces are listed under `unrecognised`). A hole or boss in
+    the floor leaves the pocket a pocket. The rounds along the floor's edges (a milled pocket's
+    cutter radius) are `floor_rounds`, among the pocket's faces, with the walls the upright faces
+    beyond them; a round on a vertical corner of the pocket is one of its `walls`. Either is also
+    the fillet it is. A recess open at a side, or whose walls reach faces at two heights, is
+    reported under `uncertain` instead.
   - `fillet`: `radius`, `convex` (`true`: a round that removed material, `false`: one that
     added it, `null`: a chain of both), `joins` (the faces it is tangent to). Blends of one
     radius that meet (a tangent chain, or mitred at a corner) are one fillet. A fillet replaces
@@ -296,20 +299,28 @@ face is outside and which faces an edge joins. Per body (`bodies[]`, `body_count
     plate's top between two chamfers stays a plain face).
 - `patterns`: alike features (same type, sizes and direction) on a lattice or a circle, three or
   more: `type` `linear` (`count1`, `pitch1`, `direction1`, and `count2`, `pitch2`, `direction2`
-  for a grid) or `circular` (`count`, `angle_step_deg`, `full_circle`, `radius`,
+  for a grid; `direction1` is the one nearest the x axis, and each points up: +z, else +y, else
+  +x) or `circular` (`count`, `angle_step_deg`, `full_circle`, `radius`,
   `axis: {origin, direction}`; the members are equally stepped around the circle, with one
   larger gap on a partial arc: three holes at 0°, 60° and 120° are a 60° pattern with
   `full_circle: false`, read the same whatever order the members come in), with `feature_type`,
   `members` (indices into `features`), their `faces` and `member_direction`. Two alike features
-  are two features. Alike features that are not one lattice or one circle are read as the rows
-  and rings that explain the most of them with the fewest patterns, the largest first: six holes
-  on a ring about a seventh of the same size at its centre are the ring of six and a lone hole,
-  not a row of three through the centre.
+  are two features; an `approximate` feature joins no pattern. A grid of any size is one
+  `linear` pattern (a 17 × 17 perforated plate is one lattice of 289). Alike features that are
+  not one lattice or one circle are read as the grids, rows and rings that explain the most of
+  them with the fewest patterns, the largest first (a grid or row before a ring of the same
+  size): a 3 × 3 grid beside a lone hole is the grid and the hole, not three rows nor a ring of
+  four about its centre; two grids on a plate are two lattices; six holes on a ring about a
+  seventh of the same size at its centre are the ring of six and a lone hole, not a row of three
+  through the centre. That search is cubic and stops at 256 members: a larger group is still
+  read as one lattice or one circle, else it gets no pattern and the body's `note` says so.
 - `unrecognised`: every face no feature covers, with its `index`, `surface` (`plane`,
   `cylinder`, `cone`, `sphere`, `torus` or `free-form`) and a `reason`. The face a hole is
   drilled into, a pocket cut into or a boss stands on is not part of that feature. A free-form
   (spline) face is never read as a feature.
 - `uncertain`: shapes that are nearly a feature, with `could_be`, their `faces` and the `reason`.
+- `note` (only when there is one): what was not read, such as a group of alike features too
+  large to search for the patterns among them.
 
 ```text
 {"id":7,"method":"engine.execute","params":{"command":"inspect.features","params":{"body":"Plate"}}}
