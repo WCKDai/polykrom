@@ -447,6 +447,34 @@ fn collapsed_rail_shares_header_hover_inset_and_expands_from_its_whole_card() {
     crate::theme::set_dark(previous);
 }
 
+/// The filter field runs to the tree's right edge (where the rows' eye icons end), in both
+/// layouts: its box reaches the field's right edge, and its × sits inside the box. It used to
+/// stop about 28 pt short of the rows, with the × in the gap.
+#[test]
+fn the_filter_field_runs_to_the_trees_right_edge() {
+    for layout in ["docked", "floating"] {
+        let mut h = Harness::new();
+        h.app.home.open = false;
+        h.call("ui.set", json!({"layout": layout}));
+        h.app.run("solid.box", json!({"length": 10, "width": 10, "height": 10, "body_name": "Block"})).unwrap();
+        h.frames(3);
+        let field = rect_of("browser:filter").unwrap();
+        let eye = handle_at("eye:Block").unwrap();
+        let identity = rect_of("browser:identity").unwrap();
+        assert!((field.right() - (eye.x + 11.0)).abs() <= 1.0, "{layout}: the field ends where the eye icons do: {field:?}, eye at {eye:?}");
+        assert!(field.right() >= identity.right() - 2.5, "{layout}: the field reaches the rows' right edge: {field:?} vs {identity:?}");
+        let editor = h.ctx.read_response(egui::Id::new("sc_browser_filter")).expect("the filter editor").rect;
+        assert!((editor.right() - field.right()).abs() <= 1.0, "{layout}: the editor's box spans the field: {editor:?} in {field:?}");
+        h.step(&json!({"click":{"handle":"browser:filter"}})).unwrap();
+        h.step(&json!({"text":"Bl"})).unwrap();
+        h.frames(2);
+        let clear = handle_at("browser:filter_clear").unwrap();
+        assert!(field.contains(clear) && clear.x > field.right() - 20.0, "{layout}: the × sits inside the field's right end: {clear:?} in {field:?}");
+        h.step(&json!({"click":{"handle":"browser:filter_clear"}})).unwrap();
+        assert!(h.app.tree.filter.is_empty(), "{layout}: the × clears the filter");
+    }
+}
+
 /// The `Filter features…` field keeps only the rows whose names contain its text (bodies,
 /// sketches, construction geometry and features), case-insensitively, with their folders open and
 /// counted; the design's settings, views and origin step aside; clearing it brings everything back.

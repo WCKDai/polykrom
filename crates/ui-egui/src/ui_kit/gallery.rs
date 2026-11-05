@@ -704,6 +704,16 @@ const ELEMENTS: &[Element] = &[
     element!("search_field", |ui, s| {
         search_field(ui, ui.id().with("search"), &mut s.value, "Search");
     }),
+    element!("search_field_with_trailing", |ui, s| {
+        // The last 22 pt stay clear of the text, for a × drawn inside the field (the browser's).
+        let r = search_field_with_trailing(ui, ui.id().with("search_trailing"), &mut s.value, "Filter features…", 22.0).rect;
+        crate::icons::paint_icon(
+            ui.painter(),
+            egui::Rect::from_center_size(egui::pos2(r.right() - 12.0, r.center().y), vec2(14.0, 14.0)),
+            "close",
+            0.6,
+        );
+    }),
     element!("cell_editor", |ui, s| {
         cell_editor(ui, ui.id().with("cell"), &mut s.value, "Expression", true);
     }),

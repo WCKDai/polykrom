@@ -925,13 +925,20 @@ fn browser_identity(app: &SolveApp, ui: &mut egui::Ui) {
 fn browser_filter(app: &mut SolveApp, ui: &mut egui::Ui) {
     let t = Tokens::get();
     let (rect, _) = ui.allocate_exact_size(vec2(ui.available_width(), FILTER_H), Sense::hover());
-    let field = Rect::from_min_max(pos2(rect.left() + t.space_6, rect.top() + 3.0), pos2(rect.right() - t.space_6, rect.bottom() - 5.0));
+    // The field runs to the tree's right edge (where the rows' eye icons end); its × sits inside
+    // it, at the right end the text keeps clear of.
+    let field = Rect::from_min_max(pos2(rect.left() + t.space_6, rect.top() + 3.0), pos2(rect.right() - 2.0, rect.bottom() - 5.0));
     crate::scenario::publish_target("browser:filter", field);
     let clear = Rect::from_center_size(pos2(field.right() - 12.0, field.center().y), vec2(16.0, 16.0));
-    let editor = Rect::from_min_max(field.min, pos2((clear.left() - 2.0).max(field.left() + 40.0), field.bottom()));
-    ui.scope_builder(egui::UiBuilder::new().max_rect(editor), |ui| {
-        ui.set_clip_rect(ui.clip_rect().intersect(editor));
-        crate::ui_kit::search_field(ui, egui::Id::new("sc_browser_filter"), &mut app.tree.filter, crate::i18n::tr("ui.browser_filter_hint"));
+    ui.scope_builder(egui::UiBuilder::new().max_rect(field), |ui| {
+        ui.set_clip_rect(ui.clip_rect().intersect(field));
+        crate::ui_kit::search_field_with_trailing(
+            ui,
+            egui::Id::new("sc_browser_filter"),
+            &mut app.tree.filter,
+            crate::i18n::tr("ui.browser_filter_hint"),
+            field.right() - clear.left() + 2.0,
+        );
     });
     if !app.tree.filter.is_empty() {
         let resp = ui.interact(clear, egui::Id::new("sc_browser_filter_clear"), Sense::click());
