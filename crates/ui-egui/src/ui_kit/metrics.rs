@@ -27,6 +27,15 @@ pub(super) const LABEL_ACTIONS_SHARE: f32 = 0.45;
 /// Widest a label column may grow, as a multiple of `form_label_width`.
 const LABEL_COLUMN_MAX: f32 = 1.6;
 
+/// Widest the measured label column of a [`super::labelled_form`] may grow, as a share of the
+/// row: a label wider than that wraps in its row rather than narrowing the control further.
+pub(super) const LABEL_WRAP_SHARE: f32 = 0.6;
+
+/// The label column a [`super::labelled_form`] measured for its rows, if this row is in one.
+pub(super) fn measured_label(ui: &Ui) -> Option<f32> {
+    ui.stack().iter().find_map(|node| node.tags().get_downcast::<f32>(super::layout::MEASURED_LABEL)).copied()
+}
+
 /// A label as drawn: the leading indent kept, the text itself translated (a nested row such as
 /// `"  Of"` lines up under the one above and still translates). Measuring (`label_width`) and the
 /// row label (`sized_row`) both prepare their text with this, so a label is translated exactly
@@ -81,6 +90,9 @@ pub(super) fn header_column(ui: &Ui, text: &str) -> f32 {
 /// two frames and shrinks again when the long rows go away.
 /// Shared label width, capped at 1.6x. Tokens: `form_label_width, font_label, dialog_label, space_4`.
 pub(super) fn label_column(ui: &Ui, text: &str, row_width: f32) -> f32 {
+    if let Some(width) = measured_label(ui) {
+        return width.min(row_width * LABEL_WRAP_SHARE);
+    }
     if let Some(width) = ui.stack().iter().find_map(|node| node.tags().get_downcast::<f32>(super::layout::FIXED_LABEL)) {
         return width.min(row_width * 0.6);
     }

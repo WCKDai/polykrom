@@ -45,6 +45,10 @@ const OTHERS_ROWS: f32 = 6.0;
 pub const PANEL_WIDTH: f32 = crate::review::PANEL_WIDTH;
 /// The most dependent features named on one line of the consequence summary.
 const MAX_NAMES: usize = 6;
+/// The label column's share of a row, from design kit view 03 (its layer JSON: the Diameter row
+/// of the feature inspector is 264 wide, its label 104). The column grows to the widest label of
+/// the rows shown, so no label is elided ([`ui_kit::labelled_form`]).
+const LABEL_SHARE: f32 = 104.0 / 264.0;
 
 // ---- The Properties panel -----------------------------------------------------------------------
 
@@ -722,13 +726,18 @@ fn contents(app: &mut SolveApp, ui: &mut egui::Ui, height: f32) {
     } else {
         tr("ui.properties.no_pending")
     };
-    if app.properties.editor.is_some() {
-        editor_view(app, ui);
-    } else if let Some(id) = selected_feature(app) {
-        feature_view(app, ui, id);
-    } else {
-        document_view(app, ui);
-    }
+    // The label column fits the widest label of the rows shown (the kit's proportion at least).
+    let labels = row_labels(app);
+    let labels: Vec<&str> = labels.iter().map(String::as_str).collect();
+    ui_kit::labelled_form(ui, &labels, LABEL_SHARE, |ui| {
+        if app.properties.editor.is_some() {
+            editor_view(app, ui);
+        } else if let Some(id) = selected_feature(app) {
+            feature_view(app, ui, id);
+        } else {
+            document_view(app, ui);
+        }
+    });
     // The footer line sits at the bottom of the panel.
     let used = ui.cursor().top() - top;
     let footer_height = ui.fonts_mut(|f| f.row_height(&egui::FontId::proportional(t.font_small))) + t.space_8;
@@ -819,6 +828,38 @@ fn context_rows(app: &mut SolveApp, id: u64) -> Vec<(&'static str, String)> {
         rows.push(("Body", bodies.iter().map(|b| tr_name(b)).collect::<Vec<_>>().join(", ")));
     }
     rows
+}
+
+/// The labels of every label/value row the panel draws this frame, as the rows are given them
+/// (the rows translate them): the editor's fields and the inputs it shows read-only
+/// ([`editor_view`]), the selected feature's inputs, sketch counts and context rows
+/// ([`feature_view`]), or the design's properties ([`document_view`]). The label column is
+/// sized to the widest of them.
+fn row_labels(app: &mut SolveApp) -> Vec<String> {
+    let mut labels: Vec<String> = Vec::new();
+    let feature = match app.properties.editor.as_mut() {
+        Some(ed) => {
+            labels.extend(fields(&mut ed.dialog).into_iter().map(|(label, _, _)| label.to_string()));
+            Some(ed.feature)
+        }
+        None => selected_feature(app),
+    };
+    match feature {
+        Some(id) => {
+            if let Some(f) = app.session.doc.feature(id) {
+                labels.extend(f.kind.inputs().into_iter().map(|(label, _, _)| label.to_string()));
+                if let FeatureKind::Sketch { .. } = &f.kind {
+                    labels.extend(["Profiles".to_string(), "Points".to_string()]);
+                }
+            }
+            labels.extend(context_rows(app, id).into_iter().map(|(label, _)| label.to_string()));
+        }
+        None => {
+            labels.extend(WELL_KNOWN.iter().map(|key| label(key).to_string()));
+            labels.push("Units".to_string());
+        }
+    }
+    labels
 }
 
 /// The subtitle of a feature: its body and instances (view 01), or instances and sketch (view 03).

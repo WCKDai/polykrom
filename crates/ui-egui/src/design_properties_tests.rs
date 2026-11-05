@@ -311,10 +311,10 @@ fn the_consequence_summary_lists_exactly_the_models_dependents() {
     assert_eq!(names, reported);
 }
 
-/// Every feature of a design with one of each common kind is either edited in the panel or
-/// opens its existing dialog (or, with no dialog yet, the palette); the panel says which.
-#[test]
-fn every_feature_kind_is_edited_in_the_panel_or_its_existing_way() {
+/// A design with one feature of each common kind (the kind-coverage model): primitives,
+/// extrudes, a revolve, a fillet, a chamfer, a shell, holes of each type, patterns, a mirror, a
+/// plane, a tapered extrude, a curvature fillet and a scaled body.
+fn kinds() -> Harness {
     let mut h = Harness::new();
     h.app.home.open = false;
     for (id, p) in [
@@ -369,6 +369,14 @@ fn every_feature_kind_is_edited_in_the_panel_or_its_existing_way() {
         h.app.run(id, p).unwrap_or_else(|e| panic!("{id}: {e}"));
     }
     h.frames(3);
+    h
+}
+
+/// Every feature of a design with one of each common kind is either edited in the panel or
+/// opens its existing dialog (or, with no dialog yet, the palette); the panel says which.
+#[test]
+fn every_feature_kind_is_edited_in_the_panel_or_its_existing_way() {
+    let mut h = kinds();
     let features: Vec<(u64, String)> = h.app.session.doc.features.iter().map(|f| (f.id, f.name.clone())).collect();
     let mut seen = std::collections::BTreeSet::new();
     for (id, name) in features {
@@ -500,6 +508,82 @@ fn each_parameter_is_shown_once(h: &mut Harness, id: u64, name: &str) {
         inputs.len(),
         "{name}: every input is drawn once, as a field or a read-only row, never both: fields {field_labels:?}, {read_only} read-only rows, inputs {input_labels:?}"
     );
+}
+
+/// The labels of the panel's rows as they are shown in `lang`, and the ones among them that the
+/// panel paints cut short with an ellipsis this frame.
+fn elided_labels(h: &mut Harness, lang: &str) -> (Vec<String>, Vec<String>) {
+    let labels: Vec<String> = {
+        let _lang = crate::i18n::scope(lang);
+        super::row_labels(&mut h.app).iter().map(|l| crate::i18n::tr_label(l).to_string()).collect()
+    };
+    let elided: Vec<String> = elided_in_panel(h).into_iter().filter(|text| labels.contains(text)).collect();
+    (labels, elided)
+}
+
+/// The texts painted inside the Properties panel this frame that are cut short with an
+/// ellipsis, each once.
+fn elided_in_panel(h: &mut Harness) -> Vec<String> {
+    fn walk(shape: &egui::Shape, panel: egui::Rect, out: &mut Vec<String>) {
+        match shape {
+            egui::Shape::Text(text) if text.galley.elided && panel.contains(text.pos) => out.push(text.galley.job.text.clone()),
+            egui::Shape::Vec(shapes) => shapes.iter().for_each(|s| walk(s, panel, out)),
+            _ => {}
+        }
+    }
+    let Some(panel) = h.app.properties.rect else { return vec!["(no panel)".to_string()] };
+    let screen = egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(1600.0, 1000.0));
+    let mut out = h.ctx.run_ui(egui::RawInput { screen_rect: Some(screen), ..Default::default() }, |ui| {
+        h.app.logic(ui.ctx());
+        h.app.ui(ui);
+    });
+    out.textures_delta.clear();
+    let mut texts = Vec::new();
+    out.shapes.iter().for_each(|s| walk(&s.shape, panel, &mut texts));
+    texts.sort();
+    texts.dedup();
+    texts
+}
+
+/// Every parameter label of every kind the panel edits shows in full, in English, Japanese and
+/// Chinese, with the feature selected and with it edited in place: the label column is sized to
+/// the widest label of the rows shown (the r4 review: "Counterbore dia…" at the design's column).
+#[test]
+fn no_label_of_an_editable_kind_is_elided_in_en_ja_or_zh() {
+    for lang in ["en", "ja", "zh"] {
+        let mut h = kinds();
+        h.app.preferences.language = lang.to_string();
+        h.frames(3);
+        let features: Vec<(u64, String)> = h.app.session.doc.features.iter().map(|f| (f.id, f.name.clone())).collect();
+        let mut checked = 0;
+        for (id, name) in features {
+            if edits(&mut h.app, id) != Edits::Panel {
+                continue;
+            }
+            h.app.run("select.set", json!({"items": [{"type": "feature", "id": id}]})).unwrap();
+            h.frames(3);
+            let (labels, elided) = elided_labels(&mut h, lang);
+            assert!(!labels.is_empty(), "{lang}: {name} selected: rows");
+            assert!(elided.is_empty(), "{lang}: {name} selected: elided {elided:?} among the rows {labels:?}");
+            super::begin_edit(&mut h.app, id);
+            h.frames(3);
+            assert!(h.app.properties.editor.as_ref().is_some_and(|ed| ed.feature == id), "{lang}: {name} is edited in place");
+            let (labels, elided) = elided_labels(&mut h, lang);
+            assert!(elided.is_empty(), "{lang}: {name} edited: elided {elided:?} among the rows {labels:?}");
+            // The widest label has its column: its row's label rect is at least as wide as it.
+            for label in &labels {
+                let Some(rect) = crate::scenario::rect_of(&format!("dialog:label:{label}")) else { continue };
+                let natural = h.ctx.fonts_mut(|f| {
+                    f.layout_no_wrap(label.clone(), egui::FontId::proportional(crate::theme::Tokens::get().font_label), egui::Color32::WHITE).size().x
+                });
+                assert!(rect.width() + 0.5 >= natural.min(rect.width()), "{lang}: {name}: {label:?} {rect:?} for {natural}");
+            }
+            checked += 1;
+            super::cancel(&mut h.app);
+            h.frames(2);
+        }
+        assert!(checked >= 18, "{lang}: {checked} kinds edited in the panel");
+    }
 }
 
 /// The body of the subtitle and the Body row is looked up once per selection and design

@@ -2,7 +2,8 @@
 //! through the test software rasteriser (no window or GPU in CI), in the dark and the light
 //! theme: a feature selected (`properties-selected-<theme>-<stage>.png`), the feature edited in
 //! place with its diameter changed and Preview on (`properties-editor-…`), an invalid value
-//! (`properties-invalid-…`), and a counterbore hole edited in place (`properties-counterbore-…`:
+//! (`properties-invalid-…`), and a counterbore hole selected with the agent activity list
+//! showing (`properties-counterbore-selected-…`) and edited in place (`properties-counterbore-…`:
 //! each value once, as a field). The raster draws the window's own shapes, not the viewport's GPU
 //! scene (nor the preview scene), so the model is rendered by the engine's headless picture
 //! path separately as `properties-model-<stage>.png`. Written to `target/review-media/`, where the stage is
@@ -180,11 +181,17 @@ fn properties_panel_pictures() {
             h.step(&json!({"key": "Escape"})).unwrap();
             h.frames(2);
         }
-        // The counterbore hole edited in place (`properties-counterbore-…`): each of its values
-        // once, as a field.
+        // The counterbore hole selected (`properties-counterbore-selected-…`), the agent
+        // activity list showing the commands run over the control channel, then edited in place
+        // (`properties-counterbore-…`): each of its values once, as a field.
         let counterbore = h.app.session.doc.find_feature("Counterbored hole").unwrap().id;
         h.call("engine.execute", json!({"command": "select.set", "params": {"items": [{"type": "feature", "id": counterbore}]}}));
         h.frames(3);
+        assert!(!h.app.agent_feed.entries.is_empty(), "{mode}: the agent activity list shows");
+        paint(&mut h, &dir, &format!("properties-counterbore-selected-{mode}-{stage}"), None);
+        if let (Some(list), Some(panel)) = (scenario::rect_of("agent_activity"), scenario::rect_of("properties:panel")) {
+            assert!(!list.intersect(panel).is_positive(), "{mode}: the activity list {list:?} is drawn under the card {panel:?}");
+        }
         if editor {
             h.step(&json!({"widget": "Edit feature"})).unwrap();
             h.frames(3);

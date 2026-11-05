@@ -7,11 +7,26 @@ pub(super) const FORM: &str = "sc_dense_form";
 
 pub(super) const LABEL: &str = "sc_form_label";
 pub(super) const FIXED_LABEL: &str = "sc_fixed_label_width";
+pub(super) const MEASURED_LABEL: &str = "sc_measured_label_width";
 
 /// A deliberate label grid for multi-column settings, inherited by the existing shared rows.
 pub(crate) fn settings_form<R>(ui: &mut Ui, label_width: f32, add: impl FnOnce(&mut Ui) -> R) -> R {
     ui.scope_builder(egui::UiBuilder::new().ui_stack_info(egui::UiStackInfo::default().with_tag_value(FIXED_LABEL, dimension(label_width))), add)
         .inner
+}
+
+/// A form whose label column is sized to its rows' labels, so every label shows in full: the
+/// widest of `labels` (translated, as the rows show them), at least `share` of the row width
+/// (a design's proportion for the card) and at most `LABEL_WRAP_SHARE` of it. A label wider
+/// than the column wraps onto a second line in its row (the row grows) instead of eliding. The
+/// rows inside inherit the column through the UI stack, so the controls line up.
+/// Tokens: `font_label, dialog_label, space_4`.
+pub(crate) fn labelled_form<R>(ui: &mut Ui, labels: &[&str], share: f32, add: impl FnOnce(&mut Ui) -> R) -> R {
+    let t = Tokens::get();
+    let width = dimension(ui.available_width());
+    let widest = labels.iter().map(|label| label_width(ui, label)).fold(0.0, f32::max);
+    let column = (widest + t.space_4).max(width * dimension(share)).min(width * LABEL_WRAP_SHARE);
+    ui.scope_builder(egui::UiBuilder::new().ui_stack_info(egui::UiStackInfo::default().with_tag_value(MEASURED_LABEL, dimension(column))), add).inner
 }
 
 /// Mark a form without global state: children inherit this tag through their UI stack.
@@ -96,16 +111,26 @@ pub(crate) fn choice_row(ui: &mut Ui, label: &str, id: &str, selected: &mut usiz
 pub(super) fn sized_row<R>(ui: &mut Ui, text: &str, height: f32, control: impl FnOnce(&mut Ui) -> R) -> R {
     let t = Tokens::get();
     let width = dimension(ui.available_width());
-    let (rect, _) = ui.allocate_exact_size(vec2(width, height), egui::Sense::hover());
     // A nested row (`"  Of"`) lines up under the one above: the lookup uses the text without its
     // indent and the indent stays in front of the translation. The `LABEL` tag keeps the original.
     let shown = indented_label(text);
     // Measuring takes the original text and prepares it the same way, so column and row agree.
-    let label_width = label_column(ui, text, width);
-    let label_rect = egui::Rect::from_min_size(rect.min, vec2(label_width, rect.height()));
+    let column = label_column(ui, text, width);
+    // In a `labelled_form`, a label wider than its measured column wraps and the row grows to
+    // hold it; elsewhere a long label elides at the column.
+    let wrapped = measured_label(ui).is_some_and(|_| label_width(ui, text) > column);
+    let height = if wrapped {
+        let galley = ui.painter().layout(shown.clone(), egui::FontId::proportional(t.font_label), t.dialog_label, column);
+        height.max(galley.size().y + t.space_4)
+    } else {
+        height
+    };
+    let (rect, _) = ui.allocate_exact_size(vec2(width, height), egui::Sense::hover());
+    let label_rect = egui::Rect::from_min_size(rect.min, vec2(column, rect.height()));
     ui.scope_builder(egui::UiBuilder::new().max_rect(label_rect).layout(egui::Layout::left_to_right(egui::Align::Center)), |ui| {
         // Left aligned in the label column, as in the design.
-        ui.add(egui::Label::new(RichText::new(shown.clone()).size(t.font_label).color(t.dialog_label)).truncate()).on_hover_text(shown);
+        let label = egui::Label::new(RichText::new(shown.clone()).size(t.font_label).color(t.dialog_label));
+        ui.add(if wrapped { label.wrap() } else { label.truncate() }).on_hover_text(shown);
     });
     let control_rect = egui::Rect::from_min_max(egui::pos2((label_rect.right() + label_gap(ui, width)).min(rect.right()), rect.top()), rect.max);
     let result = ui
