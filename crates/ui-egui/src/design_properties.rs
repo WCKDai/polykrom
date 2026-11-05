@@ -70,6 +70,9 @@ pub struct Panel {
     dependents: Option<(u64, u64, Vec<u64>)>,
     /// How a feature is edited, at a design revision (filling its dialog is not free).
     edits: Option<(u64, u64, Edits)>,
+    /// The bodies of a feature ([`body_names`]) at a design revision: finding the body under a
+    /// hole without a named body scans the model before the hole, not something to do per frame.
+    bodies: Option<(u64, u64, Vec<String>)>,
     /// The panel's rect this frame (floating, it covers the viewport for input).
     pub rect: Option<Rect>,
 }
@@ -126,11 +129,15 @@ fn build_dialog(app: &mut SolveApp, id: u64) -> Option<Dialog> {
 }
 
 /// The plain value fields of a feature dialog the panel edits in place: (label, kind, text), in
-/// the dialog's order. Picks, choices and tables stay with the dialog.
+/// the dialog's order. Picks, choices and tables stay with the dialog. A field's label is the
+/// model's for that value (`FeatureKind::inputs`), whatever its dialog calls it: the editor
+/// shows the model's inputs that are not fields read-only, by label, so a value is never shown
+/// twice.
 pub(crate) fn fields(d: &mut Dialog) -> Vec<(&'static str, ValueKind, &mut String)> {
     use ValueKind::{Angle, Length, Unitless};
     let to_object = dialogs::to_object_on(&d.inputs);
     let second_direction = d.inputs.get(2).is_some_and(|i| !i.items.is_empty()) || d.extra.contains_key("dir2");
+    let fillet_radius = fillet_radius_label(d);
     let mut v: Vec<(&'static str, ValueKind, &mut String)> = Vec::new();
     match &mut d.kind {
         Kind::Hole { diameter, depth, kind, cb_diameter, cb_depth, cs_diameter, cs_angle, opts } => {
@@ -142,11 +149,11 @@ pub(crate) fn fields(d: &mut Dialog) -> Vec<(&'static str, ValueKind, &mut Strin
             }
             match *kind {
                 1 => {
-                    v.push(("Counterbore Ø", Length, cb_diameter));
+                    v.push(("Counterbore diameter", Length, cb_diameter));
                     v.push(("Counterbore depth", Length, cb_depth));
                 }
                 2 => {
-                    v.push(("Countersink Ø", Length, cs_diameter));
+                    v.push(("Countersink diameter", Length, cs_diameter));
                     v.push(("Countersink angle", Angle, cs_angle));
                 }
                 _ => {}
@@ -156,7 +163,7 @@ pub(crate) fn fields(d: &mut Dialog) -> Vec<(&'static str, ValueKind, &mut Strin
             if to_object {
                 // An empty offset is none: nothing to edit in place.
                 if !to_offset.is_empty() {
-                    v.push(("To Offset", Length, to_offset));
+                    v.push(("To offset", Length, to_offset));
                 }
             } else if !*all {
                 v.push(("Distance", Length, distance));
@@ -165,21 +172,21 @@ pub(crate) fn fields(d: &mut Dialog) -> Vec<(&'static str, ValueKind, &mut Strin
                 v.push(("Distance 2", Length, distance2));
             }
             if !start.is_empty() {
-                v.push(("Start Offset", Length, start));
+                v.push(("Start offset", Length, start));
             }
             if *taper_present {
-                v.push(("Taper Angle", Angle, taper));
+                v.push(("Taper angle", Angle, taper));
             }
             if *thin {
-                v.push(("Wall Thickness", Length, wall));
+                v.push(("Thickness", Length, wall));
                 if dialogs::WALL_SIDES.get(*wall_side) == Some(&"two_sides") {
-                    v.push(("Outside Thickness", Length, wall2));
+                    v.push(("Thickness 2", Length, wall2));
                 }
             }
         }
         Kind::Revolve { angle, .. } => v.push(("Angle", Angle, angle)),
         Kind::Fillet { radius, chamfer, ctype, distance2, angle, .. } => {
-            v.push((if *chamfer { "Distance" } else { "Radius" }, Length, radius));
+            v.push((if *chamfer { "Distance" } else { fillet_radius }, Length, radius));
             if *chamfer {
                 match *ctype {
                     1 => v.push(("Distance 2", Length, distance2)),
@@ -192,7 +199,7 @@ pub(crate) fn fields(d: &mut Dialog) -> Vec<(&'static str, ValueKind, &mut Strin
         Kind::Draft { angle } => v.push(("Angle", Angle, angle)),
         Kind::OffsetPlane { offset } => v.push(("Offset", Length, offset)),
         Kind::AnglePlane { angle } => v.push(("Angle", Angle, angle)),
-        Kind::Scale { factor } => v.push(("Factor", Unitless, factor)),
+        Kind::Scale { factor } => v.push(("Scale factor", Unitless, factor)),
         Kind::OffsetFaces { distance } => v.push(("Distance", Length, distance)),
         Kind::Stock { margin } => v.push(("Margin", Length, margin)),
         Kind::Pipe { diameter, wall } => {
@@ -242,6 +249,20 @@ pub(crate) fn fields(d: &mut Dialog) -> Vec<(&'static str, ValueKind, &mut Strin
         _ => {}
     }
     v
+}
+
+/// What a fillet dialog's radius is in the model: the label of the feature's `radius` for its
+/// style ([`polykrom_engine::doc::FilletStyle::radius_label`]), which the dialog carries as its
+/// `type` (none for a constant radius).
+fn fillet_radius_label(d: &Dialog) -> &'static str {
+    use polykrom_engine::doc::FilletStyle;
+    match d.extra.get("type").and_then(Value::as_str) {
+        Some("curvature") => FilletStyle::Curvature.radius_label(),
+        Some("chord") => FilletStyle::Chord.radius_label(),
+        // A variable or spline fillet: the radius at the start.
+        Some("variable" | "spline") => "Start radius",
+        _ => FilletStyle::Constant.radius_label(),
+    }
 }
 
 /// Why a field's text is not a value of its kind (a whole number of at least one for a count).
@@ -513,7 +534,23 @@ fn reference_sketch(app: &SolveApp, kind: &FeatureKind) -> Option<u64> {
 
 /// The bodies the feature made or works on: the bodies it created, then the bodies its
 /// definition names (`body`, `bodies`, `targets`), then the body under a hole's position.
-fn body_names(app: &SolveApp, id: u64) -> Vec<String> {
+/// Computed once per feature and design revision: the body under a hole is found in the model's
+/// triangles, and the subtitle and the context rows ask every frame.
+fn body_names(app: &mut SolveApp, id: u64) -> Vec<String> {
+    let revision = app.session.revision;
+    if let Some((f, r, names)) = &app.properties.bodies
+        && *f == id
+        && *r == revision
+    {
+        return names.clone();
+    }
+    let names = find_body_names(app, id);
+    app.properties.bodies = Some((id, revision, names.clone()));
+    names
+}
+
+/// [`body_names`], computed.
+fn find_body_names(app: &SolveApp, id: u64) -> Vec<String> {
     let st = app.session.world_state();
     let mut out: Vec<String> = st.bodies.iter().filter(|b| b.feature == id).map(|b| b.name.clone()).collect();
     let Some(f) = app.session.doc.feature(id) else { return out };
@@ -765,7 +802,8 @@ fn primary(ui: &mut egui::Ui, key: &str, label: &str, enabled: bool) -> egui::Re
 }
 
 /// The read-only rows after the parameters: extent, instances, the driving sketch and the body.
-fn context_rows(app: &SolveApp, id: u64) -> Vec<(&'static str, String)> {
+fn context_rows(app: &mut SolveApp, id: u64) -> Vec<(&'static str, String)> {
+    let bodies = body_names(app, id);
     let Some(f) = app.session.doc.feature(id) else { return Vec::new() };
     let mut rows = Vec::new();
     if let Some(extent) = extent_text(&f.kind) {
@@ -777,7 +815,6 @@ fn context_rows(app: &SolveApp, id: u64) -> Vec<(&'static str, String)> {
     if let Some(sketch) = reference_sketch(app, &f.kind).and_then(|s| app.session.doc.feature(s)) {
         rows.push(("Reference", tr_name(&sketch.name)));
     }
-    let bodies = body_names(app, id);
     if !bodies.is_empty() {
         rows.push(("Body", bodies.iter().map(|b| tr_name(b)).collect::<Vec<_>>().join(", ")));
     }
@@ -785,11 +822,11 @@ fn context_rows(app: &SolveApp, id: u64) -> Vec<(&'static str, String)> {
 }
 
 /// The subtitle of a feature: its body and instances (view 01), or instances and sketch (view 03).
-fn subtitle(app: &SolveApp, id: u64, editing: bool) -> String {
+fn subtitle(app: &mut SolveApp, id: u64, editing: bool) -> String {
+    let body = body_names(app, id).first().map(|b| tr_name(b));
     let Some(f) = app.session.doc.feature(id) else { return String::new() };
     let instances = instances(app, &f.kind).map(instances_text);
     let sketch = reference_sketch(app, &f.kind).and_then(|s| app.session.doc.feature(s)).map(|s| tr_name(&s.name));
-    let body = body_names(app, id).first().map(|b| tr_name(b));
     let parts: Vec<String> = if editing { [instances, sketch, body] } else { [body, instances, sketch] }.into_iter().flatten().take(2).collect();
     parts.join(" / ")
 }

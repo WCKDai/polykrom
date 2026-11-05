@@ -1,8 +1,9 @@
 //! Review pictures of the Properties panel (design kit views 01 and 03), painted by the real app
 //! through the test software rasteriser (no window or GPU in CI), in the dark and the light
 //! theme: a feature selected (`properties-selected-<theme>-<stage>.png`), the feature edited in
-//! place with its diameter changed and Preview on (`properties-editor-…`), and an invalid value
-//! (`properties-invalid-…`). The raster draws the window's own shapes, not the viewport's GPU
+//! place with its diameter changed and Preview on (`properties-editor-…`), an invalid value
+//! (`properties-invalid-…`), and a counterbore hole edited in place (`properties-counterbore-…`:
+//! each value once, as a field). The raster draws the window's own shapes, not the viewport's GPU
 //! scene (nor the preview scene), so the model is rendered by the engine's headless picture
 //! path separately as `properties-model-<stage>.png`. Written to `target/review-media/`, where the stage is
 //! `REVIEW_MEDIA_STAGE` (default `after`); the same test on the base commit, where the panel does
@@ -44,6 +45,11 @@ fn mount(h: &mut Harness) {
             json!({"features": ["Mounting holes"], "dir1": [1, 0, 0], "count1": 2, "spacing1": "40 mm", "dir2": [0, 1, 0], "count2": 2, "spacing2": "30 mm", "name": "Bolt pattern"}),
         ),
         ("solid.fillet", json!({"edges": [[4, 0, 8]], "radius": "2 mm", "name": "Hole fillet"})),
+        // A counterbore hole in a corner: its editor shows the counterbore's own values.
+        (
+            "solid.hole",
+            json!({"position": [60, 40, 8], "diameter": "6 mm", "type": "counterbore", "cb_diameter": "11 mm", "cb_depth": "3 mm", "name": "Counterbored hole"}),
+        ),
     ] {
         let r = h.call("engine.execute", json!({"command": id, "params": p}));
         assert_eq!(r["ok"], true, "{id}: {r}");
@@ -60,8 +66,11 @@ fn crop(shot: &image::RgbaImage, bounds: Rect, ppp: f32) -> image::RgbaImage {
 /// right edge of the window where it would stand) as `<name>-panel.png`. With `focus`, the field
 /// of the row so labelled is clicked first, so it is painted with the keyboard (its lime border).
 fn paint(h: &mut Harness, dir: &Path, name: &str, focus: Option<&str>) {
-    // A fresh context transfers every texture (fonts and icons) to the software renderer.
+    // A fresh context transfers every texture (fonts and icons) to the software renderer. It
+    // keeps the accessibility tree the harness finds widgets by (`h.widget`), as the harness's
+    // own context has it.
     h.ctx = egui::Context::default();
+    h.ctx.enable_accesskit();
     polykrom_ui_egui::fonts::setup_fonts(&h.ctx);
     theme::apply(&h.ctx);
     let mut textures: HashMap<TextureId, ColorImage> = HashMap::new();
@@ -156,6 +165,7 @@ fn properties_panel_pictures() {
         if editor {
             h.step(&json!({"widget": "Edit feature"})).unwrap();
             h.frames(3);
+            assert!(h.app.properties.editor.is_some(), "{mode}: the hole is edited in place");
             assert!(type_into(&mut h, "Diameter", "10 mm"), "{mode}: the Diameter field");
             settle_preview(&mut h);
             assert!(h.app.preview.active, "{mode}: the Ø10 holes are previewed: {:?}", h.app.preview.error);
@@ -166,6 +176,22 @@ fn properties_panel_pictures() {
             assert!(type_into(&mut h, "Diameter", "abc"));
         }
         paint(&mut h, &dir, &format!("properties-invalid-{mode}-{stage}"), None);
+        if editor {
+            h.step(&json!({"key": "Escape"})).unwrap();
+            h.frames(2);
+        }
+        // The counterbore hole edited in place (`properties-counterbore-…`): each of its values
+        // once, as a field.
+        let counterbore = h.app.session.doc.find_feature("Counterbored hole").unwrap().id;
+        h.call("engine.execute", json!({"command": "select.set", "params": {"items": [{"type": "feature", "id": counterbore}]}}));
+        h.frames(3);
+        if editor {
+            h.step(&json!({"widget": "Edit feature"})).unwrap();
+            h.frames(3);
+            assert!(h.app.properties.editor.is_some(), "{mode}: the counterbore hole is edited in place");
+            settle_preview(&mut h);
+        }
+        paint(&mut h, &dir, &format!("properties-counterbore-{mode}-{stage}"), editor.then_some("Diameter"));
         if editor {
             h.step(&json!({"key": "Escape"})).unwrap();
             h.frames(2);

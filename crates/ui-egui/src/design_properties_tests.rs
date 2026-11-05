@@ -349,6 +349,22 @@ fn every_feature_kind_is_edited_in_the_panel_or_its_existing_way() {
         ("solid.pattern.path", json!({"bodies": ["Turned"], "path_sketch": "Path", "path": ["l1"], "count": 2, "spacing": 30, "name": "Along"})),
         ("solid.mirror", json!({"bodies": ["Pin"], "plane": "YZ", "name": "Twin"})),
         ("construct.plane.offset", json!({"base": "XY", "offset": 25, "name": "Shelf"})),
+        // The kinds whose dialog names a value differently from the model (the r3 review): a
+        // tapered extrude, counterbore and countersink holes, a curvature fillet, a scaled body.
+        ("sketch.create", json!({"plane": "XY", "offset": 10, "name": "Boss"})),
+        ("sketch.rectangle.two_point", json!({"p0": [18, 18], "p1": [25, 25]})),
+        ("sketch.finish", json!({})),
+        ("solid.extrude", json!({"sketch": "Boss", "distance": 4, "taper": "5 deg", "operation": "join", "name": "Tapered boss"})),
+        (
+            "solid.hole",
+            json!({"position": [8, 24, 10], "diameter": 3, "depth": 5, "type": "counterbore", "cb_diameter": 5, "cb_depth": 1, "name": "Counterbored"}),
+        ),
+        (
+            "solid.hole",
+            json!({"position": [33, 6, 10], "diameter": 3, "depth": 5, "type": "countersink", "cs_diameter": 6, "cs_angle": "90 deg", "name": "Countersunk"}),
+        ),
+        ("solid.fillet", json!({"edges": [[10, 5, 15]], "radius": "1 mm", "type": "curvature", "name": "Blend"})),
+        ("solid.scale", json!({"bodies": ["Ring"], "factor": 1.5, "name": "Bigger ring"})),
     ] {
         h.app.run(id, p).unwrap_or_else(|e| panic!("{id}: {e}"));
     }
@@ -376,6 +392,7 @@ fn every_feature_kind_is_edited_in_the_panel_or_its_existing_way() {
                 assert!(!fields(&mut ed.dialog).is_empty(), "{name}: the editor has fields");
                 assert!(h.app.dialog.is_none(), "{name}: no dialog beside the editor");
                 assert!(h.widget("Apply change").is_some() && h.widget("Cancel edit").is_some(), "{name}");
+                each_parameter_is_shown_once(&mut h, id, &name);
                 super::cancel(&mut h.app);
             }
             Edits::Dialog => {
@@ -410,9 +427,117 @@ fn every_feature_kind_is_edited_in_the_panel_or_its_existing_way() {
     assert_eq!(how(&mut h, "Along"), Edits::Palette);
     assert_eq!(how(&mut h, "Down to the block"), Edits::Dialog);
     assert_eq!(how(&mut h, "Twin"), Edits::Dialog);
-    for name in ["Block", "Pin", "Ball", "Ring", "Pad", "Turned", "Round", "Bevel", "Hollow pin", "Drill", "Row", "Ring of balls", "Shelf"] {
+    for name in [
+        "Block",
+        "Pin",
+        "Ball",
+        "Ring",
+        "Pad",
+        "Turned",
+        "Round",
+        "Bevel",
+        "Hollow pin",
+        "Drill",
+        "Row",
+        "Ring of balls",
+        "Shelf",
+        "Tapered boss",
+        "Counterbored",
+        "Countersunk",
+        "Blend",
+        "Bigger ring",
+    ] {
         assert_eq!(how(&mut h, name), Edits::Panel, "{name}");
     }
+}
+
+/// The texts drawn inside the Properties panel this frame (the label column of a row, a
+/// read-only value, a note), each with its centre, as often as it is drawn.
+fn panel_labels(h: &Harness) -> Vec<(String, egui::Pos2)> {
+    let Some(panel) = h.app.properties.rect else { return Vec::new() };
+    let Some(tree) = h.output.accesskit_update.as_ref() else { return Vec::new() };
+    tree.nodes
+        .iter()
+        .filter(|(_, n)| n.role() == egui::accesskit::Role::Label)
+        .filter_map(|(_, n)| {
+            let b = n.bounds()?;
+            let at = egui::pos2(((b.x0 + b.x1) / 2.0) as f32, ((b.y0 + b.y1) / 2.0) as f32);
+            let text = n.label().or(n.value())?;
+            panel.contains(at).then(|| (text.to_owned(), at))
+        })
+        .collect()
+}
+
+/// With the editor open on feature `id`: every field is one of the model's inputs (its label is
+/// the model's), and every input of the model is drawn exactly once, as a field or as a
+/// read-only row, never both (the r3 review: a field labelled "Counterbore Ø" left the model's
+/// "Counterbore diameter" row beside it, so the value showed twice).
+fn each_parameter_is_shown_once(h: &mut Harness, id: u64, name: &str) {
+    let kind = h.app.session.doc.feature(id).map(|f| f.kind.clone()).unwrap_or_else(|| panic!("{name}: a feature"));
+    let inputs = kind.inputs();
+    let input_labels: Vec<&'static str> = inputs.iter().map(|(l, _, _)| *l).collect();
+    let ed = h.app.properties.editor.as_mut().unwrap_or_else(|| panic!("{name}: the editor is open"));
+    let field_labels: Vec<&'static str> = fields(&mut ed.dialog).iter().map(|(l, _, _)| *l).collect();
+    for label in &field_labels {
+        assert!(input_labels.contains(label), "{name}: the field {label:?} is one of the model's inputs {input_labels:?}");
+    }
+    let drawn = panel_labels(h);
+    let texts: Vec<&str> = drawn.iter().map(|(d, _)| d.as_str()).collect();
+    for label in input_labels.iter().collect::<std::collections::BTreeSet<_>>() {
+        let listed = input_labels.iter().filter(|l| *l == label).count();
+        let shown = texts.iter().filter(|d| *d == label).count();
+        assert_eq!(shown, listed, "{name}: the parameter {label:?} is drawn once per input, as a field or a read-only row: {texts:?}");
+    }
+    // A read-only row of a model input: its label with a value drawn at its right on the same
+    // line (a field's row has the field there, which is not a text). Fields and read-only rows
+    // together show each input once: no value twice.
+    let read_only = drawn
+        .iter()
+        .filter(|(d, at)| input_labels.contains(&d.as_str()) && drawn.iter().any(|(v, p)| v != d && p.x > at.x && (p.y - at.y).abs() < 2.0))
+        .count();
+    assert_eq!(
+        field_labels.len() + read_only,
+        inputs.len(),
+        "{name}: every input is drawn once, as a field or a read-only row, never both: fields {field_labels:?}, {read_only} read-only rows, inputs {input_labels:?}"
+    );
+}
+
+/// The body of the subtitle and the Body row is looked up once per selection and design
+/// revision (finding the body under a hole scans the model before it), not every frame: what the
+/// cache holds is what the panel shows until the design changes.
+#[test]
+fn the_body_lookup_is_cached_per_selection_and_revision() {
+    let mut h = mount();
+    let hole = feature(&h, "Mounting hole");
+    select(&mut h, "Mounting hole");
+    let revision = h.app.session.revision;
+    assert_eq!(h.app.properties.bodies, Some((hole, revision, vec!["Mount".to_string()])), "the hole's body, found under its position");
+    assert!(h.widget("Mount / 1 instance").is_some());
+    // The cache is what the frames read: a changed cache shows, with nothing recomputed.
+    h.app.properties.bodies = Some((hole, revision, vec!["Cached body".to_string()]));
+    h.frames(3);
+    assert!(h.widget("Cached body / 1 instance").is_some() && h.widget("Cached body").is_some(), "the subtitle and the Body row read the cache");
+    assert_eq!(h.app.properties.bodies.as_ref().map(|(_, r, _)| *r), Some(revision));
+    // The editor reads the same cache.
+    h.step(&json!({"widget": "Edit feature"})).unwrap();
+    h.frames(2);
+    assert!(h.widget("Cached body").is_some());
+    super::cancel(&mut h.app);
+    h.frames(2);
+    // Another feature: computed for it (the plate made the body).
+    select(&mut h, "Base plate");
+    assert_eq!(h.app.properties.bodies, Some((feature(&h, "Base plate"), h.app.session.revision, vec!["Mount".to_string()])));
+    // A design change (a new revision): computed again.
+    select(&mut h, "Mounting hole");
+    let revision = h.app.session.revision;
+    h.app.properties.bodies = Some((hole, revision, vec!["Cached body".to_string()]));
+    h.frames(2);
+    assert!(h.widget("Cached body").is_some());
+    h.app.run("document.metadata.set", json!({"values": {"project": "Actuator"}})).unwrap();
+    h.frames(3);
+    assert!(h.app.session.revision > revision);
+    assert_eq!(h.app.properties.bodies, Some((hole, h.app.session.revision, vec!["Mount".to_string()])));
+    assert!(h.widget("Cached body").is_none() && h.widget("Mount / 1 instance").is_some());
 }
 
 #[test]
