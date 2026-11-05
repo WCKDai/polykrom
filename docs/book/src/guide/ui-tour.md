@@ -73,6 +73,18 @@
   Wireframe retains its edge presentation, and hiding a join does not remove its CAD
   identity or change the exported solid. Unsupported or uncertain wall geometry
   keeps its existing edge presentation.
+- **Properties** (right). With one feature selected in the timeline, the panel shows its kind
+  and name, its parameters (diameter, distance, radius… with the extent, instances, driving
+  sketch and body), **Edit feature**, **Edit sketch** when a sketch drives it, and the features
+  that depend on it (click one to select it). **Edit feature** turns the panel into the editor
+  in place: the values become fields, **Preview** (on by default) shows the change in the
+  viewport, a summary says what the model will do (which features rebuild, a pattern keeping its
+  pitch), and **Apply change** runs the same command the feature's dialog runs, as one undo
+  step; **Cancel edit** or Esc leaves the design as it was. A value that is not a length, angle or
+  count shows its error under the field and disables Apply. Features whose dialog has picks or
+  choices only (a mirror, a thread, an extrude ending at an object) open that dialog instead, and
+  the panel says so. With nothing selected the panel shows the design's properties and **Edit
+  properties** opens the Design Properties window.
 - **Dialogs** dock on the right with a live preview. Most features also show drag handles and a
   value box in the viewport.
 - **Timeline** (bottom). Every feature in order. Double-click to edit, drag the marker to roll
