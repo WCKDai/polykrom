@@ -1750,7 +1750,9 @@ impl SolveApp {
         if !floating && show_timeline && !left_timeline {
             timeline::timeline(self, ui);
         }
-        // Browser hugs its contents in either layout; it never becomes a full-height blank column.
+        // The Design Browser is a full-height column beside the scene in either layout (view 01),
+        // or a floating overlay card with the `browser_float` preference; hidden, it reserves no
+        // room at all.
         if !self.ui.show_browser {
             self.shell.browser = None;
         }
