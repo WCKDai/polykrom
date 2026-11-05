@@ -603,12 +603,34 @@ fn pairs(t: &Tokens) -> Vec<(String, Rgb8, Rgb8)> {
 /// Pairs under the floor that the tables leave as they are (decided for #778). Each is close to
 /// the floor for normal vision too, and construction and centerline lines also differ by their
 /// dash patterns.
-fn left_as_they_are(mode: ColorVision, _dark: bool) -> BTreeSet<String> {
+fn left_as_they_are(mode: ColorVision, dark: bool) -> BTreeSet<String> {
     let mut v = vec!["sketch lines: sketch_construction vs sketch_centerline"];
     if mode == ColorVision::Tritan {
         v.push("sketch lines: sketch_lost vs sketch_centerline");
     }
+    // The supplied logo is the kit's lime → green → mint gradient, and the title bar follows the
+    // light palette in the light theme: for a tritanope the lime end (`logo[0]`) is 5.0 from the
+    // light bar, while the gradient's green and mint stops keep the mark apart
+    // (`the_logos_gradient_keeps_it_apart_from_the_light_bar`).
+    if mode == ColorVision::Tritan && !dark {
+        v.push("logo: logo[0] vs app_bar");
+    }
     v.into_iter().map(String::from).collect()
+}
+
+/// The kit's logo (`assets/design-kit/2026-11-02/brand/Polykrom-Logo.svg`) is a gradient from
+/// lime through green to mint. On the light title bar the lime end is close to the bar for a
+/// tritanope (left as it is above); the green and mint stops keep the mark apart for every eye.
+#[test]
+fn the_logos_gradient_keeps_it_apart_from_the_light_bar() {
+    let bar = rgb(Tokens::light().app_bar);
+    for mode in MODES {
+        for (name, stop) in [("green", [0x70, 0xDE, 0x17]), ("mint", [0x00, 0xC0, 0x99])] {
+            let w = worst(mode, stop, bar);
+            assert!(w >= FLOOR, "{mode:?}: the logo's {name} stop is {w:.1} from the light bar");
+        }
+    }
+    assert!(normal([0xE0, 0xFF, 0x30], bar) >= FLOOR, "the lime end reads for normal vision");
 }
 
 // ---- the tests ----

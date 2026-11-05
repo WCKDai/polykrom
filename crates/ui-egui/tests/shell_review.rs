@@ -57,6 +57,30 @@ fn main_window_and_shell_regions() {
         let ppp = output.pixels_per_point;
         let shot = raster::raster_sized(&mut h, &textures, output, WINDOW);
         shot.save(dir.join(format!("main-window-{mode}-{stage}.png"))).unwrap();
+        // What the pictures must show: the title bar in the theme's bar colour (light in the
+        // light theme), and the assistant's sparkle drawn in the status bar in both themes.
+        let t = theme::Tokens::get();
+        let px = |x: f32, y: f32| {
+            let p = shot.get_pixel((x * ppp) as u32, (y * ppp) as u32);
+            egui::Color32::from_rgb(p[0], p[1], p[2])
+        };
+        let bar = px(900.0, 24.0);
+        assert_eq!(bar, t.app_bar, "{mode}: the title bar is filled with the theme's bar colour");
+        let light_bar = egui::Rgba::from(bar).intensity() > 0.5;
+        assert_eq!(light_bar, !dark, "{mode}: the bar is light in the light theme and dark in the dark");
+        if let Some(assistant) = scenario::rect_of("titlebar:assistant") {
+            let glyph = Rect::from_center_size(assistant.center(), vec2(14.0, 14.0));
+            let ground = egui::Rgba::from(t.window).intensity();
+            let mut inked = 0;
+            for y in (glyph.top() as u32)..(glyph.bottom() as u32) {
+                for x in (glyph.left() as u32)..(glyph.right() as u32) {
+                    if (egui::Rgba::from(px(x as f32, y as f32)).intensity() - ground).abs() > 0.25 {
+                        inked += 1;
+                    }
+                }
+            }
+            assert!(inked >= 12, "{mode}: the assistant's sparkle is drawn in the status bar ({inked} inked pixels in {glyph:?})");
+        }
         let top = scenario::rect_of("toolbar").map_or(190.0, |r| r.bottom() + 4.0);
         let browser = scenario::rect_of("browser:card").unwrap_or(Rect::from_min_size(pos2(0.0, top), vec2(300.0, 600.0)));
         let history = scenario::rect_of("history:card")

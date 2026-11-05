@@ -285,6 +285,8 @@ pub(crate) fn offer_pill(
     crate::scenario::publish_target(handle, rect);
     let hot = response.hovered() || response.has_focus();
     let fill = if hot { t.app_bar_hover_button } else { t.accent };
+    // On the accent the ink made for it; on the bar's hover chrome the bar's text.
+    let ink = if hot { t.app_bar_text } else { t.on_accent };
     let radius = PILL_HEIGHT / 2.0 * f32::from(t.radius_xl) / 10.0;
     ui.painter().rect_filled(rect, radius, fill);
     if response.has_focus() {
@@ -292,9 +294,9 @@ pub(crate) fn offer_pill(
     }
     let glyph_x = if label.is_some() { rect.left() + icon_x } else { rect.center().x };
     let glyph = Rect::from_center_size(pos2(glyph_x, rect.center().y), vec2(16.0, 16.0));
-    icons::paint_on(ui.painter(), glyph, icon, Some(true), 1.0);
+    icons::paint_ink(ui.painter(), glyph, icon, ink);
     if let Some((text, _)) = label {
-        ui.painter().text(pos2(rect.left() + text_x, rect.center().y), Align2::LEFT_CENTER, text, font, t.app_bar_text);
+        ui.painter().text(pos2(rect.left() + text_x, rect.center().y), Align2::LEFT_CENTER, text, font, ink);
     }
     Some((rect, response))
 }
@@ -1759,7 +1761,15 @@ pub(crate) fn assistant_button(app: &mut SolveApp, ui: &mut egui::Ui, at: Rect) 
         AssistantMark::Stopped => crate::ui_kit::AssistantEntryState::Stopped,
         AssistantMark::Waiting(count) => crate::ui_kit::AssistantEntryState::Waiting(count),
     };
-    crate::ui_kit::assistant_entry(ui, &resp, state, app.agent_chat.open, ui.ctx().global_style().animation_time > 0.0);
+    // The button sits in the status bar, on the window's surface.
+    crate::ui_kit::assistant_entry(
+        ui,
+        &resp,
+        state,
+        app.agent_chat.open,
+        ui.ctx().global_style().animation_time > 0.0,
+        crate::ui_kit::AssistantHost::Window,
+    );
     if resp.on_hover_text(tip).clicked() {
         crate::agent_chat::toggle(app);
     }
@@ -3065,9 +3075,61 @@ mod app_bar_tests {
                     assert!(contrast(t.app_bar_text, bg) >= 4.5, "dark={dark}, {vision:?}, {fill:?}");
                 }
                 assert!(contrast(t.app_bar_separator, t.app_bar) >= 3.0);
-                assert!(contrast(t.app_bar, t.warning) >= 4.5, "approval counts need dark ink on amber");
+                assert!(contrast(crate::ui_kit::badge_ink(&t), t.warning) >= 4.5, "approval counts need readable ink on amber");
             }
         }
+    }
+
+    /// The title bar follows each theme's palette. The kit's `color/base` token is the one
+    /// surface under its document toolbar, its workspace tabs and its status bar, and the kit's
+    /// colour collection has a single mode (Dark), so nothing defines the bar as always dark: in
+    /// the light theme it takes the window's light surface, as the tab row and the status bar
+    /// do, with the window's text on it. Its text, dividers and the Save/Export fills read on it
+    /// in both themes and every colour-vision mode.
+    #[test]
+    fn title_bar_follows_the_theme_palette() {
+        fn luminance(c: Color32) -> f32 {
+            let c = egui::Rgba::from(c);
+            0.2126 * c.r() + 0.7152 * c.g() + 0.0722 * c.b()
+        }
+        for dark in [false, true] {
+            for vision in crate::theme::ColorVision::ALL {
+                let t = Tokens::themed(dark, vision);
+                assert_eq!(t.app_bar, t.window, "dark={dark} {vision:?}: the bar is the window's surface");
+                assert_eq!(t.app_bar_text, t.text, "dark={dark} {vision:?}: the bar's text is the window's");
+                assert!(crate::theme::contrast_ratio(t.app_bar_text, t.app_bar) >= 4.5, "dark={dark} {vision:?}: text on the bar");
+                let filled = t.app_bar_tab_active.lerp_to_gamma(t.app_bar_text, 0.08);
+                assert!(crate::theme::contrast_ratio(t.app_bar_text, filled) >= 4.5, "dark={dark} {vision:?}: Save and Export labels on their fill");
+                assert!(crate::theme::contrast_ratio(t.app_bar_separator, t.app_bar) >= 3.0, "dark={dark} {vision:?}: dividers");
+                assert_eq!(luminance(t.app_bar) > 0.5, !dark, "dark={dark} {vision:?}: the bar is light in the light theme, dark in the dark");
+            }
+        }
+        // Drawn: the bar's fill is the theme's.
+        let previous = crate::theme::is_dark();
+        for dark in [false, true] {
+            crate::theme::set_dark(dark);
+            let mut h = crate::scenario::Harness::new();
+            h.app.home.open = false;
+            h.call("ui.set", json!({"dark": dark}));
+            h.app.run("solid.box", json!({"length":10,"width":10,"height":10})).unwrap();
+            h.frames(3);
+            let out = h.ctx.run_ui(
+                egui::RawInput { screen_rect: Some(Rect::from_min_size(egui::Pos2::ZERO, vec2(1400.0, 800.0))), ..Default::default() },
+                |ui| h.app.ui(ui),
+            );
+            let t = Tokens::get();
+            let bar = Rect::from_min_size(egui::Pos2::ZERO, vec2(1400.0, APP_BAR_HEIGHT));
+            let fills: Vec<Color32> = out
+                .shapes
+                .iter()
+                .filter_map(|s| match &s.shape {
+                    egui::Shape::Rect(r) if r.rect.contains_rect(bar.shrink(1.0)) && r.rect.height() <= APP_BAR_HEIGHT + 2.0 => Some(r.fill),
+                    _ => None,
+                })
+                .collect();
+            assert!(fills.contains(&t.app_bar), "dark={dark}: the title bar is filled with the theme's bar colour: {fills:?}");
+        }
+        crate::theme::set_dark(previous);
     }
 
     /// Save writes on a worker thread: frames until it has finished.

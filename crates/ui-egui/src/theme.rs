@@ -262,6 +262,10 @@ pub(crate) fn icon_accent_for_tab(tab: &str) -> Option<&'static str> {
     }
 }
 
+/// What a card's or a menu's drop shadow is made of: the kit's graphite (#202225), in either
+/// theme. (It used to be the application bar's colour, which is light in the light theme now.)
+pub(crate) const SHADOW_INK: Color32 = Color32::from_rgb(32, 34, 37);
+
 /// WCAG contrast of two opaque sRGB colours.
 pub(crate) fn contrast_ratio(a: Color32, b: Color32) -> f64 {
     let luminance = |c: Color32| {
@@ -783,7 +787,7 @@ impl Tokens {
 
     /// Subtle shell elevation, derived from the semantic application-bar colour.
     pub(crate) fn shell_shadow(self) -> egui::Shadow {
-        egui::Shadow { offset: [0, self.space_2 as i8], blur: self.space_8 as u8, spread: 0, color: self.app_bar.gamma_multiply(0.18) }
+        egui::Shadow { offset: [0, self.space_2 as i8], blur: self.space_8 as u8, spread: 0, color: SHADOW_INK.gamma_multiply(0.18) }
     }
 
     /// The tokens of the current theme and colour vision mode.

@@ -131,7 +131,7 @@ const ELEMENTS: &[Element] = &[
                     AssistantEntryState::Waiting(3),
                 ] {
                     let (_, response) = ui.allocate_exact_size(vec2(t.space_24 + t.space_8, t.space_24 + t.space_8), egui::Sense::click());
-                    assistant_entry(ui, &response, state, false, false);
+                    assistant_entry(ui, &response, state, false, false, AssistantHost::AppBar);
                 }
             });
         });
