@@ -2837,19 +2837,23 @@ mod tests {
     }
 
     /// The widest of the card's button labels stays well inside the narrowest card (346 px wide at a 760 px
-    /// window, less its padding) in every language, so a button never has to be wider than its card.
+    /// window, 328 px inside its padding) in every language, so a button never has to be wider than
+    /// its card. Inter sets the widest, Russian, at 261 px; the limit leaves the button its own
+    /// padding and 40 px of card.
     #[test]
     fn the_offers_buttons_fit_the_narrowest_card_in_every_language() {
         let ctx = crate::fonts::test_context();
         ctx.run_ui(egui::RawInput::default(), |_| {}).textures_delta.clear();
-        let font = egui::FontId::proportional(crate::theme::Tokens::get().font_label);
+        let t = crate::theme::Tokens::get();
+        let font = egui::FontId::proportional(t.font_label);
+        let limit = 346.0 - 2.0 * t.form_inset - 2.0 * t.space_6 - 40.0;
         let mut wide = Vec::new();
         for catalog in crate::i18n::LOCALES {
             use crate::space_mouse_offer::Action;
             for key in [Action::Swap, Action::Calibrate, Action::Never, Action::Close].map(|action| action.label()) {
                 let label = crate::i18n::Locale::for_language(catalog.id).text(key).to_string();
                 let width = ctx.fonts_mut(|fonts| fonts.layout_no_wrap(label.clone(), font.clone(), egui::Color32::WHITE).size().x);
-                if width > 250.0 {
+                if width > limit {
                     wide.push(format!("{} {key} \"{label}\" is {width:.0} px", catalog.id));
                 }
             }

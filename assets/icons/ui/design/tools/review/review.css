@@ -1,6 +1,6 @@
 /* App surfaces (keep in sync with assets/styles/ui/palettes.rs; lint_icons.py checks): --card is the ribbon surface `toolbar` the icons lie on, --bg the page (`panel` in light, `viewport_top` in dark), --line `border`, --fg `text`, --mut `text_dim`. */
 :root{--bg:#fbfbfb;--fg:#29292e;--card:#f7f7f7;--line:#d3d3d9;--mut:#737378;--sz:48px}
-body.dark{--bg:#333338;--fg:#e1e1e7;--card:#2a2b2f;--line:#444449;--mut:#9a9aa0}
+body.dark{--bg:#181b1f;--fg:#eceef0;--card:#292c2f;--line:#42474d;--mut:#a9b0b7}
 body{font:12px system-ui,sans-serif;margin:0;background:var(--bg);color:var(--fg)}
 header{position:sticky;top:0;background:var(--card);border-bottom:1px solid var(--line);padding:6px 12px;z-index:5;display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center}
 h1{font-size:14px;margin:0}.sum{color:var(--mut)}

@@ -89,6 +89,8 @@ pub mod install;
 pub mod issue_report;
 pub mod joint_drag;
 pub mod keymap;
+#[cfg(test)]
+mod kit_tokens_tests;
 mod linked_source;
 #[cfg(test)]
 mod loft_rails_dialog_tests;

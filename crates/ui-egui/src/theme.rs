@@ -1,6 +1,7 @@
-//! Colours and widget style: a dark theme (the default, a blue-grey in the spirit of desktop CAD
-//! tools, viewport #2e3440) and a light one, each with colour vision modes, and theme files that
-//! set any of their colours (`theme_files`). Every colour the UI uses comes from [`Tokens`].
+//! Colours and widget style: a dark theme (the default: the design kit's graphite shell, window
+//! #202225, viewport #181B1F, lime accent) and a light one with the same accent hue, each with
+//! colour vision modes, and theme files that set any of their colours (`theme_files`). Every
+//! colour the UI uses comes from [`Tokens`] (`assets/styles/ui/palettes.rs`).
 
 use std::cell::Cell;
 
@@ -961,8 +962,9 @@ mod tests {
             let accent = super::TabAccent::for_tab(&super::Tokens::light(), tab);
             assert_eq!(accent.ink != accent.color, tab == "MESH", "only light Mesh separates ink from fill");
         }
-        // Polykrom's lime Model accent (#91): a deep lime in the light theme, #CCFF00 in the dark.
-        for (t, values) in [(super::Tokens::light(), [0x4d7c0f, 0x365408, 0xa0ce2c]), (super::Tokens::dark(), [0xccff00, 0xebffb4, 0x647800])] {
+        // Polykrom's lime Model accent (#91): the kit's #E0FF30 on its muted olive selection in
+        // the dark theme, the same hue deepened to read in the light one.
+        for (t, values) in [(super::Tokens::light(), [0x637205, 0x434e07, 0xb3cc1f]), (super::Tokens::dark(), [0xe0ff30, 0xe0ff30, 0x374126])] {
             let [color, ink, soft] = values.map(rgb);
             // Render is a workspace like Design and shares its accent, as its workspace icon does.
             for tab in ["MODEL", "RENDER"] {
