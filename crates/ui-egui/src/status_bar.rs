@@ -198,7 +198,7 @@ mod tests {
         h.frames(3);
         assert_eq!(selection_summary(&h.app), "Nothing selected");
         h.app.run("select.set", json!({"items": [{"type": "body", "name": "Block"}]})).unwrap();
-        assert_eq!(selection_summary(&h.app), "1 bodies selected".replace("1 bodies", "1 bodies"));
+        assert_eq!(selection_summary(&h.app), "1 bodies selected");
         h.frames(2);
         let bar = rect_of("status:bar").unwrap();
         assert_eq!(bar.height(), HEIGHT);
