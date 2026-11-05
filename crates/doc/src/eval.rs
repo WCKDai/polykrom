@@ -663,18 +663,30 @@ fn thread_turn(t: &ThreadInfo, cyl: &kernel::CylinderFace, mb: &ModelBody) -> Re
 
 /// The work a fillet's first attempt at the radius asked for may spend, in the kernel's work
 /// units ([`kernel::with_work_budget`]: one per edge order and per edge tried, per boolean stage
-/// and per intersection). The slowest fillet the kernel cases build takes 33; the eighteen edges
-/// of #243 (a box and two gussets on a spline sole, which no construction rounds at any size)
-/// take over 90 before they are refused, and a size search would try them at a dozen radii more,
-/// each as costly. See [`fillet_work`].
-pub(crate) const FILLET_WORK: u64 = 64;
-/// Work units per edge above [`FILLET_WORK`]: an edge the first construction takes costs about
-/// one, so a fillet of many edges keeps building as before.
-const FILLET_WORK_PER_EDGE: u64 = 2;
+/// and per intersection). Measured over every corpus (docs/perf.md, "Fillet work budget: the
+/// measured margin"): of 3720 attempts the costliest that builds spends 33 (851's three edges
+/// at a knife-edge corner, 2811's 32 rib roots), 99 in 100 spend 8 or fewer, and the eighteen
+/// edges of #243 (a box and two gussets on a spline sole, which no construction rounds at any
+/// size) spend 93 before they are refused for their size, after which a size search would try
+/// them at a dozen radii more, each as costly. 80 is 2.4 times the costliest legitimate attempt
+/// and 0.86 of #243's; a fourfold 132 would let #243 into its search (over 500 s). See
+/// [`fillet_work`] for the scale with the edges, and the pin
+/// `the_costliest_known_legitimate_fillets_stay_below_half_their_work_budget` (crates/engine).
+pub(crate) const FILLET_WORK: u64 = 80;
+/// Work units per edge above [`FILLET_WORK`]: the costliest many-edge fillet that builds spends
+/// about one per edge (2811: 33 units, 32 edges), so four per edge keeps the margin near
+/// fourfold for a fillet of more than 20 edges (32 edges: 128), while #243's 18 edges (72)
+/// stay under the base.
+const FILLET_WORK_PER_EDGE: u64 = 4;
 
 /// The work budget of a fillet's first attempt on `edges` (see [`FILLET_WORK`]).
 pub(crate) fn fillet_work(edges: &[Vec3]) -> u64 {
-    FILLET_WORK.max(FILLET_WORK_PER_EDGE.saturating_mul(edges.len() as u64))
+    fillet_work_for(edges.len())
+}
+
+/// The work budget of a constant fillet's first attempt on `edges` edges (see [`FILLET_WORK`]).
+pub fn fillet_work_for(edges: usize) -> u64 {
+    FILLET_WORK.max(FILLET_WORK_PER_EDGE.saturating_mul(edges as u64))
 }
 
 /// A constant fillet of `edges`; with [`FilletFit::Reduce`](crate::FilletFit::Reduce), a radius too
@@ -687,7 +699,11 @@ fn fillet_fitted(
     r: f64,
     fit: crate::FilletFit,
 ) -> std::result::Result<(kernel::Body, Option<Vec<f64>>), kernel::KernelError> {
-    fillet_fitted_within(body, edges, r, fit, fillet_work(edges))
+    let work = fillet_work(edges);
+    // A measuring build may give every attempt another budget (`POLYKROM_FILLET_WORK`).
+    #[cfg(debug_assertions)]
+    let work = crate::fillet_work::budget_override().unwrap_or(work);
+    fillet_fitted_within(body, edges, r, fit, work)
 }
 
 /// [`fillet_fitted`] with the first attempt at the radius asked for allowed `work` units (#243).
@@ -707,6 +723,26 @@ pub(crate) fn fillet_fitted_within(
         let built = kernel::fillet(body, edges, r);
         spent = kernel::work_spent().unwrap_or(0);
         built
+    });
+    // A measuring build logs what the attempt spent (`POLYKROM_FILLET_WORK_LOG`, docs/perf.md).
+    #[cfg(debug_assertions)]
+    crate::fillet_work::record(&crate::fillet_work::Attempt {
+        edges: edges.len(),
+        radius: r,
+        fit,
+        limit: work,
+        spent,
+        outcome: match &first {
+            Ok(_) => "built",
+            Err(kernel::KernelError::BudgetSpent { .. }) => "budget",
+            Err(kernel::KernelError::TooLarge(_)) => "too_large",
+            Err(_) => "refused",
+        },
+        stage: match &first {
+            Err(kernel::KernelError::BudgetSpent { stage, .. }) => Some(stage),
+            _ => None,
+        },
+        body,
     });
     match first {
         // Spent here, not by an outer budget that had less left: this fillet is the cost.
