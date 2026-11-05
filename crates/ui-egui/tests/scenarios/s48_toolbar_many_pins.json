@@ -10,18 +10,13 @@
   }
  },
  {
+  "note": "Before pinning, the ten commands are the group's secondary (small) buttons or in its drop-down, not pinned (large) buttons.",
   "expect": {
+   "shown_handles": [
+    "button:solid.extrude"
+   ],
    "hidden_handles": [
-    "button:solid.box",
-    "button:solid.cylinder",
-    "button:solid.sphere",
-    "button:solid.torus",
-    "button:solid.coil",
-    "button:solid.loft",
-    "button:solid.rib",
-    "button:solid.sweep",
-    "button:solid.pipe",
-    "button:solid.thread"
+    "button:solid.box"
    ]
   }
  },

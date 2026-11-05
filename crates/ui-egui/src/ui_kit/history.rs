@@ -15,11 +15,14 @@ pub(crate) enum HistoryStyle {
     Names,
 }
 
+/// The bottom strip's icon-over-label step (the kit's 104 x 48 history chip).
+pub(crate) const BOTTOM_CHIP_HEIGHT: f32 = 48.0;
+
 impl HistoryStyle {
     pub fn height(self) -> f32 {
         let t = Tokens::get();
         match self {
-            Self::Bottom => t.control_height,
+            Self::Bottom => BOTTOM_CHIP_HEIGHT,
             Self::Icons => t.control_height + t.space_10,
             Self::Names => TREE_ROW_HEIGHT,
         }
@@ -63,6 +66,10 @@ impl HistoryChip<'_> {
         let mut p = painter.clone();
         if self.dim || self.suppressed {
             p.multiply_opacity(0.42);
+        }
+        if style == HistoryStyle::Bottom {
+            self.paint_step(&p, rect);
+            return;
         }
         let fill = if self.error {
             t.form_error_fill
@@ -123,6 +130,46 @@ impl HistoryChip<'_> {
             let side = if names { t.space_12 } else { t.space_10 };
             let at = if names { pos2(rect.right() - t.space_3 - side, rect.center().y - side / 2.0) } else { rect.right_top() - vec2(side, 0.0) };
             icons::paint_icon(&p, Rect::from_min_size(at, vec2(side, side)), if self.error { "error" } else { "warning" }, 1.0);
+        }
+    }
+}
+
+impl HistoryChip<'_> {
+    /// The bottom strip's step: the icon over the feature's name. The current (selected) step
+    /// sits on the selection tint with its name in the accent (the kit puts the lime on the
+    /// selected history step alone); the others are muted.
+    fn paint_step(&self, p: &Painter, rect: Rect) {
+        let t = Tokens::get();
+        let fill = if self.error {
+            t.form_error_fill
+        } else if self.selected {
+            self.accent.soft
+        } else if self.hovered {
+            t.hover
+        } else {
+            egui::Color32::TRANSPARENT
+        };
+        if self.error {
+            p.rect(rect, t.radius_sm, fill, Stroke::new(1.0, t.form_error), egui::StrokeKind::Inside);
+        } else {
+            p.rect_filled(rect, t.radius_sm, fill);
+        }
+        let side = t.space_16 + t.space_4;
+        let icon = Rect::from_center_size(pos2(rect.center().x, rect.top() + t.space_12), vec2(side, side));
+        icons::paint_accented(p, icon, self.icon, feature_icon_accent(self.kind, self.icon), 1.0);
+        if self.suppressed {
+            p.line_segment([icon.left_bottom(), icon.right_top()], Stroke::new(1.5, t.text_dim));
+        }
+        let ink = if self.selected { self.accent.color } else { t.text_dim };
+        let mut job = egui::text::LayoutJob::simple(self.name.to_owned(), egui::FontId::proportional(t.font_small), ink, (rect.width() - t.space_8).max(1.0));
+        job.wrap.max_rows = 1;
+        job.wrap.break_anywhere = true;
+        job.wrap.overflow_character = Some('\u{2026}');
+        let galley = p.layout_job(job);
+        p.galley(pos2(rect.center().x - galley.size().x / 2.0, rect.bottom() - t.space_6 - galley.size().y), galley, ink);
+        if self.error || self.warning {
+            let side = t.space_10;
+            icons::paint_icon(p, Rect::from_min_size(rect.right_top() + vec2(-side - t.space_2, t.space_2), vec2(side, side)), if self.error { "error" } else { "warning" }, 1.0);
         }
     }
 }

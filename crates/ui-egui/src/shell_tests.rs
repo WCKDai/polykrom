@@ -1,5 +1,6 @@
 use super::*;
 use crate::scenario::{Harness, rect_of};
+use crate::toolbar;
 use serde_json::json;
 
 #[test]
@@ -27,30 +28,39 @@ fn both_modes_keep_their_geometry_and_fit_clear_of_covered_rects() {
         h.app.run("solid.box", json!({"length":40,"width":30,"height":20})).unwrap();
         h.settle();
         let viewport = h.app.viewport.rect.unwrap();
-        let workspace = rect_of("ribbon:workspace").unwrap();
         let toolbar = rect_of("toolbar").unwrap();
+        let status = rect_of("status:bar").unwrap();
+        assert_eq!(status.bottom(), h.ctx.content_rect().bottom());
+        assert!(viewport.bottom() <= status.top(), "the viewport ends above the status bar");
+        let browser = rect_of("browser:card").unwrap();
+        let strip = h.app.shell.document_bar.unwrap();
         if mode == LayoutMode::Floating {
             let ribbon = rect_of("ribbon:card").unwrap();
-            assert_eq!(viewport.left(), 0.0);
-            assert_eq!(viewport.top(), toolbar::APP_BAR_HEIGHT);
-            assert_eq!(workspace.left(), SHELL_GAP);
-            assert_eq!(workspace.top(), viewport.top() + SHELL_GAP);
-            assert_eq!(ribbon.left() - workspace.right(), SHELL_GAP);
-            assert_eq!(ribbon.right(), viewport.right() - SHELL_GAP);
-            assert!(!covered(&h.app, pos2(4.0, workspace.center().y)));
-            assert!(!covered(&h.app, pos2(workspace.right() + 2.0, workspace.center().y)));
-            assert!(covered(&h.app, workspace.center()));
+            // The scene sits right of the browser and below the view bar (view 01), not behind them.
+            assert_eq!(viewport.left(), browser.right());
+            assert_eq!(viewport.top(), strip.bottom());
+            assert_eq!(viewport.bottom(), status.top());
+            assert_eq!(ribbon.left(), SHELL_GAP);
+            assert_eq!(ribbon.top(), toolbar::APP_BAR_HEIGHT + SHELL_GAP);
+            assert_eq!(ribbon.right(), h.ctx.content_rect().right() - SHELL_GAP);
             assert!(covered(&h.app, ribbon.center()));
         } else {
             assert_eq!(toolbar.top(), toolbar::APP_BAR_HEIGHT);
             // The AI review's prompt row sits between the ribbon and the viewport (design kit).
             let prompt = rect_of("review:prompt_row").unwrap();
             assert_eq!(prompt.top(), toolbar.bottom());
-            assert_eq!(viewport.top(), prompt.bottom());
+            // The document tabs and the view bar sit between the prompt row and the scene.
+            let strip = h.app.shell.document_bar.unwrap();
+            assert_eq!(strip.top(), prompt.bottom());
+            assert_eq!(viewport.top(), strip.bottom());
             assert_eq!(toolbar.height(), toolbar::RIBBON_HEIGHT);
-            assert_eq!(workspace.left(), 0.0);
-            assert_eq!(covered_rects(&h.app), vec![h.app.shell.history.unwrap(), rect_of("browser:card").unwrap()]);
+            assert_eq!(toolbar.left(), 0.0);
+            assert_eq!(
+                covered_rects(&h.app),
+                vec![h.app.shell.history.unwrap(), browser, strip]
+            );
         }
+        let _ = strip;
         h.app.fit_view();
         h.settle();
         let layout = h.app.viewport.layout.as_ref().unwrap();
@@ -87,7 +97,9 @@ fn cards_block_model_hover_wheel_and_drag_but_the_gap_remains_viewport() {
     assert_eq!(h.app.cam, camera);
     assert!(h.app.viewport.boxsel.is_none());
     assert_eq!(h.app.session.doc.to_json(), doc);
-    let gap = pos2(4.0, ribbon.center().y);
+    // The scene begins just right of the browser column.
+    let browser = rect_of("browser:card").unwrap();
+    let gap = pos2(browser.right() + 2.0, browser.center().y);
     h.call("ui.move", json!({"x":gap.x,"y":gap.y}));
     assert_eq!(h.app.viewport.mouse, Some(gap));
 }
@@ -121,7 +133,7 @@ fn floating_sketch_palette_and_compass_share_measured_clearance() {
                 h.app.start("solid.extrude");
                 h.settle();
                 let dialog = h.app.viewport.dialog_rect.unwrap();
-                let expected_top = (content.top() + crate::viewport::AXIS_VIEW_CLEARANCE).min((content.bottom() - 360.0).max(content.top()));
+                let expected_top = (content.top() + crate::viewport::AXIS_VIEW_CLEARANCE).min((content.bottom() - PANEL_MIN_HEIGHT).max(content.top()));
                 assert!((dialog.left() - content.left()).abs() < 1.0);
                 assert!((dialog.top() - expected_top).abs() < 1.0, "left dialogs retain their existing top: {dialog:?}");
             }
@@ -275,7 +287,8 @@ fn browser_and_history_cards_block_input_while_their_gaps_and_space_below_browse
         h.call("ui.drag", json!({"x0":at.x,"y0":at.y,"x1":at.x+10.0,"y1":at.y+2.0,"button":"middle","steps":6}));
         assert_eq!(h.app.cam, camera);
     }
-    for at in [pos2(3.0, browser.center().y), pos2(browser.center().x, browser.bottom() + SHELL_GAP), pos2(3.0, history.center().y)] {
+    // (The browser is a full-height column: the gap beside it and beside the history stay viewport.)
+    for at in [pos2(3.0, browser.center().y), pos2(3.0, history.center().y)] {
         assert!(!covered(&h.app, at));
         h.call("ui.move", json!({"x":at.x,"y":at.y}));
         assert_eq!(h.app.viewport.mouse, Some(at));
@@ -334,7 +347,9 @@ fn assistant_floats_without_changing_projection_and_shields_the_model() {
             assert!(card.left() > projection.left() && card.right() < projection.right());
             assert!(card.bottom() < projection.bottom());
             let content = h.app.shell.content.expect("content");
-            assert!((card.top() - content.top()).abs() < 1.0, "full-height top: {card:?} {content:?}");
+            // The card reaches the top of the content area (the document bar sits beside it).
+            let top = h.app.shell.document_bar.map_or(content.top(), |strip| strip.top());
+            assert!((card.top() - top).abs() < 1.0, "full-height top: {card:?} {content:?}");
             assert!((card.bottom() - content.bottom()).abs() < 1.0, "full-height bottom: {card:?} {content:?}");
             assert!(covered(&h.app, card.center()), "chat shields viewport input");
             if side == "right" {
@@ -506,17 +521,14 @@ fn tool_sheets_drag_over_browser_and_history_but_clear_protected_panels() {
         let chat = h.app.agent_chat.panel_rect.unwrap();
         let browser = h.app.shell.browser.unwrap();
         let history = h.app.shell.history.unwrap();
-        let ribbon = h.app.shell.cards[1];
-        let workspace = h.app.shell.cards[0];
-        for target in [browser.center(), history.center(), ribbon.center(), workspace.center(), egui::pos2(-1000.0, 400.0), egui::pos2(3000.0, 400.0)]
-        {
+        let ribbon = h.app.shell.cards[0];
+        for target in [browser.center(), history.center(), ribbon.center(), egui::pos2(-1000.0, 400.0), egui::pos2(3000.0, 400.0)] {
             let title = crate::scenario::handle_at("dialog:title").unwrap();
             h.call("ui.drag", json!({"x0":title.x,"y0":title.y,"x1":target.x,"y1":target.y,"steps":10}));
             h.frames(4);
             let sheet = h.app.viewport.dialog_rect.unwrap();
             assert!(!sheet.intersect(chat).is_positive(), "{side}: {sheet:?} overlaps Assistant {chat:?}");
             assert!(!sheet.intersect(ribbon).is_positive(), "sheet clears ribbon");
-            assert!(!sheet.intersect(workspace).is_positive(), "sheet clears workspace selector");
             if target == browser.center() {
                 assert!(sheet.intersect(browser).is_positive(), "sheet can cover Browser");
                 let layer = h.ctx.layer_id_at(sheet.intersect(browser).center()).unwrap();
@@ -578,7 +590,7 @@ fn compact_layout_is_saved_and_survives_cancel_apply_defaults_and_bad_input() {
 }
 
 #[test]
-fn compact_chrome_is_flush_and_browser_hugs_content_in_both_themes() {
+fn compact_chrome_is_flush_and_browser_fills_its_column_in_both_themes() {
     for dark in [false, true] {
         let mut h = Harness::new();
         h.call("ui.resize", json!({"width":1400,"height":900}));
@@ -587,17 +599,16 @@ fn compact_chrome_is_flush_and_browser_hugs_content_in_both_themes() {
         h.settle();
         let bar = rect_of("toolbar").unwrap();
         let browser = rect_of("browser:card").unwrap();
-        let workspace = rect_of("ribbon:workspace").unwrap();
-        assert_eq!(workspace.left(), bar.left());
-        assert_eq!(workspace.top(), bar.top());
-        assert_eq!(h.app.shell.cards.get(1).unwrap().left(), workspace.right(), "one joined top bar");
+        assert_eq!(h.app.shell.cards.len(), 1, "one joined top bar");
+        assert_eq!(bar.left(), 0.0);
         assert_eq!(browser.left(), 0.0);
         // The AI review's prompt row joins the ribbon; the Browser joins it, square and flush.
         let prompt = rect_of("review:prompt_row").unwrap();
         assert_eq!(prompt.top(), bar.bottom(), "square, flush prompt row/ribbon join");
         assert_eq!(prompt.left(), 0.0);
         assert_eq!(browser.top(), prompt.bottom(), "square, flush Browser/prompt row join");
-        assert!(browser.height() < h.app.viewport.rect.unwrap().height() / 2.0, "Browser hugs its contents");
+        // The Design Browser is a full-height column down to the history strip.
+        assert_eq!(browser.bottom(), h.app.shell.history.unwrap().top(), "the browser reaches the history strip");
         let compact = crate::ui_kit::Container::new(&h.ctx, crate::ui_kit::Surface::Panel);
         assert_eq!(compact.gap(), 0.0);
         let frame = compact.frame(&h.ctx, crate::theme::Tokens::get().panel, crate::frame::Side::Left);

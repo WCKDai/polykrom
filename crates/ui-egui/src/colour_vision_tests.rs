@@ -474,6 +474,7 @@ const NO_MEANING: &[(&str, &str)] = &[
     ("app_bar_hover_button", "translucent hover chrome"),
     ("app_bar_hover_strong", "translucent hover chrome"),
     ("app_bar_tab_active", "the active document tab's surface"),
+    ("window", "the window's base surface"),
     ("dialog_footer", "dense dialog footer band"),
     ("dialog_rule", "dense dialog divider"),
     ("control_fill", "input control fill"),

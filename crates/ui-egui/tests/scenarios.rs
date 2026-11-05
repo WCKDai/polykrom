@@ -149,7 +149,7 @@ fn home_tab_and_file_recent_open_designs() {
         {"call":"engine.execute","params":{"command":"file.save_as","params":{"path":path}}},
         {"click":{"handle":"tab:home"}},
         {"expect":{"home":true,"documents":1}},
-        {"click":{"handle":"tab:design:0"}},
+        {"click":{"handle":"home:back"}},
         {"expect":{"home":false,"bodies":1}},
         {"click":{"handle":"tab:home"}},
         {"click":{"handle":"home:recent:0"}},

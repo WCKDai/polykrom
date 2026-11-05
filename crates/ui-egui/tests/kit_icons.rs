@@ -284,8 +284,8 @@ const MAPPING: &[Glyph] = &[
         "brand/Polykrom-Logo.svg",
         "logo",
         &[],
-        Use::Reserved,
-        "the application logo, for the document toolbar of the window layout (no white background)",
+        Use::Control,
+        "the application logo, alone in the document toolbar as the application menu's button (no white background)",
     ),
 ];
 

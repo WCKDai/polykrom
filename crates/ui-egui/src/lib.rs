@@ -50,6 +50,7 @@ pub mod dialogs_sweep;
 mod dialogs_thread;
 pub mod dialogs_view_dxf;
 pub mod dim_view;
+pub mod document_bar;
 #[cfg(test)]
 mod dimension_create_ui_tests;
 pub mod documents;
@@ -242,6 +243,7 @@ pub mod space_mouse_calibration;
 pub mod space_mouse_model;
 pub mod space_mouse_offer;
 pub mod stand_up;
+pub mod status_bar;
 #[cfg(test)]
 mod sweep_dialog_tests;
 pub(crate) mod test_boat;
@@ -1714,6 +1716,9 @@ impl SolveApp {
             agent_chat::settings::dialog(self, ui.ctx());
         }
         if self.home.open {
+            // The status bar's controls (Preferences, Help, Report a bug) stay reachable on the
+            // start page too.
+            status_bar::show(self, ui);
             home::show(self, ui);
             if self.home.open {
                 // Agent detection runs in the background and is only received by `agent_chat::poll`
@@ -1725,6 +1730,12 @@ impl SolveApp {
             }
         }
         let floating = ui_kit::Container::new(ui.ctx(), ui_kit::Surface::Panel).floating();
+        // The status bar along the bottom comes first, so everything else stacks above it. Its
+        // Report a bug starts a draft, which blocks the CAD input from here on (as the bar's did).
+        if !self.home.open {
+            status_bar::show(self, ui);
+            issue_report::CadInput::block(self, ui, report_input);
+        }
         let show_timeline = self.ui.show_timeline && !render_workspace::active(self);
         let left_timeline = show_timeline && self.preferences.timeline_left;
         timeline_left::animate_folds(self, ui.ctx());
@@ -1748,8 +1759,8 @@ impl SolveApp {
         }
         let full = ui.available_rect_before_wrap();
         if floating {
-            let cards = shell::Cards::new(full, self.ui.layout, toolbar::ribbon_height(self.preferences.ribbon_labels));
-            self.shell.cards = vec![cards.workspace, cards.ribbon];
+            let cards = shell::Cards::new(full, self.ui.layout, toolbar::ribbon_height(toolbar::labels_shown(self, ui.ctx())));
+            self.shell.cards = vec![cards.ribbon];
             self.shell.history = if left_timeline {
                 let below_ribbon = egui::Rect::from_min_max(egui::pos2(full.left(), cards.bottom), full.max);
                 Some(timeline_left::floating_rect(self, below_ribbon))
@@ -1766,7 +1777,14 @@ impl SolveApp {
                     && i.pointer.press_origin().is_some_and(|p| full.contains(p) && !shell::covered(self, p))
             });
             let blocked = !continuing_navigation && ui.input(|i| i.pointer.latest_pos()).is_some_and(|p| shell::covered(self, p));
-            let mut viewport_ui = ui.new_child(egui::UiBuilder::new().max_rect(full).id_salt("floating_viewport"));
+            // The pickable viewport (view 01) sits below the document tabs and the view bar and
+            // right of the browser, not behind them. Those move only with the window, so last
+            // frame's rects place the scene; the band around it is the window's base surface.
+            let scene = shell::scene_rect(self, full);
+            if scene != full {
+                ui.painter().rect_filled(full, 0.0, theme::Tokens::get().window);
+            }
+            let mut viewport_ui = ui.new_child(egui::UiBuilder::new().max_rect(scene).id_salt("floating_viewport"));
             if blocked {
                 // Disabled only to shield the scene from input under a card or menu; it must
                 // not fade, or the whole viewport dims whenever the pointer is over the shell.
@@ -1774,7 +1792,7 @@ impl SolveApp {
                 viewport_ui.disable();
             }
             self.show_workspace(&mut viewport_ui);
-            shell::paint_top_corners(ui.painter(), full, theme::Tokens::get().app_bar);
+            shell::paint_top_corners(ui.painter(), scene, theme::Tokens::get().window);
             toolbar::toolbar(self, ui);
             theme::TabAccent::publish(self, ui.ctx());
             review::prompt_row(self, ui);
@@ -1801,7 +1819,16 @@ impl SolveApp {
             .frame(Container::new(ui.ctx(), Surface::Viewport).edge_frame(egui::Color32::TRANSPARENT))
             .show(ui, |ui| {
                 let panel_content = ui.max_rect();
-                self.shell.content = Some(shell::workspace_content(self, panel_content));
+                let mut content = shell::workspace_content(self, panel_content);
+                // The document tabs and the view bar take the top of the content area, between
+                // the browser and a floating Assistant; the viewport's overlays and fit use what
+                // is left.
+                let strip = document_bar::strip(agent_chat::tool_space(self, content));
+                if let Some(strip) = strip {
+                    content.min.y = strip.bottom();
+                }
+                self.shell.document_bar = strip;
+                self.shell.content = Some(content);
                 if floating {
                     self.shell.panels = [
                         egui::Rect::from_min_max(egui::pos2(full.left(), panel_content.top()), egui::pos2(panel_content.left(), full.bottom())),
@@ -1813,7 +1840,15 @@ impl SolveApp {
                     viewport::refresh_layout(self, ui.ctx().pixels_per_point());
                 } else {
                     preview::update(self, ui.ctx());
-                    self.show_workspace(ui);
+                    // The scene starts below the strip; the browser column beside it keeps its
+                    // full height.
+                    let scene = strip.map_or(panel_content, |s| egui::Rect::from_min_max(egui::pos2(panel_content.left(), s.bottom()), panel_content.max));
+                    let mut scene_ui = ui.new_child(egui::UiBuilder::new().max_rect(scene).id_salt("docked_viewport"));
+                    self.show_workspace(&mut scene_ui);
+                }
+                if let Some(strip) = strip {
+                    let mut strip_ui = ui.new_child(egui::UiBuilder::new().max_rect(strip).id_salt("document_bar"));
+                    document_bar::show(self, &mut strip_ui, strip);
                 }
             });
         dialogs::show(self, ui.ctx());

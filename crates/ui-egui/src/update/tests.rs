@@ -372,21 +372,20 @@ fn the_title_bar_offers_the_new_version_and_opens_the_update_window() {
     let dir = scratch();
     let (feed, version) = next_release_feed(&dir.0);
     let mut h = crate::scenario::Harness::new();
-    let report = crate::scenario::rect_of("titlebar:report").unwrap();
+    let undo = crate::scenario::rect_of("appbar:undo").unwrap();
     assert!(crate::scenario::rect_of("titlebar:update").is_none(), "nothing offered before a check");
     h.app.updater.feed = Some(feed);
     h.frame();
     wait_for_check(&mut h);
     h.frames(2);
-    // An accent pill reading "Update to <version>", left of the Settings/Help/Report cluster.
+    // An accent pill reading "Update to <version>", left of the bar's Undo/Redo/Save/Export group.
     let label = format!("Update to {version}");
     let at = h.widget(&label).unwrap_or_else(|| panic!("no `{label}` in the title bar"));
     let pill = crate::scenario::rect_of("titlebar:update").unwrap();
     assert!(pill.contains(egui::pos2(at[0] as f32, at[1] as f32)));
-    let assistant = crate::scenario::rect_of("titlebar:assistant").unwrap();
-    assert!(pill.right() < assistant.left() && assistant.left() - pill.right() < 12.0, "beside Assistant: {pill:?} {assistant:?}");
-    assert!((pill.center().y - report.center().y).abs() < 1.0 && pill.height() <= report.height());
-    assert_eq!(crate::scenario::rect_of("titlebar:report"), Some(report), "Report a bug stays where it was");
+    assert!(pill.right() < undo.left() && undo.left() - pill.right() <= 12.0, "beside Undo: {pill:?} {undo:?}");
+    assert!((pill.center().y - undo.center().y).abs() < 1.0 && pill.height() <= undo.height());
+    assert_eq!(crate::scenario::rect_of("appbar:undo"), Some(undo), "Undo stays where it was");
     assert!(!h.app.updater.open, "no window pops up by itself");
     assert!(crate::scenario::rect_of("update:window").is_none());
     // Clicking it opens the Update window (not a modal: the bar stays usable).
@@ -413,19 +412,19 @@ fn the_pill_shortens_in_a_narrow_title_bar() {
     let wide = crate::scenario::rect_of("titlebar:update").unwrap();
     let label = format!("Update to {version}");
     assert!(h.widget(&label).is_some());
-    // Narrower and narrower: the pill never grows, never reaches Report a bug, and its label gives
-    // way (to "Update", then the icon alone) before the document tabs run out of room.
+    // Narrower and narrower: the pill never grows, never reaches Undo, and its label gives way
+    // (to "Update", then the icon alone) before the document identity runs out of room.
     let mut last = wide.width();
     let mut shortened = false;
     for width in [1000.0, 800.0, 700.0, 600.0, 520.0, 440.0] {
         h.call("ui.resize", json!({"width": width, "height": 600}));
         h.frames(3);
-        let report = crate::scenario::rect_of("titlebar:report").unwrap();
+        let undo = crate::scenario::rect_of("appbar:undo").unwrap();
         // Icon alone, it keeps the full text for screen readers.
         let pill = crate::scenario::rect_of("titlebar:update").filter(|_| h.widget(&label).is_some() || h.widget("Update").is_some());
         if let Some(p) = pill {
             assert!(p.width() <= last + 0.5, "at {width}: {p:?} grew from {last}");
-            assert!(p.right() <= report.left(), "at {width}: {p:?} overlaps Report a bug {report:?}");
+            assert!(p.right() <= undo.left(), "at {width}: {p:?} overlaps Undo {undo:?}");
             last = p.width();
         }
         shortened |= pill.is_none_or(|p| p.width() < wide.width());

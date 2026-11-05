@@ -55,8 +55,10 @@ fn browser_body_clicks_respect_the_active_dialog_input() {
     assert!(h.app.session.selection.is_empty(), "an incompatible pick does not leak into the global selection");
 }
 
+/// The Design Browser is a full-height column from under the prompt row to the history
+/// card; its rows scroll inside it, and folding it leaves its header.
 #[test]
-fn browser_card_shrinks_and_scrolls_without_covering_history() {
+fn browser_card_fills_its_column_and_scrolls_without_covering_history() {
     let mut h = Harness::new();
     h.call("ui.resize", json!({"width":1400,"height":900}));
     h.settle();
@@ -68,7 +70,7 @@ fn browser_card_shrinks_and_scrolls_without_covering_history() {
     let prompt = rect_of("review:prompt_row").unwrap();
     assert_eq!(prompt.top(), rect_of("ribbon:card").unwrap().bottom() + SHELL_GAP);
     assert_eq!(short.top(), prompt.bottom() + SHELL_GAP);
-    assert!(short.bottom() < history.top() - SHELL_GAP);
+    assert!((short.bottom() - (history.top() - SHELL_GAP)).abs() < 1.0, "full height: {short:?} {history:?}");
     assert!(drawn_rows().iter().all(|(_, rect, _, _)| rect.height() == 26.0));
 
     for i in 0..35 {
@@ -77,9 +79,8 @@ fn browser_card_shrinks_and_scrolls_without_covering_history() {
     }
     h.settle();
     let tall = rect_of("browser:card").unwrap();
-    assert!(tall.height() > short.height());
-    assert!((tall.bottom() - (history.top() - SHELL_GAP)).abs() < 1.0, "{tall:?} {history:?}");
-    assert!(h.app.viewport.rect.unwrap().contains_rect(tall));
+    assert_eq!(tall, short, "the column keeps its height whatever it lists");
+    assert!(h.app.viewport.rect.unwrap().x_range().contains(tall.center().x) && tall.bottom() <= h.app.viewport.rect.unwrap().bottom());
     assert!(handle_at("row:Sketch34").is_none(), "last row starts below the scroll clip");
     let camera = h.app.cam;
     h.call("ui.scroll", json!({"x":tall.center().x,"y":tall.center().y,"delta":-1800}));
@@ -100,7 +101,7 @@ fn browser_card_shrinks_and_scrolls_without_covering_history() {
 }
 
 #[test]
-fn selected_row_paints_tab_soft_fill_and_accent_text_in_both_layouts() {
+fn selected_row_paints_tab_soft_fill_and_text_colour_in_both_layouts() {
     let previous = crate::theme::is_dark();
     for dark in [false, true] {
         crate::theme::set_dark(dark);
@@ -119,10 +120,11 @@ fn selected_row_paints_tab_soft_fill_and_accent_text_in_both_layouts() {
                 });
                 assert_eq!(row_rect.height(), 26.0);
                 assert!(out.shapes.iter().any(|s| matches!(&s.shape, egui::Shape::Rect(r) if r.rect == row_rect && r.fill == accent.soft)));
+                // The label keeps the text colour on the tint (the kit's selected browser row).
                 assert!(
                     out.shapes
                         .iter()
-                        .any(|s| matches!(&s.shape, egui::Shape::Text(t) if t.galley.text() == "Selected body" && t.fallback_color == accent.ink))
+                        .any(|s| matches!(&s.shape, egui::Shape::Text(t) if t.galley.text() == "Selected body" && t.fallback_color == Tokens::get().text))
                 );
             }
         }
@@ -299,7 +301,7 @@ fn browser_title_uses_a_single_semibold_run() {
         ui.set_width(250.0);
         browser_header(&mut app, ui, true);
     });
-    let title = crate::i18n::tr("ui.browser_title");
+    let title = crate::i18n::tr("ui.browser_design_title");
     let titles: Vec<_> = output
         .shapes
         .iter()
@@ -309,7 +311,7 @@ fn browser_title_uses_a_single_semibold_run() {
         })
         .collect();
     assert_eq!(titles.len(), 1);
-    assert_eq!(titles[0].galley.job.sections[0].format.font_id, crate::fonts::semibold(Tokens::get().font_heading));
+    assert_eq!(titles[0].galley.job.sections[0].format.font_id, crate::fonts::semibold(Tokens::get().font_body));
 }
 
 #[test]
@@ -424,4 +426,40 @@ fn collapsed_rail_shares_header_hover_inset_and_expands_from_its_whole_card() {
         }
     }
     crate::theme::set_dark(previous);
+}
+
+/// The `Filter features…` field keeps only the rows whose names contain its text (bodies,
+/// sketches, construction geometry and features), case-insensitively, with their folders open and
+/// counted; the design's settings, views and origin step aside; clearing it brings everything back.
+#[test]
+fn the_filter_field_keeps_only_the_rows_that_match() {
+    let mut h = Harness::new();
+    h.app.home.open = false;
+    h.app.session.run_script(&polykrom_engine::sample::script()).unwrap();
+    h.frames(3);
+    let labels = || drawn_rows().into_iter().map(|(label, ..)| label).collect::<Vec<_>>();
+    let all = labels();
+    assert!(all.iter().any(|l| l == "Base") && all.iter().any(|l| l == "Boss") && all.iter().any(|l| l == "Origin"), "{all:?}");
+    assert!(all.iter().any(|l| l == "Bodies (1)") && all.iter().any(|l| l == "Sketches (4)"), "folders carry their counts: {all:?}");
+    assert!(rect_of("browser:filter").is_some());
+    h.step(&json!({"click":{"handle":"browser:filter"}})).unwrap();
+    h.step(&json!({"text":"hol"})).unwrap();
+    h.frames(2);
+    assert_eq!(h.app.tree.filter, "hol");
+    let some = labels();
+    assert_eq!(some.iter().filter(|l| *l == "Holes").count(), 2, "the Holes sketch and the Holes feature: {some:?}");
+    assert!(!some.iter().any(|l| l == "Base" || l == "Boss" || l == "Bore" || l == "Plate" || l == "Origin"), "{some:?}");
+    assert!(some.iter().any(|l| l == "Sketches (1)") && some.iter().any(|l| l == "Features (1)"), "{some:?}");
+    assert!(!some.iter().any(|l| l.starts_with("Bodies")), "no body matches: its folder leaves too: {some:?}");
+    h.step(&json!({"click":{"handle":"browser:filter_clear"}})).unwrap();
+    h.frames(2);
+    assert!(h.app.tree.filter.is_empty());
+    assert_eq!(labels(), all, "clearing the filter brings every row back");
+    // Case-insensitive, and a folder closed before opens while the filter is on.
+    h.app.tree.collapsed.insert("c0/sketches".into());
+    h.frames(2);
+    assert!(!labels().iter().any(|l| l == "Boss"));
+    h.app.tree.filter = "BOSS".into();
+    h.frames(2);
+    assert_eq!(labels().iter().filter(|l| *l == "Boss").count(), 2, "{:?}", labels());
 }

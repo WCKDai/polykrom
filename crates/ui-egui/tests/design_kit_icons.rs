@@ -1,6 +1,7 @@
 //! The design kit's component SVGs (`assets/design-kit/2026-11-02/components/svg`) drawn by the
 //! app's icon renderer, pixel-compared with the kit's own PNG previews (`components/png`, the same
-//! name). Wiring the kit icons to command ids is a later task; this holds that they render right.
+//! name). The kit icons are wired to the command ids (`tests/kit_icons.rs` holds the mapping);
+//! this holds that they render right.
 //!
 //! Metric, per icon, over every premultiplied RGBA channel of every pixel at the preview's size
 //! (96 px for the icons, 256 px for the logo): the mean absolute error (`MAE`, 0..255) and the

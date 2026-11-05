@@ -10,7 +10,7 @@ use crate::SolveApp;
 use crate::test_support::each_shape as each;
 
 /// The sample with Fillet1 failing (the plate made narrower than its fillets).
-fn failing_sample() -> SolveApp {
+pub(crate) fn failing_sample() -> SolveApp {
     let mut s = polykrom_engine::Session::default();
     s.run_script(&polykrom_engine::sample::script()).unwrap();
     s.execute("parameters.change", &json!({"name": "width", "expression": "5 mm"})).unwrap();
@@ -43,16 +43,22 @@ fn error_discs(app: &mut SolveApp, draw: fn(&mut SolveApp, &mut egui::Ui)) -> Ve
     found
 }
 
-/// The features that have a disc where their mark goes (`at`: the mark's centre from the item's).
-fn marked(app: &mut SolveApp, draw: fn(&mut SolveApp, &mut egui::Ui), at: impl Fn(Pos2, Pos2) -> bool) -> Vec<(String, bool)> {
+/// A drawn item: its name and its handle's centre.
+struct Item {
+    name: String,
+    at: Pos2,
+}
+
+/// The features that have a disc where their mark goes (`at`: the mark's centre from the item).
+fn marked(app: &mut SolveApp, draw: fn(&mut SolveApp, &mut egui::Ui), at: impl Fn(&Item, Pos2) -> bool) -> Vec<(String, bool)> {
     let discs = error_discs(app, draw);
     let handles = crate::scenario::handles("timeline:");
     features(app)
         .into_iter()
         .map(|(name, _)| {
             let item = handles.iter().find(|(h, _)| *h == format!("timeline:{name}")).map(|(_, p)| *p);
-            let item = item.unwrap_or_else(|| panic!("{name} is not drawn"));
-            let has = discs.iter().any(|d| at(item, *d));
+            let item = Item { at: item.unwrap_or_else(|| panic!("{name} is not drawn")), name: name.clone() };
+            let has = discs.iter().any(|d| at(&item, *d));
             (name, has)
         })
         .collect()
@@ -64,8 +70,15 @@ fn a_failed_feature_is_marked_in_the_bottom_timeline() {
     let want = features(&app);
     assert!(want.iter().any(|(n, failed)| *failed && n == "Fillet1"), "the sample's Fillet1 fails: {want:?}");
     assert!(want.iter().filter(|(_, failed)| !failed).count() >= 3, "and others don't");
-    // The mark sits in the item's top-right corner: 10 points square, inside the 28-point item.
-    let got = marked(&mut app, crate::timeline::timeline, |item, d| (d.x - (item.x + 9.0)).abs() < 1.5 && (d.y - (item.y - 9.0)).abs() < 1.5);
+    // The mark sits in the step's top-right corner: 10 points square, 2 points in from the
+    // step's edges (the step is as wide as its name, 48 points tall).
+    // (The handle is the first step of that name, as `marked` finds it: the sample names a
+    // sketch and the feature it drives alike, and the first is the sketch.)
+    let got = marked(&mut app, crate::timeline::timeline, |item, d| {
+        let name = format!("timeline:{}", item.name);
+        let rect = crate::scenario::rects("timeline:").into_iter().find(|(n, _)| *n == name).map(|(_, r)| r).unwrap_or_else(|| panic!("{name} has no rect"));
+        (d.x - (rect.right() - 7.0)).abs() < 1.5 && (d.y - (rect.top() + 7.0)).abs() < 1.5
+    });
     assert_eq!(got, want, "an error mark on each failed feature and on no other");
 }
 
@@ -74,6 +87,6 @@ fn a_failed_feature_is_marked_in_the_feature_history() {
     let mut app = failing_sample();
     let want = features(&app);
     // The mark sits at the row's right end, on its centre line.
-    let got = marked(&mut app, crate::timeline_left::left_timeline, |item, d| (d.y - item.y).abs() < 1.5 && d.x > item.x);
+    let got = marked(&mut app, crate::timeline_left::left_timeline, |item, d| (d.y - item.at.y).abs() < 1.5 && d.x > item.at.x);
     assert_eq!(got, want, "an error mark on each failed feature and on no other");
 }

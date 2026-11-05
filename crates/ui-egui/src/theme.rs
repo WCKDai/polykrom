@@ -302,6 +302,9 @@ impl TabAccent {
     }
 
     /// Small text on a tab's solid pill. Brighter fills need dark ink in either theme.
+    /// (The tab row draws its active tab as accent text with an underline, not on a fill; the
+    /// pairing stays for themes and the contrast tests.)
+    #[allow(dead_code)]
     pub fn on_fill(self, t: &Tokens) -> Color32 {
         if contrast_ratio(t.on_accent, self.color) >= 4.5 {
             t.on_accent
@@ -570,6 +573,10 @@ pub struct Tokens {
     pub app_bar: Color32,
     /// Dividers between the application bar groups.
     pub app_bar_separator: Color32,
+    /// The window's base surface (the design kit's `base`): the workspace tab row, the document
+    /// tabs, the design history strip and the status bar sit on it, the ribbon and the panels
+    /// (`toolbar`, `panel`) are lifted from it.
+    pub window: Color32,
     pub toolbar: Color32,
     pub panel: Color32,
     pub panel_header: Color32,

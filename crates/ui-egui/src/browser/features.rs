@@ -48,15 +48,7 @@ pub(super) fn rows(app: &mut SolveApp, ui: &mut egui::Ui, component: u64, path: 
     }
     let scope = if path.is_empty() { format!("c{component}") } else { occurrence_key(path) };
     let key = format!("{scope}/features");
-    let open = is_open(app, &key, false);
-    let r = draw_row(ui, ui.id().with(&key), &Row { depth, fold: Some(open), icon: "folder", label: "Features", ..Default::default() });
-    if r.fold || r.clicked {
-        toggle(app, &key, false);
-    }
-    if !open {
-        return;
-    }
-    let indices = match app.tree.model.as_ref().filter(|m| m.matches(&app.session)) {
+    let indices: Vec<usize> = match app.tree.model.as_ref().filter(|m| m.matches(&app.session)) {
         Some(model) => model.features.get(&component).cloned().unwrap_or_default(),
         None => app
             .session
@@ -66,7 +58,27 @@ pub(super) fn rows(app: &mut SolveApp, ui: &mut egui::Ui, component: u64, path: 
             .enumerate()
             .filter_map(|(i, f)| (f.component == component && !matches!(f.kind, FeatureKind::Sketch { .. })).then_some(i))
             .collect(),
-    };
+    }
+    .into_iter()
+    .filter(|i| app.session.doc.features.get(*i).is_some_and(|f| super::filter_shows(app, &f.name)))
+    .collect();
+    if indices.is_empty() && super::filtering(app) {
+        return;
+    }
+    let open = is_open(app, &key, false);
+    // The folder's name with its count: `Features (5)`.
+    let title = format!("{} ({})", crate::i18n::tr_label("Features"), indices.len());
+    let r = draw_row(
+        ui,
+        ui.id().with(&key),
+        &Row { depth, fold: Some(open), icon: "folder", label: &title, name: true, handle: Some("Features"), ..Default::default() },
+    );
+    if r.fold || r.clicked {
+        toggle(app, &key, false);
+    }
+    if !open {
+        return;
+    }
     for index in indices {
         let Some(feature) = app.session.doc.features.get(index) else { continue };
         let (id, label, icon) = (feature.id, feature.name.clone(), crate::timeline::icon_of(&feature.kind));
@@ -143,7 +155,7 @@ mod tests {
         let saved = h.app.session.doc.to_json();
         let undo = h.app.session.undo.len();
         for cache in ["current", "missing", "stale"] {
-            assert_eq!(feature_rows(&mut h, cache), ["Features".to_owned(), name.clone()], "{cache}");
+            assert_eq!(feature_rows(&mut h, cache), ["Features (1)".to_owned(), name.clone()], "{cache}");
         }
         h.frames(2);
         let labels: Vec<_> = drawn_rows().into_iter().map(|(label, ..)| label).collect();

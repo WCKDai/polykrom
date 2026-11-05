@@ -1,15 +1,12 @@
 [
  {
-  "note": "Toolbar customization survives a restart: Pin to Toolbar, Remove from Toolbar, drag to reorder. Toolbar buttons publish handles `toolbar:<command id>`. The workspace switcher spans the toolbar's height."
+  "note": "Toolbar customization survives a restart: Pin to Toolbar, Remove from Toolbar, drag to reorder. Toolbar buttons publish handles `toolbar:<command id>`. The workspace choice is on the tab row."
  },
  {
   "expect": {
-   "spans": {
-    "inner": "workspace_switcher",
-    "outer": "toolbar",
-    "axis": "y",
-    "tol": 6
-   }
+   "shown_handles": [
+    "tab:MODEL"
+   ]
   }
  },
  {
@@ -19,7 +16,7 @@
     "toolbar:solid.revolve"
    ],
    "hidden_handles": [
-    "toolbar:solid.draft"
+    "button:solid.draft"
    ]
   }
  },
@@ -67,7 +64,7 @@
  {
   "expect": {
    "hidden_handles": [
-    "toolbar:solid.revolve"
+    "button:solid.revolve"
    ]
   }
  },
@@ -113,12 +110,9 @@
  },
  {
   "expect": {
-   "spans": {
-    "inner": "workspace_switcher",
-    "outer": "toolbar",
-    "axis": "y",
-    "tol": 6
-   }
+   "shown_handles": [
+    "tab:MODEL"
+   ]
   }
  }
 ]

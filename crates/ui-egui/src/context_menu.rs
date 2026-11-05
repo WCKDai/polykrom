@@ -2163,18 +2163,23 @@ mod workspace_menu_tests {
         assert_eq!(titles[0].galley.job.sections[0].format.font_id, crate::fonts::semibold(14.0));
     }
 
+    /// The workspaces menu (Design, Render and the planned ones) opens from the application menu;
+    /// the tab row carries the Design/Render choice too (RENDER enters, a design tab leaves).
     #[test]
     fn workspace_rows_keep_switching_handles_and_disabled_render_behavior() {
         let mut h = Harness::new();
         h.call("ui.resize", json!({"width":1200,"height":1000}));
-        h.step(&json!({"click":{"handle":"ribbon:workspace"}})).unwrap();
-        let opener = rect_of("ribbon:workspace").unwrap();
+        let open_menu = |h: &mut Harness| {
+            h.step(&json!({"click":{"handle":"appbar:file"}})).unwrap();
+            h.step(&json!({"widget":"Workspace…"})).unwrap();
+        };
+        open_menu(&mut h);
         let rows: Vec<_> = ["design", "render", "animation", "simulation", "manufacture", "drawing"]
             .iter()
             .map(|slug| rect_of(&format!("workspace:menu:{slug}")).unwrap())
             .collect();
         assert!(rows.windows(2).all(|pair| pair[0].bottom() <= pair[1].top()));
-        assert!(rows[0].top() > opener.bottom());
+        assert!(rows[0].top() >= crate::toolbar::APP_BAR_HEIGHT);
         assert_eq!(rows[0].width(), 450.0);
         assert!(items(&h.app, &Target::Workspace).iter().skip(2).all(|item| !item.enabled));
         h.step(&json!({"click":{"handle":"workspace:menu:animation"}})).unwrap();
@@ -2182,15 +2187,27 @@ mod workspace_menu_tests {
         assert!(h.app.viewport.context_menu.is_some());
         h.step(&json!({"click":{"handle":"workspace:menu:render"}})).unwrap();
         assert!(crate::render_workspace::active(&h.app));
-        h.step(&json!({"click":{"handle":"ribbon:workspace"}})).unwrap();
+        assert_eq!(h.app.ui.tab, "RENDER");
+        open_menu(&mut h);
         h.step(&json!({"click":{"handle":"workspace:menu:design"}})).unwrap();
         assert!(!crate::render_workspace::active(&h.app));
+        // The tabs: RENDER enters the Render workspace, MODEL leaves it.
+        h.step(&json!({"click":{"handle":"tab:RENDER"}})).unwrap();
+        assert!(crate::render_workspace::active(&h.app));
+        assert!(rect_of("tab:MODEL").is_some(), "the design tabs stay in the row to go back");
+        h.step(&json!({"click":{"handle":"tab:MODEL"}})).unwrap();
+        assert!(!crate::render_workspace::active(&h.app));
+        assert_eq!(h.app.ui.tab, "MODEL");
         h.app.run("sketch.create", json!({"plane":"XY"})).unwrap();
         h.frames(2);
-        h.step(&json!({"click":{"handle":"ribbon:workspace"}})).unwrap();
+        open_menu(&mut h);
         assert!(!items(&h.app, &Target::Workspace).iter().find(|i| i.id == "ui.workspace.render").unwrap().enabled);
         h.step(&json!({"click":{"handle":"workspace:menu:render"}})).unwrap();
         assert!(!crate::render_workspace::active(&h.app));
         assert!(h.app.viewport.context_menu.is_some());
+        h.step(&json!({"key":"Escape"})).unwrap();
+        h.step(&json!({"click":{"handle":"tab:RENDER"}})).unwrap();
+        assert!(!crate::render_workspace::active(&h.app), "a sketch in progress keeps the design workspace; the tab reports why");
+        assert!(h.app.status.as_ref().is_some_and(|(_, _, error)| *error));
     }
 }

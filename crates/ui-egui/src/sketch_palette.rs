@@ -462,7 +462,8 @@ pub fn show(app: &mut SolveApp, ctx: &egui::Context) {
                     "ui.palette_construction_mode",
                     selected_types.get(1).copied().unwrap_or(false),
                 );
-                crate::ui_kit::section(ui, "more", "ui.palette_more", false, |ui| {
+                let opened = egui::Id::new("sc_palette_more_opened");
+                let more = crate::ui_kit::section(ui, "more", "ui.palette_more", false, |ui| {
                     for (key, label) in TOGGLES {
                         if !["show_constraints", "show_dimensions", "show_points", "snap"].contains(&key)
                             && crate::ui_kit::checkbox_row(ui, key, label, shown(key))
@@ -470,7 +471,16 @@ pub fn show(app: &mut SolveApp, ctx: &egui::Context) {
                             set = Some((key.to_string(), !shown(key)));
                         }
                     }
+                    // Opened, the section scrolls into view: the card has only the viewport's
+                    // height, and the options it reveals are the lowest in the list.
+                    if !ui.ctx().data(|d| d.get_temp::<bool>(opened).unwrap_or(false)) {
+                        ui.scroll_to_cursor(Some(egui::Align::BOTTOM));
+                        ui.ctx().data_mut(|d| d.insert_temp(opened, true));
+                    }
                 });
+                if more.is_none() {
+                    ui.ctx().data_mut(|d| d.remove::<bool>(opened));
+                }
                 section_alias("sketch_palette:options_fold", "ui.palette_more");
             }
             crate::ui_kit::Part::Footer => {
@@ -556,7 +566,18 @@ mod tests {
         for (key, _) in TOGGLES {
             let before = h.app.session.doc.to_json();
             let undo = h.app.session.undo.len();
-            let at = crate::scenario::handle_at(&format!("sketch_palette:toggle:{key}")).unwrap();
+            // An option out of view scrolls into it first (the card has only the viewport's height).
+            let handle = format!("sketch_palette:toggle:{key}");
+            let mut at = crate::scenario::handle_at(&handle);
+            for delta in [1000.0, -1000.0] {
+                if at.is_none() {
+                    let options = crate::scenario::rect_of("sketch_palette:options").unwrap();
+                    h.call("ui.scroll", json!({"x":options.center().x,"y":options.center().y,"delta":delta}));
+                    h.settle();
+                    at = crate::scenario::handle_at(&handle);
+                }
+            }
+            let at = at.unwrap_or_else(|| panic!("{key} after scrolling"));
             h.call("ui.click", json!({"x":at.x,"y":at.y}));
             assert_ne!(h.app.session.doc.to_json(), before, "{key}");
             assert_eq!(h.app.session.undo.len(), undo + 1, "{key}");

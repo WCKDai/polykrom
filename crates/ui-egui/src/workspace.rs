@@ -444,10 +444,11 @@ pub fn sheet_body(app: &crate::SolveApp) -> Option<String> {
     state.sheets.iter().find(|s| s.body == body).map(|s| s.body.clone())
 }
 
+/// The tabs of the tab row: the design tabs, SKETCH while a sketch is open, SHEET METAL, and
+/// RENDER last. The tabs carry the workspace choice: RENDER is the Render workspace (the only
+/// workspace besides Design that has a backend), and any design tab leaves it. In the Render
+/// workspace the RENDER tab is the active one and the design tabs stay in the row to go back.
 pub fn visible_tabs(app: &crate::SolveApp) -> Vec<&'static str> {
-    if crate::render_workspace::active(app) {
-        return vec!["RENDER"];
-    }
     let mut tabs = TABS.to_vec();
     if app.session.active_sketch.is_some() {
         tabs.push("SKETCH");
@@ -455,6 +456,7 @@ pub fn visible_tabs(app: &crate::SolveApp) -> Vec<&'static str> {
     // Always reachable, as before the ribbon redesign: a sheet-metal part starts from an
     // ordinary sketch or solid, so the tab cannot wait for a sheet body.
     tabs.push("SHEET METAL");
+    tabs.push("RENDER");
     tabs
 }
 
@@ -676,8 +678,8 @@ mod tests {
     fn contextual_tabs_follow_the_active_body_and_allow_other_tabs() {
         let mut h = crate::scenario::Harness::new();
         let mut fresh = TABS.to_vec();
-        fresh.push("SHEET METAL");
-        assert_eq!(visible_tabs(&h.app), fresh, "SHEET METAL is reachable before any sheet body exists");
+        fresh.extend(["SHEET METAL", "RENDER"]);
+        assert_eq!(visible_tabs(&h.app), fresh, "SHEET METAL is reachable before any sheet body exists; RENDER is the Render workspace");
         h.app.run("sketch.create", json!({"plane":"XY"})).unwrap();
         assert_eq!(h.app.ui.tab, "SKETCH");
         h.app.run("sketch.rectangle.two_point", json!({"p0":[0,0],"p1":[40,30]})).unwrap();

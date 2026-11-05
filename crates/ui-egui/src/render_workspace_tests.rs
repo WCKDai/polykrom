@@ -326,8 +326,8 @@ fn clicked_render_workspace_saves_one_setup_and_restores_design_view() {
         let camera = h.app.cam;
         let flags = (h.app.ui.show_grid, h.app.ui.show_origin, h.app.ui.visual_style, h.app.ui.perspective);
         let undo = h.app.session.undo.len();
-        let at = crate::scenario::rect_of("workspace_switcher").unwrap().center();
-        h.step(&json!({"click":[at.x,at.y]})).unwrap();
+        h.step(&json!({"click":{"handle":"appbar:file"}})).unwrap();
+        h.step(&json!({"widget": format!("{}…", h.app.tr("ui.ribbon_workspace"))})).unwrap();
         h.step(&json!({"click":{"handle":"menu:ui.workspace.render"}})).unwrap();
         assert!(active(&h.app));
         let heading = h.app.tr("cmd.render_settings_get").to_string();

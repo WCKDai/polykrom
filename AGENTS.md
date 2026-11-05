@@ -87,9 +87,10 @@ People trust Polykrom with their designs; a crash loses their work. **This outra
   `assets/design-kit/2026-11-02/` is the authority for icons, logo and brand** (owner decision
   2026-11-02; it replaces Facet as the icon authority). Its component SVGs are the icon masters;
   use the exact vector assets, never redraw them from screenshots or invent a parallel style.
-  Until the kit icons are wired in, the app still renders the older masters in
-  `assets/icons/ui/design/svg/` through `crates/ui-egui/src/icon_svg.rs`; do not draw new Facet
-  icons. **Before any icon, icon assignment or media edit, read `assets/AGENTS.md`,
+  The kit icons are wired in: `assets/icons/ui/design/svg/supplied/` holds them as the app's
+  masters, rendered through `crates/ui-egui/src/icon_svg.rs`, and the older Facet masters in
+  `assets/icons/ui/design/svg/` stay only as fallbacks for ids the kit has no drawing for; do not
+  draw new Facet icons. **Before any icon, icon assignment or media edit, read `assets/AGENTS.md`,
   `assets/icons/ui/AGENTS.md` and `assets/design-kit/2026-11-02/AGENT_BRIEF.md`.** Any file asset must be original or openly licensed and **must have a row in ATTRIBUTION.md**
   (`cargo xtask assets` enforces it). Screenshots of commercial CAD software are never committed.
   Breaking this rule is the most serious mistake you can make in this repo.

@@ -62,6 +62,8 @@ pub fn drawn_occurrences() -> Vec<(Vec<u64>, String, Rect, bool)> {
 pub struct TreeState {
     /// The floating browser card is folded to its header.
     pub panel_collapsed: bool,
+    /// The `Filter features…` field: rows whose names don't contain it leave the tree.
+    pub filter: String,
     /// Geometry and assembly queries, independent of the camera, selection and row visibility.
     model: Option<model::Model>,
     /// Folders closed by the user (keys like `c0/bodies`).
@@ -290,6 +292,11 @@ const ROW_H: f32 = crate::ui_kit::TREE_ROW_HEIGHT;
 const CARD_INSET: f32 = 4.0;
 const HEADER_H: f32 = 26.0;
 const INDENT: f32 = 14.0;
+/// The column of eyes at the rows' right edge.
+const EYE_SLOT: f32 = 22.0;
+/// The active design row under the heading, and the filter field's row.
+const IDENTITY_H: f32 = 46.0;
+const FILTER_H: f32 = 38.0;
 /// Opacity of a dimmed row's icon (a hidden body, sketch, origin item, …).
 const DIM_ICON_OPACITY: f32 = 0.4;
 
@@ -315,6 +322,9 @@ pub(crate) struct Row<'a> {
     pub(crate) badges: &'a [&'a str],
     /// Lit by the selection or the 3D view's pointer: the item's own row, or a row leading to it.
     pub(crate) mark: Mark,
+    /// A second name the row's handles are published under (a folder's bare name beside its
+    /// counted label, `Bodies` for `Bodies (2)`), so scripts keep finding it.
+    pub(crate) handle: Option<&'a str>,
 }
 
 /// How a row relates to what the selection and the 3D view's pointer light.
@@ -382,8 +392,9 @@ pub(crate) fn draw_row(ui: &mut egui::Ui, id: egui::Id, row: &Row) -> RowResp {
     // padding, the eye, the radio, or the row itself), so a click on the arrow never also
     // selects the row or starts a drag.
     let fold_r = Rect::from_min_max(pos2(x - 4.0, r.top()), pos2(x + 15.0, r.bottom()));
-    let eye_r = Rect::from_center_size(pos2(x + 14.0 + 8.0, cy), vec2(19.0, r.height()));
-    let radio_r = Rect::from_center_size(pos2(x + 32.0 + 6.0, cy), vec2(15.0, r.height()));
+    // The eyes line up in a column at the rows' right edge (the kit's design browser).
+    let eye_r = Rect::from_center_size(pos2(r.right() - 2.0 - EYE_SLOT / 2.0, cy), vec2(EYE_SLOT, r.height()));
+    let radio_r = Rect::from_center_size(pos2(x + 14.0 + 6.0, cy), vec2(15.0, r.height()));
     let at = |p: Pos2| -> u8 {
         if row.fold.is_some() && fold_r.contains(p) {
             1
@@ -404,17 +415,22 @@ pub(crate) fn draw_row(ui: &mut egui::Ui, id: egui::Id, row: &Row) -> RowResp {
         crate::ui_kit::disclosure(ui.painter(), pos2(x + 6.0, cy), open, if hover_on == 1 { t.text } else { t.text_dim });
         out.fold = resp.clicked() && click_on == 1;
         crate::scenario::publish_handle(&format!("fold:{}", row.label), fold_r.center());
+        if let Some(handle) = row.handle {
+            crate::scenario::publish_handle(&format!("fold:{handle}"), fold_r.center());
+        }
     }
     x += 14.0;
-    // Eye.
+    // Eye, at the right.
     if let Some(vis) = row.eye {
-        let er = Rect::from_center_size(pos2(x + 8.0, cy), vec2(15.0, 15.0));
+        let er = Rect::from_center_size(eye_r.center(), vec2(15.0, 15.0));
         // Hidden or faded rows keep main's dimming, with the rounded suppression asset.
         icons::paint_icon(ui.painter(), er, if vis { "eye" } else { "suppress" }, if vis && !row.dim { 0.85 } else { DIM_ICON_OPACITY });
         out.eye = resp.clicked() && click_on == 2;
         crate::scenario::publish_handle(&format!("eye:{}", row.label), er.center());
+        if let Some(handle) = row.handle {
+            crate::scenario::publish_handle(&format!("eye:{handle}"), er.center());
+        }
     }
-    x += 18.0;
     // Activation radio (components).
     if let Some(active) = row.radio {
         let rc = pos2(x + 6.0, cy);
@@ -432,14 +448,16 @@ pub(crate) fn draw_row(ui: &mut egui::Ui, id: egui::Id, row: &Row) -> RowResp {
         icons::paint_icon(ui.painter(), ir, row.icon, if row.dim { DIM_ICON_OPACITY } else { 1.0 });
         x += 21.0;
     }
-    let col =
-        if row.selected { crate::theme::TabAccent::current(ui.ctx()).ink } else { row.color.unwrap_or(if row.dim { t.text_dim } else { t.text }) };
+    // A selected row keeps the text colour on the selection tint (the kit puts its accent on
+    // the selected history step alone).
+    let col = if row.selected { t.text } else { row.color.unwrap_or(if row.dim { t.text_dim } else { t.text }) };
     let label_display = if row.name { crate::i18n::tr_name(row.label) } else { crate::i18n::tr_dyn(row.label) };
     let font = if row.selected { crate::fonts::semibold(t.font_label) } else { FontId::proportional(t.font_label) };
     // The label stops before the badges and the card's edge; a longer name ends in an ellipsis
     // and its full text is in the tooltip.
     let badges_width = row.badges.len() as f32 * 15.0;
-    let room = (r.right() - 4.0 - badges_width - x).max(0.0);
+    let eye_width = if row.eye.is_some() { EYE_SLOT } else { 0.0 };
+    let room = (r.right() - 4.0 - badges_width - eye_width - x).max(0.0);
     let mut job = egui::text::LayoutJob::simple(label_display.to_string(), font, col, room);
     job.wrap.max_rows = 1;
     job.wrap.break_anywhere = true;
@@ -449,13 +467,16 @@ pub(crate) fn draw_row(ui: &mut egui::Ui, id: egui::Id, row: &Row) -> RowResp {
     let elided = galley.elided;
     crate::scenario::publish_rect(&format!("row_label:{}", row.label), Rect::from_min_size(pos2(x, cy - galley.size().y / 2.0), galley.size()));
     ui.painter().with_clip_rect(ui.painter().clip_rect().intersect(r)).galley(pos2(x, cy - galley.size().y / 2.0), galley, col);
-    let mut bx = (x + lw + 6.0).min(r.right() - 16.0);
+    let mut bx = (x + lw + 6.0).min(r.right() - 16.0 - eye_width);
     for b in row.badges {
         let br = Rect::from_center_size(pos2(bx + 6.0, cy), vec2(12.0, 12.0));
         badge(ui.painter(), br, b, t.text_dim);
         bx += 15.0;
     }
     crate::scenario::publish_handle(&format!("row:{}", row.label), r.center());
+    if let Some(handle) = row.handle {
+        crate::scenario::publish_handle(&format!("row:{handle}"), r.center());
+    }
     let tip = match hover_on {
         1 => Some(if row.fold == Some(true) { crate::i18n::tr("ui.collapse") } else { crate::i18n::tr("ui.expand") }),
         2 => Some(if row.eye == Some(true) { crate::i18n::tr("ui.hide") } else { crate::i18n::tr("ui.show") }),
@@ -557,7 +578,22 @@ fn reveals_in_occurrence(app: &SolveApp, path: &[u64]) -> bool {
 }
 
 pub(crate) fn is_open(app: &SolveApp, key: &str, default: bool) -> bool {
+    // While the tree is filtered every folder is open, so the matches are in view.
+    if filtering(app) {
+        return true;
+    }
     if default { !app.tree.collapsed.contains(key) } else { app.tree.expanded.contains(key) }
+}
+
+/// Whether the `Filter features…` field holds a filter.
+pub(crate) fn filtering(app: &SolveApp) -> bool {
+    !app.tree.filter.trim().is_empty()
+}
+
+/// Whether the filter lets a row named `label` show (no filter: everything shows).
+pub(crate) fn filter_shows(app: &SolveApp, label: &str) -> bool {
+    let filter = app.tree.filter.trim();
+    filter.is_empty() || label.to_lowercase().contains(&filter.to_lowercase())
 }
 
 pub(crate) fn toggle(app: &mut SolveApp, key: &str, default: bool) {
@@ -772,7 +808,9 @@ pub fn browser(app: &mut SolveApp, ui: &mut egui::Ui) {
                 let response = container.show_frame(ui, frame, limits, |ui| {
                     ui.set_width(inner_width);
                     ui.set_max_height(inner_height);
-                    if stacked {
+                    // A full-height column (the kit's design browser), unless folded to its header.
+                    let folded = collapsed || (!vertical && app.tree.panel_collapsed) || (stacked && app.preferences.timeline_left_browser_collapsed);
+                    if stacked || !folded {
                         ui.set_min_height(inner_height);
                         ui.set_clip_rect(ui.clip_rect().intersect(Rect::from_min_size(ui.max_rect().min, vec2(inner_width, inner_height))));
                     }
@@ -846,12 +884,62 @@ fn browser_contents(app: &mut SolveApp, ui: &mut egui::Ui, acts: &mut Actions, c
     {
         return;
     }
+    // The design row and the filter take their room only where the rows keep some (a card
+    // folding to its header leaves them out).
+    if ui.available_height() >= IDENTITY_H + FILTER_H + 2.0 * ROW_H && ui.available_width() >= 120.0 {
+        browser_identity(app, ui);
+        browser_filter(app, ui);
+    }
     t.secondary_hline(ui.painter(), ui.max_rect().x_range(), ui.cursor().top() + 1.0, t.toolbar.lerp_to_gamma(t.border, 0.5));
     ui.add_space(t.space_3);
-    if collapsible && !stacked {
-        browser_rows_hugging(app, ui, acts);
-    } else {
-        browser_rows(app, ui, acts);
+    browser_rows(app, ui, acts);
+}
+
+/// The active design under the heading (the kit's active component row): the body icon, the
+/// design's name, and how many components and bodies it holds.
+fn browser_identity(app: &SolveApp, ui: &mut egui::Ui) {
+    let t = Tokens::get();
+    let (rect, _) = ui.allocate_exact_size(vec2(ui.available_width(), IDENTITY_H), Sense::hover());
+    crate::scenario::publish_rect("browser:identity", rect);
+    let icon = Rect::from_center_size(pos2(rect.left() + t.space_6 + 11.5, rect.center().y), vec2(23.0, 23.0));
+    icons::paint_icon(ui.painter(), icon, "body", 1.0);
+    let x = icon.right() + t.space_10;
+    let name = crate::i18n::tr_name(&app.session.doc.name);
+    let title = ui.painter().layout_no_wrap(name, crate::fonts::semibold(t.font_body), t.text);
+    ui.painter().galley(pos2(x, rect.top() + 5.0), title, t.text);
+    let components = 1 + app.session.doc.components.len();
+    let bodies = app.session.model.state().bodies.len();
+    let components = crate::i18n::format(
+        if components == 1 { "ui.browser_components_one" } else { "ui.browser_components_other" },
+        &[("count", &components.to_string())],
+    );
+    let bodies = crate::i18n::format(if bodies == 1 { "ui.browser_bodies_one" } else { "ui.browser_bodies_other" }, &[("count", &bodies.to_string())]);
+    let summary = ui.painter().layout_no_wrap(format!("{components} · {bodies}"), FontId::proportional(t.font_small), t.text_dim);
+    crate::scenario::publish_rect("browser:summary", Rect::from_min_size(pos2(x, rect.top() + 24.0), summary.size()));
+    ui.painter().galley(pos2(x, rect.top() + 24.0), summary, t.text_dim);
+}
+
+/// The `Filter features…` field: while it holds text, only the rows whose names contain it
+/// (bodies, sketches, construction geometry and features) stay in the tree, in open folders.
+fn browser_filter(app: &mut SolveApp, ui: &mut egui::Ui) {
+    let t = Tokens::get();
+    let (rect, _) = ui.allocate_exact_size(vec2(ui.available_width(), FILTER_H), Sense::hover());
+    let field = Rect::from_min_max(pos2(rect.left() + t.space_6, rect.top() + 3.0), pos2(rect.right() - t.space_6, rect.bottom() - 5.0));
+    crate::scenario::publish_target("browser:filter", field);
+    let clear = Rect::from_center_size(pos2(field.right() - 12.0, field.center().y), vec2(16.0, 16.0));
+    let editor = Rect::from_min_max(field.min, pos2((clear.left() - 2.0).max(field.left() + 40.0), field.bottom()));
+    ui.scope_builder(egui::UiBuilder::new().max_rect(editor), |ui| {
+        ui.set_clip_rect(ui.clip_rect().intersect(editor));
+        crate::ui_kit::search_field(ui, egui::Id::new("sc_browser_filter"), &mut app.tree.filter, crate::i18n::tr("ui.browser_filter_hint"));
+    });
+    if !app.tree.filter.is_empty() {
+        let resp = ui.interact(clear, egui::Id::new("sc_browser_filter_clear"), Sense::click());
+        resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, crate::i18n::tr("ui.clear")));
+        crate::scenario::publish_handle("browser:filter_clear", clear.center());
+        icons::paint_icon(ui.painter(), clear.shrink(2.0), "close", if resp.hovered() { 1.0 } else { 0.6 });
+        if resp.clicked() {
+            app.tree.filter.clear();
+        }
     }
 }
 
@@ -871,21 +959,15 @@ fn browser_header(app: &mut SolveApp, ui: &mut egui::Ui, collapsible: bool) {
     if collapsible && (response.hovered() || response.has_focus()) {
         crate::ui_kit::panel_header_hover(ui.painter(), rect);
     }
-    let title = crate::i18n::tr("ui.browser_title").to_string();
+    let title = crate::i18n::tr("ui.browser_design_title").to_string();
     let kind = if collapsible { egui::WidgetType::Button } else { egui::WidgetType::Label };
     response.widget_info(|| egui::WidgetInfo::labeled(kind, true, &title));
-    let galley = ui.painter().layout_no_wrap(title, crate::fonts::semibold(t.font_heading), t.text);
+    let galley = ui.painter().layout_no_wrap(title, crate::fonts::semibold(t.font_body), t.text);
     ui.painter().galley(pos2(rect.left() + t.space_6, rect.center().y - galley.size().y / 2.0), galley, t.text);
-    let mut right = rect.right() - t.space_6;
+    let right = rect.right() - t.space_6;
     if collapsible {
         crate::ui_kit::disclosure(ui.painter(), pos2(right - t.form_section_icon_size / 2.0, rect.center().y), !collapsed, t.text_dim);
-        right -= 18.0;
     }
-    let bodies = app.session.model.state().bodies.len();
-    let key = if bodies == 1 { "ui.browser_bodies_one" } else { "ui.browser_bodies_other" };
-    let count = crate::i18n::format(key, &[("count", &bodies.to_string())]);
-    let galley = ui.painter().layout_no_wrap(count, FontId::proportional(t.font_body), t.text_dim);
-    ui.painter().galley(pos2(right - galley.size().x, rect.center().y - galley.size().y / 2.0), galley, t.text_dim);
     if collapsible {
         let tip = crate::i18n::tr(if collapsed { "ui.browser_expand" } else { "ui.browser_collapse" });
         if response.on_hover_cursor(egui::CursorIcon::PointingHand).on_hover_text(tip).clicked() {
@@ -953,22 +1035,16 @@ fn model_feature_indices(app: &SolveApp, component: u64, sketches: bool) -> Vec<
 }
 
 fn browser_rows(app: &mut SolveApp, ui: &mut egui::Ui, acts: &mut Actions) {
-    rows_scrolling(app, ui, acts, false);
+    rows_scrolling(app, ui, acts);
 }
 
-/// As [browser_rows], but the area hugs the rows it drew (the floating card), up to the height
-/// the caller allowed.
-fn browser_rows_hugging(app: &mut SolveApp, ui: &mut egui::Ui, acts: &mut Actions) {
-    rows_scrolling(app, ui, acts, true);
-}
-
-fn rows_scrolling(app: &mut SolveApp, ui: &mut egui::Ui, acts: &mut Actions, shrink_height: bool) {
+fn rows_scrolling(app: &mut SolveApp, ui: &mut egui::Ui, acts: &mut Actions) {
     prepare_model(app);
     acts.lit = Lit::of(app);
     egui::ScrollArea::vertical()
         // The card may animate all the way down to its header.
         .min_scrolled_height(0.0)
-        .auto_shrink([false, shrink_height])
+        .auto_shrink([false, false])
         .scroll_source(egui::scroll_area::ScrollSource { scroll_bar: true, mouse_wheel: true, ..egui::scroll_area::ScrollSource::NONE })
         .show(ui, |ui| {
             ui.spacing_mut().item_spacing.y = 0.0;
@@ -1087,7 +1163,9 @@ fn component_rows(app: &mut SolveApp, ui: &mut egui::Ui, id: u64, depth: usize, 
         return;
     }
     let d = depth + 1;
-    if id == 0 {
+    // The filter is for features: the design's settings, views, origin, canvases and analyses
+    // step aside while it is on.
+    if id == 0 && !filtering(app) {
         doc_settings(app, ui, d);
         named_view_rows(app, ui, d, acts);
         origin_rows(app, ui, d, acts);
@@ -1099,7 +1177,7 @@ fn component_rows(app: &mut SolveApp, ui: &mut egui::Ui, id: u64, depth: usize, 
         folder_rows(app, ui, id, folder, d, acts);
     }
     features::rows(app, ui, id, &[], d, acts);
-    if id == 0 {
+    if id == 0 && !filtering(app) {
         crate::dialogs_assembly::browser_joints(app, ui, d);
     }
     let children = model_children(app, id);
@@ -1152,10 +1230,10 @@ fn occurrence_rows(app: &mut SolveApp, ui: &mut egui::Ui, path: Vec<u64>, depth:
     );
     if let Some(rect) = r.rect.filter(|_| r.resp.is_some()) {
         OCCURRENCES.with(|d| d.borrow_mut().push((path.clone(), placement.name.clone(), rect, open)));
-        crate::scenario::publish_handle(&format!("row:occurrence:{}", key.trim_start_matches("o:")), pos2(rect.right() - 12.0, rect.center().y));
+        crate::scenario::publish_handle(&format!("row:occurrence:{}", key.trim_start_matches("o:")), pos2(rect.right() - 12.0 - EYE_SLOT, rect.center().y));
         let x = rect.left() + 2.0 + depth as f32 * INDENT;
-        for (control, offset) in [("fold", 6.0), ("eye", 22.0), ("activate", 38.0)] {
-            crate::scenario::publish_handle(&format!("{control}:occurrence:{}", key.trim_start_matches("o:")), pos2(x + offset, rect.center().y));
+        for (control, at) in [("fold", x + 6.0), ("eye", rect.right() - 2.0 - EYE_SLOT / 2.0), ("activate", x + 20.0)] {
+            crate::scenario::publish_handle(&format!("{control}:occurrence:{}", key.trim_start_matches("o:")), pos2(at, rect.center().y));
         }
     }
     if let Some(resp) = &r.resp {
@@ -1703,7 +1781,7 @@ fn entries(app: &SolveApp, comp: u64, folder: &str) -> Vec<Entry> {
     let doc = &app.session.doc;
     let sel = &app.session.selection;
     let state = app.session.model.state();
-    match folder {
+    let mut all: Vec<Entry> = match folder {
         "bodies" => model_body_indices(app, comp)
             .into_iter()
             .filter_map(|i| state.bodies.get(i))
@@ -1767,7 +1845,9 @@ fn entries(app: &SolveApp, comp: u64, folder: &str) -> Vec<Entry> {
                 bodies: Vec::new(),
             })
             .collect(),
-    }
+    };
+    all.retain(|e| filter_shows(app, &e.label));
+    all
 }
 
 /// A folder's groups (with their items) and the items in no group, in browser order.
@@ -1890,6 +1970,8 @@ fn folder_rows_at(app: &mut SolveApp, ui: &mut egui::Ui, comp: u64, path: Option
     // hidden, whatever their own eyes say.
     let shown = !app.session.folder_hidden(&key);
     let folder_faded = !shown || path.is_some_and(|p| !app.session.occurrence_visible(p));
+    // The folder's name with its count: `Bodies (1)`.
+    let title = format!("{} ({})", crate::i18n::tr_label(folder_label(folder)), all.len());
     let r = draw_row(
         ui,
         ui.id().with(&key),
@@ -1898,9 +1980,11 @@ fn folder_rows_at(app: &mut SolveApp, ui: &mut egui::Ui, comp: u64, path: Option
             fold: Some(open),
             eye: Some(shown),
             icon: "folder",
-            label: folder_label(folder),
+            label: &title,
+            name: true,
             dim: folder_faded,
             mark: acts.lit.branch(folder, &all),
+            handle: Some(folder_label(folder)),
             ..Default::default()
         },
     );

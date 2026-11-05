@@ -102,6 +102,7 @@ impl Tokens {
             sketch_footer_icon_size: 15.0,
             font_section_tracking: 0.04,
             app_bar: Color32::from_rgb(55, 55, 60),
+            window: Color32::from_rgb(241, 241, 245),
             app_bar_separator: Color32::from_rgb(144, 144, 149),
             toolbar: Color32::from_rgb(247, 247, 247),
             panel: Color32::from_rgb(251, 251, 251),
@@ -296,6 +297,7 @@ impl Tokens {
         t.file_recovery_ink = Color32::from_rgb(245, 204, 137);
         t.file_recovery_border = Color32::from_rgb(115, 88, 43);
         t.app_bar = Color32::from_rgb(32, 34, 37);
+        t.window = Color32::from_rgb(32, 34, 37);
         // The kit's border is too faint on the window for a divider (1.7:1): the mid grey of the
         // views' model edges (#64737D, 3.2:1) divides the application bar's groups.
         t.app_bar_separator = Color32::from_rgb(100, 115, 125);

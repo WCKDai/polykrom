@@ -7600,7 +7600,9 @@ mod tests {
                 let history = h.app.shell.history.expect("the floating history card");
                 (browser.right(), browser.center().y, history.top())
             } else {
-                (vp.left(), vp.center().y, vp.bottom())
+                // The docked browser is a full-height column at the left.
+                let browser = h.app.shell.browser.expect("the docked browser column");
+                (browser.right(), vp.center().y, vp.bottom())
             };
             let x = vp.center().x;
             for p in [

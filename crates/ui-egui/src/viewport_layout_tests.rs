@@ -6,8 +6,9 @@ use serde_json::json;
 
 #[test]
 fn thin_rotated_bounds_fit_using_the_original_full_projection() {
+    // A viewport under a 150 pt band of chrome (the layout is tested on its own, not the shell).
     for (width, height, scale) in [(1400.0, 900.0, 1.0), (700.0, 450.0, 2.0), (700.0, 360.0, 2.0), (900.0, 720.0, 1.0)] {
-        let vp = Rect::from_min_max(pos2(250.0, crate::toolbar::APP_BAR_HEIGHT + crate::toolbar::RIBBON_HEIGHT), pos2(width, height - 30.0));
+        let vp = Rect::from_min_max(pos2(250.0, 150.0), pos2(width, height - 30.0));
         let dock = Rect::from_min_max(pos2(width - 205.0, vp.top()), vp.max);
         let layout = Layout::new(vp, &[dock], scale, crate::prefs::NavigatorStyle::Axes);
         assert!(layout.drawable.width() >= 80.0 && layout.drawable.height() >= 30.0, "{layout:?}");
@@ -252,7 +253,7 @@ fn immediate_standard_view_cancels_fit_before_the_measured_frame() {
 #[test]
 fn navigation_anchors_ignore_positioned_resized_and_covering_dialogs() {
     for (width, height, scale) in [(1400.0, 900.0, 1.0), (700.0, 450.0, 2.0), (700.0, 360.0, 2.0)] {
-        let vp = Rect::from_min_max(pos2(250.0, crate::toolbar::APP_BAR_HEIGHT + crate::toolbar::RIBBON_HEIGHT), pos2(width, height - 30.0));
+        let vp = Rect::from_min_max(pos2(250.0, 150.0), pos2(width, height - 30.0));
         let baseline = Layout::new(vp, &[], scale, crate::prefs::NavigatorStyle::Axes);
         assert!(baseline.axis_view.is_positive() && baseline.navigation.is_positive());
         assert_eq!(baseline.axis_view.right_top(), vp.right_top());
@@ -340,7 +341,8 @@ fn floating_fit_uses_the_measured_browser_and_history_cards_at_each_size() {
         let layout = h.app.viewport.layout.as_ref().unwrap();
         for name in ["browser:card", "history:card"] {
             let card = crate::scenario::rect_of(name).unwrap();
-            assert!(layout.viewport.contains_rect(card), "{name}: {card:?} {layout:?}");
+            // (The browser column starts beside the document bar, above the scene's top.)
+            assert!(card.intersect(layout.viewport).is_positive() && layout.viewport.x_range().contains(card.center().x), "{name}: {card:?} {layout:?}");
             assert!(!layout.drawable.intersect(card).is_positive(), "{name}: {card:?} {layout:?}");
         }
         let projection = crate::viewport::projection(&h.app, layout.viewport);

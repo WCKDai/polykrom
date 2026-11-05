@@ -378,7 +378,7 @@ pub(crate) fn dock_drag(app: &mut SolveApp, ui: &egui::Ui, drag: &egui::Response
                     if Container::for_layout(app.ui.layout, Surface::Panel).floating() {
                         crate::timeline::floating_rect(available)
                     } else {
-                        Rect::from_min_max(pos2(available.left(), (available.bottom() - 40.0).max(available.top())), available.max)
+                        Rect::from_min_max(pos2(available.left(), (available.bottom() - crate::timeline::HISTORY_HEIGHT).max(available.top())), available.max)
                     }
                 }
                 Dock::Left => {
@@ -1235,7 +1235,8 @@ mod tests {
             h.frames(6);
             let design = h.app.session.doc.to_json();
             let projection = h.app.viewport.rect;
-            for (dock, point) in [("bottom", pos2(700.0, 990.0)), ("left", pos2(10.0, 400.0)), ("under_browser", pos2(130.0, 700.0))] {
+            // (The status bar takes the window's last 36 points: the bottom zone is above it.)
+            for (dock, point) in [("bottom", pos2(700.0, 950.0)), ("left", pos2(10.0, 400.0)), ("under_browser", pos2(130.0, 700.0))] {
                 let grip = handle_at("history:grip").expect("dock grip");
                 h.app.synthetic.push(egui::Event::PointerMoved(grip));
                 h.frame();

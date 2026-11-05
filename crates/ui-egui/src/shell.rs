@@ -1,9 +1,9 @@
 //! Transient shell geometry shared by automation, drawing and viewport occlusion.
 use crate::ui_kit::{Container, Surface};
-use egui::{Rect, pos2, vec2};
+use egui::{Rect, pos2};
 use serde::{Deserialize, Serialize};
 
-use crate::{SolveApp, theme::Tokens, toolbar};
+use crate::{SolveApp, theme::Tokens};
 
 /// Saved workspace layout; automation may override it for a session.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -62,9 +62,10 @@ pub(crate) fn paint_top_corners(painter: &egui::Painter, viewport: Rect, color: 
     }
 }
 
+/// The ribbon card (the tab row and the groups): the window's width less the floating margin.
+/// The workspace choice is on the tab row, so there is no separate workspace card.
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct Cards {
-    pub workspace: Rect,
     pub ribbon: Rect,
     pub bottom: f32,
 }
@@ -72,19 +73,11 @@ pub(crate) struct Cards {
 impl Cards {
     pub fn new(available: Rect, mode: LayoutMode, ribbon_height: f32) -> Self {
         let margin = Container::for_layout(mode, Surface::Chrome).gap();
-        let gap = margin;
         let left = available.left() + margin;
         let top = available.top() + margin;
         let right = (available.right() - margin).max(left);
-        let workspace = Rect::from_min_size(
-            pos2(left, top),
-            vec2(
-                toolbar::WORKSPACE_WIDTH.min((right - left).max(0.0)),
-                ribbon_height - if !Container::for_layout(mode, Surface::Chrome).floating() { 1.0 } else { 0.0 },
-            ),
-        );
-        let ribbon = Rect::from_min_max(pos2((workspace.right() + gap).min(right), top), pos2(right, top + ribbon_height));
-        Self { workspace, ribbon, bottom: ribbon.bottom() + margin }
+        let ribbon = Rect::from_min_max(pos2(left, top), pos2(right, top + ribbon_height));
+        Self { ribbon, bottom: ribbon.bottom() + margin }
     }
 }
 
@@ -103,6 +96,10 @@ pub(crate) struct State {
     pub history_folding: Option<[f32; 2]>,
     pub history_fold_motion: Option<[crate::timeline_left::FoldMotion; 2]>,
     pub content: Option<Rect>,
+    /// The document tabs and the view bar above the viewport (`document_bar`).
+    pub document_bar: Option<Rect>,
+    /// The status bar along the window's bottom.
+    pub status_bar: Option<Rect>,
 }
 
 /// One source of occlusion for navigation, picking, overlays and fit.
@@ -120,6 +117,7 @@ pub(crate) fn covered_rects(app: &SolveApp) -> Vec<Rect> {
         rects.extend(app.shell.history.map(|card| crate::ui_kit::HistorySeam::new(card).pill));
     }
     rects.extend(app.shell.browser.filter(|_| app.ui.show_browser));
+    rects.extend(app.shell.document_bar);
     rects.extend(app.inspector.rect);
     // The AI review's prompt row and panel cover the viewport only as floating cards; docked,
     // they are edge panels beside it.
@@ -157,6 +155,16 @@ pub(crate) fn bottom_overlay_rect(app: &SolveApp, mut viewport: Rect) -> Rect {
     viewport
 }
 
+/// The floating scene: the pickable viewport below the document tabs and the view bar and right
+/// of the browser (view 01), from last frame's shell rects (they move only with the window).
+pub(crate) fn scene_rect(app: &SolveApp, full: Rect) -> Rect {
+    let mut scene = workspace_content(app, full);
+    if let Some(strip) = app.shell.document_bar {
+        scene.min.y = strip.bottom().clamp(scene.top(), scene.bottom());
+    }
+    scene
+}
+
 /// The former central panel remains the anchor for controls and docked panels.
 pub(crate) fn content_rect(app: &SolveApp, viewport: Rect) -> Rect {
     app.shell.content.unwrap_or(viewport).intersect(viewport)
@@ -190,18 +198,27 @@ pub(crate) fn tool_drag_rect(app: &SolveApp, placement: Rect) -> Rect {
     bounds
 }
 
+/// The height a docked panel (a tool sheet, the sketch palette) keeps on a short view, moving up
+/// over the compass rather than shrinking below it.
+pub(crate) const PANEL_MIN_HEIGHT: f32 = 350.0;
+
 pub(crate) fn panel_top(app: &SolveApp, viewport: Rect, bottom: f32, side: crate::frame::Side) -> f32 {
     let content = content_rect(app, viewport);
     if side == crate::frame::Side::Right {
-        // Both layouts use the measured compass, rather than a legacy fixed-height gap.
-        // Reclaim that space on short views while keeping the panel usable.
+        // With the document bar (view 01), the right-hand properties/dialog column is level with
+        // the view bar, keeping its full height; the compass sits inside the viewport beside it
+        // (the viewport layout makes it avoid this column). Without the bar, fall back to docking
+        // below the measured compass, reclaiming space on short views.
+        if let Some(strip) = app.shell.document_bar.filter(|s| s.top().is_finite()) {
+            return strip.top().min((bottom - PANEL_MIN_HEIGHT).max(strip.top()));
+        }
         app.viewport
             .layout
             .as_ref()
             .map_or(content.top(), |l| if l.axis_view.is_positive() { l.axis_view.bottom().min(bottom) } else { content.top() })
-            .min((bottom - 360.0).max(content.top()))
+            .min((bottom - PANEL_MIN_HEIGHT).max(content.top()))
     } else {
-        (viewport.top() + crate::viewport::AXIS_VIEW_CLEARANCE).min((bottom - 360.0).max(viewport.top()))
+        (viewport.top() + crate::viewport::AXIS_VIEW_CLEARANCE).min((bottom - PANEL_MIN_HEIGHT).max(viewport.top()))
     }
 }
 
