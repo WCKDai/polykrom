@@ -5,10 +5,11 @@
 //! the request typed and an agent set up, the request pending while the agent starts, the Review
 //! changes card with the proposed Ø10 holes previewed, and the applied toast with Undo. The raster
 //! draws the window's own shapes, not the viewport's GPU scene, so the model itself is rendered by
-//! the engine's headless picture path as `review-model-<stage>.png`. Written to
-//! `target/review-media/<surface>-<mode>-<stage>.png`, where the stage is `REVIEW_MEDIA_STAGE`
-//! (default `after`); the same test on the base commit paints the app as it was (`before`).
-//! Nothing here is committed: the pictures are evidence for a review.
+//! the engine's headless picture path as `review-model-before.png` (before Apply, the Ø8 holes)
+//! and `review-model-after.png` (after it, Ø10). The card is also painted in a 1366 × 768 window
+//! in Japanese and Chinese. Written to `target/review-media/<surface>-<mode>-<stage>.png`, where
+//! the stage is `REVIEW_MEDIA_STAGE` (default `after`); the same test on the base commit paints
+//! the app as it was (`before`). Nothing here is committed: the pictures are evidence for a review.
 
 #[path = "support/raster.rs"]
 #[allow(dead_code)]
@@ -56,19 +57,24 @@ fn actuator_mount() -> Value {
 
 /// One laid-out frame of the app, rasterised and saved; the frame's output for crops.
 fn paint(h: &mut Harness, path: &Path) -> (image::RgbaImage, f32) {
+    paint_in(h, path, WINDOW, "en")
+}
+
+/// One laid-out frame of the app in a window of `size` points, with the fonts of `language`.
+fn paint_in(h: &mut Harness, path: &Path, size: egui::Vec2, language: &str) -> (image::RgbaImage, f32) {
     // A fresh context transfers every texture (fonts, icons, the view) to the software renderer.
     h.ctx = egui::Context::default();
     // The harness's widget lookups read the accessibility tree of its frames: on this context too.
     h.ctx.enable_accesskit();
-    polykrom_ui_egui::fonts::setup_fonts(&h.ctx);
+    polykrom_ui_egui::fonts::setup_fonts_for(&h.ctx, language, "");
     theme::apply(&h.ctx);
     let mut textures: HashMap<TextureId, ColorImage> = HashMap::new();
     for _ in 0..8 {
-        raster::paint_sized(h, &mut textures, vec![], WINDOW);
+        raster::paint_sized(h, &mut textures, vec![], size);
     }
-    let output = raster::paint_sized(h, &mut textures, vec![], WINDOW);
+    let output = raster::paint_sized(h, &mut textures, vec![], size);
     let ppp = output.pixels_per_point;
-    let shot = raster::raster_sized(h, &textures, output, WINDOW);
+    let shot = raster::raster_sized(h, &textures, output, size);
     save(&shot, path);
     (shot, ppp)
 }
@@ -175,10 +181,11 @@ fn review_flow_pictures() {
         let r = h.call("ui.review", json!({"preview": true}));
         assert_eq!(r["ok"], true, "{r}");
         h.frames(3);
-        let pending = r["result"]["waiting"].is_string();
-        eprintln!("{mode}: the request was taken by the starting agent: {pending}");
-        if after && pending {
-            assert_eq!(h.call("ui.inspect", json!({}))["result"]["review"]["state"], "pending");
+        // The picture is of the pending state, or there is no picture: the request must be with
+        // the starting agent.
+        if after {
+            assert!(r["result"]["waiting"].is_string(), "{mode}: the request was not taken by the starting agent: {r}");
+            assert_eq!(h.call("ui.inspect", json!({}))["result"]["review"]["state"], "pending", "{mode}");
             assert!(h.widget("Preview pending").is_some(), "the button says so");
         }
         let (shot, ppp) = paint(&mut h, &file("pending", mode));
@@ -211,6 +218,23 @@ fn review_flow_pictures() {
         if let Some(row) = scenario::rect_of("review:prompt_row") {
             crop(&shot, row, 4.0, ppp, &file("review-card-row", mode));
         }
+        // The same card in a 1366 × 768 window, in Japanese (dark) and Chinese (light): every
+        // value whole, the card below the view cube.
+        let (language, small) = (if dark { "ja" } else { "zh" }, egui::vec2(1366.0, 768.0));
+        h.call("ui.resize", json!({"width": small.x, "height": small.y}));
+        h.call("ui.prefs", json!({"language": language}));
+        h.frames(3);
+        let (shot, ppp) = paint_in(&mut h, &file(&format!("review-card-1366-{language}"), mode), small, language);
+        if let Some(card) = scenario::rect_of("review:panel") {
+            crop(&shot, card, 4.0, ppp, &file(&format!("review-card-only-1366-{language}"), mode));
+        }
+        h.call("ui.prefs", json!({"language": "en"}));
+        h.call("ui.resize", json!({"width": WINDOW.x, "height": WINDOW.y}));
+        h.frames(3);
+        // The model before Apply: the Ø8 holes (the proposal is previewed, not applied).
+        if dark {
+            render_model(&h, &dir.join("review-model-before.png"));
+        }
 
         // View 05: applied, with the receipt toast and its Undo, the status line and, on the
         // body's properties, the footer.
@@ -233,8 +257,12 @@ fn review_flow_pictures() {
         if let Some(card) = scenario::rect_of("inspector:card") {
             crop(&shot, card, 4.0, ppp, &file("applied-properties-only", mode));
         }
+        // The model after Apply: the Ø10 holes, a different picture from before.
         if dark {
-            render_model(&h, &dir.join(format!("review-model-{stage}.png")));
+            render_model(&h, &dir.join("review-model-after.png"));
+            let (before, after) =
+                (std::fs::read(dir.join("review-model-before.png")).unwrap(), std::fs::read(dir.join("review-model-after.png")).unwrap());
+            assert_ne!(before, after, "the model before and after Apply are the same picture");
         }
     }
     theme::set_dark(previous);
