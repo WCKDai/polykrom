@@ -15,7 +15,8 @@
   tab leaves it; the application menu's Workspaces… lists every workspace, including the planned
   ones. Each group shows its pinned commands as large buttons and the group's other commands as two
   rows of small buttons, as many as the ribbon's width holds (the rest wait in the group's
-  drop-down); click the group's name for all of them. Drag a command from the dropdown
+  drop-down); the groups share the ribbon's full width, so no room is left empty at its right.
+  Click the group's name for all of them. Drag a command from the dropdown
   onto a group's label or empty space to append it; the insertion line shows its destination. Drop
   onto an existing button to insert before it. Buttons can also move between groups, and the
   layout is saved.

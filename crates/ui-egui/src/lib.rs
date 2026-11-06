@@ -1704,6 +1704,10 @@ impl SolveApp {
     fn cad_ui(&mut self, ui: &mut egui::Ui, report_input: &mut Option<issue_report::CadInput>) {
         self.ui.layout.publish(ui.ctx());
         scenario::clear_handles();
+        // The window's ground: the theme's base surface under every panel and card, so the gaps
+        // between the floating chrome and the margins beside it show the theme's own colour (not
+        // the host's clear colour, white in the software rasteriser and not a theme's in eframe).
+        ui.painter().rect_filled(ui.ctx().content_rect(), 0.0, theme::Tokens::get().window);
         self.poll_deferred(ui.ctx());
         self.poll_delete_check(ui.ctx());
         toolbar::app_bar(self, ui);

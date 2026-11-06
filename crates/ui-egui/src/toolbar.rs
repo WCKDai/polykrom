@@ -89,33 +89,39 @@ pub const COLLAPSED_WIDTH: f32 = 72.0;
 /// The gap after each panel (its separator).
 const PANEL_GAP: f32 = 1.0;
 /// The workspace tab row (the kit drew 34 px; the owner asked for a shorter top bar).
-pub const TAB_ROW_HEIGHT: f32 = 30.0;
+pub const TAB_ROW_HEIGHT: f32 = 28.0;
 /// Distance from the ribbon card's edges to a group's label.
 const RIBBON_TAB_INSET: f32 = 4.0;
 /// A ribbon group: the buttons, then the group's name along the bottom. The kit drew 106 px
-/// with 72 px buttons; the tools are smaller now (the owner's direction, 2026-11-06), so the
-/// group is 82 px.
-pub const GROUP_HEIGHT: f32 = 82.0;
+/// with 72 px buttons; the tools are smaller (the owner's direction, 2026-11-06: smaller tools
+/// and icons, less padding, tighter labels), so the group is 62 px: 4 px, the 38 px buttons,
+/// the 16 px group label and 3 px under it.
+pub const GROUP_HEIGHT: f32 = 62.0;
 pub const RIBBON_HEIGHT: f32 = TAB_ROW_HEIGHT + GROUP_HEIGHT + 1.0;
-/// A large icon-over-label button, and where its icon and label sit in it.
-pub const BUTTON_HEIGHT: f32 = 54.0;
-const LARGE_ICON: f32 = 22.0;
-const LARGE_ICON_Y: f32 = 14.0;
-const LARGE_LABEL_Y: f32 = 40.0;
+/// A large icon-over-label button, and where its icon and label sit in it: a 20 px icon (drawn
+/// from the kit's SVG at that exact pixel size, never a scaled bitmap) over a one-line label.
+pub const BUTTON_HEIGHT: f32 = 38.0;
+const LARGE_ICON: f32 = 20.0;
+const LARGE_ICON_Y: f32 = 12.0;
+const LARGE_LABEL_Y: f32 = 30.0;
 /// Where a sketch family button splits: the icon above, the title and its chevron below.
-const FAMILY_SPLIT_Y: f32 = 30.0;
+const FAMILY_SPLIT_Y: f32 = 23.0;
 /// From a group's top to its buttons.
 const GROUP_PAD_TOP: f32 = 4.0;
-const ICON_BUTTON_HEIGHT: f32 = 32.0;
-const ICON_GROUP_HEIGHT: f32 = 56.0;
-/// A small icon-beside-label button: two rows of them make a column as tall as a large button.
-const SMALL_HEIGHT: f32 = 25.0;
-const SMALL_ROW_GAP: f32 = 4.0;
+const ICON_BUTTON_HEIGHT: f32 = 28.0;
+const ICON_GROUP_HEIGHT: f32 = 50.0;
+/// A small icon-beside-label button (a 14 px icon): two rows of them make a column as tall as a
+/// large button.
+const SMALL_HEIGHT: f32 = 18.0;
+const SMALL_ROW_GAP: f32 = 2.0;
 const SMALL_ROWS: usize = 2;
-const SMALL_ICON: f32 = 16.0;
-const SMALL_PAD: f32 = 5.0;
+const SMALL_ICON: f32 = 14.0;
+const SMALL_PAD: f32 = 4.0;
 /// Where a small button's label starts: the padding, the icon and a 5 px gap.
 const SMALL_TEXT_X: f32 = SMALL_PAD + SMALL_ICON + 5.0;
+/// The constraint gallery's cells: three columns of 24 x 18 cells, two rows inside the buttons' height.
+const GALLERY_CELL: egui::Vec2 = vec2(24.0, 18.0);
+const GALLERY_PITCH: egui::Vec2 = vec2(27.0, 20.0);
 const SMALL_MIN_WIDTH: f32 = 70.0;
 const SMALL_MAX_WIDTH: f32 = 184.0;
 
@@ -139,10 +145,24 @@ const BUTTON_MIN_WIDTH: f32 = 54.0;
 /// within this width).
 const BUTTON_MAX_WIDTH: f32 = 132.0;
 const BUTTON_LABEL_PADDING: f32 = 12.0;
-const SECTION_HEIGHT: f32 = 20.0;
+const SECTION_HEIGHT: f32 = 16.0;
 
 /// The » button's room at the end of the panels, kept only while some panel is in it.
 pub const MORE_ROOM: f32 = 40.0;
+
+/// How much wider each panel is drawn so that together they span `room` (the owner's direction,
+/// 2026-11-06: the tools use the full ribbon width, with larger groups across it rather than
+/// empty space at the right): the room left after [`fit`], shared in proportion to the panels'
+/// widths. Nothing widens while a panel is in the » menu (its button takes the end of the room).
+pub fn justify(plans: &[Plan], room: f32) -> Vec<f32> {
+    let used = used(plans);
+    let widths: f32 = plans.iter().map(Plan::width).sum();
+    let slack = room - used;
+    if !room.is_finite() || slack <= 0.0 || widths <= 0.0 || plans.iter().any(|p| p.fit == Fit::More) {
+        return vec![0.0; plans.len()];
+    }
+    plans.iter().map(|p| (slack * p.width() / widths).floor()).collect()
+}
 
 /// Fit panels into `room`, giving up as little as it takes, one small step at a time:
 /// 1. buttons narrow from their measured label widths to their minimum, wrapping and truncating;
@@ -1287,8 +1307,12 @@ pub fn toolbar(app: &mut SolveApp, ui: &mut egui::Ui) {
         let finish_plan = sizes.last().filter(|_| tab == "SKETCH").map(Plan::full);
         let finish_width = finish_plan.as_ref().map_or(0.0, |p| p.width().max(80.0));
         let normal_count = sizes.len().saturating_sub(usize::from(finish_plan.is_some()));
-        let mut plans = fit(sizes.get(..normal_count).unwrap_or_default(), right - 4.0 - px - finish_width);
+        let room = right - 4.0 - px - finish_width;
+        let mut plans = fit(sizes.get(..normal_count).unwrap_or_default(), room);
         let finish_right = plans.iter().any(|p| p.fit == Fit::More);
+        // The groups span the ribbon's full width: the room left over widens them in proportion.
+        let mut extras = justify(&plans, room);
+        extras.extend(finish_plan.iter().map(|_| 0.0));
         plans.extend(finish_plan);
         crate::scenario::publish_count("toolbar_collapsed", plans.iter().filter(|p| p.fit == Fit::Collapsed).count() as f64);
         crate::scenario::publish_count("toolbar_more", plans.iter().filter(|p| p.fit == Fit::More).count() as f64);
@@ -1296,7 +1320,7 @@ pub fn toolbar(app: &mut SolveApp, ui: &mut egui::Ui) {
             "toolbar_trimmed",
             plans.iter().zip(&sizes).filter(|(p, s)| p.fit == Fit::Buttons && p.shown < s.buttons.len()).count() as f64,
         );
-        for (((panel, cmds, shown), items), plan) in lists.into_iter().zip(items).zip(plans) {
+        for ((((panel, cmds, shown), items), plan), extra) in lists.into_iter().zip(items).zip(plans).zip(extras) {
             let panel: &&str = &panel;
             if plan.fit == Fit::More {
                 overflow.push((*panel, menu_commands(&cmds, &shown)));
@@ -1305,7 +1329,7 @@ pub fn toolbar(app: &mut SolveApp, ui: &mut egui::Ui) {
             let collapsed = plan.fit == Fit::Collapsed;
             let trimmed = plan.shown < plan.widths.len();
             let finish = tab == "SKETCH" && *panel == "FINISH SKETCH";
-            let width = if finish { finish_width } else { plan.width() };
+            let width = if finish { finish_width } else { plan.width() + extra };
             if finish && finish_right {
                 px = right - finish_width;
                 painter.line_segment([pos2(px, top), pos2(px, r.bottom() - 1.0)], t.tertiary_border(t.border));
@@ -1339,7 +1363,7 @@ pub fn toolbar(app: &mut SolveApp, ui: &mut egui::Ui) {
                 if let Some(c) = shown.first().or(cmds.first()) {
                     icons::paint_icon(
                         &painter,
-                        Rect::from_center_size(br.center() - vec2(0.0, 3.0), vec2(26.0, 26.0)),
+                        Rect::from_center_size(br.center() - vec2(0.0, 3.0), vec2(LARGE_ICON, LARGE_ICON)),
                         c.icon,
                         f32::from(t.icon.a()) / 255.0,
                     );
@@ -1406,7 +1430,7 @@ pub fn toolbar(app: &mut SolveApp, ui: &mut egui::Ui) {
                             painter.rect_filled(whole, t.radius_sm, t.hover);
                         }
                         let icon = if selected.id == "sketch.finish" { "finish" } else { selected.icon };
-                        let side = if finish { 30.0 } else { LARGE_ICON };
+                        let side = if finish { 24.0 } else { LARGE_ICON };
                         let icon_rect = Rect::from_center_size(
                             pos2(br.center().x, whole.top() + if labels { LARGE_ICON_Y } else { button_height / 2.0 }),
                             vec2(side, side),
@@ -1420,10 +1444,7 @@ pub fn toolbar(app: &mut SolveApp, ui: &mut egui::Ui) {
                         }
                         if let Some(f) = family {
                             let ar = if labels {
-                                Rect::from_min_max(
-                                    pos2(whole.left(), whole.top() + FAMILY_SPLIT_Y),
-                                    pos2(whole.right(), whole.top() + FAMILY_SPLIT_Y + 20.0),
-                                )
+                                Rect::from_min_max(pos2(whole.left(), whole.top() + FAMILY_SPLIT_Y), whole.right_bottom())
                             } else {
                                 Rect::from_min_max(pos2(br.right(), whole.top()), whole.right_bottom())
                             };
@@ -1497,8 +1518,11 @@ pub fn toolbar(app: &mut SolveApp, ui: &mut egui::Ui) {
                         for (index, c) in gallery.iter().enumerate() {
                             let columns = if labels { 3 } else { 6 };
                             let cell = Rect::from_min_size(
-                                pos2(whole.left() + (index % columns) as f32 * 27.0, top + 6.0 + (index / columns) as f32 * 23.0),
-                                vec2(24.0, 20.0),
+                                pos2(
+                                    whole.left() + (index % columns) as f32 * GALLERY_PITCH.x,
+                                    top + pad_top + (index / columns) as f32 * GALLERY_PITCH.y,
+                                ),
+                                GALLERY_CELL,
                             );
                             let info = c.info(&app.session);
                             let resp = ui.interact(cell, ui.id().with(("cmd", c.id)), Sense::click_and_drag());
@@ -1521,7 +1545,7 @@ pub fn toolbar(app: &mut SolveApp, ui: &mut egui::Ui) {
                             );
                             icons::paint_icon(
                                 &painter,
-                                Rect::from_center_size(cell.center(), vec2(15.0, 15.0)),
+                                Rect::from_center_size(cell.center(), vec2(SMALL_ICON, SMALL_ICON)),
                                 c.icon,
                                 if info.enabled { 1.0 } else { 0.35 },
                             );
@@ -1597,7 +1621,10 @@ pub fn toolbar(app: &mut SolveApp, ui: &mut egui::Ui) {
                 })
             });
             if !over_button && ui.rect_contains_pointer(panel_rect) && egui::DragAndDrop::payload::<ToolbarDrag>(ui.ctx()).is_some() {
-                painter.line_segment([pos2(px + width - 4.0, top + 4.0), pos2(px + width - 4.0, top + 38.0)], Stroke::new(2.0, t.accent));
+                painter.line_segment(
+                    [pos2(px + width - 4.0, top + pad_top), pos2(px + width - 4.0, top + pad_top + button_height)],
+                    Stroke::new(2.0, t.accent),
+                );
                 if ui.input(|input| input.pointer.any_released())
                     && let Some(d) = egui::DragAndDrop::take_payload::<ToolbarDrag>(ui.ctx())
                 {
@@ -2934,7 +2961,9 @@ mod panel_drop_tests {
             let label = crate::scenario::handle_at("panel:MODEL:CREATE").unwrap();
             let panel = crate::scenario::rect_of("panel:MODEL:CREATE").unwrap();
             let destination = match target {
-                "gap" => label - vec2(0.0, 10.0),
+                // The row between the buttons and the group's label (the compact ribbon leaves
+                // one point there).
+                "gap" => label - vec2(0.0, SECTION_HEIGHT / 2.0 + 0.5),
                 "left margin" => pos2(panel.left() + 1.0, label.y - 30.0),
                 "right margin" => pos2(panel.right() - 1.0, label.y - 30.0),
                 "button" => crate::scenario::handle_at("button:solid.extrude").unwrap(),
@@ -3284,8 +3313,10 @@ mod ribbon_wrap_tests {
     /// At a laptop's 1366 x 768, the default 1600 x 1000 and the kit's 1760 x 1100, no label on a
     /// ribbon button wraps or is cut: every large button is as wide as its one-line label (`Move /
     /// Copy` wrapped to two lines before), every small button's label is one line, and every
-    /// group's name fits its group with its chevron. The tools use the ribbon's width: on MODEL
-    /// the groups reach across at least four fifths of it at every size.
+    /// group's name fits its group with its chevron. The tools use the ribbon's full width: on
+    /// every tab whose groups all fit (no » menu) the last group ends at the ribbon's right edge
+    /// (`justify` shares the room left over), and on MODEL the groups reach across at least four
+    /// fifths of it at every size whatever the fit.
     #[test]
     fn no_ribbon_label_wraps_at_the_default_window_size() {
         for (w, height) in [(1366.0, 768.0), (1600.0, 1000.0), (1760.0, 1100.0)] {
@@ -3313,6 +3344,20 @@ mod ribbon_wrap_tests {
                 }
                 if tab == "MODEL" {
                     assert!(panels_right >= ribbon.left() + 0.8 * ribbon.width(), "{tab} at {w}: the groups reach {panels_right} of {ribbon:?}");
+                }
+                // Every group on the ribbon: the last one's label ends within its inset (4 px) of
+                // the ribbon's 4 px margin and the group divider, the flooring of each group's
+                // share aside.
+                if crate::scenario::count_of("toolbar_more") == Some(0.0) {
+                    let groups = crate::scenario::rects("ribbon:section:")
+                        .into_iter()
+                        .filter(|(n, _)| n.starts_with(&format!("ribbon:section:{tab}:")))
+                        .count();
+                    assert!(
+                        panels_right >= ribbon.right() - 8.0 - PANEL_GAP - groups as f32,
+                        "{tab} at {w}: the groups end at {panels_right}, short of the ribbon's right edge {}",
+                        ribbon.right()
+                    );
                 }
                 for (name, rect) in crate::scenario::rects("button:") {
                     let Some(id) = name.strip_prefix("button:") else { continue };
@@ -3403,7 +3448,7 @@ mod ribbon_gallery_tests {
         let mut cells = Vec::new();
         for id in crate::workspace::CONSTRAINT_GALLERY {
             let cell = rect_of(&format!("ribbon:constraint:{id}")).unwrap();
-            assert_eq!(cell.size(), vec2(24.0, 20.0));
+            assert_eq!(cell.size(), GALLERY_CELL);
             assert_eq!(rect_of(&format!("button:{id}")), Some(cell));
             assert!(cell.left() > dimension.right());
             cells.push(cell);

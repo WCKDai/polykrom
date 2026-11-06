@@ -90,6 +90,42 @@ fn main_window_and_shell_regions() {
             assert!(close(bar, t.app_bar), "{size} {mode}: the title bar is filled with the theme's bar colour: {bar:?} vs {:?}", t.app_bar);
             let light_bar = egui::Rgba::from(bar).intensity() > 0.5;
             assert_eq!(light_bar, !dark, "{size} {mode}: the bar is light in the light theme and dark in the dark");
+            // The gaps between the cards of the top chrome (under the title bar, around the ribbon
+            // card, around the prompt row) and the margins beside them show the theme's own base
+            // colour, never the host's clear colour. (The base commit left them to it, white in
+            // this rasteriser: that is what the before pictures show.)
+            if stage != "before" {
+                let ribbon = scenario::rect_of("ribbon:card").expect("the ribbon card");
+                let prompt = scenario::rect_of("review:prompt_row").expect("the prompt row");
+                let title_bottom = polykrom_ui_egui::toolbar::APP_BAR_HEIGHT;
+                // Clear of the cards' soft shadows (4 points around a card, 2 points lower).
+                let ground = |x: f32, y: f32, what: &str| {
+                    let p = px(x, y);
+                    assert!(close(p, t.window), "{size} {mode}: {what} at ({x}, {y}) is {p:?}, not the base {:?}", t.window);
+                };
+                ground(window.x / 2.0, title_bottom + 1.0, "the gap under the title bar");
+                ground(1.0, ribbon.center().y, "the margin left of the ribbon card");
+                ground(window.x - 2.0, ribbon.center().y, "the margin right of the ribbon card");
+                ground(1.0, prompt.center().y, "the margin left of the prompt row");
+                ground(1.0, (prompt.bottom() + scene.top()) / 2.0, "the margin beside the gap under the prompt row");
+                // No band in any gap is lighter than the base: the shadows under the cards only
+                // darken it. (The cards' own fine edges, a point either side of their bounds,
+                // are not the gap.)
+                let base = egui::Rgba::from(t.window).intensity();
+                let between = |above: f32, below: f32| (above.ceil() as u32 + 1)..(below.floor() as u32).saturating_sub(1);
+                let rows =
+                    between(title_bottom, ribbon.top()).chain(between(ribbon.bottom(), prompt.top())).chain(between(prompt.bottom(), scene.top()));
+                for y in rows {
+                    for x in [window.x * 0.25, window.x * 0.5, window.x * 0.75] {
+                        let p = px(x, y as f32);
+                        assert!(
+                            egui::Rgba::from(p).intensity() <= base + 0.01,
+                            "{size} {mode}: ({x}, {y}) is {p:?}, lighter than the base {:?}: a bright band between the cards",
+                            t.window
+                        );
+                    }
+                }
+            }
             if let Some(assistant) = scenario::rect_of("titlebar:assistant") {
                 let glyph = Rect::from_center_size(assistant.center(), vec2(14.0, 14.0));
                 let ground = egui::Rgba::from(t.window).intensity();
@@ -130,6 +166,102 @@ fn main_window_and_shell_regions() {
     }
     std::fs::write(dir.join(format!("canvas-share-{stage}.tsv")), &shares).unwrap();
     print!("{shares}");
+    theme::set_dark(previous);
+}
+
+/// The glass cards over a busy canvas (the owner's direction, 2026-11-06: the Design Browser a
+/// glass plane, the other floating cards the same look) at 1600 x 1000, dark and light. The
+/// headless canvas draws no model, so the sample design is drawn by the CPU rasteriser as
+/// `ui.render` draws it (the grid on, the camera close, so the plate runs under the cards) and
+/// put in the frame in place of the canvas's empty gradient, under the Design Browser, the
+/// document strip, the history, the Review changes card and the canvas status line. Written to
+/// `target/review-media/glass-<surface>-<mode>-<stage>.png`.
+#[test]
+fn glass_cards_over_a_busy_canvas() {
+    const WINDOW: egui::Vec2 = vec2(1600.0, 1000.0);
+    let stage = std::env::var("SHELL_REVIEW_STAGE").unwrap_or_else(|_| "after".into());
+    let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../target/review-media");
+    std::fs::create_dir_all(&dir).unwrap();
+    // No GPU here: the CPU rasteriser draws the model.
+    polykrom_engine::capture::install(std::sync::Arc::new(|scene, cam, w, h| {
+        let canvas = polykrom_engine::render::render(scene, cam, w as usize, h as usize);
+        Ok(polykrom_engine::capture::Picture { rgba: canvas.rgba, renderer: "cpu" })
+    }));
+    let previous = theme::is_dark();
+    for dark in [true, false] {
+        let mode = if dark { "dark" } else { "light" };
+        let mut h = Harness::new();
+        h.app.home.open = false;
+        h.call("ui.set", json!({"dark": dark}));
+        h.call("ui.resize", json!({"width": WINDOW.x, "height": WINDOW.y}));
+        h.app.session.run_script(&polykrom_engine::sample::script()).unwrap();
+        h.frames(3);
+        // The AI review flow's card and its canvas status line: a proposal to thicken the plate.
+        let steps = json!([{"command": "parameters.change", "params": {"name": "thickness", "expression": "10 mm"}}]);
+        let r = h.call("ui.review", json!({"prompt": "Make the plate 10 mm thick", "propose": {"commands": steps, "label": "Plate 10 mm thick"}}));
+        assert_eq!(r["ok"], true, "{r}");
+        h.frames(3);
+        // The camera close in: the plate runs under the cards, the grid fills the rest.
+        h.app.fit_view();
+        h.app.cam_anim = None;
+        h.frames(2);
+        h.app.cam.distance *= 0.5;
+        h.app.cam_anim = None;
+        h.frames(3);
+        h.ctx = egui::Context::default();
+        polykrom_ui_egui::fonts::setup_fonts(&h.ctx);
+        theme::apply(&h.ctx);
+        let mut textures: HashMap<TextureId, ColorImage> = HashMap::new();
+        for _ in 0..8 {
+            raster::paint_sized(&mut h, &mut textures, vec![], WINDOW);
+        }
+        let mut output = raster::paint_sized(&mut h, &mut textures, vec![], WINDOW);
+        let ppp = output.pixels_per_point;
+        let scene = h.app.viewport.rect.expect("the scene is drawn");
+        // The model as the window shows it, at the scene's size.
+        let (w, hgt) = ((scene.width() * ppp).round() as u32, (scene.height() * ppp).round() as u32);
+        let backdrop = dir.join(format!("glass-backdrop-{mode}.png"));
+        let r = h.call("ui.render", json!({"path": backdrop.to_string_lossy(), "width": w, "height": hgt, "grid": true}));
+        assert_eq!(r["ok"], true, "{r}");
+        let model = image::open(&backdrop).unwrap().to_rgba8();
+        std::fs::remove_file(&backdrop).ok();
+        let tex = TextureId::User(0xB1);
+        textures.insert(tex, ColorImage::from_rgba_unmultiplied([model.width() as usize, model.height() as usize], model.as_raw()));
+        // In the frame, right over the canvas's gradient (the four-vertex mesh spanning the scene)
+        // and under everything painted after it.
+        let gradient = output
+            .shapes
+            .iter()
+            .position(|s| match &s.shape {
+                egui::Shape::Mesh(m) if m.vertices.len() == 4 && m.texture_id == TextureId::default() => {
+                    let bounds = Rect::from_points(&m.vertices.iter().map(|v| v.pos).collect::<Vec<_>>());
+                    (bounds.min - scene.min).length() < 1.0 && (bounds.max - scene.max).length() < 1.0
+                }
+                _ => false,
+            })
+            .expect("the canvas's gradient is in the frame");
+        let uv = Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0));
+        output
+            .shapes
+            .insert(gradient + 1, egui::epaint::ClippedShape { clip_rect: scene, shape: egui::Shape::image(tex, scene, uv, egui::Color32::WHITE) });
+        let shot = raster::raster_sized(&mut h, &textures, output, WINDOW);
+        shot.save(dir.join(format!("glass-main-window-1600x1000-{mode}-{stage}.png"))).unwrap();
+        for (what, handle) in [
+            ("design-browser", "browser:card"),
+            ("document-strip", "document_bar:card"),
+            ("design-history", "history:card"),
+            ("review-card", "review:panel"),
+            ("status-line", "review:status"),
+        ] {
+            let Some(card) = scenario::rect_of(handle) else {
+                println!("{mode}: no {handle} in this shell, no glass-{what} picture");
+                continue;
+            };
+            let rect = card.expand(24.0).intersect(Rect::from_min_size(egui::Pos2::ZERO, WINDOW));
+            crop(&shot, rect, ppp).save(dir.join(format!("glass-{what}-{mode}-{stage}.png"))).unwrap();
+        }
+        println!("{mode}: glass pictures drawn over {} ({w} x {hgt} px of model, renderer {})", scene, r["result"]["renderer"]);
+    }
     theme::set_dark(previous);
 }
 

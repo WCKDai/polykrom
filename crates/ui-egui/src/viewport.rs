@@ -4201,7 +4201,7 @@ fn overlays(app: &SolveApp, painter: &egui::Painter, proj: &Proj) {
         && let Some(r) = app.viewport.layout.as_ref().map(|l| l.content)
     {
         let galley = painter.layout_no_wrap(line, FontId::proportional(t.font_button), t.accent);
-        let at = pos2(r.left() + 12.0, r.top() + 12.0);
+        let at = status_anchor(app, r, galley.size());
         crate::scenario::publish_rect("review:status", Rect::from_min_size(at, galley.size()));
         painter.galley(at, galley, t.accent);
     }
@@ -4245,8 +4245,25 @@ fn overlays(app: &SolveApp, painter: &egui::Painter, proj: &Proj) {
             format!("{} — {} degrees of freedom", ss.name, ss.report.dof)
         };
         let c = if ss.report.ok() { t.sketch_accent } else { t.error };
-        painter.text(pos2(r.left() + 12.0, r.top() + 12.0), Align2::LEFT_TOP, msg, FontId::proportional(t.font_button), c);
+        let galley = painter.layout_no_wrap(msg, FontId::proportional(t.font_button), c);
+        let at = status_anchor(app, r, galley.size());
+        crate::scenario::publish_rect("sketch:status", Rect::from_min_size(at, galley.size()));
+        painter.galley(at, galley, c);
     }
+}
+
+/// Where a status line of `size` (the AI review's, the active sketch's) starts in the content
+/// area `content`: 12 points in from its top-left corner, or under the document strip where the
+/// line would run under that card (floating, the strip is a card at the top of the content; it
+/// is laid out against the strip like the other overlays, never covered by it).
+fn status_anchor(app: &SolveApp, content: Rect, size: egui::Vec2) -> egui::Pos2 {
+    let mut at = pos2(content.left() + 12.0, content.top() + 12.0);
+    if let Some(strip) = app.shell.document_bar
+        && strip.intersect(Rect::from_min_size(at, size)).is_positive()
+    {
+        at.y = strip.bottom() + crate::shell::SHELL_GAP + 4.0;
+    }
+    at
 }
 
 /// Where a profile can fail: a ring round each open end (it touches no other curve) and a

@@ -819,6 +819,16 @@ fn floating_cards_never_overlap_at_every_size() {
                 cards.push((name, rect_of(name).unwrap_or_else(|| panic!("review={review} {w}x{hgt}: {name} is drawn"))));
             }
             cards.push(("agent activity", h.app.shell.agent_activity.unwrap_or_else(|| panic!("review={review} {w}x{hgt}: the feed is drawn"))));
+            if review {
+                // The canvas status line ("AI review / … / Proposed geometry shown") is laid out
+                // against the strip like the other overlays, never under it.
+                let status = rect_of("review:status").unwrap_or_else(|| panic!("{w}x{hgt}: the review's status line is drawn"));
+                assert!(
+                    status.is_positive() && h.app.viewport.rect.unwrap().contains_rect(status),
+                    "{w}x{hgt}: the status line {status:?} is on the canvas"
+                );
+                cards.push(("review status line", status));
+            }
             for (i, (a, ra)) in cards.iter().enumerate() {
                 for (b, rb) in cards.iter().skip(i + 1) {
                     assert!(!ra.intersect(*rb).is_positive(), "review={review} {w}x{hgt}: {a} {ra:?} overlaps {b} {rb:?}");

@@ -145,7 +145,8 @@ fn docked_ribbon_geometry_and_search() {
         assert_eq!(button.height(), toolbar::BUTTON_HEIGHT);
         assert!(button.width() >= 54.0);
         let section = rect_of("ribbon:section:MODEL:CREATE").unwrap();
-        assert_eq!(section.height(), 20.0);
+        // The group's name row: 16 points under the compact ribbon's 38 point buttons.
+        assert_eq!(section.height(), 16.0);
         assert!(section.top() > button.bottom());
         assert_eq!(section.bottom(), rect_of("toolbar").unwrap().bottom() - 4.0);
         assert_eq!(handle_at("panel:MODEL:CREATE"), handle_at("ribbon:section:MODEL:CREATE"));
