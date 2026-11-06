@@ -103,6 +103,7 @@ pub(crate) fn covered_rects(app: &SolveApp) -> Vec<Rect> {
     if floating {
         rects.extend(app.review.rect);
         rects.extend(app.review.prompt_rect);
+        rects.extend(app.properties.rect);
     }
     rects.extend(app.viewport.palette_rect.filter(|_| app.session.active_sketch.is_some()));
     rects.extend(app.viewport.dialog_rect.filter(|_| app.dialog.is_some() || app.tree.redefine.is_some()));
