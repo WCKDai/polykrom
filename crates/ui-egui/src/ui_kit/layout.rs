@@ -129,6 +129,43 @@ pub(super) fn sized_row<R>(ui: &mut Ui, text: &str, height: f32, control: impl F
     result
 }
 
+/// A label/value row whose value is never elided (a number with its unit, a `before → after`
+/// pair): a value wider than its column takes more lines, the pair breaking before the arrow
+/// first so each number stays whole with its unit, and the row grows to hold them. The hover text
+/// and the accessible label carry the value on one line. Tokens: `row, font_body, form_ink, space_8`.
+pub(crate) fn value_row(ui: &mut Ui, label: &str, before: Option<&str>, after: &str) -> Response {
+    let t = Tokens::get();
+    let font = egui::FontId::monospace(t.font_body);
+    let ink = t.form_ink;
+    let one_line = match before {
+        Some(b) => format!("{b} → {after}"),
+        None => after.to_owned(),
+    };
+    // The control column as `sized_row` lays it out, so the measure and the row agree.
+    let width = dimension(ui.available_width());
+    let column = (width - label_column(ui, label, width) - label_gap(ui, width)).max(0.0);
+    let fits = ui.painter().layout_no_wrap(one_line.clone(), font.clone(), ink).size().x <= column;
+    let shown = match before {
+        Some(b) if !fits => format!("{b}\n→ {after}"),
+        _ => one_line.clone(),
+    };
+    // Wrapped, never elided: a line still too wide breaks at a space, or anywhere as a last resort.
+    let galley = ui.painter().layout(shown, font, ink, column);
+    let height = row_height().max(galley.size().y + t.space_8);
+    sized_row(ui, label, height, |ui| {
+        let (rect, response) = ui.allocate_exact_size(vec2(ui.available_width(), height), egui::Sense::click());
+        // Snapped to whole device pixels, as `paint_text` does.
+        let ppp = ui.ctx().pixels_per_point().max(0.5);
+        let snap = |v: f32| (v * ppp).round() / ppp;
+        let at = egui::pos2(snap(rect.left()), snap(rect.center().y - galley.size().y / 2.0));
+        ui.painter().galley(at, galley.clone(), ink);
+        response.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Label, ui.is_enabled(), &one_line));
+        scenario::publish_rect(&format!("dialog:cell:{one_line}"), rect);
+        scenario::publish_handle(&format!("dialog:cell:{one_line}"), rect.center());
+        response.on_hover_text(one_line.clone())
+    })
+}
+
 /// A dim one-line caption in the control column of the row labelled `aligned_to`, directly under that
 /// row's control. It says in words what a colour or an icon shows, so colour is never the only cue.
 /// Dim helper beneath a row control. Tokens: `form_icon_size, font_small, text_dim, space_8; label-column tokens`.

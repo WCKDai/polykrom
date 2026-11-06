@@ -17,6 +17,8 @@ pub const REPEAT_KEY: &str = "Shift+R";
 /// Keys the application handles before any command shortcut.
 pub const RESERVED: &[&str] = &[
     REPEAT_KEY,
+    // The AI prompt row's key (`toolbar.rs` takes it before any command shortcut).
+    crate::review::FOCUS_KEY,
     "Escape",
     "S",
     "V",

@@ -787,6 +787,13 @@ const ELEMENTS: &[Element] = &[
             field(ui, &mut s.value);
         });
     }),
+    element!("value_row", "dialog:row:Gallery", Some("dialog:cell:Ø8.00 mm → Ø10.00 mm"), |ui, _| {
+        value_row(ui, "Gallery", Some("Ø8.00 mm"), "Ø10.00 mm");
+    }),
+    // A pair too wide for its column: stacked before and after, the row grown to hold them.
+    element!("value_row_stacked", "dialog:cell:86498.79 mm³ → 85594.11 mm³", Some("dialog:cell:86498.79 mm³ → 85594.11 mm³"), |ui, _| {
+        value_row(ui, "Gallery", Some("86498.79 mm³"), "85594.11 mm³");
+    }),
     element!("expr_row", "dialog:row:Gallery", Some("dialog:Gallery"), |ui, s| {
         expr_row(ui, "Gallery", &mut s.value);
     }),
