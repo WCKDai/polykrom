@@ -160,7 +160,12 @@ impl<'a> Panel<'a> {
         };
         let t = Tokens::get();
         let chrome = t.form_header_height + t.form_footer_height + t.form_gap_y * 2.0 + self.frame.total_margin().sum().y + gap;
-        egui::pos2(x, self.anchor.y.clamp(viewport.top(), (viewport.bottom() - chrome).max(viewport.top())))
+        // The outline is painted outside the window's rect: a sheet asking for the top plus its
+        // stroke (the sketch palette) keeps that when the chrome cannot fit, so the stroke stays
+        // inside the viewport; one asking for the top itself keeps the top.
+        let floor = viewport.top();
+        let ceiling = (viewport.bottom() - chrome).max(floor).max(self.anchor.y.min(floor + self.frame.stroke.width));
+        egui::pos2(x, self.anchor.y.clamp(floor, ceiling))
     }
 
     /// One positioned frame supplies both the outer surface and its footer corners.

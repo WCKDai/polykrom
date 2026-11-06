@@ -177,9 +177,10 @@ fn strength(age: f64) -> f32 {
     (1.0 - ((age - HOLD_SECONDS) / HOLD_SECONDS).clamp(0.0, 1.0)) as f32
 }
 
-/// Draw the feed in the viewport's corner and the last inspection's marks on the model.
-pub fn paint(app: &SolveApp, ctx: &egui::Context) {
-    let Some(rect) = app.viewport.rect else { return };
+/// Draw the feed in the viewport's corner and the last inspection's marks on the model. Returns
+/// the feed's card, so the toasts keep clear of it (`shell::State::agent_activity`).
+pub fn paint(app: &SolveApp, ctx: &egui::Context) -> Option<egui::Rect> {
+    let rect = app.viewport.rect?;
     let feed = &app.agent_feed;
     let t = Tokens::get();
     // Over the model but under every window and dialog.
@@ -226,22 +227,41 @@ pub fn paint(app: &SolveApp, ctx: &egui::Context) {
             }
         }
     }
-    let Some(last) = feed.entries.back() else { return };
+    let last = feed.entries.back()?;
     let k = strength(app.now - last.at);
     if k <= 0.0 {
-        return;
+        return None;
     }
     let font = FontId::proportional(t.font_label);
-    // In the viewport's bottom-right corner: the browser floats over its top-left, the view cube
-    // sits top-right and the navigation bar bottom-centre.
-    let width = 320.0_f32.min(rect.width() - 24.0).max(120.0);
+    // In the canvas's bottom-right corner, over the content area (clear of the floating History
+    // card and the browser): the view cube sits top-right and the navigation bar bottom-centre.
+    // Properties or Review changes standing at the right push the feed left of them, and the feed
+    // lifts above the navigation bar where it would otherwise run into it.
+    let gap = crate::shell::SHELL_GAP;
+    let content = crate::shell::content_rect(app, rect);
+    let mut right = content.right() - 12.0;
+    for card in [app.inspector.rect, app.review.rect].into_iter().flatten().filter(|r| r.is_finite() && r.is_positive()) {
+        right = right.min(card.left() - gap);
+    }
+    let width = 320.0_f32.min(right - content.left() - 12.0).max(120.0);
     let rows = rows(ctx, feed, font.clone(), width - 20.0, k);
     let body = rows.last().map_or(0.0, |(top, g)| top + g.size().y.max(LINE));
     let size = vec2(width, LINE + body + 12.0);
-    let at = rect.right_bottom() - size - vec2(12.0, 64.0);
+    let mut bottom = content.bottom() - 12.0;
+    if let Some(nav) = app.viewport.layout.as_ref().map(|l| l.navigation).filter(|nav| nav.is_positive())
+        && nav.left() < right
+        && nav.right() > right - width
+    {
+        bottom = bottom.min(nav.top() - gap);
+    }
+    let at = pos2(right - size.x, bottom - size.y);
     let frame = egui::Rect::from_min_size(at, size);
-    painter.rect_filled(frame, 6.0, t.panel.gamma_multiply(0.92 * k));
-    painter.rect_stroke(frame, 6.0, Stroke::new(1.0, t.border.gamma_multiply(k)), egui::StrokeKind::Inside);
+    if !frame.is_finite() || !frame.is_positive() {
+        return None;
+    }
+    // The feed is a glass card like the other floating cards, fading with the feed.
+    painter.rect_filled(frame, t.radius_md, t.glass(t.panel).gamma_multiply(k));
+    painter.rect_stroke(frame, t.radius_md, Stroke::new(1.0, t.glass_edge().gamma_multiply(k)), egui::StrokeKind::Inside);
     let title = pos2(at.x + 10.0, at.y + 6.0);
     painter.circle_filled(title + vec2(4.0, LINE / 2.0), 4.0, crate::icons::pointer::agent().gamma_multiply(k));
     painter.text(title + vec2(14.0, LINE / 2.0), Align2::LEFT_CENTER, tr("ui.agent_activity_title"), font, t.text.gamma_multiply(k));
@@ -249,6 +269,7 @@ pub fn paint(app: &SolveApp, ctx: &egui::Context) {
         let pad = (LINE - galley.size().y).max(0.0) / 2.0;
         painter.galley(pos2(title.x, title.y + LINE + top + pad), galley, Color32::TRANSPARENT);
     }
+    Some(frame)
 }
 
 /// The height of a one-line row of the feed.

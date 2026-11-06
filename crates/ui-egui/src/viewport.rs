@@ -3583,6 +3583,8 @@ fn transient_messages(app: &mut SolveApp, ui: &egui::Ui, viewport: Rect) -> Vec<
     if let Some(layout) = &app.viewport.layout {
         obstacles.extend([layout.navigation, layout.axis_view]);
     }
+    // The agent activity feed (as painted last frame) is no place for a toast either.
+    obstacles.extend(app.shell.agent_activity);
     let mut free = crate::viewport_layout::free_rect(crate::shell::content_rect(app, viewport), &obstacles).shrink(t.space_8);
     // The 3D mouse calibration offer: text and actions from its module, drawn by the shared toast.
     if let Some(offer) = crate::space_mouse_offer::due(app, ui.ctx()) {
@@ -3742,7 +3744,7 @@ fn paint_toast_with(ui: &egui::Ui, free: Rect, text: String, lead: ToastLead, ac
     if !r.is_finite() {
         return None;
     }
-    let frame = Container::new(ui.ctx(), Surface::Toast).frame(ui.ctx(), t.panel, crate::frame::Side::Left);
+    let frame = Container::new(ui.ctx(), Surface::Toast).glass_frame(ui.ctx(), t.panel, crate::frame::Side::Left);
     Container::paint_frame(ui.painter(), frame, r.shrink(frame.stroke.width));
     let dot = pos2(r.left() + 14.0, r.center().y.min(r.top() + 8.0 + galley.size().y / 2.0));
     match lead {
@@ -4547,7 +4549,7 @@ fn nav_bar(app: &mut SolveApp, ui: &mut egui::Ui, rect: Rect) {
         || menu_open;
     let mut painter = ui.painter_at(rect);
     painter.set_opacity(if active || app.preferences.navigator_style == crate::prefs::NavigatorStyle::Axes { 1.0 } else { 0.45 });
-    let surface = Container::new(ui.ctx(), Surface::Navigation).frame(ui.ctx(), t.overlay, crate::frame::Side::Left);
+    let surface = Container::new(ui.ctx(), Surface::Navigation).glass_frame(ui.ctx(), t.overlay, crate::frame::Side::Left);
     Container::paint_frame(&painter, surface, bar.shrink(surface.stroke.width));
     let columns = ((bar.width() - 10.0) / 30.0).round().clamp(1.0, 10.0) as usize;
     for (i, (icon, tip)) in items.iter().enumerate() {
@@ -7849,7 +7851,9 @@ mod tests {
     #[test]
     fn cursor_orbit_keeps_the_picked_point_on_its_pixel() {
         for perspective in [false, true] {
-            for offset in [vec2(30.0, 20.0), vec2(-60.0, 10.0), vec2(120.0, -40.0)] {
+            // Press points on the box's faces (not within reach of an edge, whose midpoint would
+            // be the pivot instead of the point under the cursor) in the full-bleed scene.
+            for offset in [vec2(30.0, 20.0), vec2(-90.0, 40.0), vec2(120.0, -40.0)] {
                 let mut h = crate::scenario::Harness::new();
                 h.app.preferences.orbit_around = crate::prefs::OrbitAround::Cursor;
                 h.app.ui.perspective = perspective;
@@ -7859,7 +7863,10 @@ mod tests {
                 let rect = h.app.viewport.rect.unwrap();
                 let at = rect.center() + offset;
                 let proj = projection(&h.app, rect);
-                assert!(pick(&h.app, &proj, at).iter().any(|hit| matches!(hit, Hit::Face { .. })), "the drag starts on the box");
+                assert!(
+                    matches!(pick(&h.app, &proj, at).first(), Some(Hit::Face { .. })),
+                    "perspective={perspective}: the drag starts on a face of the box"
+                );
                 let pivot = crate::prefs::pivot_under(&h.app, &proj, at);
                 let before = h.app.cam;
                 h.call("ui.drag", json!({"x0":at.x,"y0":at.y,"x1":at.x+150.0,"y1":at.y+60.0,"button":"middle","shift":true,"steps":20}));

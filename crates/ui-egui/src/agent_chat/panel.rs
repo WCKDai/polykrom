@@ -171,10 +171,10 @@ fn floating_bounds(app: &SolveApp, available: Rect, left: bool) -> Rect {
     let mut bounds = available.shrink(gap);
     // The ribbon already supplies the top gap shared by browser and history cards.
     bounds.min.y = available.top();
-    // A left Assistant floats over the scene beside the Design Browser column (view 01), not
-    // over the column itself; a vertical history shares that left edge, so clear it too.
+    // A left Assistant floats over the scene beside the Design Browser card, not over the card
+    // itself; a vertical history shares that left edge, so clear it too.
     if left {
-        if let Some(browser) = app.shell.browser.filter(|_| crate::shell::browser_is_column(app)) {
+        if let Some(browser) = app.shell.browser.filter(|_| app.ui.show_browser) {
             bounds.min.x = (browser.right() + gap).clamp(bounds.left(), bounds.right());
         }
         if let Some(history) = app.shell.history.filter(|_| app.ui.show_timeline && app.preferences.timeline_left) {

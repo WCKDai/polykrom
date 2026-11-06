@@ -79,9 +79,11 @@ fn browser_card_fills_its_column_and_scrolls_without_covering_history() {
     }
     h.settle();
     let tall = rect_of("browser:card").unwrap();
-    assert_eq!(tall, short, "the column keeps its height whatever it lists");
-    // The browser is a full-height column at the left; the scene sits flush to its right.
-    assert_eq!(h.app.viewport.rect.unwrap().left(), tall.right());
+    assert_eq!(tall, short, "the card keeps its height whatever it lists");
+    // The browser is a full-height card floating over the left of the full-bleed scene; the
+    // viewport's controls (its content area) start right of it.
+    assert_eq!(h.app.viewport.rect.unwrap().left(), 0.0);
+    assert!(h.app.shell.content.unwrap().left() >= tall.right());
     assert!(tall.bottom() <= h.app.viewport.rect.unwrap().bottom());
     assert!(handle_at("row:Sketch34").is_none(), "last row starts below the scroll clip");
     let camera = h.app.cam;
@@ -232,8 +234,10 @@ fn a_second_click_on_a_document_settings_entry_closes_its_window() {
     }
 }
 
+/// The floating card's header folds it to the slim rail (its disclosure and its title turned on
+/// end) at the same place, and the rail's button opens it again to its full height.
 #[test]
-fn browser_header_folds_the_floating_card_to_its_header_and_back() {
+fn browser_header_folds_the_floating_card_to_a_slim_rail_and_back() {
     let mut h = Harness::new();
     h.call("ui.resize", json!({"width":1400,"height":900}));
     h.settle();
@@ -244,13 +248,18 @@ fn browser_header_folds_the_floating_card_to_its_header_and_back() {
     h.settle();
     let folded = rect_of("browser:card").unwrap();
     assert!(h.app.tree.panel_collapsed);
-    assert!(folded.height() < 60.0 && folded.height() < open.height(), "{folded:?} {open:?}");
-    assert_eq!(folded.top(), open.top());
+    assert!(folded.width() <= RAIL_WIDTH + 1.0 && folded.height() < open.height() / 2.0, "a slim rail: {folded:?} {open:?}");
+    assert_eq!((folded.top(), folded.left()), (open.top(), open.left()));
     assert!(drawn_rows().is_empty() || handle_at("row:Plate").is_none());
+    assert!(h.widget("Design Browser").is_some() || h.widget("Browser").is_some(), "the rail keeps the browser's name");
+    // The whole rail is the button that opens the card again.
+    let at = handle_at("browser:header").unwrap();
+    assert!(folded.contains(at));
     h.call("ui.click", json!({"x":at.x,"y":at.y}));
     h.settle();
     assert!(!h.app.tree.panel_collapsed);
     assert!((rect_of("browser:card").unwrap().height() - open.height()).abs() < 1.0);
+    assert!((rect_of("browser:card").unwrap().width() - open.width()).abs() < 1.0);
 }
 
 /// Tiny or odd window sizes never panic: the cards leave out what cannot fit.
@@ -287,10 +296,9 @@ fn one_browser_keeps_its_resized_width_across_layouts_and_overlay_preferences() 
             assert_eq!(crate::scenario::handles("browser:header").len(), 1, "only one browser header");
             assert_eq!(drawn_rows().iter().filter(|(name, ..)| name == "Untitled").count(), 1, "only one tree");
             assert!((rect_of("browser:card").unwrap().width() - 310.0).abs() < 1.0);
-            // Floating, a browser column pushes the scene to its right; a floating overlay browser,
-            // and the docked layout (the column overlays a full-width viewport), leave it at 0.
-            let expected_left = if mode == LayoutMode::Floating && !overlay { rect_of("browser:card").unwrap().right() } else { 0.0 };
-            assert_eq!(h.app.viewport.rect.unwrap().left(), expected_left);
+            // The browser never takes a column out of the scene: floating, it is a card over the
+            // full-bleed canvas; docked, the column overlays a full-width viewport.
+            assert_eq!(h.app.viewport.rect.unwrap().left(), 0.0);
             let rail = handle_at("left-browser-rail").unwrap();
             h.call("ui.drag", json!({"x0":rail.x,"y0":rail.y,"x1":rail.x+60.0,"y1":rail.y,"steps":6}));
             h.settle();
@@ -346,15 +354,12 @@ fn resizing_browser_card_and_column_persists_width_including_floating_preference
         let width = h.app.preferences.browser_width;
         assert!(width > crate::prefs::DEFAULT_BROWSER_WIDTH + 40.0, "{mode:?}, float={float}, width={width}");
         assert!((rect_of("browser:card").unwrap().width() - width).abs() < 1.0);
-        // Floating, a browser column stays flush to the scene, so widening it moves the scene's
-        // left edge while its right, top and bottom hold. Docked (the column overlays a full-width
-        // viewport) and a floating overlay browser leave the projection intact.
+        // Widening the browser never moves the model's projection: floating, the card floats over
+        // the full-bleed canvas; docked, the column overlays a full-width viewport.
         let now = h.app.viewport.rect.unwrap();
-        if mode == LayoutMode::Floating && !float {
-            assert_eq!(now.left(), rect_of("browser:card").unwrap().right(), "the scene stays flush to the widened column");
-            assert_eq!((now.right(), now.top(), now.bottom()), (before.right(), before.top(), before.bottom()));
-        } else {
-            assert_eq!(now, before, "the projection is intact");
+        assert_eq!(now, before, "the projection is intact");
+        if mode == LayoutMode::Floating {
+            assert!(h.app.shell.content.unwrap().left() >= rect_of("browser:card").unwrap().right(), "the controls keep clear of the wider card");
         }
         let mut restored = SolveApp::new(Default::default(), Default::default());
         restored.load_prefs(&h.app.prefs());

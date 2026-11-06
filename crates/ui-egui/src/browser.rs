@@ -741,8 +741,11 @@ const MIN_BROWSER_WIDTH: f32 = 170.0;
 const MAX_BROWSER_WIDTH: f32 = 620.0;
 /// How wide a grip the sidebar's right edge offers, counted inwards from the edge.
 const BROWSER_RAIL: f32 = 6.0;
-/// How opaque the floating browser's card is; the workspace shows through the rest.
+/// How much of the glass card's tint the `browser_float` ("clear") preference keeps; the
+/// workspace shows through the rest.
 const BROWSER_FLOAT_ALPHA: f32 = 0.4;
+/// The width of the slim rail a collapsed browser leaves.
+pub(crate) const RAIL_WIDTH: f32 = 34.0;
 
 pub(crate) fn browser_width(remembered: f32) -> f32 {
     if remembered.is_finite() { remembered.clamp(MIN_BROWSER_WIDTH, MAX_BROWSER_WIDTH) } else { crate::prefs::DEFAULT_BROWSER_WIDTH }
@@ -786,17 +789,22 @@ pub fn browser(app: &mut SolveApp, ui: &mut egui::Ui) {
     {
         available.min.x = (history.right() + gap).min(available.right()) - gap;
     }
-    let collapsed = vertical && !stacked && app.preferences.timeline_left_browser_collapsed;
+    // Collapsed to the slim rail: beside a vertical history, or the floating glass card folded
+    // (`panel_collapsed`); the docked column folds to its header instead.
+    let rail_for_vertical = vertical && !stacked && app.preferences.timeline_left_browser_collapsed;
+    let collapsed = rail_for_vertical || (container.floating() && !vertical && !stacked && app.tree.panel_collapsed);
     let bounds = if stacked {
         crate::timeline_left::stacked_rects(app, available).0
     } else {
-        panel_bounds(available, if vertical { None } else { app.shell.history }, if collapsed { t.space_24 + t.space_10 } else { width }, gap)
+        panel_bounds(available, if vertical { None } else { app.shell.history }, if collapsed { RAIL_WIDTH } else { width }, gap)
     };
     app.shell.browser = None;
     let min_height = HEADER_H + 2.0 * (CARD_INSET + 1.0);
     if bounds.is_positive() && bounds.height() >= min_height {
+        // Floating, the card is glass over the canvas (`glass_frame`); the `browser_float`
+        // preference makes it clearer still.
         let fill = if container.floating() && app.preferences.browser_float { t.panel.gamma_multiply(BROWSER_FLOAT_ALPHA) } else { t.panel };
-        let frame = container.frame(ui.ctx(), fill, crate::frame::Side::Left).inner_margin(CARD_INSET as i8);
+        let frame = container.glass_frame(ui.ctx(), fill, crate::frame::Side::Left).inner_margin(CARD_INSET as i8);
         let inner_width = (bounds.width() - frame.total_margin().sum().x).max(0.0);
         let inner_height = (bounds.height() - frame.total_margin().sum().y).max(0.0);
         let card = Container::new(ui.ctx(), Surface::Panel)
@@ -815,7 +823,7 @@ pub fn browser(app: &mut SolveApp, ui: &mut egui::Ui) {
                         ui.set_clip_rect(ui.clip_rect().intersect(Rect::from_min_size(ui.max_rect().min, vec2(inner_width, inner_height))));
                     }
                     if collapsed {
-                        browser_collapsed_rail(app, ui);
+                        browser_collapsed_rail(app, ui, rail_for_vertical);
                     } else {
                         browser_contents(app, ui, &mut acts, true);
                     }
@@ -835,7 +843,10 @@ pub fn browser(app: &mut SolveApp, ui: &mut egui::Ui) {
     finish_browser(app, ui, acts);
 }
 
-fn browser_collapsed_rail(app: &mut SolveApp, ui: &mut egui::Ui) {
+/// The slim rail a collapsed browser leaves: its disclosure and its title turned on end; the whole
+/// rail is the button that expands it again. `vertical` says which fold it undoes: the one beside a
+/// vertical history (`timeline_left_browser_collapsed`) or the floating card's (`panel_collapsed`).
+fn browser_collapsed_rail(app: &mut SolveApp, ui: &mut egui::Ui, vertical: bool) {
     let t = Tokens::get();
     let title_top = t.space_24 + ui.spacing().item_spacing.y;
     let height = title_top + t.space_24 * 4.0 + t.space_8;
@@ -852,7 +863,11 @@ fn browser_collapsed_rail(app: &mut SolveApp, ui: &mut egui::Ui) {
     crate::scenario::publish_target("browser:header", disclosure);
     response.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, ui.is_enabled(), crate::i18n::tr("ui.browser_title")));
     if response.on_hover_text(crate::i18n::tr("ui.browser_expand")).clicked() {
-        app.preferences.timeline_left_browser_collapsed = false;
+        if vertical {
+            app.preferences.timeline_left_browser_collapsed = false;
+        } else {
+            app.tree.panel_collapsed = false;
+        }
     }
     let galley = ui.painter().layout_no_wrap(crate::i18n::tr("ui.browser_title").to_owned(), crate::fonts::semibold(t.font_body), t.text);
     let title = Rect::from_min_max(rect.min + vec2(0.0, title_top), rect.max);

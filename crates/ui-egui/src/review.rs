@@ -921,7 +921,7 @@ pub fn panel(app: &mut SolveApp, ui: &mut egui::Ui) {
         let cube =
             app.viewport.layout.as_ref().map_or(content.top(), |l| if l.axis_view.is_positive() { l.axis_view.bottom() } else { content.top() });
         let top = under_row.max(cube).min(bottom);
-        let frame = container.frame(ui.ctx(), t.panel, crate::frame::Side::Right).inner_margin(t.space_10 as i8);
+        let frame = container.glass_frame(ui.ctx(), t.panel, crate::frame::Side::Right).inner_margin(t.space_10 as i8);
         let inner = PANEL_WIDTH - frame.total_margin().sum().x;
         let height = (bottom - top - frame.total_margin().sum().y).max(0.0);
         let card = container.area(Id::new("sc_review_card")).pivot(Align2::RIGHT_TOP).fixed_pos(pos2(right, top)).order(egui::Order::Middle).show(

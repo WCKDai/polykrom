@@ -488,6 +488,24 @@ pub fn tabs_info(app: &SolveApp) -> Vec<(String, bool)> {
         .collect()
 }
 
+/// The room the strip's tabs take when every tab has its natural width (its name and the close
+/// button, within the bounds `tabs` uses) plus the room for the + button: a strip this wide shows
+/// them all, each as wide as its name.
+pub(crate) fn natural_width(app: &SolveApp, painter: &egui::Painter) -> f32 {
+    let t = Tokens::get();
+    let locale = crate::i18n::Locale::for_language(&app.preferences.language);
+    let tabs: f32 = tabs_info(app)
+        .iter()
+        .map(|(name, dirty)| {
+            let label = format!("{}{}", locale.given_name(name), if *dirty { " •" } else { "" });
+            let text = painter.layout_no_wrap(label, crate::fonts::semibold(t.font_button), t.text).size().x;
+            // `layout` keeps every tab at least MIN_TAB wide before it starts to overflow.
+            (text + 40.0).clamp(90.0, 200.0)
+        })
+        .sum();
+    tabs + 34.0
+}
+
 /// The control channel's `ui.documents`: list, `new`, `switch`, `close` (by `document` id or
 /// `index`; `force` closes without asking), `close_others` (all but that one), `close_all`, `move`
 /// (`from`, `to`) or `quit`; `answer`: save | dont_save | cancel answers "save changes?". The reply

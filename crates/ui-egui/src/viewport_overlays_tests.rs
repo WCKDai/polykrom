@@ -198,9 +198,10 @@ fn toast_card_uses_shell_tokens_wraps_and_rejects_hostile_rects() {
                 assert!(paint_toast(ui, bad, "Message".into(), error, computing).is_none());
             }
         });
+        // The toast is a glass card: the panel colour at the glass opacity with the light edge.
         fn card(shape: &Shape, t: Tokens) -> bool {
             match shape {
-                Shape::Rect(r) => r.fill == t.panel && r.stroke.color == t.border && r.corner_radius == t.radius_md.into(),
+                Shape::Rect(r) => r.fill == t.glass(t.panel) && r.stroke.color == t.glass_edge() && r.corner_radius == t.radius_md.into(),
                 Shape::Vec(shapes) => shapes.iter().any(|s| card(s, t)),
                 _ => false,
             }

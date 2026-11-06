@@ -177,7 +177,7 @@ pub fn left_panel(app: &mut SolveApp, ui: &mut egui::Ui) {
             return;
         }
         let container = Container::new(ui.ctx(), Surface::Panel).joined(crate::ui_kit::DockEdges { left: true, top: true, ..Default::default() });
-        let frame = container.frame(ui.ctx(), t.panel, crate::frame::Side::Left).inner_margin(t.space_4);
+        let frame = container.glass_frame(ui.ctx(), t.panel, crate::frame::Side::Left).inner_margin(t.space_4);
         let inner = (bounds.size() - frame.total_margin().sum()).max(egui::Vec2::ZERO);
         let card = Container::new(ui.ctx(), Surface::Panel)
             .area(egui::Id::new("sc_timeline_left_card"))
@@ -1654,10 +1654,9 @@ mod tests {
             harness.frames(4);
             assert!(crate::scenario::rect_of("browser:float").is_none(), "the explicit overlay is off");
             assert!(crate::scenario::rect_of("browser:card").is_some());
-            // Docked onto the sidebar the browser is a flush column: floating, the scene starts at
-            // its right; docked, the column overlays a full-width viewport.
-            let expected = if mode == crate::shell::LayoutMode::Floating { crate::scenario::rect_of("browser:card").unwrap().right() } else { 0.0 };
-            assert_eq!(harness.app.viewport.rect.unwrap().left(), expected);
+            // Neither takes a column out of the scene: floating, the browser is a card over the
+            // full-bleed canvas; docked, the column overlays a full-width viewport.
+            assert_eq!(harness.app.viewport.rect.unwrap().left(), 0.0);
             assert!(handle_at("left-browser-rail").is_some(), "both card and sidebar resize");
         }
     }

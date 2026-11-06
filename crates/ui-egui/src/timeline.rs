@@ -353,7 +353,12 @@ pub fn timeline(app: &mut SolveApp, ui: &mut egui::Ui) {
         app.shell.history = Some(rect);
         crate::scenario::publish_rect("history:card", rect);
         let mut child = ui.new_child(UiBuilder::new().id_salt("sc_timeline").max_rect(rect));
-        Container::paint_frame(ui.painter(), Container::new(ui.ctx(), Surface::Panel).frame(ui.ctx(), t.timeline, crate::frame::Side::Left), rect);
+        // A glass card over the bottom of the canvas, inset from its edges.
+        Container::paint_frame(
+            ui.painter(),
+            Container::new(ui.ctx(), Surface::Panel).glass_frame(ui.ctx(), t.timeline, crate::frame::Side::Left),
+            rect,
+        );
         child.set_clip_rect(rect);
         timeline_contents(app, &mut child);
     } else {

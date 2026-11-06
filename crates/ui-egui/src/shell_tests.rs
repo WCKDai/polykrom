@@ -36,10 +36,17 @@ fn both_modes_keep_their_geometry_and_fit_clear_of_covered_rects() {
         let strip = h.app.shell.document_bar.unwrap();
         if mode == LayoutMode::Floating {
             let ribbon = rect_of("ribbon:card").unwrap();
-            // The scene sits right of the browser and below the view bar (view 01), not behind them.
-            assert_eq!(viewport.left(), browser.right());
-            assert_eq!(viewport.top(), strip.bottom());
+            // The scene is the stage: the window's full width, from the chrome (the ribbon card
+            // and the prompt row) down to the status bar; the browser and the document strip float
+            // over it, and the controls' content area starts right of the browser card.
+            let prompt = rect_of("review:prompt_row").unwrap();
+            assert_eq!(viewport.left(), 0.0);
+            assert_eq!(viewport.right(), h.ctx.content_rect().right());
+            assert_eq!(viewport.top(), prompt.bottom() + SHELL_GAP);
             assert_eq!(viewport.bottom(), status.top());
+            assert!(viewport.contains_rect(browser) && viewport.contains_rect(strip));
+            assert!(strip.left() >= browser.right() + SHELL_GAP - 0.5);
+            assert!(h.app.shell.content.unwrap().left() >= browser.right());
             assert_eq!(ribbon.left(), SHELL_GAP);
             assert_eq!(ribbon.top(), toolbar::APP_BAR_HEIGHT + SHELL_GAP);
             assert_eq!(ribbon.right(), h.ctx.content_rect().right() - SHELL_GAP);
@@ -222,16 +229,19 @@ fn floating_browser_clears_cards_shields_input_and_can_dock_again() {
             assert!(crate::scenario::handle_at("left-browser-rail").is_some());
             assert!(covered(&h.app, browser.center()));
             let viewport = h.app.viewport.rect.unwrap();
-            // A floating overlay browser leaves the scene its full width; a left-docked vertical
-            // history, in either layout, takes a column that pushes the scene right.
-            if !timeline_left {
-                assert_eq!(viewport.left(), 0.0);
-            } else {
+            // A floating overlay browser leaves the scene its full width; only a docked vertical
+            // history (an edge panel) takes a column that pushes the scene right. Floating, the
+            // history is a card over the full-bleed scene too.
+            if timeline_left && mode == LayoutMode::Docked {
                 assert!(viewport.left() > 0.0);
+            } else {
+                assert_eq!(viewport.left(), 0.0);
             }
             if mode == LayoutMode::Floating {
-                // The scene starts below the document tabs and the view bar (view 01).
-                assert_eq!(viewport.top(), h.app.shell.document_bar.map_or(toolbar::APP_BAR_HEIGHT, |s| s.bottom()));
+                // The scene starts right under the top chrome (the prompt row and its gap); the
+                // document strip floats inside it.
+                assert_eq!(viewport.top(), rect_of("review:prompt_row").unwrap().bottom() + SHELL_GAP);
+                assert!(h.app.shell.document_bar.is_some_and(|s| viewport.contains_rect(s)));
                 assert!(!browser.intersect(rect_of("ribbon:card").unwrap()).is_positive());
             }
             h.app.fit_view();
@@ -273,12 +283,13 @@ fn browser_and_history_cards_block_input_while_their_gaps_and_space_below_browse
     let browser = rect_of("browser:card").unwrap();
     let history = rect_of("history:card").unwrap();
     let viewport = h.app.viewport.rect.unwrap();
-    // The history card spans the window's width below the scene, inset by the shell gap; the
-    // scene itself starts right of the full-height browser column.
+    // The history card floats over the bottom of the scene, inset by the shell gap; the browser
+    // card floats over its left, and the controls' content area starts right of the card.
     assert_eq!(history.left(), SHELL_GAP);
     assert_eq!(history.right(), viewport.right() - SHELL_GAP);
     assert_eq!(history.bottom(), viewport.bottom() - SHELL_GAP);
-    assert_eq!(viewport.left(), browser.right());
+    assert_eq!(viewport.left(), 0.0);
+    assert!(h.app.shell.content.unwrap().left() >= browser.right());
     let layout = h.app.viewport.layout.as_ref().unwrap();
     assert!(layout.navigation.bottom() < history.top());
     assert!(layout.axis_view.top() >= rect_of("ribbon:card").unwrap().bottom());
@@ -325,10 +336,10 @@ fn left_history_and_browser_share_the_left_edge_without_moving_right_controls() 
         assert!(crate::scenario::handle_at("timeline:First").is_some());
         let viewport = h.app.viewport.rect.unwrap();
         let content = content_rect(&h.app, viewport);
-        // The vertical history and the browser share the left edge. Floating, the scene starts
-        // flush to the right of the browser column; docked, the viewport spans from the history
-        // column's right with the browser overlaying it, and the content area starts past both.
-        assert_eq!(viewport.left(), if mode == LayoutMode::Floating { browser.right() } else { history.right() });
+        // The vertical history and the browser share the left edge. Floating, both are cards over
+        // the full-bleed scene; docked, the viewport spans from the history column's right with
+        // the browser overlaying it. The content area starts past both.
+        assert_eq!(viewport.left(), if mode == LayoutMode::Floating { 0.0 } else { history.right() });
         assert!(content.left() >= history.right(), "the content area starts right of the vertical history");
         assert_eq!(content.bottom(), viewport.bottom());
         if mode == LayoutMode::Floating {
@@ -560,9 +571,14 @@ fn tool_sheets_drag_over_browser_and_history_but_clear_protected_panels() {
             assert!(!sheet.intersect(chat).is_positive(), "{side}: {sheet:?} overlaps Assistant {chat:?}");
             assert!(!sheet.intersect(ribbon).is_positive(), "sheet clears ribbon");
             if target == browser.center() {
-                // The browser is a full-height column beside the scene (view 01), not an overlay
-                // inside it, so a tool sheet dragged at it clamps to the scene and clears it.
-                assert!(!sheet.intersect(browser).is_positive(), "sheet clears the browser column");
+                // The browser is a card over the scene, like History: a tool sheet may cover it,
+                // unless the Assistant stands between them (a left Assistant floats beside the
+                // browser card, and the sheet stays clear of the Assistant).
+                if side == "left" {
+                    assert!(!sheet.intersect(browser).is_positive(), "the sheet stops at the Assistant, short of the browser card");
+                } else {
+                    assert!(sheet.intersect(browser).is_positive(), "sheet can cover the browser card");
+                }
             } else if target == history.center() {
                 assert!(sheet.intersect(history).is_positive(), "sheet can cover History");
             }
@@ -711,4 +727,103 @@ fn ribbon_labels_are_saved_independently_and_icon_only_commands_remain_reachable
         assert!(!h.app.preferences.ribbon_labels);
     }
     assert!(crate::prefs::lenient(&json!({})).ribbon_labels);
+}
+
+/// The window sizes the owner's direction is checked at: a laptop's, the default and the kit's.
+const STAGE_WINDOWS: [(f32, f32); 3] = [(1366.0, 768.0), (1600.0, 1000.0), (1760.0, 1100.0)];
+
+/// The canvas is the stage (the owner's direction, 2026-11-06): in the default layout the scene
+/// spans the window's full width and all the height between the top chrome (the title bar, the
+/// workspace tabs and the ribbon, the AI prompt row) and the status bar, at every size. The
+/// Design Browser, the document strip and the history are cards inside it, none takes a band or
+/// a column out of it, and the chrome above it is shorter than the kit's shell was (a 36 px title
+/// bar with a smaller logo under a 246 px chrome).
+#[test]
+fn the_canvas_spans_the_window_under_a_shorter_chrome_at_every_size() {
+    for (w, hgt) in STAGE_WINDOWS {
+        let mut h = Harness::new();
+        h.app.home.open = false;
+        h.call("ui.resize", json!({"width": w, "height": hgt}));
+        h.app.run("solid.box", json!({"length": 40, "width": 30, "height": 20})).unwrap();
+        h.frames(3);
+        assert_eq!(h.app.ui.layout, LayoutMode::Floating, "the default layout");
+        let scene = h.app.viewport.rect.unwrap();
+        let prompt = rect_of("review:prompt_row").unwrap();
+        let ribbon = rect_of("ribbon:card").unwrap();
+        let status = rect_of("status:bar").unwrap();
+        assert_eq!((scene.left(), scene.right()), (0.0, w), "{w}x{hgt}: the full width");
+        assert_eq!(scene.top(), prompt.bottom() + SHELL_GAP, "{w}x{hgt}: right under the prompt row");
+        assert_eq!(scene.bottom(), status.top(), "{w}x{hgt}: down to the status bar");
+        assert_eq!(h.app.shell.content.unwrap().top(), scene.top(), "{w}x{hgt}: no band above the content");
+        for name in ["browser:card", "document_bar:card", "history:card"] {
+            let card = rect_of(name).unwrap_or_else(|| panic!("{w}x{hgt}: {name}"));
+            assert!(scene.contains_rect(card), "{w}x{hgt}: {name} {card:?} floats inside the scene {scene:?}");
+            assert!(card.left() >= SHELL_GAP && card.right() <= w - SHELL_GAP, "{w}x{hgt}: {name} is inset from the window's edges");
+        }
+        // The chrome: shorter than the kit's shell (48 + 7 + 141 + 7 + 36 + 7 = 246 points).
+        let logo = rect_of("appbar:logo").unwrap();
+        assert!(ribbon.top() - SHELL_GAP < 48.0, "{w}x{hgt}: the title bar is {} tall", ribbon.top() - SHELL_GAP);
+        assert!(logo.width() < 32.0 && logo.height() < 32.0, "{w}x{hgt}: the logo is {:?}", logo.size());
+        assert!(ribbon.height() < 141.0, "{w}x{hgt}: the ribbon card is {} tall", ribbon.height());
+        assert!(scene.top() <= 210.0, "{w}x{hgt}: the chrome ends at {}", scene.top());
+        // The canvas's share of the window: about 68 % on the laptop (whose fixed chrome is a
+        // larger part of its height), about 76 % at the default size and 78 % at the kit's; the
+        // kit shell gave it 44 %, 55 % and 58 %.
+        let share = f64::from(scene.area()) / f64::from(w * hgt);
+        assert!(share > 0.65, "{w}x{hgt}: the canvas is {:.1}% of the window", share * 100.0);
+        if hgt >= 1000.0 {
+            assert!(share > 0.75, "{w}x{hgt}: the canvas is {:.1}% of the window", share * 100.0);
+        }
+    }
+}
+
+/// Every pair of floating cards over the canvas stays apart at every size: the Design Browser,
+/// the document strip, the history, Properties (or Review changes), the agent activity feed, a
+/// toast, the navigation bar and the view cube.
+#[test]
+fn floating_cards_never_overlap_at_every_size() {
+    for review in [false, true] {
+        for (w, hgt) in STAGE_WINDOWS {
+            let mut h = Harness::new();
+            h.app.home.open = false;
+            h.call("ui.resize", json!({"width": w, "height": hgt}));
+            h.app.run("solid.box", json!({"length": 40, "width": 30, "height": 20})).unwrap();
+            h.frames(2);
+            let body = h.app.session.world_state().bodies[0].name.clone();
+            if review {
+                crate::review::propose(
+                    &mut h.app,
+                    vec![("timeline.edit".into(), json!({"feature": "Box1", "set": {"length": "50 mm"}}))],
+                    Some("Longer box"),
+                    crate::review::Source::Control,
+                )
+                .unwrap();
+            } else {
+                h.app.run("select.set", json!({"items": [{"type": "body", "name": body}]})).unwrap();
+            }
+            h.app.agent_feed.entries.push_back(crate::agent_activity::Entry { at: h.app.now, label: "Box".into(), outcome: "done".into(), ok: true });
+            h.app.status = Some(("Viewport message".into(), crate::now_ms(), false));
+            h.frames(4);
+            h.app.status = Some(("Viewport message".into(), crate::now_ms(), false));
+            h.frames(2);
+            let mut cards: Vec<(&str, egui::Rect)> = Vec::new();
+            for name in [
+                "browser:card",
+                "document_bar:card",
+                "history:card",
+                "toast",
+                "nav:outer",
+                "axis_view:outer",
+                if review { "review:panel" } else { "inspector:card" },
+            ] {
+                cards.push((name, rect_of(name).unwrap_or_else(|| panic!("review={review} {w}x{hgt}: {name} is drawn"))));
+            }
+            cards.push(("agent activity", h.app.shell.agent_activity.unwrap_or_else(|| panic!("review={review} {w}x{hgt}: the feed is drawn"))));
+            for (i, (a, ra)) in cards.iter().enumerate() {
+                for (b, rb) in cards.iter().skip(i + 1) {
+                    assert!(!ra.intersect(*rb).is_positive(), "review={review} {w}x{hgt}: {a} {ra:?} overlaps {b} {rb:?}");
+                }
+            }
+        }
+    }
 }

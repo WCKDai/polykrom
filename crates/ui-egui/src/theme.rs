@@ -266,6 +266,12 @@ pub(crate) fn icon_accent_for_tab(tab: &str) -> Option<&'static str> {
 /// theme. (It used to be the application bar's colour, which is light in the light theme now.)
 pub(crate) const SHADOW_INK: Color32 = Color32::from_rgb(32, 34, 37);
 
+/// The opacity of a floating card's glass ([`Tokens::glass`]) in a dark and in a light theme:
+/// restrained, so the text on the card keeps its contrast over the busiest canvas (the tests
+/// check it against every scene colour), yet clearly lighter than a solid panel.
+pub(crate) const GLASS_ALPHA_DARK: f32 = 0.78;
+pub(crate) const GLASS_ALPHA_LIGHT: f32 = 0.84;
+
 /// WCAG contrast of two opaque sRGB colours.
 pub(crate) fn contrast_ratio(a: Color32, b: Color32) -> f64 {
     let luminance = |c: Color32| {
@@ -790,6 +796,31 @@ impl Tokens {
         egui::Shadow { offset: [0, self.space_2 as i8], blur: self.space_8 as u8, spread: 0, color: SHADOW_INK.gamma_multiply(0.18) }
     }
 
+    /// Whether this is a dark theme: its base surface is dark.
+    pub(crate) fn is_dark_theme(&self) -> bool {
+        egui::Rgba::from(self.window).intensity() < 0.5
+    }
+
+    /// How opaque a floating card's glass is: the canvas reads through the rest. A light theme's
+    /// surfaces are near white, so they keep a little more of their tint for the dark text on them.
+    pub(crate) fn glass_alpha(&self) -> f32 {
+        if self.is_dark_theme() { GLASS_ALPHA_DARK } else { GLASS_ALPHA_LIGHT }
+    }
+
+    /// A floating card's glass: the surface `fill` at the glass opacity (`glass_alpha`), tinted
+    /// from the theme, so the model and the viewport show through it. The cards over the canvas
+    /// (the Design Browser, the document strip, the history, Properties, Review changes, the
+    /// toasts, the navigation bar) share it; docked panels stay solid.
+    pub fn glass(&self, fill: Color32) -> Color32 {
+        fill.gamma_multiply(self.glass_alpha())
+    }
+
+    /// The fine light edge of a glass card: a highlight rather than a dark outline, so the card
+    /// reads as a pane lifted over the canvas.
+    pub fn glass_edge(&self) -> Color32 {
+        if self.is_dark_theme() { Color32::WHITE.gamma_multiply(0.16) } else { Color32::WHITE.gamma_multiply(0.9) }
+    }
+
     /// The tokens of the current theme and colour vision mode.
     pub fn get() -> Tokens {
         Tokens::themed(is_dark(), vision())
@@ -924,6 +955,45 @@ mod tests {
         }
         assert_eq!(Tokens::outset_radius(0.0, 3.0), 0.0);
         assert_eq!(Tokens::outset_radius(6.0, 3.0), 9.0);
+    }
+
+    /// The glass of the floating cards (`glass`, `glass_edge`): clearly lighter than a solid
+    /// panel in both themes, yet the text and the muted text on a card keep their contrast over
+    /// every colour the canvas can show under it (the viewport's gradient, the grid, bodies and
+    /// their edges, a selected body, sketch curves). egui blends in gamma space, premultiplied.
+    #[test]
+    fn glass_cards_read_through_and_keep_text_contrast_over_every_scene_colour() {
+        use super::*;
+        fn over(top: Color32, bottom: Color32) -> Color32 {
+            let ch = |t: u8, b: u8| t.saturating_add(((u16::from(b) * u16::from(255 - top.a())) / 255) as u8);
+            Color32::from_rgb(ch(top.r(), bottom.r()), ch(top.g(), bottom.g()), ch(top.b(), bottom.b()))
+        }
+        for dark in [true, false] {
+            for vision in ColorVision::ALL {
+                let t = Tokens::themed(dark, vision);
+                assert_eq!(t.is_dark_theme(), dark);
+                for fill in [t.panel, t.timeline, t.overlay] {
+                    let glass = t.glass(fill);
+                    assert!(glass.a() < fill.a(), "dark={dark}: glass is translucent");
+                    assert!(
+                        f32::from(glass.a()) / 255.0 <= 0.86 * f32::from(fill.a()) / 255.0,
+                        "dark={dark}: {glass:?} is clearly lighter than {fill:?}"
+                    );
+                    assert!(f32::from(glass.a()) / 255.0 >= 0.6 * f32::from(fill.a()) / 255.0, "dark={dark}: {glass:?} keeps a tint behind the text");
+                }
+                let edge = t.glass_edge();
+                assert!(edge.a() > 0 && edge.r() == edge.g() && edge.g() == edge.b(), "a fine light edge: {edge:?}");
+                let glass = t.glass(t.panel);
+                for scene in [t.viewport_top, t.viewport_bottom, t.grid, t.grid_major, t.body, t.body_edge, t.body_selected, t.sketch, t.sketch_fixed]
+                {
+                    let ground = over(glass, scene);
+                    let text = contrast_ratio(t.text, ground);
+                    let dim = contrast_ratio(t.text_dim, ground);
+                    assert!(text >= 4.5, "dark={dark} {vision:?}: text {:?} on glass over {scene:?} ({ground:?}) reads {text:.2}:1", t.text);
+                    assert!(dim >= 3.0, "dark={dark} {vision:?}: muted text {:?} on glass over {scene:?} ({ground:?}) reads {dim:.2}:1", t.text_dim);
+                }
+            }
+        }
     }
 
     #[test]

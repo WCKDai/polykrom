@@ -3,7 +3,7 @@ use crate::ui_kit::{Container, Surface};
 use egui::{Rect, pos2};
 use serde::{Deserialize, Serialize};
 
-use crate::{SolveApp, theme::Tokens};
+use crate::SolveApp;
 
 /// Saved workspace layout; automation may override it for a session.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -27,40 +27,6 @@ impl LayoutMode {
 
 /// The gap from the viewport edge to the floating cards and between the cards.
 pub(crate) const SHELL_GAP: f32 = 7.0;
-
-/// The viewport's top corners are rounded concentrically with the cards: the card margin plus the
-/// card radius.
-pub(crate) fn corner_radius() -> f32 {
-    Tokens::outset_radius(f32::from(Tokens::get().radius_lg), SHELL_GAP)
-}
-
-/// Fill the two concave corners where the application bar flows into the viewport's top edge, so
-/// the viewport reads as a rounded surface under the bar.
-pub(crate) fn paint_top_corners(painter: &egui::Painter, viewport: Rect, color: egui::Color32) {
-    let r = corner_radius().min(viewport.width() / 2.0).min(viewport.height() / 2.0);
-    if !(r.is_finite() && r > 0.5) {
-        return;
-    }
-    const STEPS: usize = 32;
-    for left in [true, false] {
-        let (corner, centre, dir) = if left {
-            (viewport.left_top(), pos2(viewport.left() + r, viewport.top() + r), -1.0)
-        } else {
-            (viewport.right_top(), pos2(viewport.right() - r, viewport.top() + r), 1.0)
-        };
-        let mut mesh = egui::Mesh::default();
-        mesh.colored_vertex(corner, color);
-        for i in 0..=STEPS {
-            // From the top tangent point round to the side tangent point.
-            let a = std::f32::consts::FRAC_PI_2 * i as f32 / STEPS as f32;
-            mesh.colored_vertex(pos2(centre.x + dir * r * a.sin(), centre.y - r * a.cos()), color);
-        }
-        for i in 0..STEPS as u32 {
-            mesh.add_triangle(0, i + 1, i + 2);
-        }
-        painter.add(egui::Shape::mesh(mesh));
-    }
-}
 
 /// The ribbon card (the tab row and the groups): the window's width less the floating margin.
 /// The workspace choice is on the tab row, so there is no separate workspace card.
@@ -96,16 +62,21 @@ pub(crate) struct State {
     pub history_folding: Option<[f32; 2]>,
     pub history_fold_motion: Option<[crate::timeline_left::FoldMotion; 2]>,
     pub content: Option<Rect>,
-    /// The document tabs and the view bar above the viewport (`document_bar`).
+    /// The document tabs and the view bar (`document_bar`): floating, one slim card at the top
+    /// of the canvas right of the Design Browser; docked, the bands above the viewport.
     pub document_bar: Option<Rect>,
     /// The status bar along the window's bottom.
     pub status_bar: Option<Rect>,
+    /// The agent activity feed's card in the canvas's bottom right corner (`agent_activity`),
+    /// as painted last frame: the toasts keep clear of it.
+    pub agent_activity: Option<Rect>,
 }
 
 /// One source of occlusion for navigation, picking, overlays and fit.
 pub(crate) fn covered_rects(app: &SolveApp) -> Vec<Rect> {
     let mut rects = Vec::new();
-    if Container::for_layout(app.ui.layout, Surface::Panel).floating() {
+    let floating = Container::for_layout(app.ui.layout, Surface::Panel).floating();
+    if floating {
         rects.extend(app.shell.cards.iter().copied());
         rects.extend(app.shell.panels.iter().copied());
         if crate::agent_chat::shown(app) && app.agent_chat.open && !app.preferences.agent_chat_popped {
@@ -117,13 +88,19 @@ pub(crate) fn covered_rects(app: &SolveApp) -> Vec<Rect> {
         rects.extend(app.shell.history.map(|card| crate::ui_kit::HistorySeam::new(card).pill));
     }
     rects.extend(app.shell.browser.filter(|_| app.ui.show_browser));
-    // The document bar abuts the scene at its bottom edge; that shared row belongs to the scene
-    // (a model point landing exactly on the scene's top must stay pickable), so the bar yields it.
-    rects.extend(app.shell.document_bar.map(|s| Rect::from_min_max(s.min, pos2(s.max.x, (s.max.y - 1.0).max(s.min.y)))));
+    if floating {
+        // The document strip is a card over the canvas: all of it shields the scene.
+        rects.extend(app.shell.document_bar);
+    } else {
+        // The docked document bar abuts the scene at its bottom edge; that shared row belongs to
+        // the scene (a model point landing exactly on the scene's top must stay pickable), so the
+        // bar yields it.
+        rects.extend(app.shell.document_bar.map(|s| Rect::from_min_max(s.min, pos2(s.max.x, (s.max.y - 1.0).max(s.min.y)))));
+    }
     rects.extend(app.inspector.rect);
     // The AI review's prompt row and panel cover the viewport only as floating cards; docked,
     // they are edge panels beside it.
-    if Container::for_layout(app.ui.layout, Surface::Panel).floating() {
+    if floating {
         rects.extend(app.review.rect);
         rects.extend(app.review.prompt_rect);
     }
@@ -157,45 +134,15 @@ pub(crate) fn bottom_overlay_rect(app: &SolveApp, mut viewport: Rect) -> Rect {
     viewport
 }
 
-/// Whether the Design Browser is a flush full-height column (view 01), rather than a floating
-/// overlay card (the `browser_float` preference) that the scene keeps its full width under.
-pub(crate) fn browser_is_column(app: &SolveApp) -> bool {
-    app.ui.show_browser && !app.preferences.browser_float
-}
-
-/// The floating scene: the pickable viewport below the document tabs and the view bar (view 01)
-/// and flush against the Design Browser column at its left, from last frame's shell rects (they
-/// move only with the window). A floating overlay browser leaves the scene its full width.
-pub(crate) fn scene_rect(app: &SolveApp, full: Rect) -> Rect {
-    let mut scene = full;
-    let gap = Container::for_layout(app.ui.layout, Surface::Panel).gap();
-    // A left-docked history column pushes the scene (and the browser beside it) right.
-    if app.ui.show_timeline
-        && app.preferences.timeline_left
-        && !browser_is_column(app)
-        && let Some(history) = app.shell.history
-    {
-        scene.min.x = (history.right() + gap).clamp(full.left(), full.right());
-    }
-    // The browser column is flush against the scene (view 01): no gap between them.
-    if browser_is_column(app)
-        && let Some(browser) = app.shell.browser
-    {
-        scene.min.x = browser.right().clamp(full.left(), full.right());
-    }
-    if let Some(strip) = app.shell.document_bar {
-        scene.min.y = strip.bottom().clamp(scene.top(), scene.bottom());
-    }
-    scene
-}
-
 /// The former central panel remains the anchor for controls and docked panels.
 pub(crate) fn content_rect(app: &SolveApp, viewport: Rect) -> Rect {
     app.shell.content.unwrap_or(viewport).intersect(viewport)
 }
 
-/// Free anchor space shared by both layouts. Compact edge hosts have already consumed
-/// their allocation; content-hugging Browser and floating overlays reserve their measured span.
+/// Free anchor space shared by both layouts: where the viewport's controls, the tool sheets and
+/// the overlays go. The scene itself (the projection) is not changed by it. Compact edge hosts
+/// have already consumed their allocation; the Design Browser (a floating card or a column) and
+/// the History card reserve their measured span, so nothing is laid out over them.
 pub(crate) fn workspace_content(app: &SolveApp, mut content: Rect) -> Rect {
     let gap = Container::for_layout(app.ui.layout, Surface::Panel).gap();
     if let Some(history) = app.shell.history {
@@ -205,12 +152,8 @@ pub(crate) fn workspace_content(app: &SolveApp, mut content: Rect) -> Rect {
             content.max.y = (history.top() - gap).clamp(content.top(), content.bottom());
         }
     }
-    // The browser column is flush against the content area (view 01); a floating overlay browser
-    // reserves nothing.
-    if browser_is_column(app)
-        && let Some(browser) = app.shell.browser
-    {
-        content.min.x = browser.right().clamp(content.left(), content.right());
+    if let Some(browser) = app.shell.browser.filter(|_| app.ui.show_browser) {
+        content.min.x = (browser.right() + gap).clamp(content.left(), content.right()).max(content.min.x);
     }
     content
 }

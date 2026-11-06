@@ -88,33 +88,35 @@ pub const COLLAPSED_WIDTH: f32 = 72.0;
 
 /// The gap after each panel (its separator).
 const PANEL_GAP: f32 = 1.0;
-/// The workspace tab row (the kit's 34 px).
-pub const TAB_ROW_HEIGHT: f32 = 34.0;
+/// The workspace tab row (the kit drew 34 px; the owner asked for a shorter top bar).
+pub const TAB_ROW_HEIGHT: f32 = 30.0;
 /// Distance from the ribbon card's edges to a group's label.
 const RIBBON_TAB_INSET: f32 = 4.0;
-/// A ribbon group (the kit's 106 px): the buttons, then the group's name along the bottom.
-pub const GROUP_HEIGHT: f32 = 106.0;
+/// A ribbon group: the buttons, then the group's name along the bottom. The kit drew 106 px
+/// with 72 px buttons; the tools are smaller now (the owner's direction, 2026-11-06), so the
+/// group is 82 px.
+pub const GROUP_HEIGHT: f32 = 82.0;
 pub const RIBBON_HEIGHT: f32 = TAB_ROW_HEIGHT + GROUP_HEIGHT + 1.0;
-/// A large icon-over-label button (the kit's 72 px), and where its icon and label sit in it.
-const BUTTON_HEIGHT: f32 = 72.0;
-const LARGE_ICON: f32 = 28.0;
-const LARGE_ICON_Y: f32 = 18.0;
-const LARGE_LABEL_Y: f32 = 47.0;
+/// A large icon-over-label button, and where its icon and label sit in it.
+pub const BUTTON_HEIGHT: f32 = 54.0;
+const LARGE_ICON: f32 = 22.0;
+const LARGE_ICON_Y: f32 = 14.0;
+const LARGE_LABEL_Y: f32 = 40.0;
+/// Where a sketch family button splits: the icon above, the title and its chevron below.
+const FAMILY_SPLIT_Y: f32 = 30.0;
 /// From a group's top to its buttons.
-const GROUP_PAD_TOP: f32 = 6.0;
-const ICON_BUTTON_HEIGHT: f32 = 36.0;
-const ICON_GROUP_HEIGHT: f32 = 62.0;
-/// A small icon-beside-label button (the kit's 32 px): two rows of them make a column.
-const SMALL_HEIGHT: f32 = 32.0;
+const GROUP_PAD_TOP: f32 = 4.0;
+const ICON_BUTTON_HEIGHT: f32 = 32.0;
+const ICON_GROUP_HEIGHT: f32 = 56.0;
+/// A small icon-beside-label button: two rows of them make a column as tall as a large button.
+const SMALL_HEIGHT: f32 = 25.0;
 const SMALL_ROW_GAP: f32 = 4.0;
 const SMALL_ROWS: usize = 2;
-/// A group shows at most this many small-button columns; the rest stay in its drop-down.
-const SMALL_MAX_COLUMNS: usize = 3;
-const SMALL_ICON: f32 = 20.0;
-const SMALL_PAD: f32 = 6.0;
-/// Where a small button's label starts: the padding, the icon and the kit's 6 px gap.
-const SMALL_TEXT_X: f32 = SMALL_PAD + SMALL_ICON + 6.0;
-const SMALL_MIN_WIDTH: f32 = 76.0;
+const SMALL_ICON: f32 = 16.0;
+const SMALL_PAD: f32 = 5.0;
+/// Where a small button's label starts: the padding, the icon and a 5 px gap.
+const SMALL_TEXT_X: f32 = SMALL_PAD + SMALL_ICON + 5.0;
+const SMALL_MIN_WIDTH: f32 = 70.0;
 const SMALL_MAX_WIDTH: f32 = 184.0;
 
 /// The same height drives shell reservations and ribbon painting in either layout.
@@ -133,8 +135,9 @@ const SHORT_WINDOW_HEIGHT: f32 = 480.0;
 const BUTTON_GAP: f32 = 4.0;
 const BUTTON_MIN_WIDTH: f32 = 54.0;
 /// A large button is as wide as its one-line label needs, up to this; only a longer label wraps
-/// (the kit's labels are one line each).
-const BUTTON_MAX_WIDTH: f32 = 100.0;
+/// (the kit's labels are one line each, and so is every command label at the kit's small size
+/// within this width).
+const BUTTON_MAX_WIDTH: f32 = 132.0;
 const BUTTON_LABEL_PADDING: f32 = 12.0;
 const SECTION_HEIGHT: f32 = 20.0;
 
@@ -301,11 +304,14 @@ pub(crate) fn offer_pill(
     Some((rect, response))
 }
 
-/// The application bar's height: the window's title bar on desktop builds, the design kit's
-/// 48 px document toolbar (view 01).
-pub const APP_BAR_HEIGHT: f32 = 48.0;
-/// The bar's buttons (Undo, Redo, Save, Export): the kit's 30 px.
-const BAR_BUTTON_HEIGHT: f32 = 30.0;
+/// The application bar's height: the window's title bar on desktop builds. The design kit drew
+/// its document toolbar 48 px tall (view 01); the owner asked for a smaller top bar and logo
+/// (2026-11-06), so the bar is 36 px, with the document's name and its storage line on one line.
+pub const APP_BAR_HEIGHT: f32 = 36.0;
+/// The logo's side in the bar (the kit drew 32 px).
+pub const LOGO_SIZE: f32 = 24.0;
+/// The bar's buttons (Undo, Redo, Save, Export); the kit drew 30 px in its 48 px bar.
+const BAR_BUTTON_HEIGHT: f32 = 26.0;
 /// Between the bar's buttons.
 const BAR_GAP: f32 = 6.0;
 /// From the window's edge to the logo and to the last button.
@@ -388,7 +394,7 @@ pub fn app_bar(app: &mut SolveApp, ui: &mut egui::Ui) {
         let cy = r.center().y;
         // The supplied logo alone at the left (its exact vector, no ground behind it). It is also
         // the application menu's button: the start page, File, Help and Preferences live there.
-        let logo = Rect::from_center_size(pos2(left + BAR_INSET + 16.0, cy), vec2(32.0, 32.0));
+        let logo = Rect::from_center_size(pos2(left + BAR_INSET + LOGO_SIZE / 2.0, cy), vec2(LOGO_SIZE, LOGO_SIZE));
         let menu_enabled = idle && !app.native_file_menu;
         let logo_resp = ui.interact(logo, ui.id().with("appbar_menu"), if menu_enabled { Sense::click() } else { Sense::hover() });
         let menu_tip = app.tr("ui.app_menu");
@@ -456,20 +462,21 @@ pub fn app_bar(app: &mut SolveApp, ui: &mut egui::Ui) {
             (undo, redo)
         });
         let controls_left = x;
-        // The document identity: its name, then where it is stored and its revision.
-        let identity_left = logo.right() + 14.0;
+        // The document identity on one line: its name, then where it is stored and its revision.
+        let identity_left = logo.right() + 12.0;
         let (name, dirty) = crate::documents::tabs_info(app)
             .get(app.docs.active.min(crate::documents::tabs_info(app).len().saturating_sub(1)))
             .cloned()
             .unwrap_or_default();
         let shown_name = crate::i18n::Locale::for_language(&app.preferences.language).given_name(&name);
         let title = format!("{shown_name}{}", if dirty { " •" } else { "" });
-        let title_galley = ui.painter().layout_no_wrap(title, crate::fonts::semibold(t.font_heading), t.app_bar_text);
+        let title_galley = ui.painter().layout_no_wrap(title, crate::fonts::semibold(t.font_body), t.app_bar_text);
         let subtitle_galley =
             ui.painter().layout_no_wrap(document_subtitle(app), FontId::proportional(t.font_small), t.app_bar_text.gamma_multiply(0.72));
-        let identity_width = title_galley.size().x.max(subtitle_galley.size().x);
+        let subtitle_x = identity_left + title_galley.size().x + 10.0;
+        let identity_width = title_galley.size().x + 10.0 + subtitle_galley.size().x;
         let identity_right = (identity_left + identity_width).min(controls_left - 12.0);
-        let identity = Rect::from_min_max(pos2(identity_left, r.top() + 6.0), pos2(identity_right.max(identity_left), r.bottom() - 6.0));
+        let identity = Rect::from_min_max(pos2(identity_left, r.top() + 4.0), pos2(identity_right.max(identity_left), r.bottom() - 4.0));
         crate::scenario::publish_rect("appbar:document", identity);
         // A window too small for the document strip (below the app's minimum size, where even
         // the tabs would leave no scene): the name lists the open designs instead, so switching
@@ -485,9 +492,10 @@ pub fn app_bar(app: &mut SolveApp, ui: &mut egui::Ui) {
             resp.on_hover_text(crate::i18n::tr_label("All open designs"))
         });
         if identity.width() > 20.0 {
+            // The storage line comes second, so a narrow bar cuts it before the name.
             let clip = ui.painter().with_clip_rect(identity.intersect(ui.clip_rect()));
-            clip.galley(pos2(identity.left(), r.top() + 7.0), title_galley, t.app_bar_text);
-            clip.galley(pos2(identity.left(), r.top() + 27.0), subtitle_galley, t.app_bar_text.gamma_multiply(0.72));
+            clip.galley(pos2(identity.left(), cy - title_galley.size().y / 2.0), title_galley, t.app_bar_text);
+            clip.galley(pos2(subtitle_x, cy - subtitle_galley.size().y / 2.0 + 0.5), subtitle_galley, t.app_bar_text.gamma_multiply(0.72));
         }
         if let Some(opener) = &designs
             && let Some(i) = crate::documents::designs_list(app, ui.ctx(), egui::Id::new("sc_appbar_documents"), identity.left_bottom(), opener)
@@ -1058,7 +1066,7 @@ fn ribbon_tabs(app: &mut SolveApp, ui: &mut egui::Ui, row: Rect) {
                     } else {
                         t.text_dim
                     };
-                    ribbon_text(ui, pos2(tr.center().x, tr.top() + 16.0), &ribbon_label(app, tab), t.font_body, ink, active);
+                    ribbon_text(ui, pos2(tr.center().x, tr.center().y - 1.0), &ribbon_label(app, tab), t.font_body, ink, active);
                     if active {
                         ui.painter().rect_filled(
                             Rect::from_min_size(
@@ -1228,6 +1236,8 @@ pub fn toolbar(app: &mut SolveApp, ui: &mut egui::Ui) {
                 }
                 // The group's other commands as small buttons: not the ones pinned as a button on
                 // any group of the tab, nor a sketch family's variants (its button chooses them).
+                // Every one is offered, so the tools use the ribbon's full width; `fit` hands the
+                // last columns to the drop-downs as the room runs out.
                 let small: Vec<_> = if labels && tab != "SKETCH" && *panel != "SELECT" {
                     cmds.iter()
                         .copied()
@@ -1238,7 +1248,6 @@ pub fn toolbar(app: &mut SolveApp, ui: &mut egui::Ui) {
                             ribbon_label_width(&painter, app.tr_label(crate::workspace::ribbon_button_label(c))) + SMALL_TEXT_X + SMALL_PAD
                                 <= SMALL_MAX_WIDTH
                         })
-                        .take(SMALL_MAX_COLUMNS * SMALL_ROWS)
                         .collect()
                 } else {
                     Vec::new()
@@ -1356,7 +1365,7 @@ pub fn toolbar(app: &mut SolveApp, ui: &mut egui::Ui) {
                         let mut br = whole;
                         if family.is_some() {
                             if labels {
-                                br.max.y = whole.top() + 38.0;
+                                br.max.y = whole.top() + FAMILY_SPLIT_Y;
                             } else {
                                 br.max.x -= 14.0;
                             }
@@ -1411,7 +1420,10 @@ pub fn toolbar(app: &mut SolveApp, ui: &mut egui::Ui) {
                         }
                         if let Some(f) = family {
                             let ar = if labels {
-                                Rect::from_min_max(pos2(whole.left(), whole.top() + 38.0), pos2(whole.right(), whole.top() + 58.0))
+                                Rect::from_min_max(
+                                    pos2(whole.left(), whole.top() + FAMILY_SPLIT_Y),
+                                    pos2(whole.right(), whole.top() + FAMILY_SPLIT_Y + 20.0),
+                                )
                             } else {
                                 Rect::from_min_max(pos2(br.right(), whole.top()), whole.right_bottom())
                             };
@@ -2544,10 +2556,11 @@ mod header_report_tests {
         h.frames(3);
     }
 
-    /// The 48 px bar (the kit's document toolbar): the logo alone at the left, as the application
-    /// menu's button; the document's name with its storage and revision line; and Undo, Redo,
-    /// command search, Save and Export at the right. Help, Preferences, Report a bug, the version
-    /// and the start page left the bar for the status bar and the menu.
+    /// The 36 px bar (the kit's document toolbar, shortened at the owner's direction): the logo
+    /// alone at the left, as the application menu's button; the document's name with its storage
+    /// and revision on the one line; and Undo, Redo, command search, Save and Export at the right.
+    /// Help, Preferences, Report a bug, the version and the start page left the bar for the
+    /// status bar and the menu.
     #[test]
     fn title_bar_keeps_the_logo_left_and_the_actions_right() {
         let mut h = crate::scenario::Harness::new();
@@ -2560,9 +2573,10 @@ mod header_report_tests {
             assert!(crate::scenario::handle_at(gone).is_none(), "{gone} is no longer in the title bar");
         }
         let rect = |name: &str| crate::scenario::rect_of(name).unwrap_or_else(|| panic!("{name}"));
-        assert_eq!(APP_BAR_HEIGHT, 48.0);
+        assert_eq!(APP_BAR_HEIGHT, 36.0, "the bar is shorter than the kit's 48 px (the owner's direction)");
         let logo = rect("appbar:logo");
-        assert_eq!(logo.size(), vec2(32.0, 32.0));
+        assert_eq!(logo.size(), vec2(LOGO_SIZE, LOGO_SIZE));
+        assert!(logo.width() < 32.0, "the logo is smaller than the kit's 32 px: {:?}", logo.size());
         assert_eq!(logo.left(), BAR_INSET);
         assert_eq!(logo.center().y, APP_BAR_HEIGHT / 2.0);
         assert_eq!(rect("appbar:file"), logo, "the logo is the application menu's button");
@@ -3267,12 +3281,14 @@ mod ribbon_label_tests {
 mod ribbon_wrap_tests {
     use super::*;
 
-    /// At the default window size (1600 x 1000) and the kit's 1760 x 1100, no label on a ribbon
-    /// button wraps or is cut: every large button is as wide as its one-line label (`Move / Copy`
-    /// wrapped to two lines before), and every small button's label is one line.
+    /// At a laptop's 1366 x 768, the default 1600 x 1000 and the kit's 1760 x 1100, no label on a
+    /// ribbon button wraps or is cut: every large button is as wide as its one-line label (`Move /
+    /// Copy` wrapped to two lines before), every small button's label is one line, and every
+    /// group's name fits its group with its chevron. The tools use the ribbon's width: on MODEL
+    /// the groups reach across at least four fifths of it at every size.
     #[test]
     fn no_ribbon_label_wraps_at_the_default_window_size() {
-        for (w, height) in [(1600.0, 1000.0), (1760.0, 1100.0)] {
+        for (w, height) in [(1366.0, 768.0), (1600.0, 1000.0), (1760.0, 1100.0)] {
             let mut h = crate::scenario::Harness::new();
             h.app.home.open = false;
             h.app.run("solid.box", json!({"length":10,"width":10,"height":10})).unwrap();
@@ -3282,6 +3298,22 @@ mod ribbon_wrap_tests {
                 h.app.ui.tab = tab.into();
                 h.frames(3);
                 let painter = egui::Painter::new(h.ctx.clone(), egui::LayerId::background(), Rect::EVERYTHING);
+                let ribbon = crate::scenario::rect_of("toolbar").unwrap();
+                let mut panels_right = ribbon.left();
+                for (name, rect) in crate::scenario::rects("ribbon:section:") {
+                    let Some(panel) = name.strip_prefix(&format!("ribbon:section:{tab}:")) else { continue };
+                    let label = if panel == "FINISH SKETCH" { h.app.tr("ui.ribbon_exit").to_string() } else { ribbon_label(&h.app, panel) };
+                    let width = painter.layout_no_wrap(label.clone(), crate::fonts::semibold(Tokens::get().font_small), Color32::WHITE).size().x;
+                    assert!(
+                        width + 8.0 + 14.0 <= rect.width() + 0.5,
+                        "{tab} at {w}: the group name `{label}` does not fit its {} px label",
+                        rect.width()
+                    );
+                    panels_right = panels_right.max(rect.right());
+                }
+                if tab == "MODEL" {
+                    assert!(panels_right >= ribbon.left() + 0.8 * ribbon.width(), "{tab} at {w}: the groups reach {panels_right} of {ribbon:?}");
+                }
                 for (name, rect) in crate::scenario::rects("button:") {
                     let Some(id) = name.strip_prefix("button:") else { continue };
                     let Some(c) = polykrom_engine::find_command(id) else { continue };

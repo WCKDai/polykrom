@@ -142,7 +142,7 @@ fn docked_ribbon_geometry_and_search() {
         h.call("ui.resize", json!({"width":1600,"height":1000}));
         h.frames(4);
         let button = rect_of("button:solid.extrude").unwrap();
-        assert_eq!(button.height(), 72.0);
+        assert_eq!(button.height(), toolbar::BUTTON_HEIGHT);
         assert!(button.width() >= 54.0);
         let section = rect_of("ribbon:section:MODEL:CREATE").unwrap();
         assert_eq!(section.height(), 20.0);
