@@ -47,11 +47,14 @@ pub(crate) fn assistant_entry(ui: &egui::Ui, response: &Response, state: Assista
             } else {
                 0.0
             };
-            ui.painter().circle_filled(c, 6.0, ring);
-            let points = (0..=24)
+            // The busy arc orbits the glyph, outside its box: on the highlight square's edge,
+            // clear of the glyph's ink, where a corner mark would cut into its sparkle.
+            let centre = at.center();
+            let radius = at.shrink(t.space_3).width() / 2.0;
+            let points = (0..=48)
                 .map(|i| {
-                    let angle = phase + i as f32 / 24.0 * std::f32::consts::TAU * 0.75;
-                    c + vec2(angle.cos(), angle.sin()) * 4.0
+                    let angle = phase + i as f32 / 48.0 * std::f32::consts::TAU * 0.75;
+                    centre + vec2(angle.cos(), angle.sin()) * radius
                 })
                 .collect();
             ui.painter().add(egui::Shape::line(points, Stroke::new(1.8, t.agent_busy)));
@@ -66,5 +69,45 @@ pub(crate) fn assistant_entry(ui: &egui::Ui, response: &Response, state: Assista
             ui.painter().rect_filled(badge, t.sketch_mode_radius, t.warning);
             ui.painter().galley(badge.center() - galley.size() / 2.0, galley, ink);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use egui::pos2;
+
+    /// The polylines a frame paints inside `at`.
+    fn lines_in(out: &egui::FullOutput, at: Rect) -> Vec<Vec<egui::Pos2>> {
+        fn walk(shape: &egui::Shape, at: Rect, out: &mut Vec<Vec<egui::Pos2>>) {
+            match shape {
+                egui::Shape::Path(p) if p.points.iter().all(|p| at.contains(*p)) => out.push(p.points.clone()),
+                egui::Shape::Vec(shapes) => shapes.iter().for_each(|s| walk(s, at, out)),
+                _ => {}
+            }
+        }
+        let mut lines = Vec::new();
+        out.shapes.iter().for_each(|s| walk(&s.shape, at, &mut lines));
+        lines
+    }
+
+    /// Busy: the arc orbits the glyph, every point of it outside the glyph's box and inside
+    /// the button, so it never draws over the glyph.
+    #[test]
+    fn the_busy_arc_is_clear_of_the_glyph() {
+        let ctx = crate::fonts::test_context();
+        let at = Rect::from_min_size(pos2(100.0, 1.0), vec2(32.0, 32.0));
+        let screen = Rect::from_min_size(egui::Pos2::ZERO, vec2(300.0, 60.0));
+        let mut out = ctx.run_ui(egui::RawInput { screen_rect: Some(screen), ..Default::default() }, |ui| {
+            let response = ui.allocate_rect(at, egui::Sense::click());
+            assistant_entry(ui, &response, AssistantEntryState::Busy, false, false);
+        });
+        out.textures_delta.clear();
+        let glyph = at.shrink(Tokens::get().space_6 + 1.0);
+        let arcs = lines_in(&out, at);
+        assert_eq!(arcs.len(), 1, "one busy arc: {arcs:?}");
+        let inside: Vec<&egui::Pos2> = arcs[0].iter().filter(|p| glyph.contains(**p)).collect();
+        assert!(inside.is_empty(), "the arc runs over the glyph {glyph:?} at {inside:?}");
+        assert!(arcs[0].iter().all(|p| at.contains(*p)), "the arc stays in the button");
     }
 }

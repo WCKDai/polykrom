@@ -7,6 +7,7 @@ mod app_icons;
 mod assets;
 mod book;
 mod features;
+mod fonts;
 mod i18n;
 mod icons;
 mod kernel_cases;

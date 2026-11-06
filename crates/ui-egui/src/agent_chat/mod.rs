@@ -304,7 +304,7 @@ pub struct AgentChat {
     pub input: String,
     /// The viewer, open on one message's pictures.
     gallery: Option<Gallery>,
-    state: Option<State>,
+    pub(crate) state: Option<State>,
     agent: String,
     images: bool,
     /// The agent takes documents (PDFs) in a message.
@@ -1294,6 +1294,8 @@ pub(crate) fn turn_label(app: &SolveApp) -> Option<String> {
 /// The message is answered: its changes become one undo step, and what still waits is declined.
 fn end_turn(app: &mut SolveApp) {
     decline_all(app, "the message ended");
+    // A prompt row request the message answered without a proposal is no longer pending.
+    crate::review::turn_ended(app);
     let Some(turn) = app.agent_chat.turn.take() else { return };
     let steps = merge_undo(&mut app.session.undo, &turn.start_doc, turn.start_undo, &trf("ui.agent_chat_undo_label", &[("message", &turn.label)]));
     if steps > 0 {

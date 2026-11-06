@@ -185,8 +185,9 @@ pub struct FeatureResult {
     pub param_warnings: Vec<String>,
     /// For a command that takes faces (`solid.shell`, `solid.draft`, `solid.offset_face`,
     /// `solid.split_face`, `solid.replace_face`, `face.delete`, `sheet.convert`): the persistent
-    /// name (`model.faces`) of the face each entry of `faces` resolved to, in the order given;
-    /// empty where no face was within the pick tolerance. Other commands leave it out.
+    /// name (`model.faces`) of the face each entry of `faces` resolved to, in the order given,
+    /// never empty: an entry that no face is within the pick tolerance of is refused. Other
+    /// commands leave it out.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub faces_used: Option<Vec<String>>,
     /// Warnings with a kind, for programs (each is also part of `warning`, in words). Left out

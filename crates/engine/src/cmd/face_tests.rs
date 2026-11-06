@@ -416,6 +416,82 @@ fn face_taking_commands_refuse_edge_picks_and_list_the_faces_used() {
     assert!(e.contains("ambiguous pick at [50, 60, 2]"), "{e}");
 }
 
+/// Every command that takes faces refuses an entry that no face is within reach of (PK-95):
+/// the error names the entry's index and the point as given, nothing is added to the design,
+/// and the other entries are not acted on. The commands used to go on with the faces that
+/// resolved and reply with success, `""` in `faces_used` for the missing one.
+#[test]
+fn face_taking_commands_refuse_picks_that_reach_no_face() {
+    let mut s = Session::default();
+    run(&mut s, "solid.box", json!({"length": 60, "width": 40, "height": 30}));
+    let volume = |s: &Session| s.model.state().bodies.iter().map(|b| polycore::measure(&b.body).unwrap().volume).sum::<f64>();
+    let faces = |s: &Session| s.model.state().bodies.iter().map(|b| b.body.face_count()).sum::<usize>();
+    let (v0, f0) = (volume(&s), faces(&s));
+    // Entry 2 is 20 mm past the +x face: beyond the pick's reach (5 % of the body's size).
+    let far = json!([80, 20, 15]);
+    let cases: Vec<(&str, Value)> = vec![
+        ("solid.shell", json!({"faces": [[30, 20, 30], far], "thickness": 2})),
+        ("solid.draft", json!({"faces": [[60, 20, 15], far], "angle": 2, "neutral": "XY"})),
+        ("solid.offset_face", json!({"faces": [[60, 20, 15], far], "distance": 1})),
+        ("solid.replace_face", json!({"faces": [[60, 20, 15], far], "target": {"origin": [70, 0, 0], "normal": [1, 0, 0]}})),
+        ("face.delete", json!({"faces": [[30, 20, 30], far], "heal": false})),
+        ("solid.split_face", json!({"faces": [[30, 20, 30], far], "plane": {"origin": [30, 20, 30], "normal": [1, 0, 0]}})),
+        // The entry's own `body` and the command's keep the search to that body.
+        ("solid.shell", json!({"faces": [[30, 20, 30], {"point": far, "body": "Body1"}], "thickness": 2})),
+        ("solid.shell", json!({"faces": [[30, 20, 30], far], "thickness": 2, "body": "Body1"})),
+    ];
+    for (cmd, params) in cases {
+        let e = s.execute(cmd, &params).unwrap_err().to_string();
+        assert!(e.contains(cmd) && e.contains("face 2") && e.contains("[80, 20, 15]") && e.contains("no face"), "{cmd}: {e}");
+        assert_eq!(s.doc.features.len(), 1, "{cmd}: nothing was added");
+        assert_eq!((volume(&s), faces(&s)), (v0, f0), "{cmd}: the box is as it was");
+    }
+    // The first entry is checked too, and a point given as `{point}` is reported as given.
+    let e = s.execute("solid.shell", &json!({"faces": [{"point": [30, 20, 100.5]}, [30, 20, 30]], "thickness": 2})).unwrap_err().to_string();
+    assert!(e.contains("face 1") && e.contains("[30, 20, 100.5]"), "{e}");
+    assert_eq!(s.doc.features.len(), 1, "nothing was added");
+    // Picks that resolve work as before, and no name in `faces_used` is empty.
+    let reply = run(&mut s, "solid.shell", json!({"faces": [[30, 20, 30], [60, 20, 15]], "thickness": 2}));
+    assert_eq!(reply["faces_used"], json!(["F1:+z", "F1:+x"]), "{reply}");
+    // `sheet.convert`'s single `face` is such a pick too.
+    let mut s = Session::default();
+    run(&mut s, "solid.box", json!({"length": 100, "width": 60, "height": 2, "body_name": "Plate"}));
+    let e = s.execute("sheet.convert", &json!({"body": "Plate", "face": [50, 30, -20]})).unwrap_err().to_string();
+    assert!(e.contains("sheet.convert") && e.contains("face 1") && e.contains("[50, 30, -20]") && e.contains("no face"), "{e}");
+    assert!(e.contains("`Plate`"), "{e}");
+    assert_eq!(s.doc.features.len(), 1, "nothing was added");
+}
+
+/// A command's `body` that no body is called is refused as an unknown body before the picks are
+/// resolved (PK-97), whatever they reach, as a face name's lookup refuses it: with a pick out of
+/// reach, the commands used to report `no face of `Nope` is within reach` instead (and with a
+/// pick on a face, the evaluation's `unknown body`).
+#[test]
+fn face_taking_commands_report_an_unknown_body_before_resolving_the_picks() {
+    let mut s = Session::default();
+    run(&mut s, "solid.box", json!({"length": 60, "width": 40, "height": 30}));
+    let far = json!([80, 20, 15]);
+    let cases: Vec<(&str, Value)> = vec![
+        ("solid.shell", json!({"faces": [far], "thickness": 2, "body": "Nope"})),
+        ("solid.shell", json!({"faces": [[30, 20, 30]], "thickness": 2, "body": "Nope"})),
+        ("solid.draft", json!({"faces": [far], "angle": 2, "neutral": "XY", "body": "Nope"})),
+        ("solid.offset_face", json!({"faces": [far], "distance": 1, "body": "Nope"})),
+        ("solid.replace_face", json!({"faces": [far], "target": {"origin": [70, 0, 0], "normal": [1, 0, 0]}, "body": "Nope"})),
+        ("face.delete", json!({"faces": [far], "heal": false, "body": "Nope"})),
+        ("solid.split_face", json!({"faces": [far], "plane": {"origin": [30, 20, 30], "normal": [1, 0, 0]}, "body": "Nope"})),
+    ];
+    for (cmd, params) in cases {
+        let e = s.execute(cmd, &params).unwrap_err().to_string();
+        assert!(e.contains("no body `Nope`") && !e.contains("within reach"), "{cmd}: {e}");
+        assert_eq!(s.doc.features.len(), 1, "{cmd}: nothing was added");
+    }
+    // The body's own name and its world name are both known; the pick's reach is then checked.
+    let e = s.execute("solid.shell", &json!({"faces": [far], "thickness": 2, "body": "Body1"})).unwrap_err().to_string();
+    assert!(e.contains("no face of `Body1` is within reach of [80, 20, 15]"), "{e}");
+    let reply = run(&mut s, "solid.shell", json!({"faces": [[30, 20, 30]], "thickness": 2, "body": "Body1"}));
+    assert_eq!(reply["faces_used"], json!(["F1:+z"]), "{reply}");
+}
+
 /// A body too big for the tie check (here: the limit lowered to nothing) is not refused: its
 /// nearest face is taken, `faces_used` names it, and the warning says it was not checked for
 /// other faces as near.
@@ -424,11 +500,11 @@ fn bodies_too_big_for_the_pick_check_take_their_nearest_face_and_say_so() {
     let mut s = Session::default();
     run(&mut s, "solid.box", json!({"length": 60, "width": 40, "height": 30}));
     let list = [json!([30, 20, 30])];
-    let picked = super::picked_faces_within(&s, &list, None, "solid.shell", (0, 0)).unwrap_or_else(|e| panic!("{e}"));
+    let picked = super::picked_faces_within(&s.model.state(), &list, None, "solid.shell", (0, 0)).unwrap_or_else(|e| panic!("{e}"));
     assert_eq!(picked.names, vec!["F1:+z".to_string()]);
     let warning = picked.warning.as_deref().unwrap_or_default();
     assert!(warning.contains("face 1: `Body1` is too big for the pick check") && warning.contains("`F1:+z`"), "{warning}");
     assert!(picked.body.is_none());
-    let picked = super::picked_faces_within(&s, &list, None, "solid.shell", super::PICK_CHECK_LIMIT).unwrap_or_else(|e| panic!("{e}"));
+    let picked = super::picked_faces_within(&s.model.state(), &list, None, "solid.shell", super::PICK_CHECK_LIMIT).unwrap_or_else(|e| panic!("{e}"));
     assert_eq!((picked.names, picked.warning), (vec!["F1:+z".to_string()], None));
 }

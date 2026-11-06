@@ -1980,3 +1980,25 @@ fn the_picker_list_alone_chooses_the_agent_and_connect_sits_under_it() {
     h.frames(3);
     assert!(rect_of("agent_chat:pick:one").is_none() && rect_of("agent_chat:switcher").is_some(), "the picker folds into the switcher");
 }
+
+/// A request from the prompt row is pending while the agent works, and free again when the
+/// message ends without a proposal (a question back, a refusal): the row is not stuck on
+/// "Preview pending".
+#[test]
+fn a_prompt_row_request_the_agent_answers_without_a_proposal_is_no_longer_pending() {
+    use crate::review::{self, PromptState};
+    let (mut app, script, ctx) = app_with_script();
+    app.review.prompt = "Make the holes 10 mm".into();
+    review::send_prompt(&mut app, &ctx);
+    assert_eq!(app.agent_chat.state(), State::Busy);
+    assert_eq!(review::prompt_state(&app), PromptState::Pending);
+    assert_eq!(app.review.waiting.as_deref(), Some("Make the holes 10 mm"));
+    assert!(script.calls()[0].contains("Scope: Whole design"), "{:?}", script.calls());
+    ended(&script, "");
+    poll(&mut app, &ctx);
+    assert_eq!(app.agent_chat.state(), State::Ready);
+    assert_eq!(review::prompt_state(&app), PromptState::Idle, "the row is free for another request");
+    assert!(app.review.waiting.is_none());
+    assert!(app.status.as_ref().is_some_and(|(s, _, error)| !*error && s.contains("without a change")), "{:?}", app.status);
+    assert_eq!(app.review.prompt, "Make the holes 10 mm", "the request stays in the row");
+}

@@ -125,6 +125,53 @@ fn quality_gate_passes_a_solid_and_fails_an_under_constrained_model() {
     assert!(q["hard_failures"].as_array().unwrap().iter().any(|x| x.as_str().unwrap().contains("under-constrained")), "{q}");
 }
 
+/// The `features` tool is `inspect.features`: the same reading as the engine command, read-only,
+/// and a `batch` step too.
+#[test]
+fn features_tool_gives_the_engine_commands_reading_without_changing_the_design() {
+    let mut s = server();
+    tool(
+        &mut s,
+        "batch",
+        json!({"commands": [
+            {"command": "solid.box", "params": {"length": 120, "width": 80, "height": 8, "corner": [0, 0, 0], "body_name": "Plate"}},
+            {"command": "solid.hole", "params": {"position": [18, 18, 8], "diameter": 8, "name": "Hole"}},
+            {"command": "solid.pattern.rectangular", "params": {"features": ["Hole"], "dir1": [1, 0, 0], "count1": 2, "spacing1": 84, "dir2": [0, 1, 0], "count2": 2, "spacing2": 44}},
+            {"command": "solid.hole", "params": {"position": [60, 40, 8], "diameter": 6, "type": "counterbore", "cb_diameter": 10, "cb_depth": 3}},
+        ]}),
+    );
+    let before = tool(&mut s, "inspect_design", json!({"measure": false}));
+    let by_tool = tool(&mut s, "features", json!({"body": "Plate"}));
+    let by_command = tool(&mut s, "execute", json!({"command": "inspect.features", "params": {"body": "Plate"}}));
+    assert_eq!(by_tool, by_command, "the tool is the command");
+    let body = &by_tool["bodies"][0];
+    assert_eq!(by_tool["body_count"], 1, "{by_tool}");
+    let holes: Vec<&Value> = body["features"].as_array().unwrap().iter().filter(|f| f["type"] == "hole").collect();
+    assert_eq!(holes.len(), 5, "{body}");
+    let cb = holes.iter().find(|h| h["steps"].as_array().unwrap().len() == 2).unwrap_or_else(|| panic!("{body}"));
+    assert_eq!(cb["steps"][0]["kind"], "counterbore", "{cb}");
+    assert_eq!(cb["steps"][0]["diameter"], 10.0, "{cb}");
+    assert_eq!(cb["steps"][0]["depth"], 3.0, "{cb}");
+    assert_eq!(body["patterns"][0]["type"], "linear", "{body}");
+    assert_eq!(body["patterns"][0]["count"], 4, "{body}");
+    assert_eq!(body["patterns"][0]["pitch1"], 84.0, "{body}");
+    assert!(holes.iter().all(|h| h["faces"].as_array().is_some_and(|f| f.len() >= 2)), "every hole names its faces: {body}");
+    // Nothing changed: revision and undo depth as before.
+    let after = tool(&mut s, "inspect_design", json!({"measure": false}));
+    assert_eq!(before["revision"], after["revision"], "{after}");
+    assert_eq!(before["undo"], after["undo"], "{after}");
+    assert_eq!(before["redo"], after["redo"], "{after}");
+    // As a batch step, with `bodies`, and without a body (every body).
+    let b = tool(&mut s, "batch", json!({"commands": [{"command": "features", "params": {"bodies": ["Plate"]}}, {"command": "features"}]}));
+    assert_eq!(b["results"][0], by_tool, "{b}");
+    assert_eq!(b["results"][1]["body_count"], 1, "{b}");
+    let def = tool_definitions().into_iter().find(|d| d["name"] == "features").unwrap();
+    assert_eq!(def["annotations"]["readOnlyHint"], true, "{def}");
+    let r = raw_tool(&mut s, "features", json!({"body": "Plat"}));
+    assert_eq!(r["result"]["isError"], json!(true), "{r}");
+    assert!(r["result"]["content"][0]["text"].as_str().unwrap().contains("no body `Plat`"), "{r}");
+}
+
 #[test]
 fn handshake_and_tools_list() {
     let mut s = server();
@@ -150,6 +197,7 @@ fn handshake_and_tools_list() {
         "batch",
         "inspect_design",
         "quality",
+        "features",
         "measure",
         "body_topology",
         "set_parameter",
@@ -2118,9 +2166,19 @@ fn tool_annotations_tell_the_whole_truth() {
     for name in ["execute", "batch", "save", "export", "open", "screenshot", "polish"] {
         assert_eq!(hints(name), (false, true, true), "{name}");
     }
-    for name in
-        ["list_commands", "describe_command", "inspect_design", "measure", "body_topology", "crash_reports", "skill_reference", "running", "pending"]
-    {
+    for name in [
+        "list_commands",
+        "describe_command",
+        "inspect_design",
+        "quality",
+        "features",
+        "measure",
+        "body_topology",
+        "crash_reports",
+        "skill_reference",
+        "running",
+        "pending",
+    ] {
         assert_eq!(hints(name), (true, false, false), "{name}");
     }
     assert_eq!(hints("new_design"), (false, true, false));

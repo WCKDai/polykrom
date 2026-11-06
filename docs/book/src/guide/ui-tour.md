@@ -85,6 +85,22 @@
   keeps its existing edge presentation.
 - **Dialogs** dock on the right with a live preview. Most features also show drag handles and a
   value box in the viewport.
+- **AI prompt row** (under the ribbon, with AI features on). Type a request such as "Increase the
+  mounting holes to Ø10. Keep the 84 × 44 pattern." (Ctrl+J / Cmd+J puts the keyboard there), check
+  the **Scope** chip (the selected feature or bodies, with a hole pattern's count; its menu picks
+  another feature, a body or the whole design) and press Enter or **Preview changes**. The button
+  reads **Preview pending** while the agent works and **Preview ready** once its change is in; when
+  the agent cannot act (no agent set up, a sketch being edited, the agent busy or signed out) the
+  button is greyed and the reason stands beside it. The change opens as a **Review changes** card
+  where Properties stand: the command, its target, each changed value as old → new with its unit
+  (lengths in the design's units, angles in degrees, counts bare), the values it keeps (a hole
+  pattern's extent and pitch), the features touched and the dependent features that rebuild. The
+  viewport shows the proposed geometry and the status bar reads "AI review / … / Proposed geometry
+  shown"; nothing is applied yet. **Apply & rebuild** runs exactly the previewed command as one
+  undo step, a toast at the bottom of the viewport says what changed ("4 mounting holes updated /
+  Ø10.00 mm") with an **Undo** button for exactly that step, and the status bar adds "Pattern
+  preserved" when the pattern's count and pitch are unchanged. **Cancel command** leaves the
+  design, its revision and the undo history exactly as they were.
 - **Design history** (bottom). Every feature in order as an icon over its name; the current step
   is highlighted. Click a step to select its feature, double-click to edit, drag the end-of-history
   marker (the accent bar) to roll back, and drag features to reorder them. The strip's right end

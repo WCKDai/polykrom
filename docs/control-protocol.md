@@ -235,9 +235,22 @@ picks before the kernel sees them:
   without a word, while `faces_used` named it. On a moved or turned component, point and normal
   are given in the world, as every pick is (`sheet.convert`'s `face`, `face.delete`'s and
   `solid.split_face`'s `faces` too), and the error reports the point as given.
+- An entry that no face is within reach of (5 % of the body's size, as above) is refused, and
+  nothing is added to the design: the command does not go on with the entries that did resolve.
+  The error names the entry (counted from 1), the point as given and, where the command's or the
+  entry's `body` kept the search to a body, that body:
+
+  ```text
+  {"command":"solid.shell","params":{"faces":[[20,30,10],[45,15,10]],"thickness":2}}
+  → error: invalid parameters for `solid.shell`: face 2: no face is within reach of [45, 15, 10]; pick a point on the face, or give its name from model.faces
+  ```
+
+  (On a 40 × 30 × 20 box. The shell used to open the back face alone and reply with success,
+  `"faces_used": ["F1:+y", ""]`, so the caller acted on fewer faces than it asked for.) A
+  command's `body` that no body is called is refused as `no body `<name>`` before the picks
+  are resolved, whatever they reach (an out-of-reach pick used to be reported instead).
 - The reply carries `faces_used`: the persistent name of the face each entry resolved to, in the
-  order given, which is exactly the faces the operation acted on (`""` where no face is within
-  reach of the point; the command then fails as it did before).
+  order given, which is exactly the faces the operation acted on; it never holds an empty name.
   `{"faces":[[30,40,15],[0,20,15]],"thickness":2}` on a 60 × 40 × 30 box replies
   `"faces_used": ["F1:+y", "F1:-x"]`. A body of more than 50 000 faces or 2 000 000 display
   triangles is too big for the tie check: its nearest face is taken, `faces_used` names it, and
@@ -245,6 +258,112 @@ picks before the kernel sees them:
 - Two entries that resolve to one face are not deduplicated in silence: the reply's `warning`
   says `faces 1 and 3 are the same face (`F1:+y` of `Body1`)`, joined to the evaluation's own
   warning when there is one.
+- `timeline.edit` on such a feature resolves the picks its `set` gives (`faces`; `face` for a
+  sheet conversion) the same way, through the same code, against the model before the feature:
+  the entries take the same forms (points, `{point, normal?, body?}`, face names) and are given
+  in the world on a moved component, as the command's are; an ambiguous pick, a pick that no face
+  is within reach of and an unknown `body` are refused with the same errors, in the name of
+  `timeline.edit`, and leave the document, its revision and the undo history unchanged; a pick
+  within reach of a face but off it is kept as a point inside that face, so the kernel acts on
+  it; and the reply carries `faces_used`. The edit used to store the points as given, so an
+  edited shell could take an ambiguous pick, keep an off-face point the kernel dropped without a
+  word, or keep a pick that reached no face.
+
+  ```text
+  {"command":"timeline.edit","params":{"feature":"Hollow","set":{"faces":[[40.1,15,10]]}}}
+  → {"feature": 2, "recomputed": 1, "restored": 0, "faces_used": ["F1:+x"]}
+  ```
+
+### Feature recognition (`inspect.features`)
+
+`engine.execute` `inspect.features {body?, bodies?}` reads what a body is made of from its exact
+B-rep (PolyCore's planes, cylinders, cones, spheres and tori) and the body's persistent face
+names. It is read-only: the design, its revision, its selection and its undo history are as they
+were. Every value comes from the surfaces and the exact edge curves (a cylinder's radius, the
+distance between two planes), never from the display mesh; the mesh only says which side of a
+face is outside and which faces an edge joins. Per body (`bodies[]`, `body_count`, `total`):
+
+- `features`: each with `id`, `type`, the persistent `faces` it covers (what `face.delete`,
+  `appearance.assign`, `solid.shell` and the other face commands take in place of a point) and,
+  when a reading had to fall back on the mesh, `approximate: true` and a `note` saying why.
+  - `hole`: `through`, `diameter` (of the bore), `depth` (from the entry plane to the floor, the
+    drill shoulder or the exit), `axis: {origin, direction}` (the entry centre, pointing into the
+    material), `entry_face`, then `exit_face` (through), `floor_face` (flat bottom) or
+    `tip: {angle_deg, depth, faces}` (a drill point), and `steps` from the entry inward, each
+    with `kind` (`counterbore`, `countersink`, `bore`, `round`), `from` (along the axis below the
+    entry plane), `depth`, `faces`, and `diameter` (`angle_deg` for a countersink, `radius` for a
+    round). A counterbore or countersink is one hole with its steps; a fillet on a hole's mouth or
+    floor is a `round` step of the hole and also the fillet it is (a 10 mm hole 12 deep with an R1
+    round at its floor is 12 deep: a `bore` of 11, then a `round` of 1). A through hole's entry is the
+    wider end, else the end facing up most; alike ends are noted. A hole that breaks out through
+    a curved face (a cross-hole through a round post) keeps its exact diameter; its rims are no
+    circles, so its depth is read from the mesh and the hole is marked `approximate`.
+  - `boss`: `diameter`, `height`, `axis` (the base centre, pointing at the cap), `cap_face`,
+    `base_face`. Its faces are the wall and the cap; a chamfer or round on its edge is its own
+    feature. A plain cylinder with two caps is no boss.
+  - `pocket`: `depth`, `floor_face`, `walls`, `floor_rounds`, `opening_faces` (every coplanar
+    face the walls rise to; usually one) and `opening_face` (the first of them); both are always
+    given. The walls are upright: planes along the floor's normal or cylinders about it, so a
+    drafted pocket is no pocket (its faces are listed under `unrecognised`). A hole or boss in
+    the floor leaves the pocket a pocket. The rounds along the floor's edges (a milled pocket's
+    cutter radius) are `floor_rounds`, among the pocket's faces, with the walls the upright faces
+    beyond them; a round on a vertical corner of the pocket is one of its `walls`. Either is also
+    the fillet it is. A recess open at a side, or whose walls reach faces at two heights, is
+    reported under `uncertain` instead.
+  - `fillet`: `radius`, `convex` (`true`: a round that removed material, `false`: one that
+    added it, `null`: a chain of both), `joins` (the faces it is tangent to). Blends of one
+    radius that meet (a tangent chain, or mitred at a corner) are one fillet. A fillet replaces
+    an edge, so the faces it joins must be ones that could have met: a half-round between two
+    parallel faces (a through slot's end, a full round on a plate's edge) is no fillet and is
+    reported as `unrecognised`, saying so. A bore's or boss's wall tangent to the rounds at its
+    ends is a wall, not a fillet.
+  - `chamfer`: `joins` (two faces; the first is the one facing up most, as `solid.chamfer` takes
+    it), `distance` along the first of `joins`, `distance2` along the second, `angle_deg` between
+    the chamfer and the first face. A conical chamfer on a round edge joins the flat face and the
+    cylinder. A chamfer is a narrow bevel in place of the edge where its two faces would meet:
+    it reaches less far along each face than that face keeps beyond it, so a hexagonal prism's
+    sides and a drafted box's top are plain faces however they turn to their neighbours. A face
+    whose neighbour is a narrower chamfer is the face that chamfer cuts into, not a chamfer (a
+    plate's top between two chamfers stays a plain face).
+- `patterns`: alike features (same type, sizes and direction) on a lattice or a circle, three or
+  more: `type` `linear` (`count1`, `pitch1`, `direction1`, and `count2`, `pitch2`, `direction2`
+  for a grid; `direction1` is the one nearest the x axis, and each points up: +z, else +y, else
+  +x) or `circular` (`count`, `angle_step_deg`, `full_circle`, `radius`,
+  `axis: {origin, direction}`; the members are equally stepped around the circle, with one
+  larger gap on a partial arc: three holes at 0°, 60° and 120° are a 60° pattern with
+  `full_circle: false`, read the same whatever order the members come in), with `feature_type`,
+  `members` (indices into `features`), their `faces` and `member_direction`. Two alike features
+  are two features; an `approximate` feature joins no pattern. A grid of any size is one
+  `linear` pattern (a 17 × 17 perforated plate is one lattice of 289). Alike features that are
+  not one lattice or one circle are read as the grids, rows and rings that explain the most of
+  them with the fewest patterns, the largest first (a grid or row before a ring of the same
+  size): a 3 × 3 grid beside a lone hole is the grid and the hole, not three rows nor a ring of
+  four about its centre; two grids on a plate are two lattices; six holes on a ring about a
+  seventh of the same size at its centre are the ring of six and a lone hole, not a row of three
+  through the centre. That search is cubic and stops at 256 members: a larger group is still
+  read as one lattice or one circle, else it gets no pattern and the body's `note` says so.
+- `unrecognised`: every face no feature covers, with its `index`, `surface` (`plane`,
+  `cylinder`, `cone`, `sphere`, `torus` or `free-form`) and a `reason`. The face a hole is
+  drilled into, a pocket cut into or a boss stands on is not part of that feature. A free-form
+  (spline) face is never read as a feature.
+- `uncertain`: shapes that are nearly a feature, with `could_be`, their `faces` and the `reason`.
+- `note` (only when there is one): what was not read, such as a group of alike features too
+  large to search for the patterns among them.
+
+```text
+{"id":7,"method":"engine.execute","params":{"command":"inspect.features","params":{"body":"Plate"}}}
+→ {"body_count":1,"bodies":[{"body":"Plate","face_count":14,
+   "features":[{"id":0,"type":"hole","through":true,"diameter":8.0,"depth":8.0,
+                "axis":{"origin":[18.0,18.0,8.0],"direction":[0.0,0.0,-1.0]},"entry_face":"F1:+z","exit_face":"F1:-z",
+                "steps":[{"kind":"bore","from":0.0,"depth":8.0,"diameter":8.0,"faces":["F2:bore:side:0","F2:bore:side:1"]}],
+                "faces":["F2:bore:side:0","F2:bore:side:1"]}, …],
+   "patterns":[{"type":"linear","feature_type":"hole","members":[0,1,2,3],"count":4,
+                "count1":2,"pitch1":84.0,"direction1":[1.0,0.0,0.0],"count2":2,"pitch2":44.0,"direction2":[0.0,1.0,0.0],
+                "member_direction":[0.0,0.0,-1.0],"faces":[…]}],
+   "unrecognised":[{"face":"F1:+z","index":7,"surface":"plane","reason":"a planar face no feature covers …"}, …],
+   "uncertain":[]}],
+   "total":{"features":4,"patterns":1,"unrecognised":6}}
+```
 
 ### Slow commands and the window (#1989)
 

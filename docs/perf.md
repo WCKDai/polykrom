@@ -662,7 +662,8 @@ machine and thread count; `polycore::with_work_budget` stops the work with
 `KernelError::BudgetSpent` once they are spent.
 
 `crates/doc/src/eval.rs` runs a constant fillet's first attempt at the radius asked for under a
-budget of max(64, 2 per edge) units (`FILLET_WORK`, `fillet_work`). An attempt that spends it is
+budget of max(80, 4 per edge) units (`FILLET_WORK`, `fillet_work`; 64 and 2 when this landed,
+remeasured below). An attempt that spends it is
 refused as too costly at that radius, naming the budget and the kernel stage it stopped at, and no
 smaller radius is searched; an attempt refused within it for its size is reduced or tapered as
 before, and a fillet that builds within it is the same body as without. Measured with the
@@ -678,6 +679,123 @@ and in the size search alike. A cancel during the search is reported as the fill
 cancelled, not as a refusal of its size (the search's tries were stopped, not refused). The test
 `cancelling_a_running_evaluation_stops_a_long_fillet` (crates/engine/src/tests.rs) cancels the
 reduce search of #3779's pillow a moment after it starts.
+
+## Fillet work budget: the measured margin (PK-94, 2026-11-05)
+
+PK-86's commit (#373, 572c28a8) gave 48 units as the costliest fillet in the engine tests;
+nobody had measured every corpus, so a real design whose fillet spends more than the budget
+would have been refused where it used to build. This section measures every fillet attempt and
+sets the budget from the distribution.
+
+**How it is measured.** A build with debug assertions (`cargo test`'s default profile; for the
+release CLI `--config 'profile.release.package."polykrom-doc".debug-assertions=true'`) compiles
+`crates/doc/src/fillet_work.rs`: with `POLYKROM_FILLET_WORK_LOG=<file>` every constant fillet's
+first attempt appends a JSON line (edges, radius, fit, budget, the units spent as PolyCore's
+`work_spent` reports them, outcome, stage, the body's face and edge counts, the thread's name
+and the process arguments, which name the test, seed, case or script), and
+`POLYKROM_FILLET_WORK=<units>` replaces the budget of every first attempt. A release build
+compiles none of it. The corpora ran with the budget set to 1 000 000, so every attempt shows
+its full cost: `cargo test -p polykrom-engine` (every target, the 96 robustness seeds among
+them) and `-p polykrom-doc`, the 401 kernel cases through `cargo xtask kernel-cases`, each of the
+83 oracle recipes through `polykrom-cli oracle`, and every script under `examples/` through
+`polykrom-cli run` (30; `demo/enclosure_steps.json` is not a command script). The six sample
+designs of `assets/samples` are the engine's built-in sample scripts, built by the engine test
+`samples_build_cleanly`: two attempts, 5 units at most. Machine: 8 cores, 23 GiB, Linux,
+PolyCore 619f24b. PolyCore counts the units to be the same on every machine and thread count
+(but see "Is the count deterministic?" below); the times are this machine's.
+
+**The distribution.** One row per attempt, the first attempt at the radius asked for; "size"
+is a refusal for the radius (`TooLarge`, followed by the reduce search), "other" any other
+refusal.
+
+| Corpus | Attempts | Built | Size | Other | Max | p99 | Max built |
+|---|---|---|---|---|---|---|---|
+| engine tests (without the seeds) | 3518 | 3489 | 17 | 12 | 36 | 6 | 33 |
+| robustness seeds (96) | 78 | 42 | 8 | 28 | 48 | 36 | 6 |
+| doc tests | 11 | 6 | 2 | 3 | 6 | 6 | 5 |
+| kernel cases (401; 75 attempts) | 75 | 67 | 4 | 4 | 93 | 33 | 33 |
+| oracle recipes (83; 27 attempts) | 27 | 27 | 0 | 0 | 9 | 9 | 9 |
+| examples (30 scripts; 11 attempts) | 11 | 11 | 0 | 0 | 9 | 9 | 9 |
+| all | 3720 | 3642 | 31 | 47 | 93 | 8 | 33 |
+
+Of the 3720 attempts 3096 spend 1 unit, 365 spend 2 or 3, 218 spend 4 to 7, 30 spend 8 to 15,
+and 11 spend 16 or more. The doc tests' three "other" refusals are the budget test's own
+attempts under budgets of 1 and 2 units.
+
+**The ten costliest attempts.**
+
+| Units | Outcome | Edges | Radius | Body faces | Source |
+|---|---|---|---|---|---|
+| 93 | size | 18 | 0.3 reduce | 96 | kernel case `fillets/243-fillet-gussets-on-a-spline-sole-refused-within-budget` |
+| 48 | other | 3 | 3 | 25 | robustness seed 67 (`robustness_goldens::seed_67`) |
+| 36 | other | 3 | 1 | 17 | engine test `tests::robustness::fixed_seeds_run_clean` (seed 21's design) |
+| 36 | other | 3 | 1 | 17 | robustness seed 21 |
+| 33 | built | 3 | 2 | 6 | kernel case `fillets/851-fillet-three-edges-at-knife-edge-arc-corner` |
+| 33 | built | 3 | 2 | 6 | engine test `cmd::features_more::tests::fillet_edges_meeting_at_the_front_corner_of_the_arc` (851's corner) |
+| 33 | built | 3 | 2 | 6 | engine test `tests::robustness::blend_corners_where_edges_meet_on_a_curved_wall`, twice (851's corner) |
+| 33 | built | 32 | 1.5 | 49 | kernel case `fillets/2811-fillet-rib-roots` |
+| 25 | other | 3 | 0.5 | 13 | robustness seed 6 |
+| 25 | other | 3 | 1 | 26 | robustness seed 63 |
+
+Next: 13 units, kernel case `fillets/126-fillet-arc-edge-meeting-two-straight-edges` (built);
+11, the printability polish's 14-edge reduce fillet (built) and kernel case
+`fillets/3779-fillet-all-spline-spans` (size). The costliest attempt that builds anywhere spends
+33: three edges meeting at a knife-edge corner (851, whose six orders of three edges each try
+the corner's loop blends), and 32 rib roots (2811, about one unit per edge).
+
+**Is the count deterministic?** The budget's premise is that the same input spends the same
+units on every machine. #243's first attempt spent 93 in 8 of 11 runs and 102 in the other 3:
+twice with the kernel's pool on all 8 cores and once with it pinned to one core (`taskset -c
+0`, so a pool of one thread), so the variation is not the order worker threads finish in but
+per-process state, most likely the iteration order of a hash set in the blend (PolyCore's
+`blend.rs` keeps planar edges and hit sets in `HashSet`s; a PolyCore matter, outside this
+change). Every legitimate attempt remeasured was stable: 851 and 2811 spent 33 and 126 spent 13
+in 8 runs each, pinned and not. The budget is set against the lower of #243's two counts.
+
+**The budget: 80, and 4 per edge.** The costliest fillet that builds spends 33; four times
+that is 132. #243's first attempt spends 93 (or 102): under a budget of 132 it is refused for
+its size within the budget and the reduce search runs, a dozen fillets as costly, which is the
+hour-long path the budget exists to stop (519 s on a loaded machine before PK-86; run here
+with the budget set to 132 by `POLYKROM_FILLET_WORK`, see below). A fourfold margin on the
+knife-edge corner and the refusal of #243 within its 600 s limit conflict, so the budget scales
+with the fillet's edge count instead:
+
+- `FILLET_WORK` = 80: 2.4 times the costliest fillet that builds (33), 0.86 of #243's lower
+  count (93). The pin test (below) keeps the costliest known legitimate fillet under half of it.
+- `FILLET_WORK_PER_EDGE` = 4, applied as max(80, 4 × edges): the costliest many-edge fillet
+  spends about one unit per edge (2811: 33 over 32 edges), so 4 per edge is a near-fourfold
+  margin once a fillet has more than 20 edges (32 edges: 128, 3.9 times 33), and #243's 18
+  edges (72) stay under the base.
+- No face term. The task asked for a scale by edge and face counts; the measurements give no
+  face term that helps. #243's body has 96 faces, more than any other fillet body measured
+  (2811's has 49, 851's 6), and it must stay refused, while the costliest legitimate fillets sit
+  on the fewest faces: any budget that grows with the face count moves toward #243 and away from
+  the legitimate attempts. Nor does the cost per edge follow the face count (851: 11 units per
+  edge on 6 faces; 2811: 1 per edge on 49; #243: 5.2 per edge on 96). The face counts are in the
+  log for the next measurement.
+
+**The pin.** `the_costliest_known_legitimate_fillets_stay_below_half_their_work_budget`
+(crates/engine/src/tests.rs) replays kernel cases 851 and 2811 up to their fillet and runs the
+fillet command under an outer budget no fillet can spend, which PolyCore charges with what the
+attempt spent: 33 of 80 (851, 3 edges) and 33 of 128 (2811, 32 edges), each below half. Under
+the budget this change replaces (64, 2 per edge) the test fails: 33 of 64 is half or more.
+
+**Times.** Plain release build, this machine:
+
+| Case 243 (limit 600 s) | Wall time |
+|---|---|
+| budget 80, refused at 80 units at the kernel's "blend edge" stage, alone and idle, two runs | 36.0 s, 36.8 s |
+| the sole with its gussets and ridges alone (the recipe up to the fillet), two runs | 17.0 s, 16.9 s |
+| budget 80, in the rig (`cargo xtask kernel-cases --jobs 3`, three cases at a time) | 61.9 s |
+| budget 132 (`POLYKROM_FILLET_WORK=132`, measuring build), alone beside the rig (load 7-10): the first attempt spends 93, is refused for its size within 132, and the search runs | 702 s, refused for its size |
+| no budget (1 000 000), in the measuring rig (`--jobs 3`) | killed at the 600 s limit |
+
+So a budget of 132 puts #243 past its limit on a loaded machine, as the previous measurement
+(543-570 s idle, 613 s loaded) also found; 80 refuses it in a tenth of that. The regenerated
+docs/kernel-cases.md (321 of 401 pass) differs from the run with no budget in #243 alone (a hang
+there), apart from a boolean case that hangs or fails with the load (`sweeps/3936`, no fillet).
+`tests/kernel-cases/fillets/243-*/expected.json` said the sole took about two minutes to build;
+it is 17 s idle here, and the whole case 36-48 s (48 s on the reviewer's slower machine).
 
 ## Prism pairs, body measurements and the evaluation cache budget (2026-10-13)
 

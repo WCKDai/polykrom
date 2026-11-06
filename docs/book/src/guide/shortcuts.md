@@ -53,6 +53,7 @@ Keys handled by the window itself:
 | ← → ↑ ↓ | turn the view 15° (with Shift, a quarter turn) |
 | Ctrl+← → ↑ ↓ | pan the view |
 | Ctrl+8 | look straight at the selected face, plane or sketch |
+| Ctrl+J | put the keyboard in the AI prompt row under the ribbon |
 | Esc | cancel the running command, or clear the selection |
 
 While a value box has the keyboard (a dimension being added, a dialog field), keys type into

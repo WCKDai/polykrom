@@ -68,7 +68,9 @@ pub static COMMANDS: &[CommandSpec] = &[
         "feature: id|name, set: {fields to change, merged into the feature's definition as timeline.inspect returns it, \
          e.g. {\"extent\": {\"distance\": \"30\"}} (extrude), {\"angle\": \"90 deg\"} (revolve); \
          a dotted key names a nested field ({\"plane.distance\": \"8 mm\"} = {\"plane\": {\"distance\": \"8 mm\"}}); \
-         expressions are text, or a number in mm or degrees} → recomputed: features rebuilt, restored: features whose earlier result for the same inputs was reused",
+         expressions are text, or a number in mm or degrees; the faces of a shell, draft, offset/replace/split/delete face \
+         (faces) or sheet conversion (face) are picks as their command takes them, resolved the same way (ambiguous or \
+         out-of-reach picks refused, the reply's faces_used)} → recomputed: features rebuilt, restored: features whose earlier result for the same inputs was reused",
     ),
     CommandSpec::new("timeline.inspect", "Inspect Feature", inspect_feature).icon("inspect").noundo().params(
         "feature: id|name → type, definition (the fields timeline.edit's set changes, with their current values), \
@@ -1135,7 +1137,11 @@ fn edit_feature(s: &mut Session, p: &Value) -> Result<Value> {
     let f = s.doc.feature(id).cloned().ok_or_else(|| bad(cmd, "feature"))?;
     let before = serde_json::to_value(&f).map_err(|e| EngineError::Other(e.to_string()))?;
     let set = expand_dotted(set, Some(&before), cmd, 0)?;
-    let set = &numbers_as_expressions(command_profiles(&set, cmd)?, &before);
+    let mut set = numbers_as_expressions(command_profiles(&set, cmd)?, &before);
+    // New face picks of a face-taking feature: resolved as the feature's command resolves them,
+    // before the document changes (a refused pick leaves it as it was).
+    let picked = edited_face_picks(s, &f, &mut set, cmd)?;
+    let set = &set;
     let mut v = before.clone();
     merge(&mut v, set, 0);
     let mut nf: Feature = serde_json::from_value(v.clone()).map_err(|e| bad(cmd, format!("invalid feature: {e}")))?;
@@ -1212,7 +1218,71 @@ fn edit_feature(s: &mut Session, p: &Value) -> Result<Value> {
     if let Some(e) = s.model.result(id).and_then(|r| r.error.clone()) {
         return Err(EngineError::Other(e));
     }
-    Ok(json!({"feature": id, "recomputed": s.model.last_recomputed, "restored": s.model.last_restored}))
+    let reply = Ok(json!({"feature": id, "recomputed": s.model.last_recomputed, "restored": s.model.last_restored}));
+    match picked {
+        Some(picked) => picked.into_reply(reply),
+        None => reply,
+    }
+}
+
+/// The face picks `set` gives a face-taking feature (`faces` of a shell, draft, offset face,
+/// replace face, split face or delete face; `face` of a sheet metal conversion), resolved as the
+/// feature's command resolves a new feature's, through the same code (`super::face::picked_faces`,
+/// #297, PK-95, PK-97): each entry a point `[x, y, z]`, `{point, normal?, body?}` or a face name,
+/// read in the world, as a command's picks are (on a moved component they go into the feature's
+/// frame as the command's would), against the model before the feature. An ambiguous pick, one
+/// that no face is within reach of, and a `body` no body is called are refused with the command's
+/// errors, before the document changes; a pick within reach of a face but off it becomes a point
+/// inside that face, so the kernel acts on it. `set` then holds the resolved points, and the body
+/// the picks settled on where the feature named none (as a command keeps it); the reply gets
+/// `faces_used`. `None` when the edit leaves the picks alone, or the feature takes no faces.
+fn edited_face_picks(s: &Session, f: &Feature, set: &mut Value, cmd: &str) -> Result<Option<super::face::PickedFaces>> {
+    let (command, key) = match &f.kind {
+        FeatureKind::Shell { .. } => ("solid.shell", "faces"),
+        FeatureKind::Draft { .. } => ("solid.draft", "faces"),
+        FeatureKind::OffsetFace { .. } => ("solid.offset_face", "faces"),
+        FeatureKind::ReplaceFace { .. } => ("solid.replace_face", "faces"),
+        FeatureKind::SplitFace { .. } => ("solid.split_face", "faces"),
+        FeatureKind::DeleteFace { .. } => ("face.delete", "faces"),
+        FeatureKind::SheetConvert { .. } => ("sheet.convert", "face"),
+        _ => return Ok(None),
+    };
+    let Some(given) = set.get(key).filter(|v| !v.is_null()).cloned() else { return Ok(None) };
+    // The body the picks are kept to: the edit's, else the feature's.
+    let body: Option<String> = match set.get("body") {
+        None => f.kind.face_body().map(str::to_string),
+        Some(Value::Null) => None,
+        Some(Value::String(name)) => Some(name.clone()),
+        Some(_) => return Err(bad(cmd, "`body` must be a body name")),
+    };
+    let mut params = json!({ key: given });
+    if let Some(name) = &body {
+        params["body"] = json!(name);
+    }
+    // Picks in the world go into the feature's component's frame, as the command's do
+    // (`crate::frames`): Edit Feature authors in the feature's frame, whichever component is active.
+    if crate::frames::placed(s) {
+        let mut context = s.scratch();
+        context.active_component = f.component;
+        if let Some(mapped) = crate::frames::to_local(&context, command, &params) {
+            params = mapped;
+        }
+    }
+    let list: Vec<Value> = match (key, params.get(key)) {
+        ("face", Some(v)) => vec![v.clone()],
+        (_, Some(Value::Array(a))) if !a.is_empty() && a.len() <= 1000 => a.clone(),
+        _ => return Err(bad(cmd, format!("`{key}` must be a list of 1…1000 points [x, y, z] or face names"))),
+    };
+    let st = s.model.state_before(f.id);
+    let picked = super::face::picked_faces_in(&st, &list, params.get("body").and_then(Value::as_str), cmd)?;
+    let points: Vec<Value> = picked.points.iter().map(|p| json!([p.x, p.y, p.z])).collect();
+    set[key] = if key == "face" { points.first().cloned().unwrap_or(Value::Null) } else { Value::Array(points) };
+    if body.is_none()
+        && let Some(settled) = &picked.body
+    {
+        set["body"] = json!(settled);
+    }
+    Ok(Some(picked))
 }
 
 fn select_set(s: &mut Session, p: &Value) -> Result<Value> {

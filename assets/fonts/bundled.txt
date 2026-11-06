@@ -1,0 +1,16 @@
+# The fonts Polykrom's builds ship: the one list the builds and `cargo xtask licences` read.
+# One font per line, "<repository path> <how it ships>...", sorted by path. How a font ships:
+#   interface  compiled into the interface by crates/ui-egui/src/fonts.rs (desktop app and web app)
+#   sketch     compiled into the sketch text engine by crates/sketch/src/fonts.rs (every program)
+#   web        copied beside the web app by apps/polykrom-web/index.html
+# Every font here needs an ATTRIBUTION.md row and its licence file beside it (OFL.txt or
+# <Name>-OFL.txt). Tests fail when any Rust source or apps/*/index.html embeds or copies a font
+# this list lacks, when a listed font does not ship the way it says, and when the "Bundled fonts"
+# section of THIRD-PARTY-LICENSES.txt differs from this list (docs/fonts.md).
+assets/design-kit/2026-11-02/fonts/IBM-Plex-Mono-400.ttf interface
+assets/design-kit/2026-11-02/fonts/Inter-400.ttf interface
+assets/design-kit/2026-11-02/fonts/Inter-500.ttf interface
+assets/design-kit/2026-11-02/fonts/Inter-600.ttf interface
+assets/design-kit/2026-11-02/fonts/Inter-700.ttf interface
+assets/fonts/biz-udp-gothic/BIZUDPGothic-Regular.ttf web
+assets/fonts/liberation-sans/LiberationSans-Regular.ttf sketch
