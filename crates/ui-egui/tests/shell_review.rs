@@ -326,3 +326,67 @@ fn short_window_keeps_the_document_tabs() {
     }
     theme::set_dark(previous);
 }
+
+/// The laptop (1366 x 768) layout defects of the r9 review, in the dark theme: docked, with a
+/// sketch active and the Assistant docked left, the sketch's status line and the navigation bar
+/// beside the Design Browser column (the status line hid under the column, the navigation bar
+/// lay over it); and in both layouts the sketch palette and the Extrude sheet between the view
+/// cube and the history (the palette ran into the history, and over the cube docked; the sheet
+/// into the history card). Written to `target/review-media/<layout>-<state>-<stage>.png`, with
+/// the rectangles the pictures show printed for the record.
+#[test]
+fn laptop_status_lines_palette_and_sheets() {
+    const LAPTOP: egui::Vec2 = vec2(1366.0, 768.0);
+    let stage = std::env::var("SHELL_REVIEW_STAGE").unwrap_or_else(|_| "after".into());
+    let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../target/review-media");
+    std::fs::create_dir_all(&dir).unwrap();
+    let previous = theme::is_dark();
+    for layout in ["docked", "floating"] {
+        for state in ["sketch", "extrude"] {
+            let mut h = Harness::new();
+            h.app.home.open = false;
+            h.call("ui.set", json!({"dark": true, "layout": layout}));
+            h.call("ui.resize", json!({"width": LAPTOP.x, "height": LAPTOP.y}));
+            h.app.run("solid.box", json!({"length": 40, "width": 30, "height": 20})).unwrap();
+            h.frames(3);
+            if state == "sketch" {
+                h.app.run("sketch.create", json!({"plane": "XY"})).unwrap();
+                if layout == "docked" {
+                    // The Assistant docked left, before the browser column.
+                    h.call("ui.agent_chat", json!({"open": true, "side": "left", "width": 380, "picker": false}));
+                }
+            } else {
+                h.app.start("solid.extrude");
+            }
+            h.frames(4);
+            // A fresh context transfers every texture (fonts and icons) to the software renderer.
+            h.ctx = egui::Context::default();
+            polykrom_ui_egui::fonts::setup_fonts(&h.ctx);
+            theme::apply(&h.ctx);
+            let mut textures: HashMap<TextureId, ColorImage> = HashMap::new();
+            for _ in 0..8 {
+                raster::paint_sized(&mut h, &mut textures, vec![], LAPTOP);
+            }
+            let output = raster::paint_sized(&mut h, &mut textures, vec![], LAPTOP);
+            let shot = raster::raster_sized(&mut h, &textures, output, LAPTOP);
+            shot.save(dir.join(format!("{layout}-{state}-{stage}.png"))).unwrap();
+            println!("{layout} {state} ({stage}):");
+            for name in [
+                "browser:card",
+                "agent_chat:panel",
+                "history:card",
+                "history:strip",
+                "axis_view:outer",
+                "nav:outer",
+                "sketch:status",
+                "sketch_palette:outer",
+                "dialog:outer",
+            ] {
+                if let Some(r) = scenario::rect_of(name) {
+                    println!("  {name:22} {:.0} {:.0} {:.0} {:.0}", r.left(), r.top(), r.right(), r.bottom());
+                }
+            }
+        }
+    }
+    theme::set_dark(previous);
+}

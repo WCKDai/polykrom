@@ -4337,11 +4337,11 @@ pub(crate) fn refresh_layout(app: &mut SolveApp, scale: f32) {
                 content.max.x = (chat.left() - crate::shell::SHELL_GAP).clamp(content.left(), content.right());
             }
         }
-        app.viewport.layout = Some(if app.ui.layout == crate::shell::LayoutMode::Docked {
-            crate::viewport_layout::Layout::new(rect, &docks, scale, app.preferences.navigator_style)
-        } else {
-            crate::viewport_layout::Layout::with_content(rect, content, &docks, scale, app.preferences.navigator_style)
-        });
+        // In both layouts the controls and the status lines are laid out in the content area:
+        // the viewport less the Design Browser (a card over the canvas floating, a column over
+        // the full-width viewport docked) and the history. A docked Assistant is an edge panel
+        // beside the viewport, already outside `rect`.
+        app.viewport.layout = Some(crate::viewport_layout::Layout::with_content(rect, content, &docks, scale, app.preferences.navigator_style));
     }
 }
 

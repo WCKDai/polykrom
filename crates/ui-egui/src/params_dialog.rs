@@ -202,6 +202,7 @@ pub fn show(app: &mut SolveApp, ctx: &egui::Context) {
         side,
         ui_kit::Panel::feature_frame(ctx, app.ui.layout, side),
     )
+    .floor(crate::shell::sheet_floor(viewport, moved, drag_bounds))
     .wide()
     .reset_scroll(d.reset_scroll);
     let panel = if side == crate::frame::Side::Left {

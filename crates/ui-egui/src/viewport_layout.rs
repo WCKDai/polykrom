@@ -43,6 +43,9 @@ pub(crate) fn free_rect(view: Rect, obstacles: &[Rect]) -> Rect {
 }
 
 impl Layout {
+    /// A layout whose content area is the whole viewport (the tests' plain viewport; the app's
+    /// content area is the viewport less the browser and the history, `with_content`).
+    #[cfg(test)]
     pub fn new(viewport: Rect, docks: &[Rect], scale: f32, style: crate::prefs::NavigatorStyle) -> Self {
         Self::with_content(viewport, viewport, docks, scale, style)
     }

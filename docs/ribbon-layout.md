@@ -144,7 +144,7 @@ Tab labels use normal word casing. Selected standard tabs use their soft accent;
 
 Sketch's Finish group reserves space at the far right even when other groups collapse. Its unfilled Finish Sketch button uses the existing `finish` icon. The chevron-free Exit row still opens the existing command list, preserving Finish with Auto-Constrain and saved pin customizations.
 
-Additional handles: `ribbon:workspace`, `ribbon:search`, and `ribbon:section:<TAB>:<SECTION>`. Existing workspace, tab, panel, collapsed, family and command handles remain available. Layout evidence also publishes rectangles for these handles, `button:<command id>`, and the open `ribbon:search_popup`.
+Additional handles: `ribbon:search` and `ribbon:section:<TAB>:<SECTION>`. Existing workspace, tab, panel, collapsed, family and command handles remain available. Layout evidence also publishes rectangles for these handles, `button:<command id>`, and the open `ribbon:search_popup`.
 
 ## Workspace and section lists
 

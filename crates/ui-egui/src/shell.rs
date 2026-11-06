@@ -170,21 +170,31 @@ pub(crate) fn tool_drag_rect(app: &SolveApp, placement: Rect) -> Rect {
     bounds
 }
 
-/// The height a docked panel (a tool sheet, the sketch palette) keeps on a short view, moving up
-/// over the compass rather than shrinking below it.
+/// The lowest edge a tool sheet may reach: at its docked place, the bottom of `viewport` (the
+/// content area, above the history); dragged down by `moved` (`frame::dock_offset`), the sheet
+/// keeps its height and may cover the history, as far as its `drag_bounds` (`tool_drag_rect`)
+/// go.
+pub(crate) fn sheet_floor(viewport: Rect, moved: egui::Vec2, drag_bounds: Rect) -> f32 {
+    (viewport.bottom() + moved.y.max(0.0)).min(drag_bounds.bottom())
+}
+
+/// The height a left-docked panel (a tool sheet beside the sketch palette) keeps on a short view,
+/// moving up towards the top of the viewport rather than shrinking below it. Right-docked panels
+/// never move up: the view cube keeps its place above them (`panel_top`).
 pub(crate) const PANEL_MIN_HEIGHT: f32 = 350.0;
 
+/// Where a panel docked at `side` of `viewport` starts, with `bottom` the lowest edge it may
+/// reach. At the right, under the measured view cube at every size: a short view (a laptop's
+/// 1366 × 768 or 1280 × 720 under the kit's taller history and status bar) gives the panel less
+/// height, its body scrolls and its actions stay pinned at its bottom, as the Properties and the
+/// Review changes cards do; it never takes the cube's space or runs into the history.
 pub(crate) fn panel_top(app: &SolveApp, viewport: Rect, bottom: f32, side: crate::frame::Side) -> f32 {
     let content = content_rect(app, viewport);
     if side == crate::frame::Side::Right {
-        // The right-hand properties and feature dialogs dock below the measured compass, as they
-        // did before the design kit shell (a later task restyles that column); on a short view
-        // they reclaim the compass's space rather than shrink below it.
         app.viewport
             .layout
             .as_ref()
             .map_or(content.top(), |l| if l.axis_view.is_positive() { l.axis_view.bottom().min(bottom) } else { content.top() })
-            .min((bottom - PANEL_MIN_HEIGHT).max(content.top()))
     } else {
         (viewport.top() + crate::viewport::AXIS_VIEW_CLEARANCE).min((bottom - PANEL_MIN_HEIGHT).max(viewport.top()))
     }

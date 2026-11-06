@@ -71,6 +71,7 @@ pub fn show(app: &mut SolveApp, ctx: &egui::Context) {
         side,
         ui_kit::Panel::feature_frame(ctx, app.ui.layout, side),
     )
+    .floor(crate::shell::sheet_floor(viewport, moved, drag_bounds))
     .wide();
     let panel = if side == crate::frame::Side::Left {
         let available = palette.map_or(viewport.width(), |r| (r.left() - viewport.left() - crate::theme::Tokens::get().space_8).max(0.0));

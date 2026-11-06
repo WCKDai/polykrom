@@ -235,6 +235,15 @@ fn width(vp: egui::Rect) -> f32 {
     t.sketch_palette_width.min((vp.width() * 0.46 - t.space_16).max(t.space_24 * 5.0))
 }
 
+/// The height of the palette's footer as `Part::Footer` draws it: Finish Sketch across the card
+/// (`wide_primary_button`), then Look At and Slice in their band (`button_pair`: `space_6` above
+/// and below the buttons). The body gets the room above it, so the footer stays at the card's
+/// bottom on a short view instead of running under the history.
+fn footer_height() -> f32 {
+    let t = Tokens::get();
+    2.0 * t.form_button_height + 2.0 * t.space_6
+}
+
 /// The viewport the palette docks into.
 fn viewport(app: &SolveApp, ctx: &egui::Context) -> egui::Rect {
     crate::agent_chat::tool_space(app, crate::shell::content_rect(app, app.viewport.rect.unwrap_or_else(|| ctx.content_rect())))
@@ -335,9 +344,13 @@ pub fn show(app: &mut SolveApp, ctx: &egui::Context) {
         return;
     }
     let gap = crate::ui_kit::Container::new(ctx, crate::ui_kit::Surface::Palette).gap();
-    let bottom = vp.bottom().min(ctx.content_rect().bottom()) - gap;
-    let top = crate::shell::panel_top(app, vp, bottom, crate::frame::Side::Right);
     let frame = crate::ui_kit::Panel::palette_frame(ctx, app.ui.layout);
+    // The card's contents end above its bottom outline (the frame paints its stroke inside the
+    // window's rect, and `palette_rect` adds the outline's width around it, as at the right
+    // edge), so the whole card stays above the history (docked, the strip starts at the
+    // viewport's bottom).
+    let bottom = vp.bottom().min(ctx.content_rect().bottom()) - gap - 2.0 * frame.stroke.width;
+    let top = crate::shell::panel_top(app, vp, bottom, crate::frame::Side::Right);
     let anchor = egui::pos2(vp.right() - gap - frame.stroke.width, top + frame.stroke.width);
     let shown = |key: &str| match key {
         "grid" => !opts.hide_grid,
@@ -370,9 +383,10 @@ pub fn show(app: &mut SolveApp, ctx: &egui::Context) {
         crate::frame::Side::Right,
         frame,
     )
-    .width(width(vp));
+    .width(width(vp))
+    .keep_top();
     let response = panel.window(ctx).show(ctx, |ui| {
-        panel.palette(ui, bottom, top, |ui, part| match part {
+        panel.palette(ui, bottom, top, footer_height(), |ui, part| match part {
             crate::ui_kit::Part::Header => {
                 let status = if !solved || !geometry || remaining == 0 {
                     crate::i18n::tr_dyn(&dof_text(remaining, solved, geometry))

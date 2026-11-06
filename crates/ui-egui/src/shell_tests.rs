@@ -179,11 +179,16 @@ fn short_floating_palette_stays_in_viewport() {
             );
             let compass = h.app.viewport.layout.as_ref().unwrap().axis_view;
             if compass.is_positive() {
-                assert!(palette.top() < compass.bottom(), "short panels reclaim compass space");
+                // Under the compass, never over it, however short the view: a short palette
+                // scrolls as a whole instead (`Panel::keep_top`).
+                assert!(
+                    palette.top() >= compass.bottom(),
+                    "{style:?}, height={height}: the palette {palette:?} never takes the compass's space {compass:?}"
+                );
             }
             let action = crate::scenario::handle_at("sketch_palette:look_at").unwrap();
             if !palette.contains(action) {
-                // Once reclaiming is insufficient, the whole palette scrolls to its footer.
+                // A short palette scrolls as a whole to its footer.
                 h.call("ui.scroll", json!({"x":palette.center().x,"y":palette.center().y,"delta":-1200}));
                 h.frames(20);
             }
@@ -777,63 +782,158 @@ fn the_canvas_spans_the_window_under_a_shorter_chrome_at_every_size() {
     }
 }
 
-/// Every pair of floating cards over the canvas stays apart at every size: the Design Browser,
-/// the document strip, the history, Properties (or Review changes), the agent activity feed, a
-/// toast, the navigation bar and the view cube.
+/// Every pair of cards and overlays over the canvas stays apart at every size, in both layouts.
+/// Floating: the Design Browser, the document strip, the history, Properties (or Review
+/// changes), the agent activity feed, a toast, the navigation bar, the view cube and the AI
+/// review's canvas status line. Docked, with the Assistant docked left: the browser column
+/// (over the full-width viewport), the history strip, the Assistant, the feed, the toast, the
+/// navigation bar, the cube, and the review's status line (a proposal open) or, with a sketch
+/// active, the sketch palette and the sketch's status line. (The r9 review: docked, both status
+/// lines hid under the browser column at every size, and the navigation bar lay over the column
+/// beside a left Assistant; the controls were laid out on the full viewport, not on the content
+/// area between the column and the right edge.)
 #[test]
-fn floating_cards_never_overlap_at_every_size() {
-    for review in [false, true] {
-        for (w, hgt) in STAGE_WINDOWS {
+fn cards_and_overlays_never_overlap_at_every_size_in_either_layout() {
+    for layout in ["floating", "docked"] {
+        for review in [false, true] {
+            for (w, hgt) in STAGE_WINDOWS {
+                let case = format!("{layout} review={review} {w}x{hgt}");
+                let docked = layout == "docked";
+                let mut h = Harness::new();
+                h.app.home.open = false;
+                h.call("ui.resize", json!({"width": w, "height": hgt}));
+                h.call("ui.set", json!({"layout": layout}));
+                h.app.run("solid.box", json!({"length": 40, "width": 30, "height": 20})).unwrap();
+                h.frames(2);
+                let body = h.app.session.world_state().bodies[0].name.clone();
+                if docked {
+                    h.call("ui.agent_chat", json!({"open": true, "side": "left", "width": 380, "picker": false}));
+                    h.frames(3);
+                }
+                if review {
+                    crate::review::propose(
+                        &mut h.app,
+                        vec![("timeline.edit".into(), json!({"feature": "Box1", "set": {"length": "50 mm"}}))],
+                        Some("Longer box"),
+                        crate::review::Source::Control,
+                    )
+                    .unwrap();
+                } else if docked {
+                    // A sketch active: its status line on the canvas and the palette at the right.
+                    h.app.run("sketch.create", json!({"plane": "XY"})).unwrap();
+                } else {
+                    h.app.run("select.set", json!({"items": [{"type": "body", "name": body}]})).unwrap();
+                }
+                h.app.agent_feed.entries.push_back(crate::agent_activity::Entry {
+                    at: h.app.now,
+                    label: "Box".into(),
+                    outcome: "done".into(),
+                    ok: true,
+                });
+                h.app.status = Some(("Viewport message".into(), crate::now_ms(), false));
+                h.frames(4);
+                h.app.status = Some(("Viewport message".into(), crate::now_ms(), false));
+                h.frames(2);
+                let mut names = vec!["browser:card", "toast", "nav:outer", "axis_view:outer"];
+                if docked {
+                    names.extend(["history:strip", "agent_chat:panel"]);
+                } else {
+                    names.extend(["document_bar:card", "history:card"]);
+                }
+                if review {
+                    names.push("review:panel");
+                } else if docked {
+                    names.push("sketch_palette:outer");
+                } else {
+                    names.push("inspector:card");
+                }
+                let mut cards: Vec<(&str, egui::Rect)> = Vec::new();
+                for name in names {
+                    cards.push((name, rect_of(name).unwrap_or_else(|| panic!("{case}: {name} is drawn"))));
+                }
+                cards.push(("agent activity", h.app.shell.agent_activity.unwrap_or_else(|| panic!("{case}: the feed is drawn"))));
+                // The canvas status line (the review's "AI review / … / Proposed geometry shown",
+                // the sketch's "Sketch1 — n degrees of freedom") is laid out against the strip,
+                // the browser and the Assistant like the other overlays, never under them.
+                let (what, name) = if review { ("the review's status line", "review:status") } else { ("the sketch's status line", "sketch:status") };
+                if review || docked {
+                    let status = rect_of(name).unwrap_or_else(|| panic!("{case}: {what} is drawn"));
+                    assert!(status.is_positive() && h.app.viewport.rect.unwrap().contains_rect(status), "{case}: {what} {status:?} is on the canvas");
+                    cards.push((what, status));
+                }
+                for (i, (a, ra)) in cards.iter().enumerate() {
+                    for (b, rb) in cards.iter().skip(i + 1) {
+                        // The navigation bar keeps its place at the content area's centre whatever
+                        // tool panel is open (`navigation_anchors_ignore_positioned_resized_and_covering_dialogs`):
+                        // on the laptop's width, with a 380 pt Assistant beside the browser, the
+                        // palette reaches over it in either layout. Not this change's.
+                        if [*a, *b] == ["nav:outer", "sketch_palette:outer"] {
+                            continue;
+                        }
+                        assert!(!ra.intersect(*rb).is_positive(), "{case}: {a} {ra:?} overlaps {b} {rb:?}");
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// At 1366 × 768 and 1280 × 720, floating and docked, under the kit's taller history and status
+/// bar: a right-docked tool sheet (Extrude) and the sketch palette stand between the view cube
+/// and the history, inside the window, and their actions (OK and Cancel; Finish Sketch, Look At
+/// and Slice) are in sight at their bottom: a short view gives them less height and their body
+/// scrolls, as the Properties and the Review changes cards do. (The r9 review: the palette ran
+/// 8 pt into the history card floating; docked, 22 pt under the history strip and 25 pt over the
+/// cube; the Extrude sheet 30 pt into the history card.)
+#[test]
+fn palettes_and_right_docked_sheets_stay_between_the_cube_and_the_history_on_a_laptop() {
+    for layout in ["floating", "docked"] {
+        for (w, hgt) in [(1366.0_f32, 768.0_f32), (1280.0, 720.0)] {
+            let case = format!("{layout} {w}x{hgt}");
+            let window = egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(w, hgt));
+            let history_name = if layout == "floating" { "history:card" } else { "history:strip" };
             let mut h = Harness::new();
             h.app.home.open = false;
             h.call("ui.resize", json!({"width": w, "height": hgt}));
+            h.call("ui.set", json!({"layout": layout}));
             h.app.run("solid.box", json!({"length": 40, "width": 30, "height": 20})).unwrap();
-            h.frames(2);
-            let body = h.app.session.world_state().bodies[0].name.clone();
-            if review {
-                crate::review::propose(
-                    &mut h.app,
-                    vec![("timeline.edit".into(), json!({"feature": "Box1", "set": {"length": "50 mm"}}))],
-                    Some("Longer box"),
-                    crate::review::Source::Control,
-                )
-                .unwrap();
-            } else {
-                h.app.run("select.set", json!({"items": [{"type": "body", "name": body}]})).unwrap();
-            }
-            h.app.agent_feed.entries.push_back(crate::agent_activity::Entry { at: h.app.now, label: "Box".into(), outcome: "done".into(), ok: true });
-            h.app.status = Some(("Viewport message".into(), crate::now_ms(), false));
-            h.frames(4);
-            h.app.status = Some(("Viewport message".into(), crate::now_ms(), false));
-            h.frames(2);
-            let mut cards: Vec<(&str, egui::Rect)> = Vec::new();
-            for name in [
-                "browser:card",
-                "document_bar:card",
-                "history:card",
-                "toast",
-                "nav:outer",
-                "axis_view:outer",
-                if review { "review:panel" } else { "inspector:card" },
-            ] {
-                cards.push((name, rect_of(name).unwrap_or_else(|| panic!("review={review} {w}x{hgt}: {name} is drawn"))));
-            }
-            cards.push(("agent activity", h.app.shell.agent_activity.unwrap_or_else(|| panic!("review={review} {w}x{hgt}: the feed is drawn"))));
-            if review {
-                // The canvas status line ("AI review / … / Proposed geometry shown") is laid out
-                // against the strip like the other overlays, never under it.
-                let status = rect_of("review:status").unwrap_or_else(|| panic!("{w}x{hgt}: the review's status line is drawn"));
+            h.frames(3);
+            // `card` (a sheet, the palette) between the cube and the history, with `actions` in
+            // sight inside it.
+            let between = |what: &str, card: egui::Rect, actions: &[&str]| {
+                let cube = rect_of("axis_view:outer").unwrap_or_else(|| panic!("{case}: the view cube"));
+                let history = rect_of(history_name).unwrap_or_else(|| panic!("{case}: the history"));
+                assert!(window.contains_rect(card), "{case}: {what} {card:?} is inside the window {window:?}");
                 assert!(
-                    status.is_positive() && h.app.viewport.rect.unwrap().contains_rect(status),
-                    "{w}x{hgt}: the status line {status:?} is on the canvas"
+                    card.top() >= cube.bottom() - 0.5 && !card.intersect(cube).is_positive(),
+                    "{case}: {what} {card:?} starts under the cube {cube:?}"
                 );
-                cards.push(("review status line", status));
-            }
-            for (i, (a, ra)) in cards.iter().enumerate() {
-                for (b, rb) in cards.iter().skip(i + 1) {
-                    assert!(!ra.intersect(*rb).is_positive(), "review={review} {w}x{hgt}: {a} {ra:?} overlaps {b} {rb:?}");
+                assert!(
+                    card.bottom() <= history.top() + 0.5 && !card.intersect(history).is_positive(),
+                    "{case}: {what} {card:?} ends above the history {history:?}"
+                );
+                for name in actions {
+                    let action = rect_of(name).unwrap_or_else(|| panic!("{case}: {name} is drawn"));
+                    assert!(card.contains_rect(action), "{case}: {name} {action:?} is in sight inside {what} {card:?}");
                 }
-            }
+            };
+            h.app.start("solid.extrude");
+            h.frames(4);
+            let sheet = h.app.viewport.dialog_rect.unwrap_or_else(|| panic!("{case}: the Extrude sheet"));
+            between("the Extrude sheet", sheet, &["dialog:footer:actions", "dialog:ok", "dialog:cancel"]);
+            crate::dialogs::cancel(&mut h.app);
+            h.frames(2);
+            h.app.run("sketch.create", json!({"plane": "XY"})).unwrap();
+            h.frames(4);
+            let palette = h.app.viewport.palette_rect.unwrap_or_else(|| panic!("{case}: the sketch palette"));
+            between("the sketch palette", palette, &["sketch_palette:finish", "sketch_palette:look_at", "sketch_palette:slice"]);
+            // The body (the options) scrolls above the pinned actions.
+            let options = rect_of("sketch_palette:options").unwrap_or_else(|| panic!("{case}: the palette's options"));
+            let finish = rect_of("sketch_palette:finish").unwrap_or_else(|| panic!("{case}: Finish Sketch"));
+            assert!(
+                palette.contains_rect(options) && options.bottom() <= finish.top() + 0.5,
+                "{case}: the options {options:?} scroll above Finish Sketch {finish:?} inside the palette {palette:?}"
+            );
         }
     }
 }

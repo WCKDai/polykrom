@@ -149,7 +149,8 @@ fn palette_scrolls_short_views_and_retains_its_status_and_action_handles() {
                         frame,
                     );
                     panel.window(&ctx).show(&ctx, |ui| {
-                        panel.palette(ui, bottom, 0.0, |ui, part| match part {
+                        let footer_height = Tokens::get().form_button_height + 2.0 * Tokens::get().space_6;
+                        panel.palette(ui, bottom, 0.0, footer_height, |ui, part| match part {
                             Part::Header => {
                                 status_header(
                                     ui,
