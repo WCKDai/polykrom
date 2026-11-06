@@ -415,23 +415,31 @@ mod tests {
     use super::*;
 
     const KIT: &str = "assets/design-kit/2026-11-02/fonts";
+    /// The interface faces: Geist at 400, 500 and 600, Geist Mono at 400 and 500 (docs/fonts.md).
+    const GEIST: &str = "assets/fonts/geist";
 
     #[test]
     fn the_list_is_what_the_sources_ship() {
         let list = check(&crate::root()).unwrap_or_else(|e| panic!("{e}"));
         let ships = |path: &str| list.iter().find(|f| f.path == path).map(|f| f.ships.clone());
-        for face in ["Inter-400", "Inter-500", "Inter-600", "Inter-700", "IBM-Plex-Mono-400"] {
-            assert_eq!(ships(&format!("{KIT}/{face}.ttf")), Some(vec![Ships::Interface]), "{face}");
+        for face in ["Geist-Regular", "Geist-Medium", "Geist-SemiBold", "GeistMono-Regular", "GeistMono-Medium"] {
+            assert_eq!(ships(&format!("{GEIST}/{face}.ttf")), Some(vec![Ships::Interface]), "{face}");
         }
         assert_eq!(ships("assets/fonts/liberation-sans/LiberationSans-Regular.ttf"), Some(vec![Ships::Sketch]));
         assert_eq!(ships("assets/fonts/biz-udp-gothic/BIZUDPGothic-Regular.ttf"), Some(vec![Ships::Web]));
-        // The kit's unused faces and the web site's own JetBrains Mono are not the programs'.
-        assert!(!list.iter().any(|f| f.path.contains("Mono-500") || f.path.contains("Mono-600") || f.path.contains("jetbrains")), "{list:?}");
-        // What the sources ship, in detail: the kit faces by crates/ui-egui/src/fonts.rs, the
+        assert_eq!(list.len(), 7, "the five interface faces, the sketch font and the web app's Japanese font: {list:?}");
+        // The kit's Inter and IBM Plex Mono (they render the kit's SVG text), the unused Geist
+        // weights (bold, the variable fonts) and the web site's own JetBrains Mono are not the
+        // programs'.
+        let unused = |path: &str| path.starts_with(KIT) || path.ends_with("-Bold.ttf") || path.contains("Variable") || path.contains("jetbrains");
+        assert!(!list.iter().any(|f| unused(&f.path)), "{list:?}");
+        // What the sources ship, in detail: the Geist faces by crates/ui-egui/src/fonts.rs, the
         // sketch font by crates/sketch/src/fonts.rs, the Japanese font by the web app's copy rule.
         let shipped = shipped(&crate::root()).unwrap_or_else(|e| panic!("{e}"));
         let embedded_by = |path: &str| shipped.embedded.get(path).cloned().unwrap_or_default();
-        assert!(embedded_by(&format!("{KIT}/Inter-400.ttf")).contains("crates/ui-egui/src/fonts.rs"), "{:?}", shipped.embedded);
+        for face in ["Geist-Regular", "Geist-Medium", "Geist-SemiBold", "GeistMono-Regular", "GeistMono-Medium"] {
+            assert!(embedded_by(&format!("{GEIST}/{face}.ttf")).contains("crates/ui-egui/src/fonts.rs"), "{face}: {:?}", shipped.embedded);
+        }
         assert!(
             embedded_by("assets/fonts/liberation-sans/LiberationSans-Regular.ttf").contains("crates/sketch/src/fonts.rs"),
             "{:?}",

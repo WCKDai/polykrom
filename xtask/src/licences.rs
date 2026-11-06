@@ -412,18 +412,22 @@ mod tests {
     fn the_list_names_the_fonts_the_builds_ship_with_their_notices() {
         let fonts = fonts();
         let paths: Vec<&str> = fonts.iter().map(|f| f.path.as_str()).collect();
-        // Sketch text (crates/sketch), the interface and its numbers (crates/ui-egui), and the web
-        // app's Japanese face (apps/polykrom-web/index.html); the web site's own JetBrains Mono is
-        // not the app's.
+        // Sketch text (crates/sketch), the interface (Geist) and its numbers (Geist Mono)
+        // (crates/ui-egui), and the web app's Japanese face (apps/polykrom-web/index.html); the
+        // design kit's Inter and IBM Plex Mono render the kit's SVG text only, and the web site's
+        // own JetBrains Mono is not the app's.
         for expected in [
             "assets/fonts/liberation-sans/LiberationSans-Regular.ttf",
-            "assets/design-kit/2026-11-02/fonts/Inter-400.ttf",
-            "assets/design-kit/2026-11-02/fonts/IBM-Plex-Mono-400.ttf",
+            "assets/fonts/geist/Geist-Regular.ttf",
+            "assets/fonts/geist/Geist-Medium.ttf",
+            "assets/fonts/geist/Geist-SemiBold.ttf",
+            "assets/fonts/geist/GeistMono-Regular.ttf",
+            "assets/fonts/geist/GeistMono-Medium.ttf",
             "assets/fonts/biz-udp-gothic/BIZUDPGothic-Regular.ttf",
         ] {
             assert!(paths.contains(&expected), "{expected} not among {paths:?}");
         }
-        assert!(!paths.iter().any(|p| p.contains("jetbrains")), "{paths:?}");
+        assert!(!paths.iter().any(|p| p.contains("jetbrains") || p.contains("design-kit")), "{paths:?}");
         for f in &fonts {
             assert!(!f.ships.is_empty(), "{}", f.path);
             assert!(!f.copyright.is_empty() && f.copyright.iter().all(|c| is_copyright_line(c)), "{}: {:?}", f.path, f.copyright);
@@ -433,10 +437,13 @@ mod tests {
             // The licence text is the notice and the licence, nothing above them (D5).
             assert!(f.licence_text.lines().next().is_some_and(is_copyright_line), "{}: {:?}", f.path, f.licence_text.lines().next());
         }
-        // Different fonts carry different notices.
-        let inter = fonts.iter().find(|f| f.path.ends_with("Inter-400.ttf")).map(|f| f.copyright.clone()).unwrap_or_default();
-        let plex = fonts.iter().find(|f| f.path.ends_with("IBM-Plex-Mono-400.ttf")).map(|f| f.copyright.clone()).unwrap_or_default();
-        assert!(inter.concat().contains("Inter Project Authors") && plex.concat().contains("IBM Corp"), "{inter:?} {plex:?}");
+        // Different fonts carry different notices (Geist and Geist Mono share the release's one
+        // OFL.txt; the sketch and the Japanese fonts have their own).
+        let notice_of = |name: &str| fonts.iter().find(|f| f.path.ends_with(name)).map(|f| f.copyright.concat()).unwrap_or_default();
+        let (geist, mono) = (notice_of("Geist-Regular.ttf"), notice_of("GeistMono-Regular.ttf"));
+        let (liberation, biz) = (notice_of("LiberationSans-Regular.ttf"), notice_of("BIZUDPGothic-Regular.ttf"));
+        assert!(geist.contains("Geist Project Authors") && mono == geist, "{geist:?} {mono:?}");
+        assert!(liberation.contains("Red Hat") && biz.contains("BIZ UDGothic Project Authors"), "{liberation:?} {biz:?}");
     }
 
     /// The notice's font list is the bundled-font list, exactly, in both directions, with each

@@ -54,6 +54,35 @@ pub(crate) fn selection_summary(app: &SolveApp) -> String {
     }
 }
 
+/// The count the summary names, as [`selection_summary`] writes it: nothing when nothing is
+/// selected.
+fn selection_count(app: &SolveApp) -> Option<String> {
+    let n = app.session.selection.len();
+    (n > 0).then(|| n.to_string())
+}
+
+/// `text` in `font`, with its one numeric value, `figures`, set in tabular figures (the monospace
+/// family, Geist Mono, at the same size), as every numeric value of the interface is
+/// (docs/fonts.md): the words around the count keep the proportional face. Without a value, or a
+/// value the text does not carry, the whole text is in `font`.
+fn job_with_figures(text: &str, figures: Option<&str>, font: &FontId, ink: egui::Color32) -> egui::text::LayoutJob {
+    let words = egui::TextFormat::simple(font.clone(), ink);
+    let mut job = egui::text::LayoutJob::default();
+    job.wrap.max_width = f32::INFINITY;
+    match figures.filter(|f| !f.is_empty()).and_then(|f| text.find(f).map(|at| (at, f.len()))) {
+        Some((at, len)) => {
+            let numbers = egui::TextFormat::simple(FontId::monospace(font.size), ink);
+            for (piece, format) in [(&text[..at], &words), (&text[at..at + len], &numbers), (&text[at + len..], &words)] {
+                if !piece.is_empty() {
+                    job.append(piece, 0.0, format.clone());
+                }
+            }
+        }
+        None => job.append(text, 0.0, words),
+    }
+    job
+}
+
 /// One of the bar's icon buttons, `BUTTON` square, its right edge at `right`.
 fn icon_button(ui: &mut egui::Ui, right: f32, cy: f32, icon: &str, name: &str, tip: &str, enabled: bool, handles: &[&str]) -> (Rect, bool) {
     let t = Tokens::get();
@@ -133,9 +162,10 @@ pub fn contents(app: &mut SolveApp, ui: &mut egui::Ui) {
     let cy = r.center().y;
     let font = FontId::proportional(t.font_small);
     let painter = ui.painter().clone();
-    // Left: the selection, then the model units (a click changes them: Change Design Units).
+    // Left: the selection (its count in tabular figures), then the model units (a click changes
+    // them: Change Design Units).
     if design {
-        let summary = painter.layout_no_wrap(selection_summary(app), font.clone(), t.text_dim);
+        let summary = painter.layout_job(job_with_figures(&selection_summary(app), selection_count(app).as_deref(), &font, t.text_dim));
         let sel = Rect::from_min_size(pos2(r.left() + INSET, cy - summary.size().y / 2.0), summary.size());
         painter.galley(sel.min, summary, t.text_dim);
         crate::scenario::publish_rect("status:selection", sel);
@@ -153,13 +183,14 @@ pub fn contents(app: &mut SolveApp, ui: &mut egui::Ui) {
             crate::context_menu::open_for(app, ur.left_top(), crate::context_menu::Target::Units);
         }
     }
-    // Right: the credit, then the version, then the controls from the title bar.
+    // Right: the credit, then the version (a numeric value: tabular figures, Geist Mono), then
+    // the controls from the title bar.
     let credit = painter.layout_no_wrap(CREDIT.to_string(), font.clone(), t.text_dim);
     let cr = Rect::from_min_size(pos2(r.right() - INSET - credit.size().x, cy - credit.size().y / 2.0), credit.size());
     painter.galley(cr.min, credit, t.text_dim);
     crate::scenario::publish_rect("status:credit", cr);
     let version_text = crate::i18n::format("ui.version_label", &[("version", crate::update::current_version())]);
-    let version = painter.layout_no_wrap(version_text, font, t.text_dim.gamma_multiply(0.8));
+    let version = painter.layout_no_wrap(version_text, FontId::monospace(font.size), t.text_dim.gamma_multiply(0.8));
     let vr = Rect::from_min_size(pos2(cr.left() - 24.0 - version.size().x, cy - version.size().y / 2.0), version.size());
     painter.galley(vr.min, version, t.text_dim.gamma_multiply(0.8));
     crate::scenario::publish_rect("titlebar:version", vr);
@@ -278,5 +309,89 @@ mod tests {
         assert!(handle_at("titlebar:home").is_some());
         h.step(&json!({"click": {"handle": "titlebar:home"}})).unwrap();
         assert!(h.app.home.open, "the house button shows the start page");
+    }
+
+    /// The texts one more frame paints, each as its sections: the text of each with its font.
+    fn painted_sections(h: &mut Harness) -> Vec<Vec<(String, FontId)>> {
+        fn walk(shape: &egui::Shape, out: &mut Vec<Vec<(String, FontId)>>) {
+            match shape {
+                egui::Shape::Text(t) => {
+                    let job = &t.galley.job;
+                    out.push(
+                        job.sections
+                            .iter()
+                            .map(|s| (job.text[s.byte_range.start.0..s.byte_range.end.0].to_string(), s.format.font_id.clone()))
+                            .collect(),
+                    );
+                }
+                egui::Shape::Vec(shapes) => shapes.iter().for_each(|s| walk(s, out)),
+                _ => {}
+            }
+        }
+        let screen = h.ctx.content_rect();
+        let time = h.ctx.input(|i| i.time) + 1.0 / 60.0;
+        let mut out = h.ctx.run_ui(egui::RawInput { screen_rect: Some(screen), time: Some(time), ..Default::default() }, |ui| {
+            h.app.logic(ui.ctx());
+            h.app.ui(ui);
+        });
+        out.textures_delta.clear();
+        let mut texts = Vec::new();
+        out.shapes.iter().for_each(|s| walk(&s.shape, &mut texts));
+        texts
+    }
+
+    /// The bar's numbers are set with tabular figures, as every numeric value of the interface is
+    /// (docs/fonts.md): the selection count in the monospace family (Geist Mono) at the bar's size,
+    /// the words around it in the proportional face, in English and with the count mid-sentence in
+    /// Japanese and Chinese; the version wholly in the monospace family; the credit and "Nothing
+    /// selected" (no number) in the proportional face.
+    #[test]
+    fn status_bar_numbers_are_tabular_figures() {
+        let t = Tokens::get();
+        let (words, figures) = (FontId::proportional(t.font_small), FontId::monospace(t.font_small));
+        let mut h = Harness::new();
+        h.app.home.open = false;
+        h.app.run("solid.box", json!({"length": 10, "width": 10, "height": 10, "body_name": "Block"})).unwrap();
+        h.app.run("select.clear", json!({})).unwrap();
+        h.frames(3);
+        let texts = painted_sections(&mut h);
+        let find = |texts: &[Vec<(String, FontId)>], text: &str| {
+            texts
+                .iter()
+                .find(|s| s.iter().map(|(t, _)| t.as_str()).collect::<String>() == text)
+                .cloned()
+                .unwrap_or_else(|| panic!("{text} is painted"))
+        };
+        assert_eq!(find(&texts, "Nothing selected"), vec![("Nothing selected".to_string(), words.clone())]);
+        assert_eq!(find(&texts, CREDIT), vec![(CREDIT.to_string(), words.clone())]);
+        let version = format!("v{}", crate::update::current_version());
+        assert_eq!(find(&texts, &version), vec![(version.clone(), figures.clone())], "the version is a numeric value");
+        h.app.run("select.set", json!({"items": [{"type": "body", "name": "Block"}]})).unwrap();
+        h.frames(2);
+        let texts = painted_sections(&mut h);
+        assert_eq!(
+            find(&texts, "1 body selected"),
+            vec![("1".to_string(), figures.clone()), (" body selected".to_string(), words.clone())],
+            "the count in tabular figures, the words in the proportional face"
+        );
+        for (lang, summary, before, after) in [("ja", "ボディ 1 個選択中", "ボディ ", " 個選択中"), ("zh", "已选择 1 个实体", "已选择 ", " 个实体")]
+        {
+            h.app.preferences.language = lang.to_string();
+            h.frames(2);
+            let texts = painted_sections(&mut h);
+            assert_eq!(
+                find(&texts, summary),
+                vec![(before.to_string(), words.clone()), ("1".to_string(), figures.clone()), (after.to_string(), words.clone())],
+                "{lang}: the count mid-sentence keeps its tabular figures"
+            );
+        }
+        // The helper itself: a text without its value, or without a value at all, is all words.
+        let whole = |text: &str, figures: Option<&str>| {
+            job_with_figures(text, figures, &words, t.text_dim).sections.iter().map(|s| s.format.font_id.clone()).collect::<Vec<_>>()
+        };
+        assert_eq!(whole("Nothing selected", None), vec![words.clone()]);
+        assert_eq!(whole("Nothing selected", Some("3")), vec![words.clone()]);
+        assert_eq!(whole("3 selected", Some("")), vec![words.clone()]);
+        assert_eq!(whole("3 selected", Some("3")), vec![figures.clone(), words.clone()]);
     }
 }

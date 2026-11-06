@@ -34,9 +34,9 @@ choose the family independently of size; the egui Heading text style is semi-bol
 Every numeric value is set with tabular figures: Geist's own figures are proportional and egui
 has no OpenType feature switch, so numbers go through the monospace family, Geist Mono, whose
 figures are tabular by construction. The Properties card's values, the review card's values, the
-status bar's and the history's numbers, numeric fields and sketch dimensions use Geist Mono at
-regular; the review card's proposed value (what the row is about) is Geist Mono at medium
-(`fonts::mono_medium`).
+status bar's numbers (the selection count inside its summary, and the version), the history's
+numbers, numeric fields and sketch dimensions use Geist Mono at regular; the review card's
+proposed value (what the row is about) is Geist Mono at medium (`fonts::mono_medium`).
 
 ## The bundled-font list
 
