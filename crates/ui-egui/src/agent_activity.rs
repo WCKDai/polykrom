@@ -249,8 +249,15 @@ struct Laid {
 }
 
 /// Lay the list out as [`paint`] draws it this frame (None: nothing to show). It depends on the
-/// app's state alone, so the toasts, laid out earlier in the frame, see the same frame through
-/// [`frame`] that [`paint`] draws at the frame's end.
+/// app's state alone: the feed, the viewport's rect and layout, and the rects it keeps clear of
+/// ([`frame_rect`]). The toasts see it through [`frame`] while the viewport paints, [`paint`]
+/// at the frame's end; they agree when the rects it lays out against are this frame's by then,
+/// which the viewport's own controls, the ribbon cards, the History bar and the Properties card
+/// are (the card is laid out before the viewport in both layouts, `lib.rs`). A card laid out
+/// after the viewport (the browser and the inspector floating, the review panel and its prompt
+/// row, a dialog, the sketch palette) is last frame's for the toasts and this frame's for the
+/// list, so in the one frame such a card appears, moves or goes, a toast can be laid out against
+/// the list's previous place and touch it.
 fn laid_out(app: &SolveApp, ctx: &egui::Context) -> Option<Laid> {
     let rect = app.viewport.rect?;
     let feed = &app.agent_feed;

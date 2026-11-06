@@ -624,6 +624,151 @@ fn the_body_lookup_is_cached_per_selection_and_revision() {
     assert!(h.widget("Cached body").is_none() && h.widget("Mount / 1 instance").is_some());
 }
 
+/// The scrollbar drawn inside `bounds` this frame (the widget egui registers for it).
+fn scrollbar_in(h: &Harness, bounds: egui::Rect) -> Option<egui::Rect> {
+    let tree = h.output.accesskit_update.as_ref()?;
+    tree.nodes.iter().filter(|(_, n)| n.role() == egui::accesskit::Role::ScrollBar).find_map(|(_, n)| {
+        let b = n.bounds()?;
+        let r = egui::Rect::from_min_max(egui::pos2(b.x0 as f32, b.y0 as f32), egui::pos2(b.x1 as f32, b.y1 as f32));
+        bounds.contains_rect(r).then_some(r)
+    })
+}
+
+/// The filled rectangles painted inside `bounds` in a window of `window`, each with its fill.
+fn painted_fills_in(h: &mut Harness, window: egui::Rect, bounds: egui::Rect) -> Vec<(egui::Rect, egui::Color32)> {
+    fn walk(shape: &egui::Shape, bounds: egui::Rect, out: &mut Vec<(egui::Rect, egui::Color32)>) {
+        match shape {
+            egui::Shape::Rect(r) if bounds.contains_rect(r.rect) => out.push((r.rect, r.fill)),
+            egui::Shape::Vec(shapes) => shapes.iter().for_each(|s| walk(s, bounds, out)),
+            _ => {}
+        }
+    }
+    // One more frame at the harness's clock (egui's history refuses time going backwards).
+    let time = h.ctx.input(|i| i.time) + 1.0 / 60.0;
+    let mut out = h.ctx.run_ui(egui::RawInput { screen_rect: Some(window), time: Some(time), ..Default::default() }, |ui| {
+        h.app.logic(ui.ctx());
+        h.app.ui(ui);
+    });
+    out.textures_delta.clear();
+    let mut fills = Vec::new();
+    out.shapes.iter().for_each(|s| walk(&s.shape, bounds, &mut fills));
+    fills
+}
+
+/// A short window (1366 × 768 and 1280 × 720), floating and docked, the hole selected and then
+/// edited in place: the card's actions (Edit feature and Edit sketch; Apply change and Cancel
+/// edit), the panel's help line and the footer line stand at the card's bottom, inside the card
+/// and the window, and only the body above them scrolls: where it overflows (the floating card,
+/// shorter than the docked panel, at both sizes) a scrollbar shows with the pointer away, and
+/// the wheel scrolls the body to its last row (the last dependent; the editor's last consequence
+/// line) while the actions and the footer stay where they are; where it fits, the last row is
+/// in sight as it is (the r6 review: at 1366 × 768 the card was cut off at the window's bottom,
+/// the help line clipped mid-line, the dependents and the footer out of sight, with nothing to
+/// show that the card scrolls).
+#[test]
+fn the_actions_and_the_footer_stay_at_the_cards_bottom_and_only_the_body_scrolls() {
+    use crate::scenario::rect_of;
+    use crate::shell::LayoutMode;
+    let t = crate::theme::Tokens::get();
+    for layout in [LayoutMode::Floating, LayoutMode::Docked] {
+        for (width, height) in [(1366.0_f32, 768.0_f32), (1280.0, 720.0)] {
+            let mut h = mount();
+            h.call("ui.set", json!({"layout": layout}));
+            h.call("ui.resize", json!({"width": width, "height": height}));
+            select(&mut h, "Mounting hole");
+            let window = egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(width, height));
+            let fillet = feature(&h, "Hole fillet");
+            for editor in [false, true] {
+                if editor {
+                    h.step(&json!({"widget": "Edit feature"})).unwrap();
+                    h.frames(3);
+                    assert!(h.app.properties.editor.is_some(), "{layout:?} {width}×{height}: the hole is edited in place");
+                }
+                let view = if editor { "the editor" } else { "the panel" };
+                // What is pinned under the body, top down (the panel's help line goes with its
+                // actions), and the body's last row.
+                let (pinned, last): (Vec<&str>, String) = if editor {
+                    (vec!["properties:apply", "properties:cancel"], "dialog:hint:properties_consequence".to_string())
+                } else {
+                    (vec!["properties:edit", "properties:edit_sketch", "dialog:note:properties_help"], format!("properties:dependent:{fillet}"))
+                };
+                let mut overflows = false;
+                for scrolled in [false, true] {
+                    let case = format!("{layout:?} {width}×{height}, {view}{}", if scrolled { ", scrolled to the end" } else { "" });
+                    if scrolled && !overflows {
+                        continue;
+                    }
+                    if scrolled {
+                        // The wheel over the body, as a mouse would send it, then the pointer away.
+                        let card = rect_of("properties:panel").unwrap_or_else(|| panic!("{case}: the card"));
+                        h.app.synthetic.push(egui::Event::PointerMoved(egui::pos2(card.center().x, card.top() + card.height() * 0.3)));
+                        h.app.synthetic.push(egui::Event::MouseWheel {
+                            unit: egui::MouseWheelUnit::Point,
+                            delta: egui::vec2(0.0, -5000.0),
+                            modifiers: egui::Modifiers::NONE,
+                            phase: egui::TouchPhase::Move,
+                        });
+                        h.app.synthetic.push(egui::Event::PointerGone);
+                        h.settle();
+                    }
+                    h.frames(10);
+                    let card = rect_of("properties:panel").unwrap_or_else(|| panic!("{case}: the card"));
+                    assert!(window.contains_rect(card), "{case}: the card {card:?} is inside the window {window:?}");
+                    // The actions, one under the other, their note, then the footer, all inside
+                    // the card and the footer at its bottom.
+                    let mut above = card.top();
+                    for name in &pinned {
+                        let r = rect_of(name).unwrap_or_else(|| panic!("{case}: {name}"));
+                        assert!(card.contains_rect(r), "{case}: {name} {r:?} is inside the card {card:?}");
+                        assert!(r.top() >= above - 0.5, "{case}: {name} {r:?} is under the one before, which ends at {above}");
+                        above = r.bottom();
+                    }
+                    let footer = rect_of("dialog:note:properties_footer").unwrap_or_else(|| panic!("{case}: the footer"));
+                    assert!(card.contains_rect(footer), "{case}: the footer {footer:?} is inside the card {card:?}");
+                    assert!(footer.top() >= above - 0.5, "{case}: the footer {footer:?} is under the actions, which end at {above}");
+                    assert!(
+                        card.bottom() - footer.bottom() <= t.space_24,
+                        "{case}: the footer {footer:?} stands at the card's bottom {}",
+                        card.bottom()
+                    );
+                    let first_action = rect_of(pinned[0]).unwrap_or_else(|| panic!("{case}: {}", pinned[0]));
+                    // A body that overflows has its scrollbar, above the actions, its handle
+                    // painted with the pointer away. The floating card is the short one.
+                    let bar = scrollbar_in(&h, card);
+                    if !scrolled {
+                        overflows = bar.is_some();
+                        assert!(overflows || layout == LayoutMode::Docked, "{case}: the body overflows and shows its scrollbar");
+                    }
+                    if let Some(bar) = bar {
+                        assert!(
+                            bar.bottom() <= first_action.top() + 0.5,
+                            "{case}: the scrollbar {bar:?} is the body's, above the actions {first_action:?}"
+                        );
+                        let fills = painted_fills_in(&mut h, window, bar.expand(1.0));
+                        assert!(
+                            fills.iter().any(|(r, fill)| fill.a() > 0 && r.height() <= bar.height()),
+                            "{case}: the scrollbar's handle is painted in {bar:?}: {fills:?}"
+                        );
+                    }
+                    // Scrolled to the end (or fitting as it is), the body's last row is in
+                    // sight, above the actions.
+                    if scrolled || !overflows {
+                        let r = rect_of(&last).unwrap_or_else(|| panic!("{case}: {last}"));
+                        assert!(
+                            card.contains_rect(r) && r.bottom() <= first_action.top() + 0.5,
+                            "{case}: the body's last row {last} {r:?} is in sight above the actions {first_action:?}, inside the card {card:?}"
+                        );
+                    }
+                }
+                if editor {
+                    super::cancel(&mut h.app);
+                    h.frames(2);
+                }
+            }
+        }
+    }
+}
+
 #[test]
 fn the_panel_gives_way_to_the_inspector_the_review_panel_dialogs_and_tools() {
     let mut h = mount();

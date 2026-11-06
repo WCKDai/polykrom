@@ -7,7 +7,10 @@
 //! each value once, as a field), and, in a 1366 × 768 window, the hole selected with the agent
 //! activity list and a status toast showing (`properties-toast-…`: a short one, and `…-long-…`
 //! an error as wide as a toast gets), where the list, the toast, the card and the viewport's
-//! controls must all stand clear of one another. The raster draws the window's own shapes, not
+//! controls must all stand clear of one another. In a 1366 × 768 and a 1280 × 720 window, the
+//! hole selected (`properties-selected-<size>-…`) and edited in place (`properties-editor-<size>-…`):
+//! the card's actions and footer stand at its bottom and the body above them scrolls, shown
+//! scrolled to its end in `…-<size>-scrolled-…-panel.png`. The raster draws the window's own shapes, not
 //! the viewport's GPU scene (nor the preview scene), so the model is rendered by the engine's
 //! headless picture path separately as `properties-model-<stage>.png`. Written to
 //! `target/review-media/`, where the stage is `REVIEW_MEDIA_STAGE` (default `after`); the same
@@ -32,6 +35,8 @@ use serde_json::json;
 const WINDOW: egui::Vec2 = egui::vec2(1600.0, 1000.0);
 /// A laptop window: the Properties card, the agent activity list and a toast share less room.
 const LAPTOP: egui::Vec2 = egui::vec2(1366.0, 768.0);
+/// A small window: the Properties card's body is shorter than its content.
+const SMALL: egui::Vec2 = egui::vec2(1280.0, 720.0);
 /// The toasts shown in the laptop window: a status, and an error as long as they get.
 const SHORT_TOAST: &str = "Counterbored hole: 1 feature updated";
 const LONG_TOAST: &str = "Hole fillet failed: the R2 blend of the counterbored hole's top edge self-intersects where the edge \
@@ -74,11 +79,22 @@ fn crop(shot: &image::RgbaImage, bounds: Rect, ppp: f32) -> image::RgbaImage {
     image::imageops::crop_imm(shot, bounds.left() as u32, bounds.top() as u32, bounds.width() as u32, bounds.height() as u32).to_image()
 }
 
-/// Paint the window, `window` large; the full picture as `<name>.png`, and the panel (or, without
-/// one, the right edge of the window where it would stand) as `<name>-panel.png`. With `focus`,
-/// the field of the row so labelled is clicked first, so it is painted with the keyboard (its
-/// lime border).
-fn paint(h: &mut Harness, dir: &Path, name: &str, focus: Option<&str>, window: egui::Vec2) {
+/// What is done in the painted window before its picture is taken.
+#[derive(Clone, Copy)]
+enum Act<'a> {
+    /// Nothing: the window as it is.
+    Nothing,
+    /// The field of the row so labelled is clicked, so it is painted with the keyboard (its lime
+    /// border).
+    Focus(&'a str),
+    /// The wheel over the Properties card scrolls its body to the end, the pointer then away.
+    ScrollToEnd,
+}
+
+/// Paint the window, `window` large; the full picture as `<name>.png` (when `whole`), and the
+/// panel (or, without one, the right edge of the window where it would stand) as
+/// `<name>-panel.png`, after `act`.
+fn paint(h: &mut Harness, dir: &Path, name: &str, act: Act<'_>, window: egui::Vec2, whole: bool) {
     // A fresh context transfers every texture (fonts and icons) to the software renderer. It
     // keeps the accessibility tree the harness finds widgets by (`h.widget`), as the harness's
     // own context has it.
@@ -90,28 +106,54 @@ fn paint(h: &mut Harness, dir: &Path, name: &str, focus: Option<&str>, window: e
     for _ in 0..8 {
         raster::paint_sized(h, &mut textures, vec![], window);
     }
-    if let Some(label) = focus
-        && let Some(field) = scenario::rect_of(&format!("dialog:control:{label}"))
-    {
-        let at = field.center();
-        let press = |pressed| egui::Event::PointerButton { pos: at, button: egui::PointerButton::Primary, pressed, modifiers: egui::Modifiers::NONE };
-        raster::paint_sized(h, &mut textures, vec![egui::Event::PointerMoved(at)], window);
-        raster::paint_sized(h, &mut textures, vec![press(true)], window);
-        raster::paint_sized(h, &mut textures, vec![press(false)], window);
-        raster::paint_sized(h, &mut textures, vec![], window);
-        assert!(h.ctx.memory(|m| m.focused().is_some()), "{name}: the {label} field has the keyboard");
+    match act {
+        Act::Nothing => {}
+        Act::Focus(label) => {
+            if let Some(field) = scenario::rect_of(&format!("dialog:control:{label}")) {
+                let at = field.center();
+                let press =
+                    |pressed| egui::Event::PointerButton { pos: at, button: egui::PointerButton::Primary, pressed, modifiers: egui::Modifiers::NONE };
+                raster::paint_sized(h, &mut textures, vec![egui::Event::PointerMoved(at)], window);
+                raster::paint_sized(h, &mut textures, vec![press(true)], window);
+                raster::paint_sized(h, &mut textures, vec![press(false)], window);
+                raster::paint_sized(h, &mut textures, vec![], window);
+                assert!(h.ctx.memory(|m| m.focused().is_some()), "{name}: the {label} field has the keyboard");
+            }
+        }
+        Act::ScrollToEnd => {
+            let card = scenario::rect_of("properties:panel").unwrap_or_else(|| panic!("{name}: the Properties card"));
+            let at = egui::pos2(card.center().x, card.top() + card.height() * 0.3);
+            let wheel = egui::Event::MouseWheel {
+                unit: egui::MouseWheelUnit::Point,
+                delta: egui::vec2(0.0, -5000.0),
+                modifiers: egui::Modifiers::NONE,
+                phase: egui::TouchPhase::Move,
+            };
+            raster::paint_sized(h, &mut textures, vec![egui::Event::PointerMoved(at)], window);
+            raster::paint_sized(h, &mut textures, vec![wheel], window);
+            raster::paint_sized(h, &mut textures, vec![egui::Event::PointerGone], window);
+            // The wheel's scrolling is smoothed over a few frames.
+            for _ in 0..12 {
+                raster::paint_sized(h, &mut textures, vec![], window);
+            }
+        }
     }
     let output = raster::paint_sized(h, &mut textures, vec![], window);
     let ppp = output.pixels_per_point;
     let shot = raster::raster_sized(h, &textures, output, window);
-    let full = dir.join(format!("{name}.png"));
-    shot.save(&full).unwrap();
+    let mut files = Vec::new();
+    if whole {
+        let full = dir.join(format!("{name}.png"));
+        shot.save(&full).unwrap();
+        files.push(full);
+    }
     let panel = scenario::rect_of("properties:panel")
         .map(|r| r.expand(8.0))
         .unwrap_or_else(|| Rect::from_min_max(egui::pos2(window.x - 300.0, 200.0), egui::pos2(window.x, window.y)));
     let panel_file = dir.join(format!("{name}-panel.png"));
     crop(&shot, panel, ppp).save(&panel_file).unwrap();
-    for file in [full, panel_file] {
+    files.push(panel_file);
+    for file in files {
         let bytes = std::fs::metadata(&file).unwrap().len();
         assert!(bytes <= MAX_BYTES, "{}: {bytes} bytes", file.display());
     }
@@ -178,7 +220,7 @@ fn properties_panel_pictures() {
         let hole = h.app.session.doc.find_feature("Mounting holes").unwrap().id;
         h.call("engine.execute", json!({"command": "select.set", "params": {"items": [{"type": "feature", "id": hole}]}}));
         h.frames(3);
-        paint(&mut h, &dir, &format!("properties-selected-{mode}-{stage}"), None, WINDOW);
+        paint(&mut h, &dir, &format!("properties-selected-{mode}-{stage}"), Act::Nothing, WINDOW, true);
         // View 03: Edit feature, Ø10, Preview on, the Diameter field focused (its lime border).
         let editor = h.widget("Edit feature").is_some();
         if editor {
@@ -189,12 +231,12 @@ fn properties_panel_pictures() {
             settle_preview(&mut h);
             assert!(h.app.preview.active, "{mode}: the Ø10 holes are previewed: {:?}", h.app.preview.error);
         }
-        paint(&mut h, &dir, &format!("properties-editor-{mode}-{stage}"), editor.then_some("Diameter"), WINDOW);
+        paint(&mut h, &dir, &format!("properties-editor-{mode}-{stage}"), if editor { Act::Focus("Diameter") } else { Act::Nothing }, WINDOW, true);
         // Validation: a value that is not a length.
         if editor {
             assert!(type_into(&mut h, "Diameter", "abc"));
         }
-        paint(&mut h, &dir, &format!("properties-invalid-{mode}-{stage}"), None, WINDOW);
+        paint(&mut h, &dir, &format!("properties-invalid-{mode}-{stage}"), Act::Nothing, WINDOW, true);
         if editor {
             h.step(&json!({"key": "Escape"})).unwrap();
             h.frames(2);
@@ -206,7 +248,7 @@ fn properties_panel_pictures() {
         h.call("engine.execute", json!({"command": "select.set", "params": {"items": [{"type": "feature", "id": counterbore}]}}));
         h.frames(3);
         assert!(!h.app.agent_feed.entries.is_empty(), "{mode}: the agent activity list shows");
-        paint(&mut h, &dir, &format!("properties-counterbore-selected-{mode}-{stage}"), None, WINDOW);
+        paint(&mut h, &dir, &format!("properties-counterbore-selected-{mode}-{stage}"), Act::Nothing, WINDOW, true);
         if let (Some(list), Some(panel)) = (scenario::rect_of("agent_activity"), scenario::rect_of("properties:panel")) {
             assert!(!list.intersect(panel).is_positive(), "{mode}: the activity list {list:?} is drawn under the card {panel:?}");
         }
@@ -216,7 +258,14 @@ fn properties_panel_pictures() {
             assert!(editing(&h), "{mode}: the counterbore hole is edited in place");
             settle_preview(&mut h);
         }
-        paint(&mut h, &dir, &format!("properties-counterbore-{mode}-{stage}"), editor.then_some("Diameter"), WINDOW);
+        paint(
+            &mut h,
+            &dir,
+            &format!("properties-counterbore-{mode}-{stage}"),
+            if editor { Act::Focus("Diameter") } else { Act::Nothing },
+            WINDOW,
+            true,
+        );
         if editor {
             h.step(&json!({"key": "Escape"})).unwrap();
             h.frames(2);
@@ -229,11 +278,47 @@ fn properties_panel_pictures() {
         h.frames(3);
         for (name, text) in [("toast", SHORT_TOAST), ("toast-long", LONG_TOAST)] {
             h.app.status = Some((text.to_string(), polykrom_ui_egui::now_ms(), text == LONG_TOAST));
-            paint(&mut h, &dir, &format!("properties-{name}-{mode}-{stage}"), None, LAPTOP);
+            paint(&mut h, &dir, &format!("properties-{name}-{mode}-{stage}"), Act::Nothing, LAPTOP, true);
             assert!(scenario::rect_of("toast").is_some(), "{mode}: the {name} shows");
             assert!(!h.app.agent_feed.entries.is_empty(), "{mode}: the agent activity list shows");
         }
         h.app.status = None;
+        // The laptop window and a small one, the hole with dependents selected
+        // (`properties-selected-<size>-…`) and edited in place (`properties-editor-<size>-…`):
+        // the card's actions and footer stand at its bottom, in sight, and the body scrolls; the
+        // `…-scrolled-…-panel.png` crops show it scrolled to its end. That the actions and the
+        // footer are inside the card and the body scrolls to its last row is the panel's own
+        // test; the pictures show it, before and after.
+        // Each view is scrolled after its other pictures: scrolled, the base commit's card has
+        // its Edit feature button out of sight, where a click cannot reach it.
+        for size in [LAPTOP, SMALL] {
+            let tag = format!("{}x{}", size.x, size.y);
+            h.call("ui.resize", json!({"width": size.x, "height": size.y}));
+            h.call("engine.execute", json!({"command": "select.set", "params": {"items": [{"type": "feature", "id": hole}]}}));
+            h.frames(3);
+            paint(&mut h, &dir, &format!("properties-selected-{tag}-{mode}-{stage}"), Act::Nothing, size, true);
+            if editor {
+                h.step(&json!({"widget": "Edit feature"})).unwrap();
+                h.frames(3);
+                if !editing(&h) {
+                    // The base commit's card clips the button out of the pointer's reach at
+                    // 1280 × 720: the editor opens as the button would open it.
+                    h.call("engine.execute", json!({"command": "select.set", "params": {"items": [{"type": "feature", "id": hole}]}}));
+                    polykrom_ui_egui::design_properties::begin_edit(&mut h.app, hole);
+                    h.frames(3);
+                }
+                assert!(editing(&h), "{mode} {tag}: the hole is edited in place");
+                settle_preview(&mut h);
+            }
+            paint(&mut h, &dir, &format!("properties-editor-{tag}-{mode}-{stage}"), Act::Nothing, size, true);
+            paint(&mut h, &dir, &format!("properties-editor-{tag}-scrolled-{mode}-{stage}"), Act::ScrollToEnd, size, false);
+            if editor {
+                h.step(&json!({"key": "Escape"})).unwrap();
+                h.frames(2);
+                assert!(!editing(&h), "{mode} {tag}: Esc cancels the edit");
+            }
+            paint(&mut h, &dir, &format!("properties-selected-{tag}-scrolled-{mode}-{stage}"), Act::ScrollToEnd, size, false);
+        }
     }
     theme::set_dark(previous);
 }

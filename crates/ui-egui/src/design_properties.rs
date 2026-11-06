@@ -12,7 +12,9 @@
 //! revision and the history alone: the editor never rolls the timeline, it fills the dialog from
 //! a scratch copy of the session rolled back to just before the feature ([`build_dialog`]).
 //! Features whose dialog has no plain value fields (or no dialog at all) keep their existing way
-//! of editing, and the panel says which it is ([`Edits`]).
+//! of editing, and the panel says which it is ([`Edits`]). The actions, their note and the
+//! footer line stand at the card's bottom; the body above them scrolls when the window is short
+//! ([`contents`]).
 //!
 //! With nothing selected the panel shows the design's properties (project, part number,
 //! revision, author, organization, description and licence) in the same layout; **Edit
@@ -687,7 +689,7 @@ pub fn panel(app: &mut SolveApp, ui: &mut egui::Ui) {
                     container.show_frame(ui, frame, available, |ui| {
                         ui.set_width(inner);
                         ui.set_min_height(height);
-                        ui_kit::scope(ui, |ui| scrolled(ui, height, |ui| contents(app, ui, height)));
+                        ui_kit::scope(ui, |ui| contents(app, ui, height));
                     });
                 },
             );
@@ -700,7 +702,7 @@ pub fn panel(app: &mut SolveApp, ui: &mut egui::Ui) {
             .frame(container.edge_frame(t.panel))
             .show(ui, |ui| {
                 let height = ui.available_height();
-                ui_kit::scope(ui, |ui| scrolled(ui, height, |ui| contents(app, ui, height)))
+                ui_kit::scope(ui, |ui| contents(app, ui, height))
             });
         app.properties.rect = Some(r.response.rect);
     }
@@ -709,41 +711,119 @@ pub fn panel(app: &mut SolveApp, ui: &mut egui::Ui) {
     }
 }
 
-/// The panel's content in a scroll area of `height`: a short window scrolls rather than clips.
-fn scrolled(ui: &mut egui::Ui, height: f32, add: impl FnOnce(&mut egui::Ui)) {
-    egui::ScrollArea::vertical().id_salt("sc_properties_scroll").max_height(height.max(0.0)).auto_shrink([false, false]).show(ui, add);
+/// The card's body in a scroll area `height` tall, whatever the body holds, so what stands under
+/// it keeps its place: a short window scrolls the body rather than clipping the card. The
+/// scrollbar shows while the body overflows, as plainly as it does under the pointer, and the
+/// rows are inset from it.
+fn scrolled<R>(ui: &mut egui::Ui, height: f32, add: impl FnOnce(&mut egui::Ui) -> R) -> R {
+    let t = Tokens::get();
+    ui.scope(|ui| {
+        let scroll = &mut ui.style_mut().spacing.scroll;
+        scroll.floating = true;
+        scroll.floating_width = t.space_4;
+        scroll.floating_allocated_width = t.space_8;
+        scroll.dormant_background_opacity = 0.0;
+        scroll.dormant_handle_opacity = scroll.active_handle_opacity;
+        egui::ScrollArea::vertical()
+            .id_salt("sc_properties_scroll")
+            .max_height(height.max(0.0))
+            .auto_shrink([false, false])
+            .scroll_bar_visibility(egui::scroll_area::ScrollBarVisibility::VisibleWhenNeeded)
+            .show(ui, add)
+            .inner
+    })
+    .inner
 }
 
+/// What the card shows.
+#[derive(Clone, Copy)]
+enum View {
+    /// A feature edited in place (design kit view 03).
+    Editor,
+    /// The selected feature (view 01).
+    Feature(u64),
+    /// The design's properties, with nothing selected.
+    Design,
+}
+
+/// What stands under the card's body, at the card's bottom: the actions, one under the other,
+/// a note under them (the panel's help line, the design's note on exports), and the footer line.
+struct Pinned {
+    actions: usize,
+    note: Option<&'static str>,
+}
+
+/// The room [`Pinned`] and the footer line take under the body, item spacing included: the gap
+/// after the body, the space before the actions, each action's button, the note and the footer
+/// as [`ui_kit::text`] lays them out at the card's width.
+fn pinned_height(ui: &egui::Ui, pinned: &Pinned, footer: &str) -> f32 {
+    let t = Tokens::get();
+    let gap = ui.spacing().item_spacing.y;
+    let width = ui.available_width();
+    let note =
+        |text: &str| ui.painter().layout(text.to_owned(), egui::FontId::proportional(t.font_small), t.form_dim, width).size().y + 2.0 * t.space_4;
+    gap + t.space_8 + pinned.actions as f32 * (t.form_button_height + gap) + pinned.note.map_or(0.0, |text| note(text) + gap) + note(footer)
+}
+
+/// The card's content, `height` tall: the body (the heading, the rows, the dependents or the
+/// consequences) scrolls in the room above the actions, their note and the footer line, which
+/// stand at the card's bottom whatever the body holds, as the AI review card's do, so they are
+/// in sight in a window too short for the whole card (the r6 review: at 1366 × 768 the card was
+/// cut off at the window's bottom).
 fn contents(app: &mut SolveApp, ui: &mut egui::Ui, height: f32) {
     let t = Tokens::get();
-    let top = ui.cursor().top();
-    let footer = if app.properties.editor.is_some() {
-        if app.properties.editor.as_ref().is_some_and(|ed| ed.preview) {
-            tr("ui.properties.preview_not_applied")
-        } else {
-            tr("ui.properties.not_applied")
-        }
+    let view = if app.properties.editor.is_some() {
+        View::Editor
+    } else if let Some(id) = selected_feature(app) {
+        View::Feature(id)
     } else {
-        tr("ui.properties.no_pending")
+        View::Design
     };
+    let pinned = match view {
+        View::Editor => Pinned { actions: 2, note: None },
+        View::Feature(id) => Pinned { actions: feature_actions_count(app, id), note: Some(help_note(app, id)) },
+        View::Design => Pinned { actions: 1, note: Some(tr("ui.design_properties.exports")) },
+    };
+    let footer_text = |app: &SolveApp| match &app.properties.editor {
+        Some(ed) if ed.preview => tr("ui.properties.preview_not_applied"),
+        Some(_) => tr("ui.properties.not_applied"),
+        None => tr("ui.properties.no_pending"),
+    };
+    let body_height = height - pinned_height(ui, &pinned, footer_text(app));
     // The label column fits the widest label of the rows shown (the kit's proportion at least).
     let labels = row_labels(app);
     let labels: Vec<&str> = labels.iter().map(String::as_str).collect();
-    ui_kit::labelled_form(ui, &labels, LABEL_SHARE, |ui| {
-        if app.properties.editor.is_some() {
-            editor_view(app, ui);
-        } else if let Some(id) = selected_feature(app) {
-            feature_view(app, ui, id);
-        } else {
-            document_view(app, ui);
-        }
+    let editor = scrolled(ui, body_height, |ui| {
+        ui_kit::labelled_form(ui, &labels, LABEL_SHARE, |ui| match view {
+            View::Editor => editor_body(app, ui),
+            View::Feature(id) => {
+                feature_body(app, ui, id);
+                None
+            }
+            View::Design => {
+                document_body(app, ui);
+                None
+            }
+        })
     });
-    // The footer line sits at the bottom of the panel.
-    let used = ui.cursor().top() - top;
-    let footer_height = ui.fonts_mut(|f| f.row_height(&egui::FontId::proportional(t.font_small))) + t.space_8;
-    let fill = height - used - footer_height;
-    if fill > 0.0 {
-        ui.add_space(fill);
+    // The footer reads the editor as the body left it (its Preview box).
+    let footer = footer_text(app);
+    ui.add_space(t.space_8);
+    match view {
+        View::Editor => {
+            if let Some(body) = editor {
+                editor_actions(app, ui, body);
+            }
+        }
+        View::Feature(id) => feature_actions(app, ui, id),
+        View::Design => {
+            if primary(ui, "edit_properties", "ui.properties.edit_properties", true).clicked() {
+                open(app);
+            }
+        }
+    }
+    if let Some(note) = pinned.note {
+        ui_kit::text(ui, note, ui_kit::Text::Note("properties_help"));
     }
     ui_kit::text(ui, footer, ui_kit::Text::Note("properties_footer"));
 }
@@ -872,8 +952,28 @@ fn subtitle(app: &mut SolveApp, id: u64, editing: bool) -> String {
     parts.join(" / ")
 }
 
-/// Design kit view 01: the selected feature.
-fn feature_view(app: &mut SolveApp, ui: &mut egui::Ui, id: u64) {
+/// The help line under a feature's actions: how the feature is edited.
+fn help_note(app: &mut SolveApp, id: u64) -> &'static str {
+    match edits(app, id) {
+        Edits::Panel | Edits::Sketch => tr("ui.properties.help"),
+        Edits::Dialog => tr("ui.properties.in_dialog"),
+        Edits::Palette => tr("ui.properties.in_palette"),
+    }
+}
+
+/// How many actions a feature has ([`feature_actions`]): Edit sketch alone for a sketch; else
+/// Edit feature, and Edit sketch when the feature is built from a sketch.
+fn feature_actions_count(app: &mut SolveApp, id: u64) -> usize {
+    if edits(app, id) == Edits::Sketch {
+        return 1;
+    }
+    let sketch = app.session.doc.feature(id).and_then(|f| reference_sketch(app, &f.kind));
+    1 + usize::from(sketch.is_some())
+}
+
+/// Design kit view 01, the body: the selected feature, its parameters, its context rows and the
+/// features that depend on it (each a link to that feature).
+fn feature_body(app: &mut SolveApp, ui: &mut egui::Ui, id: u64) {
     let t = Tokens::get();
     let Some(f) = app.session.doc.feature(id).cloned() else { return };
     heading(app, ui, tr("ui.properties"), false);
@@ -893,24 +993,6 @@ fn feature_view(app: &mut SolveApp, ui: &mut egui::Ui, id: u64) {
         value_row(ui, label, &value);
     }
     ui.add_space(t.space_8);
-    let how = edits(app, id);
-    let sketch = reference_sketch(app, &f.kind);
-    let mut edit = false;
-    let mut edit_sketch = false;
-    if how == Edits::Sketch {
-        edit_sketch |= primary(ui, "edit_sketch", "ui.properties.edit_sketch", true).clicked();
-    } else {
-        edit |= primary(ui, "edit", "ui.properties.edit_feature", true).clicked();
-        if sketch.is_some() {
-            edit_sketch |= wide_button(ui, "edit_sketch", "ui.properties.edit_sketch").clicked();
-        }
-    }
-    let note = match how {
-        Edits::Panel | Edits::Sketch => tr("ui.properties.help"),
-        Edits::Dialog => tr("ui.properties.in_dialog"),
-        Edits::Palette => tr("ui.properties.in_palette"),
-    };
-    ui_kit::text(ui, note, ui_kit::Text::Note("properties_help"));
     ui_kit::divider(ui, "properties_dependents");
     let deps = dependents(app, id);
     let title = match deps.len() {
@@ -947,6 +1029,23 @@ fn feature_view(app: &mut SolveApp, ui: &mut egui::Ui, id: u64) {
     if let Some(dep) = pick {
         let _ = app.run("select.set", json!({"items": [{"type": "feature", "id": dep}]}));
     }
+}
+
+/// The feature's actions, under the body: Edit sketch for a sketch; else Edit feature, and Edit
+/// sketch when the feature is built from one ([`feature_actions_count`] counts them).
+fn feature_actions(app: &mut SolveApp, ui: &mut egui::Ui, id: u64) {
+    let how = edits(app, id);
+    let sketch = app.session.doc.feature(id).and_then(|f| reference_sketch(app, &f.kind));
+    let mut edit = false;
+    let mut edit_sketch = false;
+    if how == Edits::Sketch {
+        edit_sketch |= primary(ui, "edit_sketch", "ui.properties.edit_sketch", true).clicked();
+    } else {
+        edit |= primary(ui, "edit", "ui.properties.edit_feature", true).clicked();
+        if sketch.is_some() {
+            edit_sketch |= wide_button(ui, "edit_sketch", "ui.properties.edit_sketch").clicked();
+        }
+    }
     if edit {
         begin_edit(app, id);
     } else if edit_sketch {
@@ -961,12 +1060,19 @@ fn feature_view(app: &mut SolveApp, ui: &mut egui::Ui, id: u64) {
     }
 }
 
-/// Design kit view 03: the feature edited in place.
-fn editor_view(app: &mut SolveApp, ui: &mut egui::Ui) {
-    let t = Tokens::get();
-    let Some(mut ed) = app.properties.editor.take() else { return };
+/// What the editor's body found, for its actions: every field holds a value and the commands
+/// are ready (Apply is enabled), and Enter was accepted in a field (which applies).
+struct EditorBody {
+    valid: bool,
+    enter: bool,
+}
+
+/// Design kit view 03, the body: the feature edited in place. None: its feature is gone, and
+/// the editor with it.
+fn editor_body(app: &mut SolveApp, ui: &mut egui::Ui) -> Option<EditorBody> {
+    let mut ed = app.properties.editor.take()?;
     let id = ed.feature;
-    let Some(f) = app.session.doc.feature(id).cloned() else { return };
+    let f = app.session.doc.feature(id).cloned()?;
     heading(app, ui, tr("ui.properties.edit_title"), false);
     summary(ui, &kind_line(app, id), &tr_name(&f.name), &subtitle(app, id, true));
     ui_kit::divider(ui, "properties_parameters");
@@ -1013,10 +1119,14 @@ fn editor_view(app: &mut SolveApp, ui: &mut egui::Ui) {
     if let Some(e) = &ed.error {
         ui_kit::text(ui, &dialogs::shown_error(e), ui_kit::Text::Report("error", true));
     }
-    ui.add_space(t.space_4);
-    let apply_now = primary(ui, "apply", "ui.properties.apply", valid).clicked() || (enter && valid);
-    let cancel_now = wide_button(ui, "cancel", "ui.properties.cancel").clicked();
     app.properties.editor = Some(ed);
+    Some(EditorBody { valid, enter })
+}
+
+/// The editor's actions, under the body: Apply change (Enter in a field too) and Cancel edit.
+fn editor_actions(app: &mut SolveApp, ui: &mut egui::Ui, body: EditorBody) {
+    let apply_now = primary(ui, "apply", "ui.properties.apply", body.valid).clicked() || (body.enter && body.valid);
+    let cancel_now = wide_button(ui, "cancel", "ui.properties.cancel").clicked();
     if cancel_now {
         cancel(app);
     } else if apply_now {
@@ -1024,9 +1134,9 @@ fn editor_view(app: &mut SolveApp, ui: &mut egui::Ui) {
     }
 }
 
-/// The design's properties, with nothing selected.
-fn document_view(app: &mut SolveApp, ui: &mut egui::Ui) {
-    let t = Tokens::get();
+/// The design's properties, with nothing selected: the body; Edit properties and the note on
+/// exports stand under it.
+fn document_body(app: &mut SolveApp, ui: &mut egui::Ui) {
     heading(app, ui, tr("ui.properties"), true);
     let doc = &app.session.doc;
     let bodies = app.session.world_state().bodies.len();
@@ -1040,11 +1150,6 @@ fn document_view(app: &mut SolveApp, ui: &mut egui::Ui) {
         value_row(ui, label(key), &value);
     }
     value_row(ui, "Units", &doc.units.clone());
-    ui.add_space(t.space_8);
-    if primary(ui, "edit_properties", "ui.properties.edit_properties", true).clicked() {
-        open(app);
-    }
-    ui_kit::text(ui, tr("ui.design_properties.exports"), ui_kit::Text::Note("properties_help"));
 }
 
 // ---- The Design Properties window ---------------------------------------------------------------
