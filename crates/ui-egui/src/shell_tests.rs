@@ -791,7 +791,9 @@ fn the_canvas_spans_the_window_under_a_shorter_chrome_at_every_size() {
 /// active, the sketch palette and the sketch's status line. (The r9 review: docked, both status
 /// lines hid under the browser column at every size, and the navigation bar lay over the column
 /// beside a left Assistant; the controls were laid out on the full viewport, not on the content
-/// area between the column and the right edge.)
+/// area between the column and the right edge. r10: the navigation bar and the sketch palette,
+/// left out of the r9 check, are a pair like the others: on the laptop, beside a left Assistant,
+/// the palette reached over the bar's last buttons.)
 #[test]
 fn cards_and_overlays_never_overlap_at_every_size_in_either_layout() {
     for layout in ["floating", "docked"] {
@@ -863,13 +865,6 @@ fn cards_and_overlays_never_overlap_at_every_size_in_either_layout() {
                 }
                 for (i, (a, ra)) in cards.iter().enumerate() {
                     for (b, rb) in cards.iter().skip(i + 1) {
-                        // The navigation bar keeps its place at the content area's centre whatever
-                        // tool panel is open (`navigation_anchors_ignore_positioned_resized_and_covering_dialogs`):
-                        // on the laptop's width, with a 380 pt Assistant beside the browser, the
-                        // palette reaches over it in either layout. Not this change's.
-                        if [*a, *b] == ["nav:outer", "sketch_palette:outer"] {
-                            continue;
-                        }
                         assert!(!ra.intersect(*rb).is_positive(), "{case}: {a} {ra:?} overlaps {b} {rb:?}");
                     }
                 }
@@ -878,63 +873,128 @@ fn cards_and_overlays_never_overlap_at_every_size_in_either_layout() {
     }
 }
 
-/// At 1366 × 768 and 1280 × 720, floating and docked, under the kit's taller history and status
-/// bar: a right-docked tool sheet (Extrude) and the sketch palette stand between the view cube
-/// and the history, inside the window, and their actions (OK and Cancel; Finish Sketch, Look At
-/// and Slice) are in sight at their bottom: a short view gives them less height and their body
-/// scrolls, as the Properties and the Review changes cards do. (The r9 review: the palette ran
-/// 8 pt into the history card floating; docked, 22 pt under the history strip and 25 pt over the
-/// cube; the Extrude sheet 30 pt into the history card.)
+/// At 1366 × 768 and 1280 × 720, floating and docked, with the Assistant closed or docked left,
+/// under the kit's taller history and status bar: a right-docked tool sheet (Extrude) and the
+/// sketch palette stand between the view cube and the history, inside the window, and their
+/// actions (OK and Cancel; Finish Sketch, Look At and Slice) are in sight at their bottom: a
+/// short view gives them less height and their body scrolls, as the Properties and the Review
+/// changes cards do. The navigation bar stands clear of them: left of them where the content area
+/// between the browser and the right edge is too narrow for both at the bar's centre, and in
+/// more rows where the room left of them is narrower than its one row (docked, beside a left
+/// Assistant, with the Properties panel at the right edge and the Extrude sheet against it) (r10;
+/// the r9 review: beside a left Assistant the palette hid the bar's last buttons, 20 × 30 pt at
+/// 1366 × 768 and 63 × 30 pt at 1280 × 720 docked, more floating), and Finish Sketch is inset from
+/// the palette's sides as Look At and Slice are, the same in both layouts (r10: docked it ran edge
+/// to edge). (The r9 review: the palette ran 8 pt into the history card floating; docked, 22 pt
+/// under the history strip and 25 pt over the cube; the Extrude sheet 30 pt into the history card.)
 #[test]
 fn palettes_and_right_docked_sheets_stay_between_the_cube_and_the_history_on_a_laptop() {
+    let mut insets = Vec::new();
     for layout in ["floating", "docked"] {
-        for (w, hgt) in [(1366.0_f32, 768.0_f32), (1280.0, 720.0)] {
-            let case = format!("{layout} {w}x{hgt}");
-            let window = egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(w, hgt));
-            let history_name = if layout == "floating" { "history:card" } else { "history:strip" };
-            let mut h = Harness::new();
-            h.app.home.open = false;
-            h.call("ui.resize", json!({"width": w, "height": hgt}));
-            h.call("ui.set", json!({"layout": layout}));
-            h.app.run("solid.box", json!({"length": 40, "width": 30, "height": 20})).unwrap();
-            h.frames(3);
-            // `card` (a sheet, the palette) between the cube and the history, with `actions` in
-            // sight inside it.
-            let between = |what: &str, card: egui::Rect, actions: &[&str]| {
-                let cube = rect_of("axis_view:outer").unwrap_or_else(|| panic!("{case}: the view cube"));
-                let history = rect_of(history_name).unwrap_or_else(|| panic!("{case}: the history"));
-                assert!(window.contains_rect(card), "{case}: {what} {card:?} is inside the window {window:?}");
-                assert!(
-                    card.top() >= cube.bottom() - 0.5 && !card.intersect(cube).is_positive(),
-                    "{case}: {what} {card:?} starts under the cube {cube:?}"
-                );
-                assert!(
-                    card.bottom() <= history.top() + 0.5 && !card.intersect(history).is_positive(),
-                    "{case}: {what} {card:?} ends above the history {history:?}"
-                );
-                for name in actions {
-                    let action = rect_of(name).unwrap_or_else(|| panic!("{case}: {name} is drawn"));
-                    assert!(card.contains_rect(action), "{case}: {name} {action:?} is in sight inside {what} {card:?}");
+        for assistant in [false, true] {
+            for (w, hgt) in [(1366.0_f32, 768.0_f32), (1280.0, 720.0)] {
+                let case = format!("{layout} assistant={assistant} {w}x{hgt}");
+                let window = egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(w, hgt));
+                let history_name = if layout == "floating" { "history:card" } else { "history:strip" };
+                let mut h = Harness::new();
+                h.app.home.open = false;
+                h.call("ui.resize", json!({"width": w, "height": hgt}));
+                h.call("ui.set", json!({"layout": layout}));
+                h.app.run("solid.box", json!({"length": 40, "width": 30, "height": 20})).unwrap();
+                h.frames(3);
+                if assistant {
+                    h.call("ui.agent_chat", json!({"open": true, "side": "left", "width": 380, "picker": false}));
+                    // The controls follow the measured Assistant a frame later.
+                    h.frames(6);
+                    let chat = rect_of("agent_chat:panel").unwrap_or_else(|| panic!("{case}: the Assistant"));
+                    assert!(chat.left() < 400.0 && chat.width() >= 300.0, "{case}: the Assistant {chat:?} is docked left");
                 }
-            };
-            h.app.start("solid.extrude");
-            h.frames(4);
-            let sheet = h.app.viewport.dialog_rect.unwrap_or_else(|| panic!("{case}: the Extrude sheet"));
-            between("the Extrude sheet", sheet, &["dialog:footer:actions", "dialog:ok", "dialog:cancel"]);
-            crate::dialogs::cancel(&mut h.app);
-            h.frames(2);
-            h.app.run("sketch.create", json!({"plane": "XY"})).unwrap();
-            h.frames(4);
-            let palette = h.app.viewport.palette_rect.unwrap_or_else(|| panic!("{case}: the sketch palette"));
-            between("the sketch palette", palette, &["sketch_palette:finish", "sketch_palette:look_at", "sketch_palette:slice"]);
-            // The body (the options) scrolls above the pinned actions.
-            let options = rect_of("sketch_palette:options").unwrap_or_else(|| panic!("{case}: the palette's options"));
-            let finish = rect_of("sketch_palette:finish").unwrap_or_else(|| panic!("{case}: Finish Sketch"));
-            assert!(
-                palette.contains_rect(options) && options.bottom() <= finish.top() + 0.5,
-                "{case}: the options {options:?} scroll above Finish Sketch {finish:?} inside the palette {palette:?}"
-            );
+                // The bar's place before a sheet or the palette opens (floating, beside a left
+                // Assistant, it already stands left of the Properties card).
+                let nav_before = rect_of("nav:outer").unwrap_or_else(|| panic!("{case}: the navigation bar"));
+                // `card` (a sheet, the palette) between the cube and the history, with `actions`
+                // in sight inside it, and the navigation bar clear of it, in sight in the
+                // content area `content` (the controls' room: docked, a Properties panel at the
+                // right edge gives way to the palette, so it is read with the card).
+                let between = |what: &str, card: egui::Rect, actions: &[&str], content: egui::Rect| {
+                    let cube = rect_of("axis_view:outer").unwrap_or_else(|| panic!("{case}: the view cube"));
+                    let history = rect_of(history_name).unwrap_or_else(|| panic!("{case}: the history"));
+                    assert!(window.contains_rect(card), "{case}: {what} {card:?} is inside the window {window:?}");
+                    assert!(
+                        card.top() >= cube.bottom() - 0.5 && !card.intersect(cube).is_positive(),
+                        "{case}: {what} {card:?} starts under the cube {cube:?}"
+                    );
+                    assert!(
+                        card.bottom() <= history.top() + 0.5 && !card.intersect(history).is_positive(),
+                        "{case}: {what} {card:?} ends above the history {history:?}"
+                    );
+                    for name in actions {
+                        let action = rect_of(name).unwrap_or_else(|| panic!("{case}: {name} is drawn"));
+                        assert!(card.contains_rect(action), "{case}: {name} {action:?} is in sight inside {what} {card:?}");
+                    }
+                    let nav = rect_of("nav:outer").unwrap_or_else(|| panic!("{case}: the navigation bar"));
+                    assert!(!nav.intersect(card).is_positive(), "{case}: the navigation bar {nav:?} is under {what} {card:?}");
+                    assert!(nav.right() + SHELL_GAP <= card.left() + 0.5, "{case}: the navigation bar {nav:?} stands a gap clear of {what} {card:?}");
+                    // The bar keeps its one row, unless the content between the browser and the
+                    // right edge (docked, a Properties panel stands there beside the Assistant)
+                    // has no room for it beside the card: then it re-flows into more rows there.
+                    let room = card.left() - SHELL_GAP - content.left();
+                    if room >= nav_before.width() {
+                        assert_eq!(nav.size(), nav_before.size(), "{case}: the bar keeps its size beside {what}");
+                    } else {
+                        assert!(
+                            nav.width() < nav_before.width() && nav.height() > nav_before.height(),
+                            "{case}: {nav:?} re-flows in the {room} pt beside {what}"
+                        );
+                    }
+                    assert_eq!(nav.bottom(), nav_before.bottom(), "{case}: the bar keeps its row beside {what}");
+                    // Left of the content's centre, never past its left edge.
+                    assert!(
+                        nav.left() >= content.left() && nav.center().x <= content.center().x + 0.5,
+                        "{case}: {nav:?} beside {what} in {content:?}"
+                    );
+                    let browser = rect_of("browser:card").unwrap_or_else(|| panic!("{case}: the browser"));
+                    assert!(!nav.intersect(browser).is_positive(), "{case}: the navigation bar {nav:?} is clear of the browser {browser:?}");
+                };
+                h.app.start("solid.extrude");
+                h.frames(4);
+                let sheet = h.app.viewport.dialog_rect.unwrap_or_else(|| panic!("{case}: the Extrude sheet"));
+                let content = h.app.viewport.layout.as_ref().unwrap_or_else(|| panic!("{case}: the layout")).content;
+                between("the Extrude sheet", sheet, &["dialog:footer:actions", "dialog:ok", "dialog:cancel"], content);
+                crate::dialogs::cancel(&mut h.app);
+                h.frames(2);
+                assert_eq!(rect_of("nav:outer").unwrap(), nav_before, "{case}: the sheet closed, the bar is back in its place");
+                h.app.run("sketch.create", json!({"plane": "XY"})).unwrap();
+                h.frames(4);
+                let palette = h.app.viewport.palette_rect.unwrap_or_else(|| panic!("{case}: the sketch palette"));
+                let content = h.app.viewport.layout.as_ref().unwrap_or_else(|| panic!("{case}: the layout")).content;
+                between("the sketch palette", palette, &["sketch_palette:finish", "sketch_palette:look_at", "sketch_palette:slice"], content);
+                // The body (the options) scrolls above the pinned actions.
+                let options = rect_of("sketch_palette:options").unwrap_or_else(|| panic!("{case}: the palette's options"));
+                let finish = rect_of("sketch_palette:finish").unwrap_or_else(|| panic!("{case}: Finish Sketch"));
+                assert!(
+                    palette.contains_rect(options) && options.bottom() <= finish.top() + 0.5,
+                    "{case}: the options {options:?} scroll above Finish Sketch {finish:?} inside the palette {palette:?}"
+                );
+                // Finish Sketch is inset from the palette's sides like Look At and Slice under it.
+                let look_at = rect_of("sketch_palette:look_at").unwrap_or_else(|| panic!("{case}: Look At"));
+                let slice = rect_of("sketch_palette:slice").unwrap_or_else(|| panic!("{case}: Slice"));
+                let inset = (finish.left() - palette.left(), palette.right() - finish.right());
+                assert!(
+                    inset.0 >= 8.0 && (inset.0 - inset.1).abs() <= 1.0,
+                    "{case}: Finish Sketch {finish:?} is inset from the palette {palette:?}: {inset:?}"
+                );
+                assert!((finish.left() - look_at.left()).abs() <= 1.0, "{case}: Finish Sketch {finish:?} starts with Look At {look_at:?}");
+                assert!((finish.right() - slice.right()).abs() <= 1.0, "{case}: Finish Sketch {finish:?} ends with Slice {slice:?}");
+                insets.push((case, inset.0.round()));
+            }
         }
+    }
+    // The same inset in both layouts, from the card's edge: the docked card paints its outline
+    // outside its rect, the floating card inside it, a point's difference in `palette_rect`.
+    let (first, rest) = insets.split_first().unwrap();
+    for (case, inset) in rest {
+        assert!((*inset - first.1).abs() <= 1.0, "{case}: the inset is {inset}, {} in {}", first.1, first.0);
     }
 }
 
@@ -1016,48 +1076,68 @@ fn no_text_wraps_is_cut_or_overlaps_on_the_shell_at_any_stage_size_in_en_ja_or_z
                     ("status:bar", true),
                     (card, false),
                 ] {
-                    let region = rect_of(surface).unwrap_or_else(|| panic!("{case}: {surface} is drawn"));
-                    // The texts of the surface, each with the part of it that shows: a card's
-                    // body scrolls under its pinned actions and footer, so a row at the body's
-                    // edge is cut by the scroll viewport by design, never sideways.
-                    let inside: Vec<_> = texts
-                        .iter()
-                        .filter(|(_, r, _, _, _)| region.contains(r.center()))
-                        .map(|(text, rect, clip, elided, rows)| (text, *rect, rect.intersect(*clip), *clip, *elided, *rows))
-                        .filter(|(_, _, shown, _, _, _)| shown.is_positive())
-                        .collect();
-                    assert!(!inside.is_empty(), "{case}: {surface} {region:?} has texts");
-                    for (text, rect, shown, clip, elided, rows) in &inside {
-                        assert!(!elided, "{case}: {surface}: `{text}` is cut short");
-                        // A field scrolls a long expression inside its own narrow clip by
-                        // design; everything else (a label, a row, a value) is clipped only by
-                        // its surface or the body's scroll viewport, as wide as the surface.
-                        let field = clip.width() < region.width() - 40.0;
-                        assert!(
-                            field || (rect.left() >= clip.left() - 1.0 && rect.right() <= clip.right() + 1.0),
-                            "{case}: {surface}: `{text}` {rect:?} runs past its clip {clip:?}"
-                        );
-                        assert!(region.expand(1.0).contains_rect(*shown), "{case}: {surface}: `{text}` {shown:?} runs outside {region:?}");
-                        if one_line {
-                            assert_eq!(*rows, 1, "{case}: {surface}: `{text}` wraps");
-                        }
-                        checked += 1;
-                    }
-                    for (i, (a, _, ra, ..)) in inside.iter().enumerate() {
-                        for (b, _, rb, ..) in inside.iter().skip(i + 1) {
-                            assert!(
-                                !ra.shrink(0.5).intersect(rb.shrink(0.5)).is_positive(),
-                                "{case}: {surface}: `{a}` {ra:?} is drawn over `{b}` {rb:?}"
-                            );
-                        }
-                    }
+                    checked += texts_keep_to_their_room(&case, surface, one_line, &texts);
                 }
                 if state == "review" {
                     crate::review::cancel(&mut h.app);
                     h.frames(2);
                 }
             }
+            // The ribbon of every workspace tab (r10: the Sketch workspace's Rectangle family
+            // button read "Rectan…" at every stage size, cut short by `ribbon_button_lines`,
+            // which no galley reports as elided): a sketch active offers the SKETCH tab; SHEET
+            // METAL and RENDER are always offered.
+            h.app.run("sketch.create", json!({"plane": "XY"})).unwrap();
+            h.frames(3);
+            for tab in crate::workspace::visible_tabs(&h.app) {
+                h.app.ui.tab = tab.into();
+                h.frames(2);
+                assert_eq!(h.app.ui.tab, tab, "{lang} {w}x{hgt}: the {tab} tab is shown");
+                let texts = painted_texts(&mut h, window);
+                checked += texts_keep_to_their_room(&format!("{lang} {w}x{hgt} {tab} tab"), "ribbon:card", true, &texts);
+            }
             assert!(checked > 60, "{lang} {w}x{hgt}: {checked} texts checked");
         }
     }
+}
+
+/// The texts of `surface` among `texts` (from [`painted_texts`]), each with the part of it that
+/// shows, keep to their room: none is cut short with an ellipsis (a galley's, or the ribbon's
+/// own, written into a button's label), none runs past its clip or outside the surface, no two
+/// are drawn one over the other, and with `one_line` each keeps to one line. How many were checked.
+fn texts_keep_to_their_room(case: &str, surface: &str, one_line: bool, texts: &[(String, egui::Rect, egui::Rect, bool, usize)]) -> usize {
+    let region = rect_of(surface).unwrap_or_else(|| panic!("{case}: {surface} is drawn"));
+    // A card's body scrolls under its pinned actions and footer, so a row at the body's edge is
+    // cut by the scroll viewport by design, never sideways.
+    let inside: Vec<_> = texts
+        .iter()
+        .filter(|(_, r, _, _, _)| region.contains(r.center()))
+        .map(|(text, rect, clip, elided, rows)| (text, *rect, rect.intersect(*clip), *clip, *elided, *rows))
+        .filter(|(_, _, shown, _, _, _)| shown.is_positive())
+        .collect();
+    assert!(!inside.is_empty(), "{case}: {surface} {region:?} has texts");
+    for (text, rect, shown, clip, elided, rows) in &inside {
+        assert!(!elided, "{case}: {surface}: `{text}` is cut short");
+        if surface == "ribbon:card" {
+            assert!(!text.ends_with('\u{2026}'), "{case}: {surface}: `{text}` is cut short by the ribbon");
+        }
+        // A field scrolls a long expression inside its own narrow clip by design; everything
+        // else (a label, a row, a value) is clipped only by its surface or the body's scroll
+        // viewport, as wide as the surface.
+        let field = clip.width() < region.width() - 40.0;
+        assert!(
+            field || (rect.left() >= clip.left() - 1.0 && rect.right() <= clip.right() + 1.0),
+            "{case}: {surface}: `{text}` {rect:?} runs past its clip {clip:?}"
+        );
+        assert!(region.expand(1.0).contains_rect(*shown), "{case}: {surface}: `{text}` {shown:?} runs outside {region:?}");
+        if one_line {
+            assert_eq!(*rows, 1, "{case}: {surface}: `{text}` wraps");
+        }
+    }
+    for (i, (a, _, ra, ..)) in inside.iter().enumerate() {
+        for (b, _, rb, ..) in inside.iter().skip(i + 1) {
+            assert!(!ra.shrink(0.5).intersect(rb.shrink(0.5)).is_positive(), "{case}: {surface}: `{a}` {ra:?} is drawn over `{b}` {rb:?}");
+        }
+    }
+    inside.len()
 }

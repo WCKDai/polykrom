@@ -498,7 +498,16 @@ pub fn show(app: &mut SolveApp, ctx: &egui::Context) {
                 section_alias("sketch_palette:options_fold", "ui.palette_more");
             }
             crate::ui_kit::Part::Footer => {
-                let button = crate::ui_kit::wide_primary_button(ui, "Finish Sketch");
+                // Finish Sketch across the card, inset from its sides as Look At and Slice are
+                // in their band under it (`button_pair`), the same in both layouts.
+                let t = crate::theme::Tokens::get();
+                let row = ui.available_rect_before_wrap();
+                let inset = egui::Rect::from_min_max(
+                    egui::pos2(row.left() + t.space_10, row.top()),
+                    egui::pos2((row.right() - t.space_10).max(row.left() + t.space_10), row.top() + t.form_button_height),
+                );
+                let button =
+                    ui.scope_builder(egui::UiBuilder::new().max_rect(inset), |ui| crate::ui_kit::wide_primary_button(ui, "Finish Sketch")).inner;
                 crate::scenario::publish_rect("sketch_palette:finish", button.rect);
                 crate::scenario::publish_handle("sketch_palette:finish", button.rect.center());
                 finish = button.clicked();

@@ -598,8 +598,12 @@ mod preferences_tests {
     #[test]
     fn the_picture_keeps_clear_of_the_toast_that_is_up_and_a_status_replaces_the_offer() {
         use crate::prefs::SpaceMouseGhost::{LeftViewport, LeftWindow, RightViewport};
-        // Wide, and narrow enough that the toast reaches across the corners the picture sits in.
-        for (position, width) in [LeftViewport, RightViewport, LeftWindow].into_iter().flat_map(|position| [(position, 1600), (position, 760)]) {
+        // Wide, and narrow enough that the toast reaches across the corners the picture sits in:
+        // the app's minimum width (960; `with_min_inner_size`), where the picture must move up
+        // above the offer card. (Narrower still, 760, the navigation bar re-flows into two rows
+        // beside the Properties card since PK-90.shell-r10, and the bar, the card and the picture
+        // stack taller than the view: below the minimum size the shell is best effort.)
+        for (position, width) in [LeftViewport, RightViewport, LeftWindow].into_iter().flat_map(|position| [(position, 1600), (position, 960)]) {
             let mut h = spacenavd_harness();
             h.call("ui.resize", serde_json::json!({"width": width, "height": 700}));
             h.app.preferences.space_mouse_in_view = true;

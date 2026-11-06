@@ -35,7 +35,7 @@ pub enum Fit {
 }
 
 /// A ribbon button's preferred and minimum widths. The constraint gallery is a fixed-width
-/// block; ordinary buttons narrow as their labels wrap and truncate.
+/// block; ordinary buttons narrow to the compact padding around their one-line label.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct ButtonSize {
     pub width: f32,
@@ -145,6 +145,13 @@ const BUTTON_MIN_WIDTH: f32 = 54.0;
 /// within this width).
 const BUTTON_MAX_WIDTH: f32 = 132.0;
 const BUTTON_LABEL_PADDING: f32 = 12.0;
+/// A button narrows to this much padding around its one-line label, and no further: a label is
+/// never cut short or wrapped to fit the room; past this the group's last buttons go to its
+/// drop-down and the » menu (`fit`).
+const BUTTON_LABEL_MIN_PADDING: f32 = 6.0;
+/// The room a sketch family button (Rectangle, Circle…) keeps beside its title for the chevron
+/// (6 px wide, 6 px in from the button's right edge), on top of the label's padding.
+const FAMILY_CHEVRON_ROOM: f32 = 10.0;
 const SECTION_HEIGHT: f32 = 16.0;
 
 /// The » button's room at the end of the panels, kept only while some panel is in it.
@@ -165,7 +172,8 @@ pub fn justify(plans: &[Plan], room: f32) -> Vec<f32> {
 }
 
 /// Fit panels into `room`, giving up as little as it takes, one small step at a time:
-/// 1. buttons narrow from their measured label widths to their minimum, wrapping and truncating;
+/// 1. buttons narrow from their measured label widths to their minimum (the compact padding
+///    around their one-line label: no label is cut short or wrapped to fit);
 /// 2. panels hand their last buttons to their drop-down one at a time, the panel showing the
 ///    most buttons first (the rightmost of equals), down to one button (collapsed);
 /// 3. the last panels go into the » menu, and any room that frees goes back to buttons.
@@ -983,6 +991,18 @@ fn ribbon_button_width(painter: &egui::Painter, label: &str) -> f32 {
     (widest + BUTTON_LABEL_PADDING).clamp(BUTTON_MIN_WIDTH, BUTTON_MAX_WIDTH)
 }
 
+/// The narrowest a large button gets (`fit`'s first step): its label as `ribbon_button_width`
+/// lays it out, with the compact padding around it, so the label is never cut short or wrapped
+/// further to fit the room (PK-90.shell-r10: the Sketch workspace's Rectangle read "Rectan…" at
+/// every stage size).
+fn ribbon_button_min_width(painter: &egui::Painter, label: &str) -> f32 {
+    let widest = ribbon_label_lines(painter, label, BUTTON_MAX_WIDTH - BUTTON_LABEL_PADDING)
+        .iter()
+        .map(|line| ribbon_label_width(painter, line))
+        .fold(0.0_f32, f32::max);
+    (widest + BUTTON_LABEL_MIN_PADDING).clamp(BUTTON_MIN_WIDTH, BUTTON_MAX_WIDTH)
+}
+
 fn ribbon_label_lines(painter: &egui::Painter, label: &str, width: f32) -> Vec<String> {
     let measure = |text: &str| ribbon_label_width(painter, text);
     let normalized = label.split_whitespace().collect::<Vec<_>>().join(" ");
@@ -1289,7 +1309,18 @@ pub fn toolbar(app: &mut SolveApp, ui: &mut egui::Ui) {
                                 .filter(|f| tab == "SKETCH" && *panel == "CREATE" && f.commands.first().copied() == Some(c.id));
                             let label = family.map_or_else(|| crate::workspace::ribbon_button_label(c), |f| f.label);
                             if labels {
-                                ButtonSize { width: ribbon_button_width(&painter, app.tr_label(label)), min_width: BUTTON_MIN_WIDTH }
+                                let label = app.tr_label(label);
+                                if family.is_some() {
+                                    // A family button: its one-line title with the chevron's
+                                    // room beside it, padded like a label.
+                                    let title = ribbon_label_width(&painter, label) + FAMILY_CHEVRON_ROOM;
+                                    ButtonSize {
+                                        width: (title + BUTTON_LABEL_PADDING).clamp(BUTTON_MIN_WIDTH, BUTTON_MAX_WIDTH),
+                                        min_width: (title + BUTTON_LABEL_MIN_PADDING).clamp(BUTTON_MIN_WIDTH, BUTTON_MAX_WIDTH),
+                                    }
+                                } else {
+                                    ButtonSize { width: ribbon_button_width(&painter, label), min_width: ribbon_button_min_width(&painter, label) }
+                                }
                             } else {
                                 let width = if family.is_some() { 50.0 } else { 40.0 };
                                 ButtonSize { width, min_width: width }
@@ -1456,7 +1487,8 @@ pub fn toolbar(app: &mut SolveApp, ui: &mut egui::Ui) {
                             // The title sits on the same line as the other buttons' labels.
                             if labels {
                                 let title_y = whole.top() + LARGE_LABEL_Y;
-                                let galley = ribbon_button_galley(&painter, app.tr_label(f.label), ar.width() - 16.0, t.text);
+                                let room = ar.width() - FAMILY_CHEVRON_ROOM - BUTTON_LABEL_MIN_PADDING;
+                                let galley = ribbon_button_galley(&painter, app.tr_label(f.label), room, t.text);
                                 painter.galley(pos2(ar.center().x - 4.0, title_y - galley.size().y / 2.0), galley, t.text);
                                 dropdown_arrow(&painter, pos2(ar.right() - 6.0, title_y + 0.5), t.text_dim);
                             } else {
@@ -1471,7 +1503,9 @@ pub fn toolbar(app: &mut SolveApp, ui: &mut egui::Ui) {
                         } else if labels {
                             let label = app.tr_label(crate::workspace::ribbon_button_label(selected));
                             let color = if info.enabled { t.text } else { t.text_dim };
-                            let galley = ribbon_button_galley(&painter, label, whole.width() - BUTTON_LABEL_PADDING, color);
+                            // The label has the button's width less the compact padding: a
+                            // button narrowed by `fit` still shows its whole label on one line.
+                            let galley = ribbon_button_galley(&painter, label, whole.width() - BUTTON_LABEL_MIN_PADDING, color);
                             painter.galley(pos2(whole.center().x, whole.top() + LARGE_LABEL_Y - galley.size().y / 2.0), galley, t.text);
                         }
                     }
@@ -3313,13 +3347,15 @@ mod ribbon_label_tests {
 mod ribbon_wrap_tests {
     use super::*;
 
-    /// At a laptop's 1366 x 768, the default 1600 x 1000 and the kit's 1760 x 1100, no label on a
-    /// ribbon button wraps or is cut: every large button is as wide as its one-line label (`Move /
-    /// Copy` wrapped to two lines before), every small button's label is one line, and every
-    /// group's name fits its group with its chevron. The tools use the ribbon's full width: on
-    /// every tab whose groups all fit (no » menu) the last group ends at the ribbon's right edge
-    /// (`justify` shares the room left over), and on MODEL the groups reach across at least four
-    /// fifths of it at every size whatever the fit.
+    /// At a laptop's 1366 x 768, the default 1600 x 1000 and the kit's 1760 x 1100, on every
+    /// workspace tab (MODEL … VIEW, SKETCH with a sketch active, SHEET METAL, RENDER), no label
+    /// on a ribbon button wraps or is cut: every large button is as wide as its one-line label
+    /// (`Move / Copy` wrapped to two lines before; PK-90.shell-r10: the Sketch workspace's
+    /// Rectangle family button, narrowed to the minimum, read "Rectan…" at every size), every
+    /// small button's label is one line, and every group's name fits its group with its chevron.
+    /// The tools use the ribbon's full width: on every tab whose groups all fit (no » menu) the
+    /// last group ends at the ribbon's right edge (`justify` shares the room left over), and on
+    /// MODEL the groups reach across at least four fifths of it at every size whatever the fit.
     #[test]
     fn no_ribbon_label_wraps_at_the_default_window_size() {
         for (w, height) in [(1366.0, 768.0), (1600.0, 1000.0), (1760.0, 1100.0)] {
@@ -3327,10 +3363,15 @@ mod ribbon_wrap_tests {
             h.app.home.open = false;
             h.app.run("solid.box", json!({"length":10,"width":10,"height":10})).unwrap();
             h.call("ui.resize", json!({"width":w,"height":height}));
+            h.app.run("sketch.create", json!({"plane":"XY"})).unwrap();
+            h.frames(2);
+            let tabs = crate::workspace::visible_tabs(&h.app);
+            assert!(tabs.contains(&"SKETCH") && tabs.contains(&"SHEET METAL") && tabs.contains(&"RENDER"), "{tabs:?}");
             let mut seen = 0;
-            for tab in TABS.iter().copied().chain(["SHEET METAL"]) {
+            for tab in tabs {
                 h.app.ui.tab = tab.into();
                 h.frames(3);
+                assert_eq!(h.app.ui.tab, tab, "at {w}: the {tab} tab is shown");
                 let painter = egui::Painter::new(h.ctx.clone(), egui::LayerId::background(), Rect::EVERYTHING);
                 let ribbon = crate::scenario::rect_of("toolbar").unwrap();
                 let mut panels_right = ribbon.left();
@@ -3365,10 +3406,21 @@ mod ribbon_wrap_tests {
                 for (name, rect) in crate::scenario::rects("button:") {
                     let Some(id) = name.strip_prefix("button:") else { continue };
                     let Some(c) = polykrom_engine::find_command(id) else { continue };
-                    let label = h.app.tr_label(crate::workspace::ribbon_button_label(c));
-                    let galley = ribbon_button_galley(&painter, label, rect.width() - BUTTON_LABEL_PADDING, Color32::WHITE);
+                    // The constraint gallery's cells are icons without labels.
+                    if crate::scenario::rect_of(&format!("ribbon:constraint:{id}")).is_some() {
+                        continue;
+                    }
+                    // The label as the button draws it: a sketch family's default button carries
+                    // the family's title beside its chevron, every other its command's label,
+                    // each in the button's width less the compact padding.
+                    let family = crate::sketch_families::family(c.id).filter(|f| tab == "SKETCH" && f.commands.first().copied() == Some(c.id));
+                    let (label, room) = match family {
+                        Some(f) => (h.app.tr_label(f.label), rect.width() - FAMILY_CHEVRON_ROOM - BUTTON_LABEL_MIN_PADDING),
+                        None => (h.app.tr_label(crate::workspace::ribbon_button_label(c)), rect.width() - BUTTON_LABEL_MIN_PADDING),
+                    };
+                    let galley = ribbon_button_galley(&painter, label, room, Color32::WHITE);
                     assert_eq!(galley.rows.len(), 1, "{tab} at {w}: `{label}` wraps on its {} px button", rect.width());
-                    assert!(!galley.text().ends_with('…'), "{tab} at {w}: `{label}` is cut");
+                    assert!(!galley.text().ends_with('…'), "{tab} at {w}: `{label}` is cut on its {} px button", rect.width());
                     seen += 1;
                 }
                 for (name, rect) in crate::scenario::rects("ribbon:small:") {
