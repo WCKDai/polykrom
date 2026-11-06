@@ -2,32 +2,42 @@
 
 ![The Polykrom window](../generated/sample-plate.png)
 
-- **Title bar.** On Windows and Linux the application bar is the window's title bar. On the left:
-  the Polykrom logo, which opens the application menu (the start page, New, Open, Save, Save As,
-  Export…, Workspaces, Preferences, Keyboard Shortcuts, Help, Quit and the version), then the open
-  design's name with where it is stored and its revision. On the right: Undo, Redo, command search
-  (S), Save and Export (every export format), then the window's buttons.
+- **Title bar.** On Windows and Linux the application bar is the window's title bar, a slim 36 pt
+  strip. On the left: the Polykrom logo, which opens the application menu (the start page, New,
+  Open, Save, Save As, Export…, Workspaces, Preferences, Keyboard Shortcuts, Help, Quit and the
+  version), then the open design's name with where it is stored and its revision on the same
+  line. On the right: Undo, Redo, command search (S), Save and Export (every export format), then
+  the window's buttons.
 - **Workspace tabs and ribbon.** The tabs (Model, Surface, Assemble, Insert, Inspect, Manage, View,
   Sheet Metal and Render) hold groups of commands; the active tab is underlined in the accent.
   Sketch appears while editing a sketch; Sheet Metal is always there. Both select automatically when
   entered, and the other tabs remain available. Render enters the Render workspace and any design
   tab leaves it; the application menu's Workspaces… lists every workspace, including the planned
   ones. Each group shows its pinned commands as large buttons and the group's other commands as two
-  rows of small buttons; click the group's name for all of them. Drag a command from the dropdown
+  rows of small buttons, as many as the ribbon's width holds (the rest wait in the group's
+  drop-down); click the group's name for all of them. Drag a command from the dropdown
   onto a group's label or empty space to append it; the insertion line shows its destination. Drop
   onto an existing button to insert before it. Buttons can also move between groups, and the
   layout is saved.
-- **Design Browser** (left, full height). Its header names the design and counts its components
-  and bodies; **Filter features…** keeps only the rows whose names contain the text (bodies,
+- **Canvas.** The 3D view is the stage: it fills the window's whole width and all the height
+  between the chrome above (title bar, tabs and ribbon, AI prompt row) and the status bar. The
+  Design Browser, the document strip, the history and the other panels are glass cards floating
+  over it, inset from its edges: they shield the clicks under them but never move the model's
+  projection, and the model reads through their tint.
+- **Design Browser** (a glass card at the left, full height down to the history). Its header
+  names the design and counts its components and bodies; its chevron folds the card to a slim
+  rail, and the rail opens it again. **Filter features…** keeps only the rows whose names contain the text (bodies,
   sketches, construction geometry and features, with their folders open). Below: document settings
   and units, named views, the origin, bodies, sketches, construction planes, canvases, joints and
   components, the folders with their counts. The eyes line up at the right: one shows or hides an
   item; a component's radio button makes it the active component, and right-clicking any row gives
   that item's menu. Rows drag into groups and other components.
-- **Document tabs and view bar** (above the viewport). One tab per open design (each with its own
-  undo history, selection and camera; a dot marks unsaved changes), × closes it and + opens the
-  start page for a new one. Under them the view orientation (Home, Isometric, Top…), the display
-  style (shaded with edges, shaded, wireframe, hidden edges) and the selection filter.
+- **Document tabs and view bar** (one slim strip floating at the top of the canvas, right of the
+  Design Browser). One tab per open design (each with its own undo history, selection and camera;
+  a dot marks unsaved changes), × closes it and + opens the start page for a new one. Beside them
+  the view orientation (Home, Isometric, Top…), the display style (shaded with edges, shaded,
+  wireframe, hidden edges) and the selection filter. In the Compact layout they are two bands
+  above the viewport instead.
 - **Viewport.** Click to select, Shift or Ctrl to add (Preferences › Selection), drag for a window or crossing box. While sketching, Ctrl/Cmd or Alt/Option suppress auto-snap by default; Shift prefers a midpoint. To
   reach something under something else (two lines drawn on top of each other, coincident points,
   an edge in front of a face, overlapping bodies), hold the left button still for half a second
@@ -101,7 +111,7 @@
   Ø10.00 mm") with an **Undo** button for exactly that step, and the status bar adds "Pattern
   preserved" when the pattern's count and pitch are unchanged. **Cancel command** leaves the
   design, its revision and the undo history exactly as they were.
-- **Design history** (bottom). Every feature in order as an icon over its name; the current step
+- **Design history** (a glass card over the bottom of the canvas). Every feature in order as an icon over its name; the current step
   is highlighted. Click a step to select its feature, double-click to edit, drag the end-of-history
   marker (the accent bar) to roll back, and drag features to reorder them. The strip's right end
   says *End of history* or how many steps are rolled back. Preferences can put the history
@@ -132,11 +142,13 @@ Shortcuts changes them.
 ### Workspace layout
 
 General › **Workspace layout** switches between **Floating** cards and **Compact**
-panels. Compact makes the ribbon one top bar, puts the Design Browser flush
-underneath with a square join, and docks tool sheets below the compass. Tool sheets
-remain draggable: their four corners round away from the right edge, and their two
-right corners square when docked there. The Design Browser is a full-height column in
-either layout (it can fold to its header). Assistant remains on the outside edge, and
+panels. Floating, the default, keeps the canvas full-bleed under glass cards: the
+Design Browser (**Glass**, or **Clear** for a more see-through card), the document
+strip, the history, Properties and Review changes all float over the model. Compact
+makes the ribbon one top bar, puts the Design Browser flush underneath as a solid
+full-height column with a square join, and docks tool sheets below the compass. Tool
+sheets remain draggable: their four corners round away from the right edge, and their
+two right corners square when docked there. Assistant remains on the outside edge, and
 History keeps its chosen bottom, left or shared Browser column.
 The choice is saved between launches. Switching preserves the current tool,
 camera, selection and design; Cancel and Restore Defaults work like other preferences.
