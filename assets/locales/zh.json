@@ -1096,7 +1096,7 @@
   "help.apache": "Apache 许可证 2.0",
   "help.attributions": "署名信息 (ATTRIBUTION.md)",
   "help.build": "版本 {version} · 提交 {commit} · 构建日期 {date}",
-  "help.font_details": "界面使用设计套件中的 Inter（Regular、Medium、Semibold、Bold），数值和代码使用 IBM Plex Mono（均采用 SIL Open Font License 1.1）。符号和表情符号回退到 egui 的内置字体（Ubuntu Light 和 Hack，采用 Ubuntu Font Licence 和 MIT/Bitstream Vera 许可证；Noto Emoji 和表情图标字体，采用 OFL 和 MIT 许可证）。草图文本使用 Liberation Sans（SIL OFL 1.1）。网页版为日文捆绑 BIZ UDPGothic（SIL OFL 1.1）；桌面版使用系统的日文、中文、韩文和泰文字体。各捆绑字体的版权声明和许可证见下方的第三方许可证。",
+  "help.font_details": "界面使用 Geist（Regular、Medium、SemiBold），数值和代码使用 Geist Mono（Regular、Medium），均由 Vercel 制作，采用 SIL Open Font License 1.1，来自 github.com/vercel/geist-font 的固定发布版本。符号和表情符号回退到 egui 的内置字体（Ubuntu Light 和 Hack，采用 Ubuntu Font Licence 和 MIT/Bitstream Vera 许可证；Noto Emoji 和表情图标字体，采用 OFL 和 MIT 许可证）。草图文本使用 Liberation Sans（SIL OFL 1.1）。网页版为日语附带 BIZ UDPGothic（SIL OFL 1.1）；桌面版使用系统的日语、中文、韩语和泰语字体。每个附带字体的版权声明和许可证见下方的第三方许可证。",
   "help.fonts": "字体",
   "help.licences": "许可证",
   "help.mit": "MIT 许可证",

@@ -25,9 +25,7 @@ pub(crate) fn segmented(ui: &mut Ui, selected: &mut usize, options: &[&str], con
     let segment_width = dimension(ui.available_width()) / options.len().max(1) as f32;
     let widest = options
         .iter()
-        .map(|option| {
-            ui.painter().layout_no_wrap(crate::i18n::tr_label(option).to_string(), crate::fonts::semibold(t.font_label), t.form_ink).size().x
-        })
+        .map(|option| ui.painter().layout_no_wrap(crate::i18n::tr_label(option).to_string(), crate::fonts::medium(t.font_label), t.form_ink).size().x)
         .fold(0.0, f32::max);
     // Judged on the whole row, which is what a scrollbar narrows, not on one segment.
     if !intrinsic
@@ -42,9 +40,7 @@ pub(crate) fn segmented(ui: &mut Ui, selected: &mut usize, options: &[&str], con
     }
     let natural: Vec<_> = options
         .iter()
-        .map(|option| {
-            ui.painter().layout_no_wrap((*option).to_owned(), crate::fonts::semibold(t.font_label), t.form_ink).size().x.ceil() + t.space_16
-        })
+        .map(|option| ui.painter().layout_no_wrap((*option).to_owned(), crate::fonts::medium(t.font_label), t.form_ink).size().x.ceil() + t.space_16)
         .collect();
     let total = natural.iter().sum::<f32>();
     let desired = if intrinsic { total.min(dimension(ui.available_width())) } else { dimension(ui.available_width()) };
@@ -82,7 +78,7 @@ pub(crate) fn segmented(ui: &mut Ui, selected: &mut usize, options: &[&str], con
         if index > 0 {
             ui.painter().vline(segment.left(), segment.y_range(), t.control_border_stroke(t.control_border));
         }
-        let font = if on { crate::fonts::semibold(t.font_label) } else { egui::FontId::proportional(t.font_label) };
+        let font = if on { crate::fonts::medium(t.font_label) } else { egui::FontId::proportional(t.font_label) };
         let galley = ui.painter().layout_no_wrap((*option).to_string(), font.clone(), t.form_ink);
         let text_rect =
             egui::Rect::from_min_size(egui::pos2(segment.center().x - galley.size().x / 2.0, segment.top()), vec2(galley.size().x, segment.height()));

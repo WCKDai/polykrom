@@ -227,38 +227,12 @@ pub fn paint(app: &SolveApp, ctx: &egui::Context) -> Option<egui::Rect> {
             }
         }
     }
-    let last = feed.entries.back()?;
-    let k = strength(app.now - last.at);
-    if k <= 0.0 {
-        return None;
-    }
-    let font = FontId::proportional(t.font_label);
-    // In the canvas's bottom-right corner, over the content area (clear of the floating History
-    // card and the browser): the view cube sits top-right and the navigation bar bottom-centre.
-    // Properties or Review changes standing at the right push the feed left of them, and the feed
-    // lifts above the navigation bar where it would otherwise run into it.
-    let gap = crate::shell::SHELL_GAP;
-    let content = crate::shell::content_rect(app, rect);
-    let mut right = content.right() - 12.0;
-    for card in [app.inspector.rect, app.review.rect].into_iter().flatten().filter(|r| r.is_finite() && r.is_positive()) {
-        right = right.min(card.left() - gap);
-    }
-    let width = 320.0_f32.min(right - content.left() - 12.0).max(120.0);
-    let rows = rows(ctx, feed, font.clone(), width - 20.0, k);
-    let body = rows.last().map_or(0.0, |(top, g)| top + g.size().y.max(LINE));
-    let size = vec2(width, LINE + body + 12.0);
-    let mut bottom = content.bottom() - 12.0;
-    if let Some(nav) = app.viewport.layout.as_ref().map(|l| l.navigation).filter(|nav| nav.is_positive())
-        && nav.left() < right
-        && nav.right() > right - width
-    {
-        bottom = bottom.min(nav.top() - gap);
-    }
-    let at = pos2(right - size.x, bottom - size.y);
-    let frame = egui::Rect::from_min_size(at, size);
+    let Laid { frame, rows, k, font } = laid_out(app, ctx)?;
     if !frame.is_finite() || !frame.is_positive() {
         return None;
     }
+    crate::scenario::publish_rect("agent_activity", frame);
+    let at = frame.min;
     // The feed is a glass card like the other floating cards, fading with the feed.
     painter.rect_filled(frame, t.radius_md, t.glass(t.panel).gamma_multiply(k));
     painter.rect_stroke(frame, t.radius_md, Stroke::new(1.0, t.glass_edge().gamma_multiply(k)), egui::StrokeKind::Inside);
@@ -281,15 +255,15 @@ struct Laid {
 }
 
 /// Lay the list out as [`paint`] draws it this frame (None: nothing to show). It depends on the
-/// app's state alone: the feed, the viewport's rect and layout, and the rects it keeps clear of
-/// ([`frame_rect`]). The toasts see it through [`frame`] while the viewport paints, [`paint`]
-/// at the frame's end; they agree when the rects it lays out against are this frame's by then,
-/// which the viewport's own controls, the ribbon cards, the History bar and the Properties card
-/// are (the card is laid out before the viewport in both layouts, `lib.rs`). A card laid out
-/// after the viewport (the browser and the inspector floating, the review panel and its prompt
-/// row, a dialog, the sketch palette) is last frame's for the toasts and this frame's for the
-/// list, so in the one frame such a card appears, moves or goes, a toast can be laid out against
-/// the list's previous place and touch it.
+/// app's state alone: the feed, the viewport's rect and layout, the content area and the rects
+/// it keeps clear of ([`frame_rect`]). The toasts see it through [`frame`] while the viewport
+/// paints, [`paint`] at the frame's end; they agree when the rects it lays out against are this
+/// frame's by then, which the viewport's own controls, the ribbon card, the content area, the
+/// History card and the Properties card are (the card is laid out before the viewport in both
+/// layouts, `lib.rs`). A card laid out after the viewport (the browser and the inspector
+/// floating, the review panel and its prompt row, a dialog, the sketch palette) is last frame's
+/// for the toasts and this frame's for the list, so in the one frame such a card appears, moves
+/// or goes, a toast can be laid out against the list's previous place and touch it.
 fn laid_out(app: &SolveApp, ctx: &egui::Context) -> Option<Laid> {
     let rect = app.viewport.rect?;
     let feed = &app.agent_feed;
@@ -299,9 +273,11 @@ fn laid_out(app: &SolveApp, ctx: &egui::Context) -> Option<Laid> {
         return None;
     }
     let font = FontId::proportional(Tokens::get().font_label);
-    // In the viewport's bottom-right corner, beside whatever already stands there (the
-    // Properties card, the navigation bar): `frame_rect`.
-    let width = 320.0_f32.min(rect.width() - 24.0).max(120.0);
+    // In the content area's bottom-right corner (the canvas clear of the floating Design Browser
+    // and History cards), beside whatever already stands there (the Properties card, the
+    // navigation bar): `frame_rect`.
+    let content = crate::shell::content_rect(app, rect);
+    let width = 320.0_f32.min(content.width() - 2.0 * CORNER.x).max(120.0);
     let rows = rows(ctx, feed, font.clone(), width - 20.0, k);
     let body = rows.last().map_or(0.0, |(top, g)| top + g.size().y.max(LINE));
     let size = vec2(width, LINE + body + 12.0);
@@ -320,19 +296,23 @@ pub(crate) fn frame(app: &SolveApp, ctx: &egui::Context) -> Option<Rect> {
 /// The height of a one-line row of the feed.
 const LINE: f32 = 18.0;
 
-/// The list's distance from the viewport's right edge, and from its bottom: above the History
-/// bar, which floats there.
-const CORNER: egui::Vec2 = vec2(12.0, 64.0);
+/// The list's distance from the content area's right edge and from its bottom. (The floating
+/// History card is a card over the canvas, `shell::covered_rects`: the list is laid out against
+/// it like against the other cards, so the corner needs no clearance of its own for it.)
+const CORNER: egui::Vec2 = vec2(12.0, 12.0);
 
-/// Where the list stands, `size` large: in the viewport's bottom-right corner, laid out against
-/// what already has that corner the way the browser is respected at the left
-/// (`shell::covered_rects`: the Properties card, the review panel, the body inspector, a docked
-/// dialog, the History bar) and against the viewport's own controls (the navigation bar, the
-/// compass), so it is never drawn under any of them. Each one the list would cover moves it the
-/// shorter way, to its left or above it, the gap of the floating cards between them; a short
-/// view keeps the list inside the viewport rather than pushing it out, so it is never clipped.
+/// Where the list stands, `size` large: in the bottom-right corner of the content area of
+/// `viewport` (`shell::content_rect`: the canvas clear of the Design Browser and the History
+/// card, in either layout), laid out against what already has that corner the way the browser
+/// is respected at the left (`shell::covered_rects`: the Properties card, the review panel, the
+/// body inspector, a docked dialog, the History card) and against the viewport's own controls
+/// (the navigation bar, the compass), so it is never drawn under any of them. Each one the list
+/// would cover moves it the shorter way, to its left or above it, the gap of the floating cards
+/// between them; a short view keeps the list inside the viewport rather than pushing it out, so
+/// it is never clipped.
 pub(crate) fn frame_rect(app: &SolveApp, viewport: Rect, size: egui::Vec2) -> Rect {
     let gap = crate::shell::SHELL_GAP;
+    let viewport = crate::shell::content_rect(app, viewport);
     let mut obstacles = crate::shell::covered_rects(app);
     if let Some(layout) = &app.viewport.layout {
         obstacles.extend([layout.navigation, layout.axis_view]);
@@ -529,6 +509,8 @@ mod tests {
         let size = vec2(320.0, 84.0);
         let gap = crate::shell::SHELL_GAP;
         h.app.viewport.layout = None;
+        // The given viewport is the whole content area (the shell measured none).
+        h.app.shell.content = None;
         h.app.shell.cards.clear();
         h.app.shell.browser = None;
         h.app.shell.history = None;

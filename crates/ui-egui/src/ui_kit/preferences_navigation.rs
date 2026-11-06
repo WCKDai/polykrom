@@ -91,7 +91,7 @@ pub(crate) fn settings_axis_header(ui: &mut Ui) {
     let t = Tokens::get();
     let (rect, _) = ui.allocate_exact_size(vec2(dimension(ui.available_width()), t.space_24), Sense::hover());
     for (column, label) in axis_columns(rect).into_iter().zip(["prefs.axis", "prefs.live_input", "", "prefs.speed", "prefs.source"]) {
-        paint_text(ui, column, &crate::i18n::tr(label).to_uppercase(), crate::fonts::semibold(t.font_small), t.form_dim, false);
+        paint_text(ui, column, &crate::i18n::tr(label).to_uppercase(), crate::fonts::medium(t.font_small), t.form_dim, false);
     }
 }
 

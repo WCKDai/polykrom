@@ -166,7 +166,7 @@ pub(crate) fn settings_badge(ui: &mut Ui, text: &str, warning: bool) {
     let ink =
         if warning { if crate::theme::contrast_ratio(t.warning, t.dialog_body) >= 4.5 { t.warning } else { t.form_ink } } else { t.form_success };
     let fill = if warning { t.warning.gamma_multiply(0.1) } else { t.form_success_fill };
-    let galley = ui.painter().layout_no_wrap(text.to_owned(), crate::fonts::semibold(t.font_small), ink);
+    let galley = ui.painter().layout_no_wrap(text.to_owned(), crate::fonts::medium(t.font_small), ink);
     let (r, _) = ui.allocate_exact_size(vec2(galley.size().x + t.space_16, t.space_24), Sense::hover());
     ui.painter().rect_filled(r, t.radius_xl, fill);
     ui.painter().galley(r.center() - galley.size() / 2.0, galley, ink);
@@ -238,7 +238,7 @@ pub(crate) fn option_card(ui: &mut Ui, label: &str, note: Option<&str>, selected
         ui.painter(),
         label_rect,
         label,
-        if selected { crate::fonts::semibold(t.font_label) } else { FontId::proportional(t.font_label) },
+        if selected { crate::fonts::medium(t.font_label) } else { FontId::proportional(t.font_label) },
         ink,
         if matches!(figure, PreferenceFigure::ContactShading(_)) { 2 } else { 1 },
     );
@@ -484,7 +484,7 @@ pub(crate) fn scale_specimen(ui: &mut Ui, scale: f32) {
         &p,
         button,
         crate::i18n::tr_label("OK"),
-        crate::fonts::semibold(t.font_label * scale),
+        crate::fonts::medium(t.font_label * scale),
         if t.borders.bevel.is_some() { t.form_ink } else { t.on_accent },
     );
     let feature = Rect::from_min_size(origin + vec2(0.0, line_h + t.space_8 * scale), vec2(r.width() - t.space_10 * 2.0, line_h));
@@ -495,7 +495,7 @@ pub(crate) fn scale_specimen(ui: &mut Ui, scale: f32) {
         pos2(icon.right() + t.space_6 * scale, feature.center().y),
         egui::Align2::LEFT_CENTER,
         "Extrude1",
-        crate::fonts::semibold(t.font_label * scale),
+        crate::fonts::medium(t.font_label * scale),
         t.selected_ink,
     );
     p.text(feature.right_center() - vec2(t.space_8, 0.0), egui::Align2::RIGHT_CENTER, "12.5 mm", font, t.selected_ink);
@@ -559,7 +559,7 @@ pub(crate) fn status_palette_sample(ui: &mut Ui, mode: ColorVision) {
         ] {
             let ink = if crate::theme::contrast_ratio(t.on_accent, fill) >= 4.5 { t.on_accent } else { t.tab_on_fill_dark };
             let label = crate::i18n::tr(label);
-            let galley = ui.painter().layout_no_wrap(label.to_owned(), crate::fonts::semibold(t.font_small), ink);
+            let galley = ui.painter().layout_no_wrap(label.to_owned(), crate::fonts::medium(t.font_small), ink);
             let (r, _) = ui.allocate_exact_size(vec2(galley.size().x + t.space_24 + t.space_16, t.space_24), Sense::hover());
             ui.painter().rect_filled(r, t.radius_xl, fill);
             crate::icons::paint_ink(

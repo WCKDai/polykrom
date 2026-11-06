@@ -679,11 +679,15 @@ pub fn panel(app: &mut SolveApp, ui: &mut egui::Ui) {
         let under_bar = app.review.prompt_rect.map_or_else(|| app.shell.cards.last().map_or(available.top(), |c| c.bottom()), |r| r.bottom()) + gap;
         let compass = app.viewport.layout.as_ref().map(|l| l.axis_view).filter(|r| r.is_positive()).map_or(under_bar, |r| r.bottom() + gap);
         let top = under_bar.max(compass).min(bottom);
-        let frame = container.frame(ui.ctx(), t.panel, crate::frame::Side::Right).inner_margin(t.space_10 as i8);
+        // Floating, the card is glass over the canvas like the other floating cards.
+        let frame = container.glass_frame(ui.ctx(), t.panel, crate::frame::Side::Right).inner_margin(t.space_10 as i8);
         let inner = PANEL_WIDTH - frame.total_margin().sum().x;
         let height = (bottom - top - frame.total_margin().sum().y).max(0.0);
+        // Over the canvas (the panels' layer) but under every floating window and card, in any
+        // frame order: the background order, which egui keeps below the middle order the windows
+        // (Help, Crash Reports, Preferences) and the other cards use.
         let card =
-            container.area(Id::new("sc_properties_card")).pivot(Align2::RIGHT_TOP).fixed_pos(pos2(right, top)).order(egui::Order::Middle).show(
+            container.area(Id::new("sc_properties_card")).pivot(Align2::RIGHT_TOP).fixed_pos(pos2(right, top)).order(egui::Order::Background).show(
                 ui.ctx(),
                 |ui| {
                     container.show_frame(ui, frame, available, |ui| {

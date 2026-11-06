@@ -1713,11 +1713,6 @@ impl SolveApp {
         ui.painter().rect_filled(ui.ctx().content_rect(), 0.0, theme::Tokens::get().window);
         self.poll_deferred(ui.ctx());
         self.poll_delete_check(ui.ctx());
-        // The floating Properties card goes under every window, including those the application
-        // bar opens (Help, Crash Reports): shown before them, it stays below in every frame order.
-        if !self.home.open && ui_kit::Container::new(ui.ctx(), ui_kit::Surface::Panel).floating() {
-            design_properties::panel(self, ui);
-        }
         toolbar::app_bar(self, ui);
         issue_report::CadInput::block(self, ui, report_input);
         file_load::show(self, ui.ctx());
@@ -1789,6 +1784,13 @@ impl SolveApp {
             let scene = ui.available_rect_before_wrap();
             self.shell.history =
                 if left_timeline { Some(timeline_left::floating_rect(self, scene)) } else { show_timeline.then(|| timeline::floating_rect(scene)) };
+            // The floating Properties card: after the chrome, so Tab reaches it after the title
+            // bar, the tabs and the ribbon, and before the viewport, which lays its overlays
+            // (the agent activity list, the toasts) out against it this frame. Its area is in
+            // the background order (`design_properties::panel`), so it stays under every window,
+            // including those the application bar opens (Help, Crash Reports), whatever the
+            // frame order.
+            design_properties::panel(self, ui);
             // Draw the scene first, then let the unchanged panel layouts cover it. The
             // viewport keeps its full projection even underneath the browser and cards.
             preview::update(self, ui.ctx());

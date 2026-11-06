@@ -837,3 +837,127 @@ fn floating_cards_never_overlap_at_every_size() {
         }
     }
 }
+
+/// The texts one more frame paints, each with its bounds (its galley at its anchor), the clip
+/// rect it was painted under, whether it was cut short with an ellipsis and how many lines it
+/// took. Empty texts are left out.
+fn painted_texts(h: &mut Harness, window: egui::Vec2) -> Vec<(String, egui::Rect, egui::Rect, bool, usize)> {
+    fn walk(shape: &egui::Shape, clip: egui::Rect, out: &mut Vec<(String, egui::Rect, egui::Rect, bool, usize)>) {
+        match shape {
+            egui::Shape::Text(t) if !t.galley.job.text.trim().is_empty() => {
+                // The galley's rect is relative to its anchor (left, centre or right aligned).
+                let rect = t.galley.rect.translate(t.pos.to_vec2());
+                out.push((t.galley.job.text.clone(), rect, clip, t.galley.elided, t.galley.rows.len()));
+            }
+            egui::Shape::Vec(shapes) => shapes.iter().for_each(|s| walk(s, clip, out)),
+            _ => {}
+        }
+    }
+    let screen = egui::Rect::from_min_size(egui::Pos2::ZERO, window);
+    let time = h.ctx.input(|i| i.time) + 1.0 / 60.0;
+    let mut out = h.ctx.run_ui(egui::RawInput { screen_rect: Some(screen), time: Some(time), ..Default::default() }, |ui| {
+        h.app.logic(ui.ctx());
+        h.app.ui(ui);
+    });
+    out.textures_delta.clear();
+    let mut texts = Vec::new();
+    out.shapes.iter().for_each(|s| walk(&s.shape, s.clip_rect, &mut texts));
+    texts
+}
+
+/// On every surface of the shell, at 1366 × 768, 1600 × 1000 and 1760 × 1100, in English,
+/// Japanese and Chinese: no text is cut short with an ellipsis, none runs past the rect it is
+/// clipped to or outside its surface, no two texts of a surface are drawn one over the other,
+/// and on the ribbon, in the Design Browser's rows, on the document strip, on the History card's
+/// labels and on the status bar every text keeps to one line (the Properties card's title and
+/// the review card's notes wrap by design; their rows are checked by
+/// `no_label_of_an_editable_kind_is_elided_in_en_ja_or_zh`). With the sample design and its last
+/// feature selected (the Properties card), the feature edited in place (the editor), and a
+/// review proposed (the Review changes card). The interface's metrics changed with Geist
+/// (PK-90.shell-r7); this is what holds the labels to their room.
+#[test]
+fn no_text_wraps_is_cut_or_overlaps_on_the_shell_at_any_stage_size_in_en_ja_or_zh() {
+    for lang in ["en", "ja", "zh"] {
+        for (w, hgt) in STAGE_WINDOWS {
+            let window = egui::vec2(w, hgt);
+            let mut h = Harness::new();
+            h.app.home.open = false;
+            h.app.preferences.language = lang.to_string();
+            h.call("ui.resize", json!({"width": w, "height": hgt}));
+            h.app.session.run_script(&polykrom_engine::sample::script()).unwrap();
+            h.frames(3);
+            let last = h.app.session.doc.features.last().map(|f| f.id).expect("the sample's features");
+            let mut checked = 0;
+            for state in ["selected", "editor", "review"] {
+                match state {
+                    "selected" => {
+                        h.app.run("select.set", json!({"items": [{"type": "feature", "id": last}]})).unwrap();
+                    }
+                    "editor" => crate::design_properties::begin_edit(&mut h.app, last),
+                    _ => {
+                        h.app.run("select.set", json!({"items": []})).unwrap();
+                        let steps = json!([{"command": "parameters.change", "params": {"name": "thickness", "expression": "10 mm"}}]);
+                        let r = h.call(
+                            "ui.review",
+                            json!({"prompt": "Make the plate 10 mm thick", "propose": {"commands": steps, "label": "Plate 10 mm thick"}}),
+                        );
+                        assert_eq!(r["ok"], true, "{lang} {w}x{hgt}: {r}");
+                    }
+                }
+                h.frames(3);
+                let texts = painted_texts(&mut h, window);
+                let case = format!("{lang} {w}x{hgt} {state}");
+                let card = if state == "review" { "review:panel" } else { "properties:panel" };
+                for (surface, one_line) in [
+                    ("ribbon:card", true),
+                    ("browser:card", true),
+                    ("document_bar:card", true),
+                    ("history:card", true),
+                    ("status:bar", true),
+                    (card, false),
+                ] {
+                    let region = rect_of(surface).unwrap_or_else(|| panic!("{case}: {surface} is drawn"));
+                    // The texts of the surface, each with the part of it that shows: a card's
+                    // body scrolls under its pinned actions and footer, so a row at the body's
+                    // edge is cut by the scroll viewport by design, never sideways.
+                    let inside: Vec<_> = texts
+                        .iter()
+                        .filter(|(_, r, _, _, _)| region.contains(r.center()))
+                        .map(|(text, rect, clip, elided, rows)| (text, *rect, rect.intersect(*clip), *clip, *elided, *rows))
+                        .filter(|(_, _, shown, _, _, _)| shown.is_positive())
+                        .collect();
+                    assert!(!inside.is_empty(), "{case}: {surface} {region:?} has texts");
+                    for (text, rect, shown, clip, elided, rows) in &inside {
+                        assert!(!elided, "{case}: {surface}: `{text}` is cut short");
+                        // A field scrolls a long expression inside its own narrow clip by
+                        // design; everything else (a label, a row, a value) is clipped only by
+                        // its surface or the body's scroll viewport, as wide as the surface.
+                        let field = clip.width() < region.width() - 40.0;
+                        assert!(
+                            field || (rect.left() >= clip.left() - 1.0 && rect.right() <= clip.right() + 1.0),
+                            "{case}: {surface}: `{text}` {rect:?} runs past its clip {clip:?}"
+                        );
+                        assert!(region.expand(1.0).contains_rect(*shown), "{case}: {surface}: `{text}` {shown:?} runs outside {region:?}");
+                        if one_line {
+                            assert_eq!(*rows, 1, "{case}: {surface}: `{text}` wraps");
+                        }
+                        checked += 1;
+                    }
+                    for (i, (a, _, ra, ..)) in inside.iter().enumerate() {
+                        for (b, _, rb, ..) in inside.iter().skip(i + 1) {
+                            assert!(
+                                !ra.shrink(0.5).intersect(rb.shrink(0.5)).is_positive(),
+                                "{case}: {surface}: `{a}` {ra:?} is drawn over `{b}` {rb:?}"
+                            );
+                        }
+                    }
+                }
+                if state == "review" {
+                    crate::review::cancel(&mut h.app);
+                    h.frames(2);
+                }
+            }
+            assert!(checked > 60, "{lang} {w}x{hgt}: {checked} texts checked");
+        }
+    }
+}

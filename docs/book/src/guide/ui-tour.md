@@ -177,8 +177,8 @@ Gruvbox themes (dark and light, each in hard, normal and soft contrast) and any 
 imported. A choice applies at once. Dark, the default, is the design kit's graphite shell: a
 graphite window and ribbon, a darker viewport, a muted olive selected row and the lime accent on
 primary actions and the active tab. Light keeps the same accent hue, deepened so that text reads.
-The interface is set in Inter; numeric values and code in IBM Plex Mono (both from the design kit,
-on every desktop and in the browser).
+The interface is set in Geist; numeric values and code in Geist Mono, whose figures are tabular
+(both by Vercel, SIL Open Font License 1.1, on every desktop and in the browser).
 
 A theme is a small JSON file that starts from the Dark or Light palette and changes any of its
 colours and corner radii by name:

@@ -452,7 +452,7 @@ pub(crate) fn draw_row(ui: &mut egui::Ui, id: egui::Id, row: &Row) -> RowResp {
     // the selected history step alone).
     let col = if row.selected { t.text } else { row.color.unwrap_or(if row.dim { t.text_dim } else { t.text }) };
     let label_display = if row.name { crate::i18n::tr_name(row.label) } else { crate::i18n::tr_dyn(row.label) };
-    let font = if row.selected { crate::fonts::semibold(t.font_label) } else { FontId::proportional(t.font_label) };
+    let font = if row.selected { crate::fonts::medium(t.font_label) } else { FontId::proportional(t.font_label) };
     // The label stops before the badges and the card's edge; a longer name ends in an ellipsis
     // and its full text is in the tooltip.
     let badges_width = row.badges.len() as f32 * 15.0;
@@ -741,9 +741,6 @@ const MIN_BROWSER_WIDTH: f32 = 170.0;
 const MAX_BROWSER_WIDTH: f32 = 620.0;
 /// How wide a grip the sidebar's right edge offers, counted inwards from the edge.
 const BROWSER_RAIL: f32 = 6.0;
-/// How much of the glass card's tint the `browser_float` ("clear") preference keeps; the
-/// workspace shows through the rest.
-const BROWSER_FLOAT_ALPHA: f32 = 0.4;
 /// The width of the slim rail a collapsed browser leaves.
 pub(crate) const RAIL_WIDTH: f32 = 34.0;
 
@@ -802,8 +799,9 @@ pub fn browser(app: &mut SolveApp, ui: &mut egui::Ui) {
     let min_height = HEADER_H + 2.0 * (CARD_INSET + 1.0);
     if bounds.is_positive() && bounds.height() >= min_height {
         // Floating, the card is glass over the canvas (`glass_frame`); the `browser_float`
-        // preference makes it clearer still.
-        let fill = if container.floating() && app.preferences.browser_float { t.panel.gamma_multiply(BROWSER_FLOAT_ALPHA) } else { t.panel };
+        // ("Clear") preference trades the panel's tint for a thinner neutral veil, as thin as the
+        // muted text's contrast floor allows (`Tokens::clear_fill`).
+        let fill = if container.floating() && app.preferences.browser_float { t.clear_fill() } else { t.panel };
         let frame = container.glass_frame(ui.ctx(), fill, crate::frame::Side::Left).inner_margin(CARD_INSET as i8);
         let inner_width = (bounds.width() - frame.total_margin().sum().x).max(0.0);
         let inner_height = (bounds.height() - frame.total_margin().sum().y).max(0.0);

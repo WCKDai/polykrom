@@ -1472,7 +1472,7 @@ fn conversation(app: &mut SolveApp, ui: &mut egui::Ui) {
                 ui.set_width(ui.available_width());
                 ui.horizontal(|ui| {
                     let tag = if stopped && !busy { "ui.agent_chat_queued_stopped" } else { "ui.agent_chat_queued" };
-                    ui.label(RichText::new(tr(tag)).color(t.accent).semibold().size(crate::theme::Tokens::get().font_small));
+                    ui.label(RichText::new(tr(tag)).color(t.accent).medium().size(crate::theme::Tokens::get().font_small));
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                         let x = ui_kit::button(ui, "×", ui_kit::Button::Small).on_hover_text(tr("ui.agent_chat_remove"));
                         crate::scenario::publish_handle(&format!("agent_chat:pending_remove:{n}"), x.rect.center());

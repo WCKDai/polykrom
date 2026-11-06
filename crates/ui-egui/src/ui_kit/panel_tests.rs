@@ -39,7 +39,8 @@ fn heading_weight_field_surfaces_and_disclosures_follow_tokens_in_both_themes() 
                 }
                 if text.galley.job.text == "OPTIONS" {
                     let format = &text.galley.job.sections.first().unwrap().format;
-                    assert_eq!(format.font_id, crate::fonts::semibold(t.font_caption));
+                    // Section captions are medium (500): the lighter typography of the glass look.
+                    assert_eq!(format.font_id, crate::fonts::medium(t.font_caption));
                     assert!(format.extra_letter_spacing > 0.0);
                     *section += 1;
                 }
@@ -72,7 +73,7 @@ fn heading_weight_field_surfaces_and_disclosures_follow_tokens_in_both_themes() 
         }
         assert_eq!(scenario::rect_of("dialog:header").unwrap().height(), Tokens::get().form_header_height);
         assert_eq!(title, 1, "the semibold heading is painted once");
-        assert_eq!(section, 1, "semibold small caps are letter spaced and painted once");
+        assert_eq!(section, 1, "medium small caps are letter spaced and painted once");
         assert!(fields > 0, "the actual text editor has a token field fill and one pixel border");
     }
     crate::theme::set_dark(previous);

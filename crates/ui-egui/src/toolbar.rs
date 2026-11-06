@@ -1029,7 +1029,7 @@ fn ribbon_label(app: &SolveApp, label: &str) -> String {
 
 fn ribbon_text(ui: &egui::Ui, at: egui::Pos2, text: &str, size: f32, color: Color32, bold: bool) {
     let text = egui::RichText::new(text).size(size).color(color);
-    let text = if bold { text.semibold() } else { text };
+    let text = if bold { text.medium() } else { text };
     let galley = egui::WidgetText::from(text).into_galley(ui, Some(egui::TextWrapMode::Extend), f32::INFINITY, egui::TextStyle::Button);
     let origin = at - galley.size() / 2.0;
     let ppp = ui.ctx().pixels_per_point().max(0.5);
@@ -1041,7 +1041,7 @@ fn ribbon_tabs(app: &mut SolveApp, ui: &mut egui::Ui, row: Rect) {
     let t = Tokens::get();
     let tabs = crate::workspace::visible_tabs(app);
     let rendering = crate::render_workspace::active(app);
-    let font = crate::fonts::semibold(t.font_body);
+    let font = crate::fonts::medium(t.font_body);
     let widths: Vec<_> =
         tabs.iter().map(|tab| ui.painter().layout_no_wrap(ribbon_label(app, tab), font.clone(), t.text).size().x + 2.0 * TAB_PAD).collect();
     let tabs_width: f32 = widths.iter().sum::<f32>() + tabs.len().saturating_sub(1) as f32 * TAB_GAP;
@@ -1587,7 +1587,7 @@ pub fn toolbar(app: &mut SolveApp, ui: &mut egui::Ui) {
             }
             let label = if finish { app.tr("ui.ribbon_exit").to_string() } else { ribbon_label(app, panel) };
             let font = if panel_open || hot {
-                crate::fonts::semibold(crate::theme::Tokens::get().font_small)
+                crate::fonts::medium(crate::theme::Tokens::get().font_small)
             } else {
                 FontId::proportional(crate::theme::Tokens::get().font_small)
             };
@@ -1873,7 +1873,7 @@ fn section_heading(ui: &mut egui::Ui, label: &str, width: f32) {
         rect.left_center() + vec2(6.0, 0.0),
         Align2::LEFT_CENTER,
         crate::i18n::tr_label(label).to_uppercase(),
-        crate::fonts::semibold(crate::theme::Tokens::get().font_small),
+        crate::fonts::medium(crate::theme::Tokens::get().font_small),
         t.text_dim,
     );
 }
@@ -3226,7 +3226,7 @@ mod ribbon_label_tests {
                 .collect();
             assert_eq!(text.len(), 1, "ribbon labels must never be drawn twice");
             let text = text[0];
-            assert_eq!(text.galley.job.sections[0].format.font_id, crate::fonts::semibold(13.0));
+            assert_eq!(text.galley.job.sections[0].format.font_id, crate::fonts::medium(13.0));
             assert_eq!(text.galley.job.sections[0].format.color, ink);
             assert!((text.pos.x * scale - (text.pos.x * scale).round()).abs() < 0.001);
             assert!((text.pos.y * scale - (text.pos.y * scale).round()).abs() < 0.001);
@@ -3337,7 +3337,7 @@ mod ribbon_wrap_tests {
                 for (name, rect) in crate::scenario::rects("ribbon:section:") {
                     let Some(panel) = name.strip_prefix(&format!("ribbon:section:{tab}:")) else { continue };
                     let label = if panel == "FINISH SKETCH" { h.app.tr("ui.ribbon_exit").to_string() } else { ribbon_label(&h.app, panel) };
-                    let width = painter.layout_no_wrap(label.clone(), crate::fonts::semibold(Tokens::get().font_small), Color32::WHITE).size().x;
+                    let width = painter.layout_no_wrap(label.clone(), crate::fonts::medium(Tokens::get().font_small), Color32::WHITE).size().x;
                     assert!(
                         width + 8.0 + 14.0 <= rect.width() + 0.5,
                         "{tab} at {w}: the group name `{label}` does not fit its {} px label",

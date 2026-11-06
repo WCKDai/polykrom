@@ -154,13 +154,30 @@ pub(super) fn sized_row<R>(ui: &mut Ui, text: &str, height: f32, control: impl F
     result
 }
 
+/// The text of a [`value_row`]: tabular figures (the monospace family), the value after at
+/// medium weight (it is what the row is about), the value before, where there is one, at regular
+/// with the arrow between them; `stacked`, the pair on two lines.
+fn value_job(before: Option<&str>, after: &str, stacked: bool, ink: egui::Color32, width: f32) -> egui::text::LayoutJob {
+    let t = Tokens::get();
+    let regular = egui::TextFormat::simple(egui::FontId::monospace(t.font_body), ink);
+    let medium = egui::TextFormat::simple(crate::fonts::mono_medium(t.font_body), ink);
+    let mut job = egui::text::LayoutJob::default();
+    job.wrap.max_width = width;
+    if let Some(b) = before {
+        job.append(b, 0.0, regular.clone());
+        job.append(if stacked { "\n→ " } else { " → " }, 0.0, regular);
+    }
+    job.append(after, 0.0, medium);
+    job
+}
+
 /// A label/value row whose value is never elided (a number with its unit, a `before → after`
 /// pair): a value wider than its column takes more lines, the pair breaking before the arrow
-/// first so each number stays whole with its unit, and the row grows to hold them. The hover text
-/// and the accessible label carry the value on one line. Tokens: `row, font_body, form_ink, space_8`.
+/// first so each number stays whole with its unit, and the row grows to hold them. The value
+/// after is set a step heavier ([`value_job`]). The hover text and the accessible label carry the
+/// value on one line. Tokens: `row, font_body, form_ink, space_8`.
 pub(crate) fn value_row(ui: &mut Ui, label: &str, before: Option<&str>, after: &str) -> Response {
     let t = Tokens::get();
-    let font = egui::FontId::monospace(t.font_body);
     let ink = t.form_ink;
     let one_line = match before {
         Some(b) => format!("{b} → {after}"),
@@ -169,13 +186,9 @@ pub(crate) fn value_row(ui: &mut Ui, label: &str, before: Option<&str>, after: &
     // The control column as `sized_row` lays it out, so the measure and the row agree.
     let width = dimension(ui.available_width());
     let column = (width - label_column(ui, label, width) - label_gap(ui, width)).max(0.0);
-    let fits = ui.painter().layout_no_wrap(one_line.clone(), font.clone(), ink).size().x <= column;
-    let shown = match before {
-        Some(b) if !fits => format!("{b}\n→ {after}"),
-        _ => one_line.clone(),
-    };
+    let fits = ui.fonts_mut(|f| f.layout_job(value_job(before, after, false, ink, f32::INFINITY))).size().x <= column;
     // Wrapped, never elided: a line still too wide breaks at a space, or anywhere as a last resort.
-    let galley = ui.painter().layout(shown, font, ink, column);
+    let galley = ui.fonts_mut(|f| f.layout_job(value_job(before, after, !fits, ink, column)));
     let height = row_height().max(galley.size().y + t.space_8);
     sized_row(ui, label, height, |ui| {
         let (rect, response) = ui.allocate_exact_size(vec2(ui.available_width(), height), egui::Sense::click());
@@ -294,7 +307,7 @@ pub(crate) fn section_count<R>(
     let badge_value = count.map(|count| count.to_string());
     let badge_width = badge_value.as_ref().map_or(0.0, |value| label_width(ui, value) + t.space_12);
     let reserved = if badge_value.is_some() { badge_width + t.space_12 } else { 0.0 };
-    let mut format = egui::TextFormat::simple(crate::fonts::semibold(t.font_caption), t.form_dim);
+    let mut format = egui::TextFormat::simple(crate::fonts::medium(t.font_caption), t.form_dim);
     format.extra_letter_spacing = t.font_caption * t.font_section_tracking;
     let title_width = ui
         .fonts_mut(|fonts| fonts.layout_job(egui::text::LayoutJob::single_section(caption.clone(), format)))
@@ -303,7 +316,7 @@ pub(crate) fn section_count<R>(
         .ceil()
         .min((text_rect.width() - reserved).max(0.0));
     let title_rect = egui::Rect::from_min_max(text_rect.min, egui::pos2(text_rect.left() + title_width, text_rect.bottom()));
-    paint_text(ui, title_rect, &caption, crate::fonts::semibold(t.font_caption), t.form_dim, true);
+    paint_text(ui, title_rect, &caption, crate::fonts::medium(t.font_caption), t.form_dim, true);
     let mut rule_left = title_rect.right() + t.space_12;
     if let Some(value) = badge_value {
         let width = badge_width.min((rect.right() - rule_left).max(0.0));
@@ -412,8 +425,8 @@ pub(crate) fn text(ui: &mut Ui, text: &str, style: Text<'_>) -> Response {
         _ => t.form_ink,
     };
     let font = match style {
-        Text::NameCell(true) => crate::fonts::semibold(t.font_label),
-        Text::NameCell(false) => crate::fonts::medium(t.font_label),
+        Text::NameCell(true) => crate::fonts::medium(t.font_label),
+        Text::NameCell(false) => egui::FontId::proportional(t.font_label),
         Text::Heading(_) => crate::fonts::semibold(t.font_button),
         Text::MonoCell | Text::Value(_, _) => egui::FontId::monospace(t.font_body),
         Text::MonoNote(_) => egui::FontId::monospace(t.font_small),
@@ -486,7 +499,7 @@ pub(crate) fn summary_row(ui: &mut Ui, name: &str, summary: &str, enabled: &mut 
     );
     let title = egui::Rect::from_min_max(text.min, egui::pos2(text.right(), text.center().y));
     let detail = egui::Rect::from_min_max(egui::pos2(text.left(), text.center().y), text.max);
-    paint_text(ui, title, name, crate::fonts::semibold(t.font_label), t.form_ink, false);
+    paint_text(ui, title, name, crate::fonts::medium(t.font_label), t.form_ink, false);
     paint_text(ui, detail, summary, egui::FontId::proportional(t.font_small), t.form_dim, false);
     let response = ui.interact(text, ui.id().with("summary"), egui::Sense::hover()).on_hover_text(summary);
     response.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Label, ui.is_enabled(), format!("{name}: {summary}")));

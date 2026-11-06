@@ -3583,8 +3583,10 @@ fn transient_messages(app: &mut SolveApp, ui: &egui::Ui, viewport: Rect) -> Vec<
     if let Some(layout) = &app.viewport.layout {
         obstacles.extend([layout.navigation, layout.axis_view]);
     }
-    // The agent activity feed (as painted last frame) is no place for a toast either.
-    obstacles.extend(app.shell.agent_activity);
+    // The agent activity list stands where the corner's cards leave it room (beside the
+    // Properties card, above the navigation bar), which can be the toasts' band: the toasts keep
+    // clear of it (laid out as it stands this frame), the gap of the floating cards between.
+    obstacles.extend(crate::agent_activity::frame(app, ui.ctx()).map(|list| list.expand(crate::shell::SHELL_GAP)));
     let mut free = crate::viewport_layout::free_rect(crate::shell::content_rect(app, viewport), &obstacles).shrink(t.space_8);
     // The 3D mouse calibration offer: text and actions from its module, drawn by the shared toast.
     if let Some(offer) = crate::space_mouse_offer::due(app, ui.ctx()) {
@@ -4630,7 +4632,7 @@ fn view_menu(app: &mut SolveApp, ui: &mut egui::Ui, button: Rect) -> bool {
     let r = area.show(ui.ctx(), |ui| {
         Container::popup_frame(ui.style()).show(ui, |ui| {
             ui.set_width(220.0);
-            ui.label(egui::RichText::new(crate::i18n::tr_label("VIEW")).semibold().color(crate::theme::Tokens::get().text).size(t.font_caption));
+            ui.label(egui::RichText::new(crate::i18n::tr_label("VIEW")).medium().color(crate::theme::Tokens::get().text).size(t.font_caption));
             ui.label(app.tr("ui.graphics_preset"));
             crate::prefs::graphics_preset_selector(app, ui);
             ui.separator();
@@ -7878,8 +7880,12 @@ mod tests {
                 h.app.fit_view();
                 h.frames(2); // Fit resolves against the measured floating shell before the drag.
                 let rect = h.app.viewport.rect.unwrap();
-                let at = rect.center() + offset;
                 let proj = projection(&h.app, rect);
+                // From the box's centre on screen: the fit centres the model in the canvas left
+                // free by the floating cards (the Properties card at the right), not in the
+                // viewport.
+                let centre = proj.to_screen(view_bounds(&h.app).center()).unwrap();
+                let at = centre + offset;
                 assert!(
                     matches!(pick(&h.app, &proj, at).first(), Some(Hit::Face { .. })),
                     "perspective={perspective}: the drag starts on a face of the box"

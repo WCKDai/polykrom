@@ -272,6 +272,12 @@ pub(crate) const SHADOW_INK: Color32 = Color32::from_rgb(32, 34, 37);
 pub(crate) const GLASS_ALPHA_DARK: f32 = 0.78;
 pub(crate) const GLASS_ALPHA_LIGHT: f32 = 0.84;
 
+/// The opacity of the "Clear" Design Browser's veil ([`Tokens::clear_fill`]) in a dark and in a
+/// light theme: a neutral veil in place of the panel's tint, as thin as the muted text's 3:1
+/// floor over every scene colour allows (the tests check it).
+pub(crate) const CLEAR_ALPHA_DARK: f32 = 0.65;
+pub(crate) const CLEAR_ALPHA_LIGHT: f32 = 0.82;
+
 /// WCAG contrast of two opaque sRGB colours.
 pub(crate) fn contrast_ratio(a: Color32, b: Color32) -> f64 {
     let luminance = |c: Color32| {
@@ -821,6 +827,19 @@ impl Tokens {
         if self.is_dark_theme() { Color32::WHITE.gamma_multiply(0.16) } else { Color32::WHITE.gamma_multiply(0.9) }
     }
 
+    /// The fill of the Design Browser under the "Clear" preference (`browser_float`), for
+    /// `glass_frame`, which lays it over the canvas at the glass opacity (`glass`): a neutral
+    /// veil, black in a dark theme and white in a light one, in place of the panel's tint, so
+    /// that laid out it is [`CLEAR_ALPHA_DARK`] or [`CLEAR_ALPHA_LIGHT`] opaque: the thinnest
+    /// veil that keeps the muted text at its 3:1 floor over every colour the canvas can show
+    /// (the panel's own tint would have to be as opaque as the glass itself to; the neutral
+    /// veil gains the dark theme a clearly thinner card, the light theme a little). It used to
+    /// be the panel at 0.4 under the glass, about 31% opaque, with the text near 1.8:1.
+    pub fn clear_fill(&self) -> Color32 {
+        let (veil, alpha) = if self.is_dark_theme() { (Color32::BLACK, CLEAR_ALPHA_DARK) } else { (Color32::WHITE, CLEAR_ALPHA_LIGHT) };
+        veil.gamma_multiply(alpha / self.glass_alpha())
+    }
+
     /// The tokens of the current theme and colour vision mode.
     pub fn get() -> Tokens {
         Tokens::themed(is_dark(), vision())
@@ -960,7 +979,13 @@ mod tests {
     /// The glass of the floating cards (`glass`, `glass_edge`): clearly lighter than a solid
     /// panel in both themes, yet the text and the muted text on a card keep their contrast over
     /// every colour the canvas can show under it (the viewport's gradient, the grid, bodies and
-    /// their edges, a selected body, sketch curves). egui blends in gamma space, premultiplied.
+    /// their edges, a selected body, sketch curves), on every glass fill: the panel (the
+    /// browser, the strip, Properties, Review changes, the toasts, the agent activity list), the
+    /// timeline (the History card) and the overlay (the navigation bar), and on the "Clear"
+    /// browser's veil (`clear_fill`), which is no more opaque than the glass. (The r6 review:
+    /// in the light theme the History card's muted text read 2.83:1 and the navigation bar's
+    /// 2.85:1, under the 3:1 floor, and the Clear browser's text near 1.8:1.) egui blends in
+    /// gamma space, premultiplied.
     #[test]
     fn glass_cards_read_through_and_keep_text_contrast_over_every_scene_colour() {
         use super::*;
@@ -983,14 +1008,29 @@ mod tests {
                 }
                 let edge = t.glass_edge();
                 assert!(edge.a() > 0 && edge.r() == edge.g() && edge.g() == edge.b(), "a fine light edge: {edge:?}");
-                let glass = t.glass(t.panel);
-                for scene in [t.viewport_top, t.viewport_bottom, t.grid, t.grid_major, t.body, t.body_edge, t.body_selected, t.sketch, t.sketch_fixed]
+                let clear = t.glass(t.clear_fill());
+                assert!(clear.a() <= t.glass(t.panel).a(), "dark={dark}: the Clear browser {clear:?} is no more opaque than the glass");
+                assert!(clear.r() == clear.g() && clear.g() == clear.b(), "dark={dark}: a neutral veil: {clear:?}");
+                for (what, glass) in
+                    [("panel", t.glass(t.panel)), ("timeline", t.glass(t.timeline)), ("overlay", t.glass(t.overlay)), ("clear", clear)]
                 {
-                    let ground = over(glass, scene);
-                    let text = contrast_ratio(t.text, ground);
-                    let dim = contrast_ratio(t.text_dim, ground);
-                    assert!(text >= 4.5, "dark={dark} {vision:?}: text {:?} on glass over {scene:?} ({ground:?}) reads {text:.2}:1", t.text);
-                    assert!(dim >= 3.0, "dark={dark} {vision:?}: muted text {:?} on glass over {scene:?} ({ground:?}) reads {dim:.2}:1", t.text_dim);
+                    for scene in
+                        [t.viewport_top, t.viewport_bottom, t.grid, t.grid_major, t.body, t.body_edge, t.body_selected, t.sketch, t.sketch_fixed]
+                    {
+                        let ground = over(glass, scene);
+                        let text = contrast_ratio(t.text, ground);
+                        let dim = contrast_ratio(t.text_dim, ground);
+                        assert!(
+                            text >= 4.5,
+                            "dark={dark} {vision:?}: text {:?} on the {what} glass over {scene:?} ({ground:?}) reads {text:.2}:1",
+                            t.text
+                        );
+                        assert!(
+                            dim >= 3.0,
+                            "dark={dark} {vision:?}: muted text {:?} on the {what} glass over {scene:?} ({ground:?}) reads {dim:.2}:1",
+                            t.text_dim
+                        );
+                    }
                 }
             }
         }

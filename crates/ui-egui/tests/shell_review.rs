@@ -11,7 +11,7 @@
 mod raster;
 
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use egui::{ColorImage, Rect, TextureId, pos2, vec2};
 use polykrom_ui_egui::{
@@ -169,12 +169,57 @@ fn main_window_and_shell_regions() {
     theme::set_dark(previous);
 }
 
+/// The window painted over the model: the headless canvas draws no model, so the sample design
+/// is drawn by the CPU rasteriser as `ui.render` draws it (the grid on, the camera close, so the
+/// plate runs under the cards) and put in the frame in place of the canvas's empty gradient,
+/// under every card. The picture and its pixels per point.
+fn painted_over_model(h: &mut Harness, dir: &Path, mode: &str, window: egui::Vec2) -> (image::RgbaImage, f32) {
+    h.ctx = egui::Context::default();
+    polykrom_ui_egui::fonts::setup_fonts(&h.ctx);
+    theme::apply(&h.ctx);
+    let mut textures: HashMap<TextureId, ColorImage> = HashMap::new();
+    for _ in 0..8 {
+        raster::paint_sized(h, &mut textures, vec![], window);
+    }
+    let mut output = raster::paint_sized(h, &mut textures, vec![], window);
+    let ppp = output.pixels_per_point;
+    let scene = h.app.viewport.rect.expect("the scene is drawn");
+    // The model as the window shows it, at the scene's size.
+    let (w, hgt) = ((scene.width() * ppp).round() as u32, (scene.height() * ppp).round() as u32);
+    let backdrop = dir.join(format!("glass-backdrop-{mode}.png"));
+    let r = h.call("ui.render", json!({"path": backdrop.to_string_lossy(), "width": w, "height": hgt, "grid": true}));
+    assert_eq!(r["ok"], true, "{r}");
+    let model = image::open(&backdrop).unwrap().to_rgba8();
+    std::fs::remove_file(&backdrop).ok();
+    let tex = TextureId::User(0xB1);
+    textures.insert(tex, ColorImage::from_rgba_unmultiplied([model.width() as usize, model.height() as usize], model.as_raw()));
+    // In the frame, right over the canvas's gradient (the four-vertex mesh spanning the scene)
+    // and under everything painted after it.
+    let gradient = output
+        .shapes
+        .iter()
+        .position(|s| match &s.shape {
+            egui::Shape::Mesh(m) if m.vertices.len() == 4 && m.texture_id == TextureId::default() => {
+                let bounds = Rect::from_points(&m.vertices.iter().map(|v| v.pos).collect::<Vec<_>>());
+                (bounds.min - scene.min).length() < 1.0 && (bounds.max - scene.max).length() < 1.0
+            }
+            _ => false,
+        })
+        .expect("the canvas's gradient is in the frame");
+    let uv = Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0));
+    output
+        .shapes
+        .insert(gradient + 1, egui::epaint::ClippedShape { clip_rect: scene, shape: egui::Shape::image(tex, scene, uv, egui::Color32::WHITE) });
+    println!("{mode}: painted over {} ({w} x {hgt} px of model, renderer {})", scene, r["result"]["renderer"]);
+    (raster::raster_sized(h, &textures, output, window), ppp)
+}
+
 /// The glass cards over a busy canvas (the owner's direction, 2026-11-06: the Design Browser a
-/// glass plane, the other floating cards the same look) at 1600 x 1000, dark and light. The
-/// headless canvas draws no model, so the sample design is drawn by the CPU rasteriser as
-/// `ui.render` draws it (the grid on, the camera close, so the plate runs under the cards) and
-/// put in the frame in place of the canvas's empty gradient, under the Design Browser, the
-/// document strip, the history, the Review changes card and the canvas status line. Written to
+/// glass plane, the other floating cards the same look) at 1600 x 1000, dark and light, with the
+/// AI review flow's card and its canvas status line (a proposal to thicken the plate), and with
+/// the Properties card (the sample's last feature selected; r7: glass like the other cards):
+/// the Design Browser, the document strip, the history, the Review changes card, the status
+/// line and the Properties card, each over the model. Written to
 /// `target/review-media/glass-<surface>-<mode>-<stage>.png`.
 #[test]
 fn glass_cards_over_a_busy_canvas() {
@@ -190,77 +235,57 @@ fn glass_cards_over_a_busy_canvas() {
     let previous = theme::is_dark();
     for dark in [true, false] {
         let mode = if dark { "dark" } else { "light" };
-        let mut h = Harness::new();
-        h.app.home.open = false;
-        h.call("ui.set", json!({"dark": dark}));
-        h.call("ui.resize", json!({"width": WINDOW.x, "height": WINDOW.y}));
-        h.app.session.run_script(&polykrom_engine::sample::script()).unwrap();
-        h.frames(3);
-        // The AI review flow's card and its canvas status line: a proposal to thicken the plate.
-        let steps = json!([{"command": "parameters.change", "params": {"name": "thickness", "expression": "10 mm"}}]);
-        let r = h.call("ui.review", json!({"prompt": "Make the plate 10 mm thick", "propose": {"commands": steps, "label": "Plate 10 mm thick"}}));
-        assert_eq!(r["ok"], true, "{r}");
-        h.frames(3);
-        // The camera close in: the plate runs under the cards, the grid fills the rest.
-        h.app.fit_view();
-        h.app.cam_anim = None;
-        h.frames(2);
-        h.app.cam.distance *= 0.5;
-        h.app.cam_anim = None;
-        h.frames(3);
-        h.ctx = egui::Context::default();
-        polykrom_ui_egui::fonts::setup_fonts(&h.ctx);
-        theme::apply(&h.ctx);
-        let mut textures: HashMap<TextureId, ColorImage> = HashMap::new();
-        for _ in 0..8 {
-            raster::paint_sized(&mut h, &mut textures, vec![], WINDOW);
-        }
-        let mut output = raster::paint_sized(&mut h, &mut textures, vec![], WINDOW);
-        let ppp = output.pixels_per_point;
-        let scene = h.app.viewport.rect.expect("the scene is drawn");
-        // The model as the window shows it, at the scene's size.
-        let (w, hgt) = ((scene.width() * ppp).round() as u32, (scene.height() * ppp).round() as u32);
-        let backdrop = dir.join(format!("glass-backdrop-{mode}.png"));
-        let r = h.call("ui.render", json!({"path": backdrop.to_string_lossy(), "width": w, "height": hgt, "grid": true}));
-        assert_eq!(r["ok"], true, "{r}");
-        let model = image::open(&backdrop).unwrap().to_rgba8();
-        std::fs::remove_file(&backdrop).ok();
-        let tex = TextureId::User(0xB1);
-        textures.insert(tex, ColorImage::from_rgba_unmultiplied([model.width() as usize, model.height() as usize], model.as_raw()));
-        // In the frame, right over the canvas's gradient (the four-vertex mesh spanning the scene)
-        // and under everything painted after it.
-        let gradient = output
-            .shapes
-            .iter()
-            .position(|s| match &s.shape {
-                egui::Shape::Mesh(m) if m.vertices.len() == 4 && m.texture_id == TextureId::default() => {
-                    let bounds = Rect::from_points(&m.vertices.iter().map(|v| v.pos).collect::<Vec<_>>());
-                    (bounds.min - scene.min).length() < 1.0 && (bounds.max - scene.max).length() < 1.0
-                }
-                _ => false,
-            })
-            .expect("the canvas's gradient is in the frame");
-        let uv = Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0));
-        output
-            .shapes
-            .insert(gradient + 1, egui::epaint::ClippedShape { clip_rect: scene, shape: egui::Shape::image(tex, scene, uv, egui::Color32::WHITE) });
-        let shot = raster::raster_sized(&mut h, &textures, output, WINDOW);
-        shot.save(dir.join(format!("glass-main-window-1600x1000-{mode}-{stage}.png"))).unwrap();
-        for (what, handle) in [
-            ("design-browser", "browser:card"),
-            ("document-strip", "document_bar:card"),
-            ("design-history", "history:card"),
-            ("review-card", "review:panel"),
-            ("status-line", "review:status"),
-        ] {
-            let Some(card) = scenario::rect_of(handle) else {
-                println!("{mode}: no {handle} in this shell, no glass-{what} picture");
-                continue;
+        for state in ["review", "properties"] {
+            let mut h = Harness::new();
+            h.app.home.open = false;
+            h.call("ui.set", json!({"dark": dark}));
+            h.call("ui.resize", json!({"width": WINDOW.x, "height": WINDOW.y}));
+            h.app.session.run_script(&polykrom_engine::sample::script()).unwrap();
+            h.frames(3);
+            if state == "review" {
+                // The AI review flow's card and its canvas status line: a proposal to thicken the plate.
+                let steps = json!([{"command": "parameters.change", "params": {"name": "thickness", "expression": "10 mm"}}]);
+                let r = h
+                    .call("ui.review", json!({"prompt": "Make the plate 10 mm thick", "propose": {"commands": steps, "label": "Plate 10 mm thick"}}));
+                assert_eq!(r["ok"], true, "{r}");
+            } else if let Some(last) = h.app.session.doc.features.last().map(|f| f.id) {
+                // The last feature selected, as view 01 selects Hole 02: the Properties card.
+                h.app.run("select.set", json!({"items": [{"type": "feature", "id": last}]})).unwrap();
+            }
+            h.frames(3);
+            // The camera close in: the plate runs under the cards, the grid fills the rest.
+            h.app.fit_view();
+            h.app.cam_anim = None;
+            h.frames(2);
+            h.app.cam.distance *= 0.5;
+            h.app.cam_anim = None;
+            h.frames(3);
+            let (shot, ppp) = painted_over_model(&mut h, &dir, mode, WINDOW);
+            if state == "review" {
+                shot.save(dir.join(format!("glass-main-window-1600x1000-{mode}-{stage}.png"))).unwrap();
+            } else {
+                shot.save(dir.join(format!("glass-main-window-properties-1600x1000-{mode}-{stage}.png"))).unwrap();
+            }
+            let crops: &[(&str, &str)] = if state == "review" {
+                &[
+                    ("design-browser", "browser:card"),
+                    ("document-strip", "document_bar:card"),
+                    ("design-history", "history:card"),
+                    ("review-card", "review:panel"),
+                    ("status-line", "review:status"),
+                ]
+            } else {
+                &[("properties-card", "properties:panel")]
             };
-            let rect = card.expand(24.0).intersect(Rect::from_min_size(egui::Pos2::ZERO, WINDOW));
-            crop(&shot, rect, ppp).save(dir.join(format!("glass-{what}-{mode}-{stage}.png"))).unwrap();
+            for (what, handle) in crops {
+                let Some(card) = scenario::rect_of(handle) else {
+                    println!("{mode}: no {handle} in this shell, no glass-{what} picture");
+                    continue;
+                };
+                let rect = card.expand(24.0).intersect(Rect::from_min_size(egui::Pos2::ZERO, WINDOW));
+                crop(&shot, rect, ppp).save(dir.join(format!("glass-{what}-{mode}-{stage}.png"))).unwrap();
+            }
         }
-        println!("{mode}: glass pictures drawn over {} ({w} x {hgt} px of model, renderer {})", scene, r["result"]["renderer"]);
     }
     theme::set_dark(previous);
 }

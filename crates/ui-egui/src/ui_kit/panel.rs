@@ -639,7 +639,7 @@ fn page_list_sized<S>(ui: &mut Ui, selected: &mut usize, pages: &[WindowPage<S>]
                     ui.add_space(t.space_8);
                     let (rect, _) = ui.allocate_exact_size(vec2(dimension(ui.available_width()), t.space_24), egui::Sense::hover());
                     let rect = rect.shrink2(vec2(t.space_10, 0.0));
-                    paint_text(ui, rect, &crate::i18n::tr(group).to_uppercase(), crate::fonts::semibold(t.font_small), t.form_dim, true);
+                    paint_text(ui, rect, &crate::i18n::tr(group).to_uppercase(), crate::fonts::medium(t.font_small), t.form_dim, true);
                 }
                 let label = crate::i18n::tr(page.label);
                 let (rect, response) =
@@ -660,7 +660,7 @@ fn page_list_sized<S>(ui: &mut Ui, selected: &mut usize, pages: &[WindowPage<S>]
                     ui,
                     text_rect,
                     label,
-                    if on { crate::fonts::semibold(t.font_label) } else { egui::FontId::proportional(t.font_label) },
+                    if on { crate::fonts::medium(t.font_label) } else { egui::FontId::proportional(t.font_label) },
                     ink,
                     false,
                 );

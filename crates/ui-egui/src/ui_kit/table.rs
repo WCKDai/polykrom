@@ -373,7 +373,7 @@ pub(crate) fn active_pill(ui: &mut Ui) {
     let width = label_width(ui, label) + t.space_16;
     let (rect, response) = ui.allocate_exact_size(vec2(width, t.font_small + t.space_6), egui::Sense::hover());
     ui.painter().rect(rect, t.radius_xl, t.control_fill, t.control_border_stroke(t.control_border), egui::StrokeKind::Inside);
-    super::text::paint_text(ui, rect.shrink2(vec2(t.space_8, 0.0)), label, crate::fonts::semibold(t.font_small), t.form_primary, false);
+    super::text::paint_text(ui, rect.shrink2(vec2(t.space_8, 0.0)), label, crate::fonts::medium(t.font_small), t.form_primary, false);
     response.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Label, ui.is_enabled(), label));
     scenario::publish_handle(&format!("dialog:inline:{label}"), rect.center());
     scenario::publish_rect(&format!("dialog:inline:{label}"), rect);

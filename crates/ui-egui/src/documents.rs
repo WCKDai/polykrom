@@ -498,7 +498,7 @@ pub(crate) fn natural_width(app: &SolveApp, painter: &egui::Painter) -> f32 {
         .iter()
         .map(|(name, dirty)| {
             let label = format!("{}{}", locale.given_name(name), if *dirty { " •" } else { "" });
-            let text = painter.layout_no_wrap(label, crate::fonts::semibold(t.font_button), t.text).size().x;
+            let text = painter.layout_no_wrap(label, crate::fonts::medium(t.font_button), t.text).size().x;
             // `layout` keeps every tab at least MIN_TAB wide before it starts to overflow.
             (text + 40.0).clamp(90.0, 200.0)
         })
@@ -593,7 +593,7 @@ pub fn tabs(app: &mut SolveApp, ui: &mut egui::Ui, r: Rect, x0: f32, x1: f32) {
         .map(|(name, dirty)| {
             let shown_name = crate::i18n::Locale::for_language(&app.preferences.language).given_name(name);
             let label = format!("{shown_name}{}", if *dirty { " •" } else { "" });
-            let text = ui.painter().layout_no_wrap(label, crate::fonts::semibold(crate::theme::Tokens::get().font_button), t.text).size().x;
+            let text = ui.painter().layout_no_wrap(label, crate::fonts::medium(crate::theme::Tokens::get().font_button), t.text).size().x;
             (text + 40.0).clamp(72.0, MAX_FIT)
         })
         .collect();
@@ -672,7 +672,7 @@ pub fn tabs(app: &mut SolveApp, ui: &mut egui::Ui, r: Rect, x0: f32, x1: f32) {
         let name_display = crate::i18n::Locale::for_language(&app.preferences.language).given_name(name);
         let label = format!("{name_display}{}", if *dirty { " •" } else { "" });
         let font = if active {
-            crate::fonts::semibold(crate::theme::Tokens::get().font_button)
+            crate::fonts::medium(crate::theme::Tokens::get().font_button)
         } else {
             FontId::proportional(crate::theme::Tokens::get().font_button)
         };

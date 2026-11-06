@@ -398,7 +398,7 @@ fn timeline_contents(app: &mut SolveApp, ui: &mut egui::Ui) {
     x += t.space_10 + t.space_8;
     let mut drag_rect = grip;
     // The kit's heading: the History icon and DESIGN HISTORY in muted small capitals.
-    let label = p.layout_no_wrap(crate::i18n::tr("ui.history_strip_title").to_uppercase(), crate::fonts::semibold(t.font_small), t.text_dim);
+    let label = p.layout_no_wrap(crate::i18n::tr("ui.history_strip_title").to_uppercase(), crate::fonts::medium(t.font_small), t.text_dim);
     if x + 18.0 + t.space_8 + label.size().x + t.space_12 + crate::ui_kit::history_transport_width() <= r.right() {
         let icon = Rect::from_center_size(pos2(x + 9.0, r.center().y), vec2(18.0, 18.0));
         icons::paint_icon(&p, icon, "rollback", f32::from(t.icon.a()) / 255.0);

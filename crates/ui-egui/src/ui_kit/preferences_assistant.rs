@@ -59,7 +59,7 @@ fn choice_card(ui: &mut Ui, width: f32, choice: &SettingsChoice<'_>, selected: b
     }
     let title =
         Rect::from_min_max(pos2(radio.x + t.space_12, rect.top() + t.space_4), pos2(rect.right() - t.space_8, rect.top() + t.space_24 + t.space_4));
-    paint_text(ui, title, choice.title, crate::fonts::semibold(t.font_label), if selected { t.selected_ink } else { t.form_ink }, false);
+    paint_text(ui, title, choice.title, crate::fonts::medium(t.font_label), if selected { t.selected_ink } else { t.form_ink }, false);
     let body = Rect::from_min_max(pos2(rect.left() + t.space_12, title.bottom() + t.space_4), rect.max - vec2(t.space_12, t.space_8));
     let galley = ui.painter().layout(choice.summary.to_owned(), FontId::proportional(t.font_small), t.form_dim, body.width());
     ui.painter().with_clip_rect(ui.clip_rect().intersect(body)).galley(body.min, galley, t.form_dim);

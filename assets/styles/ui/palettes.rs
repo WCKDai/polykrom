@@ -149,7 +149,10 @@ impl Tokens {
             error: Color32::from_rgb(214, 54, 54),
             warning: Color32::from_rgb(222, 150, 30),
             icon: Color32::from_rgb(77, 77, 82),
-            timeline: Color32::from_rgb(234, 234, 240),
+            // A step below the panel, and light enough that the History card's glass over the
+            // darkest scene colour keeps the muted text at 3:1 (`glass_cards_read_through_…`; at
+            // 234 it read 2.83:1).
+            timeline: Color32::from_rgb(246, 246, 250),
             hover: Color32::from_rgb(240, 240, 243),
             sel_face: Color32::from_rgb(0, 122, 140),
             sel_edge: Color32::from_rgb(24, 149, 161),
@@ -202,7 +205,9 @@ impl Tokens {
             glyph_bg: Color32::WHITE,
             glyph_edge: Color32::from_rgb(190, 110, 100),
             glyph_text: icon_primary(crate::icon_svg::CONSTRAINT_PRIMARY[0]),
-            overlay: Color32::from_rgba_unmultiplied_const(255, 255, 255, 235),
+            // Near opaque: the navigation bar's glass over the darkest scene colour keeps the
+            // muted text at 3:1 (at 235 it read 2.85:1).
+            overlay: Color32::from_rgba_unmultiplied_const(255, 255, 255, 250),
             rubber_band: Color32::from_rgb(15, 139, 151),
             // On the light bar: the window's text, translucent black hovers, and the field
             // surface a step below the bar for Save and Export.
