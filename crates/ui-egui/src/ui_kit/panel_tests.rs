@@ -39,7 +39,8 @@ fn heading_weight_field_surfaces_and_disclosures_follow_tokens_in_both_themes() 
                 }
                 if text.galley.job.text == "OPTIONS" {
                     let format = &text.galley.job.sections.first().unwrap().format;
-                    assert_eq!(format.font_id, crate::fonts::semibold(t.font_caption));
+                    // Section captions are medium (500): the lighter typography of the glass look.
+                    assert_eq!(format.font_id, crate::fonts::medium(t.font_caption));
                     assert!(format.extra_letter_spacing > 0.0);
                     *section += 1;
                 }
@@ -72,7 +73,7 @@ fn heading_weight_field_surfaces_and_disclosures_follow_tokens_in_both_themes() 
         }
         assert_eq!(scenario::rect_of("dialog:header").unwrap().height(), Tokens::get().form_header_height);
         assert_eq!(title, 1, "the semibold heading is painted once");
-        assert_eq!(section, 1, "semibold small caps are letter spaced and painted once");
+        assert_eq!(section, 1, "medium small caps are letter spaced and painted once");
         assert!(fields > 0, "the actual text editor has a token field fill and one pixel border");
     }
     crate::theme::set_dark(previous);
@@ -148,7 +149,8 @@ fn palette_scrolls_short_views_and_retains_its_status_and_action_handles() {
                         frame,
                     );
                     panel.window(&ctx).show(&ctx, |ui| {
-                        panel.palette(ui, bottom, 0.0, |ui, part| match part {
+                        let footer_height = Tokens::get().form_button_height + 2.0 * Tokens::get().space_6;
+                        panel.palette(ui, bottom, 0.0, footer_height, |ui, part| match part {
                             Part::Header => {
                                 status_header(
                                     ui,
@@ -452,6 +454,9 @@ fn confirm_routes_enter_escape_selected_answers_and_blocks_background_clicks() {
 fn save_prompt_frames_dont_save_and_clicking_it_discards_for_close_and_quit() {
     for quit in [false, true] {
         let mut h = crate::scenario::Harness::new();
+        // The confirm is rendered and clicked at the same 1600 x 1000 window, so the handle the
+        // click resolves matches the frame it lands in.
+        h.call("ui.resize", serde_json::json!({"width": 1600, "height": 1000}));
         h.app.home.open = false;
         h.app.run("solid.box", serde_json::json!({"length": 10, "width": 10, "height": 10})).unwrap();
         if quit {

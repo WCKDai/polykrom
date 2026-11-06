@@ -1,6 +1,6 @@
 //! Assistant entry point and its status mark, shared by application chrome and previews.
 use crate::{icons, theme::Tokens};
-use egui::{FontId, Rect, Response, Stroke, vec2};
+use egui::{FontId, Rect, Response, Stroke, pos2, vec2};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum AssistantEntryState {
@@ -12,21 +12,23 @@ pub(crate) enum AssistantEntryState {
     Waiting(usize),
 }
 
-/// Paint the compact entry point in its caller-owned target. The caller owns state and actions.
-/// Tokens: app_bar, app_bar_hover_button/strong, agent_ok/busy, warning/error, radius_sm, font_badge.
+/// Paint the compact entry point in its caller-owned target, on the window's base surface (the
+/// status bar), with the chrome of the icon buttons beside it. The caller owns state and actions.
+/// Tokens: window, hover, icon, agent_ok/busy, warning/error, radius_sm, font_badge.
 pub(crate) fn assistant_entry(ui: &egui::Ui, response: &Response, state: AssistantEntryState, open: bool, animate: bool) {
     let t = Tokens::get();
     let at = response.rect;
     let mark = state;
-    // The highlight is a 26 px square, like the other icon buttons; the mark sits on the bubble's corner.
-    let mut ring = t.app_bar;
+    // The highlight is a 26 px square, like the other icon buttons.
+    let mut ring = t.window;
     if open || response.hovered() || response.has_focus() {
-        let fill = if open { t.app_bar_hover_strong } else { t.app_bar_hover_button };
-        ui.painter().rect_filled(at.shrink(t.space_3), t.radius_sm, fill);
-        ring = t.app_bar.blend(fill);
+        ui.painter().rect_filled(at.shrink(t.space_3), t.radius_sm, t.hover);
+        ring = t.window.blend(t.hover);
     }
-    icons::paint_app_bar(ui.painter(), at.shrink(t.space_6 + 1.0), "assistant", 1.0);
-    let c = egui::pos2(at.right() - t.space_8 - 0.5, at.top() + t.space_10 - 0.5);
+    // The sparkle, in the icon ink (not the application bar's text, which vanished on the light
+    // status bar); the status mark sits in the top-right corner, clear of the glyph's strokes.
+    icons::paint_ink(ui.painter(), Rect::from_center_size(at.center(), vec2(t.space_16, t.space_16)), "assistant", t.icon);
+    let c = pos2(at.right() - t.space_8 + 0.5, at.top() + t.space_8 - 0.5);
     match mark {
         AssistantEntryState::Quiet => {}
         AssistantEntryState::Ready | AssistantEntryState::NeedsAuth | AssistantEntryState::Stopped => {
@@ -60,11 +62,12 @@ pub(crate) fn assistant_entry(ui: &egui::Ui, response: &Response, state: Assista
         AssistantEntryState::Waiting(count) => {
             let text = count.to_string();
             let font = FontId::proportional(t.font_badge);
-            let galley = ui.painter().layout_no_wrap(text, font, t.app_bar);
+            let ink = t.warning_ink();
+            let galley = ui.painter().layout_no_wrap(text, font, ink);
             let badge = Rect::from_center_size(c, vec2((galley.size().x + t.space_6).max(t.space_14), t.space_14));
             ui.painter().rect_filled(badge.expand(1.5), Tokens::outset_radius(f32::from(t.sketch_mode_radius), 1.5), ring);
             ui.painter().rect_filled(badge, t.sketch_mode_radius, t.warning);
-            ui.painter().galley(badge.center() - galley.size() / 2.0, galley, t.app_bar);
+            ui.painter().galley(badge.center() - galley.size() / 2.0, galley, ink);
         }
     }
 }

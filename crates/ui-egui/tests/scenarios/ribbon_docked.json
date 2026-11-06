@@ -1,11 +1,10 @@
 [
-  {"note":"Docked ribbon entry points keep the existing workspace menu, section menus, command search and Sketch exit usable after resizing."},
-  {"expect":{"shown_handles":["ribbon:workspace","ribbon:search","ribbon:section:MODEL:CREATE","tab:MODEL"],"spans":{"inner":"ribbon:workspace","outer":"toolbar","axis":"y","tol":1}}},
-  {"click":{"handle":"ribbon:workspace"}},
-  {"call":"ui.menuPick","params":{"item":"ui.workspace.render"}},
-  {"expect":{"shown_handles":["tab:RENDER","ribbon:search","ribbon:workspace"]}},
-  {"click":{"handle":"ribbon:workspace"}},
-  {"call":"ui.menuPick","params":{"item":"ui.workspace.design"}},
+  {"note":"Docked ribbon entry points keep the workspace tabs (RENDER enters the Render workspace), section menus, command search and Sketch exit usable after resizing."},
+  {"expect":{"shown_handles":["tab:RENDER","ribbon:search","ribbon:section:MODEL:CREATE","tab:MODEL"]}},
+  {"click":{"handle":"tab:RENDER"}},
+  {"expect":{"shown_handles":["tab:RENDER","ribbon:search","tab:MODEL","ribbon:section:RENDER:SCENE"]}},
+  {"click":{"handle":"tab:MODEL"}},
+  {"expect":{"shown_handles":["ribbon:section:MODEL:CREATE"]}},
   {"click":{"handle":"ribbon:section:MODEL:CREATE"}},
   {"expect":{"shown_handles":["dropdown:solid.extrude"]}},
   {"key":"Escape"},
@@ -22,5 +21,5 @@
   {"call":"ui.resize","params":{"width":320,"height":800}},
   {"key":"S"},
   {"key":"Escape"},
-  {"expect":{"errors":0,"shown_handles":["ribbon:search","ribbon:workspace"]}}
+  {"expect":{"errors":0,"shown_handles":["ribbon:search","tab:MODEL"]}}
 ]

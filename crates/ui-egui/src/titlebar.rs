@@ -77,7 +77,8 @@ pub fn window_action(app: &mut SolveApp, ctx: &egui::Context, action: &str) -> R
 /// their clicks.
 pub fn drag_area(ui: &Ui, rect: Rect) {
     let ctx = ui.ctx();
-    let resp = ui.interact(rect, Id::new("titlebar-drag"), Sense::click_and_drag());
+    // Pointer only: the bar's empty space is no stop for the keyboard.
+    let resp = ui.interact(rect, Id::new("titlebar-drag"), Sense::CLICK | Sense::DRAG);
     // egui hands a drag that starts on a click-only widget to the drag-sensing background below
     // it, so remember whether the press itself landed on bare background.
     if ctx.input(|i| i.pointer.any_pressed()) {
@@ -294,22 +295,14 @@ mod tests {
             w.frame(vec![]);
             w.frame(vec![]);
             let t = Tokens::get();
-            let mut controls: Vec<Rect> = [
-                "titlebar:home",
-                "appbar:file",
-                "titlebar:save",
-                "appbar:undo",
-                "appbar:redo",
-                "tab:design:0",
-                "tab:close:0",
-                "titlebar:assistant",
-                "titlebar:preferences",
-                "appbar:help",
-                "titlebar:report",
-            ]
-            .into_iter()
-            .map(|name| crate::scenario::rect_of(name).unwrap_or_else(|| panic!("{name}")))
-            .collect();
+            // The logo's hover fill is the logo's rect grown by its 3 px halo.
+            let mut controls: Vec<Rect> = ["appbar:file", "titlebar:save", "appbar:undo", "appbar:redo", "titlebar:export"]
+                .into_iter()
+                .map(|name| {
+                    let r = crate::scenario::rect_of(name).unwrap_or_else(|| panic!("{name}"));
+                    if name == "appbar:file" { r.expand(3.0) } else { r }
+                })
+                .collect();
             controls.extend(CAPTIONS.map(|c| w.caption(c)));
             for rect in controls {
                 w.frame(vec![Event::PointerMoved(rect.center())]);
@@ -342,8 +335,7 @@ mod tests {
             assert!([min, max, close].iter().all(|r| r.width() == BUTTON_WIDTH));
             assert_eq!((min.right(), max.right()), (max.left(), close.left()));
             let texts = texts(&out);
-            let version = texts.iter().find(|(t, _)| t.starts_with('v')).map(|(_, r)| *r);
-            assert!(version.is_some_and(|r| r.right() <= min.left() - 4.0), "the version stays left of the buttons: {version:?}");
+            assert!(!texts.iter().any(|(t, _)| t.starts_with('v') && t.contains('.')), "the version is in the status bar, not the title bar");
             for (t, r) in &texts {
                 assert!(r.right() <= min.left() || r.top() >= min.bottom(), "`{t}` runs under the caption buttons at {width}");
             }

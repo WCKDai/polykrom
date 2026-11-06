@@ -86,7 +86,7 @@ impl Menu {
         let t = Tokens::get();
         let (r, _) = ui.allocate_exact_size(vec2(ui.available_width(), t.space_24), Sense::hover());
         let mut job =
-            egui::text::LayoutJob::simple_singleline(crate::i18n::tr_label(label).to_uppercase(), crate::fonts::semibold(t.font_small), t.form_dim);
+            egui::text::LayoutJob::simple_singleline(crate::i18n::tr_label(label).to_uppercase(), crate::fonts::medium(t.font_small), t.form_dim);
         for section in &mut job.sections {
             section.format.extra_letter_spacing = t.font_small * t.font_section_tracking;
         }
@@ -243,7 +243,7 @@ pub(crate) fn workspace_menu(ui: &mut egui::Ui, items: &[Item], key_row: Option<
         ui.label(
             egui::RichText::new(crate::i18n::tr("ui.ribbon_workspace").to_uppercase())
                 .size(crate::theme::Tokens::get().font_small)
-                .semibold()
+                .medium()
                 .color(t.text_dim),
         );
         ui.add_space(t.space_8);

@@ -543,9 +543,15 @@ fn dispatch(app: &mut SolveApp, ctx: &egui::Context, method: &str, p: &Value) ->
             for (k, chevron) in [("browser", false), ("chevron", true)] {
                 if let Some(label) = p.get(k).and_then(Value::as_str) {
                     let rows = crate::browser::drawn_rows();
+                    // A folder's label carries its count (`Bodies (2)`): its bare name finds it too.
+                    let counted = |row: &str| {
+                        row.strip_suffix(')')
+                            .and_then(|r| r.rsplit_once(" ("))
+                            .is_some_and(|(base, n)| base == label && !n.is_empty() && n.chars().all(|c| c.is_ascii_digit()))
+                    };
                     let found = rows
                         .iter()
-                        .find(|r| r.0 == label)
+                        .find(|r| r.0 == label || counted(&r.0))
                         .and_then(|r| if chevron { r.2.map(|f| f.center()) } else { Some(r.1.left_center() + egui::vec2(120.0, 0.0)) });
                     return match found {
                         Some(q) => ok(json!([q.x, q.y])),

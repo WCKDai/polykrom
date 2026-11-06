@@ -262,6 +262,22 @@ pub(crate) fn icon_accent_for_tab(tab: &str) -> Option<&'static str> {
     }
 }
 
+/// What a card's or a menu's drop shadow is made of: the kit's graphite (#202225), in either
+/// theme. (It used to be the application bar's colour, which is light in the light theme now.)
+pub(crate) const SHADOW_INK: Color32 = Color32::from_rgb(32, 34, 37);
+
+/// The opacity of a floating card's glass ([`Tokens::glass`]) in a dark and in a light theme:
+/// restrained, so the text on the card keeps its contrast over the busiest canvas (the tests
+/// check it against every scene colour), yet clearly lighter than a solid panel.
+pub(crate) const GLASS_ALPHA_DARK: f32 = 0.78;
+pub(crate) const GLASS_ALPHA_LIGHT: f32 = 0.84;
+
+/// The opacity of the "Clear" Design Browser's veil ([`Tokens::clear_fill`]) in a dark and in a
+/// light theme: a neutral veil in place of the panel's tint, as thin as the muted text's 3:1
+/// floor over every scene colour allows (the tests check it).
+pub(crate) const CLEAR_ALPHA_DARK: f32 = 0.65;
+pub(crate) const CLEAR_ALPHA_LIGHT: f32 = 0.82;
+
 /// WCAG contrast of two opaque sRGB colours.
 pub(crate) fn contrast_ratio(a: Color32, b: Color32) -> f64 {
     let luminance = |c: Color32| {
@@ -302,6 +318,9 @@ impl TabAccent {
     }
 
     /// Small text on a tab's solid pill. Brighter fills need dark ink in either theme.
+    /// (The tab row draws its active tab as accent text with an underline, not on a fill; the
+    /// pairing stays for themes and the contrast tests.)
+    #[allow(dead_code)]
     pub fn on_fill(self, t: &Tokens) -> Color32 {
         if contrast_ratio(t.on_accent, self.color) >= 4.5 {
             t.on_accent
@@ -312,6 +331,17 @@ impl TabAccent {
         } else {
             Color32::WHITE
         }
+    }
+
+    /// The accent as small text on `ground` (the tab row's window surface): the accent itself
+    /// where it reads at WCAG AA, else the accent's ink, else the plain text colour, else
+    /// whichever of black and white reads better. In the dark theme the Surface and Sheet Metal
+    /// fills are 3.8:1 and 3.6:1 on the window, so their active tabs take the lighter inks.
+    pub fn text_on(self, t: &Tokens, ground: Color32) -> Color32 {
+        [self.color, self.ink, t.text]
+            .into_iter()
+            .find(|ink| contrast_ratio(*ink, ground) >= 4.5)
+            .unwrap_or(if contrast_ratio(Color32::BLACK, ground) >= contrast_ratio(Color32::WHITE, ground) { Color32::BLACK } else { Color32::WHITE })
     }
 
     pub fn current(ctx: &egui::Context) -> Self {
@@ -570,6 +600,10 @@ pub struct Tokens {
     pub app_bar: Color32,
     /// Dividers between the application bar groups.
     pub app_bar_separator: Color32,
+    /// The window's base surface (the design kit's `base`): the workspace tab row, the document
+    /// tabs, the design history strip and the status bar sit on it, the ribbon and the panels
+    /// (`toolbar`, `panel`) are lifted from it.
+    pub window: Color32,
     pub toolbar: Color32,
     pub panel: Color32,
     pub panel_header: Color32,
@@ -765,7 +799,45 @@ impl Tokens {
 
     /// Subtle shell elevation, derived from the semantic application-bar colour.
     pub(crate) fn shell_shadow(self) -> egui::Shadow {
-        egui::Shadow { offset: [0, self.space_2 as i8], blur: self.space_8 as u8, spread: 0, color: self.app_bar.gamma_multiply(0.18) }
+        egui::Shadow { offset: [0, self.space_2 as i8], blur: self.space_8 as u8, spread: 0, color: SHADOW_INK.gamma_multiply(0.18) }
+    }
+
+    /// Whether this is a dark theme: its base surface is dark.
+    pub(crate) fn is_dark_theme(&self) -> bool {
+        egui::Rgba::from(self.window).intensity() < 0.5
+    }
+
+    /// How opaque a floating card's glass is: the canvas reads through the rest. A light theme's
+    /// surfaces are near white, so they keep a little more of their tint for the dark text on them.
+    pub(crate) fn glass_alpha(&self) -> f32 {
+        if self.is_dark_theme() { GLASS_ALPHA_DARK } else { GLASS_ALPHA_LIGHT }
+    }
+
+    /// A floating card's glass: the surface `fill` at the glass opacity (`glass_alpha`), tinted
+    /// from the theme, so the model and the viewport show through it. The cards over the canvas
+    /// (the Design Browser, the document strip, the history, Properties, Review changes, the
+    /// toasts, the navigation bar) share it; docked panels stay solid.
+    pub fn glass(&self, fill: Color32) -> Color32 {
+        fill.gamma_multiply(self.glass_alpha())
+    }
+
+    /// The fine light edge of a glass card: a highlight rather than a dark outline, so the card
+    /// reads as a pane lifted over the canvas.
+    pub fn glass_edge(&self) -> Color32 {
+        if self.is_dark_theme() { Color32::WHITE.gamma_multiply(0.16) } else { Color32::WHITE.gamma_multiply(0.9) }
+    }
+
+    /// The fill of the Design Browser under the "Clear" preference (`browser_float`), for
+    /// `glass_frame`, which lays it over the canvas at the glass opacity (`glass`): a neutral
+    /// veil, black in a dark theme and white in a light one, in place of the panel's tint, so
+    /// that laid out it is [`CLEAR_ALPHA_DARK`] or [`CLEAR_ALPHA_LIGHT`] opaque: the thinnest
+    /// veil that keeps the muted text at its 3:1 floor over every colour the canvas can show
+    /// (the panel's own tint would have to be as opaque as the glass itself to; the neutral
+    /// veil gains the dark theme a clearly thinner card, the light theme a little). It used to
+    /// be the panel at 0.4 under the glass, about 31% opaque, with the text near 1.8:1.
+    pub fn clear_fill(&self) -> Color32 {
+        let (veil, alpha) = if self.is_dark_theme() { (Color32::BLACK, CLEAR_ALPHA_DARK) } else { (Color32::WHITE, CLEAR_ALPHA_LIGHT) };
+        veil.gamma_multiply(alpha / self.glass_alpha())
     }
 
     /// The tokens of the current theme and colour vision mode.
@@ -788,6 +860,13 @@ impl Tokens {
             ColorVision::Protan | ColorVision::Deutan => self.red_green(dark),
             ColorVision::Tritan => self.blue_yellow(dark),
         }
+    }
+
+    /// The ink of a count on a warning badge (the assistant's waiting approvals): black or
+    /// white, whichever reads better on the amber. (It was the application bar's colour, which
+    /// is light in the light theme now.)
+    pub fn warning_ink(&self) -> Color32 {
+        if contrast_ratio(Color32::BLACK, self.warning) >= contrast_ratio(Color32::WHITE, self.warning) { Color32::BLACK } else { Color32::WHITE }
     }
 
     /// Fade idle cube colours into the viewport while retaining opaque facets.
@@ -897,6 +976,66 @@ mod tests {
         assert_eq!(Tokens::outset_radius(6.0, 3.0), 9.0);
     }
 
+    /// The glass of the floating cards (`glass`, `glass_edge`): clearly lighter than a solid
+    /// panel in both themes, yet the text and the muted text on a card keep their contrast over
+    /// every colour the canvas can show under it (the viewport's gradient, the grid, bodies and
+    /// their edges, a selected body, sketch curves), on every glass fill: the panel (the
+    /// browser, the strip, Properties, Review changes, the toasts, the agent activity list), the
+    /// timeline (the History card) and the overlay (the navigation bar), and on the "Clear"
+    /// browser's veil (`clear_fill`), which is no more opaque than the glass. (The r6 review:
+    /// in the light theme the History card's muted text read 2.83:1 and the navigation bar's
+    /// 2.85:1, under the 3:1 floor, and the Clear browser's text near 1.8:1.) egui blends in
+    /// gamma space, premultiplied.
+    #[test]
+    fn glass_cards_read_through_and_keep_text_contrast_over_every_scene_colour() {
+        use super::*;
+        fn over(top: Color32, bottom: Color32) -> Color32 {
+            let ch = |t: u8, b: u8| t.saturating_add(((u16::from(b) * u16::from(255 - top.a())) / 255) as u8);
+            Color32::from_rgb(ch(top.r(), bottom.r()), ch(top.g(), bottom.g()), ch(top.b(), bottom.b()))
+        }
+        for dark in [true, false] {
+            for vision in ColorVision::ALL {
+                let t = Tokens::themed(dark, vision);
+                assert_eq!(t.is_dark_theme(), dark);
+                for fill in [t.panel, t.timeline, t.overlay] {
+                    let glass = t.glass(fill);
+                    assert!(glass.a() < fill.a(), "dark={dark}: glass is translucent");
+                    assert!(
+                        f32::from(glass.a()) / 255.0 <= 0.86 * f32::from(fill.a()) / 255.0,
+                        "dark={dark}: {glass:?} is clearly lighter than {fill:?}"
+                    );
+                    assert!(f32::from(glass.a()) / 255.0 >= 0.6 * f32::from(fill.a()) / 255.0, "dark={dark}: {glass:?} keeps a tint behind the text");
+                }
+                let edge = t.glass_edge();
+                assert!(edge.a() > 0 && edge.r() == edge.g() && edge.g() == edge.b(), "a fine light edge: {edge:?}");
+                let clear = t.glass(t.clear_fill());
+                assert!(clear.a() <= t.glass(t.panel).a(), "dark={dark}: the Clear browser {clear:?} is no more opaque than the glass");
+                assert!(clear.r() == clear.g() && clear.g() == clear.b(), "dark={dark}: a neutral veil: {clear:?}");
+                for (what, glass) in
+                    [("panel", t.glass(t.panel)), ("timeline", t.glass(t.timeline)), ("overlay", t.glass(t.overlay)), ("clear", clear)]
+                {
+                    for scene in
+                        [t.viewport_top, t.viewport_bottom, t.grid, t.grid_major, t.body, t.body_edge, t.body_selected, t.sketch, t.sketch_fixed]
+                    {
+                        let ground = over(glass, scene);
+                        let text = contrast_ratio(t.text, ground);
+                        let dim = contrast_ratio(t.text_dim, ground);
+                        assert!(
+                            text >= 4.5,
+                            "dark={dark} {vision:?}: text {:?} on the {what} glass over {scene:?} ({ground:?}) reads {text:.2}:1",
+                            t.text
+                        );
+                        assert!(
+                            dim >= 3.0,
+                            "dark={dark} {vision:?}: muted text {:?} on the {what} glass over {scene:?} ({ground:?}) reads {dim:.2}:1",
+                            t.text_dim
+                        );
+                    }
+                }
+            }
+        }
+    }
+
     #[test]
     fn file_view_foreground_pairs_hold_small_text_contrast_without_changing_accent() {
         for dark in [false, true] {
@@ -985,6 +1124,34 @@ mod tests {
                 assert!(ratio >= 4.5, "dark={dark} {mode:?}: {ratio:.2}:1");
             }
         }
+    }
+
+    /// The active workspace tab's name on the tab row (the window surface) reads at WCAG AA in
+    /// both themes and every colour-vision mode, for every tab the ribbon can show. The accent
+    /// stays the ink where it already reads (Model's lime in the dark theme); the dark theme's
+    /// Surface (3.8:1) and Sheet Metal (3.6:1) fills step up to their inks.
+    #[test]
+    fn active_tab_ink_reads_on_the_tab_row_in_both_themes() {
+        let tabs: Vec<&str> = crate::workspace::TABS.iter().copied().chain(["SKETCH", "SHEET METAL", "RENDER"]).collect();
+        for dark in [false, true] {
+            for vision in super::ColorVision::ALL {
+                let t = super::Tokens::themed(dark, vision);
+                for tab in &tabs {
+                    let accent = super::TabAccent::for_tab(&t, tab);
+                    let ink = accent.text_on(&t, t.window);
+                    let ratio = super::contrast_ratio(ink, t.window);
+                    assert!(ratio >= 4.5, "{tab} dark={dark} {vision:?}: the active tab's ink is {ratio:.2}:1 ({ink:?} on {:?})", t.window);
+                    if super::contrast_ratio(accent.color, t.window) >= 4.5 {
+                        assert_eq!(ink, accent.color, "{tab} dark={dark} {vision:?}: an accent that reads stays the ink");
+                    }
+                }
+            }
+        }
+        let t = super::Tokens::dark();
+        assert!(super::contrast_ratio(t.surface_fill, t.window) < 4.5 && super::contrast_ratio(t.sheet_fill, t.window) < 4.5);
+        assert_eq!(super::TabAccent::for_tab(&t, "SURFACE").text_on(&t, t.window), t.surface_ink);
+        assert_eq!(super::TabAccent::for_tab(&t, "SHEET METAL").text_on(&t, t.window), t.sheet_ink);
+        assert_eq!(super::TabAccent::for_tab(&t, "MODEL").text_on(&t, t.window), t.accent);
     }
 
     #[test]

@@ -372,9 +372,26 @@ enum CellLook {
 }
 
 fn cell_editor_frame(ui: &mut Ui, id: egui::Id, value: &mut String, hint: &str, invalid: bool, limit: usize, look: CellLook) -> Response {
+    cell_editor_with_trailing(ui, id, value, hint, invalid, limit, look, 0.0)
+}
+
+/// `cell_editor_frame` keeping `trailing` points at the field's right end clear of text (for a
+/// control drawn inside the field, such as a search field's ×).
+#[allow(clippy::too_many_arguments)]
+fn cell_editor_with_trailing(
+    ui: &mut Ui,
+    id: egui::Id,
+    value: &mut String,
+    hint: &str,
+    invalid: bool,
+    limit: usize,
+    look: CellLook,
+    trailing: f32,
+) -> Response {
     let t = Tokens::get();
     let frame = look != CellLook::Bare;
     let editor = text_input(egui::TextEdit::singleline(value))
+        .margin(egui::Margin { left: t.form_inset as i8, right: (t.form_inset + trailing) as i8, top: 0, bottom: 0 })
         .char_limit(limit)
         .id(id)
         .hint_text(crate::i18n::tr_label(hint))
@@ -414,6 +431,12 @@ fn cell_editor_frame(ui: &mut Ui, id: egui::Id, value: &mut String, hint: &str, 
 /// Search input with native accessibility and a stable caller ID. Tokens: cell_editor tokens.
 pub(crate) fn search_field(ui: &mut Ui, id: egui::Id, value: &mut String, hint: &str) -> Response {
     cell_editor(ui, id, value, hint, false)
+}
+
+/// A search field whose last `trailing` points stay clear of its text, for the × the caller
+/// draws inside it. Tokens: cell_editor tokens.
+pub(crate) fn search_field_with_trailing(ui: &mut Ui, id: egui::Id, value: &mut String, hint: &str, trailing: f32) -> Response {
+    cell_editor_with_trailing(ui, id, value, hint, false, usize::MAX, CellLook::Code, trailing)
 }
 
 /// Behaviour of the one kit slider. Appearance is always owned by `slider`.

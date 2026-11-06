@@ -112,7 +112,21 @@ mod tests {
                 let dialog = h.app.viewport.dialog_rect.unwrap();
                 let dialog_content = crate::scenario::count_of("dialog:body:content_height").unwrap();
                 let viewport = h.app.viewport.rect.unwrap();
-                assert!(dialog.height() > 230.0, "scale={scale}: {dialog:?}");
+                // The sheet takes the height under the view cube, never the cube's own space:
+                // on the tall window well over 230 points; on the short one (700 × 475 points
+                // at scale 2) all there is between the cube and the content area's bottom, its
+                // body scrolling.
+                let cube = h.app.viewport.layout.as_ref().unwrap().axis_view;
+                let content = crate::shell::content_rect(&h.app, viewport);
+                assert!(cube.is_positive() && dialog.top() >= cube.bottom() - 1.0, "scale={scale}: {dialog:?} under the cube {cube:?}");
+                if scale == 1.0 {
+                    assert!(dialog.height() > 230.0, "scale={scale}: {dialog:?}");
+                } else {
+                    assert!(
+                        dialog.height() >= content.bottom() - cube.bottom() - crate::shell::SHELL_GAP - 1.0,
+                        "scale={scale}: {dialog:?} fills the room under the cube {cube:?} in {content:?}"
+                    );
+                }
                 assert!(viewport.expand(1.0).contains_rect(dialog), "scale={scale}: {dialog:?} outside {viewport:?}");
                 assert!(h.widget("Distance").is_some(), "distance must be visible without scrolling");
                 if scale == 1.0 {

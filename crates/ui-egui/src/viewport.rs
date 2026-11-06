@@ -2818,7 +2818,9 @@ pub fn show(app: &mut SolveApp, ui: &mut egui::Ui) {
     let rect = ui.max_rect();
     app.viewport.rect = Some(rect);
     refresh_layout(app, ui.ctx().pixels_per_point());
-    let resp = ui.interact(rect, ui.id().with("viewport"), Sense::click_and_drag());
+    // Pointer only: the scene is no stop for Tab (the view keys work without focus, and are
+    // held back while anything has it).
+    let resp = ui.interact(rect, ui.id().with("viewport"), Sense::CLICK | Sense::DRAG);
     let flat = crate::dialogs_sheet::flat_active(app);
     if !flat {
         app.flat_view.fitted = false;
@@ -3583,7 +3585,7 @@ fn transient_messages(app: &mut SolveApp, ui: &egui::Ui, viewport: Rect) -> Vec<
     }
     // The agent activity list stands where the corner's cards leave it room (beside the
     // Properties card, above the navigation bar), which can be the toasts' band: the toasts keep
-    // clear of it, the gap of the floating cards between.
+    // clear of it (laid out as it stands this frame), the gap of the floating cards between.
     obstacles.extend(crate::agent_activity::frame(app, ui.ctx()).map(|list| list.expand(crate::shell::SHELL_GAP)));
     let mut free = crate::viewport_layout::free_rect(crate::shell::content_rect(app, viewport), &obstacles).shrink(t.space_8);
     // The 3D mouse calibration offer: text and actions from its module, drawn by the shared toast.
@@ -3744,7 +3746,7 @@ fn paint_toast_with(ui: &egui::Ui, free: Rect, text: String, lead: ToastLead, ac
     if !r.is_finite() {
         return None;
     }
-    let frame = Container::new(ui.ctx(), Surface::Toast).frame(ui.ctx(), t.panel, crate::frame::Side::Left);
+    let frame = Container::new(ui.ctx(), Surface::Toast).glass_frame(ui.ctx(), t.panel, crate::frame::Side::Left);
     Container::paint_frame(ui.painter(), frame, r.shrink(frame.stroke.width));
     let dot = pos2(r.left() + 14.0, r.center().y.min(r.top() + 8.0 + galley.size().y / 2.0));
     match lead {
@@ -4201,7 +4203,7 @@ fn overlays(app: &SolveApp, painter: &egui::Painter, proj: &Proj) {
         && let Some(r) = app.viewport.layout.as_ref().map(|l| l.content)
     {
         let galley = painter.layout_no_wrap(line, FontId::proportional(t.font_button), t.accent);
-        let at = pos2(r.left() + 12.0, r.top() + 12.0);
+        let at = status_anchor(app, r, galley.size());
         crate::scenario::publish_rect("review:status", Rect::from_min_size(at, galley.size()));
         painter.galley(at, galley, t.accent);
     }
@@ -4245,8 +4247,25 @@ fn overlays(app: &SolveApp, painter: &egui::Painter, proj: &Proj) {
             format!("{} — {} degrees of freedom", ss.name, ss.report.dof)
         };
         let c = if ss.report.ok() { t.sketch_accent } else { t.error };
-        painter.text(pos2(r.left() + 12.0, r.top() + 12.0), Align2::LEFT_TOP, msg, FontId::proportional(t.font_button), c);
+        let galley = painter.layout_no_wrap(msg, FontId::proportional(t.font_button), c);
+        let at = status_anchor(app, r, galley.size());
+        crate::scenario::publish_rect("sketch:status", Rect::from_min_size(at, galley.size()));
+        painter.galley(at, galley, c);
     }
+}
+
+/// Where a status line of `size` (the AI review's, the active sketch's) starts in the content
+/// area `content`: 12 points in from its top-left corner, or under the document strip where the
+/// line would run under that card (floating, the strip is a card at the top of the content; it
+/// is laid out against the strip like the other overlays, never covered by it).
+fn status_anchor(app: &SolveApp, content: Rect, size: egui::Vec2) -> egui::Pos2 {
+    let mut at = pos2(content.left() + 12.0, content.top() + 12.0);
+    if let Some(strip) = app.shell.document_bar
+        && strip.intersect(Rect::from_min_size(at, size)).is_positive()
+    {
+        at.y = strip.bottom() + crate::shell::SHELL_GAP + 4.0;
+    }
+    at
 }
 
 /// Where a profile can fail: a ring round each open end (it touches no other curve) and a
@@ -4318,11 +4337,11 @@ pub(crate) fn refresh_layout(app: &mut SolveApp, scale: f32) {
                 content.max.x = (chat.left() - crate::shell::SHELL_GAP).clamp(content.left(), content.right());
             }
         }
-        app.viewport.layout = Some(if app.ui.layout == crate::shell::LayoutMode::Docked {
-            crate::viewport_layout::Layout::new(rect, &docks, scale, app.preferences.navigator_style)
-        } else {
-            crate::viewport_layout::Layout::with_content(rect, content, &docks, scale, app.preferences.navigator_style)
-        });
+        // In both layouts the controls and the status lines are laid out in the content area:
+        // the viewport less the Design Browser (a card over the canvas floating, a column over
+        // the full-width viewport docked) and the history. A docked Assistant is an edge panel
+        // beside the viewport, already outside `rect`.
+        app.viewport.layout = Some(crate::viewport_layout::Layout::with_content(rect, content, &docks, scale, app.preferences.navigator_style));
     }
 }
 
@@ -4549,7 +4568,7 @@ fn nav_bar(app: &mut SolveApp, ui: &mut egui::Ui, rect: Rect) {
         || menu_open;
     let mut painter = ui.painter_at(rect);
     painter.set_opacity(if active || app.preferences.navigator_style == crate::prefs::NavigatorStyle::Axes { 1.0 } else { 0.45 });
-    let surface = Container::new(ui.ctx(), Surface::Navigation).frame(ui.ctx(), t.overlay, crate::frame::Side::Left);
+    let surface = Container::new(ui.ctx(), Surface::Navigation).glass_frame(ui.ctx(), t.overlay, crate::frame::Side::Left);
     Container::paint_frame(&painter, surface, bar.shrink(surface.stroke.width));
     let columns = ((bar.width() - 10.0) / 30.0).round().clamp(1.0, 10.0) as usize;
     for (i, (icon, tip)) in items.iter().enumerate() {
@@ -4613,7 +4632,7 @@ fn view_menu(app: &mut SolveApp, ui: &mut egui::Ui, button: Rect) -> bool {
     let r = area.show(ui.ctx(), |ui| {
         Container::popup_frame(ui.style()).show(ui, |ui| {
             ui.set_width(220.0);
-            ui.label(egui::RichText::new(crate::i18n::tr_label("VIEW")).semibold().color(crate::theme::Tokens::get().text).size(t.font_caption));
+            ui.label(egui::RichText::new(crate::i18n::tr_label("VIEW")).medium().color(crate::theme::Tokens::get().text).size(t.font_caption));
             ui.label(app.tr("ui.graphics_preset"));
             crate::prefs::graphics_preset_selector(app, ui);
             ui.separator();
@@ -7066,6 +7085,9 @@ mod tests {
     #[test]
     fn immediate_wheel_zoom_applies_normalized_input_once() {
         let mut h = crate::scenario::Harness::new();
+        // A Page scroll converts to points against the window's height, so pin it (the design
+        // kit's taller default would change how many points 0.1 page is).
+        h.call("ui.resize", json!({"width":1600,"height":1000}));
         h.app.preferences.smooth_wheel_zoom = false;
         h.app.preferences.trackpad_pan = false;
         h.app.preferences.zoom_to_cursor = false;
@@ -7604,7 +7626,9 @@ mod tests {
                 let history = h.app.shell.history.expect("the floating history card");
                 (browser.right(), browser.center().y, history.top())
             } else {
-                (vp.left(), vp.center().y, vp.bottom())
+                // The docked browser is a full-height column at the left.
+                let browser = h.app.shell.browser.expect("the docked browser column");
+                (browser.right(), vp.center().y, vp.bottom())
             };
             let x = vp.center().x;
             for p in [
@@ -7846,7 +7870,9 @@ mod tests {
     #[test]
     fn cursor_orbit_keeps_the_picked_point_on_its_pixel() {
         for perspective in [false, true] {
-            for offset in [vec2(30.0, 20.0), vec2(-60.0, 10.0), vec2(120.0, -40.0)] {
+            // Press points on the box's faces (not within reach of an edge, whose midpoint would
+            // be the pivot instead of the point under the cursor) in the full-bleed scene.
+            for offset in [vec2(30.0, 20.0), vec2(-90.0, 40.0), vec2(120.0, -40.0)] {
                 let mut h = crate::scenario::Harness::new();
                 h.app.preferences.orbit_around = crate::prefs::OrbitAround::Cursor;
                 h.app.ui.perspective = perspective;
@@ -7854,9 +7880,16 @@ mod tests {
                 h.app.fit_view();
                 h.frames(2); // Fit resolves against the measured floating shell before the drag.
                 let rect = h.app.viewport.rect.unwrap();
-                let at = rect.center() + offset;
                 let proj = projection(&h.app, rect);
-                assert!(pick(&h.app, &proj, at).iter().any(|hit| matches!(hit, Hit::Face { .. })), "the drag starts on the box");
+                // From the box's centre on screen: the fit centres the model in the canvas left
+                // free by the floating cards (the Properties card at the right), not in the
+                // viewport.
+                let centre = proj.to_screen(view_bounds(&h.app).center()).unwrap();
+                let at = centre + offset;
+                assert!(
+                    matches!(pick(&h.app, &proj, at).first(), Some(Hit::Face { .. })),
+                    "perspective={perspective}: the drag starts on a face of the box"
+                );
                 let pivot = crate::prefs::pivot_under(&h.app, &proj, at);
                 let before = h.app.cam;
                 h.call("ui.drag", json!({"x0":at.x,"y0":at.y,"x1":at.x+150.0,"y1":at.y+60.0,"button":"middle","shift":true,"steps":20}));

@@ -60,6 +60,17 @@ pub fn run(app: &mut SolveApp, ctx: &egui::Context, item: &str) {
 }
 
 /// The Help menu under the ? button, and the About window.
+/// The Help menu's rows (id, label, icon): the same list in the status bar's Help menu and in the
+/// application menu's Help submenu.
+pub const ITEMS: [(&str, &str, &str); 6] = [
+    ("docs", "Documentation", "library"),
+    ("about", "About Polykrom", "help"),
+    ("shortcuts", "Keyboard Shortcuts", "list"),
+    ("messages", "Messages…", "list"),
+    ("report", "Report an Issue…", "bug_report"),
+    ("crashes", "Crash Reports…", "status_error"),
+];
+
 pub fn show(app: &mut SolveApp, ctx: &egui::Context, anchor: egui::Pos2) {
     if app.help.menu {
         let mut pick: Option<&str> = None;
@@ -70,14 +81,7 @@ pub fn show(app: &mut SolveApp, ctx: &egui::Context, anchor: egui::Pos2) {
             .order(egui::Order::Foreground)
             .show(ctx, |ui| {
                 crate::context_menu::menu_frame(ui, |ui| {
-                    for (id, label, icon) in [
-                        ("docs", "Documentation", "library"),
-                        ("about", "About Polykrom", "help"),
-                        ("shortcuts", "Keyboard Shortcuts", "list"),
-                        ("messages", "Messages…", "list"),
-                        ("report", "Report an Issue…", "bug_report"),
-                        ("crashes", "Crash Reports…", "status_error"),
-                    ] {
+                    for (id, label, icon) in ITEMS {
                         if crate::context_menu::list_row(ui, &crate::context_menu::Item::action(id, label, icon)).is_some() {
                             pick = Some(id);
                         }

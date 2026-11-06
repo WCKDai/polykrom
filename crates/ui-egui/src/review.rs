@@ -915,13 +915,13 @@ pub fn panel(app: &mut SolveApp, ui: &mut egui::Ui) {
         // Under the prompt row and below the view cube's measured box (the top of the content
         // while none is laid out), at every window size: the cube and its home button stay
         // visible and clickable. A short window gives the card less height, and its body scrolls
-        // (`contents`); the card never moves up over the cube. A right-docked dialog takes
-        // `shell::panel_top` instead, whose clamp keeps 360 points for the dialog over the cube.
+        // (`contents`); the card never moves up over the cube, and neither does a right-docked
+        // dialog or the sketch palette (`shell::panel_top`).
         let content = crate::shell::content_rect(app, app.viewport.rect.unwrap_or(available));
         let cube =
             app.viewport.layout.as_ref().map_or(content.top(), |l| if l.axis_view.is_positive() { l.axis_view.bottom() } else { content.top() });
         let top = under_row.max(cube).min(bottom);
-        let frame = container.frame(ui.ctx(), t.panel, crate::frame::Side::Right).inner_margin(t.space_10 as i8);
+        let frame = container.glass_frame(ui.ctx(), t.panel, crate::frame::Side::Right).inner_margin(t.space_10 as i8);
         let inner = PANEL_WIDTH - frame.total_margin().sum().x;
         let height = (bottom - top - frame.total_margin().sum().y).max(0.0);
         let card = container.area(Id::new("sc_review_card")).pivot(Align2::RIGHT_TOP).fixed_pos(pos2(right, top)).order(egui::Order::Middle).show(

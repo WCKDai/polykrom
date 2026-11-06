@@ -155,3 +155,46 @@ fn short_labels_keep_the_designs_label_column_and_long_ones_widen_it_for_every_r
     assert_eq!(a, b, "one column per form");
     assert!(a > t.form_label_width && a <= t.form_label_width * 1.6, "{a}");
 }
+
+/// A `value_row` sets its values with tabular figures (the monospace family, Geist Mono), the
+/// value after at medium weight and the value before at regular, so the proposed value is what
+/// the row is about; stacked when the pair is too wide, the same weights hold.
+#[test]
+fn value_row_sets_the_value_after_in_mono_medium_and_the_value_before_in_mono() {
+    let ctx = crate::fonts::test_context();
+    let t = Tokens::get();
+    for (width, stacked) in [(360.0, false), (220.0, true)] {
+        let mut sections = Vec::new();
+        let screen = egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(width, 200.0));
+        let mut out = ctx.run_ui(egui::RawInput { screen_rect: Some(screen), ..Default::default() }, |ui| {
+            labelled_form(ui, &["Diameter"], 0.45, |ui| {
+                value_row(ui, "Diameter", Some("8.000 mm"), "10.000 mm");
+            });
+        });
+        out.textures_delta.clear();
+        fn walk(shape: &egui::Shape, out: &mut Vec<(String, Vec<(String, egui::FontId)>, usize)>) {
+            match shape {
+                egui::Shape::Text(text) if text.galley.job.text.contains("→") => out.push((
+                    text.galley.job.text.clone(),
+                    text.galley
+                        .job
+                        .sections
+                        .iter()
+                        .map(|s| (text.galley.job.text[s.byte_range.start.0..s.byte_range.end.0].to_string(), s.format.font_id.clone()))
+                        .collect(),
+                    text.galley.rows.len(),
+                )),
+                egui::Shape::Vec(shapes) => shapes.iter().for_each(|s| walk(s, out)),
+                _ => {}
+            }
+        }
+        out.shapes.iter().for_each(|s| walk(&s.shape, &mut sections));
+        assert_eq!(sections.len(), 1, "width {width}: the value is drawn once: {sections:?}");
+        let (text, parts, rows) = &sections[0];
+        assert_eq!(*rows, if stacked { 2 } else { 1 }, "width {width}: `{text}`");
+        // egui joins the value before and the arrow, which share a format, into one section.
+        assert_eq!(parts.len(), 2, "{parts:?}");
+        assert_eq!(parts[0], (if stacked { "8.000 mm\n→ " } else { "8.000 mm → " }.to_string(), egui::FontId::monospace(t.font_body)));
+        assert_eq!(parts[1], ("10.000 mm".to_string(), crate::fonts::mono_medium(t.font_body)));
+    }
+}

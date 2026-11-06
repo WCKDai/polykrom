@@ -2,22 +2,43 @@
 
 ![The Polykrom window](../generated/sample-plate.png)
 
-- **Title bar.** On Windows and Linux the application bar is the window's title bar. On the left:
-  the File menu (New, Open, Save, Save As, Export…), undo and redo, the Home tab (the start page)
-  and one tab per open design (each with its own undo history, selection and camera; a dot marks
-  unsaved changes). On the right: Report a bug, Help (?), Preferences (which hold the theme) and the
-  window's buttons.
-- **Toolbar.** The workspace switcher (DESIGN) sits on the left. The tabs (MODEL, SURFACE,
-  ASSEMBLE, INSERT, INSPECT, MANAGE, VIEW and SHEET METAL) hold sections of commands. SKETCH appears while
-  editing a sketch; SHEET METAL is always there and is highlighted for the active sheet body. Both select automatically
-  when entered, and the other tabs remain available. Click a
-  panel's name for all its commands. Drag a command from the dropdown onto a panel's label
-  or empty space to append it; the insertion line shows its destination. Drop onto an existing
-  button to insert before it. Buttons can also move between panels, and the layout is saved.
-- **Browser** (left). The design as a tree: document settings and units, named views, the
-  origin, bodies, sketches, construction planes, canvases, joints and components. The eye shows or
-  hides an item, a component's radio button makes it the active component, and right-clicking any
-  row gives that item's menu. Rows drag into groups and other components.
+- **Title bar.** On Windows and Linux the application bar is the window's title bar, a slim 36 pt
+  strip. On the left: the Polykrom logo, which opens the application menu (the start page, New,
+  Open, Save, Save As, Export…, Workspaces, Preferences, Keyboard Shortcuts, Help, Quit and the
+  version), then the open design's name with where it is stored and its revision on the same
+  line. On the right: Undo, Redo, command search (S), Save and Export (every export format), then
+  the window's buttons.
+- **Workspace tabs and ribbon.** The tabs (Model, Surface, Assemble, Insert, Inspect, Manage, View,
+  Sheet Metal and Render) hold groups of commands; the active tab is underlined in the accent.
+  Sketch appears while editing a sketch; Sheet Metal is always there. Both select automatically when
+  entered, and the other tabs remain available. Render enters the Render workspace and any design
+  tab leaves it; the application menu's Workspaces… lists every workspace, including the planned
+  ones. Each group shows its pinned commands as large buttons and the group's other commands as two
+  rows of small buttons, as many as the ribbon's width holds (the rest wait in the group's
+  drop-down); the groups share the ribbon's full width, so no room is left empty at its right.
+  Click the group's name for all of them. Drag a command from the dropdown
+  onto a group's label or empty space to append it; the insertion line shows its destination. Drop
+  onto an existing button to insert before it. Buttons can also move between groups, and the
+  layout is saved.
+- **Canvas.** The 3D view is the stage: it fills the window's whole width and all the height
+  between the chrome above (title bar, tabs and ribbon, AI prompt row) and the status bar. The
+  Design Browser, the document strip, the history and the other panels are glass cards floating
+  over it, inset from its edges: they shield the clicks under them but never move the model's
+  projection, and the model reads through their tint.
+- **Design Browser** (a glass card at the left, full height down to the history). Its header
+  names the design and counts its components and bodies; its chevron folds the card to a slim
+  rail, and the rail opens it again. **Filter features…** keeps only the rows whose names contain the text (bodies,
+  sketches, construction geometry and features, with their folders open). Below: document settings
+  and units, named views, the origin, bodies, sketches, construction planes, canvases, joints and
+  components, the folders with their counts. The eyes line up at the right: one shows or hides an
+  item; a component's radio button makes it the active component, and right-clicking any row gives
+  that item's menu. Rows drag into groups and other components.
+- **Document tabs and view bar** (one slim strip floating at the top of the canvas, right of the
+  Design Browser). One tab per open design (each with its own undo history, selection and camera;
+  a dot marks unsaved changes), × closes it and + opens the start page for a new one. Beside them
+  the view orientation (Home, Isometric, Top…), the display style (shaded with edges, shaded,
+  wireframe, hidden edges) and the selection filter. In the Compact layout they are two bands
+  above the viewport instead.
 - **Viewport.** Click to select, Shift or Ctrl to add (Preferences › Selection), drag for a window or crossing box. While sketching, Ctrl/Cmd or Alt/Option suppress auto-snap by default; Shift prefers a midpoint. To
   reach something under something else (two lines drawn on top of each other, coincident points,
   an edge in front of a face, overlapping bodies), hold the left button still for half a second
@@ -103,11 +124,16 @@
   Ø10.00 mm") with an **Undo** button for exactly that step, and the status bar adds "Pattern
   preserved" when the pattern's count and pitch are unchanged. **Cancel command** leaves the
   design, its revision and the undo history exactly as they were.
-- **Timeline** (bottom). Every feature in order. Double-click to edit, drag the marker to roll
-  back, and drag features to reorder them. Preferences can put the timeline vertically at the
-  far left of the viewport, beside the browser. Its seam handle switches between icon
-  chips and compact feature names; the browser can collapse to a rail beside either width.
+- **Design history** (a glass card over the bottom of the canvas). Every feature in order as an icon over its name; the current step
+  is highlighted. Click a step to select its feature, double-click to edit, drag the end-of-history
+  marker (the accent bar) to roll back, and drag features to reorder them. The strip's right end
+  says *End of history* or how many steps are rolled back. Preferences can put the history
+  vertically at the far left of the viewport, beside the browser. Its seam handle switches between
+  icon chips and compact feature names; the browser can collapse to a rail beside either width.
   Previous, Play and Next sit at the top. Double-click Previous to roll to the start.
+- **Status bar** (bottom). What is selected and the model units (click them to change the
+  design's units) at the left; at the right the assistant, the start page, Preferences, Help (?),
+  Report a bug, the version and the credit *Polykrom by WCKD*.
 - **Command search (S).** Click the ribbon search field or press S to open the search popup
   below it. Results group commands by their ribbon path and show matching features and user
   parameters from this design. With an empty query, recent commands appear first, followed by
@@ -123,17 +149,20 @@ visual style and autosave. Graphics › Colour vision gives the colours that car
 states, axes, bends, analyses, icons) values for a weak red, green or blue sense: Protan, Deutan or
 Tritan. In a mode, the faces Draft and Accessibility Analysis mark as failing are striped too.
 Command messages and errors show for a few seconds in the status chip at the bottom left of the view. Click the chip, or choose Help › **Messages…**, for every message of the session: newest first, errors in red, each line selectable, with **Copy all** for a bug report.
-Help › Keyboard Shortcuts lists every key, and File › Keyboard
+Help › Keyboard Shortcuts lists every key, and the application menu's Keyboard
 Shortcuts changes them.
 
 ### Workspace layout
 
 General › **Workspace layout** switches between **Floating** cards and **Compact**
-panels. Compact joins the workspace selector and ribbon into one top bar, puts
-Browser flush underneath with a square join, and docks tool sheets below the
-compass. Tool sheets remain draggable: their four corners round away from the right
-edge, and their two right corners square when docked there. Browser keeps only the height its contents need. Assistant remains on the
-outside edge, and History keeps its chosen bottom, left or shared Browser column.
+panels. Floating, the default, keeps the canvas full-bleed under glass cards: the
+Design Browser (**Glass**, or **Clear** for a more see-through card), the document
+strip, the history, Properties and Review changes all float over the model. Compact
+makes the ribbon one top bar, puts the Design Browser flush underneath as a solid
+full-height column with a square join, and docks tool sheets below the compass. Tool
+sheets remain draggable: their four corners round away from the right edge, and their
+two right corners square when docked there. Assistant remains on the outside edge, and
+History keeps its chosen bottom, left or shared Browser column.
 The choice is saved between launches. Switching preserves the current tool,
 camera, selection and design; Cancel and Restore Defaults work like other preferences.
 
@@ -148,8 +177,8 @@ Gruvbox themes (dark and light, each in hard, normal and soft contrast) and any 
 imported. A choice applies at once. Dark, the default, is the design kit's graphite shell: a
 graphite window and ribbon, a darker viewport, a muted olive selected row and the lime accent on
 primary actions and the active tab. Light keeps the same accent hue, deepened so that text reads.
-The interface is set in Inter; numeric values and code in IBM Plex Mono (both from the design kit,
-on every desktop and in the browser).
+The interface is set in Geist; numeric values and code in Geist Mono, whose figures are tabular
+(both by Vercel, SIL Open Font License 1.1, on every desktop and in the browser).
 
 A theme is a small JSON file that starts from the Dark or Light palette and changes any of its
 colours and corner radii by name:

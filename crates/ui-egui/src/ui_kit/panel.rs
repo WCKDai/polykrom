@@ -75,6 +75,10 @@ pub(crate) struct Panel<'a> {
     ok: &'a str,
     cancel: &'a str,
     reset_scroll: bool,
+    /// The lowest edge the card may reach ([`Panel::floor`]); none, the viewport's bottom.
+    floor: Option<f32>,
+    /// The card keeps its top where its chrome cannot fit under it ([`Panel::keep_top`]).
+    keep_top: bool,
 }
 
 pub(crate) struct FeatureOptions<'a> {
@@ -120,7 +124,44 @@ impl<'a> Panel<'a> {
     }
 
     pub(crate) fn new(title: &'a str, id: egui::Id, anchor: egui::Pos2, viewport: egui::Rect, side: crate::frame::Side, frame: egui::Frame) -> Self {
-        Self { title, id, anchor, viewport, side, frame, width: Tokens::get().form_card_width, ok: "OK", cancel: "Cancel", reset_scroll: false }
+        Self {
+            title,
+            id,
+            anchor,
+            viewport,
+            side,
+            frame,
+            width: Tokens::get().form_card_width,
+            ok: "OK",
+            cancel: "Cancel",
+            reset_scroll: false,
+            floor: None,
+            keep_top: false,
+        }
+    }
+
+    /// The card keeps its top even where its header and footer cannot fit under it: on such a
+    /// short view it scrolls as a whole ([`Panel::palette`]) instead of moving up over what
+    /// stands above it (the view cube). A feature sheet, whose actions must stay in sight, moves
+    /// up as far as its chrome needs.
+    pub(crate) fn keep_top(mut self) -> Self {
+        self.keep_top = true;
+        self
+    }
+
+    /// The lowest edge the card may reach: the content area's bottom, above the history, while
+    /// the card stands at its docked place. `viewport` (a tool sheet's drag bounds) may run
+    /// further down, over the browser and the history, which a sheet dragged there may cover:
+    /// the caller moves the floor with the drag (`shell::sheet_floor`). The body scrolls in the
+    /// room the floor leaves and the actions stay pinned above it.
+    pub(crate) fn floor(mut self, floor: f32) -> Self {
+        self.floor = Some(floor);
+        self
+    }
+
+    /// The lowest edge the card may reach: its floor, within the viewport.
+    fn bottom(&self) -> f32 {
+        self.floor.map_or(self.viewport.bottom(), |floor| floor.min(self.viewport.bottom()))
     }
 
     /// A newly opened manager starts at its first section. Later frames retain user scrolling.
@@ -160,7 +201,16 @@ impl<'a> Panel<'a> {
         };
         let t = Tokens::get();
         let chrome = t.form_header_height + t.form_footer_height + t.form_gap_y * 2.0 + self.frame.total_margin().sum().y + gap;
-        egui::pos2(x, self.anchor.y.clamp(viewport.top(), (viewport.bottom() - chrome).max(viewport.top())))
+        // The outline is painted outside the window's rect: a sheet asking for the top plus its
+        // stroke (the sketch palette) keeps that when the chrome cannot fit, so the stroke stays
+        // inside the viewport; one asking for the top itself keeps the top.
+        let top = viewport.top();
+        let ceiling = if self.keep_top {
+            self.anchor.y.max(top)
+        } else {
+            (self.bottom() - chrome).max(top).max(self.anchor.y.min(top + self.frame.stroke.width))
+        };
+        egui::pos2(x, self.anchor.y.clamp(top, ceiling))
     }
 
     /// One positioned frame supplies both the outer surface and its footer corners.
@@ -182,7 +232,7 @@ impl<'a> Panel<'a> {
         let margin = frame.total_margin();
         let width = self.width.min(viewport.width().max(0.0));
         let inner_width = (width - margin.sum().x).max(0.0);
-        let height = (viewport.bottom() - anchor.y - gap).max(0.0);
+        let height = (self.bottom() - anchor.y - gap).max(0.0);
         // Keep drawing safe when even the header/footer cannot fit. egui clips the contents to
         // the remaining viewport; the normal small-height case still keeps both actions visible.
         super::Container::new(ctx, super::Surface::Feature)
@@ -256,7 +306,7 @@ impl<'a> Panel<'a> {
             } else {
                 header(ui, heading.icon, heading.title, || close = true);
             }
-            let bottom = self.viewport.bottom()
+            let bottom = self.bottom()
                 - super::Container::new(ui.ctx(), super::Surface::Feature).gap()
                 - self.frame.inner_margin.bottomf()
                 - self.frame.stroke.width;
@@ -318,8 +368,11 @@ impl<'a> Panel<'a> {
     }
 
     /// Palette composition retains its compact padding and whole-card scrolling on short views.
-    /// Tokens: space_24 and form_footer_height; header/body/footer own their historical padding.
-    pub(crate) fn palette(&self, ui: &mut Ui, bottom: f32, top: f32, mut add: impl FnMut(&mut Ui, Part)) {
+    /// The card runs from `top` to `bottom`: the body scrolls in the room the header and the
+    /// footer (`footer_height` tall, as the caller draws it) leave, so the footer's actions stay
+    /// at the card's bottom and the card never runs past `bottom`. Tokens: space_24;
+    /// header/body/footer own their historical padding.
+    pub(crate) fn palette(&self, ui: &mut Ui, bottom: f32, top: f32, footer_height: f32, mut add: impl FnMut(&mut Ui, Part)) {
         let t = Tokens::get();
         ui.set_max_height((bottom - ui.cursor().top()).max(0.0));
         super::scope(ui, |ui| {
@@ -328,7 +381,7 @@ impl<'a> Panel<'a> {
             let short = height < t.space_24 * 6.0;
             let mut contents = |ui: &mut Ui| {
                 add(ui, Part::Header);
-                let body_height = (bottom - ui.cursor().top() - t.form_footer_height).max(0.0);
+                let body_height = (bottom - ui.cursor().top() - footer_height).max(0.0);
                 let mut body = |ui: &mut Ui| {
                     egui::Frame::NONE.inner_margin(egui::Margin::symmetric(t.space_10 as i8, t.space_4 as i8)).show(ui, |ui| add(ui, Part::Body));
                 };
@@ -634,7 +687,7 @@ fn page_list_sized<S>(ui: &mut Ui, selected: &mut usize, pages: &[WindowPage<S>]
                     ui.add_space(t.space_8);
                     let (rect, _) = ui.allocate_exact_size(vec2(dimension(ui.available_width()), t.space_24), egui::Sense::hover());
                     let rect = rect.shrink2(vec2(t.space_10, 0.0));
-                    paint_text(ui, rect, &crate::i18n::tr(group).to_uppercase(), crate::fonts::semibold(t.font_small), t.form_dim, true);
+                    paint_text(ui, rect, &crate::i18n::tr(group).to_uppercase(), crate::fonts::medium(t.font_small), t.form_dim, true);
                 }
                 let label = crate::i18n::tr(page.label);
                 let (rect, response) =
@@ -655,7 +708,7 @@ fn page_list_sized<S>(ui: &mut Ui, selected: &mut usize, pages: &[WindowPage<S>]
                     ui,
                     text_rect,
                     label,
-                    if on { crate::fonts::semibold(t.font_label) } else { egui::FontId::proportional(t.font_label) },
+                    if on { crate::fonts::medium(t.font_label) } else { egui::FontId::proportional(t.font_label) },
                     ink,
                     false,
                 );

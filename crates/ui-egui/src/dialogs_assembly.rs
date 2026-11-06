@@ -895,7 +895,7 @@ fn interference_rows(app: &SolveApp, ui: &mut egui::Ui, r: &Value) {
     // Pairs closer than the clearance, nearest first.
     if !near.is_empty() {
         form_row(ui, "Too close", |ui| {
-            ui.label(RichText::new(crate::i18n::tr("ui.distance")).semibold().color(crate::theme::Tokens::get().text));
+            ui.label(RichText::new(crate::i18n::tr("ui.distance")).medium().color(crate::theme::Tokens::get().text));
         });
     }
     for h in &near {
@@ -907,7 +907,7 @@ fn interference_rows(app: &SolveApp, ui: &mut egui::Ui, r: &Value) {
     let nearest = r["nearest"].as_object().cloned().unwrap_or_default();
     if !nearest.is_empty() {
         form_row(ui, "Nearest", |ui| {
-            ui.label(RichText::new(crate::i18n::tr("ui.distance")).semibold().color(crate::theme::Tokens::get().text));
+            ui.label(RichText::new(crate::i18n::tr("ui.distance")).medium().color(crate::theme::Tokens::get().text));
         });
     }
     for (body, list) in &nearest {
@@ -921,7 +921,7 @@ fn interference_rows(app: &SolveApp, ui: &mut egui::Ui, r: &Value) {
     }
     if !hits.is_empty() {
         form_row(ui, "Interferes", |ui| {
-            ui.label(RichText::new(crate::i18n::tr_label("Volume")).semibold().color(crate::theme::Tokens::get().text));
+            ui.label(RichText::new(crate::i18n::tr_label("Volume")).medium().color(crate::theme::Tokens::get().text));
         });
     }
     for h in hits {
@@ -1379,7 +1379,7 @@ pub fn timeline_joints_vertical(app: &mut SolveApp, ui: &mut egui::Ui) {
         return;
     }
     ui.add_space(4.0);
-    ui.label(egui::RichText::new("JOINTS").size(crate::theme::Tokens::get().font_micro).semibold().color(t.text_dim));
+    ui.label(egui::RichText::new("JOINTS").size(crate::theme::Tokens::get().font_micro).medium().color(t.text_dim));
     let mut open = None;
     let mut run = None;
     for (id, name, kind, suppressed) in joints {

@@ -163,7 +163,7 @@ impl FileView {
                 ui,
                 label_rect,
                 label,
-                if selected { crate::fonts::semibold(t.font_heading) } else { FontId::proportional(t.font_heading) },
+                if selected { crate::fonts::medium(t.font_heading) } else { FontId::proportional(t.font_heading) },
                 ink,
                 false,
             );
@@ -200,7 +200,7 @@ impl FileView {
         let mut job = egui::text::LayoutJob::default();
         for (text, font) in [
             (before, FontId::proportional(t.font_button)),
-            (document, crate::fonts::semibold(t.font_button)),
+            (document, crate::fonts::medium(t.font_button)),
             (after, FontId::proportional(t.font_button)),
         ] {
             job.append(text, 0.0, egui::TextFormat::simple(font, t.file_rail_ink));

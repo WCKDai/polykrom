@@ -6,8 +6,9 @@ use serde_json::json;
 
 #[test]
 fn thin_rotated_bounds_fit_using_the_original_full_projection() {
+    // A viewport under a 150 pt band of chrome (the layout is tested on its own, not the shell).
     for (width, height, scale) in [(1400.0, 900.0, 1.0), (700.0, 450.0, 2.0), (700.0, 360.0, 2.0), (900.0, 720.0, 1.0)] {
-        let vp = Rect::from_min_max(pos2(250.0, crate::toolbar::APP_BAR_HEIGHT + crate::toolbar::RIBBON_HEIGHT), pos2(width, height - 30.0));
+        let vp = Rect::from_min_max(pos2(250.0, 150.0), pos2(width, height - 30.0));
         let dock = Rect::from_min_max(pos2(width - 205.0, vp.top()), vp.max);
         let layout = Layout::new(vp, &[dock], scale, crate::prefs::NavigatorStyle::Axes);
         assert!(layout.drawable.width() >= 80.0 && layout.drawable.height() >= 30.0, "{layout:?}");
@@ -249,17 +250,21 @@ fn immediate_standard_view_cancels_fit_before_the_measured_frame() {
     }
 }
 
+/// The controls keep their anchors whatever tool panel is open elsewhere: a positioned, a resized
+/// or a covering dialog leaves the cube and the bar alone. A right-docked sheet or palette is
+/// the exception for the bar (PK-90.shell-r10: on a laptop, with the Assistant docked left, the
+/// sketch palette reached over the bar's last buttons): the bar lays out against it, moving left
+/// to stand a gap clear, as far as the content area's left edge allows.
 #[test]
-fn navigation_anchors_ignore_positioned_resized_and_covering_dialogs() {
+fn navigation_anchors_ignore_positioned_resized_and_covering_dialogs_but_clear_right_docked_sheets() {
     for (width, height, scale) in [(1400.0, 900.0, 1.0), (700.0, 450.0, 2.0), (700.0, 360.0, 2.0)] {
-        let vp = Rect::from_min_max(pos2(250.0, crate::toolbar::APP_BAR_HEIGHT + crate::toolbar::RIBBON_HEIGHT), pos2(width, height - 30.0));
+        let vp = Rect::from_min_max(pos2(250.0, 150.0), pos2(width, height - 30.0));
         let baseline = Layout::new(vp, &[], scale, crate::prefs::NavigatorStyle::Axes);
         assert!(baseline.axis_view.is_positive() && baseline.navigation.is_positive());
         assert_eq!(baseline.axis_view.right_top(), vp.right_top());
         assert_eq!(baseline.navigation.center().x, vp.center().x);
         assert_eq!(baseline.navigation.bottom(), vp.bottom() - 7.0);
         let cases = [
-            vec![Rect::from_min_max(pos2(width - 220.0, vp.top() + 120.0), vp.max)],
             vec![Rect::from_min_size(vp.min, vec2(210.0, 170.0))],
             vec![Rect::from_center_size(vp.center(), vec2(250.0, 180.0)), Rect::from_min_size(vp.min, vec2(70.0, 120.0))],
             vec![vp],
@@ -271,6 +276,34 @@ fn navigation_anchors_ignore_positioned_resized_and_covering_dialogs() {
             assert!(vp.contains_rect(measured.axis_view));
             assert!(vp.contains_rect(measured.navigation));
         }
+        // A sheet docked at the right, from under the cube to the bottom (Extrude's, the sketch
+        // palette): the cube stays; the bar stays where it is clear of the sheet, otherwise moves
+        // left of it, a gap clear, and where the room left of the sheet is too narrow for its one
+        // row it re-flows into more rows there, as in a narrow viewport.
+        let sheet = Rect::from_min_max(pos2(width - 220.0, vp.top() + 120.0), vp.max);
+        let measured = Layout::new(vp, &[sheet], scale, crate::prefs::NavigatorStyle::Axes);
+        assert_eq!(measured.axis_view, baseline.axis_view);
+        assert_eq!(measured.navigation.bottom(), baseline.navigation.bottom());
+        assert!(
+            measured.navigation.is_positive() && measured.navigation.right() + 7.0 <= sheet.left(),
+            "{width}: {:?} clear of {sheet:?}",
+            measured.navigation
+        );
+        let room = sheet.left() - 7.0 - vp.left();
+        if baseline.navigation.right() + 7.0 <= sheet.left() {
+            assert_eq!(measured.navigation, baseline.navigation, "{width}: clear of the sheet already, the bar keeps the centre");
+        } else if room >= baseline.navigation.width() {
+            assert_eq!(measured.navigation.size(), baseline.navigation.size());
+            assert_eq!(measured.navigation.right(), sheet.left() - 7.0, "{width}: the bar moves left of the sheet {sheet:?}");
+        } else {
+            // 700 wide: 223 pt left of the sheet, so seven columns in two rows (220 x 60).
+            assert_eq!(measured.navigation.size(), vec2(220.0, 60.0), "{width}: the bar re-flows in the {room} pt left of the sheet");
+            assert_eq!(measured.navigation.center().x, vp.left() + room / 2.0);
+        }
+        assert!(vp.contains_rect(measured.navigation));
+        // The same sheet ending above the bar's row (one dragged up) leaves the bar in place.
+        let short = Rect::from_min_max(sheet.min, pos2(sheet.right(), baseline.navigation.top() - 20.0));
+        assert_eq!(Layout::new(vp, &[short], scale, crate::prefs::NavigatorStyle::Axes).navigation, baseline.navigation);
     }
 }
 
@@ -340,7 +373,8 @@ fn floating_fit_uses_the_measured_browser_and_history_cards_at_each_size() {
         let layout = h.app.viewport.layout.as_ref().unwrap();
         for name in ["browser:card", "history:card"] {
             let card = crate::scenario::rect_of(name).unwrap();
-            assert!(layout.viewport.contains_rect(card), "{name}: {card:?} {layout:?}");
+            // The browser is a full-height column beside the scene and the history a strip below
+            // it (view 01); the model's free `drawable` area keeps clear of both.
             assert!(!layout.drawable.intersect(card).is_positive(), "{name}: {card:?} {layout:?}");
         }
         let projection = crate::viewport::projection(&h.app, layout.viewport);

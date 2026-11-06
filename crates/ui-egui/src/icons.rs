@@ -162,7 +162,10 @@ fn supplied_look(look: Look, finish: Finish) -> Look {
     Look { accent: if finish == Finish::Danger { look.accent } else { None }, palette: Some(palette), ..look }
 }
 
+// The drawn brand mark (`brand_mark`) is superseded in the application bar by the design kit's
+// supplied logo; the glyph source stays complete for the asset tooling that shares it.
 #[path = "../../../assets/icons/ui/source/glyphs.rs"]
+#[allow(dead_code)]
 pub(crate) mod glyphs;
 #[path = "../../../assets/icons/ui/source/markers.rs"]
 pub(crate) mod markers;

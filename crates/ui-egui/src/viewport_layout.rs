@@ -42,7 +42,29 @@ pub(crate) fn free_rect(view: Rect, obstacles: &[Rect]) -> Rect {
     best
 }
 
+/// How far from the content area's right edge a palette or sheet still counts as docked there
+/// (the floating cards stand a shell gap and their outline inside it).
+const RIGHT_DOCK_REACH: f32 = 16.0;
+/// The gap the navigation bar keeps from a right-docked palette or sheet: the shell's.
+const NAV_CLEARANCE: f32 = super::shell::SHELL_GAP;
+
+/// The navigation bar centred at the bottom of `space`: its ten 30 pt buttons in one row where
+/// the width allows, in more rows in a narrower space, 7 pt above the bottom; nothing where
+/// even that has no room.
+fn navigation_bar(space: Rect) -> Rect {
+    let columns = ((space.width() - 10.0) / 30.0).floor().clamp(1.0, 10.0);
+    let height = (10.0 / columns).ceil() * 30.0;
+    if space.width() >= columns * 30.0 + 10.0 && space.height() >= height + 7.0 {
+        Rect::from_center_size(pos2(space.center().x, space.bottom() - height * 0.5 - 7.0), vec2(columns * 30.0 + 10.0, height))
+    } else {
+        Rect::NOTHING
+    }
+}
+
 impl Layout {
+    /// A layout whose content area is the whole viewport (the tests' plain viewport; the app's
+    /// content area is the viewport less the browser and the history, `with_content`).
+    #[cfg(test)]
     pub fn new(viewport: Rect, docks: &[Rect], scale: f32, style: crate::prefs::NavigatorStyle) -> Self {
         Self::with_content(viewport, viewport, docks, scale, style)
     }
@@ -59,13 +81,33 @@ impl Layout {
             Rect::NOTHING
         };
         let nav_space = content;
-        let columns = ((nav_space.width() - 10.0) / 30.0).floor().clamp(1.0, 10.0);
-        let nav_height = (10.0 / columns).ceil() * 30.0;
-        let navigation = if nav_space.width() >= columns * 30.0 + 10.0 && nav_space.height() >= nav_height + 7.0 {
-            Rect::from_center_size(pos2(nav_space.center().x, nav_space.bottom() - nav_height * 0.5 - 7.0), vec2(columns * 30.0 + 10.0, nav_height))
-        } else {
-            Rect::NOTHING
-        };
+        let mut navigation = navigation_bar(nav_space);
+        // The bar lays out against right-docked palettes and tool sheets (the sketch palette,
+        // Extrude's sheet) as it does against the browser column: where one reaches over it, it
+        // moves left to stand a gap clear of it; where the room left of the panel is too narrow
+        // for the bar as it is, the bar re-flows into more rows there, as it does in a narrow
+        // viewport. A panel anywhere else (a sheet dragged over the canvas, one covering the
+        // whole viewport) leaves it at the content's centre.
+        if navigation.is_positive() {
+            let limit = docks
+                .iter()
+                .filter(|d| d.is_finite() && d.is_positive())
+                .filter(|d| d.right() >= content.right() - RIGHT_DOCK_REACH && d.left() > content.left() + NAV_CLEARANCE)
+                .filter(|d| d.intersect(navigation.expand(NAV_CLEARANCE)).is_positive())
+                .map(|d| d.left())
+                .fold(f32::INFINITY, f32::min);
+            if limit.is_finite() {
+                let room = Rect::from_min_max(nav_space.min, pos2(limit - NAV_CLEARANCE, nav_space.max.y));
+                if room.width() >= navigation.width() {
+                    navigation = navigation.translate(vec2(room.right() - navigation.right(), 0.0));
+                } else {
+                    let reflowed = navigation_bar(room);
+                    if reflowed.is_positive() {
+                        navigation = reflowed;
+                    }
+                }
+            }
+        }
         // On tiny viewports keep the bottom controls usable rather than overlapping them.
         // This decision depends only on viewport size, never on an overlay.
         if axis_view.intersect(navigation).is_positive() {

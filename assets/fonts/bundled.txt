@@ -7,10 +7,10 @@
 # <Name>-OFL.txt). Tests fail when any Rust source or apps/*/index.html embeds or copies a font
 # this list lacks, when a listed font does not ship the way it says, and when the "Bundled fonts"
 # section of THIRD-PARTY-LICENSES.txt differs from this list (docs/fonts.md).
-assets/design-kit/2026-11-02/fonts/IBM-Plex-Mono-400.ttf interface
-assets/design-kit/2026-11-02/fonts/Inter-400.ttf interface
-assets/design-kit/2026-11-02/fonts/Inter-500.ttf interface
-assets/design-kit/2026-11-02/fonts/Inter-600.ttf interface
-assets/design-kit/2026-11-02/fonts/Inter-700.ttf interface
 assets/fonts/biz-udp-gothic/BIZUDPGothic-Regular.ttf web
+assets/fonts/geist/Geist-Medium.ttf interface
+assets/fonts/geist/Geist-Regular.ttf interface
+assets/fonts/geist/Geist-SemiBold.ttf interface
+assets/fonts/geist/GeistMono-Medium.ttf interface
+assets/fonts/geist/GeistMono-Regular.ttf interface
 assets/fonts/liberation-sans/LiberationSans-Regular.ttf sketch

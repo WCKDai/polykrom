@@ -71,8 +71,9 @@ fn other_windows_fit_on_screen() {
     assert!(bad.is_empty(), "{}", bad.join("\n"));
 }
 
-/// The docked ribbon reserves the same space in both themes and at narrow widths. The
-/// existing panel menus and S box remain usable through the new painted hit targets.
+/// The docked ribbon reserves the same space in both themes and at narrow widths. The command
+/// search lives in the title bar (the kit's Find command) and keeps its S box behaviour; the
+/// panel menus remain usable through the painted hit targets.
 #[test]
 fn docked_ribbon_geometry_and_search() {
     use polykrom_ui_egui::{scenario::handle_at, toolbar};
@@ -84,19 +85,13 @@ fn docked_ribbon_geometry_and_search() {
             h.call("ui.resize", json!({"width":width,"height":1000}));
             h.frames(4);
             let ribbon = rect_of("toolbar").unwrap();
-            let workspace = rect_of("ribbon:workspace").unwrap();
             let search = rect_of("ribbon:search").unwrap();
             assert_eq!(ribbon.top(), toolbar::APP_BAR_HEIGHT);
-            assert_eq!(ribbon.height(), 117.0);
+            assert_eq!(ribbon.height(), toolbar::RIBBON_HEIGHT);
             assert_eq!(ribbon.width(), width);
-            assert_eq!(workspace.width(), 88.0);
-            assert_eq!(workspace.top(), ribbon.top());
-            assert_eq!(workspace.bottom(), ribbon.bottom() - 1.0);
-            assert_eq!(toolbar::TAB_ROW_HEIGHT, 30.0);
             assert_eq!(search.height(), 22.0);
-            assert_eq!(search.top(), ribbon.top() + 4.0);
-            assert_eq!(search.right(), ribbon.right() - 4.0);
-            assert_eq!(search.center().y, ribbon.top() + 15.0);
+            assert_eq!(search.center().y, toolbar::APP_BAR_HEIGHT / 2.0);
+            assert!(search.right() < rect_of("titlebar:save").unwrap().left());
             let t = polykrom_ui_egui::theme::Tokens::get();
             let (hint_width, key_width) = h.ctx.fonts_mut(|fonts| {
                 (
@@ -111,10 +106,13 @@ fn docked_ribbon_geometry_and_search() {
                     fonts.layout_no_wrap("S".to_owned(), egui::FontId::monospace(t.font_small), t.form_dim).size().x,
                 )
             });
-            // Two outer paddings, two item gaps, and total keycap padding.
-            assert_eq!(search.width(), (hint_width + key_width + t.space_16 + t.space_4 * 5.0 + t.space_2).ceil());
-            assert!(ribbon.contains_rect(search));
-            assert!(search.left() > workspace.right());
+            // Two outer paddings, two item gaps, and total keycap padding; a narrow bar shortens it.
+            let closed = (hint_width + key_width + t.space_16 + t.space_4 * 5.0 + t.space_2).ceil();
+            if width >= 1000.0 {
+                assert_eq!(search.width(), closed);
+            } else {
+                assert!(search.width() >= 60.0 && search.width() <= closed, "{width}: {search:?}");
+            }
             assert!(h.app.viewport.rect.unwrap().top() >= toolbar::APP_BAR_HEIGHT + toolbar::RIBBON_HEIGHT);
             h.step(&json!({"click":{"handle":"ribbon:search"}})).unwrap();
             assert!(h.app.ui.palette_open);
@@ -144,18 +142,22 @@ fn docked_ribbon_geometry_and_search() {
         h.call("ui.resize", json!({"width":1600,"height":1000}));
         h.frames(4);
         let button = rect_of("button:solid.extrude").unwrap();
-        assert_eq!(button.height(), 60.0);
+        assert_eq!(button.height(), toolbar::BUTTON_HEIGHT);
         assert!(button.width() >= 54.0);
         let section = rect_of("ribbon:section:MODEL:CREATE").unwrap();
-        assert_eq!(section.height(), 20.0);
+        // The group's name row: 16 points under the compact ribbon's 38 point buttons.
+        assert_eq!(section.height(), 16.0);
         assert!(section.top() > button.bottom());
         assert_eq!(section.bottom(), rect_of("toolbar").unwrap().bottom() - 4.0);
         assert_eq!(handle_at("panel:MODEL:CREATE"), handle_at("ribbon:section:MODEL:CREATE"));
         h.step(&json!({"click":{"handle":"ribbon:section:MODEL:CREATE"}})).unwrap();
         assert!(rect_of("toolbar_dropdown").is_some());
         h.step(&json!({"key":"Escape"})).unwrap();
-        h.step(&json!({"click":{"handle":"ribbon:workspace"}})).unwrap();
-        assert!(h.app.viewport.context_menu.is_some());
+        // The tab row carries the workspace choice.
+        h.step(&json!({"click":{"handle":"tab:RENDER"}})).unwrap();
+        assert!(polykrom_ui_egui::render_workspace::active(&h.app));
+        h.step(&json!({"click":{"handle":"tab:MODEL"}})).unwrap();
+        assert!(!polykrom_ui_egui::render_workspace::active(&h.app));
     }
 }
 

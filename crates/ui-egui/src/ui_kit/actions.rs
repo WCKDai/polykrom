@@ -156,7 +156,7 @@ pub(super) fn footer_with_left(
                 });
                 let response = ui.add_enabled(
                     live,
-                    egui::Button::new(if primary && ok_enabled { text.bold_face() } else { text })
+                    egui::Button::new(if primary && ok_enabled { text.medium() } else { text })
                         .selected(marked && !primary)
                         .fill(if primary && ok_enabled {
                             primary_fill
@@ -375,7 +375,7 @@ pub(crate) fn wide_primary_button(ui: &mut Ui, label: &str) -> Response {
     let text = RichText::new(crate::i18n::tr_label(label)).size(t.font_label).color(if t.borders.bevel.is_some() { t.form_ink } else { t.on_accent });
     let size = vec2(ui.available_width(), t.form_button_height);
     let response = ui.add(
-        egui::Button::new(crate::fonts::RichTextExt::bold_face(text))
+        egui::Button::new(crate::fonts::RichTextExt::medium(text))
             .fill(if t.borders.bevel.is_some() { t.control_fill } else { t.form_primary })
             .min_size(size),
     );

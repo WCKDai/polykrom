@@ -74,7 +74,8 @@ fn toolbar_browser_and_timeline_pictures() {
             let shot = raster::raster_sized(&mut h, &textures, output, WINDOW);
             let name = format!("{mode}-{}", tab.to_ascii_lowercase());
             shot.save(dir.join(format!("{name}-full.png"))).unwrap();
-            let bar = union(&["appbar:", "tab:", "toolbar:", "button:", "ribbon:"]).expect("the application bar and ribbon publish their buttons");
+            let bar =
+                union(&["appbar:", "toolbar_tab:", "toolbar:", "button:", "ribbon:"]).expect("the application bar and ribbon publish their buttons");
             let toolbar = Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(WINDOW.x, bar.bottom() + 8.0));
             let browser = scenario::rect_of("browser:card").expect("the browser card");
             let timeline = scenario::rect_of("history:card").expect("the timeline card");

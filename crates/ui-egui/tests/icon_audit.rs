@@ -82,6 +82,10 @@ fn menu(h: &mut Harness, target: Value, surface: &str, requested: &mut BTreeMap<
 fn ribbon(h: &mut Harness, requested: &mut BTreeMap<String, bool>) {
     for tab in workspace::visible_tabs(&h.app) {
         click(h, &format!("tab:{tab}"));
+        if h.app.ui.tab != tab {
+            // RENDER enters the Render workspace, which a tool or dialog in progress refuses.
+            continue;
+        }
         let panels = polykrom_ui_egui::scenario::handles(&format!("panel:{tab}:"));
         assert!(!panels.is_empty(), "no panels on {tab}");
         for (handle, _) in panels {

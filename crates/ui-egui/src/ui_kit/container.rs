@@ -111,6 +111,20 @@ impl Container {
         }
     }
 
+    /// The glass of a card floating over the canvas: `frame` with the fill at the theme's glass
+    /// opacity and a fine light edge (`Tokens::glass`, `Tokens::glass_edge`), so the model reads
+    /// through it. Docked (compact) panels meet their edge solid, as `frame` makes them; toasts
+    /// and the navigation bar always float over the canvas, so they are always glass.
+    pub fn glass_frame(self, ctx: &Context, fill: Color32, side: crate::frame::Side) -> Frame {
+        let t = Tokens::get();
+        if self.floating() || matches!(self.surface, Surface::Toast | Surface::Navigation) {
+            let frame = self.frame(ctx, t.glass(fill), side);
+            frame.stroke(Stroke::new(frame.stroke.width, t.glass_edge()))
+        } else {
+            self.frame(ctx, fill, side)
+        }
+    }
+
     /// Movable tool sheets round all exposed corners, joining only their right dock edge.
     pub(crate) fn tool_frame(self, mut frame: Frame, right_docked: bool) -> Frame {
         if self.surface == Surface::Feature && !self.floating() {
@@ -259,7 +273,7 @@ impl Container {
                 offset: [0, t.space_14 as i8],
                 blur: (t.space_24 + t.space_12) as u8,
                 spread: 0,
-                color: t.app_bar.gamma_multiply(0.18),
+                color: crate::theme::SHADOW_INK.gamma_multiply(0.18),
             })
     }
 

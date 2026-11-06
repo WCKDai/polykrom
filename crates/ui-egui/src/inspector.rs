@@ -139,7 +139,7 @@ fn floating(app: &mut SolveApp, ui: &mut egui::Ui, available: Rect, bodies: &[St
         bottom = bottom.min(history.top() - gap);
     }
     let t = Tokens::get();
-    let frame = container.frame(ui.ctx(), t.panel, crate::frame::Side::Right).inner_margin(t.space_10 as i8);
+    let frame = container.glass_frame(ui.ctx(), t.panel, crate::frame::Side::Right).inner_margin(t.space_10 as i8);
     let inner = WIDTH - frame.total_margin().sum().x;
     let card =
         container.area(Id::new("sc_inspector_card")).pivot(Align2::RIGHT_BOTTOM).fixed_pos(pos2(right, bottom)).order(egui::Order::Middle).show(

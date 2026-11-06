@@ -794,3 +794,60 @@ fn the_panel_gives_way_to_the_inspector_the_review_panel_dialogs_and_tools() {
     assert_eq!(snapshot(&h).0, before.0);
     assert!(h.app.properties.rect.is_some());
 }
+
+/// Every rectangle one more frame paints in a window of `window`, with its fill and its edge.
+fn painted_frames_in(h: &mut Harness, window: egui::Rect) -> Vec<(egui::Rect, egui::Color32, egui::Color32)> {
+    fn walk(shape: &egui::Shape, out: &mut Vec<(egui::Rect, egui::Color32, egui::Color32)>) {
+        match shape {
+            egui::Shape::Rect(r) => out.push((r.rect, r.fill, r.stroke.color)),
+            egui::Shape::Vec(shapes) => shapes.iter().for_each(|s| walk(s, out)),
+            _ => {}
+        }
+    }
+    let time = h.ctx.input(|i| i.time) + 1.0 / 60.0;
+    let mut out = h.ctx.run_ui(egui::RawInput { screen_rect: Some(window), time: Some(time), ..Default::default() }, |ui| {
+        h.app.logic(ui.ctx());
+        h.app.ui(ui);
+    });
+    out.textures_delta.clear();
+    let mut rects = Vec::new();
+    out.shapes.iter().for_each(|s| walk(&s.shape, &mut rects));
+    rects
+}
+
+/// Floating, the card is glass over the canvas like the other floating cards (the r7 merge of
+/// the shell redesign): its frame is the panel colour at the glass opacity with the glass's
+/// light edge, not the solid panel. Docked, the panel is an edge panel beside the viewport and
+/// stays solid.
+#[test]
+fn the_floating_card_is_glass_and_the_docked_panel_is_solid() {
+    for layout in ["floating", "docked"] {
+        let mut h = mount();
+        h.call("ui.set", json!({"layout": layout}));
+        select(&mut h, "Mounting hole");
+        h.frames(3);
+        let t = crate::theme::Tokens::get();
+        // One more frame at the harness's own window, so the card stands where it was measured.
+        let window = h.ctx.content_rect();
+        let panel = h.app.properties.rect.expect("the panel");
+        // The frames painted over most of the panel's rect (the floating area's rect runs on
+        // below its painted frame; the docked panel's frame and rect differ by its edges), each
+        // with its fill and its edge.
+        let fills: Vec<(egui::Rect, egui::Color32, egui::Color32)> = painted_frames_in(&mut h, window)
+            .into_iter()
+            .filter(|(r, _, _)| r.intersect(panel).area() >= 0.6 * panel.area() && r.area() <= 2.0 * panel.area())
+            .collect();
+        let card = |fill: egui::Color32| fills.iter().any(|(_, f, _)| *f == fill);
+        if layout == "floating" {
+            assert!(
+                fills.iter().any(|(_, f, edge)| *f == t.glass(t.panel) && *edge == t.glass_edge()),
+                "{layout}: the card's frame is the panel's glass {:?} with the glass edge {:?}: {fills:?}",
+                t.glass(t.panel),
+                t.glass_edge()
+            );
+            assert!(!card(t.panel), "{layout}: the card is not the solid panel: {fills:?}");
+        } else {
+            assert!(card(t.panel), "{layout}: the panel is solid {:?}: {fills:?}", t.panel);
+        }
+    }
+}

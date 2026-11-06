@@ -77,15 +77,17 @@ fn language_preference_cancel_restores_previous_locale() {
 /// English silently, so check the word actually rendered in each language.
 #[test]
 fn window_chrome_renders_in_the_active_language() {
+    // (The Design Browser heading is translated in the complete catalogs, ja and zh; the partial
+    // ones show its English.)
     for (lang, browser, filter, faces) in [
-        ("zh", "浏览器", "选择筛选", "面"),
-        ("ja", "ブラウザ", "選択フィルター", "面"),
-        ("de", "Browser", "Auswahlfilter", "Flächen"),
-        ("ko", "브라우저", "선택 필터", "면"),
-        ("ru", "Браузер", "Фильтр выделения", "Грани"),
-        ("fr", "Navigateur", "Filtre de sélection", "Faces"),
-        ("it", "Struttura", "Filtro di selezione", "Facce"),
-        ("uk", "Браузер", "Фільтр виділення", "Грані"),
+        ("zh", "设计浏览器", "选择筛选", "面"),
+        ("ja", "デザインブラウザー", "選択フィルター", "面"),
+        ("de", "Design Browser", "Auswahlfilter", "Flächen"),
+        ("ko", "Design Browser", "선택 필터", "면"),
+        ("ru", "Design Browser", "Фильтр выделения", "Грани"),
+        ("fr", "Design Browser", "Filtre de sélection", "Faces"),
+        ("it", "Design Browser", "Filtro di selezione", "Facce"),
+        ("uk", "Design Browser", "Фільтр виділення", "Грані"),
     ] {
         let mut h = Harness::new();
         h.app.preferences.language = lang.into();

@@ -75,7 +75,7 @@ impl<'ast> Visit<'ast> for Guard<'_> {
             let names: Vec<_> = p.path.segments.iter().map(|s| s.ident.to_string()).collect();
             let last = names.last().map(String::as_str).unwrap_or_default();
             let font_id = names.iter().any(|s| s == "FontId") && matches!(last, "proportional" | "monospace" | "new");
-            let weight = matches!(last, "medium" | "semibold" | "bold");
+            let weight = matches!(last, "medium" | "semibold" | "bold" | "mono_medium");
             if (font_id || weight) && call.args.first().is_some_and(has_number) {
                 self.found.push(format!("{last}(numeric size)"));
             }

@@ -9,7 +9,15 @@ use polykrom_engine::doc::{
 use serde_json::{Value, json};
 
 use crate::SolveApp;
+use crate::icons;
 use crate::theme::Tokens;
+
+/// The design history strip's height (the kit's 60 px).
+pub const HISTORY_HEIGHT: f32 = 60.0;
+/// A step: its name's width with padding, within these bounds; and the gap between steps.
+const CHIP_MIN_WIDTH: f32 = 56.0;
+const CHIP_MAX_WIDTH: f32 = 120.0;
+const CHIP_GAP: f32 = 8.0;
 
 /// Apply transport actions from the current marker; endpoints stay bounded, including an
 /// empty design. All orientations reach the same rollback command.
@@ -345,16 +353,21 @@ pub fn timeline(app: &mut SolveApp, ui: &mut egui::Ui) {
         app.shell.history = Some(rect);
         crate::scenario::publish_rect("history:card", rect);
         let mut child = ui.new_child(UiBuilder::new().id_salt("sc_timeline").max_rect(rect));
-        Container::paint_frame(ui.painter(), Container::new(ui.ctx(), Surface::Panel).frame(ui.ctx(), t.timeline, crate::frame::Side::Left), rect);
+        // A glass card over the bottom of the canvas, inset from its edges.
+        Container::paint_frame(
+            ui.painter(),
+            Container::new(ui.ctx(), Surface::Panel).glass_frame(ui.ctx(), t.timeline, crate::frame::Side::Left),
+            rect,
+        );
         child.set_clip_rect(rect);
-        timeline_contents(app, &mut child, true);
+        timeline_contents(app, &mut child);
     } else {
         let response = Container::new(ui.ctx(), Surface::Panel)
             .edge("sc_timeline", Edge::Bottom)
-            .exact_size(40.0)
+            .exact_size(HISTORY_HEIGHT)
             .frame(Container::new(ui.ctx(), Surface::Panel).edge_frame(t.timeline))
             .show(ui, |ui| {
-                timeline_contents(app, ui, false);
+                timeline_contents(app, ui);
             });
         let frame = Container::new(ui.ctx(), Surface::Panel).edge_frame(t.timeline);
         Container::paint_inset(ui.painter(), response.response.rect - frame.outer_margin, frame);
@@ -366,10 +379,10 @@ pub fn timeline(app: &mut SolveApp, ui: &mut egui::Ui) {
 pub(crate) fn floating_rect(available: Rect) -> Rect {
     let gap = crate::shell::SHELL_GAP;
     let inset = available.shrink(gap);
-    Rect::from_min_max(pos2(inset.left(), (inset.bottom() - 40.0).max(inset.top())), inset.max)
+    Rect::from_min_max(pos2(inset.left(), (inset.bottom() - HISTORY_HEIGHT).max(inset.top())), inset.max)
 }
 
-fn timeline_contents(app: &mut SolveApp, ui: &mut egui::Ui, floating: bool) {
+fn timeline_contents(app: &mut SolveApp, ui: &mut egui::Ui) {
     let t = Tokens::get();
     let accent = crate::theme::TabAccent::for_tab(&t, &app.ui.tab);
     let r = ui.max_rect();
@@ -384,11 +397,16 @@ fn timeline_contents(app: &mut SolveApp, ui: &mut egui::Ui, floating: bool) {
     let grip = crate::ui_kit::panel_grip(&mut grip_ui).rect;
     x += t.space_10 + t.space_8;
     let mut drag_rect = grip;
-    let label = p.layout_no_wrap(crate::i18n::tr("ui.history_title").to_string(), crate::fonts::semibold(t.font_heading), t.text);
-    if x + label.size().x + t.space_12 + crate::ui_kit::history_transport_width() <= r.right() {
+    // The kit's heading: the History icon and DESIGN HISTORY in muted small capitals.
+    let label = p.layout_no_wrap(crate::i18n::tr("ui.history_strip_title").to_uppercase(), crate::fonts::medium(t.font_small), t.text_dim);
+    if x + 18.0 + t.space_8 + label.size().x + t.space_12 + crate::ui_kit::history_transport_width() <= r.right() {
+        let icon = Rect::from_center_size(pos2(x + 9.0, r.center().y), vec2(18.0, 18.0));
+        icons::paint_icon(&p, icon, "rollback", f32::from(t.icon.a()) / 255.0);
+        x += 18.0 + t.space_8;
         let title_rect = Rect::from_min_size(pos2(x, r.center().y - label.size().y / 2.0), label.size());
-        p.galley(title_rect.min, label.clone(), t.text);
-        drag_rect = drag_rect.union(title_rect);
+        p.galley(title_rect.min, label.clone(), t.text_dim);
+        crate::scenario::publish_rect("history:title", title_rect);
+        drag_rect = drag_rect.union(title_rect).union(icon);
         x += label.size().x + t.space_12;
     }
     let response = ui.interact(drag_rect, egui::Id::new("sc_history_dock_grip"), Sense::drag());
@@ -402,8 +420,26 @@ fn timeline_contents(app: &mut SolveApp, ui: &mut egui::Ui, floating: bool) {
         x += t.space_24 + t.space_2;
     }
     x += 14.0;
+    // The end of the strip says where the marker stands: at the end of history, or how many
+    // steps are rolled back (the kit's rebuild status).
+    let end_text = if marker >= n {
+        crate::i18n::tr("ui.history_end").to_string()
+    } else {
+        crate::i18n::format("ui.history_rolled_back", &[("count", &(n - marker).to_string())])
+    };
+    let status = p.layout_no_wrap(end_text, egui::FontId::proportional(t.font_small), t.text_dim);
+    let status_width = 15.0 + t.space_8 + status.size().x + t.space_16;
+    let status_rect = Rect::from_min_max(pos2((r.right() - status_width).max(x), r.top()), r.right_bottom());
+    if status_rect.width() >= status_width {
+        let icon = Rect::from_center_size(pos2(status_rect.left() + 7.5, r.center().y), vec2(15.0, 15.0));
+        if marker >= n {
+            icons::paint_icon(&p, icon, "finish", f32::from(t.icon.a()) / 255.0);
+        }
+        p.galley(pos2(icon.right() + t.space_8, r.center().y - status.size().y / 2.0), status, t.text_dim);
+        crate::scenario::publish_rect("history:end", status_rect);
+    }
     // The features scroll horizontally in the space right of the playback controls.
-    let strip = Rect::from_min_max(pos2(x, r.top()), r.right_bottom());
+    let strip = Rect::from_min_max(pos2(x, r.top()), pos2((status_rect.left() - t.space_12).max(x), r.bottom()));
     ui.scope_builder(UiBuilder::new().max_rect(strip), |ui| {
         // A plain mouse wheel scrolls the strip sideways too (#3356).
         ui.style_mut().always_scroll_the_only_direction = true;
@@ -436,12 +472,19 @@ fn timeline_contents(app: &mut SolveApp, ui: &mut egui::Ui, floating: bool) {
             let mut marker_rect: Option<Rect> = None;
             for (i, (id, name, icon, suppressed, ty, kind)) in feats.iter().enumerate() {
                 if i == marker {
-                    marker_rect = Some(Rect::from_min_size(pos2(x, r.top() + 5.0), vec2(t.space_12, r.height() - 10.0)));
+                    marker_rect = Some(Rect::from_min_size(pos2(x, r.center().y - 17.0), vec2(t.space_12, 34.0)));
                     x += t.space_16;
                 }
                 xs.push(x);
-                let br = Rect::from_min_size(pos2(x, r.top() + 6.0), vec2(28.0, 28.0));
-                crate::scenario::publish_handle(&format!("timeline:{name}"), br.center());
+                // A step: its icon over its name (the kit's history chip).
+                let chip_width = (p.layout_no_wrap(name.clone(), egui::FontId::proportional(t.font_small), t.text).size().x + t.space_16)
+                    .clamp(CHIP_MIN_WIDTH, CHIP_MAX_WIDTH)
+                    .round();
+                let br = Rect::from_min_size(
+                    pos2(x, r.center().y - crate::ui_kit::BOTTOM_CHIP_HEIGHT / 2.0),
+                    vec2(chip_width, crate::ui_kit::BOTTOM_CHIP_HEIGHT),
+                );
+                crate::scenario::publish_target(&format!("timeline:{name}"), br);
                 let resp = ui.interact(br, ui.id().with(("feat", *id)), Sense::click_and_drag());
                 let res = app.session.model.result(*id);
                 let err = res.and_then(|r| r.error.clone());
@@ -456,7 +499,8 @@ fn timeline_contents(app: &mut SolveApp, ui: &mut egui::Ui, floating: bool) {
                     icon,
                     name,
                     kind: ty,
-                    selected: sel || (floating && marker > 0 && i == marker - 1),
+                    // The current step (the last one before the marker) is highlighted too.
+                    selected: sel || (marker > 0 && i == marker - 1),
                     hovered: resp.hovered() || from_view == Some(*id),
                     dim: rolled,
                     suppressed: *suppressed,
@@ -540,11 +584,11 @@ fn timeline_contents(app: &mut SolveApp, ui: &mut egui::Ui, floating: bool) {
                     }
                     delete_after_marker_button(app, ui, *id, i, marker);
                 });
-                x += 32.0;
+                x += chip_width + CHIP_GAP;
             }
             let end = x;
             if marker >= feats.len() {
-                marker_rect = Some(Rect::from_min_size(pos2(x, r.top() + 5.0), vec2(t.space_12, r.height() - 10.0)));
+                marker_rect = Some(Rect::from_min_size(pos2(x, r.center().y - 17.0), vec2(t.space_12, 34.0)));
             }
             // The history marker: drag it to roll the model back or forward.
             if let Some(mr) = marker_rect {
@@ -556,7 +600,8 @@ fn timeline_contents(app: &mut SolveApp, ui: &mut egui::Ui, floating: bool) {
                 if resp.hovered() {
                     ui.ctx().set_cursor_icon(egui::CursorIcon::Grab);
                 }
-                crate::ui_kit::history_marker(&p, mr, false, accent);
+                // The kit's end-of-history marker: a 2 px accent bar as tall as the steps.
+                p.rect_filled(Rect::from_center_size(mr.center(), vec2(2.0, mr.height())), 0.0, accent.color);
                 resp.on_hover_text("History marker: drag to roll the model back; new features go here");
             }
             let content_end = crate::dialogs_assembly::timeline_joints(app, ui, &p, end + 10.0, r);
@@ -1027,9 +1072,9 @@ mod tests {
             } else {
                 let strip = rect_of("history:strip").unwrap();
                 assert_eq!(strip.top(), viewport.bottom());
-                assert_eq!(strip.bottom(), h.ctx.content_rect().bottom());
+                assert_eq!(strip.bottom(), rect_of("status:bar").unwrap().top(), "the strip sits on the status bar");
                 assert_eq!(strip.left(), 0.0);
-                assert_eq!(strip.height(), 40.0);
+                assert_eq!(strip.height(), super::HISTORY_HEIGHT);
             }
             h.step(&json!({"click":{"handle":"timeline:First"}})).unwrap();
             h.step(&json!({"click":{"handle":"timeline:Second"},"ctrl":true})).unwrap();
@@ -1079,6 +1124,9 @@ mod tests {
         }
     }
 
+    /// The strip's texts are its heading, each step's name and the end-of-history status; the
+    /// current step (the last done one) sits on the selection tint with its name in the accent;
+    /// the marker is a 2 px accent bar.
     #[test]
     fn floating_strip_has_only_history_text_and_accents_the_last_done_chip_and_marker() {
         let mut h = two_boxes(false);
@@ -1092,24 +1140,69 @@ mod tests {
             .shapes
             .iter()
             .filter_map(|s| match &s.shape {
-                egui::Shape::Text(text) => Some(text.galley.text()),
+                egui::Shape::Text(text) => Some((text.galley.text().to_string(), text.fallback_color)),
                 _ => None,
             })
             .collect();
-        assert_eq!(texts, ["History"]);
+        let names: Vec<&str> = texts.iter().map(|(t, _)| t.as_str()).collect();
+        assert_eq!(names, ["DESIGN HISTORY", "End of history", "First", "Second"]);
+        assert_eq!(texts.iter().find(|(t, _)| t == "Second").unwrap().1, accent.color, "the current step's name takes the accent");
+        assert_eq!(texts.iter().find(|(t, _)| t == "First").unwrap().1, t.text_dim);
         let chips: Vec<_> = out
             .shapes
             .iter()
             .filter_map(|s| match &s.shape {
-                egui::Shape::Rect(r) if r.rect.size() == egui::vec2(28.0, 28.0) => Some(r),
+                egui::Shape::Rect(r) if r.rect.height() == crate::ui_kit::BOTTOM_CHIP_HEIGHT => Some(r),
                 _ => None,
             })
             .collect();
         assert_eq!(chips.len(), 2);
         assert_eq!(chips.last().unwrap().fill, accent.soft);
-        assert_eq!(chips.last().unwrap().stroke.color, accent.color);
+        assert_eq!(chips.first().unwrap().fill, egui::Color32::TRANSPARENT);
         let marker = crate::scenario::rect_of("history:marker").unwrap();
-        assert!(out.shapes.iter().any(|s| matches!(&s.shape, egui::Shape::Circle(c)
-            if marker.contains(c.center) && c.fill == t.timeline && c.stroke == egui::Stroke::new(t.space_2, accent.color))));
+        assert!(out.shapes.iter().any(|s| matches!(&s.shape, egui::Shape::Rect(r)
+            if r.rect.width() == 2.0 && marker.contains_rect(r.rect) && r.fill == accent.color)));
+        assert_eq!(h.app.session.doc.marker, None);
+        assert!(crate::scenario::rect_of("history:end").is_some());
+    }
+
+    /// Clicking a step selects its feature; rolling the marker back changes the strip's status
+    /// from `End of history` to how many steps are rolled back, in both layouts.
+    #[test]
+    fn history_steps_select_and_the_strip_says_where_the_marker_stands() {
+        for mode in [crate::shell::LayoutMode::Floating, crate::shell::LayoutMode::Docked] {
+            let mut h = two_boxes(false);
+            h.app.ui.layout = mode;
+            h.settle();
+            let texts = |h: &mut Harness| {
+                let ctx = crate::fonts::test_context();
+                let mut out = ctx.run_ui(egui::RawInput::default(), |ui| super::timeline(&mut h.app, ui));
+                out.textures_delta.clear();
+                let texts = out
+                    .shapes
+                    .iter()
+                    .filter_map(|s| match &s.shape {
+                        egui::Shape::Text(text) => Some(text.galley.text().to_string()),
+                        _ => None,
+                    })
+                    .collect::<Vec<_>>();
+                // (The side context's frame published its own handles: draw the window again.)
+                h.frames(2);
+                texts
+            };
+            assert!(texts(&mut h).contains(&"End of history".to_string()), "{mode:?}");
+            h.step(&json!({"click":{"handle":"timeline:First"}})).unwrap();
+            let first = h.app.session.doc.find_feature("First").map(|f| f.id).unwrap();
+            assert_eq!(super::selected_feature_ids(&h.app), [first], "{mode:?}: a click selects the step's feature");
+            h.app.run("timeline.roll_to", json!({"position": 1})).unwrap();
+            h.settle();
+            let rolled = texts(&mut h);
+            assert!(rolled.contains(&"1 rolled back".to_string()), "{mode:?}: {rolled:?}");
+            assert!(!rolled.contains(&"End of history".to_string()), "{mode:?}");
+            assert!(crate::scenario::handle_at("timeline:Second").is_some(), "{mode:?}: the rolled-back step stays in the strip");
+            h.step(&json!({"click":{"handle":"history:last"}})).unwrap();
+            h.settle();
+            assert!(texts(&mut h).contains(&"End of history".to_string()), "{mode:?}");
+        }
     }
 }

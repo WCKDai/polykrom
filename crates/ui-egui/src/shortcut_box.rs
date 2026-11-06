@@ -845,14 +845,11 @@ mod tests {
         h.app.home.open = false;
         h.frames(3);
         let closed = crate::scenario::rect_of("ribbon:search").unwrap();
-        // Parent bba2183a: 30 pt tab row, 4 pt inset on every side.
-        let toolbar = crate::scenario::rect_of("toolbar").unwrap();
-        assert_eq!(crate::toolbar::TAB_ROW_HEIGHT, 30.0);
-        assert_eq!(crate::toolbar::RIBBON_HEIGHT, 117.0);
+        // The field sits in the title bar (the kit's Find command), between Redo and Save.
         assert_eq!(closed.size(), vec2(ui_kit::CommandSearch::closed_width(&h.ctx), 22.0));
-        assert_eq!(closed.right(), toolbar.right() - 4.0);
-        assert_eq!(closed.top(), toolbar.top() + 4.0);
-        assert_eq!(closed.center().y, toolbar.top() + 15.0);
+        assert_eq!(closed.center().y, crate::toolbar::APP_BAR_HEIGHT / 2.0);
+        assert!(closed.right() < crate::scenario::rect_of("titlebar:save").unwrap().left());
+        assert!(closed.left() > crate::scenario::rect_of("appbar:redo").unwrap().right());
         h.call("ui.palette", json!({}));
         h.frame();
         let middle = crate::scenario::rect_of("ribbon:search").unwrap();

@@ -101,8 +101,13 @@ impl Tokens {
             sketch_mode_tint: 0.12,
             sketch_footer_icon_size: 15.0,
             font_section_tracking: 0.04,
-            app_bar: Color32::from_rgb(55, 55, 60),
-            app_bar_separator: Color32::from_rgb(144, 144, 149),
+            // The title bar follows the light palette: the kit's base token is the one surface
+            // under the document toolbar, the workspace tabs and the status bar, and the kit has
+            // no light mode of its own, so the bar takes the window's light surface here.
+            app_bar: Color32::from_rgb(241, 241, 245),
+            window: Color32::from_rgb(241, 241, 245),
+            // 4:1 on the light bar (the dividers need 3:1).
+            app_bar_separator: Color32::from_rgb(120, 120, 125),
             toolbar: Color32::from_rgb(247, 247, 247),
             panel: Color32::from_rgb(251, 251, 251),
             panel_header: Color32::from_rgb(237, 237, 242),
@@ -144,7 +149,10 @@ impl Tokens {
             error: Color32::from_rgb(214, 54, 54),
             warning: Color32::from_rgb(222, 150, 30),
             icon: Color32::from_rgb(77, 77, 82),
-            timeline: Color32::from_rgb(234, 234, 240),
+            // A step below the panel, and light enough that the History card's glass over the
+            // darkest scene colour keeps the muted text at 3:1 (`glass_cards_read_through_…`; at
+            // 234 it read 2.83:1).
+            timeline: Color32::from_rgb(246, 246, 250),
             hover: Color32::from_rgb(240, 240, 243),
             sel_face: Color32::from_rgb(0, 122, 140),
             sel_edge: Color32::from_rgb(24, 149, 161),
@@ -197,14 +205,18 @@ impl Tokens {
             glyph_bg: Color32::WHITE,
             glyph_edge: Color32::from_rgb(190, 110, 100),
             glyph_text: icon_primary(crate::icon_svg::CONSTRAINT_PRIMARY[0]),
-            overlay: Color32::from_rgba_unmultiplied_const(255, 255, 255, 235),
+            // Near opaque: the navigation bar's glass over the darkest scene colour keeps the
+            // muted text at 3:1 (at 235 it read 2.85:1).
+            overlay: Color32::from_rgba_unmultiplied_const(255, 255, 255, 250),
             rubber_band: Color32::from_rgb(15, 139, 151),
-            app_bar_text: Color32::from_rgb(233, 233, 239),
-            app_bar_hover: Color32::from_rgba_unmultiplied_const(255, 255, 255, 28),
-            app_bar_hover_subtle: Color32::from_rgba_unmultiplied_const(255, 255, 255, 18),
-            app_bar_hover_button: Color32::from_rgba_unmultiplied_const(255, 255, 255, 30),
-            app_bar_hover_strong: Color32::from_rgba_unmultiplied_const(255, 255, 255, 40),
-            app_bar_tab_active: Color32::from_rgb(58, 58, 63),
+            // On the light bar: the window's text, translucent black hovers, and the field
+            // surface a step below the bar for Save and Export.
+            app_bar_text: Color32::from_rgb(41, 41, 46),
+            app_bar_hover: Color32::from_rgba_unmultiplied_const(0, 0, 0, 20),
+            app_bar_hover_subtle: Color32::from_rgba_unmultiplied_const(0, 0, 0, 12),
+            app_bar_hover_button: Color32::from_rgba_unmultiplied_const(0, 0, 0, 22),
+            app_bar_hover_strong: Color32::from_rgba_unmultiplied_const(0, 0, 0, 34),
+            app_bar_tab_active: Color32::from_rgb(229, 229, 234),
             dialog_body: Color32::from_rgb(255, 255, 255),
             dialog_footer: Color32::from_rgb(245, 245, 249),
             dialog_rule: Color32::from_rgb(233, 233, 239),
@@ -296,6 +308,7 @@ impl Tokens {
         t.file_recovery_ink = Color32::from_rgb(245, 204, 137);
         t.file_recovery_border = Color32::from_rgb(115, 88, 43);
         t.app_bar = Color32::from_rgb(32, 34, 37);
+        t.window = Color32::from_rgb(32, 34, 37);
         // The kit's border is too faint on the window for a divider (1.7:1): the mid grey of the
         // views' model edges (#64737D, 3.2:1) divides the application bar's groups.
         t.app_bar_separator = Color32::from_rgb(100, 115, 125);

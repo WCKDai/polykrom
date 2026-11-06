@@ -52,6 +52,7 @@ pub mod dialogs_view_dxf;
 pub mod dim_view;
 #[cfg(test)]
 mod dimension_create_ui_tests;
+pub mod document_bar;
 pub mod documents;
 pub mod drag_snap;
 pub mod edit_clipboard;
@@ -242,6 +243,7 @@ pub mod space_mouse_calibration;
 pub mod space_mouse_model;
 pub mod space_mouse_offer;
 pub mod stand_up;
+pub mod status_bar;
 #[cfg(test)]
 mod sweep_dialog_tests;
 pub(crate) mod test_boat;
@@ -1690,8 +1692,10 @@ impl SolveApp {
             issue_report::show(self, ui.ctx());
         }
         if !self.home.open {
-            agent_activity::paint(self, ui.ctx());
+            self.shell.agent_activity = agent_activity::paint(self, ui.ctx());
             agent_cursor::paint(self, ui.ctx());
+        } else {
+            self.shell.agent_activity = None;
         }
         if self.file_picker_busy() {
             ui.ctx().request_repaint_after(std::time::Duration::from_millis(50));
@@ -1703,13 +1707,12 @@ impl SolveApp {
     fn cad_ui(&mut self, ui: &mut egui::Ui, report_input: &mut Option<issue_report::CadInput>) {
         self.ui.layout.publish(ui.ctx());
         scenario::clear_handles();
+        // The window's ground: the theme's base surface under every panel and card, so the gaps
+        // between the floating chrome and the margins beside it show the theme's own colour (not
+        // the host's clear colour, white in the software rasteriser and not a theme's in eframe).
+        ui.painter().rect_filled(ui.ctx().content_rect(), 0.0, theme::Tokens::get().window);
         self.poll_deferred(ui.ctx());
         self.poll_delete_check(ui.ctx());
-        // The floating Properties card goes under every window, including those the application
-        // bar opens (Help, Crash Reports): shown before them, it stays below in every frame order.
-        if !self.home.open && ui_kit::Container::new(ui.ctx(), ui_kit::Surface::Panel).floating() {
-            design_properties::panel(self, ui);
-        }
         toolbar::app_bar(self, ui);
         issue_report::CadInput::block(self, ui, report_input);
         file_load::show(self, ui.ctx());
@@ -1722,6 +1725,10 @@ impl SolveApp {
             agent_chat::settings::dialog(self, ui.ctx());
         }
         if self.home.open {
+            // The status bar's controls (Preferences, Help, Report a bug) stay reachable on the
+            // start page too.
+            status_bar::show(self, ui);
+            status_bar::contents(self, ui);
             home::show(self, ui);
             if self.home.open {
                 // Agent detection runs in the background and is only received by `agent_chat::poll`
@@ -1733,6 +1740,15 @@ impl SolveApp {
             }
         }
         let floating = ui_kit::Container::new(ui.ctx(), ui_kit::Surface::Panel).floating();
+        // The status bar's panel along the bottom comes first, so everything else stacks above
+        // it; its controls come last (`status_bar::contents`), so Tab reaches them after the
+        // title bar, the tabs and the ribbon.
+        if !self.home.open {
+            status_bar::show(self, ui);
+            // Its Report a bug (taken by `show` at the click) starts a draft, which blocks the
+            // CAD input from here on.
+            issue_report::CadInput::block(self, ui, report_input);
+        }
         let show_timeline = self.ui.show_timeline && !render_workspace::active(self);
         let left_timeline = show_timeline && self.preferences.timeline_left;
         timeline_left::animate_folds(self, ui.ctx());
@@ -1747,23 +1763,34 @@ impl SolveApp {
         if !floating && show_timeline && !left_timeline {
             timeline::timeline(self, ui);
         }
-        // Browser hugs its contents in either layout; it never becomes a full-height blank column.
+        // The Design Browser is a glass card floating over the canvas (floating layout) or a
+        // full-height column beside it (docked, unless `browser_float`); hidden, it reserves no
+        // room at all.
         if !self.ui.show_browser {
             self.shell.browser = None;
         }
         if floating || left_timeline || !show_timeline {
             self.shell.history = None;
         }
-        let full = ui.available_rect_before_wrap();
         if floating {
-            let cards = shell::Cards::new(full, self.ui.layout, toolbar::ribbon_height(self.preferences.ribbon_labels));
-            self.shell.cards = vec![cards.workspace, cards.ribbon];
-            self.shell.history = if left_timeline {
-                let below_ribbon = egui::Rect::from_min_max(egui::pos2(full.left(), cards.bottom), full.max);
-                Some(timeline_left::floating_rect(self, below_ribbon))
-            } else {
-                show_timeline.then(|| timeline::floating_rect(full))
-            };
+            // The top chrome: the ribbon card, then the AI prompt row, both top panels. Tab
+            // reaches their tabs and buttons before the viewport's controls.
+            toolbar::toolbar(self, ui);
+            theme::TabAccent::publish(self, ui.ctx());
+            review::prompt_row(self, ui);
+            // The canvas is the stage: everything left between the chrome and the status bar,
+            // the window's full width. The cards float over it (they shield its input but never
+            // move its projection), so nothing takes a band or a column out of it.
+            let scene = ui.available_rect_before_wrap();
+            self.shell.history =
+                if left_timeline { Some(timeline_left::floating_rect(self, scene)) } else { show_timeline.then(|| timeline::floating_rect(scene)) };
+            // The floating Properties card: after the chrome, so Tab reaches it after the title
+            // bar, the tabs and the ribbon, and before the viewport, which lays its overlays
+            // (the agent activity list, the toasts) out against it this frame. Its area is in
+            // the background order (`design_properties::panel`), so it stays under every window,
+            // including those the application bar opens (Help, Crash Reports), whatever the
+            // frame order.
+            design_properties::panel(self, ui);
             // Draw the scene first, then let the unchanged panel layouts cover it. The
             // viewport keeps its full projection even underneath the browser and cards.
             preview::update(self, ui.ctx());
@@ -1771,10 +1798,10 @@ impl SolveApp {
             // gestures over chrome are blocked, as are selection drags into the ribbon.
             let continuing_navigation = ui.input(|i| {
                 (i.pointer.middle_down() || i.pointer.secondary_down())
-                    && i.pointer.press_origin().is_some_and(|p| full.contains(p) && !shell::covered(self, p))
+                    && i.pointer.press_origin().is_some_and(|p| scene.contains(p) && !shell::covered(self, p))
             });
             let blocked = !continuing_navigation && ui.input(|i| i.pointer.latest_pos()).is_some_and(|p| shell::covered(self, p));
-            let mut viewport_ui = ui.new_child(egui::UiBuilder::new().max_rect(full).id_salt("floating_viewport"));
+            let mut viewport_ui = ui.new_child(egui::UiBuilder::new().max_rect(scene).id_salt("floating_viewport"));
             if blocked {
                 // Disabled only to shield the scene from input under a card or menu; it must
                 // not fade, or the whole viewport dims whenever the pointer is over the shell.
@@ -1782,10 +1809,6 @@ impl SolveApp {
                 viewport_ui.disable();
             }
             self.show_workspace(&mut viewport_ui);
-            shell::paint_top_corners(ui.painter(), full, theme::Tokens::get().app_bar);
-            toolbar::toolbar(self, ui);
-            theme::TabAccent::publish(self, ui.ctx());
-            review::prompt_row(self, ui);
         }
         if floating && show_timeline && !left_timeline {
             timeline::timeline(self, ui);
@@ -1812,21 +1835,49 @@ impl SolveApp {
             .frame(Container::new(ui.ctx(), Surface::Viewport).edge_frame(egui::Color32::TRANSPARENT))
             .show(ui, |ui| {
                 let panel_content = ui.max_rect();
-                self.shell.content = Some(shell::workspace_content(self, panel_content));
+                let mut content = shell::workspace_content(self, panel_content);
                 if floating {
-                    self.shell.panels = [
-                        egui::Rect::from_min_max(egui::pos2(full.left(), panel_content.top()), egui::pos2(panel_content.left(), full.bottom())),
-                        egui::Rect::from_min_max(egui::pos2(panel_content.right(), panel_content.top()), full.max),
-                    ]
-                    .into_iter()
-                    .filter(|r| r.is_positive())
-                    .collect();
+                    // The full-bleed canvas has no panels beside it; the viewport's controls use
+                    // the content area (clear of the browser and history cards) measured this
+                    // frame.
+                    self.shell.panels = Vec::new();
+                    self.shell.content = Some(content);
                     viewport::refresh_layout(self, ui.ctx().pixels_per_point());
+                    // The document tabs and the view bar: one slim glass card at the top of the
+                    // canvas, right of the browser (and a floating Assistant), clear of the view
+                    // cube. It floats inside the content area like the cube does.
+                    let strip = document_bar::floating_strip(self, ui, agent_chat::tool_space(self, content));
+                    self.shell.document_bar = strip;
+                    if let Some(strip) = strip {
+                        document_bar::show_floating(self, ui, strip);
+                    }
                 } else {
+                    // Docked: the document tabs and the view bar take the top of the content
+                    // area, between the browser and a floating Assistant; the viewport's overlays
+                    // and fit use what is left.
+                    let strip = document_bar::strip(agent_chat::tool_space(self, content));
+                    if let Some(strip) = strip {
+                        content.min.y = strip.bottom();
+                    }
+                    self.shell.document_bar = strip;
+                    self.shell.content = Some(content);
                     preview::update(self, ui.ctx());
-                    self.show_workspace(ui);
+                    // The scene starts below the strip; the browser column beside it keeps its
+                    // full height.
+                    let scene =
+                        strip.map_or(panel_content, |s| egui::Rect::from_min_max(egui::pos2(panel_content.left(), s.bottom()), panel_content.max));
+                    let mut scene_ui = ui.new_child(egui::UiBuilder::new().max_rect(scene).id_salt("docked_viewport"));
+                    self.show_workspace(&mut scene_ui);
+                    if let Some(strip) = strip {
+                        let mut strip_ui = ui.new_child(egui::UiBuilder::new().max_rect(strip).id_salt("document_bar"));
+                        document_bar::show(self, &mut strip_ui, strip);
+                    }
                 }
             });
+        // The status bar's controls, last in the window's reading order. Its Report a bug starts
+        // a draft, which blocks the CAD input from here on (as the bar's did).
+        status_bar::contents(self, ui);
+        issue_report::CadInput::block(self, ui, report_input);
         dialogs::show(self, ui.ctx());
         issue_report::CadInput::block(self, ui, report_input);
         sketch_palette::show(self, ui.ctx());

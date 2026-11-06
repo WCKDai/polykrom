@@ -2483,6 +2483,7 @@ pub fn show(app: &mut SolveApp, ctx: &egui::Context) {
         _ => ("OK", "Cancel"),
     };
     let panel = crate::ui_kit::Panel::new(&heading, egui::Id::new(("sc_dialog", title(&d.kind))), anchor, drag_bounds, side, frame)
+        .floor(crate::shell::sheet_floor(vp, moved, drag_bounds))
         .actions(ok_label, close_label);
     let panel = if matches!(d.kind, Kind::Appearance(_)) {
         panel.width(t.form_card_width + t.form_label_width + t.space_6)

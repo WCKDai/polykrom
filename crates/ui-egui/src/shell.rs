@@ -1,9 +1,9 @@
 //! Transient shell geometry shared by automation, drawing and viewport occlusion.
 use crate::ui_kit::{Container, Surface};
-use egui::{Rect, pos2, vec2};
+use egui::{Rect, pos2};
 use serde::{Deserialize, Serialize};
 
-use crate::{SolveApp, theme::Tokens, toolbar};
+use crate::SolveApp;
 
 /// Saved workspace layout; automation may override it for a session.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -28,43 +28,10 @@ impl LayoutMode {
 /// The gap from the viewport edge to the floating cards and between the cards.
 pub(crate) const SHELL_GAP: f32 = 7.0;
 
-/// The viewport's top corners are rounded concentrically with the cards: the card margin plus the
-/// card radius.
-pub(crate) fn corner_radius() -> f32 {
-    Tokens::outset_radius(f32::from(Tokens::get().radius_lg), SHELL_GAP)
-}
-
-/// Fill the two concave corners where the application bar flows into the viewport's top edge, so
-/// the viewport reads as a rounded surface under the bar.
-pub(crate) fn paint_top_corners(painter: &egui::Painter, viewport: Rect, color: egui::Color32) {
-    let r = corner_radius().min(viewport.width() / 2.0).min(viewport.height() / 2.0);
-    if !(r.is_finite() && r > 0.5) {
-        return;
-    }
-    const STEPS: usize = 32;
-    for left in [true, false] {
-        let (corner, centre, dir) = if left {
-            (viewport.left_top(), pos2(viewport.left() + r, viewport.top() + r), -1.0)
-        } else {
-            (viewport.right_top(), pos2(viewport.right() - r, viewport.top() + r), 1.0)
-        };
-        let mut mesh = egui::Mesh::default();
-        mesh.colored_vertex(corner, color);
-        for i in 0..=STEPS {
-            // From the top tangent point round to the side tangent point.
-            let a = std::f32::consts::FRAC_PI_2 * i as f32 / STEPS as f32;
-            mesh.colored_vertex(pos2(centre.x + dir * r * a.sin(), centre.y - r * a.cos()), color);
-        }
-        for i in 0..STEPS as u32 {
-            mesh.add_triangle(0, i + 1, i + 2);
-        }
-        painter.add(egui::Shape::mesh(mesh));
-    }
-}
-
+/// The ribbon card (the tab row and the groups): the window's width less the floating margin.
+/// The workspace choice is on the tab row, so there is no separate workspace card.
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct Cards {
-    pub workspace: Rect,
     pub ribbon: Rect,
     pub bottom: f32,
 }
@@ -72,19 +39,11 @@ pub(crate) struct Cards {
 impl Cards {
     pub fn new(available: Rect, mode: LayoutMode, ribbon_height: f32) -> Self {
         let margin = Container::for_layout(mode, Surface::Chrome).gap();
-        let gap = margin;
         let left = available.left() + margin;
         let top = available.top() + margin;
         let right = (available.right() - margin).max(left);
-        let workspace = Rect::from_min_size(
-            pos2(left, top),
-            vec2(
-                toolbar::WORKSPACE_WIDTH.min((right - left).max(0.0)),
-                ribbon_height - if !Container::for_layout(mode, Surface::Chrome).floating() { 1.0 } else { 0.0 },
-            ),
-        );
-        let ribbon = Rect::from_min_max(pos2((workspace.right() + gap).min(right), top), pos2(right, top + ribbon_height));
-        Self { workspace, ribbon, bottom: ribbon.bottom() + margin }
+        let ribbon = Rect::from_min_max(pos2(left, top), pos2(right, top + ribbon_height));
+        Self { ribbon, bottom: ribbon.bottom() + margin }
     }
 }
 
@@ -103,12 +62,21 @@ pub(crate) struct State {
     pub history_folding: Option<[f32; 2]>,
     pub history_fold_motion: Option<[crate::timeline_left::FoldMotion; 2]>,
     pub content: Option<Rect>,
+    /// The document tabs and the view bar (`document_bar`): floating, one slim card at the top
+    /// of the canvas right of the Design Browser; docked, the bands above the viewport.
+    pub document_bar: Option<Rect>,
+    /// The status bar along the window's bottom.
+    pub status_bar: Option<Rect>,
+    /// The agent activity feed's card in the canvas's bottom right corner (`agent_activity`),
+    /// as painted last frame: the toasts keep clear of it.
+    pub agent_activity: Option<Rect>,
 }
 
 /// One source of occlusion for navigation, picking, overlays and fit.
 pub(crate) fn covered_rects(app: &SolveApp) -> Vec<Rect> {
     let mut rects = Vec::new();
-    if Container::for_layout(app.ui.layout, Surface::Panel).floating() {
+    let floating = Container::for_layout(app.ui.layout, Surface::Panel).floating();
+    if floating {
         rects.extend(app.shell.cards.iter().copied());
         rects.extend(app.shell.panels.iter().copied());
         if crate::agent_chat::shown(app) && app.agent_chat.open && !app.preferences.agent_chat_popped {
@@ -120,10 +88,19 @@ pub(crate) fn covered_rects(app: &SolveApp) -> Vec<Rect> {
         rects.extend(app.shell.history.map(|card| crate::ui_kit::HistorySeam::new(card).pill));
     }
     rects.extend(app.shell.browser.filter(|_| app.ui.show_browser));
+    if floating {
+        // The document strip is a card over the canvas: all of it shields the scene.
+        rects.extend(app.shell.document_bar);
+    } else {
+        // The docked document bar abuts the scene at its bottom edge; that shared row belongs to
+        // the scene (a model point landing exactly on the scene's top must stay pickable), so the
+        // bar yields it.
+        rects.extend(app.shell.document_bar.map(|s| Rect::from_min_max(s.min, pos2(s.max.x, (s.max.y - 1.0).max(s.min.y)))));
+    }
     rects.extend(app.inspector.rect);
     // The AI review's prompt row and panel cover the viewport only as floating cards; docked,
     // they are edge panels beside it.
-    if Container::for_layout(app.ui.layout, Surface::Panel).floating() {
+    if floating {
         rects.extend(app.review.rect);
         rects.extend(app.review.prompt_rect);
         rects.extend(app.properties.rect);
@@ -163,8 +140,10 @@ pub(crate) fn content_rect(app: &SolveApp, viewport: Rect) -> Rect {
     app.shell.content.unwrap_or(viewport).intersect(viewport)
 }
 
-/// Free anchor space shared by both layouts. Compact edge hosts have already consumed
-/// their allocation; content-hugging Browser and floating overlays reserve their measured span.
+/// Free anchor space shared by both layouts: where the viewport's controls, the tool sheets and
+/// the overlays go. The scene itself (the projection) is not changed by it. Compact edge hosts
+/// have already consumed their allocation; the Design Browser (a floating card or a column) and
+/// the History card reserve their measured span, so nothing is laid out over them.
 pub(crate) fn workspace_content(app: &SolveApp, mut content: Rect) -> Rect {
     let gap = Container::for_layout(app.ui.layout, Surface::Panel).gap();
     if let Some(history) = app.shell.history {
@@ -174,8 +153,8 @@ pub(crate) fn workspace_content(app: &SolveApp, mut content: Rect) -> Rect {
             content.max.y = (history.top() - gap).clamp(content.top(), content.bottom());
         }
     }
-    if let Some(browser) = app.shell.browser {
-        content.min.x = (browser.right() + gap).clamp(content.left(), content.right());
+    if let Some(browser) = app.shell.browser.filter(|_| app.ui.show_browser) {
+        content.min.x = (browser.right() + gap).clamp(content.left(), content.right()).max(content.min.x);
     }
     content
 }
@@ -191,18 +170,33 @@ pub(crate) fn tool_drag_rect(app: &SolveApp, placement: Rect) -> Rect {
     bounds
 }
 
+/// The lowest edge a tool sheet may reach: at its docked place, the bottom of `viewport` (the
+/// content area, above the history); dragged down by `moved` (`frame::dock_offset`), the sheet
+/// keeps its height and may cover the history, as far as its `drag_bounds` (`tool_drag_rect`)
+/// go.
+pub(crate) fn sheet_floor(viewport: Rect, moved: egui::Vec2, drag_bounds: Rect) -> f32 {
+    (viewport.bottom() + moved.y.max(0.0)).min(drag_bounds.bottom())
+}
+
+/// The height a left-docked panel (a tool sheet beside the sketch palette) keeps on a short view,
+/// moving up towards the top of the viewport rather than shrinking below it. Right-docked panels
+/// never move up: the view cube keeps its place above them (`panel_top`).
+pub(crate) const PANEL_MIN_HEIGHT: f32 = 350.0;
+
+/// Where a panel docked at `side` of `viewport` starts, with `bottom` the lowest edge it may
+/// reach. At the right, under the measured view cube at every size: a short view (a laptop's
+/// 1366 × 768 or 1280 × 720 under the kit's taller history and status bar) gives the panel less
+/// height, its body scrolls and its actions stay pinned at its bottom, as the Properties and the
+/// Review changes cards do; it never takes the cube's space or runs into the history.
 pub(crate) fn panel_top(app: &SolveApp, viewport: Rect, bottom: f32, side: crate::frame::Side) -> f32 {
     let content = content_rect(app, viewport);
     if side == crate::frame::Side::Right {
-        // Both layouts use the measured compass, rather than a legacy fixed-height gap.
-        // Reclaim that space on short views while keeping the panel usable.
         app.viewport
             .layout
             .as_ref()
             .map_or(content.top(), |l| if l.axis_view.is_positive() { l.axis_view.bottom().min(bottom) } else { content.top() })
-            .min((bottom - 360.0).max(content.top()))
     } else {
-        (viewport.top() + crate::viewport::AXIS_VIEW_CLEARANCE).min((bottom - 360.0).max(viewport.top()))
+        (viewport.top() + crate::viewport::AXIS_VIEW_CLEARANCE).min((bottom - PANEL_MIN_HEIGHT).max(viewport.top()))
     }
 }
 

@@ -31,11 +31,12 @@ fn assert_attached(h: &Harness) {
     assert!(h.app.session.model.result(id).unwrap().error.is_none());
 }
 
-/// A click on open viewport just under the chrome (the ribbon and the AI review's prompt row),
-/// right of the Browser: it clears the selection.
+/// A click on open viewport just under the floating document strip (the chrome, the ribbon and
+/// the AI review's prompt row are above it), right of the Browser: it clears the selection.
 fn click_empty(h: &mut Harness) {
     let content = h.app.shell.content.expect("the workspace content rect");
-    h.call("ui.click", json!({"x": content.left() + 36.0, "y": content.top() + 8.0}));
+    let under = h.app.shell.document_bar.map_or(content.top(), |strip| strip.bottom().max(content.top()));
+    h.call("ui.click", json!({"x": content.left() + 36.0, "y": under + 8.0}));
 }
 
 fn selected_wall(h: &Harness) -> usize {

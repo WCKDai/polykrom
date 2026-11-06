@@ -939,7 +939,7 @@ mod tests {
     #[test]
     fn configuration_compound_condition_and_rule_order_are_editable_in_dialog() {
         let mut h = crate::scenario::Harness::new();
-        h.call("ui.resize", json!({"width":1400,"height":1100}));
+        h.call("ui.resize", json!({"width":1400,"height":1224}));
         configuration_steps(
             &mut h,
             &json!([
@@ -977,7 +977,7 @@ mod tests {
     #[test]
     fn configuration_rule_editor_creates_previews_edits_and_applies_driven_value() {
         let mut h = crate::scenario::Harness::new();
-        h.call("ui.resize", json!({"width":1400,"height":1000}));
+        h.call("ui.resize", json!({"width":1400,"height":1124}));
         configuration_steps(
             &mut h,
             &json!([
@@ -1042,7 +1042,7 @@ mod tests {
     fn configuration_component_and_face_pickers_start_fresh_and_clear_inherited() {
         for (component, width) in [(true, 1400), (false, 900)] {
             let mut h = crate::scenario::Harness::new();
-            h.call("ui.resize", json!({"width":width,"height":720}));
+            h.call("ui.resize", json!({"width":width,"height":844}));
             if component {
                 h.call("engine.execute", json!({"command":"component.create","params":{"name":"Part"}}));
             }
@@ -1076,7 +1076,7 @@ mod tests {
     #[test]
     fn configuration_annulus_picker_exposes_both_certificates_despite_shared_legacy_name() {
         let mut h = crate::scenario::Harness::new();
-        h.call("ui.resize", json!({"width":1400,"height":900}));
+        h.call("ui.resize", json!({"width":1400,"height":1024}));
         h.run(&json!([
             {"call":"engine.execute","params":{"command":"sketch.create","params":{"plane":"XY"}}},
             {"call":"engine.execute","params":{"command":"sketch.circle.center","params":{"center":[0,0],"radius":10,"id":"outer"}}},
@@ -1130,7 +1130,7 @@ mod tests {
     fn configuration_table_actions_stay_on_one_line_at_normal_and_narrow_widths() {
         for width in [1400, 900] {
             let mut harness = crate::scenario::Harness::new();
-            harness.call("ui.resize", json!({"width": width, "height": 720}));
+            harness.call("ui.resize", json!({"width": width, "height": 844}));
             harness
                 .run(&json!([
                     {"call":"engine.execute","params":{"command":"solid.box","params":{"length":40,"width":20,"height":10,"body_name":"Block"}}},

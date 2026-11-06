@@ -139,6 +139,10 @@ fn second_occurrence_drawn_wire_fit_picks_and_world_triad_drag_stay_aligned() {
     h.app.ui.show_origin = false;
     h.settle();
     h.step(&json!({"click":{"handle":"sketch_palette:options_fold"}})).unwrap();
+    // The option is low in the list: scroll the palette's options to it first.
+    let options = crate::scenario::rect_of("sketch_palette:options").unwrap();
+    h.call("ui.scroll", json!({"x":options.center().x,"y":options.center().y,"delta":-1000}));
+    h.settle();
     h.step(&json!({"widget":"3D Sketch"})).unwrap();
     assert!(
         crate::sketch3d::active(&h.app),

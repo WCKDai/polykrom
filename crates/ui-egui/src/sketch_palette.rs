@@ -235,6 +235,15 @@ fn width(vp: egui::Rect) -> f32 {
     t.sketch_palette_width.min((vp.width() * 0.46 - t.space_16).max(t.space_24 * 5.0))
 }
 
+/// The height of the palette's footer as `Part::Footer` draws it: Finish Sketch across the card
+/// (`wide_primary_button`), then Look At and Slice in their band (`button_pair`: `space_6` above
+/// and below the buttons). The body gets the room above it, so the footer stays at the card's
+/// bottom on a short view instead of running under the history.
+fn footer_height() -> f32 {
+    let t = Tokens::get();
+    2.0 * t.form_button_height + 2.0 * t.space_6
+}
+
 /// The viewport the palette docks into.
 fn viewport(app: &SolveApp, ctx: &egui::Context) -> egui::Rect {
     crate::agent_chat::tool_space(app, crate::shell::content_rect(app, app.viewport.rect.unwrap_or_else(|| ctx.content_rect())))
@@ -335,9 +344,13 @@ pub fn show(app: &mut SolveApp, ctx: &egui::Context) {
         return;
     }
     let gap = crate::ui_kit::Container::new(ctx, crate::ui_kit::Surface::Palette).gap();
-    let bottom = vp.bottom().min(ctx.content_rect().bottom()) - gap;
-    let top = crate::shell::panel_top(app, vp, bottom, crate::frame::Side::Right);
     let frame = crate::ui_kit::Panel::palette_frame(ctx, app.ui.layout);
+    // The card's contents end above its bottom outline (the frame paints its stroke inside the
+    // window's rect, and `palette_rect` adds the outline's width around it, as at the right
+    // edge), so the whole card stays above the history (docked, the strip starts at the
+    // viewport's bottom).
+    let bottom = vp.bottom().min(ctx.content_rect().bottom()) - gap - 2.0 * frame.stroke.width;
+    let top = crate::shell::panel_top(app, vp, bottom, crate::frame::Side::Right);
     let anchor = egui::pos2(vp.right() - gap - frame.stroke.width, top + frame.stroke.width);
     let shown = |key: &str| match key {
         "grid" => !opts.hide_grid,
@@ -370,9 +383,10 @@ pub fn show(app: &mut SolveApp, ctx: &egui::Context) {
         crate::frame::Side::Right,
         frame,
     )
-    .width(width(vp));
+    .width(width(vp))
+    .keep_top();
     let response = panel.window(ctx).show(ctx, |ui| {
-        panel.palette(ui, bottom, top, |ui, part| match part {
+        panel.palette(ui, bottom, top, footer_height(), |ui, part| match part {
             crate::ui_kit::Part::Header => {
                 let status = if !solved || !geometry || remaining == 0 {
                     crate::i18n::tr_dyn(&dof_text(remaining, solved, geometry))
@@ -462,7 +476,8 @@ pub fn show(app: &mut SolveApp, ctx: &egui::Context) {
                     "ui.palette_construction_mode",
                     selected_types.get(1).copied().unwrap_or(false),
                 );
-                crate::ui_kit::section(ui, "more", "ui.palette_more", false, |ui| {
+                let opened = egui::Id::new("sc_palette_more_opened");
+                let more = crate::ui_kit::section(ui, "more", "ui.palette_more", false, |ui| {
                     for (key, label) in TOGGLES {
                         if !["show_constraints", "show_dimensions", "show_points", "snap"].contains(&key)
                             && crate::ui_kit::checkbox_row(ui, key, label, shown(key))
@@ -470,11 +485,29 @@ pub fn show(app: &mut SolveApp, ctx: &egui::Context) {
                             set = Some((key.to_string(), !shown(key)));
                         }
                     }
+                    // Opened, the section scrolls into view: the card has only the viewport's
+                    // height, and the options it reveals are the lowest in the list.
+                    if !ui.ctx().data(|d| d.get_temp::<bool>(opened).unwrap_or(false)) {
+                        ui.scroll_to_cursor(Some(egui::Align::BOTTOM));
+                        ui.ctx().data_mut(|d| d.insert_temp(opened, true));
+                    }
                 });
+                if more.is_none() {
+                    ui.ctx().data_mut(|d| d.remove::<bool>(opened));
+                }
                 section_alias("sketch_palette:options_fold", "ui.palette_more");
             }
             crate::ui_kit::Part::Footer => {
-                let button = crate::ui_kit::wide_primary_button(ui, "Finish Sketch");
+                // Finish Sketch across the card, inset from its sides as Look At and Slice are
+                // in their band under it (`button_pair`), the same in both layouts.
+                let t = crate::theme::Tokens::get();
+                let row = ui.available_rect_before_wrap();
+                let inset = egui::Rect::from_min_max(
+                    egui::pos2(row.left() + t.space_10, row.top()),
+                    egui::pos2((row.right() - t.space_10).max(row.left() + t.space_10), row.top() + t.form_button_height),
+                );
+                let button =
+                    ui.scope_builder(egui::UiBuilder::new().max_rect(inset), |ui| crate::ui_kit::wide_primary_button(ui, "Finish Sketch")).inner;
                 crate::scenario::publish_rect("sketch_palette:finish", button.rect);
                 crate::scenario::publish_handle("sketch_palette:finish", button.rect.center());
                 finish = button.clicked();
@@ -556,7 +589,18 @@ mod tests {
         for (key, _) in TOGGLES {
             let before = h.app.session.doc.to_json();
             let undo = h.app.session.undo.len();
-            let at = crate::scenario::handle_at(&format!("sketch_palette:toggle:{key}")).unwrap();
+            // An option out of view scrolls into it first (the card has only the viewport's height).
+            let handle = format!("sketch_palette:toggle:{key}");
+            let mut at = crate::scenario::handle_at(&handle);
+            for delta in [1000.0, -1000.0] {
+                if at.is_none() {
+                    let options = crate::scenario::rect_of("sketch_palette:options").unwrap();
+                    h.call("ui.scroll", json!({"x":options.center().x,"y":options.center().y,"delta":delta}));
+                    h.settle();
+                    at = crate::scenario::handle_at(&handle);
+                }
+            }
+            let at = at.unwrap_or_else(|| panic!("{key} after scrolling"));
             h.call("ui.click", json!({"x":at.x,"y":at.y}));
             assert_ne!(h.app.session.doc.to_json(), before, "{key}");
             assert_eq!(h.app.session.undo.len(), undo + 1, "{key}");
@@ -652,7 +696,9 @@ mod tests {
 
     #[test]
     fn palette_footer_and_scrolled_lower_option_remain_reachable_at_scale_and_resize() {
-        for (scale, height) in [(1.0, 900.0), (2.0, 900.0), (2.0, 720.0)] {
+        // The heights carry the design kit's shell (document tabs and view bar, the taller
+        // history strip and the status bar) on top of the room the palette needs.
+        for (scale, height) in [(1.0, 1024.0), (2.0, 1024.0), (2.0, 844.0)] {
             let mut h = crate::scenario::Harness::new();
             h.app.run("sketch.create", json!({"plane":"XY"})).unwrap();
             h.app.run("sketch.circle.center", json!({"center":[0,0],"radius":1})).unwrap();

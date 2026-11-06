@@ -39,6 +39,9 @@ fn a_hole_picked_under_a_thin_plate_on_xy_drills_up_into_it_as_its_arrow_shows()
     h.app.run("sketch.finish", json!({})).unwrap();
     h.app.run("solid.extrude", json!({"sketch": "S", "distance": 1.5})).unwrap();
     h.step(&json!({"call": "ui.view", "params": {"view": "bottom"}})).unwrap();
+    // Fit centres the 150 x 100 plate in the scene (the design kit's browser column and document
+    // bar offset it), so the pick lands in the open viewport rather than under the right dialog.
+    h.step(&json!({"call": "ui.view", "params": {"view": "fit"}})).unwrap();
     h.settle();
     h.step(&json!({"start": "solid.hole"})).unwrap();
     let click = screen(&mut h, Vec3::new(75.0, 50.0, 0.0));

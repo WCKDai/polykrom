@@ -1,54 +1,64 @@
-//! The design kit's interface faces (Inter for the interface, IBM Plex Mono for numeric values
-//! and code; `assets/design-kit/2026-11-02/fonts`, OFL), user overrides, and language-specific
-//! system fallbacks. The faces are compiled into the binary from the kit itself (no second copy),
-//! so the same definitions serve desktop and web; the web shell adds Japanese on demand.
+//! The interface faces: Geist for the interface and Geist Mono for numeric values and code
+//! (Vercel, SIL OFL 1.1, `assets/fonts/geist`, a pinned release of github.com/vercel/geist-font:
+//! ATTRIBUTION.md records the tag and each file's SHA-256), user overrides, and language-specific
+//! system fallbacks. The faces are compiled into the binary, so the same definitions serve desktop
+//! and web; the web shell adds Japanese on demand. The design kit's Inter and IBM Plex Mono stay
+//! in the kit (they render its SVG text) and are not compiled in (the owner's direction,
+//! 2026-11-06: cleaner, lighter faces for the see-through shell).
+//!
+//! Weights, for the lighter typography of the glass look: body text at regular (400), labels and
+//! emphasised states at medium (500), semi-bold (600) only for the titles that need it. Numeric
+//! values are set in Geist Mono (tabular by construction: Geist's own figures are proportional and
+//! egui has no OpenType feature switch), at regular, and at medium ([`mono_medium`]) where a
+//! value is the point (the review card's proposed value).
 
 use std::sync::Arc;
 
 use egui::{FontDefinitions, FontFamily, FontId, RichText};
 
-/// The interface family the kit names (`tokens/figma-text-styles.json`).
-pub const INTERFACE_FAMILY: &str = "Inter";
-/// The family of numeric values and code the kit names (`Polykrom / CAD / Number`).
-pub const NUMERIC_FAMILY: &str = "IBM Plex Mono";
+/// The interface family.
+pub const INTERFACE_FAMILY: &str = "Geist";
+/// The family of numeric values and code.
+pub const NUMERIC_FAMILY: &str = "Geist Mono";
 
 // The faces are the ones `assets/fonts/bundled.txt` lists as `interface` (the one list of the
 // fonts the builds ship, which `cargo xtask licences` reads too): each `include_bytes!` names its
 // file in full so the bundled-font guard (xtask/src/fonts.rs) can read it, and a test below
 // compares the compiled-in bytes with the listed files.
 
-/// Inter at 400, 500, 600 and 700: the entry name of each face and its bytes, in the order of
-/// [`sans_families`].
-const UI_SANS: [(&str, &[u8]); 4] = [
-    ("ui-sans", include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/../../assets/design-kit/2026-11-02/fonts/Inter-400.ttf"))),
-    ("ui-medium", include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/../../assets/design-kit/2026-11-02/fonts/Inter-500.ttf"))),
-    ("ui-semibold", include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/../../assets/design-kit/2026-11-02/fonts/Inter-600.ttf"))),
-    ("ui-bold", include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/../../assets/design-kit/2026-11-02/fonts/Inter-700.ttf"))),
+/// Geist at 400, 500 and 600: the entry name of each face and its bytes, in the order of
+/// [`sans_families`]. No 700: nothing is set in bold.
+const UI_SANS: [(&str, &[u8]); 3] = [
+    ("ui-sans", include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/../../assets/fonts/geist/Geist-Regular.ttf"))),
+    ("ui-medium", include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/../../assets/fonts/geist/Geist-Medium.ttf"))),
+    ("ui-semibold", include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/../../assets/fonts/geist/Geist-SemiBold.ttf"))),
 ];
-/// IBM Plex Mono at 400 (the only weight numbers and code use; the kit's 500 and 600 faces are
-/// not compiled in), in the order of [`mono_families`].
-const UI_MONO: [(&str, &[u8]); 1] =
-    [("ui-mono", include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/../../assets/design-kit/2026-11-02/fonts/IBM-Plex-Mono-400.ttf")))];
+/// Geist Mono at 400 (numbers and code) and 500 (a value that is the point), in the order of
+/// [`mono_families`].
+const UI_MONO: [(&str, &[u8]); 2] = [
+    ("ui-mono", include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/../../assets/fonts/geist/GeistMono-Regular.ttf"))),
+    ("ui-mono-medium", include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/../../assets/fonts/geist/GeistMono-Medium.ttf"))),
+];
 /// The weight each face of [`UI_SANS`] and [`UI_MONO`] carries (its OS/2 weight class).
 #[cfg(test)]
-const SANS_WEIGHTS: [u16; 4] = [400, 500, 600, 700];
+const SANS_WEIGHTS: [u16; 3] = [400, 500, 600];
 #[cfg(test)]
-const MONO_WEIGHTS: [u16; 1] = [400];
+const MONO_WEIGHTS: [u16; 2] = [400, 500];
 
-fn sans_families() -> [FontFamily; 4] {
-    [FontFamily::Proportional, medium_family(), semibold_family(), bold_family()]
+fn sans_families() -> [FontFamily; 3] {
+    [FontFamily::Proportional, medium_family(), semibold_family()]
 }
 
-fn mono_families() -> [FontFamily; 1] {
-    [FontFamily::Monospace]
+fn mono_families() -> [FontFamily; 2] {
+    [FontFamily::Monospace, mono_medium_family()]
 }
 
 fn all_families() -> impl Iterator<Item = FontFamily> {
     sans_families().into_iter().chain(mono_families())
 }
 
-/// Inter at 400/500/600/700 and IBM Plex Mono at 400, each a static face of the kit, followed by
-/// egui's symbol/emoji fallbacks.
+/// Geist at 400/500/600 and Geist Mono at 400/500, each a static face, followed by egui's
+/// symbol/emoji fallbacks.
 pub fn base_font_definitions() -> FontDefinitions {
     let mut fonts = FontDefinitions::default();
     let sans_fallbacks = fonts.families.get(&FontFamily::Proportional).cloned().unwrap_or_default();
@@ -72,8 +82,8 @@ fn semibold_family() -> FontFamily {
     FontFamily::Name("ui-semibold".into())
 }
 
-fn bold_family() -> FontFamily {
-    FontFamily::Name("ui-bold".into())
+fn mono_medium_family() -> FontFamily {
+    FontFamily::Name("ui-mono-medium".into())
 }
 
 /// Medium (500) interface text, retaining the language fallbacks and user override.
@@ -86,16 +96,23 @@ pub fn semibold(size: f32) -> FontId {
     FontId::new(size, semibold_family())
 }
 
-/// Bold (700) interface text, retaining the language fallbacks and user override.
+/// Medium (500) numeric text: the tabular figures of the monospace family, a step heavier, for
+/// the one value a card is about.
+pub fn mono_medium(size: f32) -> FontId {
+    FontId::new(size, mono_medium_family())
+}
+
+/// The heaviest bundled weight, semi-bold (600), under the name the view cube's letters ask for
+/// (`assets/icons/ui/source/navigation.rs`, the icon sources): nothing is set in bold (700),
+/// which is not bundled.
 pub fn bold(size: f32) -> FontId {
-    FontId::new(size, bold_family())
+    semibold(size)
 }
 
 /// Select a real interface weight without changing the text's size or colour.
 pub trait RichTextExt {
     fn medium(self) -> Self;
     fn semibold(self) -> Self;
-    fn bold_face(self) -> Self;
 }
 
 impl RichTextExt for RichText {
@@ -104,9 +121,6 @@ impl RichTextExt for RichText {
     }
     fn semibold(self) -> Self {
         self.family(semibold_family())
-    }
-    fn bold_face(self) -> Self {
-        self.family(bold_family())
     }
 }
 
@@ -1063,11 +1077,11 @@ mod tests {
         (name(ttf_parser::name_id::TYPOGRAPHIC_FAMILY).or_else(|| name(ttf_parser::name_id::FAMILY)).unwrap(), face.weight().to_number())
     }
 
-    /// The interface is set in the kit's Inter (400/500/600/700) and its numbers and code in the
-    /// kit's IBM Plex Mono (400), on the desktop and in the web build alike: each face leads its
-    /// family, with egui's symbol and emoji fallbacks behind it.
+    /// The interface is set in Geist (400/500/600) and its numbers and code in Geist Mono
+    /// (400/500), on the desktop and in the web build alike: each face leads its family, with
+    /// egui's symbol and emoji fallbacks behind it.
     #[test]
-    fn the_kit_faces_lead_every_family_on_desktop_and_web() {
+    fn the_bundled_faces_lead_every_family_on_desktop_and_web() {
         let defaults = with_symbol_fallback(FontDefinitions::default());
         for fonts in [base_font_definitions(), web_font_definitions("", None)] {
             for (((name, bytes), family), weight) in UI_SANS.into_iter().zip(sans_families()).zip(SANS_WEIGHTS) {
@@ -1099,9 +1113,51 @@ mod tests {
         assert_eq!(installed.families[&semibold_family()][0], "ui-semibold");
         assert_eq!(installed.families[&FontFamily::Monospace][0], "ui-mono");
         assert!(ctx.fonts_mut(|f| f.has_glyphs(&FontId::monospace(12.0), "Ø8.00 mm")));
-        // Only the faces above are compiled in: no second Plex Mono weight rides along unused.
-        let kit: Vec<&String> = installed.font_data.keys().filter(|k| k.starts_with("ui-")).collect();
-        assert_eq!(kit.len(), UI_SANS.len() + UI_MONO.len(), "{kit:?}");
+        // Only the faces above are compiled in: no weight rides along unused.
+        let bundled: Vec<&String> = installed.font_data.keys().filter(|k| k.starts_with("ui-")).collect();
+        assert_eq!(bundled.len(), UI_SANS.len() + UI_MONO.len(), "{bundled:?}");
+    }
+
+    /// Every numeric value is set with tabular figures: the monospace family's lead face (Geist
+    /// Mono, at both weights) gives every digit one advance, which Geist's own figures (the
+    /// interface face) do not, so numbers go through the monospace family.
+    #[test]
+    fn numeric_values_have_tabular_figures_through_the_monospace_family() {
+        fn digit_advances(bytes: &[u8]) -> Vec<u16> {
+            let face = ttf_parser::Face::parse(bytes, 0).unwrap();
+            "0123456789".chars().map(|c| face.glyph_hor_advance(face.glyph_index(c).unwrap()).unwrap()).collect()
+        }
+        for (name, bytes) in UI_MONO {
+            let advances = digit_advances(bytes);
+            assert!(advances.iter().all(|a| *a == advances[0]), "{name}: tabular figures: {advances:?}");
+        }
+        let sans = digit_advances(UI_SANS[0].1);
+        assert!(sans.iter().any(|a| *a != sans[0]), "the interface face's figures are proportional ({sans:?}): values need the monospace family");
+        let fonts = base_font_definitions();
+        assert_eq!(fonts.families[&FontFamily::Monospace][0], "ui-mono");
+        assert_eq!(fonts.families[&mono_medium_family()][0], "ui-mono-medium");
+        assert_eq!(mono_medium(12.0).family, mono_medium_family());
+    }
+
+    /// The faces at the kit's sizes: Geist's line height (1.3 em) keeps a row of text from
+    /// looking cramped at every size and weight, and a row of label text with its padding fits
+    /// the control height, a heading the panel header, so nothing of the shell's metrics has to
+    /// give.
+    #[test]
+    fn row_heights_at_the_kit_sizes_fit_the_shell_metrics() {
+        let ctx = test_context();
+        ctx.run_ui(egui::RawInput::default(), |_| {}).textures_delta.clear();
+        let t = crate::theme::Tokens::get();
+        for size in [t.font_badge, t.font_micro, t.font_small, t.font_caption, t.font_body, t.font_label, t.font_button, t.font_heading] {
+            for font in [FontId::proportional(size), medium(size), semibold(size), FontId::monospace(size), mono_medium(size)] {
+                let row = ctx.fonts_mut(|f| f.row_height(&font));
+                assert!(row >= size * 1.25 && row <= size * 1.36, "{font:?}: a row is {row} for {size} pt");
+            }
+        }
+        let label = ctx.fonts_mut(|f| f.row_height(&FontId::proportional(t.font_label)));
+        assert!(label + 2.0 * t.space_4 <= t.control_height, "a label row ({label}) with its padding fits a control ({})", t.control_height);
+        let heading = ctx.fonts_mut(|f| f.row_height(&semibold(t.font_heading)));
+        assert!(heading + 2.0 * t.space_8 <= t.form_header_height, "a heading row ({heading}) fits the header ({})", t.form_header_height);
     }
 
     #[test]
@@ -1118,7 +1174,6 @@ mod tests {
             for (text, expected) in [
                 (RichText::new("Medium").color(ink).size(16.0).medium(), medium(16.0)),
                 (RichText::new("Semibold").color(ink).size(16.0).semibold(), semibold(16.0)),
-                (RichText::new("Bold").color(ink).size(16.0).bold_face(), bold(16.0)),
             ] {
                 let galley = egui::WidgetText::from(text).into_galley(ui, None, f32::INFINITY, egui::TextStyle::Body);
                 assert_eq!(galley.job.sections[0].format.font_id, expected);
