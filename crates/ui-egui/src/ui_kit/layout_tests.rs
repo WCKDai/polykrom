@@ -37,6 +37,59 @@ fn row_height_and_label_column_are_fixed_for_long_labels_and_expressions() {
     assert_eq!(value, "width / 2 + 10 mm");
 }
 
+/// A `labelled_form` sizes its label column to the widest of the labels it is given (at least
+/// the share asked for), so every label shows in full where the plain form would elide it; a
+/// label wider than the column's maximum share wraps onto a second line and its row grows.
+#[test]
+fn a_labelled_form_keeps_its_measured_column_and_wraps_labels_wider_than_it() {
+    let ctx = crate::fonts::test_context();
+    let t = Tokens::get();
+    let mut value = String::new();
+    let long = "Counterbore diameter";
+    let longer = "A parameter label far too long for even the widest column";
+    let labels = [long, "Depth", longer];
+    let mut elided = Vec::new();
+    let mut output = None;
+    for _ in 0..3 {
+        output = Some(crate::test_support::frame(
+            &ctx,
+            egui::RawInput { screen_rect: Some(egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(320.0, 400.0))), ..Default::default() },
+            |ui| {
+                ui.set_width(248.0);
+                scope(ui, |ui| {
+                    labelled_form(ui, &labels, 104.0 / 264.0, |ui| {
+                        for label in labels {
+                            row(ui, label, |ui| {
+                                field(ui, &mut value);
+                            });
+                        }
+                    });
+                });
+            },
+        ));
+    }
+    fn walk(shape: &egui::Shape, out: &mut Vec<String>) {
+        match shape {
+            egui::Shape::Text(text) if text.galley.elided => out.push(text.galley.job.text.clone()),
+            egui::Shape::Vec(shapes) => shapes.iter().for_each(|s| walk(s, out)),
+            _ => {}
+        }
+    }
+    output.unwrap().shapes.iter().for_each(|s| walk(&s.shape, &mut elided));
+    assert!(elided.is_empty(), "no label is elided: {elided:?}");
+    let column = scenario::rect_of(&format!("dialog:label:{long}")).unwrap().width();
+    let natural = ctx.fonts_mut(|f| f.layout_no_wrap(long.to_string(), egui::FontId::proportional(t.font_label), t.dialog_label).size().x);
+    assert!(column >= natural && column >= 248.0 * 104.0 / 264.0, "the column holds the widest label in full: {column} for {natural}");
+    assert!(column <= 248.0 * 0.6 + 0.5, "{column}");
+    assert_eq!(scenario::rect_of("dialog:label:Depth").unwrap().width(), column, "one column for every row");
+    let short = scenario::rect_of("dialog:row:Depth").unwrap();
+    let wrapped = scenario::rect_of(&format!("dialog:row:{longer}")).unwrap();
+    assert_eq!(short.height(), t.control_height);
+    assert!(wrapped.height() > t.control_height * 1.5, "the over-wide label wraps onto a second line: {wrapped:?}");
+    let control = scenario::rect_of(&format!("dialog:control:{longer}")).unwrap();
+    assert!(wrapped.contains_rect(control) && control.left() > wrapped.left() + column);
+}
+
 #[test]
 fn section_toggles_persist_per_dialog() {
     let ctx = crate::fonts::test_context();

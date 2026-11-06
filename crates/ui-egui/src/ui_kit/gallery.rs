@@ -36,6 +36,16 @@ const ELEMENTS: &[Element] = &[
             });
         });
     }),
+    element!("labelled_form", |ui, state| {
+        let labels = ["Counterbore diameter", "Depth"];
+        labelled_form(ui, &labels, 104.0 / 264.0, |ui| {
+            for label in labels {
+                row(ui, label, |ui| {
+                    field(ui, &mut state.value);
+                });
+            }
+        });
+    }),
     element!("settings_composition", |ui, _| {
         settings_heading(ui, "Interface", "Appearance and workspace");
         settings_section(ui, "gallery_settings", "Layout", |ui| {
