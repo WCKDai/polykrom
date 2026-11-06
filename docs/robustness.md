@@ -68,9 +68,14 @@ changed seeds and preserves shared references. A platform record replaces the sh
 one whole, so a change that moves a seed with a platform record needs that seed checked
 on that platform too: seed 67's Windows record went stale this way after #2064 and
 #2247 and was removed once Windows built the shared record again.
-`platforms.macos.seeds` holds the macOS (aarch64-apple-darwin) records: seed 36 fails there
-as on Windows, and seed 71 builds the same volume with one coplanar face fewer (#924). They
-were recorded on Polykrom's sync of upstream `a633a67e`; Linux keeps the shared records.
+`platforms.macos.seeds` held the macOS (aarch64-apple-darwin) records: seed 36 failed there
+as on Windows, and seed 71 built the same volume with one coplanar face fewer (#924), recorded
+on Polykrom's sync of upstream `a633a67e`. Since PolyCore `6872c214` (PC-12: every
+transcendental goes through pmath, so a model gives the same bits on every platform) macOS
+builds the shared records, and the last macOS-only records (seeds 36 and 71) were removed for
+0.21.0; `platforms.macos` comes back only if a seed differs there again. The same pin moved
+seed 94's shared record to what its Windows record had held (3470.837 mm², 5456.439 mm³), so
+Linux and Windows now agree on it; the Windows record stays until a Windows build checks it.
 The Windows records were made with the MSVC target (`x86_64-pc-windows-msvc`) and all
 six were checked again on main `e9490093`. GNU builds (`x86_64-pc-windows-gnu`)
 use the shared records unless an explicit GNU override exists, so MSVC-only outcomes

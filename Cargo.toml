@@ -7,7 +7,7 @@ members = ["crates/*", "apps/*", "xtask"]
 exclude = ["vendor", "crates/kernel", "crates/geom"]
 
 [workspace.package]
-version = "0.21.0-rc.2"
+version = "0.21.0"
 edition = "2024"
 license = "MIT OR Apache-2.0"
 rust-version = "1.95"
@@ -18,9 +18,9 @@ repository = "https://github.com/wckdboy/polykrom"
 # internal
 # The kernel and its geometry foundation are maintained in PolyCore and pinned by revision.
 # Bump both entries together; they must resolve to the same commit so their types are the same.
-polycore-geom = { git = "https://github.com/WCKDai/polycore", rev = "619f24b408b13967b0b67f9cfebd58bd7bd03ac3" }
+polycore-geom = { git = "https://github.com/WCKDai/polycore", rev = "6872c214a1e76d118104569efeb6550b14759f24" }
 polykrom-sketch = { path = "crates/sketch" }
-polycore = { git = "https://github.com/WCKDai/polycore", rev = "619f24b408b13967b0b67f9cfebd58bd7bd03ac3" }
+polycore = { git = "https://github.com/WCKDai/polycore", rev = "6872c214a1e76d118104569efeb6550b14759f24" }
 polykrom-render = { path = "crates/render" }
 polykrom-gpu = { path = "crates/gpu" }
 polykrom-doc = { path = "crates/doc" }
