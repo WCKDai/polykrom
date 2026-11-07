@@ -1,4 +1,4 @@
-//! File formats. Designs use JSON or versioned containers (`.solidcraft`); the authoritative
+//! File formats. Designs use JSON or versioned containers (`.polykrom`); the authoritative
 //! document rebuilds on load and optional display caches remain provisional. Bodies export
 //! as STL (binary or ASCII), OBJ, STEP and 3MF, and assemblies as URDF ([`urdf()`]) and MJCF ([`mjcf()`]); STEP, IGES,
 //! FreeCAD and Rhino files import as a base feature (see [`step_import_feature`]), 3MF and
@@ -18,7 +18,7 @@ pub use design::{
     write_design_container_with_cache, write_design_container_with_compression, write_design_container_with_preview,
     write_design_container_with_thumbnail,
 };
-mod legacy_dir;
+pub mod identity;
 pub mod mjcf;
 #[cfg(test)]
 mod mutate;
@@ -33,7 +33,7 @@ pub mod vfs;
 
 pub use dxf::{read_dxf, write_dxf};
 pub use dxf_out::{DxfEntity, DxfLayer, DxfLinetype, DxfShape, loop_shapes, seg_shape, write_dxf_drawing};
-pub use legacy_dir::{APP_ID, LEGACY_APP_ID, adopt_legacy_dir, legacy_flatpak_path};
+pub use identity::{APP_ID, DATA_DIR_LOWER, DATA_DIR_TITLE};
 pub use safe_write::{backup_path, write_atomic};
 pub use sketch2d::{Geom2, MAX_DRAWING_BYTES};
 pub use svg::read_svg;
@@ -648,7 +648,7 @@ pub fn export_with_metadata(state: &ModelState, bodies: &[String], format: Forma
             let objs: Vec<MeshObject> = sel.iter().map(|b| mesh_object(b, format == Format::ThreeMfTagged)).collect::<Result<_>>()?;
             write_3mf_with(&objs, &threemf_metadata(meta))?
         }
-        Format::Design => return Err(IoError::Format("solidcraft (save the document instead)".into())),
+        Format::Design => return Err(IoError::Format("polykrom (save the document instead)".into())),
         Format::Urdf => return Err(IoError::Format("urdf (an assembly package; use file.export)".into())),
         Format::Mjcf => return Err(IoError::Format("mjcf (an assembly package; use file.export)".into())),
     })

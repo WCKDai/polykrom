@@ -325,7 +325,7 @@ fn newer_autosaves(path: &str) -> Vec<Value> {
 /// The name a design never given one by its user is shown under.
 const DEFAULT_NAME: &str = "Untitled";
 
-/// A design still under the default name takes its file's name (`bracket.solidcraft` →
+/// A design still under the default name takes its file's name (`bracket.polykrom` →
 /// "bracket"); a name the user chose is kept. `None` when nothing changes.
 fn default_name_for(name: &str, path: &str) -> Option<String> {
     let name = name.trim();
@@ -821,7 +821,7 @@ mod tests {
     /// the design named after its first file, its file, and nothing unsaved; undo keeps the name.
     #[test]
     fn a_save_run_on_a_copy_and_adopted_matches_saving_directly() {
-        let dir = std::env::temp_dir().join(format!("solidcraft-adopt-save-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("polykrom-adopt-save-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         let mut direct = Session::default();
         direct.execute("solid.box", &json!({"length": 10, "width": 10, "height": 10})).unwrap();
@@ -896,7 +896,7 @@ mod tests {
         for body in &state.bodies {
             body.mesh();
         }
-        let save_path = std::env::temp_dir().join(format!("solidcraft-preview-save-{}.solidcraft", std::process::id()));
+        let save_path = std::env::temp_dir().join(format!("polykrom-preview-save-{}.solidcraft", std::process::id()));
         s.execute("file.save", &json!({"path":save_path})).unwrap();
         let saved = std::fs::read(&save_path).unwrap();
         assert!(polykrom_io::read_design_geometry(&saved).is_some(), "ordinary saves keep the evaluated model");
@@ -911,7 +911,7 @@ mod tests {
             mesh.positions = mesh.positions.iter().map(|c| c * 10.0).collect();
         }
         let bytes = polykrom_io::write_design_container_with_preview(&s.doc, polykrom_io::DesignCompression::Fast, Some(&preview)).unwrap();
-        let path = std::env::temp_dir().join(format!("solidcraft-preview-{}.solidcraft", std::process::id()));
+        let path = std::env::temp_dir().join(format!("polykrom-preview-{}.solidcraft", std::process::id()));
         std::fs::write(&path, bytes).unwrap();
         let seen = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
         let callback_seen = seen.clone();
@@ -981,7 +981,7 @@ mod tests {
         for body in &world.bodies {
             body.mesh();
         }
-        let path = std::env::temp_dir().join(format!("solidcraft-cache-opt-in-{}.solidcraft", std::process::id()));
+        let path = std::env::temp_dir().join(format!("polykrom-cache-opt-in-{}.solidcraft", std::process::id()));
         for command in ["file.save", "file.save_as"] {
             for cache in [None, Some(true), Some(false), None] {
                 let mut params = json!({"path":path});
@@ -1053,7 +1053,7 @@ mod tests {
         assert!(world.bodies.iter().all(|b| b.cached_mesh().is_none()), "saving the model must not triangulate");
         assert!(polykrom_io::read_design_geometry(&bytes).is_some());
         assert!(polykrom_io::read_design_geometry(&session.design_container(polykrom_io::DesignCompression::Fast, false, false).unwrap()).is_none());
-        let path = std::env::temp_dir().join(format!("solidcraft-saved-model-{}.solidcraft", std::process::id()));
+        let path = std::env::temp_dir().join(format!("polykrom-saved-model-{}.solidcraft", std::process::id()));
         std::fs::write(&path, &bytes).unwrap();
         let mut reopened = Session::default();
         reopened.execute("doc.open", &json!({"path":path})).unwrap();
@@ -1080,7 +1080,7 @@ mod tests {
     #[ignore = "manual native cache save benchmark; generate issue303-step.json first"]
     fn benchmark_native_cache_save() {
         let target = std::env::var_os("CARGO_TARGET_DIR").map(std::path::PathBuf::from).unwrap_or_else(|| std::path::PathBuf::from("target"));
-        let input = std::env::var_os("SOLIDCRAFT_BENCH_FILE").map(std::path::PathBuf::from).unwrap_or_else(|| target.join("issue303-step.json"));
+        let input = std::env::var_os("POLYKROM_BENCH_FILE").map(std::path::PathBuf::from).unwrap_or_else(|| target.join("issue303-step.json"));
         let mut session = Session::new(polykrom_io::read_design(&std::fs::read(input).unwrap()).unwrap());
         for body in &session.world_state().bodies {
             body.mesh();
@@ -1109,7 +1109,7 @@ mod tests {
     #[ignore = "manual fresh-process opening benchmark; one encoding per process"]
     fn benchmark_native_cache_open() {
         let target = std::env::var_os("CARGO_TARGET_DIR").map(std::path::PathBuf::from).unwrap_or_else(|| std::path::PathBuf::from("target"));
-        let mode = std::env::var("SOLIDCRAFT_BENCH_ENCODING").unwrap_or_else(|_| "2".into());
+        let mode = std::env::var("POLYKROM_BENCH_ENCODING").unwrap_or_else(|_| "2".into());
         let path = target.join(format!("issue303-native-{mode}.solidcraft"));
         let display = std::sync::Arc::new(std::sync::Mutex::new(None));
         let notify = display.clone();
@@ -1137,7 +1137,7 @@ mod tests {
     }
 
     fn name_dir(tag: &str) -> std::path::PathBuf {
-        let dir = std::env::temp_dir().join(format!("solidcraft-name-{tag}-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("polykrom-name-{tag}-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         dir
     }
@@ -1210,9 +1210,9 @@ mod tests {
 
     #[test]
     fn design_save_formats_reopen_and_preserve_atomic_backups() {
-        let dir = std::env::temp_dir().join(format!("solidcraft-container-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("polykrom-container-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
-        let packaged = dir.join("design.solidcraft");
+        let packaged = dir.join("design.polykrom");
         let plain = dir.join("design.json");
         let export = dir.join("export.json");
         let mut session = Session::default();
@@ -1248,7 +1248,7 @@ mod tests {
     fn watched_open_reports_progress_and_stops_when_cancelled() {
         use polykrom_doc::progress::{Progress, watch};
         use std::sync::Arc;
-        let dir = std::env::temp_dir().join(format!("solidcraft-watched-open-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("polykrom-watched-open-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         let path = dir.join("three.solidcraft").to_string_lossy().to_string();
         let mut s = Session::default();

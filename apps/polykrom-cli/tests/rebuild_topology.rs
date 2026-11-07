@@ -16,7 +16,7 @@ fn root() -> PathBuf {
 
 /// A folder of its own for test `name` (tests run side by side).
 fn scratch_dir(name: &str) -> PathBuf {
-    let d = std::env::temp_dir().join(format!("solidcraft-rebuild-topology-{name}-{}", std::process::id()));
+    let d = std::env::temp_dir().join(format!("polykrom-rebuild-topology-{name}-{}", std::process::id()));
     std::fs::create_dir_all(&d).unwrap();
     d
 }

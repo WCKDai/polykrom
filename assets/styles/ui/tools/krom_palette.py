@@ -1,4 +1,4 @@
-"""Move a SolidCraft-derived palette onto Polykrom's (assets/styles/ui/README: "Polykrom palette").
+"""Move a Polykrom-derived palette onto Polykrom's (assets/styles/ui/README: "Polykrom palette").
 
 Run once per palette file; it keeps every value's perceptual lightness (OKLab L), so the
 contrast relationships the colour-vision tests measure hold, and changes what makes the look:

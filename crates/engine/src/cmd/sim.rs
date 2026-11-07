@@ -221,7 +221,7 @@ mod native {
     /// Runs `runner.py job.json` in `dir` within `budget` and reads the JSON it prints last.
     fn runner(dir: &Path, budget: Duration) -> Result<Value> {
         let default = if cfg!(windows) { "python" } else { "python3" };
-        let python = crate::geom::env::var_os("MUJOCO_PYTHON").filter(|v| !v.is_empty()).unwrap_or_else(|| default.into());
+        let python = crate::env::var_os("MUJOCO_PYTHON").filter(|v| !v.is_empty()).unwrap_or_else(|| default.into());
         let mut child = std::process::Command::new(&python)
             .arg(dir.join("runner.py"))
             .arg(dir.join("job.json"))

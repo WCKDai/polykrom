@@ -81,7 +81,7 @@ impl ApiBackend {
         let mcp = match &ctx.bridge {
             Some(b) => {
                 let argv = vec![b.cli.to_string_lossy().into_owned(), "mcp".into(), "--connect".into(), format!("127.0.0.1:{}", b.port)];
-                Some(AgentProcess::spawn(&argv, &ctx.cwd, &["SOLIDCRAFT_CONTROL_TOKEN"], || {})?)
+                Some(AgentProcess::spawn(&argv, &ctx.cwd, &["POLYKROM_CONTROL_TOKEN"], || {})?)
             }
             None => None,
         };
@@ -255,7 +255,7 @@ impl Worker {
         }
         self.mcp_call(
             "initialize",
-            json!({"protocolVersion": "2025-06-18", "capabilities": {}, "clientInfo": {"name": "solidcraft-agent-chat", "version": env!("CARGO_PKG_VERSION")}}),
+            json!({"protocolVersion": "2025-06-18", "capabilities": {}, "clientInfo": {"name": "polykrom-agent-chat", "version": env!("CARGO_PKG_VERSION")}}),
         )?;
         if let Some(m) = &self.mcp {
             m.send(&json!({"jsonrpc": "2.0", "method": "notifications/initialized"}));
@@ -1311,7 +1311,7 @@ mod tests {
     }
 
     /// A scripted Anthropic endpoint: one answer with a tool call, then a plain answer. The loop
-    /// runs the tool (here without SolidCraft tools: an unknown tool fails) and reports the end.
+    /// runs the tool (here without Polykrom tools: an unknown tool fails) and reports the end.
     #[test]
     fn the_anthropic_tool_loop_runs_calls_and_ends_the_turn() {
         let answers = std::sync::Mutex::new(vec![

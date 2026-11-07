@@ -569,7 +569,7 @@ fn frozen_r6_bore_copy_uses_current_geometry_despite_mesh_measure_bias() {
 /// A STEP file of three 10 mm boxes at x = 0, 30 and 60 (`Aa`, `Bb`, `Cc`). With `shared` the three
 /// solids carry one label (`X`), as the parts of many assembly files do.
 fn three_box_step(tag: &str, shared: bool) -> std::path::PathBuf {
-    let dir = std::env::temp_dir().join(format!("solidcraft-paste-new-{tag}-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("polykrom-paste-new-{tag}-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     let mut s = Session::default();
     for (i, label) in ["Aa", "Bb", "Cc"].iter().enumerate() {
@@ -667,7 +667,7 @@ fn paste_new_of_an_import_with_one_label_on_all_solids_moves_the_copy_of_each_bo
 /// from the names `Aa`, `Bb`, `Cc`, and the features made on those bodies name them so.
 #[test]
 fn paste_new_of_a_design_linked_twice_moves_the_copy_of_each_body() {
-    let dir = std::env::temp_dir().join(format!("solidcraft-paste-new-linked-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("polykrom-paste-new-linked-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     let design = dir.join("Three.solidcraft");
     let mut part = Session::default();
@@ -697,7 +697,7 @@ fn paste_new_of_a_design_linked_twice_moves_the_copy_of_each_body() {
 
 /// An OBJ file of three 10 mm cubes at x = 0, 30 and 60, every object called `X`.
 fn three_cube_obj(tag: &str) -> std::path::PathBuf {
-    let dir = std::env::temp_dir().join(format!("solidcraft-paste-new-{tag}-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("polykrom-paste-new-{tag}-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     let corners = [[0, 0, 0], [1, 0, 0], [1, 1, 0], [0, 1, 0], [0, 0, 1], [1, 0, 1], [1, 1, 1], [0, 1, 1]];
     let faces = [[0, 2, 1], [0, 3, 2], [4, 5, 6], [4, 6, 7], [0, 1, 5], [0, 5, 4], [3, 7, 6], [3, 6, 2], [0, 4, 7], [0, 7, 3], [1, 2, 6], [1, 6, 5]];

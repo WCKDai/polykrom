@@ -18,7 +18,7 @@ fn corpus() -> Vec<PathBuf> {
 }
 
 fn temp(name: &str) -> PathBuf {
-    std::env::temp_dir().join(format!("solidcraft-model-cache-{}-{name}.solidcraft", std::process::id()))
+    std::env::temp_dir().join(format!("polykrom-model-cache-{}-{name}.solidcraft", std::process::id()))
 }
 
 fn open(path: &Path) -> Session {
@@ -140,7 +140,7 @@ fn imported_assemblies_open_from_their_model_as_evaluated() {
     for c in (hinge.script)()["commands"].as_array().unwrap() {
         source.execute(c["command"].as_str().unwrap(), &c["params"]).unwrap();
     }
-    let step = std::env::temp_dir().join(format!("solidcraft-model-cache-{}-hinge.step", std::process::id()));
+    let step = std::env::temp_dir().join(format!("polykrom-model-cache-{}-hinge.step", std::process::id()));
     source.execute("file.export", &json!({"path": step.to_string_lossy()})).unwrap();
     let mut s = Session::default();
     s.execute("file.insert_step", &json!({"path": step.to_string_lossy()})).unwrap();

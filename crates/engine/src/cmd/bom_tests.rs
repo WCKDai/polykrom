@@ -11,7 +11,7 @@ fn run(s: &mut Session, id: &str, p: Value) -> Value {
 
 /// A folder of its own for one test's files.
 fn scratch(name: &str) -> std::path::PathBuf {
-    let dir = std::env::temp_dir().join(format!("solidcraft-bom-{}-{name}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("polykrom-bom-{}-{name}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
     dir

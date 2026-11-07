@@ -180,7 +180,7 @@ mod tests {
     use serde_json::json;
 
     fn folder(tag: &str) -> std::path::PathBuf {
-        let d = std::env::temp_dir().join(format!("solidcraft-crash-ui-{tag}-{}", std::process::id()));
+        let d = std::env::temp_dir().join(format!("polykrom-crash-ui-{tag}-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&d);
         let id = "20261012-162341-bb60791ed6692f1d";
         std::fs::create_dir_all(d.join(id)).unwrap();

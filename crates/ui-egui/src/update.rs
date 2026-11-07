@@ -56,8 +56,8 @@ const MAX_ASSETS: usize = 400;
 /// The room the Update pill's long label leaves for the document tabs.
 const TAB_ROOM: f32 = 300.0;
 
-/// The Linux app ID (Flatpak, desktop files).
-pub const APP_ID: &str = "ai.storyteller.solidcraft";
+/// The app ID (Flatpak, desktop files).
+pub const APP_ID: &str = polykrom_engine::io::APP_ID;
 
 /// Why a check failed. Automatic checks never show it; Check now does.
 #[derive(Clone, Debug, PartialEq)]
@@ -109,16 +109,16 @@ pub fn is_newer(latest: &str, current: &str) -> bool {
     latest.pre.is_empty() && latest > comparable(&current)
 }
 
-/// This build's version: the release workflow's `SOLIDCRAFT_VERSION` (with any nightly suffix)
+/// This build's version: the release workflow's `POLYKROM_VERSION` (with any nightly suffix)
 /// when it built this binary, else the crate version.
 pub fn current_version() -> &'static str {
-    option_env!("SOLIDCRAFT_VERSION").filter(|v| !v.is_empty()).unwrap_or(env!("CARGO_PKG_VERSION"))
+    option_env!("POLYKROM_VERSION").filter(|v| !v.is_empty()).unwrap_or(env!("CARGO_PKG_VERSION"))
 }
 
-/// The release workflow built this binary (`SOLIDCRAFT_VERSION` is set there). Anything else is a
+/// The release workflow built this binary (`POLYKROM_VERSION` is set there). Anything else is a
 /// development build, which never checks for updates.
 pub fn release_build() -> bool {
-    option_env!("SOLIDCRAFT_VERSION").is_some_and(|v| !v.is_empty()) && !cfg!(debug_assertions)
+    option_env!("POLYKROM_VERSION").is_some_and(|v| !v.is_empty()) && !cfg!(debug_assertions)
 }
 
 // ---- installations ----------------------------------------------------------------------------
@@ -149,7 +149,7 @@ pub enum InstallKind {
     WindowsPortable,
     /// The lone `Polykrom-<version>-windows-x64.exe`.
     WindowsExe,
-    /// `SolidCraft.app`, at this path (the bundle).
+    /// `Polykrom.app`, at this path (the bundle).
     MacApp(PathBuf),
     /// A release build in a place none of the above explains (FreeBSD, a copied binary).
     Other,
@@ -183,7 +183,7 @@ pub fn detect(p: &Probe) -> InstallKind {
             if let Some(id) = env("FLATPAK_ID") {
                 return InstallKind::Flatpak(id);
             }
-            if env("SNAP").is_some() && env("SNAP_NAME").is_none_or(|n| n.starts_with("solidcraft")) {
+            if env("SNAP").is_some() && env("SNAP_NAME").is_none_or(|n| n.starts_with("polykrom")) {
                 // Locally installed (unasserted) snaps have revisions x1, x2, …
                 return InstallKind::Snap { store: !env("SNAP_REVISION").is_some_and(|r| r.starts_with('x')) };
             }
@@ -192,7 +192,7 @@ pub fn detect(p: &Probe) -> InstallKind {
             }
             if exe.starts_with("/usr") {
                 // nfpm installs both packages under /usr; dpkg keeps a file list per package.
-                if (p.exists)(Path::new("/var/lib/dpkg/info/solidcraft.list")) {
+                if (p.exists)(Path::new("/var/lib/dpkg/info/polykrom.list")) {
                     return InstallKind::Deb;
                 }
                 if (p.exists)(Path::new("/var/lib/rpm")) || (p.exists)(Path::new("/usr/lib/sysimage/rpm")) {
@@ -208,7 +208,7 @@ pub fn detect(p: &Probe) -> InstallKind {
             if installed || under("ProgramFiles") || under("ProgramW6432") || under("ProgramFiles(x86)") {
                 return InstallKind::WindowsMsi;
             }
-            if exe.parent().is_some_and(|d| (p.exists)(&d.join("solidcraft-cli.exe"))) {
+            if exe.parent().is_some_and(|d| (p.exists)(&d.join("polykrom-cli.exe"))) {
                 return InstallKind::WindowsPortable;
             }
             InstallKind::WindowsExe
@@ -255,7 +255,7 @@ pub fn this_install() -> InstallKind {
     }
 }
 
-/// The folder the Windows installer recorded (solidcraft.wxs writes it for upgrades), if any.
+/// The folder the Windows installer recorded (polykrom.wxs writes it for upgrades), if any.
 #[cfg(windows)]
 fn msi_install_dir() -> Option<PathBuf> {
     let key = winreg::RegKey::predef(winreg::enums::HKEY_LOCAL_MACHINE).open_subkey(r"Software\Polykrom").ok()?;
@@ -303,7 +303,7 @@ impl InstallKind {
     pub fn update_command(&self, asset: Option<&str>) -> Option<String> {
         match self {
             InstallKind::Flatpak(id) => Some(format!("flatpak update {id}")),
-            InstallKind::Snap { store: true } => Some("sudo snap refresh solidcraft".into()),
+            InstallKind::Snap { store: true } => Some("sudo snap refresh polykrom".into()),
             InstallKind::Snap { store: false } => Some(format!("sudo snap install --dangerous ./{}", asset.unwrap_or("polykrom-linux-x86_64.snap"))),
             InstallKind::Deb => Some(format!("sudo apt install ./{}", asset.unwrap_or("polykrom-linux-x86_64.deb"))),
             InstallKind::Rpm => Some(format!("sudo dnf install ./{}", asset.unwrap_or("polykrom-linux-x86_64.rpm"))),
@@ -516,11 +516,11 @@ pub struct Updater {
     started: bool,
     /// An automatic check has started since launch (until then one is due at once).
     launch_checked: bool,
-    /// `SOLIDCRAFT_UPDATE_CHECK=0`: no checks at all.
+    /// `POLYKROM_UPDATE_CHECK=0`: no checks at all.
     off: bool,
     /// When Check now was last pressed (Unix seconds).
     last_manual: f64,
-    /// A release given by `SOLIDCRAFT_UPDATE_FEED` (a file), for tests and screenshots.
+    /// A release given by `POLYKROM_UPDATE_FEED` (a file), for tests and screenshots.
     feed: Option<PathBuf>,
     /// The one-click update in progress (`install`).
     job: Option<(Receiver<Result<install::Outcome, String>>, Arc<install::Progress>)>,
@@ -561,11 +561,11 @@ pub fn tick(app: &mut SolveApp, ctx: &egui::Context) {
         #[cfg(not(target_arch = "wasm32"))]
         {
             install::clean_up_after_update(std::env::current_exe().ok().as_deref());
-            if std::env::var("SOLIDCRAFT_UPDATE_CHECK").is_ok_and(|v| v == "0") {
+            if std::env::var("POLYKROM_UPDATE_CHECK").is_ok_and(|v| v == "0") {
                 app.updater.off = true;
                 return;
             }
-            app.updater.feed = std::env::var_os("SOLIDCRAFT_UPDATE_FEED").map(PathBuf::from);
+            app.updater.feed = std::env::var_os("POLYKROM_UPDATE_FEED").map(PathBuf::from);
         }
     }
     poll(app);
@@ -691,7 +691,7 @@ pub fn start_install(app: &mut SolveApp, ctx: &egui::Context) {
     #[cfg(not(target_arch = "wasm32"))]
     {
         let ctx = ctx.clone();
-        let staging = std::env::temp_dir().join("solidcraft-update");
+        let staging = std::env::temp_dir().join("polykrom-update");
         let net = install::Net { get, download };
         let spawned = std::thread::Builder::new().name("update-install".into()).spawn(move || {
             let result = install::run(&release, &kind, &method, std::env::consts::ARCH, &net, &staging, &progress);

@@ -332,7 +332,7 @@ fn redefine_rejects_sheet_exports_before_they_touch_any_files() {
     run(&mut s, "sketch.finish", json!({}));
     run(&mut s, "sheet.flange", json!({"name": "Plate"}));
     let doc = s.doc.clone();
-    let base = std::env::temp_dir().join(format!("solidcraft-redefine-export-{}", std::process::id()));
+    let base = std::env::temp_dir().join(format!("polykrom-redefine-export-{}", std::process::id()));
     std::fs::create_dir_all(&base).unwrap();
     for command in ["sheet.export_dxf", "sheet.export_bend_table"] {
         for existing in [false, true] {

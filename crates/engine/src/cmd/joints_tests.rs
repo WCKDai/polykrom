@@ -991,7 +991,7 @@ fn a_part_at_a_dead_point_of_its_loop_keeps_its_mobility() {
 
 /// A design file path in a fresh temporary folder (removed by the caller).
 fn temp_design(tag: &str, ext: &str) -> (std::path::PathBuf, String) {
-    let dir = std::env::temp_dir().join(format!("solidcraft-joint-visibility-{tag}-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("polykrom-joint-visibility-{tag}-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
     let path = dir.join(format!("design.{ext}")).to_string_lossy().to_string();
@@ -1268,7 +1268,7 @@ fn a_link_offset_is_in_the_linked_values_units() {
     assert!((s.doc.assembly.links[0].offset - 10f64.to_radians()).abs() < 1e-12);
     // A design saved before offsets took degrees stored 0.1 rad, and opens turning Gear 5.73° past Dial.
     s.doc_mut().assembly.links[0].offset = 0.1;
-    let (dir, path) = temp_design("link-offset", "solidcraft");
+    let (dir, path) = temp_design("link-offset", "polykrom");
     run(&mut s, "file.save", json!({"path": path}));
     run(&mut s, "file.new", json!({}));
     run(&mut s, "doc.open", json!({"path": path}));

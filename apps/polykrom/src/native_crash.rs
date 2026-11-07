@@ -232,11 +232,11 @@ mod tests {
     /// The child half: install crash reporting and the filter, then fault in native code.
     #[test]
     fn child() {
-        let Some(dir) = std::env::var_os("SOLIDCRAFT_NATIVE_CRASH_CHILD") else { return };
+        let Some(dir) = std::env::var_os("POLYKROM_NATIVE_CRASH_CHILD") else { return };
         let build = polykrom_engine::crash::Build { version: "9.9.9", commit: "abc1234", built: "2026-10-14" };
         let fresh = polykrom_engine::crash::install(PathBuf::from(dir), build);
         println!("FRESH {}", serde_json::to_string(&fresh).unwrap_or_default());
-        if std::env::var_os("SOLIDCRAFT_NATIVE_CRASH_FAULT").is_none() {
+        if std::env::var_os("POLYKROM_NATIVE_CRASH_FAULT").is_none() {
             polykrom_engine::crash::end_session();
             return;
         }
@@ -250,16 +250,16 @@ mod tests {
 
     fn run(dir: &std::path::Path, fault: bool) -> std::process::Output {
         let mut c = std::process::Command::new(std::env::current_exe().unwrap());
-        c.args(["--exact", "native_crash::tests::child", "--test-threads=1", "--nocapture"]).env("SOLIDCRAFT_NATIVE_CRASH_CHILD", dir);
+        c.args(["--exact", "native_crash::tests::child", "--test-threads=1", "--nocapture"]).env("POLYKROM_NATIVE_CRASH_CHILD", dir);
         if fault {
-            c.env("SOLIDCRAFT_NATIVE_CRASH_FAULT", "1");
+            c.env("POLYKROM_NATIVE_CRASH_FAULT", "1");
         }
         c.output().unwrap()
     }
 
     #[test]
     fn an_access_violation_is_reported_with_its_module_step_and_minidump() {
-        let dir = std::env::temp_dir().join(format!("solidcraft-native-crash-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("polykrom-native-crash-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         let out = run(&dir, true);
         assert_eq!(out.status.code().map(|c| c as u32), Some(super::STATUS_ACCESS_VIOLATION), "{out:?}");
@@ -268,7 +268,7 @@ mod tests {
         let v: serde_json::Value = serde_json::from_slice(&std::fs::read(info).unwrap()).unwrap();
         assert_eq!(v["code"], "0xC0000005", "{v}");
         assert_eq!(v["detail"], "read of 0x0000000000000010", "{v}");
-        assert!(v["module"].as_str().unwrap().to_lowercase().contains("solidcraft"), "the fault is in the test binary: {v}");
+        assert!(v["module"].as_str().unwrap().to_lowercase().contains("polykrom"), "the fault is in the test binary: {v}");
         let dump = sessions.iter().find(|p| p.extension().is_some_and(|e| e == "dmp")).expect("a minidump");
         assert_eq!(std::fs::read(dump).unwrap().get(..4), Some(&b"MDMP"[..]));
         // The next start reports it.
@@ -277,7 +277,7 @@ mod tests {
         let reports = polykrom_engine::crash::list(&dir);
         assert_eq!(reports.len(), 1, "{reports:?}");
         let r = polykrom_engine::crash::read(&dir, &reports[0].id).unwrap();
-        assert!(r["message"].as_str().unwrap().contains("EXCEPTION_ACCESS_VIOLATION (0xC0000005) in solidcraft"), "{r}");
+        assert!(r["message"].as_str().unwrap().contains("EXCEPTION_ACCESS_VIOLATION (0xC0000005) in polykrom"), "{r}");
         assert!(r["message"].as_str().unwrap().contains("during startup (device creation"), "{r}");
         assert!(r.get("minidump_path").is_some(), "{r}");
         let _ = std::fs::remove_dir_all(&dir);

@@ -2025,7 +2025,7 @@ pub fn tessellation(adapter: &wgpu::Adapter, device: &wgpu::Device, queue: &wgpu
         return None;
     }
     let info = adapter.get_info();
-    if hangs_on_gpu_tessellation(info.backend, &info.name) || std::env::var_os("SOLIDCRAFT_CPU_TESS").is_some() {
+    if hangs_on_gpu_tessellation(info.backend, &info.name) || std::env::var_os("POLYKROM_CPU_TESS").is_some() {
         log::warn!("bodies are built on the CPU on {} ({:?})", info.name, info.backend);
         return None;
     }
@@ -2040,7 +2040,7 @@ pub fn tessellation(adapter: &wgpu::Adapter, device: &wgpu::Device, queue: &wgpu
 
 /// A device whose driver hangs on the evaluation shader, so bodies are built on the CPU there:
 /// the AMD FirePro D300/D500/D700 (Mac Pro 2013, Tahiti) under Metal, where macOS resets the GPU
-/// and the whole desktop freezes. `SOLIDCRAFT_CPU_TESS=1` forces CPU evaluation on any device.
+/// and the whole desktop freezes. `POLYKROM_CPU_TESS=1` forces CPU evaluation on any device.
 pub fn hangs_on_gpu_tessellation(backend: wgpu::Backend, name: &str) -> bool {
     backend == wgpu::Backend::Metal && name.contains("FirePro")
 }

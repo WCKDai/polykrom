@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Polykrom MSI (WiX Toolset v5, plus the UI and Util extensions). Built by package.ps1:
+
+    wix build polykrom.wxs -arch x64 -ext WixToolset.UI.wixext -ext WixToolset.Util.wixext
+      -culture en-US -loc polykrom.en-us.wxl -d Version=1.2.3 -d DisplayVersion=1.2.3-rc.1
+      -d BinDir=... -d IconPath=... -o out.msi
+
+  Per-machine install with a setup wizard: Welcome, install folder (Program Files\Polykrom by
+  default, remembered for upgrades), Ready, progress, and a Finish page with a ticked "Launch
+  Polykrom" box. Installs a Start Menu shortcut, polykrom-cli, the licence files (including
+  THIRD-PARTY-LICENSES.txt), makes Polykrom the owner of `.polykrom` (and of SolidCraft's
+  `.solidcraft` and `.solvecraft`, which open as the same design type), and offers it under
+  "Open with" for STEP, IGES, 3MF and STL. `msiexec /qn` installs silently.
+  Adapted from PhotoCraft's (storytold/photocraft, Apache-2.0; see ATTRIBUTION.md).
+-->
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
+  <!-- Never change the UpgradeCode: it is what lets a new MSI replace every earlier Polykrom
+       install. It is Polykrom's own (new with the Polykrom identity, before the first stable
+       release), so it shares nothing with SolidCraft's installer. -->
+  <Package
+      Name="Polykrom"
+      Manufacturer="Polykrom contributors"
+      Version="$(var.Version)"
+      UpgradeCode="7B3F5C2E-9A41-4D8C-B6E0-2F1A8C9D4E57"
+      Scope="perMachine"
+      Compressed="yes"
+      Language="1033">
+    <SummaryInformation Description="Polykrom parametric 3D CAD" Manufacturer="Polykrom contributors" />
+    <!-- Same-version upgrades let successive pre-releases of one X.Y.Z replace each other. -->
+    <MajorUpgrade AllowSameVersionUpgrades="yes"
+        DowngradeErrorMessage="A newer version of Polykrom is already installed." />
+    <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
+
+    <!-- Advertised shortcuts to an .exe need an .exe icon identifier (ICE50). -->
+    <Icon Id="PolykromIcon.exe" SourceFile="$(var.IconPath)" />
+    <Property Id="ARPPRODUCTICON" Value="PolykromIcon.exe" />
+    <Property Id="ARPURLINFOABOUT" Value="https://polykrom.app/" />
+    <Property Id="ARPURLUPDATEINFO" Value="https://github.com/WCKDai/polykrom/releases" />
+    <Property Id="ARPHELPLINK" Value="https://github.com/WCKDai/polykrom/issues" />
+
+    <StandardDirectory Id="ProgramFiles6432Folder">
+      <Directory Id="INSTALLFOLDER" Name="Polykrom" />
+    </StandardDirectory>
+    <StandardDirectory Id="ProgramMenuFolder" />
+
+    <!-- An upgrade installs where the user put the previous version (written by PolykromApp;
+         the in-app update check reads the same key, crates/ui-egui/src/update.rs). -->
+    <Property Id="INSTALLFOLDER">
+      <RegistrySearch Id="PreviousInstallFolder" Root="HKLM" Key="Software\Polykrom" Name="InstallDir" Type="raw" />
+    </Property>
+
+    <Feature Id="Main" Title="Polykrom" Level="1">
+      <ComponentGroupRef Id="PolykromFiles" />
+    </Feature>
+
+    <!-- WixUI_InstallDir without its licence page (MIT OR Apache-2.0: nothing to accept). -->
+    <ui:WixUI Id="WixUI_InstallDir" InstallDirectory="INSTALLFOLDER" />
+    <UI>
+      <Publish Dialog="WelcomeDlg" Control="Next" Event="NewDialog" Value="InstallDirDlg" Order="2" Condition="NOT Installed" />
+      <Publish Dialog="InstallDirDlg" Control="Back" Event="NewDialog" Value="WelcomeDlg" Order="2" />
+      <Publish Dialog="ExitDialog" Control="Finish" Event="DoAction" Value="LaunchPolykrom"
+          Condition="WIXUI_EXITDIALOGOPTIONALCHECKBOX = 1 AND NOT Installed" />
+    </UI>
+
+    <Property Id="PolykromVersion" Value="$(var.DisplayVersion)" />
+    <Property Id="WIXUI_EXITDIALOGOPTIONALTEXT" Value="Polykrom $(var.DisplayVersion) is installed. You can start it any time from the Start menu." />
+    <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT" Value="Launch Polykrom" />
+    <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOX" Value="1" />
+    <Property Id="WixShellExecTarget" Value="[#PolykromExe]" />
+    <!-- Runs in the wizard's own (unelevated) process, so the app starts as the user. -->
+    <CustomAction Id="LaunchPolykrom" BinaryRef="Wix4UtilCA_$(sys.BUILDARCHSHORT)" DllEntry="WixShellExec" Impersonate="yes" Return="ignore" />
+  </Package>
+
+  <Fragment>
+    <ComponentGroup Id="PolykromFiles" Directory="INSTALLFOLDER">
+      <!-- The component GUID belongs to its key file, polykrom.exe. -->
+      <Component Id="PolykromApp" Guid="1E181CCC-3314-4E51-A7BD-9C2028AF7FFD">
+        <File Id="PolykromExe" Source="$(var.BinDir)\polykrom.exe" KeyPath="yes">
+          <Shortcut Id="StartMenuShortcut" Directory="ProgramMenuFolder" Name="Polykrom"
+              Description="Polykrom parametric 3D CAD" WorkingDirectory="INSTALLFOLDER" Advertise="yes"
+              Icon="PolykromIcon.exe" IconIndex="0" />
+        </File>
+
+        <!-- .polykrom: Polykrom's own format; Polykrom is its default app. -->
+        <ProgId Id="Polykrom.Design" Description="Polykrom Design" Icon="PolykromExe" IconIndex="0">
+          <Extension Id="polykrom" ContentType="application/x-polykrom">
+            <Verb Id="open" Command="Open" TargetFile="PolykromExe" Argument="&quot;%1&quot;" />
+          </Extension>
+        </ProgId>
+        <!-- SolidCraft's .solidcraft and its earliest releases' .solvecraft (docs/compatibility.md)
+             open as the same ProgId. Registered by hand: a second Extension under one ProgId would
+             write its open verb twice (WIX0091). -->
+        <RegistryValue Root="HKLM" Key="Software\Classes\.solidcraft" Value="Polykrom.Design" Type="string" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\.solidcraft" Name="Content Type" Value="application/x-solidcraft" Type="string" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\.solvecraft" Value="Polykrom.Design" Type="string" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\.solvecraft" Name="Content Type" Value="application/x-solvecraft" Type="string" />
+        <!-- STEP, IGES and meshes: offered under "Open with", never forced as the default. -->
+        <ProgId Id="Polykrom.Model" Description="3D model" Icon="PolykromExe" IconIndex="0" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\Polykrom.Model\shell\open\command" Value="&quot;[#PolykromExe]&quot; &quot;%1&quot;" Type="string" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\.step\OpenWithProgids" Name="Polykrom.Model" Value="" Type="string" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\.stp\OpenWithProgids" Name="Polykrom.Model" Value="" Type="string" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\.igs\OpenWithProgids" Name="Polykrom.Model" Value="" Type="string" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\.iges\OpenWithProgids" Name="Polykrom.Model" Value="" Type="string" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\.3mf\OpenWithProgids" Name="Polykrom.Model" Value="" Type="string" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\.stl\OpenWithProgids" Name="Polykrom.Model" Value="" Type="string" />
+
+        <!-- "Open with" app list and the Run dialog (Win+R "polykrom"). -->
+        <RegistryValue Root="HKLM" Key="Software\Classes\Applications\polykrom.exe" Name="FriendlyAppName" Value="Polykrom" Type="string" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\Applications\polykrom.exe\shell\open\command" Value="&quot;[#PolykromExe]&quot; &quot;%1&quot;" Type="string" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\Applications\polykrom.exe\SupportedTypes" Name=".polykrom" Value="" Type="string" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\Applications\polykrom.exe\SupportedTypes" Name=".solidcraft" Value="" Type="string" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\Applications\polykrom.exe\SupportedTypes" Name=".solvecraft" Value="" Type="string" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\Applications\polykrom.exe\SupportedTypes" Name=".step" Value="" Type="string" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\Applications\polykrom.exe\SupportedTypes" Name=".stp" Value="" Type="string" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\Applications\polykrom.exe\SupportedTypes" Name=".igs" Value="" Type="string" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\Applications\polykrom.exe\SupportedTypes" Name=".iges" Value="" Type="string" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\Applications\polykrom.exe\SupportedTypes" Name=".3mf" Value="" Type="string" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\Applications\polykrom.exe\SupportedTypes" Name=".stl" Value="" Type="string" />
+        <RegistryValue Root="HKLM" Key="Software\Microsoft\Windows\CurrentVersion\App Paths\polykrom.exe" Value="[#PolykromExe]" Type="string" />
+        <RegistryValue Root="HKLM" Key="Software\Polykrom" Name="InstallDir" Value="[INSTALLFOLDER]" Type="string" />
+      </Component>
+
+      <Component Id="PolykromCli">
+        <File Id="PolykromCliExe" Source="$(var.BinDir)\polykrom-cli.exe" KeyPath="yes" />
+      </Component>
+      <!-- Several unversioned files: an explicit GUID (WIX0367). -->
+      <Component Id="PolykromLicences" Guid="CDEDEE8D-4BE9-4872-A2EA-EE623A6C7E91">
+        <File Id="LicenseMit" Source="$(var.BinDir)\LICENSE-MIT" KeyPath="yes" />
+        <File Id="LicenseApache" Source="$(var.BinDir)\LICENSE-APACHE" />
+        <File Id="Notice" Source="$(var.BinDir)\NOTICE" />
+        <File Id="ThirdParty" Source="$(var.BinDir)\THIRD-PARTY-LICENSES.txt" />
+      </Component>
+    </ComponentGroup>
+  </Fragment>
+</Wix>

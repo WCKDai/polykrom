@@ -496,7 +496,7 @@ fn instance_styles_follow_source_identity_after_collision_rename_and_pending_mov
 
 /// A design file path in a fresh temporary folder (removed by the caller).
 fn temp_design(tag: &str, ext: &str) -> (std::path::PathBuf, String) {
-    let dir = std::env::temp_dir().join(format!("solidcraft-visibility-{tag}-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("polykrom-visibility-{tag}-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
     let path = dir.join(format!("design.{ext}")).to_string_lossy().to_string();
@@ -508,7 +508,7 @@ fn temp_design(tag: &str, ext: &str) -> (std::path::PathBuf, String) {
 /// unsaved changes, and showing it again is saved the same way.
 #[test]
 fn hidden_placements_and_bodies_are_saved_with_the_design_but_not_undone() {
-    let (dir, path) = temp_design("saved", "solidcraft");
+    let (dir, path) = temp_design("saved", "polykrom");
     let mut s = Session::default();
     run(&mut s, "solid.box", json!({"length":4,"width":4,"height":4,"body_name":"Base"}));
     let (component, first) = created(&mut s, "Part");
@@ -587,7 +587,7 @@ fn saved_box_design(path: &std::path::Path, height: f64) {
 
 #[test]
 fn a_linked_design_brings_its_bodies_in_and_follows_edits_to_the_part_file() {
-    let dir = std::env::temp_dir().join(format!("solidcraft-linked-design-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("polykrom-linked-design-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     let part = dir.join("plate.solidcraft");
     // Given a part saved in its own design: a 10 x 20 x 30 plate.
@@ -675,7 +675,7 @@ fn matrix_move_turns_a_quarter_and_moves() {
 /// one piece instead of starting a body of the root's own.
 #[test]
 fn a_stood_up_nested_step_part_is_cut_and_joined_from_its_face() {
-    let dir = std::env::temp_dir().join(format!("solidcraft-nested-stood-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("polykrom-nested-stood-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     let path = dir.join("nested.step");
     let mut src = Session::default();

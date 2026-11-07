@@ -43,7 +43,7 @@ fn view_dxf_cancellation_at_each_stage_preserves_the_destination_and_document() 
             }
         }
     }
-    let dir = std::env::temp_dir().join(format!("solidcraft-dxf-cancel-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("polykrom-dxf-cancel-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     let path = dir.join("drawing.dxf");
     let mut s = sample();

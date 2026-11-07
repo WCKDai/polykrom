@@ -24,11 +24,8 @@ pub const OPFS: &str = disk::OPFS_PREFIX;
 pub const DOWNLOADS: &str = disk::DOWNLOADS_PREFIX;
 /// Files brought in from the computer.
 pub const UPLOAD: &str = "/upload/";
-/// The autosave of unsaved work (in OPFS: `recovery.solidcraft` and `recovery.json`).
-const RECOVERY: &str = "recovery.solidcraft";
-/// The autosave earlier releases kept (compatibility shim, docs/compatibility.md): recovered
-/// when there is no current one.
-const LEGACY_RECOVERY: &str = "recovery.solvecraft";
+/// The autosave of unsaved work (in OPFS: `recovery.polykrom` and `recovery.json`).
+const RECOVERY: &str = "recovery.polykrom";
 const RECOVERY_META: &str = "recovery.json";
 
 /// What to do with a file brought in from the computer.
@@ -108,10 +105,7 @@ thread_local! {
 }
 
 /// Local storage keys of stored files.
-const LOCAL_PREFIX: &str = "solidcraft.file.";
-/// Local-storage files kept by earlier releases (compatibility shim, docs/compatibility.md):
-/// still listed and opened; removing one removes either key.
-const LEGACY_LOCAL_PREFIX: &str = "solvecraft.file.";
+const LOCAL_PREFIX: &str = "polykrom.file.";
 
 fn local() -> Result<web_sys::Storage, String> {
     web_sys::window().and_then(|w| w.local_storage().ok().flatten()).ok_or_else(|| "this browser keeps no local storage".to_string())
@@ -201,9 +195,7 @@ async fn write_file(name: &str, bytes: &[u8]) -> Result<(), String> {
 
 async fn remove_file(name: &str) -> Result<(), String> {
     if local_only() {
-        let st = local()?;
-        st.remove_item(&format!("{LEGACY_LOCAL_PREFIX}{name}")).map_err(err)?;
-        return st.remove_item(&format!("{LOCAL_PREFIX}{name}")).map_err(err);
+        return local()?.remove_item(&format!("{LOCAL_PREFIX}{name}")).map_err(err);
     }
     let dir = root().await?;
     JsFuture::from(dir.remove_entry(name)).await.map_err(err)?;
@@ -216,7 +208,7 @@ fn read_local() -> Result<Vec<(String, Vec<u8>, f64)>, String> {
     let mut out = Vec::new();
     for i in 0..st.length().unwrap_or(0).min(10_000) {
         let Some(k) = st.key(i).ok().flatten() else { continue };
-        let Some(name) = k.strip_prefix(LOCAL_PREFIX).or_else(|| k.strip_prefix(LEGACY_LOCAL_PREFIX)) else { continue };
+        let Some(name) = k.strip_prefix(LOCAL_PREFIX) else { continue };
         if let Some(v) = st.get_item(&k).ok().flatten() {
             out.push((name.to_string(), decode(&v), 0.0));
         }
@@ -281,14 +273,7 @@ pub fn start(files: &Rc<Files>) {
                     files.say("This page can't use the browser's file storage (it needs https or localhost): designs are kept in local storage, a few MB at most.", false);
                 }
                 let mut entries = Vec::new();
-                let has_recovery = all.iter().any(|(n, _, _)| n == RECOVERY);
                 for (name, bytes, modified) in all {
-                    if name == LEGACY_RECOVERY {
-                        if !has_recovery {
-                            vfs::insert(&format!("{OPFS}{RECOVERY}"), bytes);
-                        }
-                        continue;
-                    }
                     if name == RECOVERY_META {
                         let meta: serde_json::Value = serde_json::from_slice(&bytes).unwrap_or_default();
                         let n = meta["name"].as_str().unwrap_or("Untitled").to_string();
@@ -424,7 +409,6 @@ pub fn autosave(files: &Rc<Files>, doc: Option<(&polykrom_engine::doc::Document,
         }
         None => spawn_local(async move {
             let _ = remove_file(RECOVERY).await;
-            let _ = remove_file(LEGACY_RECOVERY).await;
             let _ = remove_file(RECOVERY_META).await;
         }),
     }

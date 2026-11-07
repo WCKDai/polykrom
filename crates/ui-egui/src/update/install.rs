@@ -11,8 +11,8 @@
 //! - AppImage: the new AppImage is written next to the old one and renamed over it (atomic on
 //!   one file system; the running copy keeps its old inode), then Polykrom offers a restart.
 //! - Windows installer: the `.msi` is started with `msiexec /i … /passive` as Polykrom exits.
-//! - Windows portable `.zip` / standalone `.exe`: the running `solidcraft.exe` is renamed to
-//!   `solidcraft.exe.old` (Windows allows renaming a running executable), the new one takes its
+//! - Windows portable `.zip` / standalone `.exe`: the running `polykrom.exe` is renamed to
+//!   `polykrom.exe.old` (Windows allows renaming a running executable), the new one takes its
 //!   name, and Polykrom offers a restart; the `.old` file is deleted at the next start.
 //! - macOS: the `.dmg` is verified and opened; the user drags the app to Applications. Polykrom
 //!   is ad-hoc signed and not notarized, so replacing the bundle in place would install code the
@@ -231,8 +231,8 @@ pub fn apply(method: &Method, package: &Path) -> Result<Outcome, String> {
         }
         Method::PortableZip(exe) => {
             let dir = exe.parent().ok_or_else(|| format!("{} has no folder", exe.display()))?;
-            let name = exe.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_else(|| "solidcraft.exe".into());
-            let files = [name.as_str(), "solidcraft-cli.exe"];
+            let name = exe.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_else(|| "polykrom.exe".into());
+            let files = [name.as_str(), "polykrom-cli.exe"];
             let mut extracted = Vec::new();
             for file in files {
                 let to = dir.join(format!("{file}.update"));
@@ -325,9 +325,9 @@ fn make_executable(_: &Path) -> Result<(), String> {
     Ok(())
 }
 
-/// At start: delete the executable a previous update moved aside (`solidcraft.exe.old`).
+/// At start: delete the executable a previous update moved aside (`polykrom.exe.old`).
 pub fn clean_up_after_update(exe: Option<&Path>) {
-    for file in [exe.map(Path::to_path_buf), exe.and_then(|e| e.parent()).map(|d| d.join("solidcraft-cli.exe"))].into_iter().flatten() {
+    for file in [exe.map(Path::to_path_buf), exe.and_then(|e| e.parent()).map(|d| d.join("polykrom-cli.exe"))].into_iter().flatten() {
         if let Ok(old) = sibling(&file, ".old")
             && old.exists()
         {

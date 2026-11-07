@@ -249,7 +249,7 @@ mod tests {
     /// A STEP file of three boxes at x = 0, 30 and 60. With `shared` the three solids carry one
     /// label (`X`), as the parts of many assembly files do; otherwise each has its own.
     fn three_box_step(tag: &str, shared: bool) -> std::path::PathBuf {
-        let dir = std::env::temp_dir().join(format!("solidcraft-paste-{tag}-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("polykrom-paste-{tag}-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         let mut s = Session::default();
         for (i, label) in ["Aa", "Bb", "Cc"].iter().enumerate() {
@@ -271,7 +271,7 @@ mod tests {
 
     /// An OBJ file of three 10 mm cubes at x = 0, 30 and 60, every object called `X`.
     fn three_cube_obj(tag: &str) -> std::path::PathBuf {
-        let dir = std::env::temp_dir().join(format!("solidcraft-paste-{tag}-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("polykrom-paste-{tag}-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         let corners = [[0, 0, 0], [1, 0, 0], [1, 1, 0], [0, 1, 0], [0, 0, 1], [1, 0, 1], [1, 1, 1], [0, 1, 1]];
         let faces =

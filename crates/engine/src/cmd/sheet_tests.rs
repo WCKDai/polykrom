@@ -2074,7 +2074,7 @@ fn retained_depth_check(s: &mut Session, want: f64, z0: f64, z1: f64) {
 }
 
 fn depth_step_reopen(s: &mut Session, suffix: &str, want: f64, inside: polycore_geom::Vec3, outside: polycore_geom::Vec3) {
-    let path = std::env::temp_dir().join(format!("solidcraft-depth-intersect-{suffix}-{}.step", std::process::id()));
+    let path = std::env::temp_dir().join(format!("polykrom-depth-intersect-{suffix}-{}.step", std::process::id()));
     run(s, "file.export", json!({"path":path.to_string_lossy()}));
     let mut imported = Session::default();
     run(&mut imported, "doc.open", json!({"path":path.to_string_lossy()}));
@@ -2478,7 +2478,7 @@ fn partial_depth_intersect_curved_to_object_preserves_current_trimmed_cap_footpr
     run(&mut outline_import, "solid.extrude", json!({"distance":1,"profiles":[{"point":[21,21]}]}));
     assert!((volume(&mut outline_import) - (100.0 - 4.0 * std::f64::consts::PI)).abs() < 0.01);
     assert!(!outline_import.model.state().bodies[0].body.contains(Vec3::new(25.0, 25.0, 0.5)));
-    let path = std::env::temp_dir().join(format!("solidcraft-current-trim-cap-{}.step", std::process::id()));
+    let path = std::env::temp_dir().join(format!("polykrom-current-trim-cap-{}.step", std::process::id()));
     run(&mut s, "file.export", json!({"path":path.to_string_lossy(),"bodies":[name]}));
     let mut imported = Session::default();
     run(&mut imported, "doc.open", json!({"path":path.to_string_lossy()}));

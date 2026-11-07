@@ -1,6 +1,6 @@
 //! Autosave and crash recovery.
 //!
-//! Each open design keeps its own recovery entry in the recovery folder: `<id>.solidcraft` (the design
+//! Each open design keeps its own recovery entry in the recovery folder: `<id>.polykrom` (the design
 //! as of the last autosave), `<id>.json` (its file path, name and time) and `<id>.lock`, which
 //! the app holds locked while it runs. Autosaves are written atomically, only when the design
 //! has unsaved changes it hasn't written yet; a design with nothing unsaved has no entry. An
@@ -17,16 +17,16 @@ use serde::{Deserialize, Serialize};
 
 use crate::{EngineError, Result, Session};
 
-/// The recovery folder: `SOLIDCRAFT_RECOVERY_DIR`, else the platform's per-user data folder.
+/// The recovery folder: `POLYKROM_RECOVERY_DIR`, else the platform's per-user data folder.
 /// Spelled with long names (`vfs::long_names`): an agent's commands reach it by this path, and
 /// short (8.3) names are refused there.
 pub fn default_dir() -> Option<PathBuf> {
     use polykrom_io::vfs::long_names;
     // Tests never touch the user's real recovery folder.
     if cfg!(test) {
-        return Some(polykrom_io::vfs::temp_dir().join(format!("solidcraft-test-recovery-{}", std::process::id())));
+        return Some(polykrom_io::vfs::temp_dir().join(format!("polykrom-test-recovery-{}", std::process::id())));
     }
-    if let Some(d) = polycore_geom::env::var_os("RECOVERY_DIR").filter(|d| !d.is_empty()) {
+    if let Some(d) = crate::env::var_os("RECOVERY_DIR").filter(|d| !d.is_empty()) {
         return Some(long_names(Path::new(&d)));
     }
     let env = |k: &str| std::env::var_os(k).filter(|d| !d.is_empty()).map(PathBuf::from);
@@ -37,38 +37,28 @@ pub fn default_dir() -> Option<PathBuf> {
     } else {
         env("XDG_DATA_HOME").or_else(|| env("HOME").map(|h| h.join(".local/share")))?
     };
-    let (dir, legacy) = dirs_under(&long_names(&root), cfg!(windows) || cfg!(target_os = "macos"));
-    // Compatibility shim (docs/compatibility.md): autosaves made before the rename (or, in the
-    // Flatpak sandbox, under the old app id) are copied to the new folder on first launch; the
-    // old folder is left as it was.
-    for old in polykrom_io::legacy_flatpak_path(&dir).into_iter().chain([legacy]) {
-        if let Err(e) = polykrom_io::adopt_legacy_dir(&dir, &old) {
-            log::warn!("recovery: could not copy {} to {}: {e}", old.display(), dir.display());
-        }
-    }
-    Some(dir)
+    Some(dir_under(&long_names(&root), cfg!(windows) || cfg!(target_os = "macos")))
 }
 
 /// Polykrom's per-user data folder (the recovery folder's parent unless
-/// `SOLIDCRAFT_RECOVERY_DIR` moves that): `%LOCALAPPDATA%\SolidCraft`,
-/// `~/Library/Application Support/SolidCraft`, or `$XDG_DATA_HOME/solidcraft`
-/// (`~/.local/share/solidcraft`).
+/// `POLYKROM_RECOVERY_DIR` moves that): `%LOCALAPPDATA%\Polykrom`,
+/// `~/Library/Application Support/Polykrom`, or `$XDG_DATA_HOME/polykrom`
+/// (`~/.local/share/polykrom`).
 pub fn data_dir() -> Option<PathBuf> {
     let env = |k: &str| std::env::var_os(k).filter(|d| !d.is_empty()).map(PathBuf::from);
     if cfg!(windows) {
-        Some(env("LOCALAPPDATA")?.join("SolidCraft"))
+        Some(env("LOCALAPPDATA")?.join(polykrom_io::DATA_DIR_TITLE))
     } else if cfg!(target_os = "macos") {
-        Some(env("HOME")?.join("Library/Application Support/SolidCraft"))
+        Some(env("HOME")?.join("Library/Application Support").join(polykrom_io::DATA_DIR_TITLE))
     } else {
-        Some(env("XDG_DATA_HOME").or_else(|| env("HOME").map(|h| h.join(".local/share")))?.join("solidcraft"))
+        Some(env("XDG_DATA_HOME").or_else(|| env("HOME").map(|h| h.join(".local/share")))?.join(polykrom_io::DATA_DIR_LOWER))
     }
 }
 
-/// The recovery folder under the per-user data `root`, and the folder earlier releases used.
-/// Windows and macOS name the app's folder in title case, other systems in lower case.
-fn dirs_under(root: &Path, title_case: bool) -> (PathBuf, PathBuf) {
-    let (name, legacy) = if title_case { ("SolidCraft", "SolveCraft") } else { ("solidcraft", "solvecraft") };
-    (root.join(name).join("recovery"), root.join(legacy).join("recovery"))
+/// The recovery folder under the per-user data `root`. Windows and macOS name the app's folder
+/// in title case, other systems in lower case.
+fn dir_under(root: &Path, title_case: bool) -> PathBuf {
+    root.join(if title_case { polykrom_io::DATA_DIR_TITLE } else { polykrom_io::DATA_DIR_LOWER }).join("recovery")
 }
 
 /// What an entry's `<id>.json` holds.
@@ -91,14 +81,9 @@ fn valid_id(id: &str) -> bool {
     !id.is_empty() && id.len() <= 64 && id.chars().all(|c| c.is_ascii_alphanumeric() || c == '-')
 }
 
-/// An entry's design: `<id>.polykrom`, or an autosave written under an earlier extension
-/// (`.solidcraft`, `.solvecraft`; compatibility shim, docs/compatibility.md).
+/// An entry's design: `<id>.polykrom`.
 fn design_file(dir: &Path, id: &str) -> PathBuf {
-    let current = file(dir, id, polykrom_io::DESIGN_EXT);
-    if current.is_file() {
-        return current;
-    }
-    polykrom_io::DESIGN_EXTS.iter().map(|ext| file(dir, id, ext)).find(|f| f.is_file()).unwrap_or(current)
+    file(dir, id, polykrom_io::DESIGN_EXT)
 }
 
 fn file(dir: &Path, id: &str, ext: &str) -> PathBuf {
@@ -151,7 +136,7 @@ pub fn load(dir: &Path, id: &str) -> Result<(Document, Entry)> {
 }
 
 /// Delete an entry. Only a real one: `<id>.json` must describe entry `id` and its design must
-/// be there, so a folder and id that merely name someone's `part.solidcraft` delete nothing.
+/// be there, so a folder and id that merely name someone's `part.polykrom` delete nothing.
 pub fn remove(dir: &Path, id: &str) -> Result<()> {
     let is_entry = valid_id(id)
         && fs::read(file(dir, id, "json")).ok().and_then(|b| serde_json::from_slice::<Entry>(&b).ok()).is_some_and(|e| e.id == id)
@@ -159,7 +144,7 @@ pub fn remove(dir: &Path, id: &str) -> Result<()> {
     if !is_entry {
         return Err(EngineError::Other(format!("no recovered design `{id}`")));
     }
-    for ext in ["json", polykrom_io::DESIGN_EXT, polykrom_io::SOLIDCRAFT_DESIGN_EXT, polykrom_io::LEGACY_DESIGN_EXT, "lock"] {
+    for ext in ["json", polykrom_io::DESIGN_EXT, "lock"] {
         let _ = fs::remove_file(file(dir, id, ext));
     }
     Ok(())
@@ -322,7 +307,7 @@ impl Autosaver {
         self.last_at = Instant::now();
         if !s.is_dirty() {
             if self.has_entry {
-                for ext in ["json", polykrom_io::DESIGN_EXT, polykrom_io::SOLIDCRAFT_DESIGN_EXT] {
+                for ext in ["json", polykrom_io::DESIGN_EXT] {
                     let _ = fs::remove_file(file(&self.dir, &self.id, ext));
                 }
                 self.has_entry = false;
@@ -378,7 +363,7 @@ impl Autosaver {
         if let Some(w) = self.writing.take() {
             let _ = w.done.recv();
         }
-        for ext in ["json", polykrom_io::DESIGN_EXT, polykrom_io::SOLIDCRAFT_DESIGN_EXT] {
+        for ext in ["json", polykrom_io::DESIGN_EXT] {
             let _ = fs::remove_file(file(&self.dir, &self.id, ext));
         }
         self.lock = None;
@@ -398,37 +383,22 @@ impl Autosaver {
 
 #[cfg(test)]
 mod tests {
+    /// The recovery folder is Polykrom's own (PK-100): no other name is read or written.
     #[test]
-    fn autosave_from_a_legacy_folder_is_listed_and_loads() {
-        let d = std::env::temp_dir().join(format!("solidcraft-recovery-legacy-{}", std::process::id()));
-        let _ = fs::remove_dir_all(&d);
-        fs::create_dir_all(&d).unwrap();
-        let id = "1-2-3";
-        let doc = Document::default();
-        fs::write(d.join(format!("{id}.solvecraft")), polykrom_io::write_design(&doc)).unwrap();
-        let entry = Entry { id: id.into(), path: Some("/d/part.solvecraft".into()), name: "part".into(), saved_at: 1, features: 0 };
-        fs::write(d.join(format!("{id}.json")), serde_json::to_vec(&entry).unwrap()).unwrap();
-        assert_eq!(orphans(&d).iter().map(|e| e.id.as_str()).collect::<Vec<_>>(), [id]);
-        let (_, loaded) = load(&d, id).unwrap();
-        assert_eq!(loaded, entry);
-        remove(&d, id).unwrap();
-        assert!(orphans(&d).is_empty() && !d.join(format!("{id}.solvecraft")).exists());
-        let _ = fs::remove_dir_all(&d);
-    }
-
-    #[test]
-    fn recovery_dirs_and_their_legacy_names() {
-        let (dir, legacy) = super::dirs_under(Path::new("/data"), false);
-        assert_eq!((dir.as_path(), legacy.as_path()), (Path::new("/data/solidcraft/recovery"), Path::new("/data/solvecraft/recovery")));
-        let (dir, legacy) = super::dirs_under(Path::new("/data"), true);
-        assert_eq!((dir.as_path(), legacy.as_path()), (Path::new("/data/SolidCraft/recovery"), Path::new("/data/SolveCraft/recovery")));
+    fn recovery_dirs_say_polykrom() {
+        assert_eq!(super::dir_under(Path::new("/data"), false), Path::new("/data/polykrom/recovery"));
+        assert_eq!(super::dir_under(Path::new("/data"), true), Path::new("/data/Polykrom/recovery"));
+        for name in [polykrom_io::DATA_DIR_TITLE, polykrom_io::DATA_DIR_LOWER] {
+            let lower = name.to_ascii_lowercase();
+            assert!(!lower.contains("solidcraft") && !lower.contains("solvecraft"), "{name}");
+        }
     }
 
     use super::*;
     use serde_json::json;
 
     fn dir(tag: &str) -> PathBuf {
-        let d = std::env::temp_dir().join(format!("solidcraft-recovery-{tag}-{}", std::process::id()));
+        let d = std::env::temp_dir().join(format!("polykrom-recovery-{tag}-{}", std::process::id()));
         let _ = fs::remove_dir_all(&d);
         d
     }
@@ -535,7 +505,7 @@ mod tests {
     fn discarding_refuses_what_is_not_a_recovery_entry() {
         let d = dir("discard");
         fs::create_dir_all(&d).unwrap();
-        let part = d.join("part.solidcraft");
+        let part = d.join("part.polykrom");
         fs::write(&part, polykrom_io::write_design(&Document::default())).unwrap();
         let mut s = Session::default();
         let discard = |s: &mut Session, id: &str| s.execute("doc.recovery_discard", &json!({"dir": d.to_string_lossy(), "id": id}));
@@ -569,7 +539,7 @@ mod tests {
         let r = t.execute("doc.recover", &json!({"dir": d.to_string_lossy(), "id": id, "discard": true})).unwrap();
         assert_eq!(r["features"], 1, "{r}");
         assert!(orphans(&d).is_empty() && !file(&d, &id, "json").exists() && !file(&d, &id, polykrom_io::DESIGN_EXT).exists());
-        let part = d.join("part.solidcraft");
+        let part = d.join("part.polykrom");
         fs::write(&part, polykrom_io::write_design(&Document::default())).unwrap();
         assert!(t.execute("doc.recover", &json!({"dir": d.to_string_lossy(), "id": "part", "discard": true})).is_err());
         assert!(part.exists());

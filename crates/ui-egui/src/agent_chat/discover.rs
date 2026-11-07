@@ -685,10 +685,10 @@ mod tests {
         use super::super::process::{AgentProcess, FromAgent};
         use std::os::unix::fs::PermissionsExt;
 
-        const CHILD: &str = "SOLIDCRAFT_AGENT_PATH_TEST";
+        const CHILD: &str = "POLYKROM_AGENT_PATH_TEST";
         if let Some(root) = std::env::var_os(CHILD) {
             let root = PathBuf::from(root);
-            let agent = find_in("solidcraft-test-agent", &search_dirs()).unwrap();
+            let agent = find_in("polykrom-test-agent", &search_dirs()).unwrap();
             // Generous: the scripts start slowly on a machine busy with the rest of the suite.
             assert_eq!(version(&agent, Duration::from_secs(60)).as_deref(), Some("1.2.3"));
             let mut p = AgentProcess::spawn(&[agent.to_string_lossy().into_owned()], &root, &[], || {}).unwrap();
@@ -707,8 +707,8 @@ mod tests {
         let bin = root.join(".local/bin");
         std::fs::create_dir_all(&bin).unwrap();
         for (name, script) in [
-            ("solidcraft-test-agent", "#!/usr/bin/env solidcraft-test-runtime\n"),
-            ("solidcraft-test-runtime", "#!/bin/sh\nif [ \"$2\" = \"--version\" ]; then printf 'test-agent 1.2.3\\n'; else cat; fi\n"),
+            ("polykrom-test-agent", "#!/usr/bin/env polykrom-test-runtime\n"),
+            ("polykrom-test-runtime", "#!/bin/sh\nif [ \"$2\" = \"--version\" ]; then printf 'test-agent 1.2.3\\n'; else cat; fi\n"),
         ] {
             let path = bin.join(name);
             std::fs::write(&path, script).unwrap();

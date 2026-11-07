@@ -662,7 +662,7 @@ fn sketch_and_extrude_on_every_flat_face(s: &Session, dir: &std::path::Path, lab
 #[test]
 fn every_flat_face_of_one_sketch_extruded_up_and_down_takes_an_attached_sketch() {
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/action_matrix/designs");
-    let dir = std::env::temp_dir().join(format!("solidcraft-up-down-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("polykrom-up-down-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     let script: Value = serde_json::from_str(&std::fs::read_to_string(root.join("up-down-join.json")).unwrap()).unwrap();
     let mut s = Session::default();

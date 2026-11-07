@@ -133,7 +133,7 @@ fn a_copy_goes_beside_its_source_in_that_component() {
 /// keeps mirroring them (their copies vanished: the names led to the second insert's components).
 #[test]
 fn inserting_the_same_file_again_keeps_the_mirrored_copies() {
-    let dir = std::env::temp_dir().join(format!("solidcraft-mirror-placed-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("polykrom-mirror-placed-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     let file = dir.join("nested.step").to_string_lossy().replace('\\', "/");
     let mut s = Session::default();

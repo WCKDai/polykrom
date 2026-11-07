@@ -1,5 +1,5 @@
 //! `cargo xtask licences [--check]`: THIRD-PARTY-LICENSES.txt, the licences of every crate built
-//! into the shipped programs (solidcraft, solidcraft-cli, polykrom-web), read from
+//! into the shipped programs (polykrom, polykrom-cli, polykrom-web), read from
 //! `cargo metadata` and the crates' own licence files, and of every font the builds ship, as
 //! `assets/fonts/bundled.txt` lists them (the one list the builds are checked against,
 //! `crate::fonts`), with each font's copyright notice from the licence file beside it and its

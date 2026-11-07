@@ -83,7 +83,7 @@ pub fn short_name(pkg: &str) -> &str {
     // PolyCore's packages (#304): `polycore` is the kernel, `polycore-geom` the geometry crate.
     match pkg {
         "polycore" => "kernel",
-        _ => pkg.strip_prefix("polykrom-").or_else(|| pkg.strip_prefix("polycore-")).or_else(|| pkg.strip_prefix("solidcraft-")).unwrap_or(pkg),
+        _ => pkg.strip_prefix("polykrom-").or_else(|| pkg.strip_prefix("polycore-")).unwrap_or(pkg),
     }
 }
 
@@ -142,7 +142,7 @@ impl std::fmt::Display for Violation {
                 write!(f, "{krate}: standalone crate must not depend on workspace crate {dep}")
             }
             Violation::TestkitAsNormalDep { krate } => {
-                write!(f, "{krate}: solidcraft-testkit may only be a dev-dependency")
+                write!(f, "{krate}: polykrom-testkit may only be a dev-dependency")
             }
             Violation::UiBelowL5 { krate, dep, layer } => {
                 write!(f, "{krate} (L{layer}) depends on UI crate `{dep}`; UI toolkits are only allowed in L5+")
@@ -251,7 +251,7 @@ mod tests {
         let g = [
             c("polycore-geom", &[("kurbo", Normal, false)]),
             c("polykrom-doc", &[("polycore-geom", Normal, true)]),
-            c("polykrom-engine", &[("polykrom-doc", Normal, true), ("solidcraft-testkit", Dev, true)]),
+            c("polykrom-engine", &[("polykrom-doc", Normal, true), ("polykrom-testkit", Dev, true)]),
             c("polykrom-ui-egui", &[("polykrom-engine", Normal, true), ("egui", Normal, false)]),
             c("polykrom-cli", &[("polykrom-ui-egui", Normal, true)]),
         ];
@@ -293,17 +293,17 @@ mod tests {
 
     #[test]
     fn unregistered_crate_is_error() {
-        let v = check(&[c("solidcraft-mystery", &[])]);
-        assert!(matches!(&v[..], [Violation::Unregistered { krate }] if krate == "solidcraft-mystery"));
+        let v = check(&[c("polykrom-mystery", &[])]);
+        assert!(matches!(&v[..], [Violation::Unregistered { krate }] if krate == "polykrom-mystery"));
         assert!(v[0].to_string().contains("register"));
     }
 
     #[test]
     fn testkit_only_as_dev_dependency() {
-        let v = check(&[c("polykrom-doc", &[("solidcraft-testkit", Normal, true)])]);
+        let v = check(&[c("polykrom-doc", &[("polykrom-testkit", Normal, true)])]);
         assert!(matches!(v[..], [Violation::TestkitAsNormalDep { .. }]));
-        assert!(check(&[c("polykrom-doc", &[("solidcraft-testkit", Dev, true)])]).is_empty());
-        assert!(check(&[c("solidcraft-testkit", &[("polykrom-engine", Normal, true)])]).is_empty());
+        assert!(check(&[c("polykrom-doc", &[("polykrom-testkit", Dev, true)])]).is_empty());
+        assert!(check(&[c("polykrom-testkit", &[("polykrom-engine", Normal, true)])]).is_empty());
     }
 
     #[test]

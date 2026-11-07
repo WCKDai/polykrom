@@ -226,7 +226,7 @@ fn a_part_and_its_step_round_trips_are_identical() {
     run(&mut s, "solid.box", json!({"length": 40, "width": 30, "height": 10, "body_name": "Part"}));
     run(&mut s, "solid.cylinder", json!({"diameter": 8, "height": 10, "base": [20, 15, 0], "operation": "cut", "targets": ["Part"]}));
     run(&mut s, "solid.fillet", json!({"edges": [[40, 15, 10]], "radius": 3}));
-    let dir = std::env::temp_dir().join(format!("solidcraft-compare-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("polykrom-compare-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     let path = dir.join("part.step");
     run(&mut s, "file.export", json!({"path": path, "bodies": ["Part"]}));

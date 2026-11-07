@@ -154,12 +154,10 @@ fn labels_needing_translation(known: &[&str]) -> BTreeMap<String, Vec<String>> {
 }
 
 fn registry() -> Result<Vec<Value>, String> {
-    let out = crate::cargo()
-        .args(["run", "-q", "--release", "-p", "polykrom-cli", "--", "commands"])
-        .output()
-        .map_err(|e| format!("solidcraft-cli: {e}"))?;
+    let out =
+        crate::cargo().args(["run", "-q", "--release", "-p", "polykrom-cli", "--", "commands"]).output().map_err(|e| format!("polykrom-cli: {e}"))?;
     if !out.status.success() {
-        return Err(format!("solidcraft-cli commands failed:\n{}", String::from_utf8_lossy(&out.stderr)));
+        return Err(format!("polykrom-cli commands failed:\n{}", String::from_utf8_lossy(&out.stderr)));
     }
     serde_json::from_slice(&out.stdout).map_err(|e| format!("commands JSON: {e}"))
 }

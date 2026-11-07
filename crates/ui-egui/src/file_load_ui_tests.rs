@@ -70,7 +70,7 @@ fn large_design(dir: &std::path::Path, n: usize) -> String {
 }
 
 fn scratch(name: &str) -> std::path::PathBuf {
-    let d = std::env::temp_dir().join(format!("solidcraft-file-load-{name}-{}", std::process::id()));
+    let d = std::env::temp_dir().join(format!("polykrom-file-load-{name}-{}", std::process::id()));
     let _ = std::fs::create_dir_all(&d);
     d
 }

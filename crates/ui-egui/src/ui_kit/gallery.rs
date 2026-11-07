@@ -289,7 +289,7 @@ const ELEMENTS: &[Element] = &[
             super::file_view::RecoveryMessage {
                 title: "1 design was recovered",
                 before_filename: " after Polykrom closed unexpectedly: ",
-                filename: "enclosure-lid.solidcraft",
+                filename: "enclosure-lid.polykrom",
                 after_filename: ", 2 minutes ago.",
             },
             "Recover",
@@ -307,8 +307,8 @@ const ELEMENTS: &[Element] = &[
                     id,
                     RecentRow {
                         title: "Sample Plate",
-                        path: "Designs/sample-plate.solidcraft",
-                        tooltip: "Designs/sample-plate.solidcraft",
+                        path: "Designs/sample-plate.polykrom",
+                        tooltip: "Designs/sample-plate.polykrom",
                         missing: false,
                         when: "Open now",
                         workspace: "Design",
@@ -324,8 +324,8 @@ const ELEMENTS: &[Element] = &[
             "gallery:file:recent",
             RecentRow {
                 title: "Sample Plate",
-                path: "Designs/sample-plate.solidcraft",
-                tooltip: "Designs/sample-plate.solidcraft",
+                path: "Designs/sample-plate.polykrom",
+                tooltip: "Designs/sample-plate.polykrom",
                 missing: false,
                 when: "Open now",
                 workspace: "Design",
@@ -1542,7 +1542,7 @@ fn history_board_in_both_themes_and_widths() {
                         assert_eq!(app.shell.history.unwrap().width(), 112.0);
                     }
                     assert!(app.shell.history.unwrap().right() < app.shell.browser.unwrap().left());
-                    if let Ok(dir) = std::env::var("SOLIDCRAFT_HISTORY_EVIDENCE") {
+                    if let Ok(dir) = std::env::var("POLYKROM_HISTORY_EVIDENCE") {
                         std::fs::create_dir_all(&dir).unwrap();
                         image
                             .unwrap()
@@ -1597,7 +1597,7 @@ fn menu_board_in_both_themes() {
         }
         let image = image.unwrap();
         assert!(image.pixels().any(|p| p.0[3] != 0));
-        if let Ok(dir) = std::env::var("SOLIDCRAFT_MENU_EVIDENCE") {
+        if let Ok(dir) = std::env::var("POLYKROM_MENU_EVIDENCE") {
             std::fs::create_dir_all(&dir).unwrap();
             image.save(std::path::Path::new(&dir).join(if dark { "menus-dark.png" } else { "menus-light.png" })).unwrap();
         }
@@ -1668,7 +1668,7 @@ fn command_search_board_in_both_themes() {
             }
             let image = image.unwrap();
             assert!(image.pixels().any(|p| p.0[3] != 0));
-            if let Ok(dir) = std::env::var("SOLIDCRAFT_SEARCH_EVIDENCE") {
+            if let Ok(dir) = std::env::var("POLYKROM_SEARCH_EVIDENCE") {
                 std::fs::create_dir_all(&dir).unwrap();
                 image.save(std::path::Path::new(&dir).join(format!("search-{state}-{}.png", if dark { "dark" } else { "light" }))).unwrap();
             }
@@ -1828,7 +1828,7 @@ fn confirm_radial_and_history_rows_keep_multitone_artwork() {
                 let group = if matches!(surface, "warning" | "danger" | "info") { "confirm" } else { surface };
                 dominant_accents.entry(group).or_default().insert(dominant.1);
             }
-            if let Ok(dir) = std::env::var("SOLIDCRAFT_ICON_SURFACE_EVIDENCE") {
+            if let Ok(dir) = std::env::var("POLYKROM_ICON_SURFACE_EVIDENCE") {
                 let mut textures = std::collections::HashMap::new();
                 super::checks::tests::textures_update(&mut textures, &output.textures_delta);
                 let capture = super::checks::tests::raster(&ctx, output.shapes.clone(), output.pixels_per_point, bounds, &textures);
@@ -1919,7 +1919,7 @@ fn command_search_ribbon_transition_clips_content_in_both_themes() {
             } else if frame == 25 {
                 assert_eq!(field, closed);
             }
-            if let (Some(state), Ok(dir)) = (state, std::env::var("SOLIDCRAFT_SEARCH_EVIDENCE")) {
+            if let (Some(state), Ok(dir)) = (state, std::env::var("POLYKROM_SEARCH_EVIDENCE")) {
                 std::fs::create_dir_all(&dir).unwrap();
                 let image = raster(&ctx, output.shapes, output.pixels_per_point, bounds, &textures);
                 image.save(std::path::Path::new(&dir).join(format!("ribbon-{state}-{}.png", if dark { "dark" } else { "light" }))).unwrap();
@@ -1931,15 +1931,15 @@ fn command_search_ribbon_transition_clips_content_in_both_themes() {
 
 /// Opt-in CPU capture of the actual File view, with public temporary fixtures only.
 #[test]
-#[ignore = "set SOLIDCRAFT_FILE_EVIDENCE to an output directory and run explicitly"]
+#[ignore = "set POLYKROM_FILE_EVIDENCE to an output directory and run explicitly"]
 fn file_view_application_evidence_in_both_themes_and_widths() {
     use super::checks::tests::{raster, textures_update};
     use std::collections::HashMap;
-    let output_dir = std::path::PathBuf::from(std::env::var("SOLIDCRAFT_FILE_EVIDENCE").expect("set SOLIDCRAFT_FILE_EVIDENCE"));
+    let output_dir = std::path::PathBuf::from(std::env::var("POLYKROM_FILE_EVIDENCE").expect("set POLYKROM_FILE_EVIDENCE"));
     std::fs::create_dir_all(&output_dir).unwrap();
-    let fixture_dir = std::env::temp_dir().join(format!("solidcraft-file-evidence-{}", std::process::id()));
+    let fixture_dir = std::env::temp_dir().join(format!("polykrom-file-evidence-{}", std::process::id()));
     std::fs::create_dir_all(&fixture_dir).unwrap();
-    let path = fixture_dir.join("sample-plate.solidcraft");
+    let path = fixture_dir.join("sample-plate.polykrom");
     let fixture = path.to_string_lossy().to_string();
     let mut sample = crate::test_support::sample_app();
     sample.session.execute("file.save_as", &serde_json::json!({"path":fixture})).unwrap();
@@ -1958,7 +1958,7 @@ fn file_view_application_evidence_in_both_themes_and_widths() {
             app.ui.dark = dark;
             app.recoverable.push(polykrom_engine::recovery::Entry {
                 id: "public-evidence".into(),
-                path: Some("enclosure-lid.solidcraft".into()),
+                path: Some("enclosure-lid.polykrom".into()),
                 name: "Enclosure lid".into(),
                 saved_at: web_time::SystemTime::now().duration_since(web_time::UNIX_EPOCH).unwrap().as_secs().saturating_sub(120),
                 features: 14,

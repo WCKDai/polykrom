@@ -33,7 +33,7 @@ pub(crate) struct Attempt<'a> {
 fn log_file() -> Option<&'static Mutex<std::fs::File>> {
     static FILE: OnceLock<Option<Mutex<std::fs::File>>> = OnceLock::new();
     FILE.get_or_init(|| {
-        let path = polycore_geom::env::var("FILLET_WORK_LOG")?;
+        let path = crate::env::var("FILLET_WORK_LOG")?;
         std::fs::OpenOptions::new().create(true).append(true).open(path).ok().map(Mutex::new)
     })
     .as_ref()
@@ -42,7 +42,7 @@ fn log_file() -> Option<&'static Mutex<std::fs::File>> {
 /// The budget `POLYKROM_FILLET_WORK` gives every first attempt, if set.
 pub(crate) fn budget_override() -> Option<u64> {
     static OVERRIDE: OnceLock<Option<u64>> = OnceLock::new();
-    *OVERRIDE.get_or_init(|| polycore_geom::env::var("FILLET_WORK")?.trim().parse().ok())
+    *OVERRIDE.get_or_init(|| crate::env::var("FILLET_WORK")?.trim().parse().ok())
 }
 
 /// Append `a` to the log, when there is one.

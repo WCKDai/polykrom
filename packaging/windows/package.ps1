@@ -5,12 +5,11 @@
 .DESCRIPTION
   Produces, in $env:DIST (default: dist/release):
     polykrom-<version>-windows-<arch>.msi              per-machine installer (WiX v5)
-    polykrom-<version>-windows-<arch>-portable.zip     polykrom.exe + polykrom-cli.exe (and the aliases) + licences
-                                                       (+ the solvecraft-cli.exe compatibility alias)
+    polykrom-<version>-windows-<arch>-portable.zip     polykrom.exe + polykrom-cli.exe + licences
     Polykrom-<version>-windows-<arch>.exe              the app alone (x64 only: a plain download)
 
   The binaries link the C runtime statically (+crt-static), so nothing else needs installing.
-  The icon comes from $env:SOLIDCRAFT_ICONS (solidcraft.ico, made by `solidcraft-cli icon`), or
+  The icon comes from $env:POLYKROM_ICONS (polykrom.ico, made by `polykrom-cli icon`), or
   is drawn by the CLI just built when this machine can run it. Nothing is signed.
 
   Needs: Rust (MSVC toolchain + the target) and WiX v5:
@@ -37,7 +36,7 @@ function Invoke-Native([string] $What, [scriptblock] $Block) {
 }
 
 # The version lives in one place: [workspace.package] version in the root Cargo.toml.
-$Version = $env:SOLIDCRAFT_VERSION
+$Version = $env:POLYKROM_VERSION
 if (-not $Version) {
   $inPkg = $false
   foreach ($line in Get-Content (Join-Path $Root 'Cargo.toml')) {
@@ -73,9 +72,7 @@ function Get-PeHeader([string] $Path) {
   return @{ Machine = [BitConverter]::ToUInt16($bytes, $pe + 4); Subsystem = [BitConverter]::ToUInt16($bytes, $pe + 0x5C) }
 }
 $Machine = switch ($Arch) { 'x64' { 0x8664 } 'x86' { 0x14C } 'arm64' { 0xAA64 } }
-# solidcraft.exe, solidcraft-cli.exe and solvecraft-cli.exe: the earlier names, forwarding to
-# polykrom.exe and polykrom-cli.exe (compatibility shims, docs/compatibility.md).
-$Programs = @(@('polykrom.exe', 2), @('polykrom-cli.exe', 3), @('solidcraft.exe', 2), @('solidcraft-cli.exe', 3), @('solvecraft-cli.exe', 3))
+$Programs = @(@('polykrom.exe', 2), @('polykrom-cli.exe', 3))
 foreach ($check in $Programs) {
   $h = Get-PeHeader (Join-Path $Bin $check[0])
   if ($h.Machine -ne $Machine) { throw "$($check[0]) is for machine 0x$('{0:X}' -f $h.Machine), expected 0x$('{0:X}' -f $Machine) ($Arch)" }
@@ -89,15 +86,15 @@ New-Item -ItemType Directory -Force -Path $Stage | Out-Null
 foreach ($p in $Programs) { Copy-Item (Join-Path $Bin $p[0]) $Stage }
 foreach ($f in 'LICENSE-MIT', 'LICENSE-APACHE', 'NOTICE', 'THIRD-PARTY-LICENSES.txt') { Copy-Item (Join-Path $Root $f) $Stage }
 
-$Icon = if ($env:SOLIDCRAFT_ICONS) { Join-Path $env:SOLIDCRAFT_ICONS 'solidcraft.ico' } else { Join-Path $Root 'assets/icons/app/windows/exports/solidcraft.ico' }
+$Icon = if ($env:POLYKROM_ICONS) { Join-Path $env:POLYKROM_ICONS 'polykrom.ico' } else { Join-Path $Root 'assets/icons/app/windows/exports/polykrom.ico' }
 if (-not (Test-Path $Icon)) { throw "Missing package icon: $Icon" }
 
 # ---- MSI ---------------------------------------------------------------------------------------
 $Msi = Join-Path $Dist "polykrom-$Version-windows-$Arch.msi"
 Invoke-Native 'wix build' {
-  wix build (Join-Path $Root 'assets/platforms/windows/solidcraft.wxs') -arch $Arch `
+  wix build (Join-Path $Root 'assets/platforms/windows/polykrom.wxs') -arch $Arch `
     -ext WixToolset.UI.wixext -ext WixToolset.Util.wixext `
-    -culture en-US -loc (Join-Path $Root 'assets/platforms/windows/solidcraft.en-us.wxl') `
+    -culture en-US -loc (Join-Path $Root 'assets/platforms/windows/polykrom.en-us.wxl') `
     -d "Version=$MsiVersion" -d "DisplayVersion=$Version" -d "BinDir=$Stage" -d "IconPath=$Icon" `
     -o $Msi
 }
@@ -127,7 +124,6 @@ if ($Arch -eq 'x64') {
 
 if ($CanRun) {
   Invoke-Native 'polykrom-cli --version' { & (Join-Path $Stage 'polykrom-cli.exe') --version }
-  Invoke-Native 'solidcraft-cli --version' { & (Join-Path $Stage 'solidcraft-cli.exe') --version }
 } else {
   Write-Output "skipping polykrom-cli --version: an $Arch build doesn't run on this $HostArch machine"
 }

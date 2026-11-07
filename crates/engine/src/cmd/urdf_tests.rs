@@ -96,7 +96,7 @@ fn assert_fk(m: &UrdfModel, s: &Session, what: &str) {
 }
 
 fn temp(tag: &str) -> PathBuf {
-    let d = polykrom_io::vfs::temp_dir().join(format!("solidcraft-urdf-{tag}-{}", std::process::id()));
+    let d = polykrom_io::vfs::temp_dir().join(format!("polykrom-urdf-{tag}-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&d);
     let _ = std::fs::create_dir_all(&d);
     d

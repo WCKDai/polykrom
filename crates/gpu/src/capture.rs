@@ -116,7 +116,7 @@ impl Capturer {
         self.is_lost()
     }
 
-    /// A device of its own, without a window (native only): the adapter the `SOLIDCRAFT_GPU`
+    /// A device of its own, without a window (native only): the adapter the `POLYKROM_GPU`
     /// policy picks ([`crate::select`]).
     #[cfg(not(target_arch = "wasm32"))]
     pub fn headless() -> Result<Self> {
@@ -318,7 +318,7 @@ impl Capturer {
     }
 }
 
-/// The process's headless capturer (native only), opened on first use under the `SOLIDCRAFT_GPU`
+/// The process's headless capturer (native only), opened on first use under the `POLYKROM_GPU`
 /// policy and kept; the error when no adapter qualifies or the device fails (not retried).
 #[cfg(not(target_arch = "wasm32"))]
 pub fn shared() -> std::result::Result<&'static Capturer, &'static GpuError> {
@@ -327,7 +327,7 @@ pub fn shared() -> std::result::Result<&'static Capturer, &'static GpuError> {
 }
 
 /// What draws this process's headless pictures (native only): the shared headless device, or the
-/// CPU rasterizer where the `SOLIDCRAFT_GPU` policy lands there (`cpu`, or `auto` with no
+/// CPU rasterizer where the `POLYKROM_GPU` policy lands there (`cpu`, or `auto` with no
 /// qualifying adapter).
 #[cfg(not(target_arch = "wasm32"))]
 pub enum Headless {
@@ -335,7 +335,7 @@ pub enum Headless {
     Cpu,
 }
 
-/// [`Headless`] under the `SOLIDCRAFT_GPU` policy; an error when the policy is `hardware` or
+/// [`Headless`] under the `POLYKROM_GPU` policy; an error when the policy is `hardware` or
 /// `software` and no adapter of that tier opens (or the variable names no policy).
 #[cfg(not(target_arch = "wasm32"))]
 pub fn headless() -> std::result::Result<Headless, String> {

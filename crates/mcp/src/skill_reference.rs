@@ -1,4 +1,4 @@
-//! Read-only access to the skill documents shipped with SolidCraft.
+//! Read-only access to the skill documents shipped with Polykrom.
 
 use serde_json::{Map, Value};
 

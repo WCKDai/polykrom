@@ -34,11 +34,11 @@ const MAX_JOBS: usize = 2;
 /// A refined plan and its CPU mesh (none: the body has no plan at that step).
 pub(crate) type Refined = Option<(Arc<TessPlan>, Arc<Mesh>)>;
 
-/// Whether the viewport refines at all: `SOLIDCRAFT_DISPLAY_REFINE=0` turns it off (to compare
+/// Whether the viewport refines at all: `POLYKROM_DISPLAY_REFINE=0` turns it off (to compare
 /// pictures and frame times with and without it).
 pub(crate) fn enabled() -> bool {
     static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
-    *ON.get_or_init(|| std::env::var("SOLIDCRAFT_DISPLAY_REFINE").map_or(true, |v| v != "0"))
+    *ON.get_or_init(|| std::env::var("POLYKROM_DISPLAY_REFINE").map_or(true, |v| v != "0"))
 }
 
 /// What keeps a body's identity ([`body_id`]) its own while the cache holds it.

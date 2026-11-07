@@ -16,7 +16,7 @@ fn run(s: &mut Session, id: &str, p: Value) -> Value {
 }
 
 fn temp(tag: &str) -> PathBuf {
-    let d = polykrom_io::vfs::temp_dir().join(format!("solidcraft-mjcf-{tag}-{}", std::process::id()));
+    let d = polykrom_io::vfs::temp_dir().join(format!("polykrom-mjcf-{tag}-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&d);
     let _ = std::fs::create_dir_all(&d);
     d
@@ -267,7 +267,7 @@ fn mujoco_job_of_a_study() {
 /// study. Skipped, with a note, where Python has no MuJoCo (`POLYKROM_MUJOCO_PYTHON`, else python3).
 #[test]
 fn mujoco_runs_the_arm() {
-    let python = crate::geom::env::var_os("MUJOCO_PYTHON").unwrap_or_else(|| "python3".into());
+    let python = crate::env::var_os("MUJOCO_PYTHON").unwrap_or_else(|| "python3".into());
     if !std::process::Command::new(&python).args(["-c", "import mujoco, numpy"]).status().is_ok_and(|s| s.success()) {
         eprintln!("skipped: {} has no MuJoCo (pip install mujoco numpy, or set POLYKROM_MUJOCO_PYTHON)", python.to_string_lossy());
         return;

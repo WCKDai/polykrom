@@ -145,10 +145,10 @@ fn user_defined_material_sets_the_body_mass() {
 
 /// A design file path in a fresh temporary folder (removed by the caller).
 fn temp_design(tag: &str) -> (std::path::PathBuf, String) {
-    let dir = std::env::temp_dir().join(format!("solidcraft-user-material-{tag}-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("polykrom-user-material-{tag}-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
-    let path = dir.join("design.solidcraft").to_string_lossy().to_string();
+    let path = dir.join("design.polykrom").to_string_lossy().to_string();
     (dir, path)
 }
 

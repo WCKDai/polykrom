@@ -5,7 +5,7 @@ use super::*;
 
 /// The GPU, or `None` with a note when the machine has no adapter (CI runners without a GPU).
 /// A device that cannot build the pipeline fails the test: that is a shader the device rejects
-/// (as D3D12's FXC once did), not a missing GPU. `SOLIDCRAFT_REQUIRE_GPU=1` (the Windows CI job,
+/// (as D3D12's FXC once did), not a missing GPU. `POLYKROM_REQUIRE_GPU=1` (the Windows CI job,
 /// on the WARP software adapter) fails without an adapter too.
 fn gpu() -> Option<TessGpu> {
     match TessGpu::headless() {
@@ -14,7 +14,7 @@ fn gpu() -> Option<TessGpu> {
             Some(g)
         }
         Err(e @ GpuError::Pipeline(_)) => panic!("{e}"),
-        Err(e) if std::env::var_os("SOLIDCRAFT_REQUIRE_GPU").is_some() => panic!("a GPU is required here: {e}"),
+        Err(e) if std::env::var_os("POLYKROM_REQUIRE_GPU").is_some() => panic!("a GPU is required here: {e}"),
         Err(e) => {
             eprintln!("skipping the GPU comparison: {e}");
             None
@@ -41,7 +41,7 @@ fn a_pipeline_the_device_rejects_is_an_error_not_a_crash() {
     let (adapter, device, queue) = match open_headless() {
         Ok(d) => d,
         Err(e) => {
-            assert!(std::env::var_os("SOLIDCRAFT_REQUIRE_GPU").is_none(), "a GPU is required here: {e}");
+            assert!(std::env::var_os("POLYKROM_REQUIRE_GPU").is_none(), "a GPU is required here: {e}");
             eprintln!("skipping: {e}");
             return;
         }

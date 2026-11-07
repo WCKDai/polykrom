@@ -1256,7 +1256,7 @@ mod tests {
         assert!(a.quit_requested, "nothing unsaved: quits at once");
 
         let mut a = app();
-        let file = std::env::temp_dir().join(format!("solidcraft-quit-save-{}.solidcraft", std::process::id()));
+        let file = std::env::temp_dir().join(format!("polykrom-quit-save-{}.solidcraft", std::process::id()));
         let _ = std::fs::remove_file(&file);
         a.run("solid.box", json!({"length": 10, "width": 10, "height": 10})).unwrap();
         a.run("file.save_as", json!({"path": file.to_string_lossy()})).unwrap();
@@ -1304,7 +1304,7 @@ mod tests {
         assert!(!a.quit_requested && a.docs.quitting.is_none() && a.session.is_dirty());
 
         // A picked file: saved, then quit.
-        let file = std::env::temp_dir().join(format!("solidcraft-quit-saveas-{}.solidcraft", std::process::id()));
+        let file = std::env::temp_dir().join(format!("polykrom-quit-saveas-{}.solidcraft", std::process::id()));
         let _ = std::fs::remove_file(&file);
         let to = file.to_string_lossy().to_string();
         a.services.pick_save = Some(Box::new(move |_: &str, _: &[&str]| Box::pin(std::future::ready(Some(to.clone())))));

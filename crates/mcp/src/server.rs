@@ -275,7 +275,7 @@ impl Server {
                 Ok(json!({
                     "protocolVersion": version,
                     "capabilities": {"tools": {"listChanged": false}, "resources": {"listChanged": false}},
-                    "serverInfo": {"name": "solidcraft", "title": "Polykrom", "version": env!("CARGO_PKG_VERSION")},
+                    "serverInfo": {"name": "polykrom", "title": "Polykrom", "version": env!("CARGO_PKG_VERSION")},
                     "instructions": format!("{INSTRUCTIONS} Backend: {}.", self.backend.describe()),
                 }))
             }
@@ -294,18 +294,16 @@ impl Server {
                 Ok(vfs::scoped(scope, || call_tool(backend, name, &args)))
             }
             "resources/list" => Ok(json!({"resources": [
-                {"uri": "solidcraft://design", "name": "Active design", "description": "document.inspect with measurements", "mimeType": "application/json"},
-                {"uri": "solidcraft://commands", "name": "Command catalog", "description": "every command with its parameter docs", "mimeType": "application/json"},
+                {"uri": "polykrom://design", "name": "Active design", "description": "document.inspect with measurements", "mimeType": "application/json"},
+                {"uri": "polykrom://commands", "name": "Command catalog", "description": "every command with its parameter docs", "mimeType": "application/json"},
             ]})),
             "resources/templates/list" => Ok(json!({"resourceTemplates": []})),
             "prompts/list" => Ok(json!({"prompts": []})),
             "resources/read" => {
                 let uri = params.get("uri").and_then(Value::as_str).unwrap_or("");
                 let v = match uri {
-                    // The solvecraft:// URIs are what earlier releases listed (compatibility shim,
-                    // docs/compatibility.md); clients that saved them still read the resource.
-                    "solidcraft://design" | "solvecraft://design" => self.backend.call("document.inspect", json!({"measure": true})),
-                    "solidcraft://commands" | "solvecraft://commands" => self.backend.call("engine.commands", json!({})),
+                    "polykrom://design" => self.backend.call("document.inspect", json!({"measure": true})),
+                    "polykrom://commands" => self.backend.call("engine.commands", json!({})),
                     _ => return Err((RESOURCE_NOT_FOUND, format!("unknown resource `{uri}`"))),
                 }
                 .map_err(|e| (INTERNAL_ERROR, e))?;

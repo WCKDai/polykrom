@@ -9,7 +9,7 @@ fn run(s: &mut Session, command: &str, params: Value) -> Value {
 }
 
 fn folder(case: &str) -> PathBuf {
-    let dir = std::env::temp_dir().join(format!("solidcraft-relink-{case}-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("polykrom-relink-{case}-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     dir
 }

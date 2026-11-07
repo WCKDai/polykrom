@@ -108,7 +108,7 @@ fn a_bracket_on_a_hole_in_thin_plate_stays_on_it_as_the_plate_widens() {
         on_the_hole(&s, w);
     }
     // Saved and opened again, it still follows.
-    let dir = std::env::temp_dir().join(format!("solidcraft-joint-faces-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("polykrom-joint-faces-{}", std::process::id()));
     let _ = std::fs::create_dir_all(&dir);
     let path = dir.join("tray.json").to_string_lossy().to_string();
     run(&mut s, "file.save", json!({"path": path}));
@@ -244,7 +244,7 @@ fn a_round_origin_saved_without_an_end_takes_the_end_it_took_before() {
         let o: polykrom_doc::joints::NamedOrigin = serde_json::from_value(saved).unwrap_or_else(|e| panic!("{e}"));
         s.doc_mut().assembly.origins.push(o);
     }
-    let dir = std::env::temp_dir().join(format!("solidcraft-joint-end-tie-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("polykrom-joint-end-tie-{}", std::process::id()));
     let _ = std::fs::create_dir_all(&dir);
     let path = dir.join("plate.json").to_string_lossy().to_string();
     run(&mut s, "file.save", json!({"path": path}));

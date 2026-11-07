@@ -9,7 +9,7 @@
 use crate::startup;
 
 /// Set on the start after a lost device: when the device was lost (seconds since 1970).
-pub const LOST_ENV: &str = "SOLIDCRAFT_DEVICE_LOST";
+pub const LOST_ENV: &str = "POLYKROM_DEVICE_LOST";
 
 /// A loss this recent (seconds) counts for the start after it: its note, and a second loss
 /// within it starts on the software renderer. Inherited by later starts, an older stamp is

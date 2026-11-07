@@ -46,7 +46,7 @@ pub(crate) struct Meshing {
     framed: Option<crate::Camera>,
     /// Draw the design's Home picture when all is meshed.
     remember: Option<String>,
-    /// When it started, and whether the first bodies have been shown (`SOLIDCRAFT_PROFILE_OPEN`).
+    /// When it started, and whether the first bodies have been shown (`POLYKROM_PROFILE_OPEN`).
     began: Option<f64>,
     first_shown: bool,
 }
@@ -255,5 +255,5 @@ pub(crate) fn refresh(app: &mut SolveApp, now: f64) {
 }
 
 fn profiling() -> bool {
-    polykrom_engine::geom::env::var_os("PROFILE_OPEN").is_some()
+    polykrom_engine::env::var_os("PROFILE_OPEN").is_some()
 }

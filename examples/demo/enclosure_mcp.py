@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Build an electronics enclosure in a running Polykrom over MCP, one command at a time.
 
-    solidcraft --control 7878 &
+    polykrom --control 7878 &
     python3 examples/demo/enclosure_mcp.py --port 7878
 
-The script is a minimal MCP client: it starts `solidcraft-cli mcp --connect 127.0.0.1:PORT`
+The script is a minimal MCP client: it starts `polykrom-cli mcp --connect 127.0.0.1:PORT`
 (stdio, JSON-RPC 2.0, one message per line), initializes, then sends one `execute` tool call
 per step of enclosure_steps.json, waiting `pause` seconds after each so the timeline can be
 watched growing. Camera moves (fit, home view, the closing orbit) go over the app's control
@@ -25,7 +25,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 
 
 class Mcp:
-    """A stdio MCP client for `solidcraft-cli mcp`."""
+    """A stdio MCP client for `polykrom-cli mcp`."""
 
     def __init__(self, argv):
         self.p = subprocess.Popen(argv, stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True, bufsize=1)
@@ -65,19 +65,19 @@ class Mcp:
 
 
 def control_token(port):
-    """The app's control token: SOLIDCRAFT_CONTROL_TOKEN, else the token file the app wrote for
+    """The app's control token: POLYKROM_CONTROL_TOKEN, else the token file the app wrote for
     this port (docs/control-protocol.md)."""
-    if os.environ.get("SOLIDCRAFT_CONTROL_TOKEN"):
-        return os.environ["SOLIDCRAFT_CONTROL_TOKEN"].strip()
-    if os.environ.get("SOLIDCRAFT_CONTROL_DIR"):
-        folder = Path(os.environ["SOLIDCRAFT_CONTROL_DIR"])
+    if os.environ.get("POLYKROM_CONTROL_TOKEN"):
+        return os.environ["POLYKROM_CONTROL_TOKEN"].strip()
+    if os.environ.get("POLYKROM_CONTROL_DIR"):
+        folder = Path(os.environ["POLYKROM_CONTROL_DIR"])
     elif sys.platform == "win32":
-        folder = Path(os.environ["LOCALAPPDATA"]) / "SolidCraft" / "control"
+        folder = Path(os.environ["LOCALAPPDATA"]) / "Polykrom" / "control"
     elif sys.platform == "darwin":
-        folder = Path.home() / "Library/Application Support/SolidCraft/control"
+        folder = Path.home() / "Library/Application Support/Polykrom/control"
     else:
         data = os.environ.get("XDG_DATA_HOME") or str(Path.home() / ".local/share")
-        folder = Path(data) / "solidcraft" / "control"
+        folder = Path(data) / "polykrom" / "control"
     return (folder / f"{port}.token").read_text().strip()
 
 
@@ -98,7 +98,7 @@ def control(port, method, params=None):
 def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--port", type=int, default=7878, help="the app's --control port")
-    ap.add_argument("--cli", default="solidcraft-cli", help="path to solidcraft-cli")
+    ap.add_argument("--cli", default="polykrom-cli", help="path to polykrom-cli")
     ap.add_argument("--steps", default=os.path.join(HERE, "enclosure_steps.json"))
     ap.add_argument("--pause", type=float, default=2.5, help="seconds after each step (unless the step says)")
     ap.add_argument("--log", help="write a JSON line per step: {t, caption, command}")

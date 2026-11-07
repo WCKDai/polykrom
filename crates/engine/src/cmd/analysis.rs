@@ -42,7 +42,7 @@ const ELASTIC: [(&str, f64, f64, Option<f64>); 12] = [
 ];
 
 /// The environment variable naming Nightfall's `nf`, after the prefix: `POLYKROM_NIGHTFALL`,
-/// or `SOLIDCRAFT_NIGHTFALL` from before the rename.
+/// or `POLYKROM_NIGHTFALL` from before the rename.
 const NF: &str = "NIGHTFALL";
 /// Most support and load points one call takes.
 const MAX_POINTS: usize = 1000;
@@ -112,7 +112,7 @@ pub(super) mod native {
     use crate::{Result, Session};
 
     pub(super) fn run(cmd: &str, s: &mut Session, p: &Value) -> Result<Value> {
-        let nf = crate::geom::env::var_os(NF)
+        let nf = crate::env::var_os(NF)
             .filter(|v| !v.is_empty())
             .ok_or_else(|| bad(cmd, "not available: set POLYKROM_NIGHTFALL to Nightfall's nf (it solves the analysis)"))?;
         let st = s.world_state();
@@ -202,7 +202,7 @@ pub(super) mod native {
         let nanos = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.subsec_nanos()).unwrap_or(0);
         for _ in 0..16 {
             let run = RUNS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-            let dir = std::env::temp_dir().join(format!("solidcraft-{tag}-{}-{nanos}-{run}", std::process::id()));
+            let dir = std::env::temp_dir().join(format!("polykrom-{tag}-{}-{nanos}-{run}", std::process::id()));
             match std::fs::create_dir(&dir) {
                 Ok(()) => return Ok(dir),
                 Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => continue,

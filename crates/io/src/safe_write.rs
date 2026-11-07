@@ -226,7 +226,7 @@ mod tests {
     }
 
     fn dir(tag: &str) -> PathBuf {
-        let d = std::env::temp_dir().join(format!("solidcraft-safe-write-{tag}-{}", std::process::id()));
+        let d = std::env::temp_dir().join(format!("polykrom-safe-write-{tag}-{}", std::process::id()));
         let _ = fs::remove_dir_all(&d);
         fs::create_dir_all(&d).unwrap();
         d

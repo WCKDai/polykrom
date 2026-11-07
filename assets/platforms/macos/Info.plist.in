@@ -13,7 +13,7 @@
   <key>CFBundleExecutable</key>
   <string>Polykrom</string>
   <key>CFBundleIdentifier</key>
-  <string>ai.storyteller.solidcraft</string>
+  <string>app.polykrom.Polykrom</string>
   <key>CFBundleInfoDictionaryVersion</key>
   <string>6.0</string>
   <key>CFBundlePackageType</key>
@@ -24,7 +24,7 @@
   <string>@SHORT_VERSION@</string>
   <key>CFBundleVersion</key>
   <string>@SHORT_VERSION@</string>
-  <key>SolidCraftVersion</key>
+  <key>PolykromVersion</key>
   <string>@VERSION@</string>
   <key>CFBundleIconFile</key>
   <string>Polykrom</string>
@@ -45,8 +45,8 @@
       <key>CFBundleTypeName</key>
       <string>Polykrom design</string>
       <key>CFBundleTypeExtensions</key>
-      <!-- polykrom: Polykrom's own; solidcraft: SolidCraft's, the same container; solvecraft:
-           designs saved before SolidCraft's rename (docs/compatibility.md). -->
+      <!-- .polykrom: Polykrom's own; .solidcraft and .solvecraft: designs from SolidCraft, which
+           Polykrom is forked from, the same container (docs/compatibility.md). -->
       <array><string>polykrom</string><string>solidcraft</string><string>solvecraft</string></array>
       <key>CFBundleTypeRole</key>
       <string>Editor</string>

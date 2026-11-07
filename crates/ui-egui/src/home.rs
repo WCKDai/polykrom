@@ -127,7 +127,7 @@ fn cache_path(key: &str) -> Option<std::path::PathBuf> {
         .or_else(|| std::env::var_os("XDG_CACHE_HOME"))
         .map(std::path::PathBuf::from)
         .unwrap_or_else(std::env::temp_dir);
-    Some(root.join("SolidCraft").join("thumbnails").join(format!("{:016x}.png", h.finish())))
+    Some(root.join("Polykrom").join("thumbnails").join(format!("{:016x}.png", h.finish())))
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -1128,7 +1128,7 @@ mod tests {
             return;
         }
         let nonce = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos();
-        let path = std::env::temp_dir().join(format!("solidcraft-thumb-{}-{nonce}.solidcraft", std::process::id()));
+        let path = std::env::temp_dir().join(format!("polykrom-thumb-{}-{nonce}.solidcraft", std::process::id()));
         // Deliberately invalid design: a cached recent must not parse/evaluate it.
         let bytes = b"{\"thumbnail_test\":true}";
         std::fs::write(&path, bytes).unwrap();
@@ -1164,7 +1164,7 @@ mod tests {
         let image = decode_thumbnail(png).unwrap();
         assert_eq!(image.size, THUMB);
         let nonce = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos();
-        let path = std::env::temp_dir().join(format!("solidcraft-portable-thumb-{}-{nonce}.solidcraft", std::process::id()));
+        let path = std::env::temp_dir().join(format!("polykrom-portable-thumb-{}-{nonce}.solidcraft", std::process::id()));
         std::fs::write(&path, bytes).unwrap();
         let key = path.to_string_lossy().to_string();
         assert!(cached(&key).is_none());
@@ -1185,7 +1185,7 @@ mod tests {
             return;
         }
         let nonce = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos();
-        let path = std::env::temp_dir().join(format!("solidcraft-import-thumb-{}-{nonce}.step", std::process::id()));
+        let path = std::env::temp_dir().join(format!("polykrom-import-thumb-{}-{nonce}.step", std::process::id()));
         let key = path.to_string_lossy().into_owned();
         let mut part = Session::default();
         part.execute("solid.box", &serde_json::json!({"length":10,"width":20,"height":30})).unwrap();
@@ -1220,7 +1220,7 @@ mod tests {
             return;
         }
         let nonce = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos();
-        let path = std::env::temp_dir().join(format!("solidcraft-fast-thumb-{}-{nonce}.solidcraft", std::process::id()));
+        let path = std::env::temp_dir().join(format!("polykrom-fast-thumb-{}-{nonce}.solidcraft", std::process::id()));
         let key = path.to_string_lossy().into_owned();
         let mut s = Session::default();
         s.execute("solid.box", &serde_json::json!({"length":10,"width":20,"height":30})).unwrap();

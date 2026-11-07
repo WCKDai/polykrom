@@ -3,7 +3,7 @@
 //! runs on the CPU, such as llvmpipe, lavapipe or WARP), and a [`Policy`] picks one. The last
 //! tier, below any adapter, is Polykrom's own CPU rasterizer (no surface analysis, highlights
 //! or legends): `auto` lands there only when no adapter qualifies, `cpu` forces it, `hardware`
-//! and `software` never use it. macOS uses Metal only, and has no software adapter. `SOLIDCRAFT_GPU`
+//! and `software` never use it. macOS uses Metal only, and has no software adapter. `POLYKROM_GPU`
 //! (`auto`, `hardware`, `software`, `cpu`) sets the policy from the environment; `WGPU_BACKEND`
 //! still narrows the backends.
 
@@ -72,11 +72,11 @@ impl Policy {
         }
     }
 
-    /// The policy `SOLIDCRAFT_GPU` names; [`Policy::Auto`] when it is unset, and an error when
+    /// The policy `POLYKROM_GPU` names; [`Policy::Auto`] when it is unset, and an error when
     /// it names none.
     pub fn from_env() -> Result<Policy, String> {
-        match std::env::var("SOLIDCRAFT_GPU") {
-            Ok(v) => Policy::parse(&v).ok_or_else(|| format!("SOLIDCRAFT_GPU must be auto, hardware, software or cpu, not `{v}`")),
+        match std::env::var("POLYKROM_GPU") {
+            Ok(v) => Policy::parse(&v).ok_or_else(|| format!("POLYKROM_GPU must be auto, hardware, software or cpu, not `{v}`")),
             Err(_) => Ok(Policy::Auto),
         }
     }

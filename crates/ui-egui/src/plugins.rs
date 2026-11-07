@@ -42,7 +42,7 @@ struct Manifest {
     description: String,
 }
 
-/// The plugins directory: `$XDG_DATA_HOME/solidcraft/plugins` (and the platform equivalents of
+/// The plugins directory: `$XDG_DATA_HOME/polykrom/plugins` (and the platform equivalents of
 /// [`polykrom_engine::recovery::data_dir`]). `None` when that folder cannot be named.
 pub fn plugins_dir() -> Option<PathBuf> {
     polykrom_engine::recovery::data_dir().map(|d| d.join("plugins"))
@@ -205,7 +205,7 @@ mod tests {
 
     #[test]
     fn a_folder_with_plugin_json_is_listed_and_a_bad_one_is_skipped() {
-        let dir = std::env::temp_dir().join(format!("solidcraft-plugins-scan-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("polykrom-plugins-scan-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         write(

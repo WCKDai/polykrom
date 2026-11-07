@@ -13,14 +13,14 @@ pub fn run(root: &Path) -> Result<(), String> {
     for size in [16, 24, 32, 48, 64, 128, 256, 512] {
         let png = stage.join(format!("{size}.png"));
         draw(&png, size)?;
-        exports.push((png, format!("linux/exports/hicolor/{size}x{size}/apps/ai.storyteller.solidcraft.png")));
+        exports.push((png, format!("linux/exports/hicolor/{size}x{size}/apps/app.polykrom.Polykrom.png")));
     }
-    let installer = stage.join("solidcraft.ico");
+    let installer = stage.join("polykrom.ico");
     draw(&installer, 256)?;
-    exports.push((installer, "windows/exports/solidcraft.ico".into()));
-    let executable = stage.join("solidcraft-executable.ico");
+    exports.push((installer, "windows/exports/polykrom.ico".into()));
+    let executable = stage.join("polykrom-executable.ico");
     std::fs::write(&executable, windows_ico::encode().map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
-    exports.push((executable, "windows/exports/solidcraft-executable.ico".into()));
+    exports.push((executable, "windows/exports/polykrom-executable.ico".into()));
 
     // Finish generation before replacing any canonical exports.
     for (source, relative) in exports {
@@ -36,5 +36,5 @@ pub fn run(root: &Path) -> Result<(), String> {
 fn draw(path: &Path, size: usize) -> Result<(), String> {
     let mut c = crate::cargo();
     c.args(["run", "-q", "--profile", "ci", "-p", "polykrom-cli", "--", "icon", "--size", &size.to_string(), "--out"]).arg(path);
-    crate::run(c, "solidcraft-cli icon")
+    crate::run(c, "polykrom-cli icon")
 }

@@ -439,7 +439,7 @@ fn recorder_lines_have_the_documented_shape() {
     assert_eq!(outcome_text(Some(&Ok(json!({})))), "ok");
     assert_eq!(outcome_text(Some(&Err(crate::EngineError::Other("boom".into())))), "error: boom");
     // The recorder is on exactly when built with `param-audit` and the variable names a directory.
-    let set = std::env::var_os("SOLIDCRAFT_PARAM_AUDIT").is_some_and(|v| !v.is_empty());
+    let set = std::env::var_os("POLYKROM_PARAM_AUDIT").is_some_and(|v| !v.is_empty());
     assert_eq!(super::record::enabled(), cfg!(feature = "param-audit") && set);
 }
 

@@ -9,7 +9,7 @@ license.workspace = true
 workspace = true
 
 [features]
-# Turns on the parameter-contract audit recorder (`SOLIDCRAFT_PARAM_AUDIT`, see
+# Turns on the parameter-contract audit recorder (`POLYKROM_PARAM_AUDIT`, see
 # `src/schema/record.rs`), for checking a new contract against the whole test suite.
 param-audit = []
 solver-profiling = ["polykrom-sketch/solver-profiling"]

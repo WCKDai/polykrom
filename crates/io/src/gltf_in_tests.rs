@@ -72,7 +72,7 @@ impl Fixture {
             buffer["uri"] = json!(u);
         }
         let mut j = json!({
-            "asset": {"version": "2.0", "generator": "solidcraft tests"},
+            "asset": {"version": "2.0", "generator": "polykrom tests"},
             "scene": 0,
             "scenes": [{"nodes": self.roots}],
             "nodes": self.nodes,

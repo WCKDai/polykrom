@@ -22,7 +22,7 @@ enum Pending {
 
 /// Variables the agent doesn't inherit: a control token set for the app's own `--control` port
 /// would otherwise reach the agent and outrank the chat endpoint's own token file.
-const ENV_REMOVE: &[&str] = &["SOLIDCRAFT_CONTROL_TOKEN"];
+const ENV_REMOVE: &[&str] = &["POLYKROM_CONTROL_TOKEN"];
 
 pub struct AcpBackend {
     proc: AgentProcess,

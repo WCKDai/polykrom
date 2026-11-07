@@ -127,7 +127,7 @@ impl RichTextExt for RichText {
 // Keep pending definitions too: set_fonts takes effect on the next frame, while the web
 // fetch and preference update can both finish before that frame starts.
 fn installed_fonts_id() -> egui::Id {
-    egui::Id::new("solidcraft_interface_fonts")
+    egui::Id::new("polykrom_interface_fonts")
 }
 
 fn install(ctx: &egui::Context, fonts: FontDefinitions) {
@@ -600,7 +600,7 @@ fn scan_dir_for_font_where(dir: &std::path::Path, depth_remaining: usize, matche
     None
 }
 
-/// The font folders named by `SOLIDCRAFT_FONT_DIRS` (a path list), or else by the single folder
+/// The font folders named by `POLYKROM_FONT_DIRS` (a path list), or else by the single folder
 /// in `CRAFT_FONTS_DIR` (the craft-fonts pack).
 #[cfg(not(target_arch = "wasm32"))]
 fn font_override_dirs(dirs: Option<std::ffi::OsString>, pack: Option<std::ffi::OsString>) -> Vec<std::path::PathBuf> {
@@ -611,11 +611,11 @@ fn font_override_dirs(dirs: Option<std::ffi::OsString>, pack: Option<std::ffi::O
     }
 }
 
-/// Find a CJK fallback font on the local system or in SOLIDCRAFT_FONT_DIRS / CRAFT_FONTS_DIR.
+/// Find a CJK fallback font on the local system or in POLYKROM_FONT_DIRS / CRAFT_FONTS_DIR.
 #[cfg(not(target_arch = "wasm32"))]
 fn find_system_cjk_font() -> Option<Vec<u8>> {
     // 1. Check the font folders the user named.
-    for dir in font_override_dirs(std::env::var_os("SOLIDCRAFT_FONT_DIRS"), std::env::var_os("CRAFT_FONTS_DIR")) {
+    for dir in font_override_dirs(std::env::var_os("POLYKROM_FONT_DIRS"), std::env::var_os("CRAFT_FONTS_DIR")) {
         let names = ["BIZUDPGothic-Regular.ttf", "BIZ-UDGothicR.ttc", "NotoSansCJK-Regular.ttc", "NotoSansJP-Regular.ttf"];
         for name in names {
             if let Some(bytes) = try_read_font(&dir.join(name)) {
@@ -984,7 +984,7 @@ mod tests {
         }
     }
 
-    /// `SOLIDCRAFT_FONT_DIRS` wins and may list several folders; `CRAFT_FONTS_DIR` is the fallback.
+    /// `POLYKROM_FONT_DIRS` wins and may list several folders; `CRAFT_FONTS_DIR` is the fallback.
     #[cfg(not(target_arch = "wasm32"))]
     #[test]
     fn cjk_font_folders_from_the_environment() -> Result<(), std::env::JoinPathsError> {
@@ -1416,7 +1416,7 @@ mod tests {
 
     impl FontFolder {
         fn new(name: &str) -> FontFolder {
-            let dir = std::env::temp_dir().join(format!("solidcraft-ui-font-tests-{}-{name}", std::process::id()));
+            let dir = std::env::temp_dir().join(format!("polykrom-ui-font-tests-{}-{name}", std::process::id()));
             let _ = std::fs::remove_dir_all(&dir);
             std::fs::create_dir_all(&dir).unwrap();
             FontFolder(dir)

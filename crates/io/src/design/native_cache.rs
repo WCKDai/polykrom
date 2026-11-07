@@ -18,7 +18,7 @@ const MAX_MANIFEST: usize = 32 << 20;
 /// The build that computed a cache: the same source, compiled for the same platform, computes the
 /// same numbers, so only its own caches are its results.
 fn build() -> String {
-    format!("{}/{}-{}", env!("SOLIDCRAFT_SOURCE_COMMIT"), std::env::consts::ARCH, std::env::consts::OS)
+    format!("{}/{}-{}", env!("POLYKROM_SOURCE_COMMIT"), std::env::consts::ARCH, std::env::consts::OS)
 }
 
 /// A 4 x 4 matrix as its 16 numbers, in storage order.
@@ -208,7 +208,7 @@ fn current(manifest: &Value, document: &[u8]) -> bool {
         && is("build", &build())
         && is("document", &digest(document))
         // A development build of unknown source never trusts a cache.
-        && env!("SOLIDCRAFT_SOURCE_COMMIT") != "unknown"
+        && env!("POLYKROM_SOURCE_COMMIT") != "unknown"
 }
 
 pub(super) fn read_geometry_with<R: Read + Seek>(reader: &mut PackageReader<R>, document: &[u8]) -> Result<SavedModel> {

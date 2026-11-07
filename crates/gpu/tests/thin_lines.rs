@@ -1,7 +1,7 @@
 //! Lines thinner than a pixel (the grid's minor lines are 0.7 px) are drawn wherever they fall,
 //! without multisampling (#2823). A quad narrower than a pixel covers no pixel centre when it
 //! falls between two rows, so such lines came and went as the view zoomed. Skipped, with the
-//! reason printed, without a GPU adapter (`SOLIDCRAFT_REQUIRE_GPU=1` makes that a failure).
+//! reason printed, without a GPU adapter (`POLYKROM_REQUIRE_GPU=1` makes that a failure).
 
 use polykrom_engine::geom::Vec3;
 use polykrom_engine::render::{Camera, Rgb, Scene, SceneLine, StandardView};
@@ -17,7 +17,7 @@ fn capturer() -> Option<&'static Capturer> {
             assert_eq!(c.samples(), 1);
             Some(c)
         }
-        Err(e @ GpuError::NoAdapter(_)) if std::env::var_os("SOLIDCRAFT_REQUIRE_GPU").is_none() => {
+        Err(e @ GpuError::NoAdapter(_)) if std::env::var_os("POLYKROM_REQUIRE_GPU").is_none() => {
             eprintln!("skipping: {e}");
             None
         }

@@ -3,7 +3,7 @@
 
 Usage: param_audit.py AUDIT_DIR [OUT_JSON]
 
-AUDIT_DIR is the directory `SOLIDCRAFT_PARAM_AUDIT` named for a test run built with the engine's
+AUDIT_DIR is the directory `POLYKROM_PARAM_AUDIT` named for a test run built with the engine's
 `param-audit` feature (see crates/engine/src/schema/record.rs). Each process writes one
 audit-<pid>.jsonl, repeating a signature's line as its count grows, so this keeps the highest
 count per signature in each file and adds the files up.

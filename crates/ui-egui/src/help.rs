@@ -8,8 +8,8 @@ use crate::ui_kit;
 use crate::ui_kit::{Container, Surface};
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
-pub const COMMIT: &str = env!("SOLIDCRAFT_COMMIT");
-pub const BUILD_DATE: &str = env!("SOLIDCRAFT_BUILD_DATE");
+pub const COMMIT: &str = env!("POLYKROM_COMMIT");
+pub const BUILD_DATE: &str = env!("POLYKROM_BUILD_DATE");
 /// The user and developer guide (docs/book, published by .github/workflows/pages.yml).
 pub const DOCS_URL: &str = "https://github.com/wckdboy/polykrom/tree/main/docs";
 const ATTRIBUTION: &str = include_str!("../../../ATTRIBUTION.md");

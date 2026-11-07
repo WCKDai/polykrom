@@ -499,7 +499,7 @@ fn each_sheet_body_can_have_a_file_of_its_own() {
     let bend_lines = |f: &Value| entities(f["dxf"].as_str().unwrap_or_default()).iter().filter(|e| layer_of(e) == "BEND_UP").count();
     assert_eq!((bend_lines(&files[0]), bend_lines(&files[1])), (0, 1));
     // With a path, each body is written to a file named after it, beside the path, and no text comes back.
-    let dir = polykrom_io::vfs::temp_dir().join(format!("solidcraft-dxf-per-body-{}", std::process::id()));
+    let dir = polykrom_io::vfs::temp_dir().join(format!("polykrom-dxf-per-body-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap_or_default();
     let path = dir.join("panel.dxf").to_string_lossy().to_string();

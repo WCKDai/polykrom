@@ -155,7 +155,7 @@ mod tests {
 
     #[test]
     fn generate_lists_every_file_with_its_digest() {
-        let dir = std::env::temp_dir().join(format!("solidcraft-web-offline-unit-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("polykrom-web-offline-unit-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         let ok = std::fs::create_dir_all(dir.join("snippets"))
             .and_then(|()| std::fs::create_dir_all(dir.join("fonts")))

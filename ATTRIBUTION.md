@@ -122,18 +122,18 @@ Editable drawing code, native projects and shipped exports are collected under `
 | assets/fonts/geist/OFL.txt | Vercel, Inc. (The Geist Project Authors) | Unmodified accompanying font licence (the release's OFL.txt, SHA-256 c683bfbcc7e087f5d37a54ef628f10387c451a83ddc459b151403a164ac46c90) | SIL OFL 1.1 |
 | assets/fonts/jetbrains-mono/OFL.txt | The JetBrains Mono Project Authors | Unmodified accompanying font licence | SIL OFL 1.1 |
 | assets/fonts/liberation-sans/OFL.txt | Red Hat, Inc.; Liberation Fonts contributors | Unmodified accompanying font licence | SIL OFL 1.1 |
-| assets/icons/app/linux/exports/hicolor/128x128/apps/ai.storyteller.solidcraft.png | Polykrom contributors | Generated from assets/icons/app/shared/source/app_icon.rs with the original CLI/ICO encoders | MIT OR Apache-2.0 |
-| assets/icons/app/linux/exports/hicolor/16x16/apps/ai.storyteller.solidcraft.png | Polykrom contributors | Generated from assets/icons/app/shared/source/app_icon.rs with the original CLI/ICO encoders | MIT OR Apache-2.0 |
-| assets/icons/app/linux/exports/hicolor/24x24/apps/ai.storyteller.solidcraft.png | Polykrom contributors | Generated from assets/icons/app/shared/source/app_icon.rs with the original CLI/ICO encoders | MIT OR Apache-2.0 |
-| assets/icons/app/linux/exports/hicolor/256x256/apps/ai.storyteller.solidcraft.png | Polykrom contributors | Generated from assets/icons/app/shared/source/app_icon.rs with the original CLI/ICO encoders | MIT OR Apache-2.0 |
-| assets/icons/app/linux/exports/hicolor/32x32/apps/ai.storyteller.solidcraft.png | Polykrom contributors | Generated from assets/icons/app/shared/source/app_icon.rs with the original CLI/ICO encoders | MIT OR Apache-2.0 |
-| assets/icons/app/linux/exports/hicolor/48x48/apps/ai.storyteller.solidcraft.png | Polykrom contributors | Generated from assets/icons/app/shared/source/app_icon.rs with the original CLI/ICO encoders | MIT OR Apache-2.0 |
-| assets/icons/app/linux/exports/hicolor/512x512/apps/ai.storyteller.solidcraft.png | Polykrom contributors | Generated from assets/icons/app/shared/source/app_icon.rs with the original CLI/ICO encoders | MIT OR Apache-2.0 |
-| assets/icons/app/linux/exports/hicolor/64x64/apps/ai.storyteller.solidcraft.png | Polykrom contributors | Generated from assets/icons/app/shared/source/app_icon.rs with the original CLI/ICO encoders | MIT OR Apache-2.0 |
+| assets/icons/app/linux/exports/hicolor/128x128/apps/app.polykrom.Polykrom.png | Polykrom contributors | Generated from assets/icons/app/shared/source/app_icon.rs with the original CLI/ICO encoders | MIT OR Apache-2.0 |
+| assets/icons/app/linux/exports/hicolor/16x16/apps/app.polykrom.Polykrom.png | Polykrom contributors | Generated from assets/icons/app/shared/source/app_icon.rs with the original CLI/ICO encoders | MIT OR Apache-2.0 |
+| assets/icons/app/linux/exports/hicolor/24x24/apps/app.polykrom.Polykrom.png | Polykrom contributors | Generated from assets/icons/app/shared/source/app_icon.rs with the original CLI/ICO encoders | MIT OR Apache-2.0 |
+| assets/icons/app/linux/exports/hicolor/256x256/apps/app.polykrom.Polykrom.png | Polykrom contributors | Generated from assets/icons/app/shared/source/app_icon.rs with the original CLI/ICO encoders | MIT OR Apache-2.0 |
+| assets/icons/app/linux/exports/hicolor/32x32/apps/app.polykrom.Polykrom.png | Polykrom contributors | Generated from assets/icons/app/shared/source/app_icon.rs with the original CLI/ICO encoders | MIT OR Apache-2.0 |
+| assets/icons/app/linux/exports/hicolor/48x48/apps/app.polykrom.Polykrom.png | Polykrom contributors | Generated from assets/icons/app/shared/source/app_icon.rs with the original CLI/ICO encoders | MIT OR Apache-2.0 |
+| assets/icons/app/linux/exports/hicolor/512x512/apps/app.polykrom.Polykrom.png | Polykrom contributors | Generated from assets/icons/app/shared/source/app_icon.rs with the original CLI/ICO encoders | MIT OR Apache-2.0 |
+| assets/icons/app/linux/exports/hicolor/64x64/apps/app.polykrom.Polykrom.png | Polykrom contributors | Generated from assets/icons/app/shared/source/app_icon.rs with the original CLI/ICO encoders | MIT OR Apache-2.0 |
 | assets/icons/app/shared/source/app_icon.rs | Polykrom contributors | original drawing code: the lime pixel p on an ink tile | MIT OR Apache-2.0 |
 | assets/icons/app/shared/source/windows_ico.rs | SolidCraft contributors | Original SolidCraft resource data or drawing code, collected without redesign | MIT OR Apache-2.0 |
-| assets/icons/app/windows/exports/solidcraft-executable.ico | Polykrom contributors | Generated from assets/icons/app/shared/source/app_icon.rs with the original CLI/ICO encoders | MIT OR Apache-2.0 |
-| assets/icons/app/windows/exports/solidcraft.ico | Polykrom contributors | Generated from assets/icons/app/shared/source/app_icon.rs with the original CLI/ICO encoders | MIT OR Apache-2.0 |
+| assets/icons/app/windows/exports/polykrom-executable.ico | Polykrom contributors | Generated from assets/icons/app/shared/source/app_icon.rs with the original CLI/ICO encoders | MIT OR Apache-2.0 |
+| assets/icons/app/windows/exports/polykrom.ico | Polykrom contributors | Generated from assets/icons/app/shared/source/app_icon.rs with the original CLI/ICO encoders | MIT OR Apache-2.0 |
 | assets/icons/ui/source/glyphs.rs | SolidCraft / VectorCraft contributors | Original glyphs; caption geometry adapted from VectorCraft titlebar.rs (https://github.com/storytold/vectorcraft) | MIT OR Apache-2.0 |
 | assets/icons/ui/source/markers.rs | SolidCraft contributors | Original SolidCraft resource data or drawing code, collected without redesign | MIT OR Apache-2.0 |
 | assets/icons/ui/source/navigation.rs | SolidCraft contributors | Original SolidCraft resource data or drawing code, collected without redesign | MIT OR Apache-2.0 |
@@ -164,13 +164,13 @@ Editable drawing code, native projects and shipped exports are collected under `
 | assets/locales/zh.json | SolidCraft contributors | Original SolidCraft resource data or drawing code, collected without redesign | MIT OR Apache-2.0 |
 | assets/locales/zh-TW.json | SolidCraft contributors | Original Traditional Chinese (Taiwan) translation of SolidCraft's English catalog; no commercial CAD text used | MIT OR Apache-2.0 |
 | assets/materials/library.rs | SolidCraft contributors | Original SolidCraft resource data or drawing code, collected without redesign | MIT OR Apache-2.0 |
-| assets/platforms/linux/ai.storyteller.solidcraft.desktop | PhotoCraft / SolidCraft contributors | PhotoCraft packaging templates (https://github.com/storytold/photocraft), adapted for SolidCraft | Apache-2.0 |
-| assets/platforms/linux/ai.storyteller.solidcraft.metainfo.xml.in | PhotoCraft / SolidCraft contributors | PhotoCraft packaging templates (https://github.com/storytold/photocraft), adapted for SolidCraft | Apache-2.0 |
-| assets/platforms/linux/ai.storyteller.solidcraft.mime.xml | PhotoCraft / SolidCraft contributors | PhotoCraft packaging templates (https://github.com/storytold/photocraft), adapted for SolidCraft | Apache-2.0 |
+| assets/platforms/linux/app.polykrom.Polykrom.desktop | PhotoCraft / SolidCraft contributors | PhotoCraft packaging templates (https://github.com/storytold/photocraft), adapted for SolidCraft | Apache-2.0 |
+| assets/platforms/linux/app.polykrom.Polykrom.metainfo.xml.in | PhotoCraft / SolidCraft contributors | PhotoCraft packaging templates (https://github.com/storytold/photocraft), adapted for SolidCraft | Apache-2.0 |
+| assets/platforms/linux/app.polykrom.Polykrom.mime.xml | PhotoCraft / SolidCraft contributors | PhotoCraft packaging templates (https://github.com/storytold/photocraft), adapted for SolidCraft | Apache-2.0 |
 | assets/platforms/macos/Info.plist.in | PhotoCraft / SolidCraft contributors | PhotoCraft packaging templates (https://github.com/storytold/photocraft), adapted for SolidCraft | Apache-2.0 |
 | assets/platforms/macos/README.txt | PhotoCraft / SolidCraft contributors | PhotoCraft packaging templates (https://github.com/storytold/photocraft), adapted for SolidCraft | Apache-2.0 |
-| assets/platforms/windows/solidcraft.en-us.wxl | PhotoCraft / SolidCraft contributors | PhotoCraft packaging templates (https://github.com/storytold/photocraft), adapted for SolidCraft | Apache-2.0 |
-| assets/platforms/windows/solidcraft.wxs | PhotoCraft / SolidCraft contributors | PhotoCraft packaging templates (https://github.com/storytold/photocraft), adapted for SolidCraft | Apache-2.0 |
+| assets/platforms/windows/polykrom.en-us.wxl | PhotoCraft / SolidCraft contributors | PhotoCraft packaging templates (https://github.com/storytold/photocraft), adapted for SolidCraft | Apache-2.0 |
+| assets/platforms/windows/polykrom.wxs | PhotoCraft / SolidCraft contributors | PhotoCraft packaging templates (https://github.com/storytold/photocraft), adapted for SolidCraft | Apache-2.0 |
 | assets/shaders/viewport.wgsl | SolidCraft contributors | Original SolidCraft resource data or drawing code, collected without redesign | MIT OR Apache-2.0 |
 | assets/styles/ui/palettes.rs | SolidCraft contributors | Original SolidCraft resource data or drawing code, collected without redesign | MIT OR Apache-2.0 |
 | assets/styles/ui/themes/gruvbox-dark.json | SolidCraft contributors | original SolidCraft theme file mapping SolidCraft's UI colours to the Gruvbox palette's colour values (Gruvbox by Pavel Pertsev, https://github.com/morhetz/gruvbox, MIT) | MIT OR Apache-2.0 |
@@ -179,7 +179,7 @@ Editable drawing code, native projects and shipped exports are collected under `
 | assets/styles/ui/themes/gruvbox-light.json | SolidCraft contributors | original SolidCraft theme file mapping SolidCraft's UI colours to the Gruvbox palette's colour values (Gruvbox by Pavel Pertsev, https://github.com/morhetz/gruvbox, MIT) | MIT OR Apache-2.0 |
 | assets/styles/ui/themes/gruvbox-light-hard.json | SolidCraft contributors | original SolidCraft theme file mapping SolidCraft's UI colours to the Gruvbox palette's colour values (Gruvbox by Pavel Pertsev, https://github.com/morhetz/gruvbox, MIT) | MIT OR Apache-2.0 |
 | assets/styles/ui/themes/gruvbox-light-soft.json | SolidCraft contributors | original SolidCraft theme file mapping SolidCraft's UI colours to the Gruvbox palette's colour values (Gruvbox by Pavel Pertsev, https://github.com/morhetz/gruvbox, MIT) | MIT OR Apache-2.0 |
-| assets/styles/ui/themes/solidcraft-95.json | SolidCraft contributors | original SolidCraft theme file | MIT OR Apache-2.0 |
+| assets/styles/ui/themes/polykrom-95.json | SolidCraft contributors | original SolidCraft theme file | MIT OR Apache-2.0 |
 | assets/styles/ui/themes/platinum-9.json | SolidCraft contributors | original SolidCraft theme file | MIT OR Apache-2.0 |
 | assets/styles/ui/themes/cupertino.json | SolidCraft contributors | original SolidCraft theme file | MIT OR Apache-2.0 |
 | assets/styles/ui/themes/green-phosphor.json | SolidCraft contributors | original SolidCraft theme file | MIT OR Apache-2.0 |

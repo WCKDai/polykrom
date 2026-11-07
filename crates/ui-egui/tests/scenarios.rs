@@ -18,12 +18,12 @@ fn run(name: &str) {
 
 include!(concat!(env!("OUT_DIR"), "/scenario_tests.rs"));
 
-/// A scenario file named by `SOLIDCRAFT_SCENARIO_FILE` (for trying one out):
-/// `SOLIDCRAFT_SCENARIO_FILE=x.json cargo test --test scenarios adhoc -- --ignored --nocapture`.
+/// A scenario file named by `POLYKROM_SCENARIO_FILE` (for trying one out):
+/// `POLYKROM_SCENARIO_FILE=x.json cargo test --test scenarios adhoc -- --ignored --nocapture`.
 #[test]
 #[ignore]
 fn adhoc() {
-    let Ok(path) = polykrom_engine::geom::env::var("SCENARIO_FILE").ok_or(()) else { return };
+    let Ok(path) = polykrom_engine::env::var("SCENARIO_FILE").ok_or(()) else { return };
     let text = std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("{path}: {e}"));
     let steps: serde_json::Value = serde_json::from_str(&text).unwrap_or_else(|e| panic!("{path}: {e}"));
     let mut h = Harness::new();

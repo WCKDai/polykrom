@@ -97,7 +97,7 @@ fn assistant_transcript_tools_and_approvals_fit_in_both_themes() {
             assert_eq!(h.app.agent_chat.waiting(), 1, "rendering and expanding tools never answer an approval");
             let approval = scenario::rect_of("assistant:approval").expect("approval card");
             assert!(approval.height() < 160.0, "approval stays compact at {width}: {approval:?}");
-            if let Ok(dir) = std::env::var("SOLIDCRAFT_ASSISTANT_EVIDENCE") {
+            if let Ok(dir) = std::env::var("POLYKROM_ASSISTANT_EVIDENCE") {
                 std::fs::create_dir_all(&dir).unwrap();
                 image::imageops::crop_imm(&screenshot, panel.left() as u32, panel.top() as u32, panel.width() as u32, panel.height() as u32)
                     .to_image()

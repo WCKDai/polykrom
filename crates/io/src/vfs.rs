@@ -458,7 +458,7 @@ pub fn read_to_string(path: &str, max: usize) -> Result<String> {
 mod tests {
     #[test]
     fn files_round_trip() {
-        let dir = std::env::temp_dir().join(format!("solidcraft-vfs-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("polykrom-vfs-{}", std::process::id()));
         let _ = std::fs::create_dir_all(&dir);
         let p = dir.join("a.txt").to_string_lossy().to_string();
         assert!(!super::exists(&p));
@@ -485,7 +485,7 @@ mod tests {
         assert!(e.to_string().contains("not a regular file"), "{e}");
         assert!(super::read_to_string("/dev/zero", 1024).is_err());
 
-        let dir = std::env::temp_dir().join(format!("solidcraft-vfs-fifo-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("polykrom-vfs-fifo-{}", std::process::id()));
         let _ = std::fs::create_dir_all(&dir);
         let fifo = dir.join("p");
         let made = std::process::Command::new("mkfifo").arg(&fifo).status().map(|s| s.success()).unwrap_or(false);
@@ -508,7 +508,7 @@ mod tests {
     #[test]
     fn a_scope_confines_every_call_to_its_folders() {
         use super::{PathScope, scoped};
-        let base = std::env::temp_dir().join(format!("solidcraft-vfs-scope-{}", std::process::id()));
+        let base = std::env::temp_dir().join(format!("polykrom-vfs-scope-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&base);
         let (root, out) = (base.join("root"), base.join("out"));
         std::fs::create_dir_all(root.join("sub")).unwrap();
@@ -552,7 +552,7 @@ mod tests {
     #[test]
     fn roots_are_folders_and_new_files_resolve_through_their_folder() {
         use super::PathScope;
-        let base = std::env::temp_dir().join(format!("solidcraft-vfs-prefix-{}", std::process::id()));
+        let base = std::env::temp_dir().join(format!("polykrom-vfs-prefix-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&base);
         let (a, ab, out) = (base.join("a"), base.join("ab"), base.join("out"));
         for d in [&a, &ab, &out] {
@@ -585,7 +585,7 @@ mod tests {
     #[test]
     fn a_folder_and_a_path_meet_whichever_way_each_is_spelled() {
         use super::{PathScope, scoped};
-        let base = std::env::temp_dir().join(format!("solidcraft-vfs-spelling-{}", std::process::id()));
+        let base = std::env::temp_dir().join(format!("polykrom-vfs-spelling-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&base);
         let (real, link, out) = (base.join("real"), base.join("link"), base.join("out"));
         std::fs::create_dir_all(&real).unwrap();
@@ -679,7 +679,7 @@ mod tests {
     #[cfg(windows)]
     #[test]
     fn windows_unc_verbatim_drive_relative_and_device_paths_are_refused() {
-        let root = super::temp_dir().join(format!("solidcraft-vfs-win-{}", std::process::id()));
+        let root = super::temp_dir().join(format!("polykrom-vfs-win-{}", std::process::id()));
         std::fs::create_dir_all(&root).unwrap();
         let scope = super::PathScope::new([root.clone()]);
         let inside = |f: &str| root.join(f).to_string_lossy().to_string();
@@ -721,7 +721,7 @@ mod tests {
     fn derived_folders_are_spelled_with_long_names_and_short_names_from_agents_stay_refused() {
         use super::{PathScope, long_names, short_name, temp_dir};
         assert!(!temp_dir().iter().any(|n| short_name(&n.to_string_lossy())), "{}", temp_dir().display());
-        let long = temp_dir().join(format!("solidcraft-vfs-long-names-{}", std::process::id()));
+        let long = temp_dir().join(format!("polykrom-vfs-long-names-{}", std::process::id()));
         std::fs::create_dir_all(&long).unwrap();
         let Some(short) = short_spelling(&long) else {
             eprintln!("skipped: {} has no short (8.3) name on this volume", long.display());
@@ -749,7 +749,7 @@ mod tests {
     #[test]
     fn the_designs_folder_counts_only_when_safe_and_never_reaches_hidden_files() {
         use super::{PathScope, design_folder_refusal_in as refusal};
-        let base = std::env::temp_dir().join(format!("solidcraft-vfs-design-{}", std::process::id()));
+        let base = std::env::temp_dir().join(format!("polykrom-vfs-design-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&base);
         let home = base.join("home");
         let (proj, dotdir) = (home.join("work/proj"), home.join(".config/x"));
@@ -806,7 +806,7 @@ mod tests {
     #[test]
     fn a_link_is_judged_by_where_it_leads() {
         use super::PathScope;
-        let base = std::env::temp_dir().join(format!("solidcraft-vfs-link-{}", std::process::id()));
+        let base = std::env::temp_dir().join(format!("polykrom-vfs-link-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&base);
         let (root, out) = (base.join("root"), base.join("out"));
         std::fs::create_dir_all(&root).unwrap();

@@ -41,6 +41,7 @@ pub use polycore as kernel;
 pub use polycore_geom as geom;
 pub use polykrom_doc as doc;
 pub use polykrom_doc::Visibility;
+pub use polykrom_doc::env;
 pub use polykrom_io as io;
 pub use polykrom_render as render;
 pub use polykrom_sketch as sketch;
@@ -479,13 +480,13 @@ impl Session {
 
     /// A session on `doc` whose evaluation is the model its file kept (`saved`), when that is
     /// `doc`'s evaluation ([`Model::adopt`]); otherwise the timeline is evaluated.
-    /// `SOLIDCRAFT_NO_MODEL_CACHE` set always evaluates.
+    /// `POLYKROM_NO_MODEL_CACHE` set always evaluates.
     pub fn opened(mut doc: Document, saved: Option<&polykrom_doc::SavedModel>) -> Self {
         // The session keeps what is hidden (not an undo step); the design file carries it.
         let visibility = std::mem::take(&mut doc.visibility);
         let doc = Arc::new(doc);
         let adopted = saved
-            .filter(|_| polycore_geom::env::var_os("NO_MODEL_CACHE").is_none())
+            .filter(|_| crate::env::var_os("NO_MODEL_CACHE").is_none())
             .and_then(|saved| Model::adopt(&doc, saved).map_err(|e| log::info!("the saved model is not used: {e}")).ok());
         let model = adopted.unwrap_or_else(|| {
             let mut model = Model::new();

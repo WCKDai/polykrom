@@ -1,4 +1,4 @@
-# Polykrom's checks. The inherited ci.yml targets SolidCraft's Blacksmith runners, which this
+# Polykrom's checks. The inherited ci.yml targets the upstream project's Blacksmith runners, which this
 # repository does not have (its jobs never start here), so this workflow runs the same gate as
 # `cargo xtask ci`. The tests are scripts/ci/nextest.sh's: pull requests run them in parallel parts,
 # main in one run. It runs only in WCKDai/polykrom.

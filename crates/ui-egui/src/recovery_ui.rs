@@ -187,7 +187,7 @@ mod tests {
     use std::fs;
 
     fn app(tag: &str, interval: Duration) -> (SolveApp, PathBuf) {
-        let dir = std::env::temp_dir().join(format!("solidcraft-recovery-tabs-{tag}-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("polykrom-recovery-tabs-{tag}-{}", std::process::id()));
         let _ = fs::remove_dir_all(&dir);
         let mut app = SolveApp::new(Session::default(), Services::default());
         start(&mut app, &dir, interval);

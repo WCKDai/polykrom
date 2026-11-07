@@ -1,6 +1,6 @@
 //! Install as an app (`polykrom_ui_egui::install`). The browser offers it with a
 //! `beforeinstallprompt` event, which can come before this code runs: index.html keeps the event
-//! as `window.solidcraftInstall` (and drops it once the app is installed). The offer is good for
+//! as `window.polykromInstall` (and drops it once the app is installed). The offer is good for
 //! one prompt; a browser that is still willing makes a new one later. Safari makes no offer: it
 //! gets its steps, unless the app is already running installed.
 
@@ -8,7 +8,7 @@ use polykrom_ui_egui::install::{InstallApp, Offer, safari_steps};
 use wasm_bindgen::{JsCast as _, JsValue};
 
 /// Where index.html keeps the browser's offer.
-const OFFER: &str = "solidcraftInstall";
+const OFFER: &str = "polykromInstall";
 
 /// The browser's offer, kept by index.html (None: none, or it was used).
 fn offer() -> Option<js_sys::Object> {

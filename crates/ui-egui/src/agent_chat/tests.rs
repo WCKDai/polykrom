@@ -455,8 +455,8 @@ fn the_agents_own_questions_are_answered_by_the_mode_or_asked() {
             PermissionOption { id: "no".into(), name: "Reject".into(), kind: "reject_once".into() },
         ]
     };
-    on_permission(&mut app, 1, "mcp__solidcraft__batch".into(), opts());
-    assert!(matches!(app.agent_chat.items.last(), Some(Item::Notice { text, .. }) if text.contains("mcp__solidcraft__batch")));
+    on_permission(&mut app, 1, "mcp__polykrom__batch".into(), opts());
+    assert!(matches!(app.agent_chat.items.last(), Some(Item::Notice { text, .. }) if text.contains("mcp__polykrom__batch")));
     on_permission(&mut app, 2, "Run ls".into(), opts());
     assert!(matches!(app.agent_chat.items.last(), Some(Item::Permission { answer: None, .. })));
     let n = app.agent_chat.items.len() - 1;
@@ -931,7 +931,7 @@ done
 
 /// A folder of files to attach: a picture and a text file.
 fn attachable(tag: &str) -> std::path::PathBuf {
-    let d = std::env::temp_dir().join(format!("solidcraft-chat-files-{tag}-{}", std::process::id()));
+    let d = std::env::temp_dir().join(format!("polykrom-chat-files-{tag}-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&d);
     std::fs::create_dir_all(&d).unwrap();
     image::RgbaImage::from_pixel(40, 30, image::Rgba([250, 250, 250, 255])).save(d.join("target.png")).unwrap();
@@ -1265,7 +1265,7 @@ fn the_plus_button_attaches_a_chosen_file_or_a_pasted_picture() {
     for ext in ["png", "jpg", "gif", "webp", "svg", "md", "step", "stl"] {
         assert!(exts.iter().any(|e| e == ext), "{ext} in {exts:?}");
     }
-    assert!(!exts.iter().any(|e| e == "solidcraft"));
+    assert!(!exts.iter().any(|e| e == "polykrom" || e == "solidcraft"), "designs are not attachments: {exts:?}");
     attach_rgba(&mut h.app, 4, 3, &[200; 48]).unwrap();
     attach_rgba(&mut h.app, 4, 3, &[200; 47]).unwrap();
     settle_chat(&mut h);
@@ -1788,7 +1788,7 @@ fn add_agent_opens_its_dialog_from_home() {
 #[cfg(unix)]
 fn stand_ins(tag: &str, programs: &[(&str, &str)]) -> std::path::PathBuf {
     use std::os::unix::fs::PermissionsExt;
-    let d = std::env::temp_dir().join(format!("solidcraft-chat-setup-{tag}-{}", std::process::id()));
+    let d = std::env::temp_dir().join(format!("polykrom-chat-setup-{tag}-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&d);
     std::fs::create_dir_all(&d).unwrap();
     for (name, body) in programs {

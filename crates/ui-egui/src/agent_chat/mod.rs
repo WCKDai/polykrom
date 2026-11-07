@@ -717,25 +717,22 @@ pub(crate) fn assistant_tip(mark: AssistantMark) -> String {
 
 /// Whether a permission question is about one of Polykrom's own tools (which Polykrom's own
 /// gate checks): the agents name MCP tools after their server.
-fn solidcraft_tool(title: &str) -> bool {
-    title.to_ascii_lowercase().contains("solidcraft")
+fn polykrom_tool(title: &str) -> bool {
+    title.to_ascii_lowercase().contains("polykrom")
 }
 
-/// `polykrom-cli` next to this program, else on the search path; failing that, SolidCraft's
-/// name for it (an older install, or a PATH that only has that one).
+/// `polykrom-cli` next to this program, else on the search path.
 #[cfg(not(target_arch = "wasm32"))]
 fn find_cli() -> Option<std::path::PathBuf> {
-    if let Some(p) = polykrom_engine::geom::env::var("CLI").map(std::path::PathBuf::from).filter(|p| p.is_file()) {
+    if let Some(p) = polykrom_engine::env::var("CLI").map(std::path::PathBuf::from).filter(|p| p.is_file()) {
         return Some(p);
     }
-    let beside = std::env::current_exe().ok().and_then(|e| e.parent().map(std::path::Path::to_path_buf));
-    ["polykrom-cli", "solidcraft-cli"].into_iter().find_map(|name| {
-        beside
-            .as_ref()
-            .map(|d| d.join(format!("{name}{}", std::env::consts::EXE_SUFFIX)))
-            .filter(|p| p.is_file())
-            .or_else(|| discover::find_in(name, &discover::search_dirs()))
-    })
+    let name = "polykrom-cli";
+    std::env::current_exe()
+        .ok()
+        .and_then(|e| e.parent().map(|d| d.join(format!("{name}{}", std::env::consts::EXE_SUFFIX))))
+        .filter(|p| p.is_file())
+        .or_else(|| discover::find_in(name, &discover::search_dirs()))
 }
 
 /// The agent's working folder: an empty folder of Polykrom's own, so an agent's own file tools
@@ -743,7 +740,7 @@ fn find_cli() -> Option<std::path::PathBuf> {
 fn working_dir() -> std::path::PathBuf {
     let d = polykrom_engine::recovery::data_dir()
         .map(|d| d.join("agent-chat").join("work"))
-        .unwrap_or_else(|| std::env::temp_dir().join("solidcraft-agent-chat"));
+        .unwrap_or_else(|| std::env::temp_dir().join("polykrom-agent-chat"));
     #[cfg(not(target_arch = "wasm32"))]
     let _ = std::fs::create_dir_all(&d);
     d
@@ -1243,7 +1240,7 @@ fn on_permission(app: &mut SolveApp, key: u64, title: String, options: Vec<Permi
     let agent = app.agent_chat.running_id.clone();
     let mode = agents::mode_for(&app.preferences, &agent);
     let remembered = agents::always_allowed(&app.preferences, &agent, &title);
-    let why = if solidcraft_tool(&title) {
+    let why = if polykrom_tool(&title) {
         Some("ui.ai_auto_ours")
     } else if remembered {
         Some("ui.ai_auto_remembered")

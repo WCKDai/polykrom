@@ -37,6 +37,7 @@ const AMBIGUOUS_KEYS: &[&str] = &["path", "paths", "source"];
 
 /// File extensions that make a bare word a file name.
 const FILE_EXTENSIONS: &[&str] = &[
+    "polykrom",
     "solidcraft",
     "json",
     "csv",
@@ -216,7 +217,7 @@ fn is_scratch(params: &Value) -> bool {
             .iter()
             .filter_map(Value::as_str)
             .map(std::path::Path::new)
-            .any(|r| r.file_name().and_then(|n| n.to_str()).is_some_and(|n| n.starts_with("solidcraft-mcp-")) && path.starts_with(r))
+            .any(|r| r.file_name().and_then(|n| n.to_str()).is_some_and(|n| n.starts_with("polykrom-mcp-")) && path.starts_with(r))
     })
 }
 
@@ -325,9 +326,9 @@ mod tests {
 
     #[test]
     fn the_mcp_servers_own_pictures_need_no_question() {
-        let scratch = json!({"path": "/tmp/solidcraft-mcp-41-a3/shot-1.png", "allow_paths": ["/tmp/solidcraft-mcp-41-a3"]});
+        let scratch = json!({"path": "/tmp/polykrom-mcp-41-a3/shot-1.png", "allow_paths": ["/tmp/polykrom-mcp-41-a3"]});
         assert_eq!(request("ui.screenshot", &scratch, 0), Verdict::Run { change: false });
-        let elsewhere = json!({"path": "/home/u/Desktop/shot.png", "allow_paths": ["/tmp/solidcraft-mcp-41-a3", "/home/u/Desktop"]});
+        let elsewhere = json!({"path": "/home/u/Desktop/shot.png", "allow_paths": ["/tmp/polykrom-mcp-41-a3", "/home/u/Desktop"]});
         assert!(matches!(request("ui.screenshot", &elsewhere, 0), Verdict::Ask(_)));
         assert_eq!(request("ui.render", &json!({"width": 400}), 0), Verdict::Run { change: false });
     }

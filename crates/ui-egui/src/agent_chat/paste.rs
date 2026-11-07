@@ -194,7 +194,7 @@ mod tests {
 
     #[test]
     fn a_text_of_file_links_attaches_the_files_but_other_text_does_not() {
-        let d = std::env::temp_dir().join(format!("solidcraft-paste-{}", std::process::id()));
+        let d = std::env::temp_dir().join(format!("polykrom-paste-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&d);
         std::fs::create_dir_all(&d).unwrap();
         let spaced = d.join("my part.stl");

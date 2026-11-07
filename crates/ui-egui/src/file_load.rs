@@ -376,7 +376,7 @@ fn start(app: &mut SolveApp) {
                 let Some(partial) = watch.take_partial() else { continue };
                 let began = std::time::Instant::now();
                 let picture = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| partial_picture(&partial.world, &stop))).ok().flatten();
-                if polykrom_engine::geom::env::var_os("PROFILE_OPEN").is_some() {
+                if polykrom_engine::env::var_os("PROFILE_OPEN").is_some() {
                     eprintln!(
                         "Polykrom partial picture: features={} bodies={} drawn={} ms={:.1}",
                         partial.features,
@@ -414,7 +414,7 @@ fn start(app: &mut SolveApp) {
                     let picture = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| saved_picture(preview))).ok().flatten();
                     if let Some(picture) = picture.filter(|_| !progress.is_cancelled()) {
                         let _ = preview_tx.send(picture);
-                        if polykrom_engine::geom::env::var_os("PROFILE_OPEN").is_some() {
+                        if polykrom_engine::env::var_os("PROFILE_OPEN").is_some() {
                             eprintln!("Polykrom saved preview: ready_ms={:.3}", preview_began.elapsed().as_secs_f64() * 1000.0);
                         }
                     }
@@ -733,7 +733,7 @@ fn compute(
     phase: &AtomicU8,
     progress: &Arc<Progress>,
 ) -> Job {
-    let profile = polykrom_engine::geom::env::var_os("PROFILE_OPEN").is_some();
+    let profile = polykrom_engine::env::var_os("PROFILE_OPEN").is_some();
     let began = std::time::Instant::now();
     let cancelled = || Err("file operation cancelled".to_string());
     if progress.is_cancelled() {
@@ -1239,7 +1239,7 @@ mod tests {
     /// lands as a worker's would; Cancel between frames leaves the design as it was.
     #[test]
     fn a_staged_step_import_lands_over_frames_and_cancels_between_them() {
-        let dir = std::env::temp_dir().join(format!("solidcraft-staged-step-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("polykrom-staged-step-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         let path = dir.join("boxes.step").to_string_lossy().into_owned();
         let mut part = Session::default();

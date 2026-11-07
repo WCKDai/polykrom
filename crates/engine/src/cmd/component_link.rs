@@ -27,7 +27,7 @@ mod relink_tests;
 
 pub static COMMANDS: &[CommandSpec] = &[
     CommandSpec::new("component.insert_design", "Insert Design", insert_design).at("SOLID", "ASSEMBLE").icon("component").params(
-        "path: a .solidcraft design → a new component linked to it, holding its solid bodies as placed in that design; \
+        "path: a .polykrom design → a new component linked to it, holding its solid bodies as placed in that design; \
          name? (default: the design's name); parent?: component id or name (default: the active one); translate?: [x,y,z]; \
          reuse?: bool (default false): insert a free occurrence, reusing an existing link to the same file when available",
     ),
@@ -36,13 +36,13 @@ pub static COMMANDS: &[CommandSpec] = &[
          → updated, unchanged, warnings (also joints whose faces are gone or that no longer solve)",
     ),
     CommandSpec::new("component.relink", "Relink Source", relink).icon("update").params(
-        "component: id or name of a linked component; path: a saved .solidcraft design — replaces the source and linked bodies for all its occurrences, preserving identities and placements; returns path, previous_path, warnings, joint_errors and joint_conflicts",
+        "component: id or name of a linked component; path: a saved .polykrom design — replaces the source and linked bodies for all its occurrences, preserving identities and placements; returns path, previous_path, warnings, joint_errors and joint_conflicts",
     ),
     CommandSpec::new("component.break_link", "Break Link", break_link)
         .icon("break")
         .params("component: id or name of a linked component — keeps its bodies as they are and forgets the design file"),
     CommandSpec::new("component.extract", "Extract to File", extract::extract).icon("export").params(
-        "component: id or name of a component that is not linked; path: the .solidcraft design to write → its history, subcomponents and their joints \
+        "component: id or name of a component that is not linked; path: the .polykrom design to write → its history, subcomponents and their joints \
          move to that design, and the component becomes linked to it (as component.insert_design makes it); returns path, file, feature, bodies, \
          notices (what stays behind), warnings and copies (components that build the same bodies: see component.replace_with_link)",
     ),
@@ -50,7 +50,7 @@ pub static COMMANDS: &[CommandSpec] = &[
         "component: id or name of a linked component → copies: [{component, name}], the components not linked whose own history builds the same bodies",
     ),
     CommandSpec::new("component.replace_with_link", "Replace with Link", extract::replace_with_link).icon("chain").params(
-        "component or components: [ids or names] of components that are not linked; with: a linked component, or path: a .solidcraft design \
+        "component or components: [ids or names] of components that are not linked; with: a linked component, or path: a .polykrom design \
          (its link here, else a new linked component) → each component's history goes and its placements become placements of the linked \
          component; refused when its bodies are not the same as the link's; returns component, name, replaced and warnings",
     ),
@@ -315,7 +315,7 @@ fn relink(s: &mut Session, p: &Value) -> Result<Value> {
     let given = str_(p, "path").filter(|x| !x.trim().is_empty() && x.len() < 4096).ok_or_else(|| bad(cmd, "`path` is required"))?;
     let file = absolute(Path::new(given));
     if !file.extension().and_then(|e| e.to_str()).is_some_and(|e| polykrom_io::DESIGN_EXTS.iter().any(|x| e.eq_ignore_ascii_case(x))) {
-        return Err(bad(cmd, "choose a saved .solidcraft design"));
+        return Err(bad(cmd, "choose a saved .polykrom design"));
     }
     // The ordinary lexical check in linked_bodies also works in the browser VFS. On native
     // hosts, reject an alias of this assembly too (a symlink or a path with different case).
@@ -432,7 +432,7 @@ mod tests {
 
     #[test]
     fn a_saved_assembly_reopens_with_its_link_updates_it_and_breaks_it() {
-        let dir = std::env::temp_dir().join(format!("solidcraft-link-reopen-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("polykrom-link-reopen-{}", std::process::id()));
         std::fs::create_dir_all(dir.join("parts")).unwrap();
         std::fs::create_dir_all(dir.join("asm")).unwrap();
         let part = dir.join("parts").join("plate.solidcraft");
@@ -472,7 +472,7 @@ mod tests {
     #[test]
     fn inserting_a_missing_file_or_bad_parameters_changes_nothing() {
         let mut s = Session::default();
-        let missing = std::env::temp_dir().join(format!("solidcraft-no-such-part-{}.solidcraft", std::process::id()));
+        let missing = std::env::temp_dir().join(format!("polykrom-no-such-part-{}.solidcraft", std::process::id()));
         assert!(s.execute("component.insert_design", &json!({"path": missing})).is_err());
         assert!(s.execute("component.insert_design", &json!({})).is_err());
         assert!(s.execute("component.insert_design", &json!({"path": "x.solidcraft", "translate": [1, "a", 2]})).is_err());
@@ -528,7 +528,7 @@ mod tests {
     /// size that takes the first one's place in the file.
     #[test]
     fn joints_on_a_linked_part_follow_its_faces_through_update_links() {
-        let dir = std::env::temp_dir().join(format!("solidcraft-link-names-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("polykrom-link-names-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         let path = dir.join("plate.solidcraft");
         let hx = |part: &mut Session, x: &str| {
@@ -573,7 +573,7 @@ mod tests {
     /// say so instead of moving the joint to another hole of the same size.
     #[test]
     fn a_joint_whose_linked_face_is_gone_is_reported_not_moved() {
-        let dir = std::env::temp_dir().join(format!("solidcraft-link-gone-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("polykrom-link-gone-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         let path = dir.join("plate.solidcraft");
         let mut part = plate(&path);
@@ -594,7 +594,7 @@ mod tests {
     /// place in the file: Update Links says it can't vouch for it, and keeps the names from then on.
     #[test]
     fn update_links_warns_about_joints_on_faces_named_by_their_place() {
-        let dir = std::env::temp_dir().join(format!("solidcraft-link-numbered-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("polykrom-link-numbered-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         let path = dir.join("plate.solidcraft");
         let mut part = plate(&path);

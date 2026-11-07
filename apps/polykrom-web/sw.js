@@ -32,10 +32,10 @@
 const RETIRE = VERSION === "dev";
 
 const PATH = new URL(self.registration.scope).pathname;
-const CACHE_PREFIX = `solidcraft-app ${PATH} `;
+const CACHE_PREFIX = `polykrom-app ${PATH} `;
 const CACHE = CACHE_PREFIX + VERSION;
 /** Which build each open page started: page id → cache name (or NETWORK). */
-const PAGES = `solidcraft-app-pages ${PATH}`;
+const PAGES = `polykrom-app-pages ${PATH}`;
 /** A page that came from the network gets its files from there too. */
 const NETWORK = "network";
 const NAVIGATE_TIMEOUT_MS = 4000;

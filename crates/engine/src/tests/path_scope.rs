@@ -8,7 +8,7 @@ use crate::*;
 
 #[test]
 fn file_commands_stay_inside_the_agents_folders() {
-    let base = polykrom_io::vfs::temp_dir().join(format!("solidcraft-path-scope-{}", std::process::id()));
+    let base = polykrom_io::vfs::temp_dir().join(format!("polykrom-path-scope-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&base);
     let (root, out) = (base.join("root"), base.join("out"));
     std::fs::create_dir_all(&root).unwrap();
@@ -74,7 +74,7 @@ fn file_commands_stay_inside_the_agents_folders() {
 /// font outside its folders stays unread, even one already read (and cached) for the user.
 #[test]
 fn a_designs_font_file_stays_inside_the_agents_folders() {
-    let base = polykrom_io::vfs::temp_dir().join(format!("solidcraft-font-scope-{}", std::process::id()));
+    let base = polykrom_io::vfs::temp_dir().join(format!("polykrom-font-scope-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&base);
     let (root, out) = (base.join("root"), base.join("out"));
     std::fs::create_dir_all(&root).unwrap();

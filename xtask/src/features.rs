@@ -30,12 +30,10 @@ const AREAS: &[(&str, &str)] = &[
 ];
 
 pub fn run(root: &Path) -> Result<(), String> {
-    let out = crate::cargo()
-        .args(["run", "-q", "--release", "-p", "polykrom-cli", "--", "commands"])
-        .output()
-        .map_err(|e| format!("solidcraft-cli: {e}"))?;
+    let out =
+        crate::cargo().args(["run", "-q", "--release", "-p", "polykrom-cli", "--", "commands"]).output().map_err(|e| format!("polykrom-cli: {e}"))?;
     if !out.status.success() {
-        return Err(format!("solidcraft-cli commands failed:\n{}", String::from_utf8_lossy(&out.stderr)));
+        return Err(format!("polykrom-cli commands failed:\n{}", String::from_utf8_lossy(&out.stderr)));
     }
     let cmds: Value = serde_json::from_slice(&out.stdout).map_err(|e| format!("commands JSON: {e}"))?;
     let list = cmds.as_array().map(Vec::as_slice).unwrap_or_default();

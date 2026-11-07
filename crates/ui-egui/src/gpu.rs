@@ -92,7 +92,7 @@ mod test_support {
                 }));
                 true
             }
-            Err(e @ polykrom_gpu::GpuError::NoAdapter(_)) if std::env::var_os("SOLIDCRAFT_REQUIRE_GPU").is_none() => {
+            Err(e @ polykrom_gpu::GpuError::NoAdapter(_)) if std::env::var_os("POLYKROM_REQUIRE_GPU").is_none() => {
                 eprintln!("skipping: {e}");
                 false
             }

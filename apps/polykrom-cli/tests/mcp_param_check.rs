@@ -6,7 +6,7 @@ use std::process::{Command, Stdio};
 
 #[test]
 fn param_check_applies_to_the_starting_script() {
-    let dir = std::env::temp_dir().join(format!("solidcraft-mcp-param-check-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("polykrom-mcp-param-check-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     let script = dir.join("typo.json");
     let box_ = r#"{"command": "solid.box", "params": {"length": 5, "width": 5, "height": 5, "operaton": "cut"}}"#;
