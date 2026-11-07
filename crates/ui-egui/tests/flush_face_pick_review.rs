@@ -54,13 +54,23 @@ fn picture(h: &mut Harness, path: &PathBuf) {
     shot.save(path).unwrap();
 }
 
-/// Frames until the dialog's preview has settled (it may run off the UI thread).
+/// How long a preview may take to compute before the test stops waiting for it: generous, for a
+/// loaded CI runner, where a computation that takes a fraction of a second here has taken many.
+const PREVIEW_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30);
+
+/// Frames until the dialog's preview has settled (it may run off the UI thread): it is active or
+/// its error is set, and nothing is computing or applying. Frames are pumped until that holds or
+/// `PREVIEW_TIMEOUT` of wall-clock time has passed, not for a fixed count that runs out on a slow
+/// CI runner while the preview is still computing (PK-99).
 fn settle(h: &mut Harness) {
-    for _ in 0..60 {
+    let deadline = std::time::Instant::now() + PREVIEW_TIMEOUT;
+    loop {
         h.frames(1);
-        if h.app.applying.is_none() && !h.app.preview.busy && (h.app.preview.error.is_some() || h.app.preview.active) {
+        let settled = h.app.applying.is_none() && !h.app.preview.busy && (h.app.preview.error.is_some() || h.app.preview.active);
+        if settled || std::time::Instant::now() >= deadline {
             break;
         }
+        std::thread::sleep(std::time::Duration::from_millis(2));
     }
     h.frames(3);
 }

@@ -34,16 +34,23 @@ fn shows(h: &Harness, text: &str) -> bool {
         .is_some_and(|tree| tree.nodes.iter().any(|(_, n)| n.label().into_iter().chain(n.value()).any(|l| l.contains(text))))
 }
 
-/// Frames until the proposal's preview is up (it computes off the window thread).
+/// How long a preview may take to compute before the test stops waiting for it: generous, for a
+/// loaded CI runner, where a computation that takes a fraction of a second here has taken many.
+const PREVIEW_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30);
+
+/// Frames until the proposal's preview is up (it computes off the window thread), pumped until
+/// `PREVIEW_TIMEOUT` of wall-clock time has passed: a fixed count of frames runs out on a slow
+/// CI runner while the preview is still computing (PK-99).
 fn wait_for_preview(h: &mut Harness) {
-    for _ in 0..400 {
+    let deadline = std::time::Instant::now() + PREVIEW_TIMEOUT;
+    while std::time::Instant::now() < deadline {
         if h.app.preview.active {
             return;
         }
         h.frame();
         std::thread::sleep(std::time::Duration::from_millis(2));
     }
-    panic!("the proposed geometry was not previewed");
+    panic!("the proposed geometry was not previewed: {:?}", h.app.preview.error);
 }
 
 #[test]
