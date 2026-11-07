@@ -18,8 +18,8 @@ Editable drawing code, native projects and shipped exports are collected under `
 | examples/render-studio.json | SolidCraft contributors | original procedural box/cylinder enclosure script for the integrated Render workspace | MIT OR Apache-2.0 |
 | examples/render-opaque-studio.json | SolidCraft contributors | original procedural sphere study varying opaque metal fraction and roughness independently; no external assets or engineering data | MIT OR Apache-2.0 |
 | crates/gpu/src/pbr.rs | SolidCraft contributors | original WGSL translation of SolidCraft's opaque surface and fixed studio reference, embedded as Rust source; no external shader code | MIT OR Apache-2.0 |
-| assets/icons/app/macos/source/Polykrom.icon/icon.json | Polykrom contributors | Icon Composer composition: an ink fill and the lime pixel p layer | MIT OR Apache-2.0 |
-| assets/icons/app/macos/source/Polykrom.icon/Assets/03-p.svg | Polykrom contributors | original lowercase pixel p in the WCKD family's six-cell style (autobot-www brand/kit.json), in Polykrom's lime #CCFF00 | MIT OR Apache-2.0 |
+| assets/icons/app/macos/source/Polykrom.icon/icon.json | Polykrom contributors | Icon Composer composition: an ink fill and the honeycomb logo layer | MIT OR Apache-2.0 |
+| assets/icons/app/macos/source/Polykrom.icon/Assets/03-honeycomb.svg | Polykrom contributors | the seven hexagons of assets/branding/polykrom-logo.svg in its lime-to-teal gradient, scaled onto the 1024 px canvas | MIT OR Apache-2.0 |
 | assets/icons/app/macos/exports/Assets.car | Polykrom contributors | Apple actool compilation of assets/icons/app/macos/source/Polykrom.icon for macOS; contains original artwork only | MIT OR Apache-2.0 |
 | assets/archive/icons/macos-v1/source/icon.vectorcraft | SolidCraft contributors | retained editable historical VectorCraft source, with named face and background layers; redundant exports retired | MIT OR Apache-2.0 |
 | assets/icons/app/macos/exports/icon.icns | Polykrom contributors | macOS fallback compiled by Apple's actool from the assets/icons/app/macos/source/Polykrom.icon composition | MIT OR Apache-2.0 |
@@ -130,7 +130,7 @@ Editable drawing code, native projects and shipped exports are collected under `
 | assets/icons/app/linux/exports/hicolor/48x48/apps/app.polykrom.Polykrom.png | Polykrom contributors | Generated from assets/icons/app/shared/source/app_icon.rs with the original CLI/ICO encoders | MIT OR Apache-2.0 |
 | assets/icons/app/linux/exports/hicolor/512x512/apps/app.polykrom.Polykrom.png | Polykrom contributors | Generated from assets/icons/app/shared/source/app_icon.rs with the original CLI/ICO encoders | MIT OR Apache-2.0 |
 | assets/icons/app/linux/exports/hicolor/64x64/apps/app.polykrom.Polykrom.png | Polykrom contributors | Generated from assets/icons/app/shared/source/app_icon.rs with the original CLI/ICO encoders | MIT OR Apache-2.0 |
-| assets/icons/app/shared/source/app_icon.rs | Polykrom contributors | original drawing code: the lime pixel p on an ink tile | MIT OR Apache-2.0 |
+| assets/icons/app/shared/source/app_icon.rs | Polykrom contributors | original drawing code: the honeycomb logo on an ink tile | MIT OR Apache-2.0 |
 | assets/icons/app/shared/source/windows_ico.rs | SolidCraft contributors | Original SolidCraft resource data or drawing code, collected without redesign | MIT OR Apache-2.0 |
 | assets/icons/app/windows/exports/polykrom-executable.ico | Polykrom contributors | Generated from assets/icons/app/shared/source/app_icon.rs with the original CLI/ICO encoders | MIT OR Apache-2.0 |
 | assets/icons/app/windows/exports/polykrom.ico | Polykrom contributors | Generated from assets/icons/app/shared/source/app_icon.rs with the original CLI/ICO encoders | MIT OR Apache-2.0 |
