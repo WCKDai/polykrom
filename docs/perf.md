@@ -241,13 +241,13 @@ Reproduce after compiling, without other builds running:
 
 ```sh
 cargo test -p polycore --profile ci benchmark_independent_step_solids --no-run
-SOLIDCRAFT_STEP_BENCH_COUNT=512 SOLIDCRAFT_STEP_BENCH_KIND=cylinder \
+POLYKROM_STEP_BENCH_COUNT=512 POLYKROM_STEP_BENCH_KIND=cylinder \
   cargo test -p polycore --profile ci benchmark_independent_step_solids \
   -- --ignored --nocapture --test-threads=1
 ```
 
 Use `torus` or `box` for the other fixtures and repeat in three fresh processes.
-`SOLIDCRAFT_STEP_BENCH_FIXTURE` optionally writes the original STEP for native inspection.
+`POLYKROM_STEP_BENCH_FIXTURE` optionally writes the original STEP for native inspection.
 No timing threshold runs in CI. Regressions compare serial and threaded imports with
 different worker counts: exact display meshes, measures, body/face source identities,
 names, colours/opacity, units, rotated assembly placements, duplicates and partial failures
@@ -348,7 +348,7 @@ An actual desktop sensor-enclosure opening on e8a8e0f prepared its saved picture
 24.320 ms; geometry reconstruction, display warmup and thumbnail preparation took
 8,913.212 ms. The same preview experiment is now explicitly opt-in; full geometry
 readiness still requires reconstruction.
-For actual desktop opening phases, launch with `SOLIDCRAFT_PROFILE_OPEN=1`: `ready_ms`
+For actual desktop opening phases, launch with `POLYKROM_PROFILE_OPEN=1`: `ready_ms`
 reports saved-picture preparation, while the normal phase log reports reconstruction,
 display warmup and thumbnail completion. Neither log measures the exact GPU first frame.
 
@@ -374,10 +374,10 @@ cargo test -p polykrom-engine --profile ci benchmark_native_cache_open -- --igno
 ```
 
 Use an absolute `CARGO_TARGET_DIR`. The save benchmark defaults to the generated
-512-box STEP document and accepts `SOLIDCRAFT_BENCH_FILE` for another public design.
+512-box STEP document and accepts `POLYKROM_BENCH_FILE` for another public design.
 It alternates nine saves of each encoding, including flush/replacement/backup, and
 verifies document identity and native-cache presence. It never times initial fixture
-evaluation as save work. Open runs once per process; `SOLIDCRAFT_BENCH_ENCODING`
+evaluation as save work. Open runs once per process; `POLYKROM_BENCH_ENCODING`
 selects 0=JSON, 1=container without cache, 2=native cache, 3=compact native cache.
 Changing only `cache/key.json`'s application version provides a cache-miss control.
 Fresh processes do not imply a cold operating-system file cache. The engine callback
@@ -478,8 +478,8 @@ analytic lines and 1,000 generated face segments, median time fell from **45.90 
 identity is compared. This measures certification only, not complete extrusion, file-open
 latency or Boolean operations; it does not establish an end-to-end loading speedup.
 Remaining cold geometry rebuild and import costs are tracked in
-[#255](https://github.com/bherbruck/solidcraft/issues/255); certification work is
-[#254](https://github.com/bherbruck/solidcraft/issues/254).
+[#255](https://github.com/tangency-labs/solidcraft/issues/255); certification work is
+[#254](https://github.com/tangency-labs/solidcraft/issues/254).
 
 ## Cold geometry rebuilds after 0.3.1
 
@@ -513,7 +513,7 @@ Both saved fixtures retain exactly the same body names, face/edge/vertex/shell c
 bounds, volumes, and surface areas. Focused tests compare cached and uncached refinement
 coordinates and normals bit for bit on periodic, singular and transformed surfaces.
 
-For desktop phase profiling, set `SOLIDCRAFT_PROFILE_OPEN=1` before launching the app.
+For desktop phase profiling, set `POLYKROM_PROFILE_OPEN=1` before launching the app.
 Interactive Open reports geometry, placement, tessellation, thumbnail and total worker
 times to stderr without logging the source path. Thumbnails were about 0.1 seconds of
 the slow assembly's open and were not the main bottleneck. Further cold Boolean and

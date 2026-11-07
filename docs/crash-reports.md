@@ -16,15 +16,15 @@ To send a report:
 
 ## Where they are
 
-`<data dir>/solidcraft/crashes/`, next to the recovery folder:
+`<data dir>/polykrom/crashes/`, next to the recovery folder:
 
 | System | Folder |
 |---|---|
-| Linux | `~/.local/share/solidcraft/crashes` (or `$XDG_DATA_HOME/solidcraft/crashes`) |
-| Windows | `%LOCALAPPDATA%\SolidCraft\crashes` |
-| macOS | `~/Library/Application Support/SolidCraft/crashes` |
+| Linux | `~/.local/share/polykrom/crashes` (or `$XDG_DATA_HOME/polykrom/crashes`) |
+| Windows | `%LOCALAPPDATA%\Polykrom\crashes` |
+| macOS | `~/Library/Application Support/Polykrom/crashes` |
 
-`SOLIDCRAFT_CRASH_DIR` overrides the folder. `solidcraft --crash-log` and
+`POLYKROM_CRASH_DIR` overrides the folder. `polykrom --crash-log` and
 `polykrom-cli crashes dir` print it.
 
 ## For agents
@@ -43,7 +43,7 @@ commands, and reports whether the same internal error happens again (same place 
 Without the CLI, run `polykrom-cli run <report>/replay.json --in <report>/design.solidcraft`.
 A fixed crash turns into a regression test with the same two files.
 
-**Check that reporting works:** with `SOLIDCRAFT_CRASH_TEST=1` set for the app, the command
+**Check that reporting works:** with `POLYKROM_CRASH_TEST=1` set for the app, the command
 `diagnostics.crash_test` has three modes:
 - `panic`: an internal error in a command
 - `kernel`: an internal error inside the geometry kernel

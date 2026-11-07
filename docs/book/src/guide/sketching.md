@@ -50,7 +50,7 @@ circle and update the outline when the inline **Sides** value changes.
 **Text** is set in the built-in font (Liberation Sans) unless it is given another: `sketch.text` and
 `sketch.edit_text` take a `font`, the family or full name of an installed font ("DejaVu Sans") or the path
 of a `.ttf` / `.otf` file, and the **Edit Text** dialog has a **Font** field for it. An unknown font is an
-error, and the font is kept with the text in the design, so the text stays editable in it. `SOLIDCRAFT_FONT_DIRS`
+error, and the font is kept with the text in the design, so the text stays editable in it. `POLYKROM_FONT_DIRS`
 adds folders to the ones searched for installed fonts. A text's `height`, its `angle` and each coordinate of
 its `at` can be expressions of the design's parameters, given as strings (`"height": "plate_height / 10"`,
 `"at": ["plate_width / 2", 5]`): the text keeps the expression and follows the parameters when they change, and

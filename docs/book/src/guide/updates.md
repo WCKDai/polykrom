@@ -30,14 +30,14 @@ Where Polykrom can replace itself safely, the window also has **Update now**:
 |---|---|
 | AppImage | Downloads the new AppImage next to the old one, verifies it, renames it over the old file and offers **Restart now** |
 | Windows installer (`.msi`) | **Install (closes Polykrom)**: downloads and verifies the `.msi`, closes Polykrom (asking about unsaved designs first) and starts the installer |
-| Windows portable `.zip` or `.exe` | Downloads and verifies the package, swaps in the new `solidcraft.exe` (and `polykrom-cli.exe`) and offers **Restart now**; the old file is removed at the next start |
+| Windows portable `.zip` or `.exe` | Downloads and verifies the package, swaps in the new `polykrom.exe` (and `polykrom-cli.exe`) and offers **Restart now**; the old file is removed at the next start |
 | macOS | **Download and open**: downloads and verifies the `.dmg` and opens it; drag Polykrom to Applications to replace the old copy |
 | Flatpak, Snap, `.deb`, `.rpm`, `.tar.gz` | Nothing: your package manager updates these (the window shows the command), or you unpack the new archive |
 
 Every download is verified before anything changes: its SHA-256 must match the release's
 `SHA256SUMS.txt`, fetched over HTTPS from the same release, and, once the project signs its
 releases, that list must carry a valid signature by Polykrom's release key that names the
-release (see [releasing](https://github.com/wckdboy/polykrom/blob/main/docs/releasing.md#update-signing)).
+release (see [releasing](https://github.com/WCKDai/polykrom/blob/main/docs/releasing.md#update-signing)).
 A download that doesn't verify is deleted and the installed copy is left as it was; **Download**
 still gets the package for a manual install. On macOS Polykrom opens the disk image rather than
 replacing the app itself, because the app is ad-hoc signed and not notarized: replacing it in the
@@ -64,14 +64,14 @@ affected.
 One HTTPS request each time Polykrom starts, and once a day while it stays open:
 
 ```text
-GET https://api.github.com/repos/wckdboy/polykrom/releases/latest
+GET https://api.github.com/repos/WCKDai/polykrom/releases/latest
 User-Agent: Polykrom-update-check
 Accept: application/vnd.github+json
 X-GitHub-Api-Version: 2022-11-28
 ```
 
 **Update now** then downloads `SHA256SUMS.txt` (and its signature) and the one package from the
-release's own `github.com/wckdboy/polykrom/releases/download/…` links, with the same
+release's own `github.com/WCKDai/polykrom/releases/download/…` links, with the same
 User-Agent. That's all: no version number, no machine or user identifier, no usage data, no cookies. GitHub
 sees the request like any other visit to the API (your IP address, the time); see
 [GitHub's privacy statement](https://docs.github.com/site-policy/privacy-policies/github-general-privacy-statement).
@@ -82,29 +82,29 @@ Polykrom compares the answer with its own version on your computer.
 - GitHub's rate limit for anonymous requests (60 an hour per address) is respected: when GitHub
   says to wait, Polykrom waits that long, Check now and the check at start included.
 - Turning off **Check for updates automatically** stops the checks; only **Check now** asks.
-- Setting the environment variable `SOLIDCRAFT_UPDATE_CHECK=0` turns all checks off, for
+- Setting the environment variable `POLYKROM_UPDATE_CHECK=0` turns all checks off, for
   example on managed machines.
 
 Builds you compile yourself, the Flatpak and the browser app (which updates itself) never check.
 
 ## Which file Download gets
 
-Releases attach the main packages under fixed names (see [releasing](https://github.com/wckdboy/polykrom/blob/main/docs/releasing.md)),
+Releases attach the main packages under fixed names (see [releasing](https://github.com/WCKDai/polykrom/blob/main/docs/releasing.md)),
 and Polykrom picks the one matching how it was installed:
 
 | Installed as | Detected by | Download | How to update |
 |---|---|---|---|
 | AppImage | `APPIMAGE` is set | `polykrom-linux-<arch>.AppImage` | Replace the old AppImage with the new one |
-| Flatpak | `FLATPAK_ID` is set | doesn't check (see below) | `flatpak update ai.storyteller.solidcraft` |
-| Snap from the Snap Store | `SNAP` is set | release page | `sudo snap refresh solidcraft` (snapd also refreshes by itself) |
+| Flatpak | `FLATPAK_ID` is set | doesn't check (see below) | `flatpak update app.polykrom.Polykrom` |
+| Snap from the Snap Store | `SNAP` is set | release page | `sudo snap refresh polykrom` (snapd also refreshes by itself) |
 | Snap from a downloaded file | `SNAP_REVISION` starts with `x` | `polykrom-linux-<arch>.snap` | `sudo snap install --dangerous ./polykrom-linux-<arch>.snap` |
-| `.deb` | under `/usr`, dpkg knows `solidcraft` | `polykrom-linux-<arch>.deb` | `sudo apt install ./polykrom-linux-<arch>.deb` |
+| `.deb` | under `/usr`, dpkg knows `polykrom` | `polykrom-linux-<arch>.deb` | `sudo apt install ./polykrom-linux-<arch>.deb` |
 | `.rpm` | under `/usr`, an rpm database exists | `polykrom-linux-<arch>.rpm` | `sudo dnf install ./polykrom-linux-<arch>.rpm` |
 | `.tar.gz` | anywhere else on Linux | `polykrom-<version>-linux-<arch>.tar.gz` | Unpack over the old copy |
 | Windows installer | under Program Files, or in the folder the installer recorded | `polykrom-windows-<arch>.msi` | Run the installer |
 | Windows portable | `polykrom-cli.exe` beside it | `polykrom-windows-<arch>-portable.zip` | Unzip over the old copy |
 | Windows `.exe` | anywhere else on Windows | `Polykrom-<version>-windows-x64.exe` | Replace the old `.exe` |
-| macOS | inside `SolidCraft.app` | `polykrom-macos-universal.dmg` | Drag the new app to Applications |
+| macOS | inside `Polykrom.app` | `polykrom-macos-universal.dmg` | Drag the new app to Applications |
 
 The window shows the command for Snap, `.deb` and `.rpm` installations, with a Copy button. The
 Flatpak has no network permission and Flatpak itself (or your software center) offers its

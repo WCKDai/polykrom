@@ -71,10 +71,10 @@ with doc tests alongside. Arguments after `--` go to each test binary, for examp
 ## Test-level scheduling for full local CI
 
 Install [cargo-nextest](https://nexte.st/docs/installation/pre-built-binaries/), then set
-`SOLIDCRAFT_TEST_RUNNER=nextest` when running `cargo xtask ci`. For example, on PowerShell:
+`POLYKROM_TEST_RUNNER=nextest` when running `cargo xtask ci`. For example, on PowerShell:
 
 ```powershell
-$env:SOLIDCRAFT_TEST_RUNNER = 'nextest'
+$env:POLYKROM_TEST_RUNNER = 'nextest'
 cargo xtask ci
 ```
 
@@ -93,7 +93,7 @@ and the web-offline gate still follows a successful native/Wasm/doc run.
 
 The backend keeps Cargo and binary metadata under `target/xtask-nextest/` and reuses it for the
 native run, freeing Cargo to run the side gates. Nextest prints each test's result and duration
-as it finishes. `SOLIDCRAFT_TEST_RUNNER=libtest` (or leaving it unset) retains the original runner;
+as it finishes. `POLYKROM_TEST_RUNNER=libtest` (or leaving it unset) retains the original runner;
 `cargo xtask test` and its Cargo/libtest argument forwarding are unchanged. Unknown runner names
 fail explicitly.
 
@@ -122,7 +122,7 @@ mirror, pattern) on every face, edge, vertex and body of a corpus of designs and
 checked-in baseline: an action that passed there and fails now fails the test. Every run checks a
 fixed sample; the nightly "Action matrix" job runs it all. After a fix, record what passes now with
 `cargo xtask action-matrix --bless`. The results and the causes of the failures are in
-[the action matrix page](https://github.com/bherbruck/solidcraft/blob/main/docs/action-matrix.md).
+[the action matrix page](https://github.com/WCKDai/polykrom/blob/main/docs/action-matrix.md).
 
 To run exactly what a pull request runs: `cargo nextest run --cargo-profile ci --profile ci`;
 add `--ignore-default-filter` for the full set. A new test that takes over a minute on CI can

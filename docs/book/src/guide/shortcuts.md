@@ -16,16 +16,16 @@ line tells you to add a key, release all keys, or wait for confirmation; the pro
 stays visible during confirmation. Nothing is saved while the preview is still pending.
 
 On macOS, the editor, Help list, toolbar hints, context menus and S search display Cmd and
-Option. Existing settings retain SolidCraft's Ctrl/Cmd alias for the primary modifier;
+Option. Existing settings retain Polykrom's Ctrl/Cmd alias for the primary modifier;
 Control and Command pressed together are recorded explicitly as Ctrl+Cmd. Conflicting
 bindings still require confirmation, and built-in reserved shortcuts remain reserved.
 Recording changes app settings, not the design file.
 
 This follows the usual [modifier-before-key convention documented by Apple](https://support.apple.com/en-ie/102650)
 and the [key-event and modifier-state model documented by W3C](https://www.w3.org/TR/uievents/#keys-modifiers).
-The one-second grace period is SolidCraft's recording aid, not a standard-mandated delay;
+The one-second grace period is Polykrom's recording aid, not a standard-mandated delay;
 using an already assigned shortcut has no added delay. Operating systems and browsers can
-intercept reserved combinations before SolidCraft receives them. Choose a different chord
+intercept reserved combinations before Polykrom receives them. Choose a different chord
 if that happens; recording is cancelled if the app loses focus.
 
 | Key | Command | Key | Command |

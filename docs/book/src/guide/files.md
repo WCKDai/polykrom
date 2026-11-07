@@ -57,18 +57,18 @@ Closed mechanical meshes with a constant cross-section can be rebuilt as solids 
 ordinary 3MF in which every triangle also names the B-rep face it lies on and every coordinate
 is the tessellation's own double-precision value. Meshing and analysis tools can use the tags to
 keep a model's faces (for loads, boundary conditions or feature edges); other 3MF readers ignore
-them. The format is specified in [`docs/formats/3mf-face-tags.md`](https://github.com/bherbruck/solidcraft/blob/main/docs/formats/3mf-face-tags.md).
+them. The format is specified in [`docs/formats/3mf-face-tags.md`](https://github.com/WCKDai/polykrom/blob/main/docs/formats/3mf-face-tags.md).
 
 **File → Export URDF…** (`file.export` with a `.urdf` path) writes the assembly for robot
 simulators and ROS: a link per component placement with its mesh, mass and inertia, and the
 assembly's joints, so the parts move in the simulator as they do in Polykrom. The meshes are
-written as STL files next to the `.urdf`. See [`docs/urdf.md`](https://github.com/bherbruck/solidcraft/blob/main/docs/urdf.md).
+written as STL files next to the `.urdf`. See [`docs/urdf.md`](https://github.com/WCKDai/polykrom/blob/main/docs/urdf.md).
 
 `file.export` with `format: "mjcf"` (or a `.mjcf` path) writes the same robot for MuJoCo: nested
 bodies with mass and inertia, hinge and slide joints with their ranges, a position actuator per
 joint (its force limit from a library actuator's rated torque), and, unless `scene` is off, a
 floor and a light. A robot with nothing grounded gets a free base and falls onto the floor. See
-[`docs/mjcf.md`](https://github.com/bherbruck/solidcraft/blob/main/docs/mjcf.md).
+[`docs/mjcf.md`](https://github.com/WCKDai/polykrom/blob/main/docs/mjcf.md).
 
 Saves are atomic: a crash at any moment leaves either the old file or the new one, and the
 replaced version is kept as `<file>.bak`. A save keeps the file's permissions, and a design

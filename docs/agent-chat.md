@@ -168,14 +168,14 @@ session and ends it again.
 ### Flatpak
 
 The Flatpak sandbox has no home-folder or network access by default. Agents installed
-through nvm or `~/.local/bin` can therefore work in a terminal while SolidCraft reports
+through nvm or `~/.local/bin` can therefore work in a terminal while Polykrom reports
 that no agent was found. For Claude Code and its ACP adapter, run:
 
 ```sh
-flatpak override --user ai.storyteller.solidcraft --filesystem=~/.nvm:ro --filesystem=~/.local/bin:ro --filesystem=~/.local/share/claude:ro --filesystem=~/.claude --filesystem=~/.claude.json --share=network
+flatpak override --user app.polykrom.Polykrom --filesystem=~/.nvm:ro --filesystem=~/.local/bin:ro --filesystem=~/.local/share/claude:ro --filesystem=~/.claude --filesystem=~/.claude.json --share=network
 ```
 
-These permissions apply to SolidCraft for your user account:
+These permissions apply to Polykrom for your user account:
 
 - `~/.nvm:ro` exposes Node and globally installed npm adapters read-only.
 - `~/.local/bin:ro` exposes locally installed executables read-only.
@@ -183,10 +183,10 @@ These permissions apply to SolidCraft for your user account:
   including the targets of links in `~/.local/bin`.
 - `~/.claude` and `~/.claude.json` allow Claude Code to read and update its sign-in
   and configuration files.
-- `--share=network` lets the adapter reach its service. It also gives SolidCraft
+- `--share=network` lets the adapter reach its service. It also gives Polykrom
   network access, including making an enabled control server reachable from the host.
 
-Restart SolidCraft after applying the override. Other agents or installation folders
+Restart Polykrom after applying the override. Other agents or installation folders
 may need different filesystem permissions.
 
 ### XAI Grok
@@ -241,7 +241,7 @@ Whatever you typed before signing in is sent once the agent is ready.
 
 The agent reaches the open design only through Polykrom's own tools (the
 [MCP server](mcp.md)), which Polykrom hands it when the chat starts. That server is named
-`solidcraft-app`, so an MCP server you set up yourself under the name `solidcraft` (as in
+`solidcraft-app`, so an MCP server you set up yourself under the name `polykrom` (as in
 [client configuration](mcp.md#client-configuration)) doesn't take its place:
 
 - **Read the design:** list commands, inspect features, sketches and parameters, measure,
@@ -339,7 +339,7 @@ or "ask" to see the agent ask its own permission.
 `polykrom-cli bench-assistant` runs the eleven tasks of the
 [standard model test (v1, #4851)](https://github.com/tangency-labs/solidcraft/issues/4851) against a
 desktop app that is already running with a control port, and checks each result on the design
-itself. Use it to see how well a local model drives SolidCraft before you post its results.
+itself. Use it to see how well a local model drives Polykrom before you post its results.
 
 ```sh
 polykrom --control 9271
@@ -355,7 +355,7 @@ sends the prompt once, and waits for the turn to end. It runs only the setup the
 (the box some tasks start from) and does none of the modelling itself. When it finishes it stops
 the agent and puts your permission setting back.
 
-- The control token comes from `--token`, `SOLIDCRAFT_CONTROL_TOKEN`, or the app's
+- The control token comes from `--token`, `POLYKROM_CONTROL_TOKEN`, or the app's
   [token file](control-protocol.md#token), in that order.
 - `--tasks 1,2,5` runs only those tasks, `--repeat N` runs the test N times, and `--timeout-s`
   (default 300) is each turn's deadline; a turn that runs past it is stopped and fails as "timeout".

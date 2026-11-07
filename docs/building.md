@@ -5,7 +5,7 @@ cargo run --release -p polykrom -- --sample          # desktop app with a sample
 cargo run --release -p polykrom-cli -- commands      # the command registry
 cargo run --release -p polykrom-cli -- run examples/bracket.json --out bracket.step
 cargo run --release -p polykrom-cli -- snapshot examples/bracket.json --out bracket.png
-cargo run --release -p polykrom-cli -- snapshot part.solidcraft --out preview.png --tool Pin --section z=12
+cargo run --release -p polykrom-cli -- snapshot part.polykrom --out preview.png --tool Pin --section z=12
 cargo run --release -p polykrom-cli -- render examples/render-studio.json --out product.png
 cargo run --release -p polykrom -- part.step          # open a STEP file as a new design
 cargo run --release -p polykrom-cli -- eval part.step # measure an imported STEP file

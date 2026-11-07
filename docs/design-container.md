@@ -185,7 +185,7 @@ resolved and hashed, never parsed. Every feature is up to date, so an edit
 evaluates from the first feature it changes, as after any evaluation: a feature
 appended or edited at the end evaluates from the saved final state, an edit to
 feature k from the saved state before k. Moving the timeline marker, undo and redo
-reuse the saved results whose fingerprints come back. `SOLIDCRAFT_NO_MODEL_CACHE`
+reuse the saved results whose fingerprints come back. `POLYKROM_NO_MODEL_CACHE`
 set evaluates anyway.
 
 A thinned cache is taken the same way, and the features whose state it left out
@@ -220,11 +220,11 @@ The implementation is split into the following review increments after the
 phase-one container PR (#327):
 
 1. Seekable IO and its read-volume/hostile-input tests (the API above).
-2. A versioned SolidCraft-owned B-rep schema and bounded binary codec, tested without
+2. A versioned Polykrom-owned B-rep schema and bounded binary codec, tested without
    constructing a kernel body. Topology references, oriented edge uses and face
    loops, geometric domains, analytic/spline curve and surface definitions, units,
    tolerances and orientation must have explicit semantics. Preserve face-source
-   certificates, persistent names and history using SolidCraft-owned identities.
+   certificates, persistent names and history using Polykrom-owned identities.
    No truck serialized structs, memory layouts, pointers or opaque kernel blobs
    form part of the persisted contract. No evaluated STEP round trip is a substitute.
 3. Separate adapters between the neutral schema and supported kernels. Unsupported

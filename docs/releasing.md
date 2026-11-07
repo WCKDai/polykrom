@@ -8,28 +8,28 @@ version bump and no patch release for every merge.
 
 ## Names and deployment
 
-Release titles, installer product names, release files and everything a person reads use the
-Polykrom name (`polykrom-<version>-linux-<arch>.AppImage`, `Polykrom-<version>-windows-x64.exe`,
-`polykrom-cli` archives, …; #304). Binary and package names keep SolidCraft's names until their
-steps of the second rename stage. The old name survives only in the shims listed in
-[compatibility.md](compatibility.md) (the end-of-life Flatpak refs of the old Linux app ID, the
-`solidcraft-…` copies of the version-less installers, the legacy `.zsync` and `.flatpakrepo`
-copies, the deprecated old-name CLI alias); keep them until that document says they can go. Do not
-rewrite published assets, checksums, tags or historical release notes of earlier versions.
+Release titles, installer product names, release files, programs, packages and IDs all use the
+Polykrom name: `polykrom-<version>-linux-<arch>.AppImage`, `Polykrom-<version>-windows-x64.exe`,
+`polykrom-cli` archives, the programs `polykrom` and `polykrom-cli`, `Polykrom.app`, the deb, rpm
+and Snap packages `polykrom`, and the app and bundle ID `app.polykrom.Polykrom`. A release carries
+no old-name copies, aliases or feeds: SolidCraft's name appears only where
+[compatibility.md](compatibility.md) says it may (the credit, and reading the files it wrote).
+Do not rewrite published assets, checksums, tags or historical release notes of earlier versions.
 
 The main installers (`.msi`, portable `.zip`, `.dmg`, `.AppImage`, `.deb`, `.rpm`, `.flatpak`, `.snap`) are
 also attached without the version in their names, for example `polykrom-windows-x64.msi` and
-`polykrom-linux-x86_64.AppImage`, and again under SolidCraft's names (`solidcraft-windows-x64.msi`, …)
-for links and installs from before the rename (docs/compatibility.md), all listed in `SHA256SUMS.txt`. The README's Download section
-links to `https://github.com/WCKDai/polykrom/releases/latest/download/<name>`, which follows
-the release marked latest; nightlies never are. Keep these names stable: renaming one breaks the
-README links and the in-app update check, which picks them by name (`crates/ui-egui/src/update.rs`;
-[updates and privacy](book/src/guide/updates.md)).
+`polykrom-linux-x86_64.AppImage`, all listed in `SHA256SUMS.txt`. The docs' download links
+(`docs/downloads.md`) point at `https://github.com/WCKDai/polykrom/releases/latest/download/<name>`,
+which follows the release marked latest; nightlies never are. Keep these names stable: renaming
+one breaks those links and the in-app update check, which picks them by name
+(`crates/ui-egui/src/update.rs`; [updates and privacy](book/src/guide/updates.md)).
 
-Project Pages publishes the documentation, browser app and published-release Flatpak
-repository under `/solidcraft/`. Do not add a separate owner-site publisher or permanent
-old-name Pages/Flatpak aliases. GitHub repository redirects are separate from Pages hosting;
-verify the new project URLs after deployment.
+The product's home is <https://polykrom.app>: the site, the documentation at
+<https://polykrom.app/docs/> and the browser app at <https://polykrom.app/app/>
+(`.github/workflows/site.yml`, `site/build.py`). Code, issues and releases live at
+<https://github.com/WCKDai/polykrom>. Do not add old-name site, Pages or Flatpak aliases.
+GitHub repository redirects are separate from site hosting; verify the project URLs after
+deployment.
 
 The browser app keeps itself for offline use (`apps/polykrom-web/sw.js`). Browsers keep that
 service worker after the code that registered it is gone, so to switch it off deploy
@@ -124,21 +124,30 @@ Items to carry into the next release's notes (step 3 below), then remove from he
     of modelling: ask for a change, see it previewed on the model, read the review card, and
     apply it as one step that a single Undo takes back. The Properties panel shows the selected
     feature's values and lets you edit them in place.
-  - The same model gives the same result on macOS, Windows and Linux. The PolyCore kernel's
-    sines, cosines, exponentials and logarithms now come from its own maths library instead of
-    each operating system's, so a design built on one computer rebuilds bit for bit on another.
+  - The same model gives the same result on macOS and Linux, verified bit for bit. The PolyCore
+    kernel's sines, cosines, exponentials and logarithms now come from its own maths library
+    instead of each operating system's, so a design built on one of them rebuilds identically on
+    the other. Windows is not yet re-checked: 6 of the 96 robustness seeds still keep their older
+    Windows records.
   - A faster kernel. Building the robustness seed designs takes about a tenth less time than
     before.
+  - Everything is named Polykrom (decided 2026-11-07, before this first stable release, so no
+    migration was needed): the programs `polykrom` and `polykrom-cli`, `Polykrom.app`, the app
+    and bundle ID `app.polykrom.Polykrom`, the `polykrom` deb, rpm and Snap packages, the
+    settings and recovery folders, the keychain service and the `POLYKROM_*` environment
+    variables. The release candidates' `solidcraft-…` copies of the version-less installers, the
+    old-name `.zsync` copies, the `solidcraft`, `solidcraft-cli` and `solvecraft-cli` aliases,
+    the old-folder, old-variable and old-keychain fallbacks and the Flatpak end-of-life entries
+    for the old IDs are gone ([compatibility.md](compatibility.md)).
   - From the release candidates (0.21.0-rc.2: packaging corrections and an update fix, #304,
     #305):
     - Release files are named Polykrom (`polykrom-<version>-<platform>`,
-      `Polykrom-<version>-windows-x64.exe`). The version-less installers are also attached under
-      their earlier `solidcraft-…` names, so old download links and installs keep finding them.
+      `Polykrom-<version>-windows-x64.exe`).
     - In-app update checks work again: since the repository moved to the WCKDai organisation, the
       check turned down every file of a release.
   - Compatibility: designs now carry the `polykrom/36` format tag (#304). 0.21.0 opens every
-    earlier design, including SolidCraft's; a design saved by 0.21.0 does not open in the release
-    candidates or in SolidCraft.
+    earlier design, including SolidCraft's `.solidcraft` and `.solvecraft` files; a design saved
+    by 0.21.0 does not open in the release candidates or in SolidCraft.
 
 ## Verify and publish
 
@@ -208,33 +217,34 @@ without it they are skipped and the `.snap` files are still attached to the rele
 To enable the Snap Store once (owner):
 
 1. Sign in at <https://snapcraft.io> with an Ubuntu One account and register the name at
-   <https://snapcraft.io/register-snap> (or `snapcraft login` then `snapcraft register solidcraft`).
+   <https://snapcraft.io/register-snap> (or `snapcraft login` then `snapcraft register polykrom`).
 2. On a machine with snapcraft (`sudo snap install snapcraft --classic`), export upload-only
    credentials for this snap:
 
    ```sh
-   snapcraft export-login --snaps=solidcraft \
+   snapcraft export-login --snaps=polykrom \
      --channels=edge,candidate,stable \
      --acls=package_access,package_push,package_update,package_release \
-     --expires=2027-10-01 solidcraft-store-credentials.txt
+     --expires=2027-10-01 polykrom-store-credentials.txt
    ```
 
 3. Store them as the repository secret and delete the file:
 
    ```sh
-   gh secret set SNAPCRAFT_STORE_CREDENTIALS -R bherbruck/solidcraft < solidcraft-store-credentials.txt
-   rm solidcraft-store-credentials.txt
+   gh secret set SNAPCRAFT_STORE_CREDENTIALS -R WCKDai/polykrom < polykrom-store-credentials.txt
+   rm polykrom-store-credentials.txt
    ```
 
-4. Optional: fill in the store listing at <https://snapcraft.io/solidcraft/listing> (the icon,
-   summary and description come from the snap; add screenshots and the category "Art and design").
+4. Optional: fill in the store listing (the snap's page on <https://snapcraft.io>, "Listing";
+   the icon, summary and description come from the snap; add screenshots and the category
+   "Art and design").
 5. The next nightly fills `edge` and the next release fills `candidate`, then `stable` on
    publication. To fill `stable` from an already published release right away, download its
    `.snap` files and run `snapcraft upload --release=stable <file>` for each.
 
 Renew the credentials before `--expires` by repeating steps 2 and 3. The snap uses strict
 confinement and only plugs that connect automatically, apart from `removable-media`, which users
-connect with `sudo snap connect solidcraft:removable-media` (getting-started.md).
+connect with `sudo snap connect polykrom:removable-media` (getting-started.md).
 
 ## WinGet (Windows Package Manager)
 
@@ -242,7 +252,7 @@ Polykrom is in [winget-pkgs](https://github.com/microsoft/winget-pkgs) as
 `wckdboy.Polykrom` (`winget install wckdboy.Polykrom`). Publishing a non-prerelease
 GitHub release runs `winget.yml`, which uses [Komac](https://github.com/russellbanks/Komac)
 (a pinned, checksum-verified binary) to open a pull request at microsoft/winget-pkgs from the
-owner's fork `bherbruck/winget-pkgs`. It submits the three versioned MSIs
+token owner's fork of winget-pkgs. It submits the three versioned MSIs
 (`polykrom-<version>-windows-{x64,x86,arm64}.msi`, never the fixed-name copies), reads their
 product codes, links the release notes and keeps the other fields from the previous version's
 manifest. The winget-pkgs bots validate it and a moderator merges it, usually within a day or two.
@@ -250,26 +260,26 @@ manifest. The winget-pkgs bots validate it and a moderator merges it, usually wi
 The job does nothing, successfully, while the `WINGET_TOKEN` repository secret is missing or
 before the package's first version is merged into winget-pkgs. Like `snap-store.yml`, a
 publication made with `GITHUB_TOKEN` doesn't trigger it: then run
-`gh workflow run winget.yml -R bherbruck/solidcraft -f tag=v<version>`.
+`gh workflow run winget.yml -R WCKDai/polykrom -f tag=v<version>`.
 
 To enable it once (owner):
 
 1. Create a **classic** personal access token at <https://github.com/settings/tokens/new>
    (Settings > Developer settings > Personal access tokens > Tokens (classic)): note
-   "solidcraft winget", an expiry such as one year, and only the **`public_repo`** scope.
+   "polykrom winget", an expiry such as one year, and only the **`public_repo`** scope.
    Fine-grained tokens can't open pull requests on microsoft/winget-pkgs.
 2. Store it as the repository secret (paste the token when asked):
 
    ```sh
-   gh secret set WINGET_TOKEN -R bherbruck/solidcraft
+   gh secret set WINGET_TOKEN -R WCKDai/polykrom
    ```
 
-3. Keep the fork `bherbruck/winget-pkgs` (Komac pushes its branches there). Its default branch
-   doesn't need syncing.
+3. Keep the token owner's fork of winget-pkgs (Komac pushes its branches there). Its default
+   branch doesn't need syncing.
 
 When the token expires, create a new one the same way and run step 2 again. If a release was
 published while the secret was missing or expired, submit it afterwards with
-`gh workflow run winget.yml -R bherbruck/solidcraft -f tag=v<version>`.
+`gh workflow run winget.yml -R WCKDai/polykrom -f tag=v<version>`.
 
 ## Update signing
 
@@ -289,17 +299,17 @@ To turn it on once (owner):
    `winget install minisign`), make a key pair without a password (the workflow can't type one):
 
    ```sh
-   minisign -G -W -p solidcraft-update.pub -s solidcraft-update.key
+   minisign -G -W -p polykrom-update.pub -s polykrom-update.key
    ```
 
 2. Store the secret key as the repository secret and keep an offline backup of it (a lost key
    means a new key and an app release that carries it; a leaked key means the same, quickly):
 
    ```sh
-   gh secret set UPDATE_SIGNING_KEY -R bherbruck/solidcraft < solidcraft-update.key
+   gh secret set UPDATE_SIGNING_KEY -R WCKDai/polykrom < polykrom-update.key
    ```
 
-3. Put the public key (the second line of `solidcraft-update.pub`, starting with `RW`) into
+3. Put the public key (the second line of `polykrom-update.pub`, starting with `RW`) into
    `crates/ui-egui/src/update/install.rs`:
 
    ```rust
@@ -308,7 +318,7 @@ To turn it on once (owner):
 
    and land that through a PR. Builds from then on refuse unsigned updates; releases built
    from then on carry `SHA256SUMS.txt.minisig`.
-4. Delete `solidcraft-update.key` from the machine once the backup is safe.
+4. Delete `polykrom-update.key` from the machine once the backup is safe.
 
 Older builds without the key keep updating with the SHA-256 check alone.
 

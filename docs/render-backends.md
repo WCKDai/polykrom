@@ -137,5 +137,5 @@ The legacy rasterizer, CLI snapshots and GPU viewport keep their existing behavi
 and limits; none is routed through this resolver in R1.
 
 The follow-on Render workspace, persistent setups, job hosts and optional engines are
-tracked in [#620](https://github.com/bherbruck/solidcraft/issues/620). The implemented
-foundation is scoped by [#642](https://github.com/bherbruck/solidcraft/issues/642).
+tracked in [#620](https://github.com/tangency-labs/solidcraft/issues/620). The implemented
+foundation is scoped by [#642](https://github.com/tangency-labs/solidcraft/issues/642).

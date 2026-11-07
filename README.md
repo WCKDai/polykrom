@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/icons/app/linux/exports/hicolor/256x256/apps/ai.storyteller.solidcraft.png" width="96" height="96" alt="Polykrom" />
+  <img src="assets/icons/app/linux/exports/hicolor/256x256/apps/app.polykrom.Polykrom.png" width="96" height="96" alt="Polykrom" />
 </p>
 
 <h1 align="center">Polykrom</h1>
@@ -35,9 +35,13 @@ does; fixes that help both go upstream as pull requests to
 - **Kernel robustness**: trimmed faces whose boundary crosses itself mesh instead of crashing,
   and moved bodies keep their edges on STEP export.
 
-There are no Polykrom release builds yet; build it from source below. Inside, the crates,
-binaries, design files and settings still carry SolidCraft's names; `polykrom` and
-`polykrom-cli` are aliases ([docs/compatibility.md](docs/compatibility.md)).
+Releases are on [polykrom.app](https://polykrom.app) and the
+[releases page](https://github.com/WCKDai/polykrom/releases) ([every package](docs/downloads.md)):
+`Polykrom.app` on macOS, the `polykrom` packages on Linux, the Windows installer, and the browser
+app at [polykrom.app/app](https://polykrom.app/app/). The programs are `polykrom` and
+`polykrom-cli`, and the app ID is `app.polykrom.Polykrom`. Designs from SolidCraft
+(`.solidcraft`, `.solvecraft`) open and save as `.polykrom`
+([docs/compatibility.md](docs/compatibility.md)).
 
 ## What works
 
@@ -85,7 +89,7 @@ Format and example: [docs/scripts.md](docs/scripts.md). Pages can also be driven
 
 Help is welcome. [CONTRIBUTING.md](CONTRIBUTING.md) covers how to build and test, the code map,
 the clean-room and licence rules, and where help is wanted most. Open work is in
-[GitHub issues](https://github.com/wckdboy/polykrom/issues). Fixes that also apply to SolidCraft
+[GitHub issues](https://github.com/WCKDai/polykrom/issues). Fixes that also apply to SolidCraft
 are welcome upstream.
 
 ## Licence
