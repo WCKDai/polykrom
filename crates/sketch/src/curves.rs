@@ -2,6 +2,7 @@
 //! control points) and conics (rational quadratic Béziers). Evaluation works on positions so
 //! the solver can use it with trial values.
 
+use polycore_geom::pmath;
 use std::f64::consts::TAU;
 
 use polycore_geom::Vec2;
@@ -16,7 +17,7 @@ pub fn ellipse_point(c: Vec2, m: Vec2, r: f64, t: f64) -> Vec2 {
     let u = m - c;
     let a = u.len().max(1e-12);
     let v = u.perp() / a * r;
-    c + u * t.cos() + v * t.sin()
+    c + u * pmath::cos(t) + v * pmath::sin(t)
 }
 
 pub fn ellipse_polyline(c: Vec2, m: Vec2, r: f64) -> Vec<Vec2> {

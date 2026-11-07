@@ -4,6 +4,7 @@
 //! distance from a round item's centre or axis (see [`super::measure_shape`]) and, where both
 //! have a direction (planar faces, straight edges), the angle.
 
+use polycore_geom::pmath;
 use polycore_geom::{Mesh, UnitVec3, Vec3};
 use serde_json::{Value, json};
 
@@ -130,7 +131,7 @@ fn arc_points(center: Vec3, axis: UnitVec3, start: Vec3, angle: f64) -> Vec<Vec3
     (0..=n)
         .map(|i| {
             let t = angle * f64::from(i) / f64::from(n);
-            center + x * t.cos() + y * t.sin()
+            center + x * pmath::cos(t) + y * pmath::sin(t)
         })
         .collect()
 }
@@ -168,7 +169,7 @@ fn sketch_curve(ss: &polykrom_doc::SolvedSketch, id: &str) -> Option<Item> {
             let (center, a, b) = (at(c)?, at(a)?, at(b)?);
             let radius = center.dist(a);
             let (x, y) = ((a - center).normalized()?, normal.cross((a - center).normalized()?));
-            let mut angle = (b - center).dot(y).atan2((b - center).dot(x));
+            let mut angle = pmath::atan2((b - center).dot(y), (b - center).dot(x));
             if angle <= 0.0 {
                 angle += std::f64::consts::TAU;
             }
@@ -543,7 +544,7 @@ pub(crate) fn measure_items(s: &Session, items: &Value) -> Result<Value> {
         if let (Some(da), Some(db)) = (a.dir, b.dir) {
             let both_faces = matches!(sels.as_slice(), [Sel::Face { .. }, Sel::Face { .. }]);
             let cos = if both_faces { da.dot(db) } else { corner_cos(a.shape, b.shape).unwrap_or_else(|| da.dot(db).abs()) };
-            out["angle_deg"] = json!(cos.clamp(-1.0, 1.0).acos().to_degrees());
+            out["angle_deg"] = json!(pmath::acos(cos.clamp(-1.0, 1.0)).to_degrees());
         }
     }
     Ok(out)

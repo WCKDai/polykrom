@@ -1,6 +1,11 @@
 //! Bounded opaque metallic/roughness surfaces in linear sRGB.
 //! This numerical contract does not enable a renderer or persist appearances.
 
+// UI only: this file draws, animates, converts colours or places the camera, and feeds nothing
+// into a design, so it keeps the platform's transcendental functions (listed with its reason in
+// crates/engine/tests/pmath_gate.rs; everything that reaches a command goes through pmath).
+#![allow(clippy::disallowed_methods)]
+
 use std::f64::consts::PI;
 
 use polycore_geom::Vec3;

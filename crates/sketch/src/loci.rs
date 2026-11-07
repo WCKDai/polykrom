@@ -33,6 +33,7 @@
 //! are computed from, so a construction far from the origin behaves like the same one near it.
 
 use polycore_geom::Vec2;
+use polycore_geom::pmath;
 
 use crate::model::{ConstraintKind, CurveKind, MAX_COORD, Sketch, in_range, radius_in_range};
 use crate::union_find::{find, union};
@@ -432,7 +433,7 @@ pub(crate) fn place(items: &[Item], p_before: Option<Vec2>) -> Option<Fix> {
 
 /// Turn `d` by `by` radians.
 fn turned(d: Vec2, by: f64) -> Vec2 {
-    let (s, c) = by.sin_cos();
+    let (s, c) = pmath::sin_cos(by);
     Vec2::new(d.x * c - d.y * s, d.x * s + d.y * c)
 }
 
@@ -659,9 +660,9 @@ fn agreed(m: usize, direct: &[(usize, f64)], equal: &[(usize, usize)]) -> Vec<Op
 /// A line's level: horizontal (`Some(true)`) or vertical (`Some(false)`) when `angle` is a
 /// multiple of a quarter turn.
 fn level_at(angle: f64) -> Option<bool> {
-    if angle.sin().abs() < 1e-12 {
+    if pmath::sin(angle).abs() < 1e-12 {
         Some(true)
-    } else if angle.cos().abs() < 1e-12 {
+    } else if pmath::cos(angle).abs() < 1e-12 {
         Some(false)
     } else {
         None

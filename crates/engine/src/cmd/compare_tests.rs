@@ -1,3 +1,4 @@
+use polycore_geom::pmath;
 use serde_json::{Value, json};
 
 use crate::Session;
@@ -193,7 +194,7 @@ fn a_hole_moved_2_mm_leaves_two_crescents() {
     // Each is a disk of 2.5 mm radius less its overlap with the other, centres 2 mm apart, through
     // the 2.5 mm sheet: (π r² − 2 r² acos(d / 2r) + (d / 2) √(4 r² − d²)) · t.
     let (rr, d, t) = (2.5f64, 2.0f64, 2.5);
-    let crescent = (std::f64::consts::PI * rr * rr - 2.0 * rr * rr * (d / (2.0 * rr)).acos() + d / 2.0 * (4.0 * rr * rr - d * d).sqrt()) * t;
+    let crescent = (std::f64::consts::PI * rr * rr - 2.0 * rr * rr * pmath::acos(d / (2.0 * rr)) + d / 2.0 * (4.0 * rr * rr - d * d).sqrt()) * t;
     assert!((crescent - 24.316_34).abs() < 1e-4);
     for g in &rs {
         assert!(close(f(&g["volume_mm3"]), crescent, 0.02), "{g}");

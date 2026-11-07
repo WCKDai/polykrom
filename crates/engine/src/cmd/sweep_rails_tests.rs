@@ -4,6 +4,7 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
+use polycore_geom::pmath;
 use std::f64::consts::PI;
 
 use serde_json::{Value, json};
@@ -106,7 +107,7 @@ fn two_rails_carry_a_line_between_arcs() {
         json!({"sketch": "L", "curves": ["l"], "path_sketch": "P", "path": ["up"], "rails": [{"sketch": "R", "curves": ["left"]}, {"sketch": "R", "curves": ["right"]}], "body_name": "Between"}),
     );
     let m = measure(&s, "Between");
-    let area = 2.0 * (20.0 * 15.0 + 625.0 * 0.8f64.asin()) - 400.0;
+    let area = 2.0 * (20.0 * 15.0 + 625.0 * pmath::asin(0.8f64)) - 400.0;
     assert!((m.area - area).abs() < 1e-3 * area, "area {} vs {area}", m.area);
     assert!((m.bbox.max.x - 20.0).abs() < 1e-2 && (m.bbox.min.x + 20.0).abs() < 1e-2, "{:?}", m.bbox);
 }

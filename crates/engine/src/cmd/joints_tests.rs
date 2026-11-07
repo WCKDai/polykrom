@@ -1,3 +1,4 @@
+use polycore_geom::pmath;
 use std::f64::consts::FRAC_PI_2;
 
 use polycore_geom::Vec3;
@@ -415,7 +416,7 @@ fn rocker_pin(from: f64, to: f64, mut q: Vec3) -> Vec3 {
     let n = ((to - from).abs().ceil() as usize).max(1);
     for k in 1..=n {
         let th = (90.0 + from + (to - from) * k as f64 / n as f64).to_radians();
-        let [m1, m2] = meet(Vec3::new(20.0 * th.cos(), 20.0 * th.sin(), 0.0), 50.0, Vec3::new(45.0, 0.0, 0.0), 40.0);
+        let [m1, m2] = meet(Vec3::new(20.0 * pmath::cos(th), 20.0 * pmath::sin(th), 0.0), 50.0, Vec3::new(45.0, 0.0, 0.0), 40.0);
         q = if m1.dist(q) <= m2.dist(q) { m1 } else { m2 };
     }
     q
@@ -435,7 +436,7 @@ fn four_bar_follows_its_crank() {
         assert!((r["values"][0]["value"].as_f64().unwrap_or(f64::NAN) - v).abs() < 1e-9 && r["values"][0]["unit"] == "deg", "{r}");
         q = rocker_pin(v - 30.0, v, q);
         let th = (90.0 + v).to_radians();
-        let p = Vec3::new(20.0 * th.cos(), 20.0 * th.sin(), 0.0);
+        let p = Vec3::new(20.0 * pmath::cos(th), 20.0 * pmath::sin(th), 0.0);
         for (part, local, want) in [("Crank", p0, p), ("Coupler", p0, p), ("Coupler", q0, q), ("Rocker", q0, q)] {
             assert!(near(place(&s, part, local), want), "{v}°: {part} {:?} wants {want:?}", place(&s, part, local));
         }
@@ -465,19 +466,19 @@ fn four_bar_follows_its_crank() {
 #[test]
 fn four_bar_rocker_stops_where_the_loop_cannot_close() {
     let (mut s, _, q0) = four_bar();
-    let start = q0.y.atan2(q0.x - 45.0).to_degrees();
+    let start = pmath::atan2(q0.y, q0.x - 45.0).to_degrees();
     let r = run(&mut s, "joint.drive", json!({"joint": "Rocker", "value": 100}));
     assert!(r["stopped_by_loop"].is_object(), "{r}");
     assert_eq!(r["conflicts"].as_array().map(Vec::len), Some(0), "{r}");
     let reached = r["values"][0]["value"].as_f64().unwrap_or(f64::NAN);
     // |Q|² = 45² + 40² + 2·45·40·cos φ = 30².
-    let limit = ((900.0f64 - 3625.0) / 3600.0).acos().to_degrees() - start;
+    let limit = pmath::acos((900.0f64 - 3625.0) / 3600.0).to_degrees() - start;
     assert!(reached > limit - 5.0 && reached <= limit, "stopped at {reached}°, the limit is {limit}°");
     // Inside its swing it moves freely, and the crank follows.
     let r = run(&mut s, "joint.drive", json!({"joint": "Rocker", "value": -10}));
     assert!(r["stopped_by_loop"].is_null() && r["conflicts"].as_array().map(Vec::len) == Some(0), "{r}");
     let q = place(&s, "Rocker", q0);
-    assert!((q.y.atan2(q.x - 45.0).to_degrees() - (start - 10.0)).abs() < 1e-6, "{q:?}");
+    assert!((pmath::atan2(q.y, q.x - 45.0).to_degrees() - (start - 10.0)).abs() < 1e-6, "{q:?}");
     assert!(place(&s, "Coupler", q0).dist(q) < 1e-6);
     // A full turn would end where it started, but the rocker can't get there.
     let (mut s, _, _) = four_bar();
@@ -505,7 +506,7 @@ fn four_bar_turns_the_source_of_a_linked_loop_value() {
     assert_eq!(r["conflicts"].as_array().map(Vec::len), Some(0), "{r}");
     let q = rocker_pin(0.0, 60.0, q0);
     assert!(near(place(&s, "Rocker", q0), q), "{:?} wants {q:?}", place(&s, "Rocker", q0));
-    let turn = q.y.atan2(q.x - 45.0) - q0.y.atan2(q0.x - 45.0);
+    let turn = pmath::atan2(q.y, q.x - 45.0) - pmath::atan2(q0.y, q0.x - 45.0);
     let dial = s.doc.assembly.joints.iter().find(|j| j.name == "Dial").and_then(|j| j.values.first().copied()).unwrap_or(f64::NAN);
     assert!((dial - 2.0 * turn).abs() < 1e-9, "dial {dial}, rocker turned {turn}");
     // Driving the dial drives the rocker through the chain: two turns of the dial would turn
@@ -563,9 +564,9 @@ fn slider_crank_moves_the_piston() {
         let r = run(&mut s, "joint.drive", json!({"joint": "Crank", "value": v}));
         assert_eq!(r["conflicts"].as_array().map(Vec::len), Some(0), "{v}°: {r}");
         let th = (90.0f64 + v).to_radians();
-        let x = 15.0 * th.cos() + (40.0f64.powi(2) - (15.0 * th.sin()).powi(2)).sqrt();
+        let x = 15.0 * pmath::cos(th) + (40.0f64.powi(2) - (15.0 * pmath::sin(th)).powi(2)).sqrt();
         assert!(near(place(&s, "Piston", s0), Vec3::new(x, 0.0, 0.0)), "{v}°: {:?} wants x = {x}", place(&s, "Piston", s0));
-        assert!(near(place(&s, "Rod", p0), Vec3::new(15.0 * th.cos(), 15.0 * th.sin(), 0.0)));
+        assert!(near(place(&s, "Rod", p0), Vec3::new(15.0 * pmath::cos(th), 15.0 * pmath::sin(th), 0.0)));
     }
 }
 
@@ -620,10 +621,10 @@ fn slotted_arm_drives(yaw_first: bool, gap: f64) {
     let (shaft, pin_at) = (Vec3::new(52.0, 0.0, 0.0), Vec3::new(26.0, 0.0, 0.0));
     let check = |s: &Session, what: &str| {
         let th = values_of(s, "Yaw").first().copied().unwrap_or(f64::NAN);
-        let p = Vec3::new(26.0 * th.cos(), 26.0 * th.sin(), 0.0);
+        let p = Vec3::new(26.0 * pmath::cos(th), 26.0 * pmath::sin(th), 0.0);
         assert!(near(place(s, "Clamp", pin_at), p), "{what}: pin {:?} wants {p:?}", place(s, "Clamp", pin_at));
         let arm = values_of(s, "Shaft").first().copied().unwrap_or(f64::NAN);
-        let want = (26.0 * th.sin()).atan2(52.0 - 26.0 * th.cos());
+        let want = pmath::atan2(26.0 * pmath::sin(th), 52.0 - 26.0 * pmath::cos(th));
         assert!((arm.abs() - want.abs()).abs() < 1e-6, "{what}: arm {arm} wants ±{want}");
         // The arm's slot points at the pin, which sits as far out as the slot says.
         let tip = place(s, "Arm", Vec3::new(40.0, 0.0, 0.0));
@@ -655,7 +656,11 @@ fn slotted_arm_drives(yaw_first: bool, gap: f64) {
     }
     // The clamp's pin reaches a point on its circle, the arm following.
     let (th, at) = (20f64.to_radians(), place(&s, "Clamp", pin_at));
-    let r = run(&mut s, "joint.reach", json!({"occurrence": "Clamp", "at": [at.x, at.y, at.z], "point": [26.0 * th.cos(), 26.0 * th.sin(), 0.0]}));
+    let r = run(
+        &mut s,
+        "joint.reach",
+        json!({"occurrence": "Clamp", "at": [at.x, at.y, at.z], "point": [26.0 * pmath::cos(th), 26.0 * pmath::sin(th), 0.0]}),
+    );
     assert!(r["reached"] == json!(true) && r["stopped_by_loop"].is_null(), "yaw first {yaw_first}, gap {gap}, reach: {r}");
     check(&s, &format!("yaw first {yaw_first}, gap {gap}, reach"));
     // A limit on the arm stops the yaw where the arm meets it.
@@ -1341,9 +1346,9 @@ fn traced(r: &Value) -> Vec<Vec3> {
 
 /// A point rigidly carried from segment (a0, b0) to segment (a, b) in the XY plane.
 fn carried(p0: Vec3, a0: Vec3, b0: Vec3, a: Vec3, b: Vec3) -> Vec3 {
-    let turn = (b.y - a.y).atan2(b.x - a.x) - (b0.y - a0.y).atan2(b0.x - a0.x);
+    let turn = pmath::atan2(b.y - a.y, b.x - a.x) - pmath::atan2(b0.y - a0.y, b0.x - a0.x);
     let d = p0 - a0;
-    a + Vec3::new(d.x * turn.cos() - d.y * turn.sin(), d.x * turn.sin() + d.y * turn.cos(), d.z)
+    a + Vec3::new(d.x * pmath::cos(turn) - d.y * pmath::sin(turn), d.x * pmath::sin(turn) + d.y * pmath::cos(turn), d.z)
 }
 
 /// A point on the four-bar's coupler, 10 mm off the line between its pins, traces the coupler
@@ -1369,7 +1374,7 @@ fn four_bar_coupler_point_traces_its_closed_form_curve() {
             q = rocker_pin(v - 5.0, v, q);
         }
         let th = (90.0 + v).to_radians();
-        let want = carried(c0, p0, q0, Vec3::new(20.0 * th.cos(), 20.0 * th.sin(), 0.0), q);
+        let want = carried(c0, p0, q0, Vec3::new(20.0 * pmath::cos(th), 20.0 * pmath::sin(th), 0.0), q);
         assert!(near(*got, want), "{v}°: {got:?} wants {want:?}");
     }
     assert!(pts.first().zip(pts.last()).is_some_and(|(a, b)| near(*a, *b)), "a full turn closes the curve");
@@ -1398,7 +1403,7 @@ fn chebyshev_demo_regenerates_its_analytic_trajectory_without_resampling_playbac
     let mut q = Vec3::new(40.0, 50.0, 0.0);
     for (i, got) in original.iter().enumerate() {
         let theta = (90.0 + 2.5 * i as f64).to_radians();
-        let p = Vec3::new(20.0 * theta.cos(), 20.0 * theta.sin(), 0.0);
+        let p = Vec3::new(20.0 * pmath::cos(theta), 20.0 * pmath::sin(theta), 0.0);
         let [a, b] = meet(p, 50.0, Vec3::new(40.0, 0.0, 0.0), 50.0);
         q = if a.dist(q) < b.dist(q) { a } else { b };
         let want = q * 2.0 - p + Vec3::Z * 10.0;
@@ -1580,8 +1585,8 @@ fn slider_crank_rod_traces_its_closed_form_curve() {
     assert_eq!(pts.len(), 37, "{r}");
     for (k, got) in pts.iter().enumerate() {
         let th = (90.0 + 10.0 * k as f64).to_radians();
-        let x = 15.0 * th.cos() + (40.0f64.powi(2) - (15.0 * th.sin()).powi(2)).sqrt();
-        let want = (Vec3::new(15.0 * th.cos(), 15.0 * th.sin(), 0.0) + Vec3::new(x, 0.0, 0.0)) * 0.5;
+        let x = 15.0 * pmath::cos(th) + (40.0f64.powi(2) - (15.0 * pmath::sin(th)).powi(2)).sqrt();
+        let want = (Vec3::new(15.0 * pmath::cos(th), 15.0 * pmath::sin(th), 0.0) + Vec3::new(x, 0.0, 0.0)) * 0.5;
         assert!(near(*got, want), "{}°: {got:?} wants {want:?}", 10 * k);
     }
 }
@@ -1590,7 +1595,7 @@ fn slider_crank_rod_traces_its_closed_form_curve() {
 #[test]
 fn a_trace_ends_where_the_loop_stops_the_motion() {
     let (mut s, _, q0) = four_bar();
-    let start = q0.y.atan2(q0.x - 45.0).to_degrees();
+    let start = pmath::atan2(q0.y, q0.x - 45.0).to_degrees();
     let r = run(
         &mut s,
         "motion.trace",
@@ -1600,11 +1605,11 @@ fn a_trace_ends_where_the_loop_stops_the_motion() {
     let k = r["stopped_at"].as_u64().unwrap_or(u64::MAX) as usize;
     let pts = traced(&r);
     assert!(k > 0 && k < 20 && pts.len() == k + 1 && r["samples"] == k + 1, "{r}");
-    let angle = |p: &Vec3| p.y.atan2(p.x - 45.0).to_degrees();
+    let angle = |p: &Vec3| pmath::atan2(p.y, p.x - 45.0).to_degrees();
     for (i, p) in pts.iter().take(k).enumerate() {
         assert!((angle(p) - (start + 5.0 * i as f64)).abs() < 1e-6, "sample {i}: {}", angle(p));
     }
-    let limit = ((900.0f64 - 3625.0) / 3600.0).acos().to_degrees();
+    let limit = pmath::acos((900.0f64 - 3625.0) / 3600.0).to_degrees();
     let last = pts.last().map(angle).unwrap_or(f64::NAN);
     assert!(last > limit - 5.0 && last <= limit + 1e-9, "stopped at {last}°, the limit is {limit}°");
 }
@@ -1773,7 +1778,8 @@ mod motion_sweep;
 /// the textbook lens of two circles. The pin is chamfered, so it is not a plain prism.
 #[test]
 fn interference_of_a_pin_a_hair_off_its_hole() {
-    let crescent = |r: f64, e: f64| std::f64::consts::PI * r * r - (2.0 * r * r * (e / (2.0 * r)).acos() - e / 2.0 * (4.0 * r * r - e * e).sqrt());
+    let crescent =
+        |r: f64, e: f64| std::f64::consts::PI * r * r - (2.0 * r * r * pmath::acos(e / (2.0 * r)) - e / 2.0 * (4.0 * r * r - e * e).sqrt());
     for offset in [0.0, 1e-6, 5.9e-4, 1e-2] {
         let mut s = Session::default();
         run(&mut s, "solid.box", json!({"length": 20, "width": 20, "height": 5, "corner": [-10, -10, 0], "body_name": "Plate"}));
@@ -1798,7 +1804,8 @@ fn interference_of_a_pin_a_hair_off_its_hole() {
 /// two walls of one radius that never meet along the axis don't stop the crescent from counting.
 #[test]
 fn interference_of_a_headed_pin_a_hair_off_a_bush_of_its_heads_radius() {
-    let crescent = |r: f64, e: f64| std::f64::consts::PI * r * r - (2.0 * r * r * (e / (2.0 * r)).acos() - e / 2.0 * (4.0 * r * r - e * e).sqrt());
+    let crescent =
+        |r: f64, e: f64| std::f64::consts::PI * r * r - (2.0 * r * r * pmath::acos(e / (2.0 * r)) - e / 2.0 * (4.0 * r * r - e * e).sqrt());
     let offset = 5.9e-4;
     let mut s = Session::default();
     run(&mut s, "solid.cylinder", json!({"radius": 5.25, "height": 10, "base": [0, 0, 0], "operation": "new", "body_name": "Bush"}));
@@ -1818,7 +1825,8 @@ fn interference_of_a_headed_pin_a_hair_off_a_bush_of_its_heads_radius() {
 /// whichever body comes first.
 #[test]
 fn interference_of_a_headed_pin_made_before_its_plate() {
-    let crescent = |r: f64, e: f64| std::f64::consts::PI * r * r - (2.0 * r * r * (e / (2.0 * r)).acos() - e / 2.0 * (4.0 * r * r - e * e).sqrt());
+    let crescent =
+        |r: f64, e: f64| std::f64::consts::PI * r * r - (2.0 * r * r * pmath::acos(e / (2.0 * r)) - e / 2.0 * (4.0 * r * r - e * e).sqrt());
     let offset = 5.6e-4;
     let mut s = Session::default();
     run(&mut s, "solid.cylinder", json!({"radius": 3, "height": 12, "base": [offset, 0, -2.35], "operation": "new", "body_name": "Pin"}));
@@ -2196,8 +2204,8 @@ fn hold_keeps_the_other_input_of_a_five_bar() {
     let a = place(&s, "L1", Vec3::new(20.0, 30.0, 0.0));
     assert!(
         a.dist(Vec3::new(
-            20.0 * 5f64.to_radians().cos() - 30.0 * 5f64.to_radians().sin(),
-            20.0 * 5f64.to_radians().sin() + 30.0 * 5f64.to_radians().cos(),
+            20.0 * pmath::cos(5f64.to_radians()) - 30.0 * pmath::sin(5f64.to_radians()),
+            20.0 * pmath::sin(5f64.to_radians()) + 30.0 * pmath::cos(5f64.to_radians()),
             0.0
         )) < 1e-6,
         "{r}"

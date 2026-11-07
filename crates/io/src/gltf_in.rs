@@ -17,6 +17,7 @@
 //! sRGB here), alpha (blended materials only) and metallic/roughness factors give the body's
 //! look. Textures are not read.
 
+use polycore_geom::pmath;
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 
@@ -842,7 +843,7 @@ impl<'d> Reader<'d, '_, '_> {
 /// Linear to sRGB (0–1).
 fn srgb(c: f32) -> f32 {
     let c = if c.is_finite() { c.clamp(0.0, 1.0) } else { 0.8 };
-    if c <= 0.003_130_8 { 12.92 * c } else { 1.055 * c.powf(1.0 / 2.4) - 0.055 }
+    if c <= 0.003_130_8 { 12.92 * c } else { 1.055 * pmath::powf(f64::from(c), 1.0 / 2.4) as f32 - 0.055 }
 }
 
 /// A material's look: base colour, alpha when blended, metallic/roughness when opaque.

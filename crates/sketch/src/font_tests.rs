@@ -2,6 +2,7 @@
 //! known by hand; the repository's second font (BIZ UDPGothic, `assets/fonts/biz-udp-gothic`) stands for
 //! a real one.
 
+use polycore_geom::pmath;
 use std::path::PathBuf;
 
 use polycore_geom::Vec2;
@@ -286,7 +287,7 @@ fn a_font_name_is_a_path_when_it_has_a_separator_or_a_font_extension() {
 fn a_text_that_the_font_makes_too_large_is_refused() {
     // A glyph of 300 corner points, 20 000 lines at most in a link: 66 of them are 19 800 lines, 67 are 20 100.
     let ring: Vec<(i16, i16)> =
-        (0..300).map(|i| ((500.0 * (f64::from(i) * 0.0209).cos()) as i16, (500.0 * (f64::from(i) * 0.0209).sin()) as i16)).collect();
+        (0..300).map(|i| ((500.0 * pmath::cos(f64::from(i) * 0.0209)) as i16, (500.0 * pmath::sin(f64::from(i) * 0.0209)) as i16)).collect();
     let font = build_font("Many", &[Glyph { ch: 'H', advance: 100, contours: vec![ring] }]);
     let folder = Folder::new("large");
     let path = folder.0.join("many.ttf").to_string_lossy().into_owned();

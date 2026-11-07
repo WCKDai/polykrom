@@ -14,6 +14,7 @@
 //! build total, then the phases `bench-open` prints for the saved design.
 
 use polykrom_engine::Session;
+use polykrom_engine::geom::pmath;
 use serde_json::{Value, json};
 
 struct Script {
@@ -56,8 +57,8 @@ impl Script {
         for k in 0..spokes {
             let a = std::f64::consts::TAU * k as f64 / spokes as f64;
             let side = if k % 2 == 1 { 1.0 } else { -1.0 };
-            let hub = [cx + 30.0 * a.cos(), side * 40.0, 340.0 + 30.0 * a.sin()];
-            let (ca, sa) = ((a + 0.12).cos(), (a + 0.12).sin());
+            let hub = [cx + 30.0 * pmath::cos(a), side * 40.0, 340.0 + 30.0 * pmath::sin(a)];
+            let (ca, sa) = (pmath::cos(a + 0.12), pmath::sin(a + 0.12));
             let rim = [cx + 300.0 * ca, side * 4.0, 340.0 + 300.0 * sa];
             self.tube(hub, rim, 1.0, &format!("{label} spoke {k}"));
             let nipple = json!({"radius": 2, "height": 12, "base": rim.map(round3), "axis": [round6(ca), 0, round6(sa)], "body_name": format!("{label} nipple {k}")});
@@ -116,7 +117,7 @@ pub fn bicycle(scale: f64) -> Value {
     let links = n(112.0);
     for k in 0..links {
         let a = std::f64::consts::TAU * k as f64 / links as f64;
-        let (x, z) = (round3(-210.0 + 230.0 * a.cos()), round3(320.0 + 80.0 * a.sin()));
+        let (x, z) = (round3(-210.0 + 230.0 * pmath::cos(a)), round3(320.0 + 80.0 * pmath::sin(a)));
         for (side, y) in [("in", 46), ("out", 56)] {
             s.c("solid.box", json!({"length": 12, "width": 1, "height": 8, "corner": [round3(x - 6.0), y, round3(z - 4.0)], "body_name": format!("Link {k} {side}")}));
         }
@@ -146,7 +147,7 @@ pub fn bicycle(scale: f64) -> Value {
     let bolts = n(240.0);
     for k in 0..bolts {
         let a = std::f64::consts::TAU * k as f64 / bolts as f64;
-        let p = [round3(-300.0 + 2.5 * k as f64), round3(120.0 + 10.0 * a.sin()), round3(400.0 + 10.0 * a.cos())];
+        let p = [round3(-300.0 + 2.5 * k as f64), round3(120.0 + 10.0 * pmath::sin(a)), round3(400.0 + 10.0 * pmath::cos(a))];
         s.c("solid.cylinder", json!({"radius": 5, "height": 4, "base": p, "axis": "Z", "body_name": format!("Bolt {k} head")}));
         s.c(
             "solid.cylinder",

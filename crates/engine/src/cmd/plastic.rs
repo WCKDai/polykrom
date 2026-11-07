@@ -270,6 +270,7 @@ fn snap_fit(s: &mut Session, p: &Value) -> Result<Value> {
 #[cfg(test)]
 mod tests {
     use polycore_geom::Vec3;
+    use polycore_geom::pmath;
     use std::f64::consts::PI;
 
     use serde_json::{Value, json};
@@ -519,7 +520,7 @@ mod tests {
         // Drafted 2°: the section shrinks by 2·s·tan 2° each way at height s.
         let (mut d, v0) = plate();
         run(&mut d, "plastic.rest", json!({"position": [30, 30, 3], "width": 10, "length": 20, "height": 4, "draft": "2 deg"}));
-        let a = 2f64.to_radians().tan();
+        let a = pmath::tan(2f64.to_radians());
         let want = 800.0 - a * 30.0 * 16.0 + 4.0 / 3.0 * a * a * 64.0;
         assert!(rel(volume(&mut d) - v0, want) < 1e-6, "{} {want}", volume(&mut d) - v0);
         // A wall thicker than half the width, or a draft that closes the top, is refused.
@@ -543,7 +544,7 @@ mod tests {
         let body = run(&mut s, "inspect.measure", json!({}))["bodies"][0]["name"].as_str().unwrap_or_default().to_string();
         run(&mut s, "plastic.assign_rule", json!({"bodies": [body], "rule": "Thick ABS"}));
         run(&mut s, "plastic.boss", json!({"position": [30, 30, 3], "diameter": 10, "height": 12}));
-        let rt = 5.0 - 12.0 * 1.5f64.to_radians().tan();
+        let rt = 5.0 - 12.0 * pmath::tan(1.5f64.to_radians());
         let want = PI * 12.0 / 3.0 * (25.0 + 5.0 * rt + rt * rt);
         assert!(rel(volume(&mut s) - v0, want) < 1e-3, "{} {want}", volume(&mut s) - v0);
         // Editing the rule rebuilds the boss.

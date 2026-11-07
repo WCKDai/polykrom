@@ -39,6 +39,7 @@
 //!
 //! The same files drive the live app over the control channel for screenshots.
 
+use polykrom_engine::geom::pmath;
 use std::cell::RefCell;
 use std::path::PathBuf;
 use std::rc::Rc;
@@ -416,7 +417,7 @@ impl Harness {
         for i in 0..240 {
             self.frame();
             let now = basis(&self.app.cam);
-            let ang = |a: polykrom_engine::geom::Vec3, b: polykrom_engine::geom::Vec3| a.dot(b).clamp(-1.0, 1.0).acos().to_degrees();
+            let ang = |a: polykrom_engine::geom::Vec3, b: polykrom_engine::geom::Vec3| pmath::acos(a.dot(b).clamp(-1.0, 1.0)).to_degrees();
             let d = ang(prev.0, now.0).max(ang(prev.2, now.2));
             if d > worst.0 {
                 worst = (d, i);

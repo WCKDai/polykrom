@@ -80,6 +80,7 @@ mod tests {
     use super::*;
     use crate::joints::{JointKind, JointOrigin, Snap};
     use polycore_geom::Vec3;
+    use polycore_geom::pmath;
 
     fn joint(kind: JointKind) -> Joint {
         let at = |occurrence| JointOrigin { occurrence, snap: Snap::Point { point: Vec3::ZERO, z: None, x: None } };
@@ -117,7 +118,7 @@ mod tests {
         // Perpendicular: z square to A's.
         assert!(z_of(&at(JointKind::Perpendicular)).z.abs() < 1e-12);
         // Angle: 0.6 from mated.
-        assert!((z_of(&at(JointKind::Angle)).z + 0.6f64.cos()).abs() < 1e-12);
+        assert!((z_of(&at(JointKind::Angle)).z + pmath::cos(0.6f64)).abs() < 1e-12);
         // Point on plane: the origin on A's plane.
         assert!(at(JointKind::PointOnPlane)[3][2].abs() < 1e-12);
         // Point on line: on A's z axis.

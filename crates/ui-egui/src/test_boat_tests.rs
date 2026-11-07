@@ -1,6 +1,7 @@
 use super::*;
 use crate::space_mouse::Motion;
 use egui::vec2;
+use polykrom_engine::geom::pmath;
 
 fn boat() -> &'static Model {
     model().expect("the built-in model reads")
@@ -72,7 +73,7 @@ fn test_boat_step_orbits_pans_zooms_rolls_and_holds_the_boat_in_its_box() {
     for _ in 0..400 {
         step(&mut cam, motion([1.0, 1.0, 1.0], [0.0; 3]), 0.05, 150.0, radius, aspect, false, false);
     }
-    assert!(cam.distance >= radius * NEAREST / 1.0 - 1e-6 && cam.target.len() <= cam.distance * (FOV / 2.0).tan() + 1e-6);
+    assert!(cam.distance >= radius * NEAREST / 1.0 - 1e-6 && cam.target.len() <= cam.distance * pmath::tan(FOV / 2.0) + 1e-6);
     let mut cam = start;
     for _ in 0..400 {
         step(&mut cam, motion([-1.0, -1.0, -1.0], [0.0; 3]), 0.05, 150.0, radius, aspect, false, false);

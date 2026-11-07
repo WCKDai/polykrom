@@ -8,6 +8,7 @@
 //! in `assets/icons/ui/design/palette.toml`; `assets/styles/ui/palettes.rs` links those generated
 //! values to UI tokens and owns the remaining UI-only colour-vision adjustments.
 
+use polykrom_engine::geom::pmath;
 use std::collections::BTreeSet;
 
 use egui::Color32;
@@ -52,11 +53,11 @@ fn eye(mode: ColorVision) -> Eye {
 // ---- the instruments ----
 
 fn to_lin(c: f64) -> f64 {
-    if c <= 0.04045 { c / 12.92 } else { ((c + 0.055) / 1.055).powf(2.4) }
+    if c <= 0.04045 { c / 12.92 } else { pmath::powf((c + 0.055) / 1.055, 2.4) }
 }
 
 fn to_srgb(c: f64) -> f64 {
-    if c <= 0.0031308 { 12.92 * c } else { 1.055 * c.powf(1.0 / 2.4) - 0.055 }
+    if c <= 0.0031308 { 12.92 * c } else { 1.055 * pmath::powf(c, 1.0 / 2.4) - 0.055 }
 }
 
 fn mul(m: &M3, v: V3) -> V3 {
@@ -147,7 +148,7 @@ fn simulate(c: Rgb8, eye: Eye, how: Instrument) -> V3 {
 /// CIELAB (D65) of an sRGB colour.
 fn lab(srgb: V3) -> V3 {
     let [x, y, z] = mul(&XYZ_FROM_LIN, srgb.map(to_lin));
-    let f = |t: f64| if t > (6.0f64 / 29.0).powi(3) { t.cbrt() } else { t / (3.0 * (6.0f64 / 29.0).powi(2)) + 4.0 / 29.0 };
+    let f = |t: f64| if t > (6.0f64 / 29.0).powi(3) { pmath::cbrt(t) } else { t / (3.0 * (6.0f64 / 29.0).powi(2)) + 4.0 / 29.0 };
     let (fx, fy, fz) = (f(x / 0.95047), f(y), f(z / 1.08883));
     [116.0 * fy - 16.0, 500.0 * (fx - fy), 200.0 * (fy - fz)]
 }
@@ -155,12 +156,12 @@ fn lab(srgb: V3) -> V3 {
 /// CIEDE2000 (Sharma, Wu, Dalal 2005).
 fn de2000(l1: V3, l2: V3) -> f64 {
     let ([lightness1, a1, b1], [lightness2, a2, b2]) = (l1, l2);
-    let (c1, c2) = (a1.hypot(b1), a2.hypot(b2));
+    let (c1, c2) = (pmath::hypot(a1, b1), pmath::hypot(a2, b2));
     let cb = (c1 + c2) / 2.0;
     let g = 0.5 * (1.0 - (cb.powi(7) / (cb.powi(7) + 25f64.powi(7))).sqrt());
     let (a1p, a2p) = ((1.0 + g) * a1, (1.0 + g) * a2);
-    let (c1p, c2p) = (a1p.hypot(b1), a2p.hypot(b2));
-    let hue = |b: f64, a: f64, c: f64| if c == 0.0 { 0.0 } else { b.atan2(a).to_degrees().rem_euclid(360.0) };
+    let (c1p, c2p) = (pmath::hypot(a1p, b1), pmath::hypot(a2p, b2));
+    let hue = |b: f64, a: f64, c: f64| if c == 0.0 { 0.0 } else { pmath::atan2(b, a).to_degrees().rem_euclid(360.0) };
     let (h1p, h2p) = (hue(b1, a1p, c1p), hue(b2, a2p, c2p));
     let dlp = lightness2 - lightness1;
     let dcp = c2p - c1p;
@@ -173,7 +174,7 @@ fn de2000(l1: V3, l2: V3) -> f64 {
     } else {
         h2p - h1p + 360.0
     };
-    let dhp_big = 2.0 * (c1p * c2p).sqrt() * (dhp / 2.0).to_radians().sin();
+    let dhp_big = 2.0 * (c1p * c2p).sqrt() * pmath::sin((dhp / 2.0).to_radians());
     let lbp = (lightness1 + lightness2) / 2.0;
     let cbp = (c1p + c2p) / 2.0;
     let hbp = if c1p * c2p == 0.0 {
@@ -185,14 +186,14 @@ fn de2000(l1: V3, l2: V3) -> f64 {
     } else {
         (h1p + h2p - 360.0) / 2.0
     };
-    let cos = |deg: f64| deg.to_radians().cos();
+    let cos = |deg: f64| pmath::cos(deg.to_radians());
     let t = 1.0 - 0.17 * cos(hbp - 30.0) + 0.24 * cos(2.0 * hbp) + 0.32 * cos(3.0 * hbp + 6.0) - 0.20 * cos(4.0 * hbp - 63.0);
-    let dtheta = 30.0 * (-((hbp - 275.0) / 25.0).powi(2)).exp();
+    let dtheta = 30.0 * pmath::exp(-((hbp - 275.0) / 25.0).powi(2));
     let rc = 2.0 * (cbp.powi(7) / (cbp.powi(7) + 25f64.powi(7))).sqrt();
     let sl = 1.0 + 0.015 * (lbp - 50.0).powi(2) / (20.0 + (lbp - 50.0).powi(2)).sqrt();
     let sc = 1.0 + 0.045 * cbp;
     let sh = 1.0 + 0.015 * cbp * t;
-    let rt = -(2.0 * dtheta).to_radians().sin() * rc;
+    let rt = -pmath::sin((2.0 * dtheta).to_radians()) * rc;
     ((dlp / sl).powi(2) + (dcp / sc).powi(2) + (dhp_big / sh).powi(2) + rt * (dcp / sc) * (dhp_big / sh)).sqrt()
 }
 

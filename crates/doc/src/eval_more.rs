@@ -5,6 +5,7 @@ use super::*;
 use crate::EmbossFace;
 use crate::apply_point;
 use crate::sheet;
+use polycore_geom::pmath;
 use polycore_geom::{Aabb3, Loop2, Ring, Seg2};
 
 pub(super) fn eval(doc: &Document, vals: &BTreeMap<String, Value>, f: &Feature, st: &mut ModelState) -> Result<()> {
@@ -114,7 +115,7 @@ pub(super) fn eval(doc: &Document, vals: &BTreeMap<String, Value>, f: &Feature, 
                 // Turn `a` onto −b (faces meet) or b (flipped), about the `from` point.
                 let want = if *flip { b } else { b * -1.0 };
                 let axis = a.cross(want);
-                let ang = axis.len().atan2(a.dot(want));
+                let ang = pmath::atan2(axis.len(), a.dot(want));
                 let axis = axis.normalized().unwrap_or_else(|| a.any_perp());
                 if ang.abs() > 1e-12 {
                     m = rotation(from, axis, ang);
@@ -1792,7 +1793,7 @@ pub(super) fn plastic_eval(doc: &Document, vals: &BTreeMap<String, Value>, f: &F
                 Some(e) => len(e)?.max(0.0),
                 None => 0.0,
             };
-            let r_top = r0 - h * dr.tan();
+            let r_top = r0 - h * pmath::tan(dr);
             if r_top <= 0.0 {
                 return Err(DocError::Invalid("the draft closes the boss before its top".into()));
             }
@@ -1800,7 +1801,7 @@ pub(super) fn plastic_eval(doc: &Document, vals: &BTreeMap<String, Value>, f: &F
             let (x, _, z) = local_frame(direction.0, None)?;
             // The post: a (tapered) cylinder from a little inside the face.
             let base = Plane::new(position.0 - z * delta, x, z.cross(x)).ok_or_else(|| DocError::Invalid("boss frame".into()))?;
-            let r_in = r0 + delta * dr.tan();
+            let r_in = r0 + delta * pmath::tan(dr);
             let disc = Region2 { outer: Loop2::circle(Vec2::ZERO, r_in), holes: Vec::new() };
             let post = if dr.abs() > 1e-12 {
                 vec![kernel::extrude_tapered(&base, &disc, h + delta, 1.0, -dr)?]
@@ -1833,7 +1834,7 @@ pub(super) fn plastic_eval(doc: &Document, vals: &BTreeMap<String, Value>, f: &F
                 }
                 for k in 0..n as usize {
                     let a = std::f64::consts::TAU * k as f64 / n;
-                    let (u, v) = (x * a.cos() + z.cross(x) * a.sin(), z.cross(x) * a.cos() - x * a.sin());
+                    let (u, v) = (x * pmath::cos(a) + z.cross(x) * pmath::sin(a), z.cross(x) * pmath::cos(a) - x * pmath::sin(a));
                     let rp = Plane::new(position.0, u, v).ok_or_else(|| DocError::Invalid("rib frame".into()))?;
                     let rect = Region2 {
                         outer: Loop2::polygon(&[
@@ -2004,7 +2005,7 @@ pub(super) fn plastic_eval(doc: &Document, vals: &BTreeMap<String, Value>, f: &F
             if !(dr.abs() < 1.0) {
                 return Err(DocError::Invalid("the rest's draft must be under 57°".into()));
             }
-            let shrink = h * dr.tan();
+            let shrink = h * pmath::tan(dr);
             let closes = match t {
                 Some(t) => 2.0 * shrink >= t,
                 None => 2.0 * shrink >= w.min(l.unwrap_or(w)),
@@ -2015,7 +2016,7 @@ pub(super) fn plastic_eval(doc: &Document, vals: &BTreeMap<String, Value>, f: &F
             let delta = (h * 0.05).clamp(1e-3, 0.5);
             let (x, y, z) = local_frame(direction.0, along.map(Vec3::from))?;
             // Sized at the face: the tool starts a little inside, grown by the draft over that.
-            let e = delta * dr.tan();
+            let e = delta * pmath::tan(dr);
             let shape = |grow: f64| match l {
                 Some(l) => Loop2::polygon(&[
                     Vec2::new(-l / 2.0 - grow, -w / 2.0 - grow),

@@ -5,6 +5,11 @@
 //! it rests in (slide), and the gauge beside it rises and falls (pull up, press down).
 //! It's a generic cap on a round base, drawn in code, not any maker's device.
 
+// UI only: this file draws, animates, converts colours or places the camera, and feeds nothing
+// into a design, so it keeps the platform's transcendental functions (listed with its reason in
+// crates/engine/tests/pmath_gate.rs; everything that reaches a command goes through pmath).
+#![allow(clippy::disallowed_methods)]
+
 use egui::{Pos2, Shape, Stroke};
 use polykrom_space_mouse::{Calibration, Kind, Step};
 

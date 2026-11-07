@@ -1,5 +1,6 @@
 //! An agent builds parts through MCP only and verifies them through MCP only.
 
+use polykrom_engine::geom::pmath;
 use std::f64::consts::PI;
 
 use serde_json::{Value, json};
@@ -1543,7 +1544,7 @@ fn mechanisms_skill_example_moves_as_documented() {
     assert!(near(&wing, [0.0, 20.0, 1.5]), "joined where it was modelled: {wing:?}");
 
     // The tip at (0, 30 cos θ, 30 sin θ), the root at (0, 0, -40): L² = 2500 + 2400 sin θ.
-    let stroke = |deg: f64| (2500.0 + 2400.0 * deg.to_radians().sin()).sqrt() - 50.0;
+    let stroke = |deg: f64| (2500.0 + 2400.0 * pmath::sin(deg.to_radians())).sqrt() - 50.0;
     assert!((stroke(20.0) - 7.6268).abs() < 5e-5, "the reference states {}", stroke(20.0));
     exec(&mut s, "joint.drive", json!({"joint": "Hinge", "value": 20}));
     let list = exec(&mut s, "joint.list", json!({}));
@@ -1554,7 +1555,7 @@ fn mechanisms_skill_example_moves_as_documented() {
     assert!(near(&wing2, [0.0, -18.281, 8.250]), "{wing2:?}");
 
     // The rod reaches +10 mm where L = 60: sin θ = 11/24.
-    let stop = (11.0f64 / 24.0).asin().to_degrees();
+    let stop = pmath::asin(11.0f64 / 24.0).to_degrees();
     assert!((stop - 27.280).abs() < 5e-4, "the reference states {stop}");
     let r = exec(&mut s, "joint.drive", json!({"joint": "Hinge", "value": 45}));
     assert_eq!(r["stopped_by_loop"]["joint"], "Stroke", "{r}");

@@ -1,6 +1,7 @@
 //! A joint origin on a face or a hole keeps its turn about z as the geometry tilts.
 
 use polycore_geom::Vec3;
+use polycore_geom::pmath;
 use serde_json::{Value, json};
 
 use super::tests::{occ, run};
@@ -40,7 +41,7 @@ fn top(s: &mut Session) -> Value {
 fn bar_from_tilt_axis(s: &Session) -> f64 {
     let m = polykrom_doc::joints::occurrence_world(&s.doc, occ(s, "Bar"));
     let x = polykrom_doc::apply_vector(&m, Vec3::X);
-    x.dot(Vec3::Y).abs().min(1.0).acos().to_degrees()
+    pmath::acos(x.dot(Vec3::Y).abs().min(1.0)).to_degrees()
 }
 
 #[test]

@@ -4,6 +4,7 @@
 //! component into its frame, and every evaluation wrote every imported STEP file out again to
 //! fingerprint it, so each sketch command took longer the more parts were inserted.
 
+use polycore_geom::pmath;
 use std::cell::Cell;
 use std::sync::Arc;
 
@@ -92,7 +93,7 @@ fn joint_face_measurements_are_shared_across_motion_samples_and_snap_kinds() {
                 let solution = joints::solve(&doc, &snapshot.state());
                 assert!(solution.errors.is_empty() && solution.conflicts.is_empty(), "{solution:?}");
                 let point = apply_point(&solution.world[&occurrence], Vec3::new(5.0, 0.0, 10.0));
-                assert!(point.dist(Vec3::new(5.0 * angle.cos(), 5.0 * angle.sin(), 10.0)) < 1e-9);
+                assert!(point.dist(Vec3::new(5.0 * pmath::cos(angle), 5.0 * pmath::sin(angle), 10.0)) < 1e-9);
                 doc.apply_joint_solution(&solution);
             }
         }

@@ -290,6 +290,7 @@ impl Sketch {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use polycore_geom::pmath;
 
     #[test]
     fn wire_space_defaults_and_preserves_detached_provenance() {
@@ -339,7 +340,8 @@ mod tests {
     /// the closing point as everywhere else; an open one keeps its mirrored end tangents.
     #[test]
     fn a_closed_spline_is_smooth_where_it_closes() {
-        let ring: Vec<Vec3> = (0..=12).map(|k| f64::from(k) * std::f64::consts::TAU / 12.0).map(|a| Vec3::new(a.cos(), a.sin(), 0.0)).collect();
+        let ring: Vec<Vec3> =
+            (0..=12).map(|k| f64::from(k) * std::f64::consts::TAU / 12.0).map(|a| Vec3::new(pmath::cos(a), pmath::sin(a), 0.0)).collect();
         let pts = fit_polyline(&ring);
         let dir = |a: Vec3, b: Vec3| (b - a).normalized().unwrap();
         let n = pts.len();

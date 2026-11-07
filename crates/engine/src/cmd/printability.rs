@@ -6,6 +6,7 @@
 //! are not judged yet; the reply says so.
 
 use polycore_geom::Vec3;
+use polycore_geom::pmath;
 use serde_json::{Value, json};
 
 use super::CommandSpec;
@@ -68,7 +69,7 @@ fn printability(s: &mut Session, p: &Value) -> Result<Value> {
     if bodies.len() > MAX_BODIES {
         return Err(bad(cmd, format!("at most {MAX_BODIES} bodies")));
     }
-    let sin = limit.to_radians().sin();
+    let sin = pmath::sin(limit.to_radians());
     let out: Vec<Value> = bodies
         .iter()
         .map(|b| {

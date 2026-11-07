@@ -1,5 +1,6 @@
 //! Analytic cursor oracle plus feasibility checks on every accepted continuation step.
 use polycore_geom::Vec2;
+use polycore_geom::pmath;
 use polykrom_sketch::{ConstraintKind, Sketch, move_line_towards, move_point_towards, solve};
 
 fn linkage() -> (Sketch, usize, usize) {
@@ -47,7 +48,7 @@ fn circle_oracle_all_directions_and_large_targets() {
         for i in 0..24 {
             let (mut sk, a, c) = linkage();
             let angle = std::f64::consts::TAU * i as f64 / 24.0;
-            let target = Vec2::new(angle.cos(), angle.sin()) * radius;
+            let target = Vec2::new(pmath::cos(angle), pmath::sin(angle)) * radius;
             let nearest = target * (10.0 / radius);
             assert!(move_point_towards(&mut sk, a, target, 1.25, None, |before, after| {
                 assert!(after.points[a].pos.dist(target) < before.points[a].pos.dist(target));
@@ -120,12 +121,12 @@ fn cursor_motion_refreshes_driven_dimensions_without_a_followup_solve() {
 #[test]
 fn the_other_moving_joint_reaches_its_rocker_arc_and_motion_limits() {
     let base = Vec2::new(42.0, 0.0);
-    let lo = -(-1264.0_f64 / 1680.0).acos(); // |OC| >= 40 - 10
-    let hi = -(0.2_f64).acos(); // |OC| <= 40 + 10
+    let lo = -pmath::acos(-1264.0_f64 / 1680.0); // |OC| >= 40 - 10
+    let hi = -pmath::acos(0.2_f64); // |OC| <= 40 + 10
     for angle in [-2.6_f64, -2.1, -1.5, -1.1] {
         let (mut sk, a, c) = linkage();
-        let target = base + Vec2::new(angle.cos(), angle.sin()) * 60.0;
-        let nearest = base + Vec2::new(angle.clamp(lo, hi).cos(), angle.clamp(lo, hi).sin()) * 20.0;
+        let target = base + Vec2::new(pmath::cos(angle), pmath::sin(angle)) * 60.0;
+        let nearest = base + Vec2::new(pmath::cos(angle.clamp(lo, hi)), pmath::sin(angle.clamp(lo, hi))) * 20.0;
         assert!(move_point_towards(&mut sk, c, target, 1.25, None, |_, after| {
             (base - after.points[a].pos).cross(after.points[c].pos - after.points[a].pos) < 0.0
         }));

@@ -4,6 +4,7 @@
 //! `sketch.edit_text` live; the whole gesture is one undo step and Esc cancels it (the drag
 //! shares [`crate::viewport::Viewport::text_drag`] with moving a text, so it ends and cancels
 //! the same way).
+use polykrom_engine::geom::pmath;
 use std::cell::RefCell;
 
 use egui::{Align2, CursorIcon, FontId, Painter, Pos2, Rect, Shape, Stroke, StrokeKind, vec2};
@@ -58,7 +59,7 @@ impl Frame {
 }
 
 fn rotate(v: Vec2, angle: f64) -> Vec2 {
-    let (s, c) = angle.sin_cos();
+    let (s, c) = pmath::sin_cos(angle);
     Vec2::new(v.x * c - v.y * s, v.x * s + v.y * c)
 }
 
@@ -230,7 +231,7 @@ fn follow(d: &Drag, to: Vec2, shift: bool) -> Option<(Vec2, f64, f64)> {
             if a.len() < 1e-9 || b.len() < 1e-9 {
                 return None;
             }
-            let mut turn = b.y.atan2(b.x) - a.y.atan2(a.x);
+            let mut turn = pmath::atan2(b.y, b.x) - pmath::atan2(a.y, a.x);
             if shift {
                 let step = ANGLE_STEP_DEG.to_radians();
                 turn = ((f.angle + turn) / step).round() * step - f.angle;

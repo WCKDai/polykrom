@@ -1,6 +1,7 @@
 //! Exercise the actual feature editor, including frames rendered before OK.
 use crate::scenario::Harness;
 use polykrom_engine::doc::{Extent, FeatureKind};
+use polykrom_engine::geom::pmath;
 use serde_json::{Value, json};
 
 fn make(params: Value) -> Harness {
@@ -249,8 +250,8 @@ fn adjacent_profiles_from_slanted_face_use_same_merged_centre_as_geometry() {
     h.app.run("sketch.rectangle.two_point", json!({"p0":[0,0],"p1":[2,10]})).unwrap();
     h.app.run("sketch.rectangle.two_point", json!({"p0":[2,0],"p1":[10,10]})).unwrap();
     h.app.run("sketch.finish", json!({})).unwrap();
-    let angle = 0.1f64.atan();
-    let point = [2.0 * angle.sin(), 0.0, 10.0 + 2.0 * angle.cos()];
+    let angle = pmath::atan(0.1f64);
+    let point = [2.0 * pmath::sin(angle), 0.0, 10.0 + 2.0 * pmath::cos(angle)];
     h.app.run("solid.extrude", json!({"sketch":"Adjacent","distance":10,"from":point,"name":"Depth","body_name":"Main","operation":"new"})).unwrap();
     let min_z = h.app.session.world_state().body("Main").unwrap().mesh().bounds().min.z;
     open(&mut h);
@@ -258,7 +259,7 @@ fn adjacent_profiles_from_slanted_face_use_same_merged_centre_as_geometry() {
     assert!((base.z - min_z).abs() < 1e-7, "displayed start{} geometry start{min_z}", base.z);
     // Averaging the two unmerged rectangle loops gives x=3.5; their internal
     // seam must not bias the reference ray used by the extent handle.
-    let unmerged_height = 10.0 + 2.0 / angle.cos() - 3.5 * angle.tan();
+    let unmerged_height = 10.0 + 2.0 / pmath::cos(angle) - 3.5 * pmath::tan(angle);
     assert!((base.z - unmerged_height).abs() > 0.01, "fixture must distinguish the raw-profile centre");
     h.step(&json!({"widget":"OK"})).unwrap();
     assert!((h.app.session.world_state().body("Main").unwrap().mesh().bounds().min.z - min_z).abs() < 1e-7);
@@ -309,7 +310,7 @@ fn symmetric_total_distance_preview_handle_drag_apply_and_reopen_agree() {
         open(&mut h);
         let expected_tip = h.at(&json!({"world":[5,5,cap]})).unwrap();
         let handle = h.at(&json!({"handle":"arrow"})).unwrap();
-        assert!((handle[0] - expected_tip[0]).hypot(handle[1] - expected_tip[1]) < 1.0, "{convention}: {handle:?} expected {expected_tip:?}");
+        assert!(pmath::hypot(handle[0] - expected_tip[0], handle[1] - expected_tip[1]) < 1.0, "{convention}: {handle:?} expected {expected_tip:?}");
         h.step(&json!({"drag":[{"handle":"arrow"},{"world":[5,5,60]}]})).unwrap();
         let d = h.app.dialog.as_ref().unwrap();
         let crate::dialogs::Kind::Extrude { distance, .. } = &d.kind else { panic!("extrude") };
@@ -394,7 +395,7 @@ fn extrusion_arrow_tracks_the_current_drag_frame() {
         let world = base + normal.unwrap() * distance;
         let expected = h.at(&json!({"world":[world.x, world.y, world.z]})).unwrap();
         let drawn = h.at(&json!({"handle":"arrow"})).unwrap();
-        assert!((drawn[0] - expected[0]).hypot(drawn[1] - expected[1]) < 0.1, "arrow {drawn:?} trails current value {expected:?}");
+        assert!(pmath::hypot(drawn[0] - expected[0], drawn[1] - expected[1]) < 0.1, "arrow {drawn:?} trails current value {expected:?}");
     }
 }
 

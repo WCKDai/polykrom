@@ -2,6 +2,7 @@
 //! full cycle, a gear pair, a rack and pinion, and a clevis whose sweep must stop where geometry
 //! says the link meets its fork. Each checks kinematics and contact together, end to end.
 
+use polycore_geom::pmath;
 use serde_json::{Value, json};
 
 use crate::Session;
@@ -68,7 +69,7 @@ fn a_slider_crank_strokes_twice_its_crank_radius_through_a_clear_cycle() {
     let (lo, hi) = range("Bore");
     assert!((hi - lo - 50.0).abs() < 1e-6, "stroke {}", hi - lo);
     let (wlo, whi) = range("Wrist pin");
-    let swing = (25.0f64 / 100.0).asin().to_degrees();
+    let swing = pmath::asin(25.0f64 / 100.0).to_degrees();
     assert!((whi - swing).abs() < 1e-3 && (wlo + swing).abs() < 1e-3, "rod swing {wlo}..{whi}, want ±{swing}");
 }
 
@@ -139,8 +140,8 @@ fn a_clevis_sweep_stops_where_the_link_meets_its_fork() {
         "joint.create",
         json!({"type": "revolute", "name": "Pivot", "a": {"occurrence": "Fork", "point": [0, 0, 35], "z": [0, 1, 0]}, "b": {"occurrence": "Link", "point": [0, 0, 35], "z": [0, 1, 0]}, "flip": true}),
     );
-    let corner = (20.0f64).hypot(25.0);
-    let want = (25.0f64 / 20.0).atan().to_degrees() - (10.0 / corner).asin().to_degrees();
+    let corner = pmath::hypot(20.0f64, 25.0);
+    let want = pmath::atan(25.0f64 / 20.0).to_degrees() - pmath::asin(10.0 / corner).to_degrees();
     let ways: Vec<Value> = [90, -90].iter().map(|to| run(&mut s, "joint.sweep", json!({"joint": "Pivot", "from": 0, "to": to}))).collect();
     let stops: Vec<f64> = ways.iter().filter_map(|w| w["stopped_at"].as_f64()).collect();
     assert_eq!(stops.len(), 1, "one way meets the block, the other is free: {ways:?}");

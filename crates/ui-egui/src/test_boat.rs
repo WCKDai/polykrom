@@ -9,6 +9,7 @@
 //! camera takes (`navigation::device_camera`), so calibration, reassigned axes, invert, speed and
 //! the zoom direction all show. Pan and zoom are held so the boat never leaves its box.
 
+use polykrom_engine::geom::pmath;
 use std::sync::OnceLock;
 
 use egui::{Pos2, Rect, pos2};
@@ -125,7 +126,7 @@ pub(crate) fn step(
     let shorter = aspect.min(1.0);
     cam.distance = cam.distance.clamp(radius * NEAREST / shorter.max(0.2), radius * FARTHEST);
     // Pan so the boat's centre stays where the whole boat is still inside: within the box less its radius.
-    let half = cam.distance * (FOV / 2.0).tan();
+    let half = cam.distance * pmath::tan(FOV / 2.0);
     let room = (half * aspect.min(1.0) - radius).max(0.0);
     let off = cam.target.len();
     if off > room && off > 0.0 {

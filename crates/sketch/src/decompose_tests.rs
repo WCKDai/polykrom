@@ -8,6 +8,7 @@ use super::*;
 use crate::construct::switch;
 use crate::model::{Constraint, ConstraintKind, CurveKind, Sketch};
 use crate::solver::{SolveReport, solve};
+use polycore_geom::pmath;
 
 use crate::tests::Lcg;
 
@@ -241,7 +242,7 @@ fn fan(rng: &mut Lcg, k: usize, lo: f64, hi: f64, anchored: bool) -> Option<Case
         .map(|i| {
             let t = i as f64 / k as f64 * std::f64::consts::TAU;
             let r = rng.range(30.0, 40.0);
-            Vec2::new(r * t.cos(), r * t.sin())
+            Vec2::new(r * pmath::cos(t), r * pmath::sin(t))
         })
         .collect();
     let mut dist = std::collections::HashMap::new();
@@ -676,7 +677,7 @@ fn a_busy_ground_point_does_not_exhaust_the_budget() {
     }
     for i in 0..1000 {
         let t = i as f64 * 0.0063;
-        let p = sk.add_point(Vec2::new(-30.0 * t.cos(), -30.0 - 30.0 * t.sin()), None).unwrap();
+        let p = sk.add_point(Vec2::new(-30.0 * pmath::cos(t), -30.0 - 30.0 * pmath::sin(t)), None).unwrap();
         sk.add_constraint(ConstraintKind::Distance { p: hub, q: p, value: 30.0 }, None).unwrap();
     }
     let mut strip = vec![hub, second];
@@ -707,7 +708,7 @@ fn a_drag_frame_decomposes_within_its_budget() {
     let mut strip = vec![(hub, Vec2::new(0.0, 0.0)), (second, Vec2::new(10.0, 0.0))];
     for i in 0..1000 {
         let t = i as f64 * 0.0063;
-        let p = sk.add_point(Vec2::new(-30.0 * t.cos(), -30.0 - 30.0 * t.sin()), None).unwrap();
+        let p = sk.add_point(Vec2::new(-30.0 * pmath::cos(t), -30.0 - 30.0 * pmath::sin(t)), None).unwrap();
         sk.add_constraint(ConstraintKind::Distance { p: hub, q: p, value: 30.0 }, None).unwrap();
         let j = i + 2;
         let at = Vec2::new(j as f64 * 5.0 + 7.0, (j % 2) as f64 * 8.0 + 4.0);
@@ -986,7 +987,7 @@ fn large_inputs_are_capped() {
 
     // A dense complete graph under the cap finishes (the merge loop is bounded).
     let mut sk = Sketch::new();
-    let pts: Vec<Vec2> = (0..60).map(|i| Vec2::new((i as f64 * 1.7).sin() * 50.0, (i as f64 * 2.3).cos() * 50.0)).collect();
+    let pts: Vec<Vec2> = (0..60).map(|i| Vec2::new(pmath::sin(i as f64 * 1.7) * 50.0, pmath::cos(i as f64 * 2.3) * 50.0)).collect();
     let ids: Vec<usize> = pts.iter().map(|p| sk.add_point(*p, None).unwrap()).collect();
     sk.add_constraint(ConstraintKind::Fix { p: ids[0] }, None).unwrap();
     sk.add_constraint(ConstraintKind::Fix { p: ids[1] }, None).unwrap();

@@ -772,6 +772,7 @@ fn fair(s: &mut Session, p: &Value) -> Result<Value> {
 mod tests {
     use super::*;
     use crate::Session;
+    use polycore_geom::pmath;
     use serde_json::json;
 
     fn run(s: &mut Session, c: &str, p: Value) -> Value {
@@ -982,7 +983,7 @@ mod tests {
             json!({"sketch": "S", "curves": ["side"], "axis": "y", "angle": "90 deg", "symmetric": true, "body_name": "Both"}),
         );
         let bb = polycore::measure(&s.world_state().body("Both").unwrap().body).unwrap().bbox;
-        let z = 3.0 * (PI / 4.0).sin();
+        let z = 3.0 * pmath::sin(PI / 4.0);
         assert!((bb.min.z + z).abs() < 1e-3 && (bb.max.z - z).abs() < 1e-3, "{bb:?}");
         run(&mut s, "surface.revolve", json!({"sketch": "S", "curves": ["slant"], "axis": "y", "body_name": "Cone"}));
         close(area(&s, "Cone"), PI * 3.0 * 5.0);
@@ -1301,7 +1302,7 @@ mod tests {
         let pi = std::f64::consts::PI;
         assert!((area(&s, "Half") - (150.0 * pi - 100.0)).abs() < 150.0 * pi * 1e-3, "{}", area(&s, "Half"));
         let name = polykrom_doc::naming::face_names(s.model.state().body("Half").unwrap()).first().cloned().unwrap();
-        let on = [10.0 * 2.5f64.cos(), 10.0 * 2.5f64.sin(), 5.0];
+        let on = [10.0 * pmath::cos(2.5f64), 10.0 * pmath::sin(2.5f64), 5.0];
         assert!(s.execute("surface.untrim", &json!({"face": {"body": "Half", "point": on}})).is_err(), "no holes, outer kept");
         run(&mut s, "surface.untrim", json!({"face": {"body": "Half", "point": on}, "outer": true, "in_place": true}));
         let st = s.world_state();
@@ -1352,7 +1353,7 @@ mod tests {
         let pi = std::f64::consts::PI;
         let mut s = Session::default();
         quarter_cylinder(&mut s, "Strip");
-        let top = [10.0 * (pi / 4.0).cos(), 10.0 * (pi / 4.0).sin(), 20.0];
+        let top = [10.0 * pmath::cos(pi / 4.0), 10.0 * pmath::sin(pi / 4.0), 20.0];
         run(&mut s, "surface.extend", json!({"body": "Strip", "edges": [top], "distance": "5 mm", "name": "Up"}));
         let want = 10.0 * pi / 2.0 * 25.0;
         assert!((area(&s, "Strip") - want).abs() < want * 1e-3, "{} vs {want}", area(&s, "Strip")); // (measured on meshes)
@@ -1373,7 +1374,7 @@ mod tests {
 
         let side = [0.0, 10.0, 10.0];
         let k: f64 = 0.1;
-        let parabola = 2.5 * (1.0 + 25.0 * k * k).sqrt() + (5.0 * k).asinh() / (2.0 * k);
+        let parabola = 2.5 * (1.0 + 25.0 * k * k).sqrt() + pmath::asinh(5.0 * k) / (2.0 * k);
         for (mode, run_off) in [("tangent", 5.0), ("curvature", parabola)] {
             run(&mut s, "surface.extend", json!({"body": "Strip", "edges": [side], "distance": 5, "mode": mode}));
             let st = s.world_state();
@@ -1410,7 +1411,7 @@ mod tests {
         let mut s = Session::default();
         quarter_cylinder(&mut s, "Strip");
         let before = s.doc.features.len();
-        let top = [10.0 * (std::f64::consts::PI / 4.0).cos(), 10.0 * (std::f64::consts::PI / 4.0).sin(), 20.0];
+        let top = [10.0 * pmath::cos(std::f64::consts::PI / 4.0), 10.0 * pmath::sin(std::f64::consts::PI / 4.0), 20.0];
         for p in [
             json!({"body": "Strip", "edges": [top]}),
             json!({"body": "Strip", "edges": [top], "distance": 5, "mode": "sideways"}),
@@ -1550,7 +1551,7 @@ mod tests {
         run(&mut s, "sketch.finish", json!({}));
         let (r, a): (f64, f64) = (10.0, 3.0);
         let n = 4000;
-        let f = |phi: f64| 2.0 * a * a * phi.cos().powi(2) * r / (r * r - (a * phi.sin()).powi(2)).sqrt();
+        let f = |phi: f64| 2.0 * a * a * pmath::cos(phi).powi(2) * r / (r * r - (a * pmath::sin(phi)).powi(2)).sqrt();
         let h = pi / n as f64;
         let ends = (0..=n)
             .map(|k| {
@@ -1565,7 +1566,7 @@ mod tests {
             .sum::<f64>()
             * h
             / 3.0;
-        let inside = 16.0 * 2.0 * r * (a / r).asin() + ends;
+        let inside = 16.0 * 2.0 * r * pmath::asin(a / r) + ends;
         run(&mut s, "surface.trim", json!({"body": "Half", "curves": {"sketch": "Slot"}, "keep": [0, 10, 20]}));
         // (Measured on meshes.)
         assert!((area(&s, "Half") - inside).abs() < inside * 1e-3, "{} vs {inside}", area(&s, "Half"));
@@ -1691,7 +1692,7 @@ mod tests {
         // The cover is a smooth surface on the rim, close to the cylinder that cut it (its area
         // within 1% of the cylinder's inside the rim).
         let area = polycore::measure(cover).unwrap().area;
-        let want = 28.0 * 40.0 * 2.0 * (14.0f64 / 40.0).asin();
+        let want = 28.0 * 40.0 * 2.0 * pmath::asin(14.0f64 / 40.0);
         assert!((area - want).abs() < want * 1e-2, "{area} vs {want}");
         assert!(s.execute("surface.thicken", &json!({"bodies": ["Nope"], "thickness": 1})).is_err());
         assert!(s.execute("surface.trim", &json!({"body": "Sheet"})).is_err());
@@ -1961,7 +1962,7 @@ mod tests {
         run(&mut s, "solid.cylinder", json!({"radius": 10, "height": 30, "base": [0, 0, 40], "body_name": "High"}));
         run(&mut s, "surface.unstitch", json!({"body": "High", "faces": [[0, 0, 40]]}));
         let rim = |z: f64| -> Value {
-            json!((0..8).map(|k| f64::from(k) * 0.785 + 0.1).map(|a| json!([10.0 * a.cos(), 10.0 * a.sin(), z])).collect::<Vec<_>>())
+            json!((0..8).map(|k| f64::from(k) * 0.785 + 0.1).map(|a| json!([10.0 * pmath::cos(a), 10.0 * pmath::sin(a), z])).collect::<Vec<_>>())
         };
         // Unstitching keeps the wall under the body's own name.
         let blend = json!({"from": {"body": "Low", "edges": rim(30.0)}, "to": {"body": "High", "edges": rim(40.0)}, "continuity": ["g1", "g1"], "body_name": "Neck"});
@@ -1974,7 +1975,7 @@ mod tests {
             grid.iter()
                 .map(|row| {
                     let (a, b) = (row[0], row[row.len() - 1]);
-                    (a.y.atan2(a.x) - b.y.atan2(b.x)).rem_euclid(std::f64::consts::TAU).to_degrees()
+                    (pmath::atan2(a.y, a.x) - pmath::atan2(b.y, b.x)).rem_euclid(std::f64::consts::TAU).to_degrees()
                 })
                 .map(|d| d.min(360.0 - d))
                 .fold(0.0, f64::max)
@@ -2114,7 +2115,7 @@ mod tests {
         let mut s = Session::default();
         run(&mut s, "solid.cylinder", json!({"radius": 10, "height": 30, "body_name": "Tube"}));
         run(&mut s, "surface.unstitch", json!({"body": "Tube", "faces": [[0, 0, 30]]}));
-        let rim: Vec<Value> = (0..8).map(|k| f64::from(k) * 0.785).map(|a| json!([10.0 * a.cos(), 10.0 * a.sin(), 30.0])).collect();
+        let rim: Vec<Value> = (0..8).map(|k| f64::from(k) * 0.785).map(|a| json!([10.0 * pmath::cos(a), 10.0 * pmath::sin(a), 30.0])).collect();
         (s, json!(rim))
     }
 

@@ -1,5 +1,6 @@
 //! Sketch commands: create/edit/finish sketches, draw curves, constraints and dimensions.
 
+use polycore_geom::pmath;
 use polycore_geom::{Plane, Vec2, Vec3};
 use polykrom_doc::{FeatureKind, PlaneRef, expr::Kind};
 use polykrom_sketch::{Analysis, Budget, ConstraintKind, CurveKind, Hold, PointExprs, Sketch, SolveReport, solve, solve_with};
@@ -1361,7 +1362,7 @@ fn polygon(s: &mut Session, p: &Value, cmd: &str, center: Vec2, r_vertex: f64, s
             }
         }
         // Construction circle tying the polygon to its centre.
-        let rc = if inscribed { r_vertex } else { r_vertex * (std::f64::consts::PI / n as f64).cos() };
+        let rc = if inscribed { r_vertex } else { r_vertex * pmath::cos(std::f64::consts::PI / n as f64) };
         let circ = sk.add_circle(center, rc, None, None)?;
         support_circle = sk.curves.get(circ).map(|c| c.id.clone()).unwrap_or_default();
         if let Some(cu) = sk.curves.get_mut(circ) {
@@ -1406,7 +1407,7 @@ fn polygon_circumscribed(s: &mut Session, p: &Value) -> Result<Value> {
     let r = radius_arg(p, cmd)?;
     let n = sides(p, cmd)?;
     let a = num(p, "angle").unwrap_or(90.0).to_radians();
-    polygon(s, p, cmd, c, r / (std::f64::consts::PI / n as f64).cos(), a + std::f64::consts::PI / n as f64, n, false)
+    polygon(s, p, cmd, c, r / pmath::cos(std::f64::consts::PI / n as f64), a + std::f64::consts::PI / n as f64, n, false)
 }
 
 fn polygon_edge(s: &mut Session, p: &Value) -> Result<Value> {
@@ -1417,8 +1418,8 @@ fn polygon_edge(s: &mut Session, p: &Value) -> Result<Value> {
     if e < 1e-9 {
         return Err(bad(cmd, "the points must differ"));
     }
-    let rv = e / (2.0 * (std::f64::consts::PI / n as f64).sin());
-    let apothem = rv * (std::f64::consts::PI / n as f64).cos();
+    let rv = e / (2.0 * pmath::sin(std::f64::consts::PI / n as f64));
+    let apothem = rv * pmath::cos(std::f64::consts::PI / n as f64);
     let mid = (a + b) * 0.5;
     let dir = (b - a).normalized().unwrap_or(Vec2::X);
     let center = mid + dir.perp() * apothem;
@@ -2427,7 +2428,7 @@ fn dimension(s: &mut Session, p: &Value) -> Result<Value> {
                             between
                         }
                         (None, None) => {
-                            let mut ang = da.cross(db).atan2(da.dot(db));
+                            let mut ang = pmath::atan2(da.cross(db), da.dot(db));
                             let (mut ka, mut kb) = (a, b);
                             if ang < 0.0 {
                                 ang = -ang;
@@ -2698,7 +2699,7 @@ fn angle_from_shared_end(
         .find(|(p, q, ..)| p.dist(*q) <= tol)
         .map(|(_, _, sa, sb)| (sa, sb))?;
     let (ra, rb) = ((a1 - a0) * sa, (b1 - b0) * sb);
-    let mut ang = ra.cross(rb).atan2(ra.dot(rb));
+    let mut ang = pmath::atan2(ra.cross(rb), ra.dot(rb));
     let (mut first, mut second) = ((a, sa), (b, sb));
     if ang < 0.0 {
         ang = -ang;

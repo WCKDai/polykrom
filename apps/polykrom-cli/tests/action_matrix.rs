@@ -21,6 +21,7 @@
 //! Each design runs in a child process (this test binary, [`action_matrix_worker`]) so an action
 //! that hangs or aborts is recorded as such and the rest of the design still runs.
 
+use polykrom_engine::geom::pmath;
 use std::collections::{BTreeMap, BTreeSet};
 use std::io::{BufRead, Write};
 use std::path::{Path, PathBuf};
@@ -358,7 +359,7 @@ fn actions(s: &Session) -> Vec<Action> {
                 Some(FaceSurface::Cone { apex, axis, half_angle }) => {
                     let v = p - apex;
                     let radial = (v - axis * v.dot(axis)).normalized()?;
-                    (radial * half_angle.cos() - axis * half_angle.sin()).normalized()
+                    (radial * pmath::cos(half_angle) - axis * pmath::sin(half_angle)).normalized()
                 }
                 Some(FaceSurface::Sphere { center, .. }) => (p - center).normalized(),
                 Some(FaceSurface::Torus { center, axis, major, .. }) => {
@@ -372,7 +373,7 @@ fn actions(s: &Session) -> Vec<Action> {
         // A smooth (tangent) edge, such as where a round meets a wall: nothing to blend.
         let smooth = |e: usize, mid: Vec3| -> bool {
             let Some([a, b]) = mesh.edge_faces.get(e).and_then(|fs| <[u32; 2]>::try_from(fs.as_slice()).ok()) else { return false };
-            matches!((normal_at(a, mid), normal_at(b, mid)), (Some(na), Some(nb)) if na.dot(nb).abs() > (2f64).to_radians().cos())
+            matches!((normal_at(a, mid), normal_at(b, mid)), (Some(na), Some(nb)) if na.dot(nb).abs() > pmath::cos((2f64).to_radians()))
         };
         let mut ordered = pickable.clone();
         ordered.sort_by_cached_key(|e| {
@@ -1661,7 +1662,7 @@ fn a_tangent_plane_on_a_drill_tip() {
     let distance = (picked - plane.origin).dot(plane.normal());
     // The pick lies on the tessellated cone and the plane is the exact one, so allow for chord error.
     assert!(distance.abs() < 0.05, "the pick is {distance} mm off the plane");
-    assert!((plane.normal().z.abs() - 31f64.to_radians().cos()).abs() < 1e-2, "{:?}", plane.normal());
+    assert!((plane.normal().z.abs() - pmath::cos(31f64.to_radians())).abs() < 1e-2, "{:?}", plane.normal());
 }
 
 #[test]

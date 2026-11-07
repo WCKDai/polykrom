@@ -1,6 +1,11 @@
 //! The 3D viewport: navigation, GPU (or CPU fallback) rendering, picking, overlays, the axis
 //! view and the navigation bar.
 
+// UI only: this file draws, animates, converts colours or places the camera, and feeds nothing
+// into a design, so it keeps the platform's transcendental functions (listed with its reason in
+// crates/engine/tests/pmath_gate.rs; everything that reaches a command goes through pmath).
+#![allow(clippy::disallowed_methods)]
+
 use crate::fonts::RichTextExt as _;
 use crate::ui_kit::{Container, Surface};
 use egui::{Align2, Color32, FontId, Pos2, Rect, Sense, Shape, Stroke, pos2, vec2};

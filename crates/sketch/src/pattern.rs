@@ -1,6 +1,7 @@
 //! Stored parameters and stable entity ids for editing an existing sketch pattern.
 
 use polycore_geom::Vec2;
+use polycore_geom::pmath;
 use serde::{Deserialize, Serialize};
 
 use crate::{CurveKind, Sketch, SketchError};
@@ -137,7 +138,7 @@ impl Sketch {
         let step = total / if (total.abs() - 360.0).abs() < 1e-9 { count as f64 } else { (count - 1) as f64 };
         for slot in 1..count {
             let angle = (step * alignment.multiplier(slot, reversed)).to_radians();
-            let (sin, cos) = angle.sin_cos();
+            let (sin, cos) = pmath::sin_cos(angle);
             let transform = |p: Vec2| {
                 let d = p - origin;
                 origin + Vec2::new(d.x * cos - d.y * sin, d.x * sin + d.y * cos)
@@ -245,7 +246,7 @@ impl Sketch {
                             let Some(seed) = self.point(p) else { continue };
                             let c = center.and_then(|c| self.point(c)).unwrap_or(Vec2::ZERO);
                             let d = seed - c;
-                            let (sin, cos) = angle.sin_cos();
+                            let (sin, cos) = pmath::sin_cos(angle);
                             if let Some(copy) = self.points.get_mut(q) {
                                 copy.pos = c + Vec2::new(d.x * cos - d.y * sin, d.x * sin + d.y * cos) + offset;
                             }

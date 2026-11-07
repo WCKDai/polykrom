@@ -5,6 +5,7 @@
 //! node limit, interior splits align the curves geometrically instead of requiring
 //! identical parameter speeds; stored nodes and interpolation remain unchanged.
 use crate::{CurveKind, Sketch, SketchError, fit_beziers_mode};
+use polycore_geom::pmath;
 use polycore_geom::{Seg2, Vec2};
 use serde::{Deserialize, Serialize};
 
@@ -105,10 +106,10 @@ impl V {
         Ok(Self { x: self.x.div(b)?, y: self.y.div(b)? })
     }
     fn upper(self) -> f64 {
-        self.x.abs_max().hypot(self.y.abs_max())
+        pmath::hypot(self.x.abs_max(), self.y.abs_max())
     }
     fn lower(self) -> f64 {
-        self.x.abs_min().hypot(self.y.abs_min())
+        pmath::hypot(self.x.abs_min(), self.y.abs_min())
     }
     fn cross(self, b: Self) -> I {
         self.x.mul(b.y).sub(self.y.mul(b.x))
@@ -715,7 +716,7 @@ mod tests {
         // Simpson integration evaluates the analytic ellipse speed, not offset samples.
         let n = 4096usize;
         let h = std::f64::consts::TAU / n as f64;
-        let speed = |t: f64| (100.0 * t.sin().powi(2) + 25.0 * t.cos().powi(2)).sqrt();
+        let speed = |t: f64| (100.0 * pmath::sin(t).powi(2) + 25.0 * pmath::cos(t).powi(2)).sqrt();
         let perimeter = (0..=n)
             .map(|i| {
                 speed(i as f64 * h)
@@ -894,7 +895,7 @@ mod tests {
         let perimeter = (0..=n)
             .map(|i| {
                 let t = i as f64 * h;
-                (100.0 * t.sin().powi(2) + 25.0 * t.cos().powi(2)).sqrt()
+                (100.0 * pmath::sin(t).powi(2) + 25.0 * pmath::cos(t).powi(2)).sqrt()
                     * if i == 0 || i == n {
                         1.0
                     } else if i % 2 == 0 {

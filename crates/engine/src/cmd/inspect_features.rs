@@ -9,6 +9,7 @@
 //!
 //! Read-only: it never touches the design, its revision or its undo history.
 
+use polycore_geom::pmath;
 use std::collections::{BTreeMap, BTreeSet};
 use std::f64::consts::{FRAC_PI_2, PI, TAU};
 use std::sync::Arc;
@@ -174,7 +175,7 @@ fn raw_normal(s: &FaceSurface, p: Vec3) -> Option<Vec3> {
         FaceSurface::Cone { apex, axis, half_angle } => {
             let w = p - apex;
             let out = (w - axis.vec() * w.dot(axis)).normalized()?;
-            (out * half_angle.cos() - axis.vec() * half_angle.sin()).normalized()
+            (out * pmath::cos(half_angle) - axis.vec() * pmath::sin(half_angle)).normalized()
         }
         FaceSurface::Sphere { center, .. } => (p - center).normalized(),
         FaceSurface::Torus { center, axis, major, .. } => {
@@ -401,7 +402,7 @@ impl Topo {
                 continue;
             };
             let (Some(na), Some(nb)) = (self.normal(a, p), self.normal(b, p)) else { continue };
-            let turn = na.dot(nb).clamp(-1.0, 1.0).acos();
+            let turn = pmath::acos(na.dot(nb).clamp(-1.0, 1.0));
             let convex = if turn < ANG {
                 None
             } else {
@@ -758,11 +759,11 @@ fn edge_extent(e: &Edge, o: Vec3, a: Vec3) -> (f64, f64, bool) {
             if let Some(x) = (c.start - c.center).normalized() {
                 let y = c.axis.vec().cross(x);
                 let (cx, cy) = (x.dot(a), y.dot(a));
-                let theta = cy.atan2(cx);
+                let theta = pmath::atan2(cy, cx);
                 for th in [theta, theta + PI] {
                     let th = th.rem_euclid(TAU);
                     if th <= c.angle {
-                        take(c.center + (x * th.cos() + y * th.sin()) * c.radius);
+                        take(c.center + (x * pmath::cos(th) + y * pmath::sin(th)) * c.radius);
                     }
                 }
             }
@@ -1022,7 +1023,7 @@ fn rim_radius(walls: &[Segment], elems: &[Elem], seg: usize, end_elem: Option<&E
     };
     let last_wall = elems.iter().rev().find_map(wall_r).unwrap_or(base);
     match end_elem {
-        Some(Elem::Cone { half, apex, lo, hi, .. }) => (lo - apex).abs().max((hi - apex).abs()) * half.tan(),
+        Some(Elem::Cone { half, apex, lo, hi, .. }) => (lo - apex).abs().max((hi - apex).abs()) * pmath::tan(*half),
         Some(Elem::Round { minor, .. }) => last_wall + minor,
         _ => last_wall,
     }
@@ -1143,7 +1144,7 @@ fn holes_and_bosses(t: &Topo, r: &mut Recognised) {
                         bottom = Some(Bottom::Tip { faces: fs.clone(), angle_deg: deg(2.0 * half), depth: (apex - near).abs() });
                     } else {
                         // A countersink: its diameter is the cone's at its end nearest the entry.
-                        let diameter = 2.0 * (near - apex).abs() * half.tan();
+                        let diameter = 2.0 * (near - apex).abs() * pmath::tan(*half);
                         steps.push(Step {
                             kind: "countersink",
                             faces: fs.clone(),
@@ -1708,7 +1709,7 @@ fn chamfers(t: &Topo, r: &mut Recognised) {
         };
         let (joins, distance, distance2, n_first) =
             if first_is_a { (vec![c.joins[0], c.joins[1]], d_a, d_b, n_a) } else { (vec![c.joins[1], c.joins[0]], d_b, d_a, n_b) };
-        let angle_deg = deg(n_c.dot(n_first).clamp(-1.0, 1.0).acos());
+        let angle_deg = deg(pmath::acos(n_c.dot(n_first).clamp(-1.0, 1.0)));
         let along = Some(along);
         r.claim(&[c.face]);
         let position = t.faces.get(c.face).map_or(Vec3::ZERO, |f| f.centroid);
@@ -1750,14 +1751,14 @@ fn chamfers(t: &Topo, r: &mut Recognised) {
         }
         let (true, Some((pf, r_plane)), Some((cf, r_cyl))) = (ok, plane, cyl) else { continue };
         let radial = (r_plane - r_cyl).abs();
-        let axial = radial / half_angle.tan();
+        let axial = radial / pmath::tan(half_angle);
         // Along the flat face first (it faces along the axis), then along the cylinder.
         let angle_deg = deg(FRAC_PI_2 - half_angle);
         let cyl_group = t.faces.get(cf).map(|f| f.group.clone()).unwrap_or_else(|| vec![cf]);
         let mut joins = vec![pf];
         joins.extend(cyl_group);
         r.claim(&face.group);
-        let position = o + a * ((r_plane.min(r_cyl) + radial * 0.5) / half_angle.tan());
+        let position = o + a * ((r_plane.min(r_cyl) + radial * 0.5) / pmath::tan(half_angle));
         r.features.push(Feature {
             kind: Kind::Chamfer { distance: radial, distance2: axial, angle_deg, joins, along: None },
             faces: face.group.clone(),
@@ -2043,7 +2044,7 @@ fn circle(points: &[Vec3], axis_dir: Option<Vec3>, tol: f64) -> Option<Circle> {
         .iter()
         .map(|p| {
             let d = *p - center;
-            let t = d.dot(y).atan2(d.dot(x));
+            let t = pmath::atan2(d.dot(y), d.dot(x));
             if t < 0.0 { t + TAU } else { t }
         })
         .collect();

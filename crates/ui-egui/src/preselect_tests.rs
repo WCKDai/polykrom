@@ -4,6 +4,7 @@
 use crate::test_support::app_with_script as app_with;
 use polykrom_engine::doc::expr::Kind as ValueKind;
 use polykrom_engine::geom::Vec3;
+use polykrom_engine::geom::pmath;
 use polykrom_engine::{Sel, Session};
 use serde_json::json;
 
@@ -1897,7 +1898,7 @@ fn patch_dialog_fills_a_loop_of_edges_that_is_not_planar() {
     assert!(fill.body.is_surface() && fill.body.face_count() == 1);
     // One smooth face over the rim: its area is close to the cylinder's inside the rim.
     let area = fill.mesh().measure().area;
-    let want = 28.0 * 40.0 * 2.0 * (14.0f64 / 40.0).asin();
+    let want = 28.0 * 40.0 * 2.0 * pmath::asin(14.0f64 / 40.0);
     assert!((area - want).abs() < want * 1e-2, "{area} vs {want}");
 }
 
@@ -2234,7 +2235,7 @@ fn hovering_a_large_body_does_not_wait_for_its_pick_index() {
     let (rings, segments) = (500usize, 300usize);
     let at = |i: usize, j: usize| {
         let (theta, phi) = (std::f64::consts::PI * i as f64 / rings as f64, std::f64::consts::TAU * j as f64 / segments as f64);
-        [20.0 * theta.sin() * phi.cos(), 20.0 * theta.sin() * phi.sin(), 20.0 * theta.cos()]
+        [20.0 * pmath::sin(theta) * pmath::cos(phi), 20.0 * pmath::sin(theta) * pmath::sin(phi), 20.0 * pmath::cos(theta)]
     };
     let mut stl = vec![0u8; 80];
     let mut tris: Vec<[[f64; 3]; 3]> = Vec::new();

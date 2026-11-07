@@ -10,6 +10,7 @@
 //! together; the flat solid is the outline extruded through the thickness.
 
 use polycore::{self as kernel, Body, EdgeSpec, FaceSpec, SurfSpec};
+use polycore_geom::pmath;
 use polycore_geom::{Aabb2, LINEAR_TOL, Loop2, Plane, Region2, Ring, Seg2, Vec2, Vec3};
 use serde::{Deserialize, Serialize};
 
@@ -864,9 +865,9 @@ fn sinusoid_least(h: &dyn Fn(f64) -> f64, th: f64) -> f64 {
     let (c, d) = (h0 - a, h90 - a - b * FRAC_PI_2);
     let mut least = h0.min(h(th));
     // c·sin φ − d·cos φ = r·sin(φ − ψ) = b.
-    let r = c.hypot(d);
+    let r = pmath::hypot(c, d);
     if r > 1e-12 && b.abs() <= r {
-        let (psi, x) = (d.atan2(c), (b / r).asin());
+        let (psi, x) = (pmath::atan2(d, c), pmath::asin(b / r));
         for phi in [psi + x, psi + PI - x] {
             let phi = phi.rem_euclid(TAU);
             if phi > 0.0 && phi < th {
@@ -1073,7 +1074,7 @@ impl SheetBody {
         // From the axis to the bend's start line at height z, and that turned a right angle.
         let ez = Vec3::Z * (z - axis_o.z);
         let ek = k.cross(ez) * sigma;
-        let (sn, cs) = phi.sin_cos();
+        let (sn, cs) = pmath::sin_cos(phi);
         let w = self.world(f.parent);
         let local = axis_o + v3(f.d) * u + ez * cs + ek * sn;
         // Each derivative along n turns the last a right angle about the axis and divides it by
@@ -1147,7 +1148,7 @@ impl SheetBody {
                 return n;
             }
             // The distance falls as the eighth power of the pieces' length.
-            let guess = (n as f64 * (off / BEND_CHAIN_TOL).powf(1.0 / 8.0)).ceil();
+            let guess = (n as f64 * pmath::powf(off / BEND_CHAIN_TOL, 1.0 / 8.0)).ceil();
             n = (guess as usize).clamp(n + 1, BEND_CHAIN_PIECES);
         }
     }
@@ -2146,7 +2147,7 @@ impl SheetBody {
                     let q2 = Vec2::new(q.x, q.y);
                     let d = b - a;
                     let t = ((q2 - a).dot(d) / d.len2()).clamp(0.0, 1.0);
-                    let dist = ((a + d * t) - q2).len().hypot(q.z - z);
+                    let dist = pmath::hypot(((a + d * t) - q2).len(), q.z - z);
                     if best.as_ref().is_none_or(|x| dist < x.4) {
                         best = Some((pi, a, b, top, dist));
                     }
@@ -2335,7 +2336,7 @@ impl SheetBody {
             if !(e.angle > 1e-6 && e.angle <= std::f64::consts::PI - 1e-6) {
                 return Err(DocError::Invalid(format!("{}the flange angle must be between 0 and 180°", on(k))));
             }
-            let sharp = (radius + self.t) * (e.angle / 2.0).tan();
+            let sharp = (radius + self.t) * pmath::tan(e.angle / 2.0);
             let setback = match position {
                 "inside" | "" => sharp,
                 "outside" => 0.0,
@@ -2895,7 +2896,7 @@ impl SheetBody {
         // The bend's outer face is R + T from the axis and starts T outside `own`'s inner face: it
         // crosses that plane at the turn φ with (R + T)·(1 − cos φ) = T, or not before its end.
         let th = f.angle.abs();
-        let from = (f.radius / (f.radius + self.t)).acos().min(th);
+        let from = pmath::acos(f.radius / (f.radius + self.t)).min(th);
         let least = self.arc_least(&f, ci, z_in, (0.0, th), &clear).min(self.arc_least(&f, ci, self.t - z_in, (from, th), &clear));
         let u_bend = (-least / cu).max(0.0);
         // The panel's end is one line in the flat: through what its start and its far edge need
@@ -2953,12 +2954,12 @@ impl SheetBody {
         let (a, b) = ((v0 + v180) / 2.0, (v0 - v180) / 2.0);
         let c = v90 - a;
         let mut least = at(turns.0).min(at(turns.1));
-        let mut phi = c.atan2(b) + std::f64::consts::PI;
+        let mut phi = pmath::atan2(c, b) + std::f64::consts::PI;
         if phi >= std::f64::consts::TAU {
             phi -= std::f64::consts::TAU;
         }
         if phi > turns.0 && phi < turns.1 {
-            least = least.min(a - b.hypot(c));
+            least = least.min(a - pmath::hypot(b, c));
         }
         least
     }
@@ -3256,7 +3257,7 @@ impl SheetBody {
             return Err("an edge of the base at the corner has no length".into());
         };
         // The angle the base fills at the corner.
-        let alpha = db.cross(da).atan2(db.dot(da));
+        let alpha = pmath::atan2(db.cross(da), db.dot(da));
         if !(alpha > 1e-6 && alpha < std::f64::consts::PI - 1e-6) {
             // An inside corner of the base: the flanges turn away from each other.
             return Ok(None);
@@ -3496,7 +3497,7 @@ impl SheetBody {
             "centerline" | "center" | "centre" => l - ba / 2.0,
             "start" => l,
             "end" => l - ba,
-            "mould" | "mold" => l - (radius + self.t) * (angle / 2.0).tan(),
+            "mould" | "mold" => l - (radius + self.t) * pmath::tan(angle / 2.0),
             o => return Err(DocError::Invalid(format!("unknown fold position `{o}` (centerline, start, end or mould)"))),
         };
         let fixed_part = clip(&pts, n * s0, n * -1.0);
@@ -3949,7 +3950,7 @@ impl SheetBody {
             if rho < f.radius - tol || rho > f.radius + self.t + tol {
                 continue;
             }
-            let phi = radial.dot(toward).atan2(radial.dot(start));
+            let phi = pmath::atan2(radial.dot(toward), radial.dot(start));
             if phi < -1e-6 || phi > f.angle.abs() + 1e-6 {
                 continue;
             }
@@ -4036,7 +4037,7 @@ impl SheetBody {
         let (o, ex, ey) = (map(Vec2::default()), map(Vec2::new(1.0, 0.0)), map(Vec2::new(0.0, 1.0)));
         let (ax, ay) = (ex - o, ey - o);
         let mirrored = ax.cross(ay) < 0.0;
-        let rot = ax.y.atan2(ax.x);
+        let rot = pmath::atan2(ax.y, ax.x);
         let seg = |sg: &Seg2| -> Seg2 {
             match *sg {
                 Seg2::Line { a, b } => Seg2::Line { a: map(a), b: map(b) },
@@ -4548,14 +4549,14 @@ pub fn contour_flange(body: &str, rule: &str, rv: &RuleValues, plane: &Plane, pt
         let (da, _) = seg_dir(i)?;
         let (db, _) = seg_dir(i + 1)?;
         let cross = da.cross(db) * side;
-        let ang = da.dot(db).clamp(-1.0, 1.0).acos();
+        let ang = pmath::acos(da.dot(db).clamp(-1.0, 1.0));
         if ang < 1e-9 {
             return Err(DocError::Invalid("straight corners in a contour flange".into()));
         }
         // Right-hand material: turning right (negative cross) bends toward it.
         corners.push((ang, cross < 0.0));
     }
-    let setback = |ang: f64, up: bool| if up { (r + t) * (ang / 2.0).tan() } else { r * (ang / 2.0).tan() };
+    let setback = |ang: f64, up: bool| if up { (r + t) * pmath::tan(ang / 2.0) } else { r * pmath::tan(ang / 2.0) };
     let mut sheet = SheetBody {
         body: body.into(),
         rule: rule.into(),
@@ -5139,7 +5140,7 @@ mod tests {
         let regions = s.flat_regions().unwrap();
         assert_eq!(regions[0].holes.len(), 1);
         assert!(regions[0].holes[0].segs.iter().all(|s| matches!(s, Seg2::Arc { radius, .. } if (*radius - 5.0).abs() < 1e-9)));
-        let intersection = 50.0 * (0.2f64).acos() - (96.0f64).sqrt();
+        let intersection = 50.0 * pmath::acos(0.2f64) - (96.0f64).sqrt();
         let area = 6000.0 - (50.0 * std::f64::consts::PI - intersection);
         assert!((regions[0].area() - area).abs() < 1e-6);
         assert!((vol(&s.solid().unwrap()) - area * 2.5).abs() < 0.1);
@@ -5237,7 +5238,7 @@ mod tests {
             Vec2::new(400.00000000000017, 300.0000000000008),
             Vec2::new(0.0, 300.0000000000009),
         ];
-        let (c, s) = (1e-14f64.cos(), 1e-14f64.sin());
+        let (c, s) = (pmath::cos(1e-14f64), pmath::sin(1e-14f64));
         let turned = square.map(|p| Vec2::new(p.x * c - p.y * s, p.x * s + p.y * c));
         for corners in [solved, turned] {
             let mut sheet = tray(corners);
@@ -5299,7 +5300,7 @@ mod tests {
         let angle = 72f64.to_radians();
         let s = flanged(angle);
         let f = s.flanges[0].clone();
-        let setback = 3.0 * (angle / 2.0).tan();
+        let setback = 3.0 * pmath::tan(angle / 2.0);
         // The unclamped zone map agrees with the fold inside the zone.
         for (sv, u, z) in [(0.3, 10.0, 0.0), (1.2, 40.0, 1.0), (2.4, 90.0, 2.0)] {
             let q = f.p + f.n * sv + f.d * u;
@@ -5314,7 +5315,7 @@ mod tests {
         for z in [0.0, 2.0] {
             let helix = |t: f64| {
                 let (phi, rho) = (angle * t, 3.0 - z);
-                Vec3::new(e.point_at(t).x, setback - rho * phi.sin(), 3.0 - rho * phi.cos())
+                Vec3::new(e.point_at(t).x, setback - rho * pmath::sin(phi), 3.0 - rho * pmath::cos(phi))
             };
             let EdgeSpec::Chain { degree: 7, ctrl } = s.zone_chain(&f, &e, z) else { panic!("a slanted edge folds to a chain of degree 7") };
             assert_eq!(ctrl.len(), 7 * n + 1);
@@ -5422,14 +5423,14 @@ mod tests {
             let (s, notes) = tray(&alu(), deg, h);
             assert!(notes.is_empty(), "{notes:?}");
             let th = deg.to_radians();
-            let s0 = (r + t) * (th / 2.0).tan();
+            let s0 = (r + t) * pmath::tan(th / 2.0);
             let ba = th * (r + 0.5 * t);
             let leg = h - s0;
             // By hand, for the flange on y = 0 and its mirror image on x = 0: a point of the flange w up
             // its outer face from the virtual sharp (the original edge), h along the outward normal
             // (−T ≤ h ≤ 0) is (x, −w·cosθ − h·sinθ, w·sinθ − h·cosθ). Keeping x − y ≥ g/√2 on the
             // inner face (h = −T) gives the end x(w) = g/√2 + T·sinθ − w·cosθ; the panel spans w = s0 … h.
-            let x_end = |w: f64| g / std::f64::consts::SQRT_2 + t * th.sin() - w * th.cos();
+            let x_end = |w: f64| g / std::f64::consts::SQRT_2 + t * pmath::sin(th) - w * pmath::cos(th);
             let (y0, y1) = (s0 - ba, s0 - ba - leg);
             let want = [(x_end(s0), y0), (120.0 - x_end(s0), y0), (120.0 - x_end(h), y1), (x_end(h), y1)];
             let got = corners_of(&s.panel(&s.flanges[0]));
@@ -5442,7 +5443,7 @@ mod tests {
                 assert!((s.flanges[0].ext.0 - (s0 - t - g / std::f64::consts::SQRT_2)).abs() < 1e-12);
                 assert_eq!(s.flanges[0].slope, (0.0, 0.0));
             } else {
-                assert!((s.flanges[0].slope.0 - th.cos()).abs() < 1e-12, "{:?}", s.flanges[0].slope);
+                assert!((s.flanges[0].slope.0 - pmath::cos(th)).abs() < 1e-12, "{:?}", s.flanges[0].slope);
             }
             // Folded, the inner edges of the two ends (bottom flange 0, left flange 3) run parallel,
             // `gap` apart.
@@ -5577,7 +5578,7 @@ mod tests {
         match shape {
             ReliefShape::Notch | ReliefShape::Tear => 0.0,
             ReliefShape::Round => r * r * alpha / 2.0 + 2.0 * r * ba,
-            ReliefShape::Rectangular => r * r * (alpha / 2.0).tan() + 2.0 * r * ba,
+            ReliefShape::Rectangular => r * r * pmath::tan(alpha / 2.0) + 2.0 * r * ba,
         }
     }
 
@@ -5610,7 +5611,7 @@ mod tests {
         // the sheet's corner. A relief 8 mm across reaches 4 mm from c along both edges of the base.
         for deg in [72.0f64, 90.0] {
             let th = deg.to_radians();
-            let (s0, ba) = (3.0 * (th / 2.0).tan(), th * 2.0);
+            let (s0, ba) = (3.0 * pmath::tan(th / 2.0), th * 2.0);
             let len = 120.0 - 2.0 * s0;
             let c = Vec2::new(s0, s0);
             let (notch, _) = tray(&alu(), deg, 38.6);
@@ -5674,9 +5675,9 @@ mod tests {
         // at the upper ones. With every edge trimmed by s0, the bends on y = 0 and on the left edge meet
         // at c = (s0/tan(α/2), s0), and the left edge leaves c in the direction (cos α, sin α).
         let th = 72f64.to_radians();
-        let (s0, ba) = (3.0 * (th / 2.0).tan(), th * 2.0);
-        let alpha = 90f64.atan2(20.0);
-        let c = Vec2::new(s0 / (alpha / 2.0).tan(), s0);
+        let (s0, ba) = (3.0 * pmath::tan(th / 2.0), th * 2.0);
+        let alpha = pmath::atan2(90f64, 20.0);
+        let c = Vec2::new(s0 / pmath::tan(alpha / 2.0), s0);
         let (along, up) = (Vec2::new(1.0, 0.0), Vec2::from_angle(alpha));
         let (notch, _) = trapezoid(&alu(), 72.0);
         for shape in [ReliefShape::Round, ReliefShape::Rectangular] {
@@ -5696,7 +5697,7 @@ mod tests {
                 assert!(found, "{what}: {segs:?}");
             } else {
                 // A kite: both cuts square to their edge, meeting 4/cos(α/2) from c on the bisector.
-                let x = c + Vec2::from_angle(alpha / 2.0) * (4.0 / (alpha / 2.0).cos());
+                let x = c + Vec2::from_angle(alpha / 2.0) * (4.0 / pmath::cos(alpha / 2.0));
                 let line =
                     |a: Vec2, b: Vec2| segs.iter().any(|g| matches!(g, Seg2::Line { .. }) && g.start().dist(a) < 1e-8 && g.end().dist(b) < 1e-8);
                 assert!(line(c + up * 4.0, x) && line(x, c + along * 4.0), "{what}: {segs:?}");
@@ -5717,7 +5718,7 @@ mod tests {
         // The round relief runs into the bends' straight ends tangentially, a contact the planar
         // booleans have to keep as one point. So every 5° from 45° to 135° is built on the tray and on
         // the trapezoid with both shapes, and on the tray reliefs from 0.5 to 20 mm across.
-        let alpha = 90f64.atan2(20.0);
+        let alpha = pmath::atan2(90f64, 20.0);
         for shape in [ReliefShape::Round, ReliefShape::Rectangular] {
             for k in 9..=27 {
                 let deg = k as f64 * 5.0;
@@ -5773,9 +5774,9 @@ mod tests {
     /// The corner of the trimmed base at the corner `c` of the base, whose edges leave it in the
     /// directions `dirs`: the two bend lines, each `s0` in from its edge, meet there.
     fn trimmed_corner(c: Vec2, dirs: [Vec2; 2], s0: f64) -> Vec2 {
-        let alpha = dirs[1].cross(dirs[0]).atan2(dirs[1].dot(dirs[0])).abs();
+        let alpha = pmath::atan2(dirs[1].cross(dirs[0]), dirs[1].dot(dirs[0])).abs();
         let bisector = (dirs[0] + dirs[1]).normalized().unwrap_or(Vec2::X);
-        c + bisector * (s0 / (alpha / 2.0).sin())
+        c + bisector * (s0 / pmath::sin(alpha / 2.0))
     }
 
     /// Two corner reliefs that would overlap are both left out. The two corners do not share an
@@ -5891,7 +5892,7 @@ mod tests {
                         // The cuts are square to the edges they start on, and the kite's far corner
                         // is 4 / cos(α / 2) from the corner, on the bisector.
                         assert!((x - (c + d1 * 4.0)).dot(d1).abs() < 1e-9 && (x - (c + d2 * 4.0)).dot(d2).abs() < 1e-9, "{what}");
-                        assert!((x.dist(c) - 4.0 / (alpha / 2.0).cos()).abs() < 1e-9, "{what}");
+                        assert!((x.dist(c) - 4.0 / pmath::cos(alpha / 2.0)).abs() < 1e-9, "{what}");
                     }
                     for f in &s.flanges {
                         let (u0, u1) = s.zone_span(f);
@@ -6269,7 +6270,7 @@ mod tests {
     }
 
     fn turned(x: f64, y: f64, turn: f64) -> Vec2 {
-        Vec2::new(x * turn.cos() - y * turn.sin(), x * turn.sin() + y * turn.cos())
+        Vec2::new(x * pmath::cos(turn) - y * pmath::sin(turn), x * pmath::sin(turn) + y * pmath::cos(turn))
     }
 
     #[test]
@@ -6285,7 +6286,7 @@ mod tests {
         let (ba, panel, quarter) = (std::f64::consts::PI, 12.0, std::f64::consts::FRAC_PI_2);
         for (position, line) in [("inside", 3.0), ("middle", 3.0 / 2.0)] {
             for both in [false, true] {
-                for turn in [0.0, (5.0f64 / 13.0).asin()] {
+                for turn in [0.0, pmath::asin(5.0f64 / 13.0)] {
                     // Exact square to the axes; to within the crossings' 1e-9 grid when turned.
                     let tol = if turn == 0.0 { 1e-9 } else { 1e-6 };
                     for hair in [0.0, 1e-7, -1e-7] {
@@ -6592,7 +6593,7 @@ mod tests {
 
     /// ∫ √(64 − z²): the area under an arc of radius 8, from its centre's height on.
     fn under8(z: f64) -> f64 {
-        z / 2.0 * (64.0 - z * z).sqrt() + 32.0 * (z / 8.0).asin()
+        z / 2.0 * (64.0 - z * z).sqrt() + 32.0 * pmath::asin(z / 8.0)
     }
 
     #[test]
@@ -6617,7 +6618,7 @@ mod tests {
             // sides to the trimmed line, an angle asin((8 − line)/8) each.
             let (arcs, edges, length, shortest) = arcs_and_edges(&s.base.outer);
             assert!((arcs, edges) == (4, 8) && shortest > 2.0, "{position}: {arcs} arcs of {edges} edges, shortest {shortest:e}");
-            let outline = f.len + 2.0 * 84.0 + 184.0 + 8.0 * std::f64::consts::PI + 16.0 * ((8.0 - line) / 8.0).asin();
+            let outline = f.len + 2.0 * 84.0 + 184.0 + 8.0 * std::f64::consts::PI + 16.0 * pmath::asin((8.0 - line) / 8.0);
             assert!((length - outline).abs() < 1e-9, "{position}: {length} vs {outline}");
             assert!((s.base.area() - (whole - below(line))).abs() < 1e-9, "{position}: {} vs {}", s.base.area(), whole - below(line));
             // The flat pattern: the base and f.len × (BA + 37) of flange, its outline the base's
@@ -6893,7 +6894,7 @@ mod tests {
             let rel = q - o;
             let perp = rel - k * rel.dot(k);
             let down = Vec3::Z * -1.0;
-            let (rho, turn) = (perp.len(), perp.dot(k.cross(down)).atan2(perp.dot(down)));
+            let (rho, turn) = (perp.len(), pmath::atan2(perp.dot(k.cross(down)), perp.dot(down)));
             let u = (Vec2::new(q.x, q.y) - self.p).dot(self.d);
             // A torn end runs along the bend as the bend turns, from the start line's end to the panel's.
             let (span, ends, x) = (self.span, self.ends, turn / self.angle);
@@ -6974,10 +6975,10 @@ mod tests {
             (Vec2::new(0.0, 90.0), Vec2::new(0.0, -1.0), Vec2::new(1.0, 0.0), 90.0),
         ][i];
         let th = angles[i].to_radians();
-        let (s0, ba) = ((r + t) * (th / 2.0).tan(), th * (r + rv.k_factor * t));
+        let (s0, ba) = ((r + t) * pmath::tan(th / 2.0), th * (r + rv.k_factor * t));
         let x_end = |phi: f64, w: f64| {
-            let c = th.cos() * phi.cos();
-            ((g / 2.0) * (2.0 - 2.0 * c).sqrt() + t * (1.0 - c) - w * th.sin() * phi.cos()) / phi.sin()
+            let c = pmath::cos(th) * pmath::cos(phi);
+            ((g / 2.0) * (2.0 - 2.0 * c).sqrt() + t * (1.0 - c) - w * pmath::sin(th) * pmath::cos(phi)) / pmath::sin(phi)
         };
         let (prev, next) = (angles[(i + 3) % 4].to_radians(), angles[(i + 1) % 4].to_radians());
         let flat = |u: f64, w: f64| o + d * u + v * (s0 - ba - (w - s0));
@@ -6990,7 +6991,7 @@ mod tests {
     /// s0 = (R + T)·tan(θ/2) a flange's setback and BA = θ·(R + K·T) its bend allowance, the base
     /// is (120 − s0_left − s0_right) by (90 − s0_bottom − s0_top).
     fn hand_flat_area(rv: &RuleValues, angles: [f64; 4], heights: [f64; 4]) -> f64 {
-        let s0 = angles.map(|a| (rv.bend_radius + rv.thickness) * (a.to_radians() / 2.0).tan());
+        let s0 = angles.map(|a| (rv.bend_radius + rv.thickness) * pmath::tan(a.to_radians() / 2.0));
         let ba = angles.map(|a| a.to_radians() * (rv.bend_radius + rv.k_factor * rv.thickness));
         let (w, h) = (120.0 - s0[3] - s0[1], 90.0 - s0[0] - s0[2]);
         let panels: f64 = (0..4).map(|i| signed_area(&hand_panel(rv, angles, heights, i)).abs()).sum();
@@ -7011,7 +7012,7 @@ mod tests {
             for i in 0..4 {
                 let (f, th) = (&s.flanges[i], MIXED[i].to_radians());
                 assert!((f.angle - th).abs() < 1e-12, "{what}: flange {i}");
-                assert!((f.leg - (heights[i] - (rv.bend_radius + rv.thickness) * (th / 2.0).tan())).abs() < 1e-9, "{what}: flange {i}");
+                assert!((f.leg - (heights[i] - (rv.bend_radius + rv.thickness) * pmath::tan(th / 2.0))).abs() < 1e-9, "{what}: flange {i}");
                 let got = corners_of(&s.panel(f));
                 assert_eq!(got.len(), 4, "{what}: flange {i}");
                 for q in hand_panel(&rv, MIXED, heights, i) {
@@ -7044,7 +7045,7 @@ mod tests {
         assert!(notes.is_empty(), "{notes:?}");
         for i in 0..4 {
             let (f, th) = (&s.flanges[i], angles[i].to_radians());
-            assert!((f.angle - th).abs() < 1e-12 && (f.leg - (heights[i] - 3.0 * (th / 2.0).tan())).abs() < 1e-9, "flange {i}: {f:?}");
+            assert!((f.angle - th).abs() < 1e-12 && (f.leg - (heights[i] - 3.0 * pmath::tan(th / 2.0))).abs() < 1e-9, "flange {i}: {f:?}");
         }
         let corners = s.corners(&[0, 1, 2, 3]);
         assert_eq!(corners.len(), 4);
@@ -7258,17 +7259,17 @@ mod tests {
         let (made, notes) = returns(&mut s, &all, 180.0 - deg, 12.0);
         assert!(notes.is_empty() && made.len() == n, "{what}: {notes:?}");
         let (th, rho) = (deg.to_radians(), (180.0 - deg).to_radians());
-        let v = (t + r) * th.sin() - (20.0 - (r + t) * (rho / 2.0).tan()) * th.cos();
+        let v = (t + r) * pmath::sin(th) - (20.0 - (r + t) * pmath::tan(rho / 2.0)) * pmath::cos(th);
         // Half the base's angle at corner c, and the two directions along its edges.
         let edges = |c: usize| ((pts[(c + n - 1) % n] - pts[c]).normalized().unwrap(), (pts[(c + 1) % n] - pts[c]).normalized().unwrap());
-        let half = |c: usize| edges(c).0.dot(edges(c).1).acos() / 2.0;
-        let x_b = |c: usize| (g / 2.0 + v * half(c).cos()) / half(c).sin();
+        let half = |c: usize| pmath::acos(edges(c).0.dot(edges(c).1)) / 2.0;
+        let x_b = |c: usize| (g / 2.0 + v * pmath::cos(half(c))) / pmath::sin(half(c));
         for k in 0..n {
             let (ret, next) = (&s.flanges[n + k], (k + 1) % n);
             let want = pts[k].dist(pts[next]) - x_b(k) - x_b(next);
             assert!((ret.len - want).abs() < 1e-9 && ret.ext.0.abs() < 1e-9 && ret.ext.1.abs() < 1e-9, "{what}: return {k}: {want} vs {ret:?}");
             assert!(
-                (ret.slope.0 + 1.0 / half(k).tan()).abs() < 1e-9 && (ret.slope.1 + 1.0 / half(next).tan()).abs() < 1e-9,
+                (ret.slope.0 + 1.0 / pmath::tan(half(k))).abs() < 1e-9 && (ret.slope.1 + 1.0 / pmath::tan(half(next))).abs() < 1e-9,
                 "{what}: return {k}: {ret:?}"
             );
         }
@@ -7285,7 +7286,7 @@ mod tests {
             }
         }
         // A wall leaning out reaches 20·cosθ past its edge at its tip; one leaning in stays inside.
-        let reach = (20.0 * th.cos()).max(0.0);
+        let reach = (20.0 * pmath::cos(th)).max(0.0);
         for k in 0..n {
             let d = (pts[(k + 1) % n] - pts[k]).normalized().unwrap();
             for i in 0..2 * n {
@@ -7326,7 +7327,7 @@ mod tests {
     fn returns_close_at_any_corner_on_walls_leaning_either_way() {
         // Walls leaning out (70°), upright and leaning in (110°), each with level returns, on the
         // tray, the trapezoid and parallelograms with corners of 60° and 120°: 9 parts, 36 corners.
-        let (c, sn) = (60f64.to_radians().cos(), 60f64.to_radians().sin());
+        let (c, sn) = (pmath::cos(60f64.to_radians()), pmath::sin(60f64.to_radians()));
         let bases = [
             ("tray", [Vec2::new(0.0, 0.0), Vec2::new(120.0, 0.0), Vec2::new(120.0, 90.0), Vec2::new(0.0, 90.0)]),
             ("trapezoid", [Vec2::new(0.0, 0.0), Vec2::new(120.0, 0.0), Vec2::new(100.0, 90.0), Vec2::new(20.0, 90.0)]),
@@ -7351,7 +7352,7 @@ mod tests {
         // relief is cut as without returns: at each corner the flat loses what the relief takes.
         let tray = [Vec2::new(0.0, 0.0), Vec2::new(120.0, 0.0), Vec2::new(120.0, 90.0), Vec2::new(0.0, 90.0)];
         let trapezoid = [Vec2::new(0.0, 0.0), Vec2::new(120.0, 0.0), Vec2::new(100.0, 90.0), Vec2::new(20.0, 90.0)];
-        let alpha = 90f64.atan2(20.0);
+        let alpha = pmath::atan2(90f64, 20.0);
         let cases = [
             ("tray", tray, [FRAC_PI_2; 4], 90.0, 8.0),
             ("tray", tray, [FRAC_PI_2; 4], 90.0, 36.0),
@@ -7475,7 +7476,7 @@ mod tests {
             let (made, notes) = returns(&mut s, &[0], 180.0 - deg, 12.0);
             assert!(notes.is_empty() && made == [4], "{deg}°: {notes:?}");
             let (th, rho) = (deg.to_radians(), (180.0 - deg).to_radians());
-            let edge = e + t * th.sin() - (20.0 - (r + t) * (rho / 2.0).tan()) * th.cos();
+            let edge = e + t * pmath::sin(th) - (20.0 - (r + t) * pmath::tan(rho / 2.0)) * pmath::cos(th);
             let (lo, hi) = s.far_edge(&s.flanges[0]);
             assert!((s.flanges[0].p.x + lo - edge).abs() < 2e-9 && (hi - lo - (120.0 - 2.0 * edge)).abs() < 2e-9, "{deg}°: {edge} vs {lo} {hi}");
             let ret = &s.flanges[4];
@@ -7653,7 +7654,7 @@ mod tests {
         let (made, notes) = returns(&mut s, &[0, 3], 90.0, 12.0);
         assert!(notes.is_empty() && made == [5, 6], "{made:?} {notes:?}");
         let half = 67.5f64.to_radians();
-        let short = (rv.gap / 2.0 + 2.0 * half.cos()) / half.sin();
+        let short = (rv.gap / 2.0 + 2.0 * pmath::cos(half)) / pmath::sin(half);
         for (i, edge) in [(5, 104.0), (6, 74.0)] {
             let f = &s.flanges[i];
             assert!(f.ext == (0.0, 0.0) && f.slope == (0.0, 0.0) && (f.len - (edge - (2.0 + e) - short)).abs() < 1e-9, "{f:?}");
@@ -7688,7 +7689,7 @@ mod tests {
         let rv = alu();
         let mut cases = 0;
         for alpha in [60.0f64, 90.0, 120.0] {
-            let u = Vec2::new(alpha.to_radians().cos(), alpha.to_radians().sin());
+            let u = Vec2::new(pmath::cos(alpha.to_radians()), pmath::sin(alpha.to_radians()));
             let pts = [Vec2::new(0.0, 0.0), Vec2::new(120.0, 0.0), Vec2::new(120.0, 0.0) + u * 90.0, u * 90.0];
             for a in SWEEP {
                 for b in SWEEP {
@@ -7729,7 +7730,7 @@ mod tests {
             // 120 − 3·tan 60° − 3·tan 45° long, less the two reliefs.
             let (bends, before) = (s.bends(), notch.bends());
             assert_eq!((bends.len(), before.len()), (4, 4), "{what}");
-            assert!((bends[0].length - (120.0 - 3.0 * 60f64.to_radians().tan() - 3.0 - 8.0)).abs() < 1e-9, "{what}: {}", bends[0].length);
+            assert!((bends[0].length - (120.0 - 3.0 * pmath::tan(60f64.to_radians()) - 3.0 - 8.0)).abs() < 1e-9, "{what}: {}", bends[0].length);
             for (b, b0) in bends.iter().zip(&before) {
                 assert!((b.length - (b0.length - 8.0)).abs() < 1e-9, "{what}: {} vs {}", b.length, b0.length);
             }
@@ -7777,8 +7778,8 @@ mod tests {
             assert!(notes.is_empty(), "{what}: {notes:?}");
             tears_nothing_but_the_bend_ends(&s, &notch, 8, &what);
             let th = deg.to_radians();
-            let (s0, ba) = ((r + t) * (th / 2.0).tan(), th * (r + 0.5 * t));
-            let x_end = |w: f64| g / SQRT_2 + t * th.sin() - w * th.cos();
+            let (s0, ba) = ((r + t) * pmath::tan(th / 2.0), th * (r + 0.5 * t));
+            let x_end = |w: f64| g / SQRT_2 + t * pmath::sin(th) - w * pmath::cos(th);
             let (y0, y1) = (s0 - ba, s0 - ba - (h - s0));
             // The bend on y = 0: its start line between the corners, its far edge as long as the panel's.
             let zone = corners_of(&s.zone(&s.flanges[0]));
@@ -7817,7 +7818,7 @@ mod tests {
                 let x = i as f64 / 64.0;
                 let q = c + (far - c) * x;
                 let apart = s.map3(Piece::Zone(0), q, t).dist(s.map3(Piece::Zone(3), Vec2::new(q.y, q.x), t));
-                let want = SQRT_2 * (r * (th * x).sin() - grow * x);
+                let want = SQRT_2 * (r * pmath::sin(th * x) - grow * x);
                 assert!((apart - want).abs() < 1e-9 && apart > g * x - 1e-9, "{what}: {x}: {apart} vs {want}");
                 assert!(s.bend_end(&s.flanges[0], false, th * x, t).dist(s.map3(Piece::Zone(0), q, t)) < 1e-9, "{what}: {x}");
             }
@@ -7841,9 +7842,9 @@ mod tests {
         // than nothing, the panel runs on past the corner, and the tear cuts from the corner to there.
         let (r, g) = (1.0, 0.5);
         let th = 72f64.to_radians();
-        let (s0, ba) = (3.0 * (th / 2.0).tan(), th * 2.0);
-        let (alpha, beta) = (90f64.atan2(20.0), std::f64::consts::PI - 90f64.atan2(20.0));
-        let u_end = |a: f64| (g / 2.0 - r * th.sin() * (a / 2.0).cos()) / (a / 2.0).sin();
+        let (s0, ba) = (3.0 * pmath::tan(th / 2.0), th * 2.0);
+        let (alpha, beta) = (pmath::atan2(90f64, 20.0), std::f64::consts::PI - pmath::atan2(90f64, 20.0));
+        let u_end = |a: f64| (g / 2.0 - r * pmath::sin(th) * pmath::cos(a / 2.0)) / pmath::sin(a / 2.0);
         let (notch, _) = trapezoid(&alu(), 72.0);
         let (s, notes) = trapezoid(&torn(), 72.0);
         assert!(notes.is_empty(), "{notes:?}");
@@ -7852,8 +7853,8 @@ mod tests {
         let at = |pts: &[Vec2], q: Vec2| pts.iter().any(|p| p.dist(q) < 1e-8);
         // The bend on y = 0 (flange 0) between the lower corners, and the one on y = 90 (flange 2)
         // between the upper ones: the corner of the bends, where the cut ends, and the notch's step.
-        let lower = (Vec2::new(s0 / (alpha / 2.0).tan(), s0), Vec2::new(u_end(alpha), -ba));
-        let upper = (Vec2::new(20.0 + s0 / (beta / 2.0).tan(), 90.0 - s0), Vec2::new(u_end(beta), ba));
+        let lower = (Vec2::new(s0 / pmath::tan(alpha / 2.0), s0), Vec2::new(u_end(alpha), -ba));
+        let upper = (Vec2::new(20.0 + s0 / pmath::tan(beta / 2.0), 90.0 - s0), Vec2::new(u_end(beta), ba));
         for (i, (c, to)) in [(0, lower), (2, upper)] {
             let zone = corners_of(&s.zone(&s.flanges[i]));
             let mirror = |q: Vec2| Vec2::new(120.0 - q.x, q.y);
@@ -7884,11 +7885,11 @@ mod tests {
         for deg in [90.0f64, 72.0] {
             let what = format!("{deg}°");
             let th = deg.to_radians();
-            let (s0, ba, grow) = (3.0 * (th / 2.0).tan(), th * 2.0, th.sin() - 0.25 * 2f64.sqrt());
+            let (s0, ba, grow) = (3.0 * pmath::tan(th / 2.0), th * 2.0, pmath::sin(th) - 0.25 * 2f64.sqrt());
             let (whole, _) = tray(&torn(), deg, 38.6);
             let mut s = whole.clone();
             s.holes.push(Region2 { outer: Loop2::circle(Vec2::new(s0, s0), 2.0), holes: vec![] });
-            let (removed, want) = (flat_area(&whole) - flat_area(&s), 4.0 * (PI - (FRAC_PI_2 - 2.0 * (grow / ba).atan()) / 2.0));
+            let (removed, want) = (flat_area(&whole) - flat_area(&s), 4.0 * (PI - (FRAC_PI_2 - 2.0 * pmath::atan(grow / ba)) / 2.0));
             assert!((removed - want).abs() < 1e-6, "{what}: {removed} vs {want}");
             let body = s.solid().unwrap_or_else(|e| panic!("{what}: no solid: {e}"));
             assert!(body.validity().is_empty() && body.shell_count() == 1, "{what}: {:?}", body.validity());
@@ -8002,11 +8003,11 @@ mod tests {
         // between its square end and the cut, BA·(−u_end)/2 with u_end as in
         // `a_tear_follows_corners_that_are_not_square`. The flanges' ends stay the gap apart, no
         // bend runs into the other flange, and the folded part holds the flat pattern's material.
-        let alpha = 90f64.atan2(20.0);
+        let alpha = pmath::atan2(90f64, 20.0);
         for step in 9..=27 {
             let deg = step as f64 * 5.0;
             let th = deg.to_radians();
-            let u_end = |a: f64| (0.25 - th.sin() * (a / 2.0).cos()) / (a / 2.0).sin();
+            let u_end = |a: f64| (0.25 - pmath::sin(th) * pmath::cos(a / 2.0)) / pmath::sin(a / 2.0);
             for (name, (s, notes), (notch, _), angles) in [
                 ("tray", tray(&torn(), deg, 38.6), tray(&alu(), deg, 38.6), [FRAC_PI_2; 4]),
                 ("trapezoid", trapezoid(&torn(), deg), trapezoid(&alu(), deg), [alpha, alpha, PI - alpha, PI - alpha]),
@@ -8040,7 +8041,7 @@ mod tests {
         let heights = [38.6, 30.0, 45.0, 25.0];
         let (notch, _) = tray_each(&alu(), MIXED, heights);
         let (s, notes) = tray_each(&rv, MIXED, heights);
-        let s0 = MIXED.map(|a| 3.0 * (a.to_radians() / 2.0).tan());
+        let s0 = MIXED.map(|a| 3.0 * pmath::tan(a.to_radians() / 2.0));
         let ba = MIXED.map(|a| a.to_radians() * 2.0);
         let refused = format!("the corner at ({:.3}, {:.3}, 0.000) keeps its notch: a tear would run a bend into the other one", s0[3], s0[0]);
         assert_eq!(notes, [refused]);
@@ -8087,7 +8088,7 @@ mod tests {
         // closed ones, no bend lies in the other flange, and the part is one valid shell.
         let mut torn_pairs = Vec::new();
         for alpha in [60.0f64, 90.0, 120.0] {
-            let u = Vec2::new(alpha.to_radians().cos(), alpha.to_radians().sin());
+            let u = Vec2::new(pmath::cos(alpha.to_radians()), pmath::sin(alpha.to_radians()));
             let pts = [Vec2::new(0.0, 0.0), Vec2::new(120.0, 0.0), Vec2::new(120.0, 0.0) + u * 90.0, u * 90.0];
             let mut count = 0;
             for a in SWEEP {
@@ -8128,7 +8129,7 @@ mod tests {
         // returns (the returns' own bends are not).
         let tray = [Vec2::new(0.0, 0.0), Vec2::new(120.0, 0.0), Vec2::new(120.0, 90.0), Vec2::new(0.0, 90.0)];
         let trapezoid = [Vec2::new(0.0, 0.0), Vec2::new(120.0, 0.0), Vec2::new(100.0, 90.0), Vec2::new(20.0, 90.0)];
-        let alpha = 90f64.atan2(20.0);
+        let alpha = pmath::atan2(90f64, 20.0);
         let cases = [
             ("tray", tray, [FRAC_PI_2; 4], 90.0f64),
             ("tray", tray, [FRAC_PI_2; 4], 110.0),
@@ -8141,7 +8142,7 @@ mod tests {
             tears_nothing_but_the_bend_ends(&s, &notch, 8, &what);
             assert!(s.flanges.iter().all(|f| f.tear == (f.parent.is_none(), f.parent.is_none())), "{what}");
             let th = deg.to_radians();
-            let want: f64 = angles.iter().map(|a| -(th * 2.0) * (0.25 - th.sin() * (a / 2.0).cos()) / (a / 2.0).sin()).sum();
+            let want: f64 = angles.iter().map(|a| -(th * 2.0) * (0.25 - pmath::sin(th) * pmath::cos(a / 2.0)) / pmath::sin(a / 2.0)).sum();
             let gained = flat_area(&s) - flat_area(&notch);
             assert!((gained - want).abs() < 1e-6, "{what}: {gained} vs {want}");
             returns_keep_out_of_the_walls(&s, &what);
@@ -8259,7 +8260,7 @@ mod tests {
         for (alpha, a, b, why) in cases {
             let what = format!("corner {alpha}°, flanges {a}° and {b}°");
             let alpha = alpha.to_radians();
-            let u = Vec2::new(alpha.cos(), alpha.sin());
+            let u = Vec2::new(pmath::cos(alpha), pmath::sin(alpha));
             let pts = [Vec2::new(0.0, 0.0), Vec2::new(120.0, 0.0), Vec2::new(120.0, 0.0) + u * 90.0, u * 90.0];
             let each = [
                 EdgeFlange { pick: Vec3::new(60.0, 0.0, 2.0), height: 38.6, angle: a.to_radians() },
@@ -8268,8 +8269,8 @@ mod tests {
             let base = || Region2 { outer: Loop2::polygon(&pts).ccw(), holes: vec![] };
             let (notch, none) = flanges_each(base(), &alu(), &each);
             let (s, notes) = flanges_each(base(), &torn(), &each);
-            let (s0_a, s0_b) = (3.0 * (a.to_radians() / 2.0).tan(), 3.0 * (b.to_radians() / 2.0).tan());
-            let c = Vec2::new((s0_b + s0_a * alpha.cos()) / alpha.sin(), s0_a);
+            let (s0_a, s0_b) = (3.0 * pmath::tan(a.to_radians() / 2.0), 3.0 * pmath::tan(b.to_radians() / 2.0));
+            let c = Vec2::new((s0_b + s0_a * pmath::cos(alpha)) / pmath::sin(alpha), s0_a);
             assert!(none.is_empty(), "{what}: {none:?}");
             assert_eq!(notes, [format!("the corner at ({:.3}, {:.3}, 0.000) keeps its notch: {why}", c.x, c.y)], "{what}");
             assert_eq!((&s.base, &s.flanges), (&notch.base, &notch.flanges), "{what}");

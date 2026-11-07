@@ -1,6 +1,7 @@
 //! Independent isotropic CPU LOD reference from unwrapped UV gradients per shading-grid pixel.
 //! No sampling, derivative inference, normal filtering or GPU capability is implied.
 use crate::texture_input::MAX_TEXTURE_EDGE;
+use polycore_geom::pmath;
 
 /// Versioned convention: largest singular value, log2, magnification at zero,
 /// saturated at the last floor-halved level. Not a GPU parity guarantee.
@@ -59,7 +60,7 @@ pub fn select_isotropic_lod(dimensions: [u32; 2], duv_dx: [f64; 2], duv_dy: [f64
         let first = a * a + b * b;
         let second = c * c + d * d;
         let cross = a * c + b * d;
-        scale * (0.5 * (first + second + (first - second).hypot(2.0 * cross))).sqrt()
+        scale * (0.5 * (first + second + pmath::hypot(first - second, 2.0 * cross))).sqrt()
     };
     let mut w = width;
     let mut h = height;
@@ -69,7 +70,7 @@ pub fn select_isotropic_lod(dimensions: [u32; 2], duv_dx: [f64; 2], duv_dy: [f64
         h = (h / 2).max(1);
         max_level += 1;
     }
-    let lod = if footprint_texels <= 1.0 { 0.0 } else { footprint_texels.log2().min(f64::from(max_level)) };
+    let lod = if footprint_texels <= 1.0 { 0.0 } else { pmath::log2(footprint_texels).min(f64::from(max_level)) };
     Ok(LodSelection { lod, footprint_texels, max_level })
 }
 

@@ -1,6 +1,7 @@
 //! A Single hole at a sketch point follows the point when the sketch changes (#2110), drilled
 //! into the face it was placed on, and keeps doing so after the design is saved and reopened.
 
+use polycore_geom::pmath;
 use std::f64::consts::PI;
 
 use polycore_geom::Vec3;
@@ -42,7 +43,7 @@ fn centre(s: &Session) -> (String, Vec3) {
 fn bore_at(s: &Session, at: Vec3) {
     for k in 0..8 {
         let a = PI / 4.0 * f64::from(k);
-        let p = |r: f64| at + Vec3::new(a.cos(), a.sin(), 0.0) * r - Vec3::new(0.0, 0.0, 5.0);
+        let p = |r: f64| at + Vec3::new(pmath::cos(a), pmath::sin(a), 0.0) * r - Vec3::new(0.0, 0.0, 5.0);
         assert!(!solid_at(s, p(0.0)) && !solid_at(s, p(2.4)), "the bore about {at:?} is empty {a} rad from +x");
         assert!(solid_at(s, p(2.6)), "the wall about {at:?} is solid {a} rad from +x");
     }

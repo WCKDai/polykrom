@@ -2,6 +2,7 @@
 use crate::scenario::Harness;
 use crate::sketch_display::{curve_sample, projection_key};
 use crate::viewport::{Hit, Proj, pick, projection};
+use polykrom_engine::geom::pmath;
 use polykrom_engine::geom::{Plane, Vec2, Vec3};
 use polykrom_engine::render::{SampledPath, SamplingQuality};
 use serde_json::json;
@@ -27,7 +28,7 @@ fn segment_distance(p: egui::Pos2, a: egui::Pos2, b: egui::Pos2) -> f64 {
     let py = f64::from(p.y - a.y);
     let length = dx * dx + dy * dy;
     let t = if length > 0.0 { ((px * dx + py * dy) / length).clamp(0.0, 1.0) } else { 0.0 };
-    (px - t * dx).hypot(py - t * dy)
+    pmath::hypot(px - t * dx, py - t * dy)
 }
 
 fn dense_circle_error(path: &SampledPath, plane: &Plane, proj: &Proj, radius: f64, ppp: f32) -> f64 {
@@ -39,7 +40,7 @@ fn dense_circle_error(path: &SampledPath, plane: &Plane, proj: &Proj, radius: f6
     (0..8192)
         .map(|i| {
             let angle = i as f64 * std::f64::consts::TAU / 8192.0;
-            let p = proj.to_screen(plane.to_world(Vec2::new(radius * angle.cos(), radius * angle.sin()))).unwrap();
+            let p = proj.to_screen(plane.to_world(Vec2::new(radius * pmath::cos(angle), radius * pmath::sin(angle)))).unwrap();
             lines.iter().map(|&(a, b)| segment_distance(p, a, b)).fold(f64::INFINITY, f64::min) * f64::from(ppp)
         })
         .fold(0.0, f64::max)
@@ -68,7 +69,7 @@ fn pixel_circle_fit_exact_half_chord_hover_click_and_model_invariance() {
     // Midpoints of the old ten-chord pick outline. No centre/point handle is nearby.
     for k in [0, 2, 5, 7] {
         let angle = (2 * k + 1) as f64 * std::f64::consts::PI / 10.0;
-        let world = plane.to_world(Vec2::new(angle.cos(), angle.sin()));
+        let world = plane.to_world(Vec2::new(pmath::cos(angle), pmath::sin(angle)));
         let screen = proj.to_screen(world).unwrap();
         assert!(pick(&h.app, &proj, screen).iter().any(|hit| matches!(hit, Hit::SketchCurve { sketch, id, .. } if *sketch == sid && id == "c1")));
         h.step(&json!({"move":{"world":[world.x,world.y,world.z]}})).unwrap();
@@ -205,7 +206,7 @@ fn pixel_curve_second_nested_rotated_occurrence_uses_its_world_plane() {
     let tilt = 35.0f64.to_radians();
     assert!(ss.plane.x.dist(Vec3::X) < 1e-8);
     assert!(
-        ss.plane.y.dist(Vec3::new(0.0, tilt.cos(), tilt.sin())) < 1e-8,
+        ss.plane.y.dist(Vec3::new(0.0, pmath::cos(tilt), pmath::sin(tilt))) < 1e-8,
         "independent expected occurrence rotation must tilt the actual sketch plane"
     );
     let proj = projection(&h.app, h.app.viewport.rect.unwrap());

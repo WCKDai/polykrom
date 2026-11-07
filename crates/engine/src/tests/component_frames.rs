@@ -1,6 +1,7 @@
 //! Components as frames (regression cases for user bug #4): picks, sketches and bodies on
 //! moved components and pasted instances.
 
+use polycore_geom::pmath;
 use std::f64::consts::PI;
 
 use serde_json::json;
@@ -212,7 +213,7 @@ fn revolve_to_a_cylinder_in_another_moved_component() {
     run(&mut s, "sketch.create", json!({"name": "Profile", "plane": "XZ"}));
     run(&mut s, "sketch.rectangle.two_point", json!({"p0": [10, 0], "p1": [15, 5]}));
     run(&mut s, "sketch.finish", json!({}));
-    let (c, sn) = ((PI / 4.0).cos(), (PI / 4.0).sin());
+    let (c, sn) = (pmath::cos(PI / 4.0), pmath::sin(PI / 4.0));
     // The post's side nearest the profile: its axis plus 4 mm turned the same way.
     let to = [14.0 * sn + 4.0 * c, 14.0 * c - 4.0 * sn, 2.0];
     run(
@@ -226,7 +227,7 @@ fn revolve_to_a_cylinder_in_another_moved_component() {
     let overlap = polycore::boolean(arc, post, polycore::BoolOp::Intersect).unwrap();
     assert!(overlap.is_none_or(|b| polycore::measure(&b).unwrap().volume < 1e-3), "the arc runs into the post");
     // Past the picked point's angle (29°) on the inner side, where the post leaves room.
-    let at = |r: f64, deg: f64| Vec3::new(r * deg.to_radians().cos(), r * deg.to_radians().sin(), -2.5);
+    let at = |r: f64, deg: f64| Vec3::new(r * pmath::cos(deg.to_radians()), r * pmath::sin(deg.to_radians()), -2.5);
     assert!(arc.contains(at(10.2, 35.0)), "the arc is not cut back to the post's surface");
 }
 

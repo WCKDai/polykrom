@@ -340,6 +340,7 @@ fn center_of_mass(s: &mut Session, p: &Value) -> Result<Value> {
 
 #[cfg(test)]
 mod tests {
+    use polycore_geom::pmath;
     use serde_json::{Value, json};
 
     use crate::Session;
@@ -402,7 +403,7 @@ mod tests {
         let r = s.execute("inspect.isocurve", &json!({"faces": [[58, 0, 5]], "count": 4})).unwrap();
         let curves = r["curves"].as_array().unwrap();
         let ring =
-            |c: &Value| c.as_array().unwrap().iter().all(|q| ((q[0].as_f64().unwrap() - 50.0).hypot(q[1].as_f64().unwrap()) - 8.0).abs() < 0.2);
+            |c: &Value| c.as_array().unwrap().iter().all(|q| (pmath::hypot(q[0].as_f64().unwrap() - 50.0, q[1].as_f64().unwrap()) - 8.0).abs() < 0.2);
         assert!(curves.len() >= 8, "{}", curves.len());
         assert!(curves.iter().all(ring), "every curve lies on the cylinder");
         let flat = |c: &Value| {

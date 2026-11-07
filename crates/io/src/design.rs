@@ -728,6 +728,7 @@ fn read_document<R: Read + Seek>(reader: &mut PackageReader<R>) -> Result<Docume
 mod tests {
     use super::*;
     use polycore_geom::Vec2;
+    use polycore_geom::pmath;
 
     struct CountingReader {
         source: Cursor<Vec<u8>>,
@@ -1590,7 +1591,7 @@ mod tests {
     fn benchmark_design_storage() {
         let mut doc = Document::new("Generated mesh benchmark");
         let mut large = mesh();
-        large.positions = (0..300_000).map(|i| (i as f64 * 0.001234567890123).sin() * 100.0).collect();
+        large.positions = (0..300_000).map(|i| pmath::sin(i as f64 * 0.001234567890123) * 100.0).collect();
         large.triangles = (0..300_000).map(|i| (i % 100_000) as u32).collect();
         doc.add_feature(FeatureKind::MeshImport { file: "generated.obj".into(), meshes: vec![large] }, None).unwrap();
         measure_storage(&doc, "mesh");

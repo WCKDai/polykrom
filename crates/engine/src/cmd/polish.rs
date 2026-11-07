@@ -8,6 +8,7 @@
 //! Everything is read from the bodies' cached display meshes (edge polylines, the faces each
 //! edge bounds, vertex normals) in world placement, so it is quick and the same every time.
 
+use polycore_geom::pmath;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 use polycore_geom::compare::closest_on_triangle;
@@ -374,7 +375,7 @@ fn edges(m: &Mesh, planar: &[Option<Vec3>], tol: f64) -> Vec<Edge> {
         let (length, [q1, mid, q3]) = along(line);
         let Some(&p) = line.get(line.len() / 2) else { continue };
         let (Some((n1, c1)), Some((n2, c2))) = (side(f1, p), side(f2, p)) else { continue };
-        let angle = n1.dot(n2).clamp(-1.0, 1.0).acos().to_degrees();
+        let angle = pmath::acos(n1.dot(n2).clamp(-1.0, 1.0)).to_degrees();
         let convex = (c1 - p).dot(n2) + (c2 - p).dot(n1) < 0.0;
         out.push(Edge { index, faces: [f1 as usize, f2 as usize], angle, convex, length, mid, quarter: [q1, q3] });
     }

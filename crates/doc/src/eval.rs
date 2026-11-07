@@ -3,6 +3,7 @@
 #[path = "placed_mesh.rs"]
 mod placed_mesh;
 
+use polycore_geom::pmath;
 use std::collections::BTreeMap;
 use std::hash::{Hash, Hasher};
 use std::sync::{Arc, OnceLock};
@@ -515,7 +516,7 @@ fn thread_on_impl(
 fn thread_groove(t: &ThreadInfo, radius: f64, open: (bool, bool)) -> Result<polycore_geom::Mesh> {
     let (p, d) = (t.pitch, t.major_diameter);
     let h = p * 3f64.sqrt() / 2.0;
-    let slope = (std::f64::consts::PI / 6.0).tan();
+    let slope = pmath::tan(std::f64::consts::PI / 6.0);
     let len = t.end - t.start;
     if !(p > 1e-3 && len > 1e-6) {
         return Err(DocError::Invalid("thread too short".into()));
@@ -586,7 +587,7 @@ fn thread_groove(t: &ThreadInfo, radius: f64, open: (bool, bool)) -> Result<poly
     if !outer.is_finite() {
         return Err(DocError::Invalid("thread dimensions are too large".into()));
     }
-    let angle = (1.0 - (p * 0.01 / outer).min(1.0)).acos();
+    let angle = pmath::acos(1.0 - (p * 0.01 / outer).min(1.0));
     let stations = (std::f64::consts::PI / angle).ceil().max(48.0);
     if !stations.is_finite() || stations > 720.0 {
         return Err(DocError::Invalid("the modelled thread is too fine for this diameter; use a cosmetic thread".into()));
@@ -612,7 +613,7 @@ fn thread_turn(t: &ThreadInfo, cyl: &kernel::CylinderFace, mb: &ModelBody) -> Re
     let solid_round = |s: f64, radius: f64| {
         (0..12).any(|i| {
             let a = std::f64::consts::TAU * f64::from(i) / 12.0;
-            mesh.contains(t.axis_point + *k * s + (u * a.cos() + v * a.sin()) * radius)
+            mesh.contains(t.axis_point + *k * s + (u * pmath::cos(a) + v * pmath::sin(a)) * radius)
         })
     };
     // The ring reaches a little past the shaft; the part must not go on there (a shaft standing
@@ -3337,7 +3338,7 @@ fn grow_profile_for_coplanar(sur: &Surroundings, r: &Region2, probe: &dyn Fn(Vec
                 // moved arc), on the circles themselves where it is concave.
                 let near = radius + sur.round * sweep.signum();
                 let steps = ((sweep.abs() / (8.0 * sur.round / radius.max(far)).sqrt()).ceil() as usize).clamp(1, 256);
-                let scale = if sweep > 0.0 { 1.0 / (sweep.abs() / steps as f64 / 2.0).cos() } else { 1.0 };
+                let scale = if sweep > 0.0 { 1.0 / pmath::cos(sweep.abs() / steps as f64 / 2.0) } else { 1.0 };
                 let at = |k: usize, rad: f64| center + Vec2::from_angle(start + sweep * k as f64 / steps as f64) * (rad * scale);
                 Some((0..steps).flat_map(|k| [[at(k, near), at(k + 1, near), at(k + 1, far)], [at(k, near), at(k + 1, far), at(k, far)]]).collect())
             }
@@ -4282,7 +4283,7 @@ fn hole_tools_and_prisms(
             let exits_at_shoulder = solid_at(bottom + eps) && !solid_at(bottom - eps);
             if depth.is_some() && half > 1e-3 && half < std::f64::consts::FRAC_PI_2 && !exits_at_shoulder {
                 // One revolved tool (cylinder with a drill point).
-                let tip = r / half.tan();
+                let tip = r / pmath::tan(half);
                 let up = -dir;
                 let side = up.any_perp();
                 let rp = Plane::new(*position, side, up).ok_or_else(|| DocError::Invalid("hole axis".into()))?;
@@ -4312,9 +4313,9 @@ fn hole_tools_and_prisms(
                 return Err(DocError::Invalid("the countersink must be wider than the hole".into()));
             }
             // Cone from above the face to just inside the hole radius, then the hole.
-            let r_top = rc + top * half.tan();
+            let r_top = rc + top * pmath::tan(half);
             let r_end = r * 0.9;
-            let len = (r_top - r_end) / half.tan();
+            let len = (r_top - r_end) / pmath::tan(half);
             let top_plane = plane.offset(top);
             tools.push((crate::lineage::part_tool(kernel::extrude_tapered(&top_plane, &disc(r_top), len, -1.0, -half)?, "csink"), None));
             tools.push(cyl(r, bottom, top, "bore")?);
@@ -4388,7 +4389,7 @@ pub fn revolve_extent_with_convention(
             } else {
                 -axis
             };
-            let sweep = angle_axis.dot(u.cross(v)).atan2(u.dot(v));
+            let sweep = pmath::atan2(angle_axis.dot(u.cross(v)), u.dot(v));
             (0.0, if sweep <= 1e-9 { sweep + std::f64::consts::TAU } else { sweep })
         }
         (None, Some(other), _) => (-other, angle + other),
@@ -4687,7 +4688,7 @@ fn feature_tools_with_constructor(
                                 .filter(|t| targets.is_empty() || targets.iter().any(|x| *x == t.name))
                                 .any(|t| kernel::can_join_touching_faces(&t.body, &exact))
                         {
-                            growth = growth.max(len * taper.tan().abs());
+                            growth = growth.max(len * pmath::tan(taper).abs());
                             return Ok(roles.tool(exact, None));
                         }
                         let (lo, hi) = if sign < 0.0 { (base - len, base) } else { (base, base + len) };
@@ -4696,9 +4697,9 @@ fn feature_tools_with_constructor(
                         // A taper that narrows the tool away from the face widens it as it runs on into it, past
                         // the profile (where the profile is the whole face, out through the body's sides, #1534):
                         // then it starts on the face instead.
-                        if a < 0.0 && a * taper.tan() > 0.0 {
+                        if a < 0.0 && a * pmath::tan(taper) > 0.0 {
                             let dir = n * sign;
-                            if !taper_run_on_fits(st, &start_plane, dir, r, -a, a * taper.tan(), *operation, &plain_targets) {
+                            if !taper_run_on_fits(st, &start_plane, dir, r, -a, a * pmath::tan(taper), *operation, &plain_targets) {
                                 a = 0.0;
                             }
                         }
@@ -4707,7 +4708,7 @@ fn feature_tools_with_constructor(
                         // face the tool stands on into the body.
                         let foot = if a >= 0.0 && on_face { TAPER_FOOT.min((b - a) * 0.01) } else { 0.0 };
                         let body = kernel::extrude_tapered_between(&start_plane, r, a, b, foot, sign, taper)?;
-                        growth = growth.max(a.abs().max(b.abs()) * taper.tan().abs());
+                        growth = growth.max(a.abs().max(b.abs()) * pmath::tan(taper).abs());
                         Ok(roles.tool(body, None))
                     })
                     .collect::<Result<_>>()?;
@@ -5025,7 +5026,10 @@ fn feature_tools_with_constructor(
                                 let a = region_extent.sweep * k as f64 / 4.0
                                     + if *convention == crate::RevolveConvention::SketchNormal { region_extent.start } else { 0.0 };
                                 let v = q - origin_w;
-                                origin_w + v * a.cos() + rotation_axis.cross(v) * a.sin() + rotation_axis * (rotation_axis.dot(v) * (1.0 - a.cos()))
+                                origin_w
+                                    + v * pmath::cos(a)
+                                    + rotation_axis.cross(v) * pmath::sin(a)
+                                    + rotation_axis * (rotation_axis.dot(v) * (1.0 - pmath::cos(a)))
                             })
                             .collect::<Vec<_>>()
                     };
@@ -5052,7 +5056,7 @@ fn feature_tools_with_constructor(
                 let u0 = flat(c);
                 let angle_of = |q: Vec3| {
                     let v = flat(q);
-                    let a = angle_axis.dot(u0.cross(v)).atan2(u0.dot(v));
+                    let a = pmath::atan2(angle_axis.dot(u0.cross(v)), u0.dot(v));
                     if a < 0.0 { a + std::f64::consts::TAU } else { a }
                 };
                 let far = tb.mesh().positions.iter().map(|q| angle_of(*q)).fold(0.0, f64::max);
@@ -5140,7 +5144,7 @@ fn feature_tools_with_constructor(
             // Radial direction at the start; the section lies in the plane of the axis.
             let x0 = if k.cross(Vec3::X).len() > 1e-6 { (Vec3::X - k * k.dot(Vec3::X)).normalized() } else { Some(k.any_perp()) };
             let x0 = x0.ok_or_else(|| DocError::Invalid("coil axis".into()))?;
-            let x = x0 * a0.cos() + k.cross(x0) * a0.sin();
+            let x = x0 * pmath::cos(a0) + k.cross(x0) * pmath::sin(a0);
             let plane = Plane { origin: *base, x, y: k };
             let c = Vec2::new(r, 0.0);
             let outer = match section {
@@ -5588,7 +5592,7 @@ fn translation(t: Vec3) -> Mat {
 /// Rotation by `ang` about the line through `o` with direction `a` (column-major).
 fn rotation(o: Vec3, a: Vec3, ang: f64) -> Mat {
     let a = a.normalized().unwrap_or(Vec3::Z);
-    let (c, s) = (ang.cos(), ang.sin());
+    let (c, s) = (pmath::cos(ang), pmath::sin(ang));
     let t = 1.0 - c;
     let r = [
         [t * a.x * a.x + c, t * a.x * a.y + s * a.z, t * a.x * a.z - s * a.y],
@@ -5756,7 +5760,7 @@ fn pattern_transforms(doc: &Document, vals: &BTreeMap<String, Value>, st: &Model
                 let (pk, tk) = path_at(&segs, step * i as f64);
                 let mut m = if *orient {
                     // Signed turn of the tangent about the sketch normal.
-                    let ang = t0.cross(tk).dot(normal).atan2(t0.dot(tk));
+                    let ang = pmath::atan2(t0.cross(tk).dot(normal), t0.dot(tk));
                     rotation(p0, normal, ang)
                 } else {
                     translation(Vec3::ZERO)
@@ -5800,7 +5804,7 @@ fn seg_len(s: &kernel::PathSeg) -> f64 {
 
 /// Rotate `v` about the unit axis `k` by `ang` (Rodrigues).
 fn rotate_vec(v: Vec3, k: Vec3, ang: f64) -> Vec3 {
-    v * ang.cos() + k.cross(v) * ang.sin() + k * (k.dot(v) * (1.0 - ang.cos()))
+    v * pmath::cos(ang) + k.cross(v) * pmath::sin(ang) + k * (k.dot(v) * (1.0 - pmath::cos(ang)))
 }
 
 /// Point and unit tangent `t` mm along a segment.
@@ -6326,7 +6330,7 @@ pub fn tangent_face_chain(b: &ModelBody, picks: &[Vec3]) -> Vec<(usize, Vec3)> {
             }
             let Some(mid) = e.get(e.len() / 2).copied() else { continue };
             if let (Some(n1), Some(n2)) = (normal_near(f, mid), normal_near(other, mid))
-                && n1.dot(n2) > 2f64.to_radians().cos()
+                && n1.dot(n2) > pmath::cos(2f64.to_radians())
             {
                 chosen.push(other);
             }
@@ -8311,7 +8315,7 @@ mod coplanar_growth_tests {
         let id = doc.add_feature(import, None).unwrap();
         doc.feature_mut(id).unwrap().body_names = vec!["A".into(), "B".into(), "C".into()];
         let mut sk = polykrom_sketch::Sketch::new();
-        let radius = 4.29 / 30f64.to_radians().cos();
+        let radius = 4.29 / pmath::cos(30f64.to_radians());
         let pts: Vec<usize> = (0..6).map(|k| sk.add_point(Vec2::from_angle((60.0 * k as f64 - 16.0).to_radians()) * radius, None).unwrap()).collect();
         for k in 0..6 {
             sk.add_line_pts(pts[k], pts[(k + 1) % 6], None).unwrap();

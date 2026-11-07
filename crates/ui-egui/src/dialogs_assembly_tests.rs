@@ -1,4 +1,5 @@
 use polykrom_engine::Session;
+use polykrom_engine::geom::pmath;
 use serde_json::json;
 
 use super::*;
@@ -231,8 +232,10 @@ fn body_of_a_further_instance_is_its_own_occurrence() {
 /// Round edges snap to their centre; straight ones are not circles.
 #[test]
 fn circles_from_edge_polylines() {
-    let pts: Vec<Vec3> =
-        (0..=24).map(|i| f64::from(i) / 24.0 * std::f64::consts::TAU).map(|t| Vec3::new(5.0 + 3.0 * t.cos(), 2.0 + 3.0 * t.sin(), 7.0)).collect();
+    let pts: Vec<Vec3> = (0..=24)
+        .map(|i| f64::from(i) / 24.0 * std::f64::consts::TAU)
+        .map(|t| Vec3::new(5.0 + 3.0 * pmath::cos(t), 2.0 + 3.0 * pmath::sin(t), 7.0))
+        .collect();
     let (c, n) = circle_of(&pts).unwrap();
     assert!(c.dist(Vec3::new(5.0, 2.0, 7.0)) < 1e-9 && n.cross(Vec3::Z).len() < 1e-9);
     let line: Vec<Vec3> = (0..10).map(|i| Vec3::new(f64::from(i), 0.0, 0.0)).collect();
@@ -561,7 +564,7 @@ fn four_bar() -> SolveApp {
     let (p0, o4) = ([0.0, 20.0], [45.0, 0.0]);
     // The rocker pin: where the coupler (50 from the crank pin) meets the rocker (40 from O4).
     let (dx, dy) = (o4[0] - p0[0], o4[1] - p0[1]);
-    let l = f64::hypot(dx, dy);
+    let l = pmath::hypot(dx, dy);
     let a = (2500.0 - 1600.0 + l * l) / (2.0 * l);
     let h = (2500.0 - a * a).sqrt();
     let q0 = [p0[0] + dx * a / l - dy * h / l, p0[1] + dy * a / l + dx * h / l];

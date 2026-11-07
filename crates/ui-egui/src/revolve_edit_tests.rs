@@ -1,5 +1,6 @@
 use crate::scenario::Harness;
 use polykrom_engine::doc::{AxisRef, FeatureKind};
+use polykrom_engine::geom::pmath;
 use serde_json::{Value, json};
 
 fn make(h: Harness, axis: Value) -> Harness {
@@ -203,7 +204,7 @@ fn rotated_owner_explicit_axis_is_lossless_with_another_component_active() {
     let (origin, direction) = crate::canvas::revolve_axis(&h.app, h.app.dialog.as_ref().unwrap()).unwrap();
     assert!((origin.x - 100.0).abs() < 1e-8 && (origin.z - 20.0).abs() < 1e-8);
     let angle = 17.0f64.to_radians();
-    assert!((direction.x + angle.sin()).abs() < 1e-8 && (direction.y - angle.cos()).abs() < 1e-8);
+    assert!((direction.x + pmath::sin(angle)).abs() < 1e-8 && (direction.y - pmath::cos(angle)).abs() < 1e-8);
     h.step(&json!({"widget":"OK"})).unwrap();
     assert_eq!(axis(&h), original);
     assert_eq!(h.app.session.active_component, active);
@@ -222,7 +223,7 @@ fn world_and_sketch_axis_handles_follow_authoring_occurrence() {
         let (origin, direction) = crate::canvas::revolve_axis(&h.app, h.app.dialog.as_ref().unwrap()).unwrap();
         let angle = 17.0f64.to_radians();
         assert!((origin.x - 100.0).abs() < 1e-8 && (origin.z - 20.0).abs() < 1e-8);
-        assert!((direction.x + angle.sin()).abs() < 1e-8 && (direction.y - angle.cos()).abs() < 1e-8);
+        assert!((direction.x + pmath::sin(angle)).abs() < 1e-8 && (direction.y - pmath::cos(angle)).abs() < 1e-8);
         h.step(&json!({"widget":"OK"})).unwrap();
         assert_eq!(axis(&h), original);
     }

@@ -3,6 +3,7 @@
 //! so masses and centres are exact; tolerances are 1e-9 N·m / N / mm, or rounding of a hand sum.
 
 use polycore_geom::Vec2;
+use polycore_geom::pmath;
 use serde_json::{Value, json};
 
 use crate::Session;
@@ -130,7 +131,7 @@ fn com(boxes: &[(f64, [f64; 2])]) -> [f64; 2] {
 /// The signed distance from `c` to the line through `a` and `b`, positive on the origin's side.
 fn to_line(a: [f64; 2], b: [f64; 2], c: [f64; 2]) -> f64 {
     let (dx, dy) = (b[0] - a[0], b[1] - a[1]);
-    let side = |p: [f64; 2]| (dx * (p[1] - a[1]) - dy * (p[0] - a[0])) / dx.hypot(dy);
+    let side = |p: [f64; 2]| (dx * (p[1] - a[1]) - dy * (p[0] - a[0])) / pmath::hypot(dx, dy);
     side(c) * side([0.0, 0.0]).signum()
 }
 
@@ -273,7 +274,7 @@ fn over_a_study_the_horizontal_arm_is_the_worst_step() {
     assert!(r["min_margin_mm"].is_number() && r["stopped_at"].is_null(), "{r}");
     close(&shoulder(&run(&mut s, "inspect.statics", json!({})))["load_nm"], m * G * 0.1, 1e-9, "unchanged design");
     run(&mut s, "motion.play", json!({"study": "Raise", "step": 5}));
-    close(&shoulder(&run(&mut s, "inspect.statics", json!({})))["load_nm"], m * G * 0.1 * 45f64.to_radians().cos(), 1e-9, "45°");
+    close(&shoulder(&run(&mut s, "inspect.statics", json!({})))["load_nm"], m * G * 0.1 * pmath::cos(45f64.to_radians()), 1e-9, "45°");
     run(&mut s, "motion.play", json!({"study": "Raise", "step": 10}));
     close(&shoulder(&run(&mut s, "inspect.statics", json!({})))["load_nm"], 0.0, 1e-9, "upright");
     assert!(s.execute("inspect.statics", &json!({"study": "Nope"})).is_err());

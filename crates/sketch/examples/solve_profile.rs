@@ -1,5 +1,6 @@
 //! Reproducible numerical traces and paired wall-time samples. Use `--help` for cases and bounds.
 
+use polycore_geom::pmath;
 use std::{error::Error, io::Write, path::PathBuf, time::Instant};
 
 use polycore_geom::Vec2;
@@ -144,7 +145,7 @@ fn make_case(name: &str, opt: &Options) -> Result<Case> {
             let (bx, by) = *truth.get(b).ok_or("missing endpoint")?;
             let p = *ids.get(a).ok_or("missing point")?;
             let q = *ids.get(b).ok_or("missing point")?;
-            sk.add_constraint(ConstraintKind::Distance { p, q, value: (ax - bx).hypot(ay - by) * opt.scale }, None)?;
+            sk.add_constraint(ConstraintKind::Distance { p, q, value: pmath::hypot(ax - bx, ay - by) * opt.scale }, None)?;
         }
         if name == "linkage-edit" {
             let report = solve_with(&mut sk, &Hold::default(), None, Analysis::Full, None);

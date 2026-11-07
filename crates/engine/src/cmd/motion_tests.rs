@@ -1,4 +1,5 @@
 use polycore_geom::Vec3;
+use polycore_geom::pmath;
 use serde_json::{Value, json};
 
 use crate::Session;
@@ -975,7 +976,7 @@ fn driving_a_joint_moves_parts_without_evaluating_them() {
         assert!(std::sync::Arc::ptr_eq(&model, &s.model.state()), "the parts' bodies are the ones they were");
     }
     // The head went round with the arm: 75° about Z through the origin.
-    let (sin, cos) = 75f64.to_radians().sin_cos();
+    let (sin, cos) = pmath::sin_cos(75f64.to_radians());
     let want = Vec3::new(before.x * cos - before.y * sin, before.x * sin + before.y * cos, before.z);
     assert!(tip(&s).dist(want) < 1e-6, "{:?} vs {want:?}", tip(&s));
     same_bodies(&s.model.state(), &rebuilt(&s));

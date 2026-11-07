@@ -610,6 +610,7 @@ mod tests {
     use super::*;
     use crate::Services;
     use polykrom_engine::Session;
+    use polykrom_engine::geom::pmath;
     use polykrom_engine::render::Camera;
 
     /// The camera math the page applies the motion with (`navigation::device`): `sketch` keeps
@@ -1024,10 +1025,10 @@ mod tests {
                     for i in 0..128 {
                         let before = app.cam;
                         assert!(frame(&mut app, &ctx, mapping, axes, step / (2.0 * f64::from(speed))));
-                        assert!((before.back().dot(app.cam.back()) - step.cos()).abs() < 1e-10);
+                        assert!((before.back().dot(app.cam.back()) - pmath::cos(step)).abs() < 1e-10);
                         if i == 0 {
                             let direction = if reversed { -1.0 } else { 1.0 };
-                            assert!((app.cam.back().dot(initial.basis().1) - direction * step.sin()).abs() < 1e-10);
+                            assert!((app.cam.back().dot(initial.basis().1) - direction * pmath::sin(step)).abs() < 1e-10);
                         }
                     }
                     assert!(app.cam.back().dist(initial.back()) < 1e-9 && app.cam.basis().0.dist(initial.basis().0) < 1e-9);

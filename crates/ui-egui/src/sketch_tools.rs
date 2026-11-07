@@ -5,6 +5,7 @@
 
 use crate::icons::markers::glyph_icon;
 use crate::icons::markers::glyph_letter;
+use polykrom_engine::geom::pmath;
 use std::cell::{Cell, RefCell};
 
 use egui::{Pos2, Stroke};
@@ -753,7 +754,7 @@ fn round_nice(x: f64) -> f64 {
     if !(x.is_finite() && x > 0.0) {
         return 1.0;
     }
-    let p = 10f64.powf(x.log10().floor());
+    let p = pmath::powf(10f64, pmath::log10(x).floor());
     let m = x / p;
     let n = if m < 1.5 {
         1.0

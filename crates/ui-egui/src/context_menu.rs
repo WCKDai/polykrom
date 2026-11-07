@@ -11,6 +11,11 @@
 //! state; [`items`] lists them and [`run_item`] runs one, so the control channel (`ui.menu`,
 //! `ui.menuPick`) and tests reach everything a click does.
 
+// UI only: this file draws, animates, converts colours or places the camera, and feeds nothing
+// into a design, so it keeps the platform's transcendental functions (listed with its reason in
+// crates/engine/tests/pmath_gate.rs; everything that reaches a command goes through pmath).
+#![allow(clippy::disallowed_methods)]
+
 use crate::ui_kit::{Container, Surface};
 use egui::{Color32, Pos2, Rect, Sense, Vec2, pos2, vec2};
 use polykrom_engine::Sel;

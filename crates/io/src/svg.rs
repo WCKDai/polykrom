@@ -4,6 +4,7 @@
 //! `viewBox`; y is flipped so the drawing reads upright in the sketch.
 
 use polycore_geom::Vec2;
+use polycore_geom::pmath;
 use quick_xml::Reader;
 use quick_xml::events::{BytesStart, Event};
 
@@ -95,13 +96,13 @@ fn parse_transform(s: &str) -> Tf {
             "translate" => Tf([1.0, 0.0, 0.0, 1.0, g(0, 0.0), g(1, 0.0)]),
             "scale" => Tf([g(0, 1.0), 0.0, 0.0, g(1, g(0, 1.0)), 0.0, 0.0]),
             "rotate" => {
-                let (s, c) = g(0, 0.0).to_radians().sin_cos();
+                let (s, c) = pmath::sin_cos(g(0, 0.0).to_radians());
                 let r = Tf([c, s, -s, c, 0.0, 0.0]);
                 let (cx, cy) = (g(1, 0.0), g(2, 0.0));
                 Tf([1.0, 0.0, 0.0, 1.0, cx, cy]).mul(r).mul(Tf([1.0, 0.0, 0.0, 1.0, -cx, -cy]))
             }
-            "skewX" => Tf([1.0, 0.0, g(0, 0.0).to_radians().tan(), 1.0, 0.0, 0.0]),
-            "skewY" => Tf([1.0, g(0, 0.0).to_radians().tan(), 0.0, 1.0, 0.0, 0.0]),
+            "skewX" => Tf([1.0, 0.0, pmath::tan(g(0, 0.0).to_radians()), 1.0, 0.0, 0.0]),
+            "skewY" => Tf([1.0, pmath::tan(g(0, 0.0).to_radians()), 0.0, 1.0, 0.0, 0.0]),
             _ => Tf::ID,
         };
         t = t.mul(m);
@@ -173,7 +174,7 @@ impl Out {
     fn elliptic(&mut self, t: Tf, c: Vec2, rx: f64, ry: f64, phi: f64, t0: f64, dt: f64) -> Result<()> {
         let u = Vec2::from_angle(phi);
         let v = u.perp();
-        let at = |a: f64| c + u * (rx * a.cos()) + v * (ry * a.sin());
+        let at = |a: f64| c + u * (rx * pmath::cos(a)) + v * (ry * pmath::sin(a));
         let circle = t.uniform().filter(|_| (rx - ry).abs() < 1e-9 * rx.max(ry));
         if let Some(k) = circle {
             let (p0, p1) = (t.apply(at(t0)), t.apply(at(t0 + dt)));
@@ -201,8 +202,8 @@ impl Out {
         // Elliptic arc: cubic Béziers of at most 90 degrees each.
         let n = ((dt.abs() / std::f64::consts::FRAC_PI_2).ceil() as usize).max(1);
         let h = dt / n as f64;
-        let k = 4.0 / 3.0 * (h / 4.0).tan();
-        let d = |a: f64| u * (-rx * a.sin()) + v * (ry * a.cos());
+        let k = 4.0 / 3.0 * pmath::tan(h / 4.0);
+        let d = |a: f64| u * (-rx * pmath::sin(a)) + v * (ry * pmath::cos(a));
         for i in 0..n {
             let (a0, a1) = (t0 + h * i as f64, t0 + h * (i + 1) as f64);
             self.cubic(t, [at(a0), at(a0) + d(a0) * k, at(a1) - d(a1) * k, at(a1)])?;
@@ -223,7 +224,7 @@ fn arc_to(out: &mut Out, t: Tf, p0: Vec2, mut rx: f64, mut ry: f64, phi_deg: f64
         return out.line(t, p0, p1);
     }
     let phi = phi_deg.to_radians();
-    let (s, c) = phi.sin_cos();
+    let (s, c) = pmath::sin_cos(phi);
     let d = (p0 - p1) * 0.5;
     let x1 = Vec2::new(c * d.x + s * d.y, -s * d.x + c * d.y);
     let lam = (x1.x / rx).powi(2) + (x1.y / ry).powi(2);
@@ -240,7 +241,7 @@ fn arc_to(out: &mut Out, t: Tf, p0: Vec2, mut rx: f64, mut ry: f64, phi_deg: f64
     let cx1 = Vec2::new(co * rx * x1.y / ry, -co * ry * x1.x / rx);
     let mid = (p0 + p1) * 0.5;
     let cc = Vec2::new(c * cx1.x - s * cx1.y, s * cx1.x + c * cx1.y) + mid;
-    let ang = |u: Vec2, v: Vec2| u.cross(v).atan2(u.dot(v));
+    let ang = |u: Vec2, v: Vec2| pmath::atan2(u.cross(v), u.dot(v));
     let u = Vec2::new((x1.x - cx1.x) / rx, (x1.y - cx1.y) / ry);
     let v = Vec2::new((-x1.x - cx1.x) / rx, (-x1.y - cx1.y) / ry);
     let t0 = ang(Vec2::X, u);

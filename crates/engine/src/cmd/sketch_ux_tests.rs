@@ -1,6 +1,7 @@
 //! Sketch interaction tests: dimension placement, Fix/Unfix, the construction toggle, and
 //! which entity moves when a two-entity constraint is applied.
 
+use polycore_geom::pmath;
 use polykrom_sketch::{DimFrame, Sketch, dim_frame, dim_layout};
 use serde_json::{Value, json};
 
@@ -689,10 +690,10 @@ fn arm_drags(links: Links) -> (usize, usize) {
     while kept < 1000 {
         let th1 = rnd() * TAU;
         let bend = (0.4 + rnd() * 2.2) * if rnd() < 0.5 { 1.0 } else { -1.0 };
-        let v2 = o + v(a * th1.cos(), a * th1.sin());
-        let v3 = v2 + v(b * (th1 + bend).cos(), b * (th1 + bend).sin());
+        let v2 = o + v(a * pmath::cos(th1), a * pmath::sin(th1));
+        let v3 = v2 + v(b * pmath::cos(th1 + bend), b * pmath::sin(th1 + bend));
         let (tr, tt) = (lo + rnd() * (hi - lo), rnd() * TAU);
-        let to = o + v(tr * tt.cos(), tr * tt.sin());
+        let to = o + v(tr * pmath::cos(tt), tr * pmath::sin(tt));
         let clear = |p: polycore_geom::Vec2| (lo..=hi).contains(&p.dist(o));
         if !(0..=100).all(|i| clear(v3 + (to - v3) * (i as f64 / 100.0))) {
             continue;
@@ -776,10 +777,10 @@ fn hanging_triangle_flips(n: usize) -> usize {
     while kept < n {
         let th1 = rnd() * TAU;
         let bend = (0.4 + rnd() * 2.2) * if rnd() < 0.5 { 1.0 } else { -1.0 };
-        let v2 = o + v(a * th1.cos(), a * th1.sin());
-        let v3 = v2 + v(b * (th1 + bend).cos(), b * (th1 + bend).sin());
+        let v2 = o + v(a * pmath::cos(th1), a * pmath::sin(th1));
+        let v3 = v2 + v(b * pmath::cos(th1 + bend), b * pmath::sin(th1 + bend));
         let (tr, tt) = (lo + rnd() * (hi - lo), rnd() * TAU);
-        let to = o + v(tr * tt.cos(), tr * tt.sin());
+        let to = o + v(tr * pmath::cos(tt), tr * pmath::sin(tt));
         let clear = |p: polycore_geom::Vec2| (lo..=hi).contains(&p.dist(o));
         if !(0..=100).all(|i| clear(v3 + (to - v3) * (i as f64 / 100.0))) {
             continue;
@@ -919,7 +920,7 @@ fn free_arc(sweep: f64) -> Session {
 
 fn on_arc(deg: f64) -> [f64; 2] {
     let t = deg.to_radians();
-    [50.0 + 10.0 * t.cos(), 50.0 + 10.0 * t.sin()]
+    [50.0 + 10.0 * pmath::cos(t), 50.0 + 10.0 * pmath::sin(t)]
 }
 
 /// An arc's end dragged through its start never wraps the sweep (15° → 0° → 345°, or
@@ -993,7 +994,7 @@ fn a_dragged_fillet_stays_in_its_corner() {
         let corner = o;
         let at = |deg: f64| {
             let t = deg.to_radians();
-            [corner.x + leg * t.cos(), corner.y + leg * t.sin()]
+            [corner.x + leg * pmath::cos(t), corner.y + leg * pmath::sin(t)]
         };
         let mut bad = Vec::new();
         let mut last = at(90.0);
@@ -1201,7 +1202,7 @@ fn arcs_near_a_full_turn_or_nothing_can_still_be_dragged() {
         let sw0 = sweep_deg(&s, "a1");
         // The arc's own end.
         let t = (end - v(50.0, 50.0)).angle() + nudge;
-        let to = [50.0 + 10.0 * t.cos(), 50.0 + 10.0 * t.sin()];
+        let to = [50.0 + 10.0 * pmath::cos(t), 50.0 + 10.0 * pmath::sin(t)];
         drag(&mut s, "a1.end", [end.x, end.y], to);
         assert!(pt(&s, "a1.end").dist(v(to[0], to[1])) < 1e-9, "sweep {sweep}°: the arc's end did not move");
         // The joined line's far end, which pulls the arc's end along (inwards).
@@ -1417,7 +1418,7 @@ fn hung_elbow_side(s: &Session) -> f64 {
 fn hung_hand_target(s: &Session, angle: f64, scale: f64) -> polycore_geom::Vec2 {
     let (b, h) = (pt(s, "ab.end"), pt(s, "eh.end"));
     let r = h - b;
-    let (c, si) = (angle.cos(), angle.sin());
+    let (c, si) = (pmath::cos(angle), pmath::sin(angle));
     b + v(r.x * c - r.y * si, r.x * si + r.y * c) * scale
 }
 

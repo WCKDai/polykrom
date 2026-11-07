@@ -20,6 +20,11 @@
 //! [`Config`] (kept with the preferences, edited in [`editor`]) holds the person's own list for
 //! any of them: how many tools and in which place, clockwise from the top.
 
+// UI only: this file draws, animates, converts colours or places the camera, and feeds nothing
+// into a design, so it keeps the platform's transcendental functions (listed with its reason in
+// crates/engine/tests/pmath_gate.rs; everything that reaches a command goes through pmath).
+#![allow(clippy::disallowed_methods)]
+
 use crate::ui_kit::{Container, Surface};
 use std::collections::BTreeMap;
 

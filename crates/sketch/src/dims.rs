@@ -9,6 +9,7 @@
 //! [`Constraint::text`]: crate::Constraint::text
 
 use polycore_geom::Vec2;
+use polycore_geom::pmath;
 
 use crate::model::{ConstraintKind, CurveKind, Sketch};
 use crate::union_find::{find, union};
@@ -136,7 +137,7 @@ pub fn dim_frame(sk: &Sketch, k: &ConstraintKind) -> Option<DimFrame> {
             let score = |s: f64| (ma - vertex).dot(da * s) + (mb - vertex).dot(db * s);
             let s = if score(1.0) >= score(-1.0) { 1.0 } else { -1.0 };
             let (d0, d1) = (da * s, db * s);
-            DimFrame::Angular { vertex, d0, sweep: d0.cross(d1).atan2(d0.dot(d1)).rem_euclid(std::f64::consts::TAU) }
+            DimFrame::Angular { vertex, d0, sweep: pmath::atan2(d0.cross(d1), d0.dot(d1)).rem_euclid(std::f64::consts::TAU) }
         }
         _ => return None,
     })

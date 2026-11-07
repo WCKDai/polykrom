@@ -1,6 +1,7 @@
 //! 3D sketch curves from the model: curves projected onto faces, intersection curves of bodies
 //! and faces (on their display meshes), and spun profiles.
 
+use polycore_geom::pmath;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
@@ -148,7 +149,7 @@ pub(crate) fn mesh_intersection(ma: &Mesh, fa: Option<u32>, mb: &Mesh, fb: Optio
     if !(lo.is_finite() && hi.is_finite()) {
         return Vec::new();
     }
-    let n = ((tb.len() as f64).cbrt().ceil() as usize).clamp(1, 48);
+    let n = (pmath::cbrt(tb.len() as f64).ceil() as usize).clamp(1, 48);
     let ext = hi - lo;
     let cell = |p: Vec3| -> [usize; 3] {
         let f = |v: f64, l: f64, e: f64| if e > 1e-12 { (((v - l) / e) * n as f64).floor().clamp(0.0, (n - 1) as f64) as usize } else { 0 };

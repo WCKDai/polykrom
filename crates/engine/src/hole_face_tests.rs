@@ -3,6 +3,7 @@
 //! where it was put and says so instead of sliding to the face's nearest point.
 
 use polycore_geom::Vec3;
+use polycore_geom::pmath;
 use serde_json::{Value, json};
 
 use crate::Session;
@@ -346,10 +347,10 @@ fn drilled_sketch_points_break_through_a_sloping_back_face() {
     assert!(result.boolean_diagnostics.unverified().is_none());
     // The cylindrical bore and cone, less the oblique conical cap outside x = z/4.
     let r = 2.5;
-    let k = 59f64.to_radians().tan();
+    let k = pmath::tan(59f64.to_radians());
     let tip = r / k;
     let outside = 4.0 - (5.0 - tip);
-    let cap = pi() * k * k * outside.powi(3) / (3.0 * (1.0 - (k / 4.0).powi(2)).powf(1.5));
+    let cap = pi() * k * k * outside.powi(3) / (3.0 * pmath::powf(1.0 - (k / 4.0).powi(2), 1.5));
     let expected = 2.0 * (pi() * r * r * (10.0 + tip / 3.0) - cap);
     let left = volume(&mut s);
     // The measured curved faces are tessellated; 0.05 mm³ is 0.013% of the removed material.

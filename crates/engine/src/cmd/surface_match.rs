@@ -63,6 +63,7 @@ mod tests {
     use super::*;
     use crate::Session;
     use polycore_geom::Vec3;
+    use polycore_geom::pmath;
     use serde_json::json;
 
     fn run(s: &mut Session, c: &str, p: Value) -> Value {
@@ -78,7 +79,7 @@ mod tests {
             .edges(boss.size() * 1e-2)
             .unwrap()
             .into_iter()
-            .find(|e| e.length > 25.0 && (e.mid.x.hypot(e.mid.y) - 10.0).abs() < 0.05 && e.mid.z > 5.0 && e.mid.z < 25.0)
+            .find(|e| e.length > 25.0 && (pmath::hypot(e.mid.x, e.mid.y) - 10.0).abs() < 0.05 && e.mid.z > 5.0 && e.mid.z < 25.0)
             .expect("the cylinder has a straight vertical wall seam");
         let (a, b) = (e.points.first().copied(), e.points.last().copied());
         let (a, b) = (a.unwrap_or(e.mid), b.unwrap_or(e.mid));
@@ -93,8 +94,8 @@ mod tests {
         run(s, "sketch.finish", json!({}));
         run(s, "solid.extrude", json!({"sketch": "Round", "distance": 30, "body_name": "Boss"}));
         let seam = picks(s)[0];
-        let a = seam.y.atan2(seam.x);
-        let at = |t: f64| json!([11.0 * t.cos(), 11.0 * t.sin()]);
+        let a = pmath::atan2(seam.y, seam.x);
+        let at = |t: f64| json!([11.0 * pmath::cos(t), 11.0 * pmath::sin(t)]);
         run(s, "sketch.create", json!({"plane": "XY", "name": "Skirt sketch"}));
         let arc = run(s, "sketch.arc.three_point", json!({"start": at(a), "end": at(a + 60f64.to_radians()), "through": at(a + 30f64.to_radians())}))
             ["created"]["curves"][0]

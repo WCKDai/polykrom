@@ -10,6 +10,7 @@
 //! lines and circular arcs are recovered exactly, the rest (an ellipse from a tilted circle,
 //! a spline edge running out of the plane) becomes a chain of lines.
 
+use polycore_geom::pmath;
 use std::collections::BTreeMap;
 
 use polycore_geom::{Mesh, Plane, Seg2, Vec2, Vec3};
@@ -326,7 +327,7 @@ fn link_geom(s: &Seg2) -> Option<LinkGeom> {
         Seg2::Line { a, b } => LinkGeom::Line(a, b),
         Seg2::Arc { center, radius, sweep, .. } if sweep.abs() >= std::f64::consts::TAU - 1e-9 => LinkGeom::Circle(center, radius),
         Seg2::Arc { center, radius, start, sweep } => {
-            let at = |t: f64| center + Vec2::new(t.cos(), t.sin()) * radius;
+            let at = |t: f64| center + Vec2::new(pmath::cos(t), pmath::sin(t)) * radius;
             // Counter-clockwise from `a` to `b`.
             let (a, b) = if sweep > 0. { (at(start), at(start + sweep)) } else { (at(start + sweep), at(start)) };
             LinkGeom::Arc { c: center, a, b }
@@ -867,7 +868,7 @@ fn tilted_circle(plane: &Plane, pts: &[Vec3]) -> Option<Vec<LinkGeom>> {
     let p0 = *pts.first()?;
     let e1 = (p0 - c).normalized()?;
     let e2 = n.cross(e1);
-    let ang = |p: Vec3| (p - c).dot(e2).atan2((p - c).dot(e1));
+    let ang = |p: Vec3| pmath::atan2((p - c).dot(e2), (p - c).dot(e1));
     let mut sweep = 0.0;
     for w in pts.windows(2) {
         let mut d = ang(w[1]) - ang(w[0]);
@@ -881,13 +882,13 @@ fn tilted_circle(plane: &Plane, pts: &[Vec3]) -> Option<Vec<LinkGeom>> {
     }
     let k = ((sweep.abs() / std::f64::consts::FRAC_PI_2).ceil() as usize).clamp(1, 8);
     let h = sweep / k as f64;
-    let at = |t: f64| c + (e1 * t.cos() + e2 * t.sin()) * r;
-    let w = (h.abs() / 2.0).cos();
+    let at = |t: f64| c + (e1 * pmath::cos(t) + e2 * pmath::sin(t)) * r;
+    let w = pmath::cos(h.abs() / 2.0);
     let rho = w / (1.0 + w);
     let mut out = Vec::new();
     for i in 0..k {
         let (t0, t1) = (h * i as f64, h * (i + 1) as f64);
-        let apex = c + (e1 * ((t0 + t1) / 2.0).cos() + e2 * ((t0 + t1) / 2.0).sin()) * (r / w);
+        let apex = c + (e1 * pmath::cos((t0 + t1) / 2.0) + e2 * pmath::sin((t0 + t1) / 2.0)) * (r / w);
         out.push(LinkGeom::Conic { a: plane.to_local(at(t0)), apex: plane.to_local(apex), b: plane.to_local(at(t1)), rho });
     }
     Some(out)
@@ -904,7 +905,7 @@ fn as_spline(pts: &[Vec2], tol: f64) -> Option<LinkGeom> {
     // No sharp corners.
     for w in pts.windows(3) {
         let (Some(u), Some(v)) = ((w[1] - w[0]).normalized(), (w[2] - w[1]).normalized()) else { continue };
-        if u.dot(v) < 30f64.to_radians().cos() {
+        if u.dot(v) < pmath::cos(30f64.to_radians()) {
             return None;
         }
     }
@@ -1070,8 +1071,8 @@ pub(crate) fn section(plane: &Plane, m: &Mesh, face: Option<u32>) -> Vec<LinkGeo
         let (na, nb) = (normal(a), normal(b));
         let l = match (na, nb) {
             (Some(x), Some(y)) => {
-                let half = 0.5 * x.dot(y).clamp(-1.0, 1.0).acos();
-                if half > 1e-9 { d.len() * half / half.sin() } else { d.len() }
+                let half = 0.5 * pmath::acos(x.dot(y).clamp(-1.0, 1.0));
+                if half > 1e-9 { d.len() * half / pmath::sin(half) } else { d.len() }
             }
             _ => d.len(),
         };
@@ -1391,7 +1392,7 @@ pub(crate) fn fit_chain(raw: &[Vec2], loose: Option<f64>, out: &mut Vec<LinkGeom
             let next = if i + 1 >= n { if closed { 1 } else { return 0.0 } } else { i + 1 };
             match (p.get(prev), p.get(i), p.get(next)) {
                 (Some(a), Some(b), Some(c)) => match ((*b - *a).normalized(), (*c - *b).normalized()) {
-                    (Some(u), Some(v)) => u.cross(v).atan2(u.dot(v)).abs(),
+                    (Some(u), Some(v)) => pmath::atan2(u.cross(v), u.dot(v)).abs(),
                     _ => 0.0,
                 },
                 _ => 0.0,

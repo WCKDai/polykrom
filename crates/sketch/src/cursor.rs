@@ -10,6 +10,7 @@ use crate::{
     union_find::{find, union},
 };
 use polycore_geom::Vec2;
+use polycore_geom::pmath;
 
 const MAX_VARIABLES: usize = 400;
 const MAX_STEPS: usize = 96;
@@ -322,7 +323,7 @@ fn target_step(z: &[Vec<f64>], axes: &[(usize, Vec2)], error: Vec2) -> Vec<f64> 
         b += x * y;
         c += y * y;
     }
-    let high = 0.5 * (a + c + (a - c).hypot(2.0 * b));
+    let high = 0.5 * (a + c + pmath::hypot(a - c, 2.0 * b));
     let low = if high > 0.0 { (a * c - b * b).max(0.0) / high } else { 0.0 };
     let axis = if a >= c { Vec2::new(high - c, b) } else { Vec2::new(b, high - a) }.normalized().unwrap_or(if a >= c { Vec2::X } else { Vec2::Y });
     let other = Vec2::new(-axis.y, axis.x);

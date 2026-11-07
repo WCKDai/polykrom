@@ -363,6 +363,7 @@ pub fn capture_profile_selection(ss: &SolvedSketch, indices: &[usize]) -> Result
 mod tests {
     #![allow(clippy::unwrap_used, clippy::panic)]
     use super::*;
+    use polycore_geom::pmath;
     use polycore_geom::{Plane, Vec2};
     use polykrom_sketch::{Sketch, find_profiles, solve};
 
@@ -648,8 +649,8 @@ mod tests {
         // Probe away from exact spline-span seams, using the independent analytic
         // ellipse point and unit outward gradient rather than a stored profile sample.
         let parameter = 0.2_f64;
-        let source_point = Vec2::new(12. * parameter.cos(), 5. * parameter.sin());
-        let normal = Vec2::new(parameter.cos() / 12., parameter.sin() / 5.).normalized().unwrap();
+        let source_point = Vec2::new(12. * pmath::cos(parameter), 5. * pmath::sin(parameter));
+        let normal = Vec2::new(pmath::cos(parameter) / 12., pmath::sin(parameter) / 5.).normalized().unwrap();
         let ring_point = source_point + normal * 1.25;
         assert!(updated_region.contains(ring_point));
         assert!(!updated_region.contains(source_point + normal * 0.5));

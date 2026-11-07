@@ -3,6 +3,7 @@
 mod four_bar;
 
 use polycore_geom::Vec2;
+use polycore_geom::pmath;
 use serde_json::json;
 
 fn drag(s: &mut polykrom_engine::Session, target: Vec2) {
@@ -89,14 +90,14 @@ fn four_bar_live_cursor_motion_updates_driven_dimensions_before_release() {
 #[test]
 fn four_bar_other_joint_follows_the_rocker_arc_and_its_limits() {
     let base = Vec2::new(42.0, 0.0);
-    let lo = -(-1264.0_f64 / 1680.0).acos();
-    let hi = -(0.2_f64).acos();
+    let lo = -pmath::acos(-1264.0_f64 / 1680.0);
+    let hi = -pmath::acos(0.2_f64);
     for angle in [-2.6_f64, -2.1, -1.5, -1.1] {
         let mut s = four_bar::session().unwrap();
         let side = four_bar::branch(&s).unwrap();
         let from = four_bar::point(&s, "coupler.end").unwrap();
-        let target = base + Vec2::new(angle.cos(), angle.sin()) * 60.0;
-        let nearest = base + Vec2::new(angle.clamp(lo, hi).cos(), angle.clamp(lo, hi).sin()) * 20.0;
+        let target = base + Vec2::new(pmath::cos(angle), pmath::sin(angle)) * 60.0;
+        let nearest = base + Vec2::new(pmath::cos(angle.clamp(lo, hi)), pmath::sin(angle.clamp(lo, hi))) * 20.0;
         s.execute("sketch.drag", &json!({"entity":"coupler.end","from":[from.x,from.y],"to":[target.x,target.y],"live":true})).unwrap();
         assert!(four_bar::point(&s, "coupler.end").unwrap().dist(nearest) < 1e-4, "angle {angle}");
         assert!(four_bar::length_error(&s).unwrap() < 1e-6);
@@ -173,14 +174,14 @@ fn crank_edge_large_drag_reaches_the_nearest_material_point() {
 #[test]
 fn rocker_edge_keeps_its_material_point_and_motion_limits() {
     let base = Vec2::new(42.0, 0.0);
-    let lo = -(-1264.0_f64 / 1680.0).acos();
-    let hi = -(0.2_f64).acos();
+    let lo = -pmath::acos(-1264.0_f64 / 1680.0);
+    let hi = -pmath::acos(0.2_f64);
     for fraction in [0.2, 0.5, 0.8] {
         for angle in [-2.6_f64, -2.1, -1.5, -1.1] {
             let mut s = four_bar::session().unwrap();
             let from = grab(&s, "rocker", fraction);
-            let target = base + Vec2::new(angle.cos(), angle.sin()) * (60.0 * (1.0 - fraction));
-            let closest = base + Vec2::new(angle.clamp(lo, hi).cos(), angle.clamp(lo, hi).sin()) * (20.0 * (1.0 - fraction));
+            let target = base + Vec2::new(pmath::cos(angle), pmath::sin(angle)) * (60.0 * (1.0 - fraction));
+            let closest = base + Vec2::new(pmath::cos(angle.clamp(lo, hi)), pmath::sin(angle.clamp(lo, hi))) * (20.0 * (1.0 - fraction));
             s.execute("sketch.drag", &json!({"entity":"rocker","from":[from.x,from.y],"to":[target.x,target.y],"live":true})).unwrap();
             assert!(
                 grab(&s, "rocker", fraction).dist(closest) < 1e-4,
@@ -215,7 +216,7 @@ fn an_off_centre_edge_grab_agrees_for_one_move_split_moves_and_holding_still() {
 }
 
 fn coupler_point(angle: f64, along: f64) -> Vec2 {
-    let a = Vec2::new(angle.cos(), angle.sin()) * 10.0;
+    let a = Vec2::new(pmath::cos(angle), pmath::sin(angle)) * 10.0;
     let d = Vec2::new(42.0, 0.0) - a;
     let len = d.len();
     let u = d * (1.0 / len);
@@ -272,7 +273,7 @@ fn parallelograms() -> polykrom_engine::Session {
         s.execute(id, &p).unwrap_or_else(|e| panic!("{id} {p}: {e}"));
     };
     run(&mut s, "sketch.create", json!({"plane":"XY"}));
-    let at = |deg: f64, r: f64| Vec2::new(deg.to_radians().cos(), deg.to_radians().sin()) * r;
+    let at = |deg: f64, r: f64| Vec2::new(pmath::cos(deg.to_radians()), pmath::sin(deg.to_radians())) * r;
     let p1 = at(147.7, 80.0);
     let m = p1 + Vec2::new(0.0, 20.0);
     let r = m + at(20.0, 80.0);

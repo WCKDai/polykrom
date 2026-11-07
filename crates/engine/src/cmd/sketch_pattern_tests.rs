@@ -1,4 +1,5 @@
 use super::*;
+use polycore_geom::pmath;
 
 fn point(sk: &polykrom_sketch::Sketch, id: &str) -> Vec2 {
     sk.point(sk.resolve_point(id).unwrap()).unwrap()
@@ -13,7 +14,7 @@ fn circular_centered_six_holes_span_ninety_degrees_and_flip_about_the_original()
     let check = |s: &Session, angles: &[f64], seed: Vec2, center: Vec2| {
         assert!(point(&sketch(s), "seed.center").dist(seed) < 1e-6);
         for (id, angle) in copies.iter().zip(angles) {
-            let (sin, cos) = angle.to_radians().sin_cos();
+            let (sin, cos) = pmath::sin_cos(angle.to_radians());
             let d = seed - center;
             let expected = center + Vec2::new(d.x * cos - d.y * sin, d.x * sin + d.y * cos);
             assert!(point(&sketch(s), &format!("{id}.center")).dist(expected) < 1e-6, "angle {angle}");
@@ -62,7 +63,7 @@ fn circular_alignment_handles_odd_arcs_one_sided_rotation_and_full_turns() {
         let mut positions = vec![Vec2::new(20., 0.)];
         for (id, a) in ids(&out["curves"]).iter().zip(expected) {
             let pos = point(&sketch(&s), &format!("{id}.center"));
-            let (sin, cos) = a.to_radians().sin_cos();
+            let (sin, cos) = pmath::sin_cos(a.to_radians());
             assert!(pos.dist(Vec2::new(20. * cos, 20. * sin)) < 1e-6);
             assert!(positions.iter().all(|p| pos.dist(*p) > 1.));
             positions.push(pos);
@@ -576,7 +577,7 @@ fn circular_quantity_expression_survives_parameter_edits_undo_and_reopen() {
         assert_eq!(before.points, after.points);
         assert_eq!(before.constraints, after.constraints);
     }
-    let expected = Vec2::new(20.0 * (std::f64::consts::TAU / 7.0).cos(), 20.0 * (std::f64::consts::TAU / 7.0).sin());
+    let expected = Vec2::new(20.0 * pmath::cos(std::f64::consts::TAU / 7.0), 20.0 * pmath::sin(std::f64::consts::TAU / 7.0));
     assert!(point(&expanded, &format!("{}.center", original[0].curves[0])).dist(expected) < 1e-6);
     run(&mut s, "edit.undo", json!({}));
     assert_eq!(sketch(&s).curves.len(), 5);
@@ -646,7 +647,7 @@ fn circular_quantity_changes_keep_partial_full_centered_and_reversed_placements(
                     let step = angle / if angle.abs() == 360.0 { count as f64 } else { (count - 1) as f64 };
                     for instance in &sk.patterns[0].instances {
                         let a = (step * alignment.multiplier(instance.index[0], reversed)).to_radians();
-                        let expected = Vec2::new(20.0 * a.cos(), 20.0 * a.sin());
+                        let expected = Vec2::new(20.0 * pmath::cos(a), 20.0 * pmath::sin(a));
                         assert!(point(&sk, &format!("{}.center", instance.curves[0])).dist(expected) < 1e-6);
                     }
                     sk.validate_patterns().unwrap();

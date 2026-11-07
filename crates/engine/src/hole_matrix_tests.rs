@@ -13,6 +13,7 @@
 //! case that passes fails the test (take it off the list), and so does an unlisted one that fails.
 //! `HOLE_MATRIX_BLESS=1 cargo test -p polykrom-engine hole_matrix` rewrites the list.
 
+use polycore_geom::pmath;
 use std::f64::consts::PI;
 
 use polycore_geom::Vec3;
@@ -149,7 +150,7 @@ fn cyl(r: f64, h: f64) -> f64 {
 
 /// The drill point of a 118° drill on a hole of radius r.
 fn tip(r: f64) -> f64 {
-    let h = r / (59.0f64.to_radians()).tan();
+    let h = r / pmath::tan(59.0f64.to_radians());
     PI * r * r * h / 3.0
 }
 
@@ -161,7 +162,7 @@ fn csink(rc: f64, r: f64) -> (f64, f64) {
 
 /// The part of a disc of radius r whose centre is `a` inside a straight edge.
 fn disc_inside(r: f64, a: f64) -> f64 {
-    PI * r * r - (r * r * (a / r).acos() - a * (r * r - a * a).sqrt())
+    PI * r * r - (r * r * pmath::acos(a / r) - a * (r * r - a * a).sqrt())
 }
 
 /// A radial hole of radius r, `depth` deep, drilled into a cylinder of radius `rr` from its
@@ -389,7 +390,7 @@ fn cases() -> Vec<Case> {
             hole(json!({"position": [20, 15, 20], "depth": 10, "type": "drilled"})),
             blind + tip(r),
             r,
-            vec![spot([20.0, 15.0, 20.0], DOWN, 10.0, Some(10.0 + r / 59f64.to_radians().tan()))],
+            vec![spot([20.0, 15.0, 20.0], DOWN, 10.0, Some(10.0 + r / pmath::tan(59f64.to_radians())))],
         )
         .faces(2),
         Case::new(

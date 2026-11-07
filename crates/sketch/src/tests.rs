@@ -1,3 +1,4 @@
+use polycore_geom::pmath;
 use std::f64::consts::{FRAC_PI_2, PI};
 
 use polycore_geom::{Seg2, Vec2};
@@ -346,7 +347,7 @@ fn solver_tangencies_split_profiles() {
         let ps = find_profiles(&b);
         // The band: the trapezoid between the tangent points less the circular segments the
         // circles take from it (as exact sums: the hull less the two discs).
-        let alpha = ((r1 - r2) / d).asin();
+        let alpha = pmath::asin((r1 - r2) / d);
         let tangent_len = (d * d - (r1 - r2).powi(2)).sqrt();
         let hull = r1 * r1 * (PI / 2.0 + alpha) + r2 * r2 * (PI / 2.0 - alpha) + (r1 + r2) * tangent_len;
         let total: f64 = ps.iter().map(|p| p.area).sum();
@@ -586,7 +587,7 @@ fn near_overlaps_that_are_not_one_path_keep_their_regions() {
         let ps = find_profiles(&sk);
         let areas: Vec<f64> = ps.iter().map(|p| p.area).collect();
         assert_eq!(ps.len(), regions, "{d}: {areas:?}");
-        let lens = 2.0 * r * r * (d / (2.0 * r)).acos() - d / 2.0 * (4.0 * r * r - d * d).sqrt();
+        let lens = 2.0 * r * r * pmath::acos(d / (2.0 * r)) - d / 2.0 * (4.0 * r * r - d * d).sqrt();
         let union = if regions == 1 { PI * r * r } else { 2.0 * PI * r * r - lens };
         assert!((areas.iter().sum::<f64>() - union).abs() < 1e-6, "{d}: {areas:?}");
         // Cut where they cross: no whole-circle identity.
@@ -610,7 +611,7 @@ fn curves_lying_on_one_another_do_not_chain_past_the_tolerance() {
     let (p0, p1) = (c + Vec2::from_angle(PI / 4.0) * r, c + Vec2::from_angle(3.0 * PI / 4.0) * r);
     sk.add_arc(c, p0, p1, [None, None, None], None).unwrap();
     let areas: Vec<f64> = find_profiles(&sk).iter().map(|p| p.area).collect();
-    let lens = 2.0 * r * r * (d / (2.0 * r)).acos() - d / 2.0 * (4.0 * r * r - d * d).sqrt();
+    let lens = 2.0 * r * r * pmath::acos(d / (2.0 * r)) - d / 2.0 * (4.0 * r * r - d * d).sqrt();
     // The discs' union once, not each disc whole.
     assert!((areas.iter().sum::<f64>() - (2.0 * PI * r * r - lens)).abs() < 1e-6, "{areas:?}");
 
@@ -969,7 +970,7 @@ fn a_degree_nine_control_spline_stays_exact_and_closes_a_profile_exactly() {
 #[test]
 fn profiles_line_passing_next_to_a_junction_splits_the_loop() {
     let o = v(0.0, 0.0);
-    let at = |r: f64, a: f64| v(r * a.cos(), r * a.sin());
+    let at = |r: f64, a: f64| v(r * pmath::cos(a), r * pmath::sin(a));
     // A slot: half circles of radius 1 round (0, 0) and (-5, 0), joined by the lines y = 1 and
     // y = -1, which meet the arcs tangentially at (0, 1) and (0, -1).
     let mut sk = Sketch::new();

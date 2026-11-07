@@ -7,6 +7,7 @@
 
 use polykrom_engine::Sel;
 use polykrom_engine::doc::FeatureKind;
+use polykrom_engine::geom::pmath;
 use polykrom_engine::geom::{Aabb3, Vec2, Vec3};
 use polykrom_engine::sketch::{CurveKind, LinkKind, SPoint};
 use serde_json::{Value, json};
@@ -127,7 +128,7 @@ fn a_single_hole_picked_near_a_circle_centre_goes_to_the_centre() {
     let bore = |h: &Harness| {
         for k in 0..8 {
             let a = std::f64::consts::FRAC_PI_4 * f64::from(k);
-            let dir = Vec3::new(a.cos(), a.sin(), 0.0);
+            let dir = Vec3::new(pmath::cos(a), pmath::sin(a), 0.0);
             let at = |r: f64| centre + dir * r - Vec3::new(0.0, 0.0, 5.0);
             assert!(!solid_at(h, at(0.0)) && !solid_at(h, at(2.4)), "the bore is empty {a} rad from +x");
             assert!(solid_at(h, at(2.6)), "the wall is solid {a} rad from +x");
@@ -285,7 +286,7 @@ fn select_other_keeps_the_face_as_picked_beside_many_snapped_points() {
     let many = crate::select_other::MAX_PER_KIND + 4;
     for i in 0..many {
         let a = i as f64 * 0.3;
-        h.app.run("sketch.point", json!({"point": [12.0 + 0.1 * a.cos(), 9.0 + 0.1 * a.sin()]})).unwrap();
+        h.app.run("sketch.point", json!({"point": [12.0 + 0.1 * pmath::cos(a), 9.0 + 0.1 * pmath::sin(a)]})).unwrap();
     }
     h.app.run("sketch.finish", json!({})).unwrap();
     h.step(&json!({"call": "ui.view", "params": {"view": "top"}})).unwrap();
@@ -465,7 +466,7 @@ fn cylinder_with_cluster(sketch: Value, at: [f64; 2], view: &str) -> Cluster {
     h.app.run("solid.cylinder", json!({"radius": 15, "height": 20})).unwrap();
     h.app.run("sketch.create", sketch).unwrap();
     let many = 3 * crate::select_other::MAX_PER_KIND;
-    let local: Vec<Vec2> = (0..many).map(|i| i as f64 * 0.3).map(|a| Vec2::new(at[0] + 0.1 * a.cos(), at[1] + 0.1 * a.sin())).collect();
+    let local: Vec<Vec2> = (0..many).map(|i| i as f64 * 0.3).map(|a| Vec2::new(at[0] + 0.1 * pmath::cos(a), at[1] + 0.1 * pmath::sin(a))).collect();
     for p in &local {
         h.app.run("sketch.point", json!({"point": [p.x, p.y]})).unwrap();
     }

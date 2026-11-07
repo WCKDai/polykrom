@@ -6,6 +6,7 @@
 //! Deterministic (fixed LCG seeds), no timing.
 
 use polycore_geom::Vec2;
+use polycore_geom::pmath;
 
 use crate::construct::{Placement, seed};
 use crate::decompose::Budget;
@@ -767,7 +768,7 @@ fn the_touch_point_comes_from_the_point_on_curve_index() {
     let circle = sk.add_circle(v(40.0, 12.0) + d.perp() * 8.5, 8.0, None, None).unwrap();
     let CurveKind::Circle { c, .. } = sk.curves[circle].kind else { panic!() };
     push(&mut sk, ConstraintKind::Fix { p: a });
-    push(&mut sk, ConstraintKind::LineAngle { l, value: 12f64.atan2(40.0) });
+    push(&mut sk, ConstraintKind::LineAngle { l, value: pmath::atan2(12f64, 40.0) });
     push(&mut sk, ConstraintKind::Length { l, value: v(40.0, 12.0).len() });
     push(&mut sk, ConstraintKind::Radius { c: circle, value: 8.0 });
     push(&mut sk, ConstraintKind::Tangent { a: l, b: circle });

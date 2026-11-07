@@ -2,6 +2,7 @@
 //! arc slots.
 
 use polycore_geom::Vec2;
+use polycore_geom::pmath;
 use polykrom_sketch::{ConstraintKind, CurveKind, LinkKind, LinkSource, Shape, Sketch, TextAlign, TextExprs, TextStyle};
 use serde_json::{Value, json};
 
@@ -318,7 +319,7 @@ pub(super) fn move_text(sk: &mut Sketch, link: &str, translate: Vec2, rotation: 
         return Err(bad("sketch.move", "a text on a path follows its curve: move the curve, or take the text off it"));
     }
     let q = at - center;
-    let (sin, cos) = rotation.sin_cos();
+    let (sin, cos) = pmath::sin_cos(rotation);
     let moved = center + Vec2::new(q.x * cos - q.y * sin, q.x * sin + q.y * cos) + translate;
     // What the move changes is a number now, not the expression it was; the rest stays.
     if (moved.x - at.x).abs() > 1e-12 {

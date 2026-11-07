@@ -3,6 +3,7 @@
 //! advances its pitch per turn.
 
 use super::*;
+use polycore_geom::pmath;
 use polykrom_doc::joints::{Coupling, Size};
 
 /// A joint's value as `joint.list` gives it (degrees or mm).
@@ -62,7 +63,7 @@ fn rim(s: &Session, name: &str, x: f64, r: f64) -> Vec3 {
 
 fn turned(x: f64, r: f64, deg: f64) -> Vec3 {
     let a = deg.to_radians();
-    Vec3::new(x + r * a.cos(), r * a.sin(), 2.5)
+    Vec3::new(x + r * pmath::cos(a), r * pmath::sin(a), 2.5)
 }
 
 #[test]

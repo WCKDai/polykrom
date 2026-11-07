@@ -352,11 +352,13 @@ fn marks(app: &SolveApp, painter: &egui::Painter, proj: &Proj) {
 mod tests {
     use super::*;
     use polykrom_engine::geom::Vec3;
+    use polykrom_engine::geom::pmath;
 
     /// A square face (two triangles) at z = 5 with a round edge about (2, 3) on it.
     fn mesh() -> Mesh {
         let p = |x: f64, y: f64| Vec3::new(x, y, 5.0);
-        let rim: Vec<Vec3> = (0..=16).map(|k| f64::from(k) * std::f64::consts::TAU / 16.0).map(|a| p(2.0 + a.cos(), 3.0 + a.sin())).collect();
+        let rim: Vec<Vec3> =
+            (0..=16).map(|k| f64::from(k) * std::f64::consts::TAU / 16.0).map(|a| p(2.0 + pmath::cos(a), 3.0 + pmath::sin(a))).collect();
         Mesh {
             positions: vec![p(0.0, 0.0), p(10.0, 0.0), p(10.0, 10.0), p(0.0, 10.0)],
             triangles: vec![[0, 1, 2], [0, 2, 3]],

@@ -1,3 +1,4 @@
+use polycore_geom::pmath;
 use polycore_geom::{Aabb3, Vec3};
 use serde::{Deserialize, Serialize};
 
@@ -136,9 +137,9 @@ impl Quat {
         if d > 0.9995 {
             return self.scale(1.0 - t).add(o.scale(t)).normalized();
         }
-        let th = d.clamp(-1.0, 1.0).acos();
-        let s = th.sin();
-        self.scale(((1.0 - t) * th).sin() / s).add(o.scale((t * th).sin() / s)).normalized()
+        let th = pmath::acos(d.clamp(-1.0, 1.0));
+        let s = pmath::sin(th);
+        self.scale(pmath::sin((1.0 - t) * th) / s).add(o.scale(pmath::sin(t * th) / s)).normalized()
     }
     /// The rotated basis vectors (columns of the rotation matrix).
     pub fn basis(self) -> (Vec3, Vec3, Vec3) {
@@ -246,8 +247,8 @@ impl Default for Camera {
 impl Camera {
     /// Direction from the target toward the eye.
     pub fn back(&self) -> Vec3 {
-        let (cp, sp) = (self.pitch.cos(), self.pitch.sin());
-        self.up.from_frame(Vec3::new(-self.yaw.sin() * cp, -self.yaw.cos() * cp, sp).normalized().unwrap_or(Vec3::Z))
+        let (cp, sp) = (pmath::cos(self.pitch), pmath::sin(self.pitch));
+        self.up.from_frame(Vec3::new(-pmath::sin(self.yaw) * cp, -pmath::cos(self.yaw) * cp, sp).normalized().unwrap_or(Vec3::Z))
     }
     /// The world's up direction.
     pub fn up_dir(&self) -> Vec3 {
@@ -267,9 +268,9 @@ impl Camera {
     /// Camera basis: right, up, back (orthonormal).
     pub fn basis(&self) -> (Vec3, Vec3, Vec3) {
         let b = self.back();
-        let right = self.up.from_frame(Vec3::new(self.yaw.cos(), -self.yaw.sin(), 0.0));
+        let right = self.up.from_frame(Vec3::new(pmath::cos(self.yaw), -pmath::sin(self.yaw), 0.0));
         let up = b.cross(right).normalized().unwrap_or(self.up.dir());
-        let (s, c) = self.roll.sin_cos();
+        let (s, c) = pmath::sin_cos(self.roll);
         (right * c + up * s, up * c - right * s, b)
     }
     pub fn view(&self) -> Mat4 {
@@ -279,7 +280,7 @@ impl Camera {
     }
     /// Half the visible height at the target distance.
     pub fn half_height(&self) -> f64 {
-        if self.fov > 0.0 { self.distance * (self.fov * 0.5).tan() } else { self.distance * 0.4 }
+        if self.fov > 0.0 { self.distance * pmath::tan(self.fov * 0.5) } else { self.distance * 0.4 }
     }
     /// Near/far planes that keep a scene of radius `radius` around the target visible.
     pub fn clip(&self, radius: f64) -> (f64, f64) {
@@ -295,7 +296,7 @@ impl Camera {
         let aspect = if aspect.is_finite() && aspect > 1e-6 { aspect } else { 1.0 };
         let (n, f) = (near, far.max(near + 1e-6));
         if self.fov > 0.0 {
-            let t = 1.0 / (self.fov * 0.5).tan();
+            let t = 1.0 / pmath::tan(self.fov * 0.5);
             Mat4([[t / aspect, 0.0, 0.0, 0.0], [0.0, t, 0.0, 0.0], [0.0, 0.0, f / (n - f), -1.0], [0.0, 0.0, n * f / (n - f), 0.0]])
         } else {
             let h = self.half_height();
@@ -384,22 +385,22 @@ impl Camera {
         if !self.is_valid() || !radians.is_finite() {
             return;
         }
-        let angle = radians.x.hypot(radians.y).hypot(radians.z);
+        let angle = pmath::hypot(pmath::hypot(radians.x, radians.y), radians.z);
         if !(angle > 1e-12) || !angle.is_finite() {
             return;
         }
         let (right, up, back) = self.basis();
         let Some(axis) = (right * (radians.x / angle) + up * (radians.y / angle) + back * (radians.z / angle)).normalized() else { return };
-        let (sin, cos) = angle.sin_cos();
+        let (sin, cos) = pmath::sin_cos(angle);
         let rotate = |v: Vec3| v * cos + axis.cross(v) * sin + axis * (axis.dot(v) * (1.0 - cos));
         let rotated_right = rotate(right);
         let Some(rotated_back) = rotate(back).normalized() else { return };
         let framed = self.up.to_frame(rotated_back);
-        let yaw = if framed.x.hypot(framed.y) < 1e-10 { self.yaw } else { (-framed.x).atan2(-framed.y) };
-        let pitch = framed.z.clamp(-1.0, 1.0).asin();
-        let base_right = self.up.from_frame(Vec3::new(yaw.cos(), -yaw.sin(), 0.0));
+        let yaw = if pmath::hypot(framed.x, framed.y) < 1e-10 { self.yaw } else { pmath::atan2(-framed.x, -framed.y) };
+        let pitch = pmath::asin(framed.z.clamp(-1.0, 1.0));
+        let base_right = self.up.from_frame(Vec3::new(pmath::cos(yaw), -pmath::sin(yaw), 0.0));
         let Some(base_up) = rotated_back.cross(base_right).normalized() else { return };
-        let roll = rotated_right.dot(base_up).atan2(rotated_right.dot(base_right));
+        let roll = pmath::atan2(rotated_right.dot(base_up), rotated_right.dot(base_right));
         if yaw.is_finite() && pitch.is_finite() && roll.is_finite() {
             self.yaw = yaw;
             self.pitch = pitch;
@@ -420,19 +421,19 @@ impl Camera {
         }
         self.target = b.center();
         let r = (b.diagonal() * 0.5).max(1.0);
-        self.distance = if self.fov > 0.0 { r / (self.fov * 0.5).sin() * 1.1 } else { r / 0.4 * 1.15 };
+        self.distance = if self.fov > 0.0 { r / pmath::sin(self.fov * 0.5) * 1.1 } else { r / 0.4 * 1.15 };
     }
     /// The same camera looking from direction `back` (target → eye). Straight up or down
     /// keeps the yaw, rounded to the nearest quarter turn so the view stays square.
     pub fn looking_from(&self, back: Vec3) -> Camera {
         let Some(b) = self.up.to_frame(back).normalized() else { return *self };
         let lim = std::f64::consts::FRAC_PI_2 - 1e-6;
-        let pitch = b.z.clamp(-1.0, 1.0).asin().clamp(-lim, lim);
-        let yaw = if b.x.hypot(b.y) < 1e-6 {
+        let pitch = pmath::asin(b.z.clamp(-1.0, 1.0)).clamp(-lim, lim);
+        let yaw = if pmath::hypot(b.x, b.y) < 1e-6 {
             let q = std::f64::consts::FRAC_PI_2;
             (self.yaw / q).round() * q
         } else {
-            (-b.x).atan2(-b.y)
+            pmath::atan2(-b.x, -b.y)
         };
         Camera { yaw, pitch, roll: 0.0, ..*self }
     }
@@ -511,7 +512,7 @@ mod tests {
                     assert!(cam.is_valid());
                     // An X or Y turn moves the viewing direction every step, including at a pole.
                     if axis != Vec3::Z {
-                        assert!((before.2.dot(after.2) - step.cos()).abs() < 1e-10);
+                        assert!((before.2.dot(after.2) - pmath::cos(step)).abs() < 1e-10);
                     }
                     assert!(before.0.dot(after.0) > 0.999 && before.1.dot(after.1) > 0.999);
                     assert!(after.0.cross(after.1).dist(after.2) < 1e-10);

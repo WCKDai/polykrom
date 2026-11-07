@@ -1,4 +1,10 @@
 //! Original, code-drawn navigation cube. Flat faces share invisible picking regions.
+
+// UI only: this file draws, animates, converts colours or places the camera, and feeds nothing
+// into a design, so it keeps the platform's transcendental functions (listed with its reason in
+// crates/engine/tests/pmath_gate.rs; everything that reaches a command goes through pmath).
+#![allow(clippy::disallowed_methods)]
+
 use super::*;
 use crate::icons::navigation::{Facet, arrow, curved_arrow, paint_cube};
 use polykrom_engine::geom::Ring;

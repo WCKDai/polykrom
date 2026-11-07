@@ -4,6 +4,7 @@
 //! round steps at the current zoom, angles to 5°; hold Alt or Ctrl for a free drag), so the caller
 //! adds it to the values it had when the drag started.
 
+use polykrom_engine::geom::pmath;
 use std::cell::RefCell;
 
 use egui::{Color32, Pos2, Rect, Sense, Shape, Stroke, vec2};
@@ -95,7 +96,7 @@ pub fn handle_point(name: &str, by: Vec3, turn: f64) -> Option<Vec3> {
             let i = axis(&r[1..])?;
             let (e1, e2) = ring_basis(i);
             let th = turn.to_radians();
-            return Some(c + (e1 * th.cos() + e2 * th.sin()) * (RING * l) + by);
+            return Some(c + (e1 * pmath::cos(th) + e2 * pmath::sin(th)) * (RING * l) + by);
         }
         a => c + DIRS[axis(a)?] * (0.75 * l),
     };
@@ -196,7 +197,7 @@ fn shapes(proj: &Proj, t: &Triad, l: f64) -> Option<Shapes> {
             let (e1, e2) = ring_basis(i);
             let pts: Vec<Pos2> = (0..=64)
                 .map(|k| k as f64 / 64.0 * std::f64::consts::TAU)
-                .filter_map(|th| proj.to_screen(c + (e1 * th.cos() + e2 * th.sin()) * (RING * l)))
+                .filter_map(|th| proj.to_screen(c + (e1 * pmath::cos(th) + e2 * pmath::sin(th)) * (RING * l)))
                 .collect();
             if pts.len() > 2 {
                 s.rings.push((i, pts));
@@ -302,7 +303,7 @@ pub fn show(ui: &mut egui::Ui, painter: &egui::Painter, proj: &Proj, id: egui::I
                 Handle::Ring(i) => {
                     let q = on_plane(proj, from, c, DIRS[i])? - c;
                     let (e1, e2) = ring_basis(i);
-                    s.last = q.dot(e2).atan2(q.dot(e1));
+                    s.last = pmath::atan2(q.dot(e2), q.dot(e1));
                 }
                 _ => s.grab = on_plane(proj, from, c, plane_normal(h))?,
             }
@@ -318,7 +319,7 @@ pub fn show(ui: &mut egui::Ui, painter: &egui::Painter, proj: &Proj, id: egui::I
         Handle::Ring(i) => {
             if let Some(q) = on_plane(proj, p, st.center, DIRS[i]).map(|q| q - st.center) {
                 let (e1, e2) = ring_basis(i);
-                let th = q.dot(e2).atan2(q.dot(e1));
+                let th = pmath::atan2(q.dot(e2), q.dot(e1));
                 let mut d = th - st.last;
                 while d > std::f64::consts::PI {
                     d -= std::f64::consts::TAU;
@@ -360,7 +361,7 @@ fn arrow(painter: &egui::Painter, a: Pos2, b: Pos2, col: Color32, hot: bool) {
 
 /// A 3×3 rotation (rows) about a unit axis.
 pub fn rotation(axis: Vec3, angle: f64) -> [[f64; 3]; 3] {
-    let (c, s) = (angle.cos(), angle.sin());
+    let (c, s) = (pmath::cos(angle), pmath::sin(angle));
     let t = 1.0 - c;
     let (x, y, z) = (axis.x, axis.y, axis.z);
     [
@@ -391,7 +392,7 @@ pub fn apply(m: &[[f64; 3]; 3], p: Vec3) -> Vec3 {
 /// The axis and angle of a rotation (angle 0 for none).
 pub fn axis_angle(m: &[[f64; 3]; 3]) -> (Vec3, f64) {
     let tr = m[0][0] + m[1][1] + m[2][2];
-    let angle = ((tr - 1.0) / 2.0).clamp(-1.0, 1.0).acos();
+    let angle = pmath::acos(((tr - 1.0) / 2.0).clamp(-1.0, 1.0));
     if angle < 1e-12 {
         return (Vec3::Z, 0.0);
     }

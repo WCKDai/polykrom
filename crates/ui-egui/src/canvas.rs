@@ -9,6 +9,7 @@ use crate::ui_kit::{Container, Surface};
 use egui::{Color32, Pos2, Stroke, vec2};
 use polykrom_engine::Sel;
 use polykrom_engine::doc::expr::Kind as ValueKind;
+use polykrom_engine::geom::pmath;
 use polykrom_engine::geom::{Mesh, Vec2, Vec3};
 
 use crate::SolveApp;
@@ -351,7 +352,7 @@ pub fn show(app: &mut SolveApp, ui: &mut egui::Ui, painter: &egui::Painter, proj
 /// A round step for dragged values at this zoom (1, 2 or 5 times a power of ten).
 pub fn snap_step(half_height: f64) -> f64 {
     let raw = (half_height / 40.0).max(1e-4);
-    let p = 10f64.powf(raw.log10().floor());
+    let p = pmath::powf(10f64, pmath::log10(raw).floor());
     if raw / p < 2.0 {
         p
     } else if raw / p < 5.0 {
@@ -1014,7 +1015,7 @@ pub(crate) fn taper_limits(regions: &[&polykrom_engine::geom::Region2], height: 
     if !(height > 1e-9) || regions.is_empty() {
         return (-MAX, MAX);
     }
-    let at = |r: f64| (0.99 * r / height).atan().to_degrees().min(MAX);
+    let at = |r: f64| pmath::atan(0.99 * r / height).to_degrees().min(MAX);
     let inward = regions.iter().map(|r| r.inradius(1e-3)).fold(f64::INFINITY, f64::min);
     let outward = regions.iter().flat_map(|r| &r.holes).map(|h| h.inradius(1e-3)).fold(f64::INFINITY, f64::min);
     (if inward.is_finite() { -at(inward) } else { -MAX }, if outward.is_finite() { at(outward) } else { MAX })
@@ -1037,7 +1038,7 @@ fn taper_handle(
 ) {
     let t = Tokens::get();
     let l = span.len();
-    let end = foot + span + e * (l * angle.tan().clamp(-10.0, 10.0));
+    let end = foot + span + e * (l * pmath::tan(angle).clamp(-10.0, 10.0));
     let (Some(fs), Some(es)) = (proj.to_screen(foot), proj.to_screen(end)) else { return };
     let r = ui.interact(egui::Rect::from_center_size(es, vec2(16.0, 16.0)), egui::Id::new("sc_taper"), egui::Sense::drag());
     crate::scenario::publish_handle("taper", es);
@@ -1053,7 +1054,7 @@ fn taper_handle(
         && let Some(s) = along(proj, p, foot + span, e)
     {
         crate::tool_modifiers::set_manipulator_dragging(true);
-        let mut deg = s.atan2(l).to_degrees();
+        let mut deg = pmath::atan2(s, l).to_degrees();
         let (lo, hi) = limits;
         if crate::tool_modifiers::manipulator_free() {
             deg = deg.clamp(lo, hi);
@@ -1136,7 +1137,7 @@ fn draw_revolve(
                 polykrom_engine::doc::RevolveConvention::LegacyAxisStart => -direction.dot(extent.rotation_axis),
                 polykrom_engine::doc::RevolveConvention::SketchNormal => 1.0,
             };
-            let at = |angle: f64| centre + (e1 * angle.cos() + e2 * angle.sin()) * radius;
+            let at = |angle: f64| centre + (e1 * pmath::cos(angle) + e2 * pmath::sin(angle)) * radius;
             let points: Vec<_> = (0..=48).filter_map(|i| proj.to_screen(at(extent.display_start + extent.sweep * i as f64 / 48.0))).collect();
             painter.add(egui::Shape::line(points, Stroke::new(2.0, Tokens::get().manipulator)));
             if let Some(end) = proj.to_screen(at(extent.display_start + extent.sweep)) {
@@ -1311,7 +1312,7 @@ fn rotation_handle(
     name: &str,
     value: &mut String,
 ) -> Option<Pos2> {
-    let end = proj.to_screen(centre + (e1 * boundary.cos() + e2 * boundary.sin()) * radius)?;
+    let end = proj.to_screen(centre + (e1 * pmath::cos(boundary) + e2 * pmath::sin(boundary)) * radius)?;
     crate::scenario::publish_handle(name, end);
     let response = ui.interact(egui::Rect::from_center_size(end, vec2(20.0, 20.0)), egui::Id::new(("sc_rotator", name)), egui::Sense::drag());
     let hot = response.hovered() || response.dragged();
@@ -1330,7 +1331,7 @@ fn rotation_handle(
         // Near edge-on, a plane intersection magnifies subpixel pointer error.
         let raw = if den.abs() > 0.05 {
             let point = origin + direction * ((centre - origin).dot(axis) / den) - centre;
-            Some(point.dot(e2).atan2(point.dot(e1)))
+            Some(pmath::atan2(point.dot(e2), point.dot(e1)))
         } else {
             projected_rotation_angle(proj, pointer, centre, e1, e2, radius, boundary, bounds)
         };
@@ -1367,7 +1368,7 @@ fn projected_rotation_angle(
     (lo, hi): (f64, f64),
 ) -> Option<f64> {
     let distance = |angle: f64| {
-        proj.to_screen(centre + (e1 * angle.cos() + e2 * angle.sin()) * radius)
+        proj.to_screen(centre + (e1 * pmath::cos(angle) + e2 * pmath::sin(angle)) * radius)
             .map(|point| f64::from(point.distance_sq(pointer)))
             .unwrap_or(f64::INFINITY)
     };
@@ -1452,13 +1453,14 @@ mod tests {
 #[cfg(test)]
 mod taper_limit_tests {
     use super::taper_limits;
+    use polykrom_engine::geom::pmath;
     use polykrom_engine::geom::{Loop2, Region2, Vec2};
 
     /// #1602: a drag stops just short of the taper that closes the profile, either way.
     #[test]
     fn a_taper_drag_stops_before_the_profile_closes() {
         let close = |a: f64, b: f64| (a - b).abs() < 0.05;
-        let deg = |r: f64, h: f64| (0.99 * r / h).atan().to_degrees();
+        let deg = |r: f64, h: f64| pmath::atan(0.99 * r / h).to_degrees();
         // A 10 × 4 rectangle 26 high: going in closes at its half width; going out never does.
         let rect = Region2 {
             outer: Loop2::polygon(&[Vec2::new(0.0, 0.0), Vec2::new(10.0, 0.0), Vec2::new(10.0, 4.0), Vec2::new(0.0, 4.0)]),

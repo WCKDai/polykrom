@@ -2,6 +2,7 @@
 //! distances with the closest and farthest listed too, diameters and radii, slot sizes. Every
 //! expected value is worked out by hand from the part's dimensions.
 
+use polycore_geom::pmath;
 use std::f64::consts::{PI, TAU};
 
 use polycore_geom::Vec3;
@@ -89,9 +90,12 @@ fn faces_picked_by_a_point_alone_measure_like_full_selections() {
 #[test]
 fn connected_lines_measure_the_corner_regardless_of_endpoint_or_selection_order() {
     // cos(angle) = -3/5: the corner is 126.869898°, not its 53.130102° supplement.
-    for (end, want) in
-        [([-24.0, 32.0], (-0.6f64).acos().to_degrees()), ([24.0, 32.0], 0.6f64.acos().to_degrees()), ([0.0, 40.0], 90.0), ([-40.0, 0.0], 180.0)]
-    {
+    for (end, want) in [
+        ([-24.0, 32.0], pmath::acos(-0.6f64).to_degrees()),
+        ([24.0, 32.0], pmath::acos(0.6f64).to_degrees()),
+        ([0.0, 40.0], 90.0),
+        ([-40.0, 0.0], 180.0),
+    ] {
         for reverse_a in [false, true] {
             for reverse_b in [false, true] {
                 let mut s = Session::default();
@@ -127,7 +131,7 @@ fn solid_edges_measure_the_obtuse_corner() {
     let b = edge(&s, |p| p.z.abs() < 1e-8 && (4.0 * p.x + 3.0 * p.y).abs() < 1e-8);
     for items in [vec![a.clone(), b.clone()], vec![b, a]] {
         let r = measure(&mut s, items);
-        assert!(close(&r["angle_deg"], (-0.6f64).acos().to_degrees(), 1e-8), "{r}");
+        assert!(close(&r["angle_deg"], pmath::acos(-0.6f64).to_degrees(), 1e-8), "{r}");
     }
 }
 
@@ -139,7 +143,7 @@ fn separate_and_duplicate_lines_keep_the_undirected_angle() {
     run(&mut s, "sketch.line", json!({"points": [[0, 10], [-24, 42]]}));
     let (a, b) = (json!({"type": "sketch_curve", "id": "l1"}), json!({"type": "sketch_curve", "id": "l2"}));
     let r = measure(&mut s, vec![a.clone(), b]);
-    assert!(close(&r["angle_deg"], 0.6f64.acos().to_degrees(), 1e-8), "{r}");
+    assert!(close(&r["angle_deg"], pmath::acos(0.6f64).to_degrees(), 1e-8), "{r}");
     let r = measure(&mut s, vec![a.clone(), a]);
     assert!(close(&r["angle_deg"], 0.0, 1e-8), "{r}");
 }
@@ -152,7 +156,7 @@ fn two_holes_measure_centre_to_centre_with_min_and_max() {
     let r = measure(&mut s, vec![a.clone(), b.clone()]);
     assert!(close(&r["center_distance"], 30.0, 1e-9), "{r}");
     assert!(close(&r["min"], 30.0 - 3.0 - 4.0, 1e-9), "{r}");
-    assert!(close(&r["max"], (37.0f64).hypot(10.0), 1e-9), "{r}");
+    assert!(close(&r["max"], pmath::hypot(37.0f64, 10.0), 1e-9), "{r}");
     assert_eq!(r["measure"], "center");
     // Backward compatible: the closest distance is still `distance_mm`, with its points.
     assert!(close(&r["distance_mm"], 23.0, 1e-9) && r["from"].is_array() && r["to"].is_array(), "{r}");
@@ -202,8 +206,8 @@ fn elevated_cylinder_rims_measure_between_the_picked_circles_centres() {
             }
         }
         assert!((r["center_delta"][2].as_f64().unwrap().abs() - 22.0).abs() < 1e-9, "{r}");
-        assert!(close(&r["min"], (1517_f64.sqrt() - 8.0).hypot(22.0), 1e-9), "{r}");
-        assert!(close(&r["max"], (1517_f64.sqrt() + 8.0).hypot(22.0), 1e-9), "{r}");
+        assert!(close(&r["min"], pmath::hypot(1517_f64.sqrt() - 8.0, 22.0), 1e-9), "{r}");
+        assert!(close(&r["max"], pmath::hypot(1517_f64.sqrt() + 8.0, 22.0), 1e-9), "{r}");
     }
 }
 
@@ -223,7 +227,7 @@ fn an_elevated_circle_to_a_straight_edge_keeps_its_height_difference() {
     };
     for items in [vec![straight.clone(), round.clone()], vec![round, straight]] {
         let r = measure(&mut s, items);
-        assert!(close(&r["center_distance"], 25_f64.hypot(14.0), 1e-9), "{r}");
+        assert!(close(&r["center_distance"], pmath::hypot(25_f64, 14.0), 1e-9), "{r}");
         let (line, circle) = if r["items"][0]["round"] == "circle" { ("center_to", "center_from") } else { ("center_from", "center_to") };
         for (key, expected) in [(line, [34.0, 0.0, 6.0]), (circle, [34.0, 25.0, 20.0])] {
             for (axis, value) in expected.into_iter().enumerate() {
@@ -231,8 +235,8 @@ fn an_elevated_circle_to_a_straight_edge_keeps_its_height_difference() {
             }
         }
         assert!((r["center_delta"][2].as_f64().unwrap().abs() - 14.0).abs() < 1e-9, "{r}");
-        assert!(close(&r["min"], 13_f64.hypot(14.0), 1e-9), "{r}");
-        assert!(close(&r["max"], (34_f64.hypot(25.0) + 12.0).hypot(14.0), 0.05), "{r}");
+        assert!(close(&r["min"], pmath::hypot(13_f64, 14.0), 1e-9), "{r}");
+        assert!(close(&r["max"], pmath::hypot(pmath::hypot(34_f64, 25.0) + 12.0, 14.0), 0.05), "{r}");
     }
 }
 
@@ -367,7 +371,7 @@ fn prism(s: &mut Session, offset: f64, points: Value, distance: f64, name: &str)
 
 /// A part ring (210° of a chamfered section) less two oblique prisms and a notch.
 fn cut_ring(s: &mut Session) {
-    let (c, si) = (15f64.to_radians().cos(), 15f64.to_radians().sin());
+    let (c, si) = (pmath::cos(15f64.to_radians()), pmath::sin(15f64.to_radians()));
     run(s, "sketch.create", json!({"plane": {"origin": [0, 0, 0], "x_dir": [si, c, 0], "y_dir": [0, 0, -1]}}));
     let section = json!([[16.6, 0], [17.5, 0], [18.5, -1.0], [18.5, -7.0], [17.5, -8.0], [16.6, -8.0], [16.4, -7.8], [16.4, -0.2]]);
     run(s, "sketch.line", json!({"points": section, "closed": true}));

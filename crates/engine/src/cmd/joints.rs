@@ -3,6 +3,7 @@
 //! joint graph and moves the occurrences it places; the session re-solves after any edit too,
 //! so joints follow the geometry their origins snap to.
 
+use polycore_geom::pmath;
 use std::collections::{BTreeMap, BTreeSet};
 
 use polycore_geom::{Aabb3, Vec3};
@@ -958,7 +959,7 @@ fn reach(s: &mut Session, p: &Value) -> Result<Value> {
     if let Some((a, z)) = axis {
         // From the sine too: the cosine alone loses small angles to rounding.
         let v = polykrom_doc::apply_vector(&t, a);
-        let deg = v.cross(z).len().atan2(v.dot(z)).to_degrees();
+        let deg = pmath::atan2(v.cross(z).len(), v.dot(z)).to_degrees();
         out["error_deg"] = json!(deg);
         there &= deg <= joints::REACH_TOL;
     }

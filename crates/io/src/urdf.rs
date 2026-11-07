@@ -9,6 +9,7 @@
 //! `L = T_A · F_a` and the parent-side joint frame `L · M(q)`, the chain inverted (reversed, axes
 //! negated, so each URDF value still equals Polykrom's).
 
+use polycore_geom::pmath;
 use std::collections::{BTreeMap, BTreeSet, HashSet, VecDeque};
 
 use polycore_geom::{Mesh, Vec3};
@@ -158,7 +159,7 @@ pub(crate) fn translation(v: Vec3) -> Mat {
 
 /// Rotation by `a` about the unit axis `u` (Rodrigues), column-major like `Mat`.
 pub(crate) fn rotation(u: Vec3, a: f64) -> Mat {
-    let (s, c) = a.sin_cos();
+    let (s, c) = pmath::sin_cos(a);
     let t = 1.0 - c;
     let r = [
         [t * u.x * u.x + c, t * u.x * u.y - s * u.z, t * u.x * u.z + s * u.y],
@@ -776,13 +777,13 @@ fn metres(m: &Mesh) -> Mesh {
 fn xyz_rpy(m: &Mat) -> (Vec3, Vec3) {
     let r = |row: usize, col: usize| m.get(col).and_then(|c| c.get(row)).copied().unwrap_or(0.0);
     // atan2 over hypot keeps pitch precise next to +-90 degrees, where asin would not.
-    let cos_pitch = r(0, 0).hypot(r(1, 0));
-    let pitch = (-r(2, 0)).atan2(cos_pitch);
+    let cos_pitch = pmath::hypot(r(0, 0), r(1, 0));
+    let pitch = pmath::atan2(-r(2, 0), cos_pitch);
     let (roll, yaw) = if cos_pitch > 1e-12 {
-        (r(2, 1).atan2(r(2, 2)), r(1, 0).atan2(r(0, 0)))
+        (pmath::atan2(r(2, 1), r(2, 2)), pmath::atan2(r(1, 0), r(0, 0)))
     } else {
         // Gimbal lock: yaw carries the whole turn about z.
-        (0.0, (-r(0, 1)).atan2(r(1, 1)))
+        (0.0, pmath::atan2(-r(0, 1), r(1, 1)))
     };
     let t = apply_point(m, Vec3::ZERO) * 1e-3;
     (t, Vec3::new(roll, pitch, yaw))

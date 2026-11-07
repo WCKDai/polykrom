@@ -1,4 +1,10 @@
 //! Floating controls reserve drawing space without changing rendering or picking projection.
+
+// UI only: this file draws, animates, converts colours or places the camera, and feeds nothing
+// into a design, so it keeps the platform's transcendental functions (listed with its reason in
+// crates/engine/tests/pmath_gate.rs; everything that reaches a command goes through pmath).
+#![allow(clippy::disallowed_methods)]
+
 use egui::{Rect, pos2, vec2};
 use polykrom_engine::geom::{Aabb3, Vec3};
 use polykrom_engine::render::Camera;

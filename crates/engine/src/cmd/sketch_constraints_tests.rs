@@ -1,4 +1,5 @@
 use polycore_geom::Vec2;
+use polycore_geom::pmath;
 use serde_json::{Value, json};
 
 use crate::Session;
@@ -61,7 +62,7 @@ fn a_dimension_reports_the_solved_value() {
     assert!((d["measured"].as_f64().unwrap() - 40.0).abs() < 1e-6, "{d}");
     // A driven dimension measures the solved geometry too.
     let d = run(&mut s, "sketch.dimension", json!({"entities": ["p1", "p3"], "driven": true}));
-    assert!((d["measured"].as_f64().unwrap() - 100.0_f64.hypot(40.0)).abs() < 1e-6, "{d}");
+    assert!((d["measured"].as_f64().unwrap() - pmath::hypot(100.0_f64, 40.0)).abs() < 1e-6, "{d}");
     let c = run(&mut s, "sketch.circle.center", json!({"center": [50, 20], "radius": 7.3}));
     let c = ids(&c["curves"])[0].clone();
     let d = run(&mut s, "sketch.dimension", json!({"entities": [c], "value": 15}));
@@ -305,7 +306,7 @@ fn line_angle(s: &Session, a: &str, b: &str) -> f64 {
         q - p
     };
     let (u, v) = (dir(a), dir(b));
-    let t = u.cross(v).abs().atan2(u.dot(v)).to_degrees();
+    let t = pmath::atan2(u.cross(v).abs(), u.dot(v)).to_degrees();
     t.min(180.0 - t)
 }
 
@@ -343,7 +344,7 @@ fn an_angle_between_lines_takes_the_reading_nearest_its_value_and_reports_degree
 fn an_angle_between_two_lines_from_one_point_measures_the_angle_between_them() {
     // #2724: two radii of a circle 120° apart measured 60°, and 150° apart 30°.
     for deg in [30.0_f64, 60.0, 90.0, 120.0, 150.0] {
-        let far = [20.0 * deg.to_radians().cos(), 20.0 * deg.to_radians().sin()];
+        let far = [20.0 * pmath::cos(deg.to_radians()), 20.0 * pmath::sin(deg.to_radians())];
         // Both drawn out from the centre, the second drawn in towards it, or a corner.
         let shapes = [
             vec![json!([[0, 0], [20, 0]]), json!([[0, 0], far])],
@@ -369,7 +370,7 @@ fn an_angle_between_two_lines_from_one_point_measures_the_angle_between_them() {
         let ((a0, a1), (b0, b1)) = (line("l1"), line("l2"));
         assert!(a1.dist(b0) < 1e-9, "the corner stays joined");
         let (ra, rb) = (a0 - a1, b1 - b0);
-        let between = ra.cross(rb).abs().atan2(ra.dot(rb)).to_degrees();
+        let between = pmath::atan2(ra.cross(rb).abs(), ra.dot(rb)).to_degrees();
         assert!((between - want).abs() < 1e-6, "{deg}°: the sides are {between}° apart");
     }
     // Lines that share no end keep the acute reading.

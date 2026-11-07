@@ -5,6 +5,7 @@
 //! fallback. Skipped, with the reason printed, without a GPU adapter (`POLYKROM_REQUIRE_GPU=1`
 //! makes that a failure).
 
+use polycore_geom::pmath;
 use polykrom_engine::Session;
 use polykrom_engine::geom::{Mesh, Vec3};
 use polykrom_engine::render::{Camera, Rgb, Scene, SceneLine, SceneMesh, StandardView};
@@ -133,11 +134,11 @@ fn at_ten_metres_a_thin_label_is_whole_and_a_washer_behind_stays_hidden() {
 
 /// A 30 × 40 mm sheet at y = z·tan(`tilt`) (facing the front camera when `tilt` is 0).
 fn sheet(tilt: f64) -> Mesh {
-    let t = tilt.tan();
+    let t = pmath::tan(tilt);
     let c = [(-15.0, -20.0), (15.0, -20.0), (15.0, 20.0), (-15.0, 20.0)].map(|(x, z)| Vec3::new(x, z * t, z));
     Mesh {
         positions: c.to_vec(),
-        normals: vec![Vec3::new(0.0, -tilt.cos(), tilt.sin()); 4],
+        normals: vec![Vec3::new(0.0, -pmath::cos(tilt), pmath::sin(tilt)); 4],
         triangles: vec![[0, 1, 2], [0, 2, 3]],
         tri_face: vec![0, 0],
         ..Default::default()
@@ -147,7 +148,7 @@ fn sheet(tilt: f64) -> Mesh {
 /// A front view of `mesh` with `lines`, as part of a design of `radius`, 40 mm high on 200 px.
 fn front(mesh: Mesh, lines: Vec<SceneLine>, radius: f64, fov: f64) -> (Scene, Camera) {
     let scene = Scene { meshes: vec![SceneMesh::solid(Arc::new(mesh), Rgb(160, 165, 175))], lines, radius, ..Default::default() };
-    let mut cam = Camera { distance: if fov > 0.0 { 25.0 / (fov * 0.5).tan() } else { 62.5 }, fov, ..Default::default() };
+    let mut cam = Camera { distance: if fov > 0.0 { 25.0 / pmath::tan(fov * 0.5) } else { 62.5 }, fov, ..Default::default() };
     cam.set_view(StandardView::Front);
     (scene, cam)
 }
@@ -166,7 +167,7 @@ fn red_pixels(c: &Capturer, scene: &Scene, cam: &Camera) -> usize {
 fn an_edge_on_a_face_draws_whole_at_any_angle() {
     for (mode, c) in capturers() {
         for tilt in [0.0_f64, 60.0, 80.0] {
-            let t = tilt.to_radians().tan();
+            let t = pmath::tan(tilt.to_radians());
             // Across the sheet, at z = 5: y = 5·tan(tilt).
             let (a, b) = (Vec3::new(-12.0, 5.0 * t, 5.0), Vec3::new(12.0, 5.0 * t, 5.0));
             for radius in [30.0, 17_000.0] {

@@ -1,6 +1,7 @@
 //! Booleans that failed, panicked or hung, replayed from the scripts in
 //! `examples/regressions/` (each script's description says what went wrong).
 
+use polycore_geom::pmath;
 use serde_json::{Value, json};
 
 use crate::Session;
@@ -55,7 +56,7 @@ fn intersection_never_keeps_material_outside_the_trimming_cylinder() {
     let before = volume(&s, "Base");
     let r = s.execute("solid.cylinder", &json!({"radius": 16.65, "height": 14.59, "operation": "intersect", "targets": ["Base"]}));
     let state = s.model.state();
-    let reach = state.body("Base").unwrap().body.tessellate(1e-3).unwrap().positions.iter().map(|p| p.x.hypot(p.y)).fold(0.0, f64::max);
+    let reach = state.body("Base").unwrap().body.tessellate(1e-3).unwrap().positions.iter().map(|p| pmath::hypot(p.x, p.y)).fold(0.0, f64::max);
     match r {
         Ok(_) => assert!(reach < 16.65 + 1e-2, "kept material out to radius {reach}"),
         Err(e) => assert!((volume(&s, "Base") - before).abs() < 1e-9 && reach > 16.9, "{e}"),
@@ -161,7 +162,9 @@ fn eighteen_tabs_join_the_ribs_of_a_chamfered_base() {
         println!("#2059 volume {got:.6} / {expected:.6} mm³; one valid shell, eighteen tabs");
         for k in 0..6 {
             let angle = k as f64 * std::f64::consts::TAU / 6.0;
-            let p = |x: f64, y: f64, z| polycore_geom::Vec3::new(x * angle.cos() - y * angle.sin(), x * angle.sin() + y * angle.cos(), z);
+            let p = |x: f64, y: f64, z| {
+                polycore_geom::Vec3::new(x * pmath::cos(angle) - y * pmath::sin(angle), x * pmath::sin(angle) + y * pmath::cos(angle), z)
+            };
             for x in [15.5, 25.5, 35.5] {
                 assert!(mesh.contains(p(x, 0.0, 12.0)), "tab {k} at {x}");
                 assert!(!mesh.contains(p(x, 1.2, 12.0)), "tab {k} grew sideways at {x}");
@@ -546,7 +549,7 @@ fn ring_notch() -> f64 {
         let x1 = (18.4f64 * 18.4 - s * s).sqrt();
         let g = |x: f64| {
             let r = (x * x + s * s).sqrt();
-            18.4 * x - 0.5 * (x * r + s * s * (x + r).ln())
+            18.4 * x - 0.5 * (x * r + s * s * pmath::ln(x + r))
         };
         g(x1) - g(17.6)
     };
@@ -601,7 +604,7 @@ fn raked_wedge(lean: f64) -> Session {
 /// the issue had it and moved by 0.02 mm, as it also tried.
 #[test]
 fn box_intersect_splits_the_end_off_a_raked_wedge_after_its_end_rounds() {
-    for lean in [10f64.to_radians().tan(), 0.0] {
+    for lean in [pmath::tan(10f64.to_radians()), 0.0] {
         let mut s = raked_wedge(lean);
         let whole = volume(&s, "Wedge");
         for (i, x0) in [55.0, 55.02].into_iter().enumerate() {
@@ -811,7 +814,7 @@ fn imported_rotated_face_extrusions_preserve_other_operations_and_bodies() {
     let mut centers = Vec::new();
     for i in 0..12 {
         let angle = i as f64 * std::f64::consts::TAU / 12.;
-        let (c, s) = (angle.cos(), angle.sin());
+        let (c, s) = (pmath::cos(angle), pmath::sin(angle));
         let outline: Vec<_> =
             [(-2., -2.), (2., -2.), (2., 2.), (-2., 2.)].into_iter().map(|(x, y)| [10.7 * c + x * c - y * s, 10.7 * s + x * s + y * c]).collect();
         outlines.push(outline);
@@ -1074,8 +1077,8 @@ fn cut_beside_a_sealed_void_keeps_the_body() {
     use std::f64::consts::PI;
     let r: f64 = 24.0;
     // The circle's segment beyond a chord at `d` from the centre, and its integral over `d`.
-    let segment = |d: f64| r * r * (d / r).acos() - d * (r * r - d * d).sqrt();
-    let wedge = |d: f64| r * r * (d * (d / r).acos() - (r * r - d * d).sqrt()) + (r * r - d * d).powf(1.5) / 3.0;
+    let segment = |d: f64| r * r * pmath::acos(d / r) - d * (r * r - d * d).sqrt();
+    let wedge = |d: f64| r * r * (d * pmath::acos(d / r) - (r * r - d * d).sqrt()) + pmath::powf(r * r - d * d, 1.5) / 3.0;
     let sphere = 4.0 / 3.0 * PI * 8.0;
     let combine = |z: [f64; 2], tool: &[(&str, Value)], operation: &str| {
         let mut s = Session::default();
@@ -1316,7 +1319,7 @@ fn spherical_shell_cuts_and_joins_a_block_crossing_its_hollow() {
     let under = |big: f64| {
         let inner = |y: f64| {
             let a2 = big * big - y * y;
-            let f = |z: f64| 0.5 * (z * (a2 - z * z).sqrt() + a2 * (z / a2.sqrt()).asin());
+            let f = |z: f64| 0.5 * (z * (a2 - z * z).sqrt() + a2 * pmath::asin(z / a2.sqrt()));
             f(4.0) - f(-4.0)
         };
         let n = 200;

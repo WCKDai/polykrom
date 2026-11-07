@@ -1,6 +1,7 @@
 //! Faces by name: `model.faces` lists a point on each face (and a cylinder's axis and radius), and
 //! the commands that take a face as a point take the name `model.faces` lists instead.
 
+use polycore_geom::pmath;
 use std::f64::consts::PI;
 
 use polycore_geom::Vec3;
@@ -59,11 +60,11 @@ fn model_faces_gives_a_point_on_each_face_and_the_hole_axis_and_radius() {
         match f.get("cylinder") {
             // On the cylinder itself, not only on its facets (which lie inside it).
             Some(c) => {
-                let radial = (at.x - 30.0).hypot(at.y - 20.0);
+                let radial = pmath::hypot(at.x - 30.0, at.y - 20.0);
                 assert!((radial - 5.0).abs() < 1e-9 && at.z > 0.0 && at.z < 10.0, "{at:?}");
                 // The centroid of a half cylinder's wall is 2r/π = 3.18 from the axis, not on the wall.
                 let centroid = vec(&f["centroid"]);
-                let inside = (centroid.x - 30.0).hypot(centroid.y - 20.0);
+                let inside = pmath::hypot(centroid.x - 30.0, centroid.y - 20.0);
                 assert!((2.5..4.0).contains(&inside), "the centroid of a half cylinder is inside it: {inside}");
                 // The hole's axis: the line through (30, 20) along z, its radius 5.
                 let (origin, axis) = (vec(&c["origin"]), vec(&c["axis"]));
@@ -80,9 +81,9 @@ fn model_faces_gives_a_point_on_each_face_and_the_hole_axis_and_radius() {
     // The top face is the rectangle less the hole; its centroid is in the hole, its point is not.
     let top = all.iter().find(|f| f["plane_normal"][2].as_f64().is_some_and(|z| z > 0.99)).unwrap();
     let (centroid, at) = (vec(&top["centroid"]), vec(&top["point"]));
-    assert!((centroid.x - 30.0).hypot(centroid.y - 20.0) < 1e-6, "{centroid:?}");
+    assert!(pmath::hypot(centroid.x - 30.0, centroid.y - 20.0) < 1e-6, "{centroid:?}");
     assert!(
-        (at.x - 30.0).hypot(at.y - 20.0) > 5.0 && (0.0..=60.0).contains(&at.x) && (0.0..=40.0).contains(&at.y) && (at.z - 10.0).abs() < 1e-9,
+        pmath::hypot(at.x - 30.0, at.y - 20.0) > 5.0 && (0.0..=60.0).contains(&at.x) && (0.0..=40.0).contains(&at.y) && (at.z - 10.0).abs() < 1e-9,
         "{at:?}"
     );
 }
@@ -222,7 +223,7 @@ fn draft_takes_a_cylinders_side_by_name() {
     }
     let names: Vec<Value> = sides.iter().map(|f| f["name"].clone()).collect();
     run(&mut s, "solid.draft", json!({"faces": names, "angle": "5 deg", "neutral": "XY", "body": "Pin"}));
-    let small = 10.0 - 20.0 * 5f64.to_radians().tan();
+    let small = 10.0 - 20.0 * pmath::tan(5f64.to_radians());
     let want = PI * 20.0 / 3.0 * (100.0 + 10.0 * small + small * small);
     assert!((volume(&mut s, "Pin") - want).abs() < 1e-3 * want, "{} vs {want}", volume(&mut s, "Pin"));
 }

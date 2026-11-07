@@ -4,6 +4,7 @@
 //! inclusive (LM includes Jacobian and linear solve time), not additive. On wasm the counters
 //! and trace work but clocks are disabled: `std::time::Instant` is unavailable there.
 
+use polycore_geom::pmath;
 use std::cell::Cell;
 
 use serde::Serialize;
@@ -190,7 +191,7 @@ pub(crate) fn record_trial(
         cost_before: finite(before),
         cost_after: after.and_then(finite),
         gradient_inf: finite(gradient.iter().fold(0.0_f64, |m, g| if g.is_finite() { m.max(g.abs()) } else { f64::INFINITY })),
-        step_norm: step.and_then(|s| finite(s.iter().fold(0.0_f64, |n, x| n.hypot(*x)))),
+        step_norm: step.and_then(|s| finite(s.iter().fold(0.0_f64, |n, x| pmath::hypot(n, *x)))),
         predicted_reduction: predicted.and_then(finite),
         actual_reduction: actual.and_then(finite),
         rho: predicted.filter(|p| *p > 0.0).zip(actual).and_then(|(p, a)| finite(a / p)),
