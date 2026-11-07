@@ -7,7 +7,7 @@ match their analytic or FreeCAD-computed volume, area, centre of mass and boundi
 ([oracle.md](oracle.md)); the other is a tracked bug.
 These checks do not establish complete geometric or workflow equivalence. The commands Polykrom has
 are listed by area in [features.md](features.md); status and plans are in [ROADMAP.md](../ROADMAP.md).
-Open work and known bugs are in [GitHub issues](https://github.com/tangency-labs/solidcraft/issues),
+Open work and known bugs are in [GitHub issues](https://github.com/WCKDai/polykrom/issues),
 and help is welcome: see [CONTRIBUTING.md](../CONTRIBUTING.md).
 
 
@@ -54,7 +54,7 @@ and help is welcome: see [CONTRIBUTING.md](../CONTRIBUTING.md).
   retained shallow prismatic pockets, exact line/arc/circle DXF outlines and bend tables;
   plastic enclosure features and rules. Pocket depth and side survive unfold/refold and appear
   separately from through-hole outlines in the flat preview and DXF.
-- **Files**: design containers (`.solidcraft`) with lossless binary mesh payloads;
+- **Files**: design containers (`.polykrom`) with lossless binary mesh payloads;
   plain JSON remains supported for opening, Save As and export. Desktop Open can show a saved
   provisional picture from warm geometry caches while rebuilding before editing; caches never
   replace the parametric design. Export to STEP (AP242 with body names, colours and

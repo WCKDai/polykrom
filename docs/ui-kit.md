@@ -528,7 +528,7 @@ circular compass and native widget-owned tooltip content, does not acquire an in
 ```
 
 Those are Blueprint's settings: a single primary outline and dotted secondary rules. Secondary roles optionally accept `pattern`: `solid` (default) or `dotted`; this pattern follows horizontal/vertical section rules. Container outlines remain solid, as do the other roles. Themes without border settings retain their previous appearance.
-SolidCraft 95 uses silver surfaces and directional two-band bevels: light top/left
+Polykrom 95 uses silver surfaces and directional two-band bevels: light top/left
 edges and dark bottom/right edges for raised panels and buttons, reversed for
 recessed fields and pressed buttons. Inputs use the `field` colour independently
 of the neutral button face. Disabled controls fade their bevel; focus, selection

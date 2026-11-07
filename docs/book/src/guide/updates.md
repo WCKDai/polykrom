@@ -46,18 +46,14 @@ background would install code macOS can't vouch for without you seeing it.
 Update now needs write access to the installed file: an AppImage in a folder you can't write to
 fails with a message, and **Download** is the way to update it.
 
-## Updating from 0.11 to 0.14
+## Earlier programs
 
-Polykrom 0.11.0 to 0.14.0 only accept packages from the project's old GitHub address. Since
-the repository moved to `github.com/tangency-labs/solidcraft`, every release names the new address,
-so these versions see that a newer release is out but find no package in it: **Update now** can't
-install it, and **Download** opens the release page.
-
-Download 0.15.0 or later once yourself, from the release page or the
-[download links](https://github.com/tangency-labs/solidcraft#download), and install it over the old
-version as you first installed it. From 0.15.0 on, Polykrom accepts either address, and
-**Update now** works again. Package managers (Flatpak, Snap, WinGet, `.deb`, `.rpm`) aren't
-affected.
+Polykrom's first release is 0.21.0, so there is no older Polykrom to update from. The check
+asks only the `WCKDai/polykrom` repository on GitHub and accepts packages from its releases
+alone (GitHub may still name them under the repository's earlier `wckdboy/polykrom` address).
+A SolidCraft install, the project Polykrom is forked from, is a different program: it is
+never updated to Polykrom and keeps its own settings
+([compatibility](https://github.com/WCKDai/polykrom/blob/main/docs/compatibility.md)).
 
 ## What is sent
 

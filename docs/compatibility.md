@@ -15,7 +15,6 @@ folder, variable, key or update feed to keep working.
 | `"format": "solidcraft/N"` and `"format": "solvecraft/N"` tags | Read like `polykrom/N` and upgraded through the same format steps; the design is re-tagged `polykrom/N` when saved. Not backward-compatible: SolidCraft and Polykrom builds before 0.21.0 refuse a design saved with the new tag (format 36). | `crates/doc/src/format.rs` (`LEGACY_FORMAT_PREFIXES`, `version_of`); `crates/io/tests/fixtures/legacy-solvecraft-v1.solidcraft` |
 | Draft design containers marked `solvecraft-container/1` | Accepted next to the current container marker; only the current marker is written | `crates/io/src/design.rs` (`LEGACY_VERSION`) |
 | Keyboard-shortcut files exported as `solvecraft-shortcuts/1` | Import like the current shortcut files | `crates/ui-egui/src/toolbar_custom.rs` |
-| MCP resource URIs that earlier releases listed (`solvecraft://design`, `solvecraft://commands`) | Still read, next to the current URIs | `crates/mcp/src/server.rs` |
 
 Format markers inside files (`…-container/1`, `…-shortcuts/1`, `…-library/1`, `…-theme/1`,
 `…-crash/1`, the 3MF face-tag namespace in `docs/formats/3mf-face-tags.md`) are identifiers, not
@@ -23,7 +22,7 @@ branding: a reader accepts every marker it ever wrote, and a renamed marker adds
 
 Tests: `crates/io` (`Format::from_name`, `is_design_path`, the legacy fixture),
 `legacy_extension_and_format_tag_still_open` (CLI, `run_results.rs`),
-`legacy_design_files_and_resource_uris` (MCP `open` and resources),
+`legacy_design_files_and_resource_uris` (MCP `open`; it also proves the old resource URIs are refused),
 `draft_container_marker_remains_readable`. A change to one of these shims updates this file in
 the same PR.
 
@@ -42,8 +41,10 @@ working. None of it applies to Polykrom, whose first release already carries the
 - settings, preferences, autosave, recovery and thumbnail folders: Polykrom reads and writes its
   own folders and never looks in a `solidcraft` or `SolveCraft` one;
 - keychain entries: the agent-chat keys live under Polykrom's own service name;
-- environment variables: `POLYKROM_*` only (`polycore_geom::env`), with no `SOLIDCRAFT_*` or
-  `SOLVECRAFT_*` fallback;
+- environment variables: `POLYKROM_*` only (`polykrom_doc::env`, re-exported as
+  `polykrom_engine::env`), with no `SOLIDCRAFT_*` or `SOLVECRAFT_*` fallback;
+- MCP resource URIs: `polykrom://design` and `polykrom://commands` only; `solidcraft://…` and
+  `solvecraft://…` are refused as unknown resources (`crates/mcp/src/server.rs`);
 - package identity: the app ID is `app.polykrom.Polykrom` (macOS `CFBundleIdentifier`, Linux
   desktop entry, AppStream and Flatpak ID, D-Bus and Wayland `app_id`), the bundle is
   `Polykrom.app`, and the deb, rpm and Snap packages are `polykrom`. There are no end-of-life

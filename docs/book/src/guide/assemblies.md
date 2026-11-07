@@ -51,7 +51,7 @@ records are reported. Unsupported destructive links refuse the entire copy. See
 
 **Extract to File** (`component.extract`, in a component's right-click menu) moves a component
 into a design of its own: its sketches, features, bodies, subcomponents and the joints among them
-go to the new `.solidcraft` file at its origin, with the parameters they use, and the component
+go to the new `.polykrom` file at its origin, with the parameters they use, and the component
 becomes linked to that file, as **Insert Design** makes it. Its placements and the joints to the
 rest of the assembly stay. Components whose own history builds the same bodies are offered to
 become placements of the new link too (`component.copies`, `component.replace_with_link`).
@@ -288,7 +288,7 @@ association is detached. Changes and their generated curves undo and redo togeth
 A trace takes 2 to 500
 samples: 100 by default for a joint, one per step for a study.
 
-The [Chebyshev linkage demo](https://github.com/tangency-labs/solidcraft/blob/main/docs/chebyshev-motion-trace.md)
+The [Chebyshev linkage demo](https://github.com/WCKDai/polykrom/blob/main/docs/chebyshev-motion-trace.md)
 builds a complete four-joint mechanism, plays a saved study and demonstrates the
 same retained trajectory updating after a link-length or driving-range edit.
 
@@ -368,7 +368,7 @@ the part's bodies only: its timeline, parameters and sheet-metal data (flat patt
 table) stay in the part's own design.
 
 If a source file moves or is renamed, right-click its linked component or occurrence in the
-Browser and choose **Relink Source (All Instances)…**. Choose the saved `.solidcraft` design
+Browser and choose **Relink Source (All Instances)…**. Choose the saved `.polykrom` design
 to use. Relinking updates that component's stored path and solid bodies for **all its
 instances**, keeping their identities and placements. Cancelling or choosing a missing,
 invalid, empty or self-referencing design leaves the assembly unchanged. The operation is

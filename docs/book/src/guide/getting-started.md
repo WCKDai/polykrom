@@ -48,19 +48,20 @@ A bundle has no update feed: install the next release's bundle the same way.
 
 ### Linux Snap
 
-On Ubuntu and other distributions with snapd:
+On Ubuntu and other distributions with snapd, download the release's `.snap` file for your
+architecture and install it from the file (there is no Snap Store listing yet, so `--dangerous`
+tells snapd the package is unsigned):
 
 ```sh
-sudo snap install polykrom
+sudo snap install --dangerous ./polykrom-VERSION-linux-ARCH.snap
 polykrom                # or open Polykrom from the app menu
 polykrom.cli --version  # the CLI, for scripts and `polykrom.cli mcp`
 ```
 
 The snap can open designs in your home folder (not hidden folders) and, through the file
 chooser, anywhere else. For USB drives and other mounted disks, run
-`sudo snap connect polykrom:removable-media` once. A release's `.snap` file installs without
-the store with `sudo snap install --dangerous ./polykrom-VERSION-linux-ARCH.snap`; it then
-doesn't update automatically.
+`sudo snap connect polykrom:removable-media` once. A snap installed from a file doesn't update
+automatically: install the next release's `.snap` the same way.
 
 ## Web
 
@@ -98,11 +99,10 @@ no longer matches the build the browser would keep. Debug builds (`trunk serve`)
 The web app is also a container image built by `.github/workflows/docker.yml`, for Linux on
 x86_64 and ARM64: `latest` is the latest release, a version tag a release, `edge` the newest
 `main`. It serves the app with nginx on port 8080 and keeps nothing on the server: designs stay
-in each visitor's browser. Substitute the image name the workflow publishes under the WCKDai
-organisation on GitHub Container Registry:
+in each visitor's browser. The image is `ghcr.io/wckdai/polykrom-web`:
 
 ```sh
-docker run -d --name polykrom -p 8080:8080 --restart unless-stopped ghcr.io/wckdai/<image>:latest
+docker run -d --name polykrom -p 8080:8080 --restart unless-stopped ghcr.io/wckdai/polykrom-web:latest
 ```
 
 Or with Docker Compose, using
