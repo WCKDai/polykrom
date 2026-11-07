@@ -26,11 +26,11 @@ polykrom-cli mcp --in part.polykrom
 
 # Bridged to the running app, so you can watch the agent model. The app's control channel is
 # on by default (see below), so no flag is needed on either side:
-solidcraft &
+polykrom &
 polykrom-cli mcp          # finds the running app; headless when none runs (--headless forces that)
 
 # A fixed port, or a second app: name it.
-solidcraft --control 7878 &
+polykrom --control 7878 &
 polykrom-cli mcp --connect 127.0.0.1:7878
 ```
 
@@ -73,11 +73,11 @@ channel / MCP)" is off; the setting takes effect at the next start. It is reacha
 computer only, and every connection must show the token made fresh for that launch, readable only
 by your user account ([control-protocol.md](control-protocol.md#token)). The app writes the port to
 `control/current.port` in the same folder as its token file; `polykrom-cli mcp` with no
-arguments reads it. `--control PORT` and `SOLIDCRAFT_CONTROL_PORT` still choose the port and apply
+arguments reads it. `--control PORT` and `POLYKROM_CONTROL_PORT` still choose the port and apply
 even when the setting is off. With the setting off and no flag, the app listens on nothing.
 
 Bridged, the server finds the app's control token in the token file the app wrote for that port
-([control-protocol.md](control-protocol.md#token)); `--token T` or `SOLIDCRAFT_CONTROL_TOKEN` give
+([control-protocol.md](control-protocol.md#token)); `--token T` or `POLYKROM_CONTROL_TOKEN` give
 it explicitly when the app runs in a sandbox whose data folder the server can't see (prefer the
 variable: command-line arguments are visible to other users in the process list).
 
@@ -85,7 +85,7 @@ A bridged server starts even when no app listens on that port yet, so an MCP cli
 launches it before the app (or after the app was closed) keeps its tools. The server's
 instructions then say the app was not running, and every tool call answers with an error that
 starts `no Polykrom app is listening at HOST:PORT` and says how to start it
-(`solidcraft --control PORT`). The first call after the app starts connects to it, reading that
+(`polykrom --control PORT`). The first call after the app starts connects to it, reading that
 launch's token. When the app quits or crashes mid-session, the next call says the same; a call
 that was running when it went away says the app did not answer and may have quit or crashed,
 after running the call or not, so inspect the design before sending a change again.
@@ -188,13 +188,12 @@ not read-only, `destructiveHint` and `openWorldHint` are true.
 
 ### Client configuration
 
-Claude Code (project `.mcp.json`, or `claude mcp add polykrom -- polykrom-cli mcp`; a setup
-added under the previous name keeps working, see the [compatibility notes](https://github.com/bherbruck/solidcraft/blob/main/docs/compatibility.md#mcp)):
+Claude Code (project `.mcp.json`, or `claude mcp add polykrom -- polykrom-cli mcp`):
 
 ```json
 {
   "mcpServers": {
-    "solidcraft": { "command": "polykrom-cli", "args": ["mcp"] }
+    "polykrom": { "command": "polykrom-cli", "args": ["mcp"] }
   }
 }
 ```
@@ -204,36 +203,36 @@ Claude Desktop (`claude_desktop_config.json`), bridged to a running app:
 ```json
 {
   "mcpServers": {
-    "solidcraft": { "command": "/path/to/polykrom-cli", "args": ["mcp", "--connect", "127.0.0.1:7878"] }
+    "polykrom": { "command": "/path/to/polykrom-cli", "args": ["mcp", "--connect", "127.0.0.1:7878"] }
   }
 }
 ```
 
-On Windows the installer puts `polykrom-cli.exe` next to `solidcraft.exe` in
-`C:\Program Files\SolidCraft` (the portable zip has both too). Give the full path, with each
-backslash doubled in JSON. This configuration declares two servers: `solidcraft` models
-headless (no window; steadier for timings), `solidcraft-live` drives the app you have open, so
+On Windows the installer puts `polykrom-cli.exe` next to `polykrom.exe` in
+`C:\Program Files\Polykrom` (the portable zip has both too). Give the full path, with each
+backslash doubled in JSON. This configuration declares two servers: `polykrom` models
+headless (no window; steadier for timings), `polykrom-live` drives the app you have open, so
 you can watch the agent model. `--allow-path` names a folder where the agent may save and
 export; it must already exist.
 
 ```json
 {
   "mcpServers": {
-    "solidcraft": {
-      "command": "C:\\Program Files\\SolidCraft\\polykrom-cli.exe",
-      "args": ["mcp", "--allow-path", "C:\\Users\\NAME\\SolidCraft-Agent"]
+    "polykrom": {
+      "command": "C:\\Program Files\\Polykrom\\polykrom-cli.exe",
+      "args": ["mcp", "--allow-path", "C:\\Users\\NAME\\Polykrom-Agent"]
     },
-    "solidcraft-live": {
-      "command": "C:\\Program Files\\SolidCraft\\polykrom-cli.exe",
-      "args": ["mcp", "--connect", "127.0.0.1:7878", "--allow-path", "C:\\Users\\NAME\\SolidCraft-Agent"]
+    "polykrom-live": {
+      "command": "C:\\Program Files\\Polykrom\\polykrom-cli.exe",
+      "args": ["mcp", "--connect", "127.0.0.1:7878", "--allow-path", "C:\\Users\\NAME\\Polykrom-Agent"]
     }
   }
 }
 ```
 
-Start the app with its control channel for `solidcraft-live`, from PowerShell:
-`& "C:\Program Files\SolidCraft\solidcraft.exe" --control 7878`, or once for every launch:
-`setx SOLIDCRAFT_CONTROL_PORT 7878`.
+Start the app with its control channel for `polykrom-live`, from PowerShell:
+`& "C:\Program Files\Polykrom\polykrom.exe" --control 7878`, or once for every launch:
+`setx POLYKROM_CONTROL_PORT 7878`.
 
 Open `claude_desktop_config.json` with Claude Desktop's **Settings > Developer > Edit Config**
 rather than by its path: the Microsoft Store (MSIX) build of Claude Desktop can keep its data in
@@ -243,16 +242,16 @@ completely (from the notification area) and start it again to load the servers.
 
 ### Agent skills
 
-[`skills/`](https://github.com/bherbruck/solidcraft/tree/main/skills) holds five [Agent Skills](https://agentskills.io) for agents that model through this server:
+[`skills/`](https://github.com/WCKDai/polykrom/tree/main/skills) holds five [Agent Skills](https://agentskills.io) for agents that model through this server:
 - `solidcraft-modeling` covers building a new part.
 - `solidcraft-editing` covers changing an existing design.
 - `solidcraft-checking` adds checks for errors Polykrom does not report, regression tests and porting, next to the other two.
 - `solidcraft-mechanisms` covers assemblies: joints placed by world coordinates, motion links, closed loops such as actuators, contact sets and motion studies, checked against analytic values.
 - `solidcraft-polish` covers finish in the style asked for (organic, faceted or technical): radius or chamfer families, no raw boxes, lofted shells, printed details and colour blocking, in passes measured with `polish`.
 
-They cover the workflow, the command shapes, how to verify with `measure`, and the known traps. With them an agent builds a part in a few `batch` calls and reads far less output. To install them for Claude Code, copy the folders into `~/.claude/skills/`; [skills/README.md](https://github.com/bherbruck/solidcraft/blob/main/skills/README.md) has the details.
+They cover the workflow, the command shapes, how to verify with `measure`, and the known traps. With them an agent builds a part in a few `batch` calls and reads far less output. To install them for Claude Code, copy the folders into `~/.claude/skills/`; [skills/README.md](https://github.com/WCKDai/polykrom/blob/main/skills/README.md) has the details.
 
-The `skill_reference` tool returns these documents from the copies built into SolidCraft, so an agent without file access can follow them: `{"skill": "solidcraft-modeling"}` returns its `reference.md`, the default file. Mechanisms also has `reference.md`, checking has `reference/porting.md`, and every skill has `SKILL.md` (editing uses modeling's reference). With no `file`, a skill without `reference.md` returns its `SKILL.md`. It never reads a path from disk. An unknown skill is refused with the available choices. An unknown file name gets the closest document instead: the file of that name in a subfolder, else the skill's main one. A note in front names it and the available files. A path that leaves the skill (`..`, absolute) is refused. SolidCraft's own chat turns the agent's file tools off, so this is how its agent reads the skills there.
+The `skill_reference` tool returns these documents from the copies built into Polykrom, so an agent without file access can follow them: `{"skill": "solidcraft-modeling"}` returns its `reference.md`, the default file. Mechanisms also has `reference.md`, checking has `reference/porting.md`, and every skill has `SKILL.md` (editing uses modeling's reference). With no `file`, a skill without `reference.md` returns its `SKILL.md`. It never reads a path from disk. An unknown skill is refused with the available choices. An unknown file name gets the closest document instead: the file of that name in a subfolder, else the skill's main one. A note in front names it and the available files. A path that leaves the skill (`..`, absolute) is refused. Polykrom's own chat turns the agent's file tools off, so this is how its agent reads the skills there.
 
 ## Tools
 
@@ -386,7 +385,7 @@ engine's reply directly, without an additional design-inspection request.
 
 ## Demo: an enclosure built over MCP
 
-`examples/demo/enclosure_mcp.py` is a small MCP client. It drives a running app (`solidcraft
+`examples/demo/enclosure_mcp.py` is a small MCP client. It drives a running app (`polykrom
 --control PORT`) through `polykrom-cli mcp --connect` and builds an electronics enclosure one
 `execute` call at a time (`enclosure_steps.json`): a rounded box, shelled open at the top, a
 USB port cut through a side wall, four screw bosses, and then a change of the `width`

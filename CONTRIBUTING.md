@@ -12,7 +12,7 @@ needed most.
 
 Polykrom is a fork of [SolidCraft](https://github.com/tangency-labs/solidcraft). The process
 below is SolidCraft's; for Polykrom, open issues and PRs on
-[wckdboy/polykrom](https://github.com/wckdboy/polykrom), and send fixes that also apply to
+[WCKDai/polykrom](https://github.com/WCKDai/polykrom), and send fixes that also apply to
 SolidCraft upstream under its own rules.
 
 Before choosing a task, check the [command inventory](docs/features.md) and
@@ -36,7 +36,7 @@ build you also need `rustup target add wasm32-unknown-unknown` and [`trunk`](htt
 ([documentation](https://trunk-rs.github.io/trunk/)).
 
 ```sh
-git clone https://github.com/wckdboy/polykrom && cd polykrom
+git clone https://github.com/WCKDai/polykrom && cd polykrom
 cargo run --release -p polykrom -- --sample      # desktop app with a sample part
 cargo xtask test                                   # unit, engine and UI-scenario tests
 cargo xtask ci                                     # everything a PR must pass (see below)
@@ -63,7 +63,7 @@ loader wgpu renders through, and libdbus-1, which rfd's file dialogs reach xdg-d
 through (a dialog then never appears and the pick returns no path):
 
 ```
-ERROR solidcraft: winit EventLoopError: ... The wayland library could not be loaded
+ERROR polykrom: winit EventLoopError: ... The wayland library could not be loaded
 ERROR eframe::native::run: Exiting because of error: WGPU error: Failed to create surface for any enabled backend: {}
 ERROR rfd::backend::xdg_desktop_portal::portal::libdbus: Can't connect to a portal: libdbus-1.so not found
 ```
@@ -76,10 +76,10 @@ may need a matching [nixGL wrapper](https://github.com/nix-community/nixGL).
 The default development shell retains the Rust/C toolchain already on `PATH`;
 `nix develop .#rust` supplies the pinned toolchain and builds in `target/nix`.
 
-To launch, use `nix run .#solidcraft -- --sample`. To install the app's terminal
-commands, desktop entry and generated icons, use `nix profile install .#solidcraft`.
+To launch, use `nix run . -- --sample`. To install the app's terminal
+commands, desktop entry and generated icons, use `nix profile install .#polykrom`.
 `nix build` alone creates a build result; it does not install a launcher in your
-desktop menu. The installed `solidcraft` command runs the wrapped app; `polykrom-cli` is included as
+desktop menu. The installed `polykrom` command runs the wrapped app; `polykrom-cli` is included as
 well. See
 [Nix installation and troubleshooting](docs/nix.md) for remote-flake commands,
 desktop integration and how to distinguish an old executable on `PATH`.
@@ -145,7 +145,7 @@ The [architecture page](docs/architecture.md) has the layer table. The short ver
    `hand_rolled_camera_input_is_rejected` test fails if a page does.
 
 Labels, parameter docs, messages and docs use the terms in the
-[glossary](https://docs.solidcraft.io/reference/glossary.html): one term for each idea. A change that adds a new
+[glossary](https://polykrom.app/docs/reference/glossary): one term for each idea. A change that adds a new
 idea adds its term there.
 
 [AGENTS.md](AGENTS.md) has the long form of these rules. It's written for AI agents, but it's

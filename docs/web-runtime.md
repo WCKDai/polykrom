@@ -8,7 +8,7 @@ agent control that stay aligned with the desktop app, the control channel, and
 [`apps/polykrom-web`](../apps/polykrom-web) and [`files.rs`](../apps/polykrom-web/src/files.rs)
 rather than growing a second stack here.
 
-Related: [plugins.md](plugins.md) and [#1221](https://github.com/bherbruck/solidcraft/issues/1221)
+Related: [plugins.md](plugins.md) and [#1221](https://github.com/tangency-labs/solidcraft/issues/1221)
 (desktop WIT + wasmtime first; parametric timeline features in phase 2), [design containers](design-container.md),
 [control protocol](control-protocol.md).
 
@@ -42,7 +42,7 @@ renderer into a worker is out of scope for the first integration; worker GPU is 
    reads of cloud blobs through CollabCraft without vendor types in generic crates.
 4. **One worker broker.** A SharedWorker (or dedicated-worker fallback) coordinates storage writes,
    job queues, and shared wasm module compile per origin. Plugins and offload jobs register on the
-   broker; do not spawn one SharedWorker per plugin ([#1221 comment thread](https://github.com/bherbruck/solidcraft/issues/1221)).
+   broker; do not spawn one SharedWorker per plugin ([#1221 comment thread](https://github.com/tangency-labs/solidcraft/issues/1221)).
 
 ## Architecture
 
@@ -65,7 +65,7 @@ Tiers (craft-tier-store)
 ```
 
 On **desktop**, the same `BlobStore` and job envelopes apply: warm/cold map to normal directories;
-[`polykrom-cli mcp`](mcp.md) and wasmtime plugin hosts ([#1221](https://github.com/bherbruck/solidcraft/issues/1221))
+[`polykrom-cli mcp`](mcp.md) and wasmtime plugin hosts ([#1221](https://github.com/tangency-labs/solidcraft/issues/1221))
 call the same `run(command, args)` JSON.
 
 ## Mapping Polykrom today
@@ -113,7 +113,7 @@ providers and key namespaces only.
 File policy for web agents mirrors MCP folders: design directory, cold tier roots, recovery;
 never `--allow-any-path` in the tab.
 
-## Plugins ([#1221](https://github.com/bherbruck/solidcraft/issues/1221))
+## Plugins ([#1221](https://github.com/tangency-labs/solidcraft/issues/1221))
 
 | Host | Runtime |
 |------|---------|

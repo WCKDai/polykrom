@@ -1,6 +1,6 @@
 # Plugins (design)
 
-Design companion to [#1221](https://github.com/bherbruck/solidcraft/issues/1221): sandboxed
+Design companion to [#1221](https://github.com/tangency-labs/solidcraft/issues/1221): sandboxed
 WebAssembly plugins with a WIT interface, the same `run(command, args)` JSON as
 [MCP](mcp.md) and the [control protocol](control-protocol.md). Browser hosting is in
 [web-runtime.md](web-runtime.md).
@@ -46,7 +46,7 @@ FeatureKind::Plugin {
 | Field | Role |
 |-------|------|
 | `label` | Primary timeline / browser text |
-| `icon_id` | Host icon registry name (same system as [`feature_icon`](https://github.com/bherbruck/solidcraft/blob/main/crates/ui-egui/src/workspace.rs)) |
+| `icon_id` | Host icon registry name (same system as [`feature_icon`](https://github.com/WCKDai/polykrom/blob/main/crates/ui-egui/src/workspace.rs)) |
 | `tooltip` | Hover text, `inspect` type string |
 | `type_name` | short feature type name for power users |
 
@@ -114,7 +114,7 @@ without a reviewed icon pack.
 creation unless the plugin updates it via a host callback (optional future).
 
 Command naming: prefer **`plugin_id.function`** in `run()` or registered command aliases to avoid
-collisions ([#1221 discussion](https://github.com/bherbruck/solidcraft/issues/1221)).
+collisions ([#1221 discussion](https://github.com/tangency-labs/solidcraft/issues/1221)).
 
 ## Group header variant (lighter-weight v2a)
 
@@ -128,7 +128,7 @@ full `FeatureKind::Plugin` when `evaluate` lands.
 Plugin **document model and eval** stay in Polykrom (`crates/doc`, `crates/engine`). craft-libs
 provides worker/broker hosting only ([web-runtime.md](web-runtime.md)). Neutral serde types
 (`VersionedParams`, `PluginDisplay`) may move to a shared crate later if multiple apps need them;
-CAD plugins remain SolidCraft-specific.
+CAD plugins remain Polykrom-specific.
 
 ## Phasing
 

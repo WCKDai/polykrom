@@ -12,13 +12,13 @@ shader compiler. That covers older Intel graphics, PCs without a graphics driver
 Safe mode starts with default settings (your own settings stay as they are, for the next normal
 start), skips the "Recover unsaved design?" offer and draws with the software renderer.
 
-- Windows: run `solidcraft.exe --safe-mode` from a terminal in the install folder, or add
+- Windows: run `polykrom.exe --safe-mode` from a terminal in the install folder, or add
   ` --safe-mode` to the end of a shortcut's *Target*.
 - macOS: `open -a Polykrom --args --safe-mode`
-- Linux: `polykrom --safe-mode` (Flatpak: `flatpak run ai.storyteller.solidcraft --safe-mode`)
+- Linux: `polykrom --safe-mode` (Flatpak: `flatpak run app.polykrom.Polykrom --safe-mode`)
 
-Setting `SOLIDCRAFT_SAFE_MODE=1` does the same. From 0.10.2, if two launches in a row stop
-before the window opens, the next one starts in safe mode by itself. `SOLIDCRAFT_RENDERER=cpu`
+Setting `POLYKROM_SAFE_MODE=1` does the same. From 0.10.2, if two launches in a row stop
+before the window opens, the next one starts in safe mode by itself. `POLYKROM_RENDERER=cpu`
 uses only the software renderer and keeps your settings.
 
 ## Reset the settings
@@ -31,14 +31,14 @@ with a bug report.
 
 | System | Settings (`app.ron`, `graphics.json`) | Data (`recovery`, `crashes`, `control`, thumbnails) |
 |---|---|---|
-| Windows | `%APPDATA%\SolidCraft` | `%LOCALAPPDATA%\SolidCraft` |
-| macOS | `~/Library/Application Support/SolidCraft` | (the same folder) |
-| Linux | `~/.local/share/solidcraft` | (the same folder); thumbnails in `$XDG_CACHE_HOME/Polykrom` or `/tmp/Polykrom` |
-| Linux (Flatpak) | `~/.var/app/ai.storyteller.solidcraft/data/solidcraft` | (the same folder) |
+| Windows | `%APPDATA%\Polykrom` | `%LOCALAPPDATA%\Polykrom` |
+| macOS | `~/Library/Application Support/Polykrom` | (the same folder) |
+| Linux | `~/.local/share/polykrom` | (the same folder); thumbnails in `$XDG_CACHE_HOME/Polykrom` or `/tmp/Polykrom` |
+| Linux (Flatpak) | `~/.var/app/app.polykrom.Polykrom/data/polykrom` | (the same folder) |
 
 On Windows, paste `%APPDATA%` or `%LOCALAPPDATA%` into the Explorer address bar to open the
-folder. Releases before the rename used `SolveCraft` folders next to these; Polykrom only
-reads them, so you can leave them alone.
+folder. A SolidCraft install keeps its own folders next to these; Polykrom never reads or
+changes them.
 
 - The **`recovery`** folder holds autosaves of designs that were never saved. Rename the data
   folder rather than deleting it, so you can still open those autosaves (`.polykrom` files)
@@ -67,7 +67,7 @@ saying what failed (earlier versions closed without a word). Things to try:
 Some graphics drivers hang on the shader Polykrom uses to build bodies on the GPU, and the
 system then resets the GPU. Polykrom already builds bodies on the CPU on the AMD FirePro
 D300/D500/D700 (Mac Pro 2013). On another GPU that does this, start Polykrom with
-`SOLIDCRAFT_CPU_TESS=1` set to build bodies on the CPU, and open an issue with the GPU's name.
+`POLYKROM_CPU_TESS=1` set to build bodies on the CPU, and open an issue with the GPU's name.
 
 ## Polykrom closes right away on Windows
 
@@ -83,7 +83,7 @@ Polykrom from it:
 
 ```
 set WGPU_BACKEND=dx12
-"C:\Program Files\SolidCraft\solidcraft.exe"
+"C:\Program Files\Polykrom\polykrom.exe"
 ```
 
 `vulkan` and `gl` are the other choices. `setx WGPU_BACKEND dx12` keeps it for apps started

@@ -1,7 +1,9 @@
 # 3MF with B-rep face tags
 
 Version 1 (2026-10). Namespace `https://github.com/bherbruck/solidcraft/formats/3mf-face-tags/2026/10`,
-prefix `ft`.
+prefix `ft`. The namespace is an opaque identifier that names this version of the extension, not
+a web address: it is the string the writer (`crates/io/src/threemf.rs`, `FACE_TAGS_NS`) puts in
+every file, and readers match it byte for byte, so it keeps the name it was published with.
 
 A tessellated body loses its faces: a plain mesh says where the surface is, not which B-rep face
 each triangle came from. Downstream tools that mesh or analyse a part need that back. They apply

@@ -14,7 +14,7 @@ The analysis runs Nightfall's `nf`, built with its studies. Point Polykrom at it
 export POLYKROM_NIGHTFALL=/path/to/nightfall/build/occt/tools/cli/nf
 ```
 
-Without it, the command says so and does nothing. `SOLIDCRAFT_NIGHTFALL` still works. The browser build has no analysis.
+Without it, the command says so and does nothing. The browser build has no analysis.
 
 ## Running it
 

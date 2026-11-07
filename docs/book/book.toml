@@ -10,8 +10,8 @@ build-dir = "../../target/book"
 create-missing = false
 
 [output.html]
-git-repository-url = "https://github.com/wckdboy/polykrom"
-edit-url-template = "https://github.com/wckdboy/polykrom/edit/main/docs/book/{path}"
+git-repository-url = "https://github.com/WCKDai/polykrom"
+edit-url-template = "https://github.com/WCKDai/polykrom/edit/main/docs/book/{path}"
 site-url = "/docs/"
 no-section-label = false
 
@@ -23,7 +23,7 @@ enable = true
 # links; these send them to the right place.
 "/dev/mcp.html" = "../guide/mcp.html"
 "/dev/docs/oracle.html" = "../oracle.html"
-"/dev/README.html" = "https://github.com/wckdboy/polykrom/blob/main/README.md"
-"/dev/ATTRIBUTION.html" = "https://github.com/wckdboy/polykrom/blob/main/ATTRIBUTION.md"
-"/dev/AGENTS.html" = "https://github.com/wckdboy/polykrom/blob/main/AGENTS.md"
-"/dev/ROADMAP.html" = "https://github.com/wckdboy/polykrom/blob/main/ROADMAP.md"
+"/dev/README.html" = "https://github.com/WCKDai/polykrom/blob/main/README.md"
+"/dev/ATTRIBUTION.html" = "https://github.com/WCKDai/polykrom/blob/main/ATTRIBUTION.md"
+"/dev/AGENTS.html" = "https://github.com/WCKDai/polykrom/blob/main/AGENTS.md"
+"/dev/ROADMAP.html" = "https://github.com/WCKDai/polykrom/blob/main/ROADMAP.md"

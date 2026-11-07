@@ -5,9 +5,9 @@ colour/opacity and density/look definitions. Its separate v1 catalog is not the 
 resource-pack/provenance/update system proposed below. Texture/environment descriptors
 remain coordinated with the maintainer's renderer work.
 
-Proposal for [#785](https://github.com/bherbruck/solidcraft/issues/785),
-[#786](https://github.com/bherbruck/solidcraft/issues/786) and
-[#787](https://github.com/bherbruck/solidcraft/issues/787). This page describes planned
+Proposal for [#785](https://github.com/tangency-labs/solidcraft/issues/785),
+[#786](https://github.com/tangency-labs/solidcraft/issues/786) and
+[#787](https://github.com/tangency-labs/solidcraft/issues/787). This page describes planned
 contracts and acceptance gates, not an implemented pack format or new commands. It does
 not bring the deferred Simulation or Render workspaces into scope.
 
@@ -100,7 +100,7 @@ Non-finite or degenerate frames refuse; automatic choice remains a suggestion.
 
 Visual grain does not rotate the body, its geometric bounding box or a manufacturing
 stock frame. Structural grain direction and grain-aware nesting/cut lists are distinct
-features, coordinated with [#137](https://github.com/bherbruck/solidcraft/issues/137).
+features, coordinated with [#137](https://github.com/tangency-labs/solidcraft/issues/137).
 An anisotropic shading effect also does not imply mechanical anisotropy.
 
 After basic wood mapping, add sheet-specific top/bottom/edge looks: MDF, chipboard,
@@ -111,7 +111,7 @@ Face/edge assignments require durable identities and must refuse a lost associat
 rather than paint a nearby replacement face.
 
 Keep texture role, color space, normal-map convention and physical scale explicit.
-Coordinate with the [render capability contract](https://github.com/bherbruck/solidcraft/blob/main/docs/render-backends.md):
+Coordinate with the [render capability contract](https://github.com/WCKDai/polykrom/blob/main/docs/render-backends.md):
 the existing color/opacity viewport is not proof of PBR or texture support. A renderer
 must report what it supports; unavailable maps use a documented preview fallback with
 a visible notice. Export either preserves supported mapping/resources or reports loss.

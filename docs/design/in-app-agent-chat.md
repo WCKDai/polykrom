@@ -131,7 +131,7 @@ Another kind of backend slots in the same way without reshaping the panel.
 On the first Connect the app starts **an endpoint of the chat's own**
 (`control_server::listen_agent`): a free loopback port with a fresh random token, written to the
 per-user token file where `polykrom-cli mcp --connect` finds it. The token never passes
-through the agent, `SOLIDCRAFT_CONTROL_TOKEN` is removed from the agent's environment, and
+through the agent, `POLYKROM_CONTROL_TOKEN` is removed from the agent's environment, and
 `--allow-any-path` is never passed, so the MCP server keeps its #205 folder limits (a request
 that names no folders is confined to the chat's working folder).
 
@@ -218,6 +218,6 @@ returns the whole state, for tests and screenshots.
 | Session controls | Model and mode pickers from `configOptions` / `modes`, slash commands |
 | Auth | An embedded terminal or "open a terminal here" for terminal logins on each OS; logout |
 | Discovery | Read the ACP registry; keychain-aware login check on macOS |
-| Packaging | Make sure every desktop package ships `polykrom-cli` next to `solidcraft` (Flatpak, AppImage, macOS bundle, Windows zip), or serve MCP from the app binary itself |
+| Packaging | Make sure every desktop package ships `polykrom-cli` next to `polykrom` (Flatpak, AppImage, macOS bundle, Windows zip), or serve MCP from the app binary itself |
 | Windows | Job objects instead of `taskkill /T` once there's a safe API for them |
 | API backend | Streaming answers; images in tool results |

@@ -161,7 +161,7 @@ sketch-pattern children, drag reordering and command JSON retain their existing 
 `history_icons`, `history_names`, `history_marker` and the `history_seam_rest/hover/drag` states
 have light/dark gallery references. The CPU
 board test captures both strip widths with expanded and collapsed browsers
-(`SOLIDCRAFT_HISTORY_EVIDENCE`).
+(`POLYKROM_HISTORY_EVIDENCE`).
 
 `text(ui, text, options)` supports the existing text behaviors and the new error band:
 
@@ -396,7 +396,7 @@ The menu gallery includes normal, hovered, open, disabled, checked/unchecked,
 swatch and danger rows, a submenu and rename. Radial geometry tests measure the
 actual side endpoints at both radii and sample all four rounded corners. Optional
 CPU-rendered menu evidence can be produced without a window with
-`SOLIDCRAFT_MENU_EVIDENCE=/tmp/menus cargo test -p polykrom-ui-egui --lib menu_board_in_both_themes`.
+`POLYKROM_MENU_EVIDENCE=/tmp/menus cargo test -p polykrom-ui-egui --lib menu_board_in_both_themes`.
 Desktop interaction and visual acceptance still require a reviewer capture.
 
 Command search uses the ribbon field itself (`sc_sbox_text`); `ribbon:search`,
@@ -412,7 +412,7 @@ rule. Ranking, command mode and keyboard routing remain with the caller.
 
 Generate CPU-rendered evidence of all five search states and the actual ribbon's
 closed/opening/open/closing transition in both themes with
-`SOLIDCRAFT_SEARCH_EVIDENCE=/tmp/search cargo test -p polykrom-ui-egui --lib command_search`.
+`POLYKROM_SEARCH_EVIDENCE=/tmp/search cargo test -p polykrom-ui-egui --lib command_search`.
 
 ### Compact workspace composition
 
@@ -465,7 +465,7 @@ neutral `file_image_tint`; icon and text colours do not change their pixels.
 Spacing, dimensions, fonts and radii come from `theme::Tokens`.
 
 Gallery and geometry tests cover these components. To capture the actual File
-view using public temporary fixtures, set `SOLIDCRAFT_FILE_EVIDENCE` to an output
+view using public temporary fixtures, set `POLYKROM_FILE_EVIDENCE` to an output
 directory and run `file_view_application_evidence_in_both_themes_and_widths` with
 `--ignored`. It produces desktop and 420 pt narrow PNGs in both themes.
 

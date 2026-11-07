@@ -1,88 +1,64 @@
 # Getting started
 
-The desktop executable is `solidcraft` (also `polykrom`), the CLI is `polykrom-cli` (also
-`polykrom-cli`), and designs are saved as `.polykrom`. SolidCraft's `.solidcraft` designs open too,
-and save as `.polykrom`. Designs, settings and setups from builds released under the previous product name keep
-working (see the [compatibility notes](https://github.com/wckdboy/polykrom/blob/main/docs/compatibility.md)).
+The desktop executable is `polykrom`, the CLI is `polykrom-cli`, and designs are saved as
+`.polykrom`. Designs from SolidCraft, the project Polykrom is forked from, and from earlier
+Polykrom builds (`.solidcraft`, `.solvecraft`) open too, and save as `.polykrom` (see the
+[compatibility notes](https://github.com/WCKDai/polykrom/blob/main/docs/compatibility.md)).
 
 ## Desktop
 
 Download the installer for your system from the
-[Download section of the README](https://github.com/bherbruck/solidcraft#download) or the
-[releases page](https://github.com/bherbruck/solidcraft/releases), or build it yourself with
+[downloads page](https://github.com/WCKDai/polykrom/blob/main/docs/downloads.md) or the
+[releases page](https://github.com/WCKDai/polykrom/releases), or build it yourself with
 stable Rust (1.95 or newer):
 
 ```sh
-git clone https://github.com/bherbruck/solidcraft && cd solidcraft
+git clone https://github.com/WCKDai/polykrom && cd polykrom
 cargo run --release -p polykrom -- --sample   # opens with a sample part
 ```
 
-`solidcraft part.step` opens a STEP, IGES, 3MF, STL or OBJ file as a new design, and
-`solidcraft design.polykrom` opens a saved design. Windows builds cross-compile from Linux with
+`polykrom part.step` opens a STEP, IGES, 3MF, STL or OBJ file as a new design, and
+`polykrom design.polykrom` opens a saved design. Windows builds cross-compile from Linux with
 `cargo xwin build --release --target x86_64-pc-windows-msvc -p polykrom`.
 
 ### macOS
 
-Open the release `.dmg` and drag `SolidCraft.app` onto Applications.
-
-When updating from a build released under the previous product name, follow the
-[macOS upgrade notes](https://github.com/wckdboy/polykrom/blob/main/docs/compatibility.md#macos) so you replace it rather than install a second copy.
+Open the release `.dmg` and drag `Polykrom.app` onto Applications.
 
 ### Linux AppImage
 
 The first time you open the AppImage it adds a menu entry and icons under `~/.local/share`
-(`applications/ai.storyteller.solidcraft.desktop`, `icons/hicolor`), so the desktop shows the
+(`applications/app.polykrom.Polykrom.desktop`, `icons/hicolor`), so the desktop shows the
 right name and icon. It adds nothing if [appimaged](https://github.com/probonopd/go-appimage)
 already made an entry for the file, or if a launcher such as Gear Lever or AppImageLauncher
 started it (and removes the entry Polykrom added before). To
-turn it off for good, create an empty file `~/.local/share/solidcraft/no-desktop-integration`, or
-start the AppImage with `SOLIDCRAFT_NO_DESKTOP_INTEGRATION=1`.
+turn it off for good, create an empty file `~/.local/share/polykrom/no-desktop-integration`, or
+start the AppImage with `POLYKROM_NO_DESKTOP_INTEGRATION=1`.
 
 ### Linux Flatpak
 
-Install Flatpak using your distribution's package manager. For an installation that receives
-updates, add Flathub for the required Freedesktop runtime and the Polykrom application feed
-to the same user installation:
-
-```sh
-flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
-flatpak remote-add --user --if-not-exists solidcraft https://docs.solidcraft.io/flatpak/solidcraft.flatpakrepo
-flatpak install --user solidcraft ai.storyteller.solidcraft
-flatpak run ai.storyteller.solidcraft
-```
-
-A Polykrom remote added before the project moved to `docs.polykrom.io` (from
-`bherbruck.github.io`) no longer finds updates. Point it at the new address, then update:
-`flatpak remote-modify --user --url=https://docs.solidcraft.io/flatpak/repo/ solidcraft` and
-`flatpak update --user`.
-
-Releases up to 0.7 used the application ID `ai.storyteller.solvecraft`. If you installed one
-of those from the Polykrom remote, `flatpak update --user` reports it as end-of-life and offers
-to replace it with `ai.storyteller.solidcraft`; accept, and your settings and autosaves move with
-it. If you installed a `.flatpak` bundle, install the new bundle, launch it once (it copies your
-settings), then run `flatpak uninstall --user ai.storyteller.solvecraft` (see the
-[compatibility notes](https://github.com/wckdboy/polykrom/blob/main/docs/compatibility.md#linux-app-id)).
-
-Alternatively, download the release's `.flatpak` file for your architecture and run
+Install Flatpak using your distribution's package manager, then download the release's
+`.flatpak` file for your architecture and run
 `flatpak install --user ./polykrom-VERSION-linux-ARCH.flatpak`. The bundle supplies the
 Flathub runtime repository address; installation still needs internet access to fetch any
-missing runtime. Launch with `flatpak run ai.storyteller.solidcraft`, rather than looking for
-a host `solidcraft` binary. Files chosen through Open/Save use the desktop file-chooser portal;
+missing runtime. Launch with `flatpak run app.polykrom.Polykrom`, rather than looking for
+a host `polykrom` binary. Files chosen through Open/Save use the desktop file-chooser portal;
 command-line paths outside Documents may need a specific additional filesystem permission.
+A bundle has no update feed: install the next release's bundle the same way.
 
 ### Linux Snap
 
 On Ubuntu and other distributions with snapd:
 
 ```sh
-sudo snap install solidcraft
-solidcraft                # or open Polykrom from the app menu
-solidcraft.cli --version  # the CLI, for scripts and `solidcraft.cli mcp`
+sudo snap install polykrom
+polykrom                # or open Polykrom from the app menu
+polykrom.cli --version  # the CLI, for scripts and `polykrom.cli mcp`
 ```
 
 The snap can open designs in your home folder (not hidden folders) and, through the file
 chooser, anywhere else. For USB drives and other mounted disks, run
-`sudo snap connect solidcraft:removable-media` once. A release's `.snap` file installs without
+`sudo snap connect polykrom:removable-media` once. A release's `.snap` file installs without
 the store with `sudo snap install --dangerous ./polykrom-VERSION-linux-ARCH.snap`; it then
 doesn't update automatically.
 
@@ -93,7 +69,7 @@ part, `?webgl` forces WebGL2 where WebGPU is missing or misbehaves; the browser 
 `?webgpu`, and an app installed from Chrome or Edge starts with it too). Designs are saved in the
 browser's private file storage, which needs HTTPS or localhost.
 Planned worker and tiered-storage integration is
-described in [web-runtime.md](https://github.com/bherbruck/solidcraft/blob/main/docs/web-runtime.md)
+described in [web-runtime.md](https://github.com/WCKDai/polykrom/blob/main/docs/web-runtime.md)
 (design; not yet wired in the shipped wasm build).
 
 After the first visit the web app works offline: the browser keeps a copy of it. Online, each
@@ -119,18 +95,19 @@ no longer matches the build the browser would keep. Debug builds (`trunk serve`)
 
 ### Self-hosting with Docker
 
-The web app is also a container image, `ghcr.io/tangency-labs/solidcraft-web`, for Linux on x86_64
-and ARM64: `latest` is the latest release, `0.14.0` or `0.14` a release, `edge` the newest `main`.
-It serves the app with nginx on port 8080 and keeps nothing on the server: designs stay in each
-visitor's browser.
+The web app is also a container image built by `.github/workflows/docker.yml`, for Linux on
+x86_64 and ARM64: `latest` is the latest release, a version tag a release, `edge` the newest
+`main`. It serves the app with nginx on port 8080 and keeps nothing on the server: designs stay
+in each visitor's browser. Substitute the image name the workflow publishes under the WCKDai
+organisation on GitHub Container Registry:
 
 ```sh
-docker run -d --name solidcraft -p 8080:8080 --restart unless-stopped ghcr.io/tangency-labs/solidcraft-web:latest
+docker run -d --name polykrom -p 8080:8080 --restart unless-stopped ghcr.io/wckdai/<image>:latest
 ```
 
 Or with Docker Compose, using
-[`packaging/docker/compose.yaml`](https://github.com/tangency-labs/solidcraft/blob/main/packaging/docker/compose.yaml)
-(`SOLIDCRAFT_PORT` picks another port):
+[`packaging/docker/compose.yaml`](https://github.com/WCKDai/polykrom/blob/main/packaging/docker/compose.yaml)
+(`POLYKROM_PORT` picks another port):
 
 ```sh
 docker compose -f packaging/docker/compose.yaml up -d      # start
@@ -220,7 +197,7 @@ A script is a list of commands:
 
 ![The bracket example, rendered by polykrom-cli snapshot](../generated/bracket.png)
 
-`snapshot` looks at the model from the iso view. `--view NAME` takes another standard view (`front`, `back`, `top`, `bottom`, `left`, `right`) or the name of a view saved in the design with `view.save`. `--camera JSON` takes any camera, as the MCP `screenshot` tool does (its conventions are in [the MCP page](mcp.md#camera-and-close-up-recipe)). A script that applies a view itself with `view.apply` sets the camera too. The ground grid lies on Z 0, so it cuts through a part that straddles it: `--no-grid` leaves it out of the picture, and `--no-axes` the origin's axes. The picture is drawn on the GPU with the viewport's own pipelines, so it shows what the window would (a surface analysis such as `inspect.zebra` included); a machine without a GPU uses a software one (Mesa's lavapipe on Linux, WARP on Windows), and with neither (a Mac without usable Metal, a Linux box without Mesa's Vulkan) the CPU rasterizer draws it, without surface analysis colours, and the reply's `renderer` says `cpu` with a warning. `SOLIDCRAFT_GPU=auto|hardware|software|cpu` chooses (`hardware` and `software` fail rather than fall to the CPU), and `polykrom-cli gpu` lists the adapters and the tier a snapshot would use.
+`snapshot` looks at the model from the iso view. `--view NAME` takes another standard view (`front`, `back`, `top`, `bottom`, `left`, `right`) or the name of a view saved in the design with `view.save`. `--camera JSON` takes any camera, as the MCP `screenshot` tool does (its conventions are in [the MCP page](mcp.md#camera-and-close-up-recipe)). A script that applies a view itself with `view.apply` sets the camera too. The ground grid lies on Z 0, so it cuts through a part that straddles it: `--no-grid` leaves it out of the picture, and `--no-axes` the origin's axes. The picture is drawn on the GPU with the viewport's own pipelines, so it shows what the window would (a surface analysis such as `inspect.zebra` included); a machine without a GPU uses a software one (Mesa's lavapipe on Linux, WARP on Windows), and with neither (a Mac without usable Metal, a Linux box without Mesa's Vulkan) the CPU rasterizer draws it, without surface analysis colours, and the reply's `renderer` says `cpu` with a warning. `POLYKROM_GPU=auto|hardware|software|cpu` chooses (`hardware` and `software` fail rather than fall to the CPU), and `polykrom-cli gpu` lists the adapters and the tier a snapshot would use.
 
 ```sh
 polykrom-cli snapshot part.polykrom --out photo.png --view Photo
@@ -308,12 +285,13 @@ and Z is up.
 ## Name and compatibility
 
 Polykrom is a fork of [SolidCraft](https://github.com/tangency-labs/solidcraft), which was
-itself renamed from an earlier working name (SolveCraft). Since SolidCraft 0.5.0 the internals
-use the SolidCraft name, and Polykrom keeps them for now: the `solidcraft` and `polykrom-cli` programs, `.solidcraft` designs, `SOLIDCRAFT_*`
-environment variables, settings folders and the `solidcraft` MCP server. Upgrading keeps
-working: designs, settings, recovery files, environment variables and CLI/MCP setups from
-earlier builds carry over. Every compatibility shim is listed in the
-[compatibility notes](https://github.com/wckdboy/polykrom/blob/main/docs/compatibility.md).
+itself renamed from an earlier working name (SolveCraft). Everything in Polykrom carries its own
+name: the `polykrom` and `polykrom-cli` programs, `Polykrom.app`, the app ID
+`app.polykrom.Polykrom`, `.polykrom` designs, `POLYKROM_*` environment variables, the settings
+folders and the `polykrom` MCP registration. The designs those programs wrote (`.solidcraft`,
+`.solvecraft`, and their `solidcraft/N` and `solvecraft/N` format tags) open in Polykrom; nothing
+else of theirs is read, as the
+[compatibility notes](https://github.com/WCKDai/polykrom/blob/main/docs/compatibility.md) describe.
 
-Use the Polykrom documentation and web-app URLs. GitHub redirects links to the renamed
-repository; old-name Pages and Flatpak URLs are not maintained as permanent aliases.
+The documentation lives at <https://polykrom.app/docs/> and the browser app at
+<https://polykrom.app/app/>; code and issues at <https://github.com/WCKDai/polykrom>.
