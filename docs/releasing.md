@@ -116,12 +116,29 @@ it at the draft's target commit.
 
 Items to carry into the next release's notes (step 3 below), then remove from here:
 
-- 0.21.0-rc.2 (a release candidate: packaging corrections and an update fix, #304, #305).
-  - Release files are named Polykrom (`polykrom-<version>-<platform>`,
-    `Polykrom-<version>-windows-x64.exe`). The version-less installers are also attached under
-    their earlier `solidcraft-…` names, so old download links and installs keep finding them.
-  - In-app update checks work again: since the repository moved to the WCKDai organisation, the
-    check turned down every file of a release.
+- 0.21.0, the first stable release of Polykrom by WCKD. A minor bump: it adds new capabilities
+  on `0.x` (the redesigned interface and the kernel's determinism) and closes the 0.21.0 release
+  candidates (#304–#307, #388–#390). PolyCore is pinned at `6872c214` (PC-12).
+  - A redesigned interface. The model fills the whole window, and the panels float over it as
+    glass. The chrome is compact, and the text is set in the Geist fonts. Asking the AI is part
+    of modelling: ask for a change, see it previewed on the model, read the review card, and
+    apply it as one step that a single Undo takes back. The Properties panel shows the selected
+    feature's values and lets you edit them in place.
+  - The same model gives the same result on macOS, Windows and Linux. The PolyCore kernel's
+    sines, cosines, exponentials and logarithms now come from its own maths library instead of
+    each operating system's, so a design built on one computer rebuilds bit for bit on another.
+  - A faster kernel. Building the robustness seed designs takes about a tenth less time than
+    before.
+  - From the release candidates (0.21.0-rc.2: packaging corrections and an update fix, #304,
+    #305):
+    - Release files are named Polykrom (`polykrom-<version>-<platform>`,
+      `Polykrom-<version>-windows-x64.exe`). The version-less installers are also attached under
+      their earlier `solidcraft-…` names, so old download links and installs keep finding them.
+    - In-app update checks work again: since the repository moved to the WCKDai organisation, the
+      check turned down every file of a release.
+  - Compatibility: designs now carry the `polykrom/36` format tag (#304). 0.21.0 opens every
+    earlier design, including SolidCraft's; a design saved by 0.21.0 does not open in the release
+    candidates or in SolidCraft.
 
 ## Verify and publish
 

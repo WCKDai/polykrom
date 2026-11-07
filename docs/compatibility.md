@@ -67,7 +67,7 @@ Polykrom before #304 say `"format": "solidcraft/N"`, and builds up to 0.5 say `"
 three and upgrades them as usual (the file is re-tagged `polykrom/N` when saved).
 
 Not backward-compatible: SolidCraft, and Polykrom builds from before #304, don't know the new tag
-and refuse designs saved by later builds (`format/pending/polykrom-format-tag.rs`).
+and refuse designs saved by later builds (`format/v36/polykrom-format-tag.rs`, format 36 since 0.21.0).
 
 Not backward-compatible: builds up to 0.5 don't know the new tag and refuse files saved by
 later builds. Test: `version_of` accepts both prefixes; legacy-tagged designs load and are
