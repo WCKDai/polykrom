@@ -3,7 +3,7 @@
 ## Supported versions
 
 Polykrom is young and moves quickly, so only the latest release gets security fixes. Please
-update to the [latest release](https://github.com/wckdboy/polykrom/releases/latest) before
+update to the [latest release](https://github.com/WCKDai/polykrom/releases/latest) before
 reporting, and check whether the problem is still on `main`.
 
 | Version | Supported |
@@ -15,9 +15,9 @@ reporting, and check whether the problem is still on `main`.
 ## Reporting a vulnerability
 
 Please **don't open a public issue** for a security problem. Report it privately through GitHub:
-open the repository's [Security tab](https://github.com/wckdboy/polykrom/security) and choose
+open the repository's [Security tab](https://github.com/WCKDai/polykrom/security) and choose
 **Report a vulnerability**
-([direct link](https://github.com/wckdboy/polykrom/security/advisories/new)).
+([direct link](https://github.com/WCKDai/polykrom/security/advisories/new)).
 
 A problem that also affects SolidCraft, which Polykrom is forked from, should also be reported to
 [SolidCraft](https://github.com/tangency-labs/solidcraft/security) under its own policy.

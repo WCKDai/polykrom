@@ -12,7 +12,7 @@ edition = "2024"
 license = "MIT OR Apache-2.0"
 rust-version = "1.95"
 authors = ["Polykrom contributors"]
-repository = "https://github.com/wckdboy/polykrom"
+repository = "https://github.com/WCKDai/polykrom"
 
 [workspace.dependencies]
 # internal

@@ -143,7 +143,10 @@ jobs:
           dpkg-deb --contents dist/release/*.deb | grep -E 'usr/bin/polykrom$'
           dpkg-deb --contents dist/release/*.deb | grep -E 'usr/bin/polykrom-cli$'
           # Nothing under any earlier name: the package is polykrom and ships its two programs.
-          ! dpkg-deb --contents dist/release/*.deb | grep -E -i 'solid[c]raft|solve[c]raft'
+          if dpkg-deb --contents dist/release/*.deb | grep -E -i 'solid[c]raft|solve[c]raft'; then
+            echo "::error::the deb carries a file under a name other than Polykrom's"
+            exit 1
+          fi
           test "$(dpkg-deb --field dist/release/*.deb Package)" = polykrom
           rpm -qip dist/release/*.rpm
           rpm -qlp dist/release/*.rpm | grep -E '/usr/bin/polykrom$'
@@ -156,8 +159,13 @@ jobs:
             test -s "$appimage.zsync"
           done
           # Every file carries Polykrom's name and no other.
-          ls dist/release | grep -E -i -v '^polykrom-' && exit 1
-          true
+          for f in dist/release/*; do
+            name="${f##*/}"
+            case "${name,,}" in
+              polykrom-*) ;;
+              *) echo "::error::$name does not carry Polykrom's name"; exit 1 ;;
+            esac
+          done
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: release-linux-${{ matrix.arch }}
@@ -435,10 +443,13 @@ jobs:
             test -s "$f" || { echo "::error::missing version-less copy $f"; exit 1; }
           done
           ls -l polykrom-[!0-9]*
-          if ls | grep -E -i 'solid[c]raft|solve[c]raft'; then
-            echo "::error::a release asset carries a name other than Polykrom's"
-            exit 1
-          fi
+          for f in *; do
+            case "${f,,}" in
+              *solid[c]raft* | *solve[c]raft*)
+                echo "::error::a release asset carries a name other than Polykrom's: $f"
+                exit 1 ;;
+            esac
+          done
       - name: Checksums and notes
         run: |
           (cd artifacts && sha256sum -- * | tee SHA256SUMS.txt)

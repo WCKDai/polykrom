@@ -199,7 +199,7 @@ pub fn no_window_message(error: &str, settings: Option<&Path>) -> String {
          - Over Remote Desktop or in a virtual machine, enable 3D acceleration or run it on the machine itself.\n\
          - Start it once with `polykrom --safe-mode`.\n\
          - Rename the settings folder: {folder}\n\n\
-         More: https://github.com/wckdboy/polykrom/blob/main/docs/book/src/guide/troubleshooting.md"
+         More: https://github.com/WCKDai/polykrom/blob/main/docs/book/src/guide/troubleshooting.md"
     )
 }
 
