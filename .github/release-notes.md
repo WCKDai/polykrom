@@ -29,7 +29,7 @@ project Polykrom is forked from, open in this one
 The installed programs are `polykrom` and `polykrom-cli`; the app ID on Linux (desktop entry,
 Flatpak, AppStream) and the macOS bundle ID is `app.polykrom.Polykrom`.
 
-**Flatpak repository:** every published release is also in Polykrom's own repository at
+**Flatpak repository:** the latest stable release is also in Polykrom's own repository at
 <https://polykrom.app/flatpak/>, which `flatpak update` follows. Add it next to Flathub (the
 runtime's source) in the same user installation, then install:
 

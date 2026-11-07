@@ -38,7 +38,7 @@ start the AppImage with `POLYKROM_NO_DESKTOP_INTEGRATION=1`.
 ### Linux Flatpak
 
 Install Flatpak using your distribution's package manager. Polykrom's own repository at
-<https://polykrom.app/flatpak/> holds every published release; Flathub provides the
+<https://polykrom.app/flatpak/> serves the latest stable release, and `flatpak update` follows it; Flathub provides the
 Freedesktop runtime it needs. Add both remotes to the same user installation, then install:
 
 ```sh

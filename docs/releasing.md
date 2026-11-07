@@ -195,7 +195,8 @@ token for publication. Do not assume the repository updated: check the deploymen
 Flatpak workflow requests the site workflow (`site.yml`) with that tag; the site deployment
 assembles the landing page, documentation, browser app and Flatpak repository together, and
 every ordinary deployment (any push to main) includes the latest stable release too, mirroring
-the repository already served so earlier releases stay. Verify the resulting Site run, not only
+the repository already served so refs a release does not replace stay. The mirror keeps only
+the commit each ref points to, so the repository serves the latest stable release. Verify the resulting Site run, not only
 the dispatch job, so a release cannot erase the docs or app and docs updates cannot erase the
 package repository.
 

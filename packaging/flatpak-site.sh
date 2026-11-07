@@ -2,8 +2,8 @@
 # The Flatpak repository of polykrom.app: flatpak-site.sh SITE_DIR adds SITE_DIR/flatpak/ (the
 # OSTree repository under repo/, polykrom.flatpakrepo and an index page) to the assembled site,
 # from the .flatpak bundles of the latest published release (or RELEASE_TAG). The repository
-# already served at SITE_BASE_URL (https://polykrom.app) is mirrored first, so earlier releases
-# stay and `flatpak update` keeps working. Every site deployment (.github/workflows/site.yml) runs
+# already served at SITE_BASE_URL (https://polykrom.app) is mirrored first, so refs this release
+# does not replace stay and `flatpak update` keeps working; it serves the latest release only. Every site deployment (.github/workflows/site.yml) runs
 # it, and no other workflow replaces the site. Objects over Cloudflare's per-file limit are split
 # afterwards by site/parts.py and joined again by site/worker.js.
 set -euo pipefail
@@ -23,8 +23,11 @@ if ! printf '%s' "$tag" | grep -Eq '^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9]
   exit 1
 fi
 published="$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$tag" \
-  --jq 'select(.draft == false and .published_at != null) | .tag_name')"
-test "$published" = "$tag"
+  --jq 'select(.draft == false and .prerelease == false and .published_at != null) | .tag_name')"
+if [ "$published" != "$tag" ]; then
+  echo "error: $tag is not a published stable release (draft or prerelease)" >&2
+  exit 1
+fi
 test -s "$site/index.html"
 test -s "$site/app/index.html"
 
@@ -37,11 +40,21 @@ ostree --repo="$repo_dir" init --mode=archive-z2
 base_url="${SITE_BASE_URL:-https://polykrom.app}"
 base_url="${base_url%/}"
 previous_url="$base_url/flatpak/repo"
-if curl --fail --silent --location --output /dev/null "$previous_url/summary"; then
-  ostree --repo="$repo_dir" remote add --no-gpg-verify previous "$previous_url"
-  ostree --repo="$repo_dir" pull --mirror previous
-  ostree --repo="$repo_dir" remote delete previous
-fi
+# Only a 404 means nothing is served yet: a transient failure must not drop refs this release
+# does not replace.
+status="$(curl --silent --location --output /dev/null --write-out '%{http_code}' "$previous_url/summary" || true)"
+case "$status" in
+  200)
+    ostree --repo="$repo_dir" remote add --no-gpg-verify previous "$previous_url"
+    ostree --repo="$repo_dir" pull --mirror previous
+    ostree --repo="$repo_dir" remote delete previous
+    ;;
+  404) ;;
+  *)
+    echo "error: $previous_url/summary answered HTTP ${status:-none}; not replacing the served repository" >&2
+    exit 1
+    ;;
+esac
 for arch in x86_64 aarch64; do
   asset="polykrom-$version-linux-$arch.flatpak"
   gh release download "$tag" --repo "$GITHUB_REPOSITORY" --pattern "$asset" --dir "$bundles"

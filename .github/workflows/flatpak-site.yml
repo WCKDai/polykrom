@@ -24,7 +24,9 @@ concurrency:
 jobs:
   publish:
     name: Request the site deployment with the Flatpak repository
-    if: github.repository == 'WCKDai/polykrom'
+    # Release candidates and nightlies are published as prereleases; only stable releases reach
+    # the stable Flatpak channel.
+    if: github.repository == 'WCKDai/polykrom' && (github.event_name != 'release' || !github.event.release.prerelease)
     runs-on: ubuntu-24.04
     env:
       GH_TOKEN: ${{ github.token }}
@@ -34,7 +36,7 @@ jobs:
         run: |
           set -euo pipefail
           published="$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG" \
-            --jq 'select(.draft == false and .published_at != null) | .tag_name')"
+            --jq 'select(.draft == false and .prerelease == false and .published_at != null) | .tag_name')"
           test "$published" = "$RELEASE_TAG"
           gh workflow run site.yml --repo "$GITHUB_REPOSITORY" --ref main \
             -f release_tag="$RELEASE_TAG"
