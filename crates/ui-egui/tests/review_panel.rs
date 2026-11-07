@@ -109,10 +109,20 @@ fn render_model(h: &Harness, path: &Path) {
     assert!(std::fs::metadata(path).unwrap().len() <= MAX_BYTES);
 }
 
-/// Frames until the proposal's preview is up (it computes off the window thread).
+/// How long a preview may take to compute before the test stops waiting for it: generous, for a
+/// loaded CI runner, where a computation that takes a fraction of a second here has taken many.
+const PREVIEW_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30);
+
+/// Frames until the proposal's preview has settled (it computes off the window thread): it is
+/// active or its error is set, and nothing is computing. Frames are pumped until that holds or
+/// `PREVIEW_TIMEOUT` of wall-clock time has passed: a fixed count of frames ran out on a slow
+/// CI runner while the preview was still computing, and the pictures were painted without it
+/// (PK-99). The caller asserts the state.
 fn settle_preview(h: &mut Harness) {
-    for _ in 0..400 {
-        if h.app.preview.active {
+    let deadline = std::time::Instant::now() + PREVIEW_TIMEOUT;
+    loop {
+        let settled = !h.app.preview.busy && (h.app.preview.active || h.app.preview.error.is_some());
+        if settled || std::time::Instant::now() >= deadline {
             break;
         }
         h.frame();
@@ -208,6 +218,8 @@ fn review_flow_pictures() {
             assert_eq!(r["result"]["open"]["pattern_preserved"], true);
         }
         settle_preview(&mut h);
+        // The pictures from here to Apply show the proposal previewed: never painted without it.
+        assert!(h.app.preview.active, "{mode}: the proposed Ø10 holes are previewed: {:?}", h.app.preview.error);
         if after {
             assert!(h.widget("Ø8.00 mm → Ø10.00 mm").is_some() && h.widget("Preview ready").is_some(), "the card's value and the row's button");
         }

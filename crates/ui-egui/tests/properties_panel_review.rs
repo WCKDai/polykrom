@@ -176,10 +176,19 @@ fn editing(h: &Harness) -> bool {
     h.widget("Apply change").is_some()
 }
 
-/// Frames until the preview is up (it computes off the window thread).
+/// How long a preview may take to compute before the test stops waiting for it: generous, for a
+/// loaded CI runner, where a computation that takes a fraction of a second here has taken many.
+const PREVIEW_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30);
+
+/// Frames until the preview has settled (it computes off the window thread): it is active or
+/// its error is set, and nothing is computing. Frames are pumped until that holds or
+/// `PREVIEW_TIMEOUT` of wall-clock time has passed: a fixed count of frames ran out on a slow
+/// CI runner while the preview was still computing (PK-99). The caller asserts the state.
 fn settle_preview(h: &mut Harness) {
-    for _ in 0..400 {
-        if h.app.preview.active || h.app.preview.error.is_some() {
+    let deadline = std::time::Instant::now() + PREVIEW_TIMEOUT;
+    loop {
+        let settled = !h.app.preview.busy && (h.app.preview.active || h.app.preview.error.is_some());
+        if settled || std::time::Instant::now() >= deadline {
             break;
         }
         h.frame();
