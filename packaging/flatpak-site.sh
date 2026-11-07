@@ -12,12 +12,32 @@ trap 'echo "flatpak-site.sh: line $LINENO: \"$BASH_COMMAND\" failed (exit $?)" >
 site="${1:?site directory required}"
 tag="${RELEASE_TAG:-}"
 app_id=app.polykrom.Polykrom
+base_url="${SITE_BASE_URL:-https://polykrom.app}"
+base_url="${base_url%/}"
+previous_url="$base_url/flatpak/repo"
+# Only a 404 means nothing is served yet: a transient failure must not drop refs this release
+# does not replace.
+status="$(curl --silent --location --output /dev/null --write-out '%{http_code}' "$previous_url/summary" || true)"
+case "$status" in
+  200 | 404) ;;
+  *)
+    echo "error: $previous_url/summary answered HTTP ${status:-none}; not replacing the served repository" >&2
+    exit 1
+    ;;
+esac
 if [ -z "$tag" ]; then
-  tag="$(gh api "repos/$GITHUB_REPOSITORY/releases?per_page=100" \
-    --jq '[.[] | select(.draft == false and .prerelease == false)][0].tag_name // empty')"
+  # Nightlies and release candidates are prereleases published daily, so the latest stable
+  # release can be pages back: read every page, as packaging/nightly.sh does.
+  tag="$(gh api --paginate --slurp "repos/$GITHUB_REPOSITORY/releases?per_page=100" \
+    | jq -r '[.[][] | select(.draft == false and .prerelease == false and .published_at != null)] | sort_by(.published_at) | last | .tag_name // empty')"
 fi
-# Before the first publication the docs and browser app can still deploy.
-if [ -z "$tag" ]; then exit 0; fi
+if [ -z "$tag" ]; then
+  # Before the first publication the docs and browser app can still deploy; once a repository
+  # is served, deploying without one would remove it.
+  if [ "$status" = 404 ]; then exit 0; fi
+  echo "error: no published stable release found, but $previous_url is served" >&2
+  exit 1
+fi
 if ! printf '%s' "$tag" | grep -Eq '^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-((0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*)(\.(0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*))*))?(\+[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$'; then
   echo "invalid release tag: $tag" >&2
   exit 1
@@ -37,24 +57,11 @@ gh release download "$tag" --repo "$GITHUB_REPOSITORY" --pattern SHA256SUMS.txt 
 repo_dir="$site/flatpak/repo"
 mkdir -p "$repo_dir"
 ostree --repo="$repo_dir" init --mode=archive-z2
-base_url="${SITE_BASE_URL:-https://polykrom.app}"
-base_url="${base_url%/}"
-previous_url="$base_url/flatpak/repo"
-# Only a 404 means nothing is served yet: a transient failure must not drop refs this release
-# does not replace.
-status="$(curl --silent --location --output /dev/null --write-out '%{http_code}' "$previous_url/summary" || true)"
-case "$status" in
-  200)
-    ostree --repo="$repo_dir" remote add --no-gpg-verify previous "$previous_url"
-    ostree --repo="$repo_dir" pull --mirror previous
-    ostree --repo="$repo_dir" remote delete previous
-    ;;
-  404) ;;
-  *)
-    echo "error: $previous_url/summary answered HTTP ${status:-none}; not replacing the served repository" >&2
-    exit 1
-    ;;
-esac
+if [ "$status" = 200 ]; then
+  ostree --repo="$repo_dir" remote add --no-gpg-verify previous "$previous_url"
+  ostree --repo="$repo_dir" pull --mirror previous
+  ostree --repo="$repo_dir" remote delete previous
+fi
 for arch in x86_64 aarch64; do
   asset="polykrom-$version-linux-$arch.flatpak"
   gh release download "$tag" --repo "$GITHUB_REPOSITORY" --pattern "$asset" --dir "$bundles"
