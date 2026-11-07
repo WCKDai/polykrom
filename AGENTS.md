@@ -64,7 +64,7 @@ People trust Polykrom with their designs; a crash loses their work. **This outra
   When someone says the app crashed, look there first: `polykrom-cli crashes`, `crashes show <id>`,
   `crashes replay <id>` (or the `diagnostics.crash_reports` command / MCP `crash_reports` tool).
 - **Prove it:** every crash fix lands with a regression test (see `hostile_params_never_panic`); a
-  crash report's `design.solidcraft` + `replay.json` is the test's starting point.
+  crash report's `design.polykrom` + `replay.json` is the test's starting point.
 - **Where tests go:** a regression test goes into the existing test file for its area (booleans, blends,
   shell, sweep, STEP, naming…), never a new file named after the bug (#3226).
 - Every production crate root carries
@@ -127,7 +127,7 @@ People trust Polykrom with their designs; a crash loses their work. **This outra
   Keep them minimal; `cargo xtask web-offline-test` covers the service worker.
 - **Quality gates** before every commit: `cargo xtask ci` (fmt, clippy -D warnings, tests,
   assets, layers). Commit after every feature arc that builds.
-- **Publishing**: the repository is github.com/wckdboy/polykrom. Changes land through
+- **Publishing**: the repository is github.com/WCKDai/polykrom. Changes land through
   **pull requests**: push a branch and open a PR against `main`. A fix that also applies to
   SolidCraft goes upstream first, as a PR to tangency-labs/solidcraft following that project's
   rules, and comes to Polykrom with the next merge from upstream. Keep each PR to one topic and one issue, and never
