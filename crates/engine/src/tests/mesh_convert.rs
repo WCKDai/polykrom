@@ -131,7 +131,7 @@ fn exported_binary_stl_with_a_bore_reconstructs_analytic_faces() {
     run(&mut s, "sketch.circle.center", json!({"center":[10,10],"radius":4}));
     run(&mut s, "sketch.finish", json!({}));
     run(&mut s, "solid.extrude", json!({"sketch":"Section","profiles":[{"point":[30,10]}],"distance":15,"body_name":"Bracket"}));
-    let path = std::env::temp_dir().join(format!("solidcraft-mesh-convert-{}.stl", std::process::id()));
+    let path = std::env::temp_dir().join(format!("polykrom-mesh-convert-{}.stl", std::process::id()));
     run(&mut s, "file.save_mesh", json!({"path":path}));
     run(&mut s, "doc.open", json!({"path":path}));
     let name = s.model.state().bodies[0].name.clone();
@@ -184,7 +184,7 @@ fn stl_export_is_closed_where_faces_meet() {
 #[test]
 fn save_mesh_rejects_unknown_format_and_slicer_without_writing() {
     let mut s = imported_box();
-    let path = std::env::temp_dir().join(format!("solvecraft-save-mesh-{}.stl", std::process::id()));
+    let path = std::env::temp_dir().join(format!("polykrom-save-mesh-{}.stl", std::process::id()));
     let _ = std::fs::remove_file(&path);
     for params in [json!({"path":path,"format":"nope"}), json!({"path":path,"slicer":"no such slicer anywhere"})] {
         assert!(s.execute("file.save_mesh", &params).is_err());
@@ -197,7 +197,7 @@ fn save_mesh_writes_stl_and_3mf() {
     let mut s = imported_box();
     let dir = std::env::temp_dir();
     for (ext, format) in [("stl", None), ("3mf", None), ("dat", Some("3mf"))] {
-        let path = dir.join(format!("solvecraft-save-mesh-{}.{ext}", std::process::id()));
+        let path = dir.join(format!("polykrom-save-mesh-{}.{ext}", std::process::id()));
         let mut params = json!({"path": path});
         if let Some(f) = format {
             params["format"] = json!(f);
@@ -219,7 +219,7 @@ fn installed_slicers_are_listed() {
 
 fn insert_box_mesh(s: &mut Session, suffix: &str) -> (String, u64) {
     let mut source = imported_box();
-    let path = std::env::temp_dir().join(format!("solidcraft-convert-component-{}-{suffix}.stl", std::process::id()));
+    let path = std::env::temp_dir().join(format!("polykrom-convert-component-{}-{suffix}.stl", std::process::id()));
     run(&mut source, "file.save_mesh", json!({"path":path}));
     let result = run(s, "file.insert_mesh", json!({"path":path,"name":"Mesh 1"}));
     std::fs::remove_file(path).unwrap();

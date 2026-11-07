@@ -40,14 +40,14 @@ pub fn initialize_params(version: &str) -> Value {
             "auth": {"terminal": true},
             "_meta": {"terminal-auth": true},
         },
-        "clientInfo": {"name": "solidcraft", "title": "Polykrom", "version": version},
+        "clientInfo": {"name": "polykrom", "title": "Polykrom", "version": version},
     })
 }
 
-/// The name the chat gives its MCP server (#2592): not `solidcraft`, the name docs/mcp.md suggests
+/// The name the chat gives its MCP server (#2592): not `polykrom`, the name docs/mcp.md suggests
 /// for a user's own setup, so an agent that merges its own MCP servers with the session's (Codex
 /// keeps its own entry on a clash) can't shadow the bridge with a headless session.
-pub const BRIDGE_NAME: &str = "solidcraft-app";
+pub const BRIDGE_NAME: &str = "polykrom-app";
 
 /// The MCP server the agent starts to reach the design: `polykrom-cli mcp --connect` bridged to
 /// this app's control port. The server finds the port's token in the token file the app wrote
@@ -72,7 +72,7 @@ impl McpBridge {
 
 /// What every session is told about where it is. Agents that don't read `_meta` ignore it.
 pub const SYSTEM_NOTE: &str = "You are running inside Polykrom, a parametric 3D CAD application, as the user's assistant. \
-The open design is reachable through the `solidcraft-app` MCP server: use its tools (list_commands, batch, execute, inspect_design, \
+The open design is reachable through the `polykrom-app` MCP server: use its tools (list_commands, batch, execute, inspect_design, \
 measure, screenshot, set_parameter, undo) to read and change the design the user is looking at, and verify with measure or \
 inspect_design. Prefer one `batch` over many small calls. Saving, opening or exporting files waits for the user's approval in \
 the chat, and each message allows a limited number of changes. Don't use shell or file tools: work through the Polykrom tools. \
@@ -488,21 +488,21 @@ mod tests {
         assert!(split_command("   ").is_empty());
     }
 
-    /// #2592: the bridge is not called `solidcraft`, the name a user's own MCP entry takes from
+    /// #2592: the bridge is not called `polykrom`, the name a user's own MCP entry takes from
     /// docs/mcp.md, and the note tells the agent the name it really has.
     #[test]
     fn the_bridge_has_a_name_of_its_own_and_the_note_uses_it() {
-        assert_ne!(BRIDGE_NAME, "solidcraft");
+        assert_ne!(BRIDGE_NAME, "polykrom");
         assert!(SYSTEM_NOTE.contains(&format!("`{BRIDGE_NAME}` MCP server")), "{SYSTEM_NOTE}");
-        assert!(!SYSTEM_NOTE.contains("`solidcraft` MCP server"));
+        assert!(!SYSTEM_NOTE.contains("`polykrom` MCP server"));
         // The panel still recognises the bridge's tools as Polykrom's (agents name them after
-        // their server, e.g. `mcp__solidcraft-app__batch`).
-        assert!(BRIDGE_NAME.contains("solidcraft"));
+        // their server, e.g. `mcp__polykrom-app__batch`).
+        assert!(BRIDGE_NAME.contains("polykrom"));
     }
 
     #[test]
     fn the_session_gets_the_bridged_mcp_server_without_a_token_or_any_path() {
-        let b = McpBridge { cli: "/opt/solidcraft/polykrom-cli".into(), port: 41234 };
+        let b = McpBridge { cli: "/opt/polykrom/polykrom-cli".into(), port: 41234 };
         let p = session_new_params(std::path::Path::new("/home/u/designs"), Some(&b));
         let s = &p["mcpServers"][0];
         assert_eq!(s["name"], BRIDGE_NAME);

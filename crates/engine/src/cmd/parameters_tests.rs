@@ -315,7 +315,7 @@ fn csv_and_json_round_trip() {
     assert_eq!(s.doc.param("len").map(|p| p.expr.as_str()), Some("80 mm"));
     assert!(matches!(s.execute("parameters.import", &json!({})), Err(EngineError::BadParams { .. })));
 
-    let dir = std::env::temp_dir().join(format!("solidcraft-params-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("polykrom-params-{}", std::process::id()));
     let _ = std::fs::create_dir_all(&dir);
     let path = dir.join("p.json");
     let r = run(&mut s, "parameters.export", json!({"path": path.to_string_lossy()}));

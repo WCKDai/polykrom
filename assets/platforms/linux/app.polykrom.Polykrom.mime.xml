@@ -4,13 +4,13 @@
 <mime-info xmlns="http://www.freedesktop.org/standards/shared-mime-info">
   <mime-type type="application/x-polykrom">
     <comment>Polykrom design</comment>
-    <icon name="ai.storyteller.solidcraft"/>
+    <icon name="app.polykrom.Polykrom"/>
     <sub-class-of type="application/json"/>
     <glob pattern="*.polykrom"/>
-    <!-- SolidCraft's designs: the same container (docs/compatibility.md). -->
+    <!-- Designs from SolidCraft, which Polykrom is forked from, and from its earliest releases:
+         the same container, still opened (docs/compatibility.md). -->
     <glob pattern="*.solidcraft"/>
     <alias type="application/x-solidcraft"/>
-    <!-- Compatibility shim (docs/compatibility.md): designs saved before the rename. -->
     <glob pattern="*.solvecraft"/>
     <alias type="application/x-solvecraft"/>
   </mime-type>

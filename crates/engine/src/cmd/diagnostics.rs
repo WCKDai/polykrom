@@ -25,7 +25,7 @@ pub static COMMANDS: &[CommandSpec] = &[
     CommandSpec::new("diagnostics.crash_test", "Crash Test", crash_test).icon("bug_report").noundo().enabled(crash_test_enabled).params(
         "mode: panic | kernel | abort. Checks that crash reports work: panic = an internal error in this command (caught; \
          the design is unchanged), kernel = one inside the geometry kernel (caught), abort = the app ends at once (reported \
-         at the next start). Only when the SOLIDCRAFT_CRASH_TEST environment variable is set",
+         at the next start). Only when the POLYKROM_CRASH_TEST environment variable is set",
     ),
 ];
 
@@ -53,11 +53,11 @@ fn clear(_: &mut Session, p: &Value) -> Result<Value> {
 }
 
 fn crash_test_enabled(_: &Session) -> std::result::Result<(), String> {
-    if polycore_geom::env::var_os("CRASH_TEST").is_some() { Ok(()) } else { Err("set SOLIDCRAFT_CRASH_TEST to use the crash test".into()) }
+    if crate::env::var_os("CRASH_TEST").is_some() { Ok(()) } else { Err("set POLYKROM_CRASH_TEST to use the crash test".into()) }
 }
 
 // The one deliberate panic: it proves the crash reports work, and runs only when asked for with
-// SOLIDCRAFT_CRASH_TEST.
+// POLYKROM_CRASH_TEST.
 #[allow(clippy::panic)]
 fn crash_test(_: &mut Session, p: &Value) -> Result<Value> {
     let cmd = "diagnostics.crash_test";

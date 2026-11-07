@@ -61,7 +61,7 @@ const pr = (number, login = 'other', state = 'open') => ({
 
 function ctx(body, { assignees = [], labels = [], user = 'alice', extra = {} } = {}) {
   return {
-    repo: { owner: 'bherbruck', repo: 'solidcraft' },
+    repo: { owner: 'WCKDai', repo: 'polykrom' },
     payload: {
       issue: {
         number: 7,
@@ -191,7 +191,7 @@ const issue = (number, assignees = ['bob']) => ({
   assignees: assignees.map((login) => ({ login })),
   labels: [{ name: 'in progress' }],
 });
-const repo = { owner: 'bherbruck', repo: 'solidcraft' };
+const repo = { owner: 'WCKDai', repo: 'polykrom' };
 
 test('sweep releases a claim older than 72 h with no PR', async () => {
   const { github, calls } = fake({ issues: [issue(7)], timeline: [labeled(ago(80 * H))] });

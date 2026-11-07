@@ -524,7 +524,7 @@ const BUILTIN: [(&str, &str); 20] = [
     ("gruvbox-light", include_str!("../../../assets/styles/ui/themes/gruvbox-light.json")),
     ("gruvbox-light-hard", include_str!("../../../assets/styles/ui/themes/gruvbox-light-hard.json")),
     ("gruvbox-light-soft", include_str!("../../../assets/styles/ui/themes/gruvbox-light-soft.json")),
-    ("solidcraft-95", include_str!("../../../assets/styles/ui/themes/solidcraft-95.json")),
+    ("polykrom-95", include_str!("../../../assets/styles/ui/themes/polykrom-95.json")),
     ("platinum-9", include_str!("../../../assets/styles/ui/themes/platinum-9.json")),
     ("cupertino", include_str!("../../../assets/styles/ui/themes/cupertino.json")),
     ("green-phosphor", include_str!("../../../assets/styles/ui/themes/green-phosphor.json")),
@@ -668,7 +668,7 @@ mod tests {
             assert!(from_value(&bad).is_err());
         }
         for theme in builtin() {
-            assert_eq!(resolve(theme).borders.bevel.is_some(), theme.id == "solidcraft-95", "{}", theme.id);
+            assert_eq!(resolve(theme).borders.bevel.is_some(), theme.id == "polykrom-95", "{}", theme.id);
         }
     }
 
@@ -877,7 +877,7 @@ mod tests {
         for id in ["platinum-9", "green-phosphor", "amber-phosphor"] {
             assert_eq!(values(id), [0; 6], "{id}");
         }
-        assert_eq!(values("solidcraft-95"), [3, 3, 4, 4, 3, 3]);
+        assert_eq!(values("polykrom-95"), [3, 3, 4, 4, 3, 3]);
         assert_eq!(values("blueprint"), [4, 6, 8, 10, 6, 7]);
         assert_eq!(values("cupertino"), [6, 8, 12, 16, 8, 9]);
         let defaults = radius_values(Tokens::dark());

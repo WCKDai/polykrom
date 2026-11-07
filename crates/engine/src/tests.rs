@@ -476,7 +476,7 @@ fn box_fillet_cut_part() {
     assert!(rel(volume(&mut s), expect2) < 5e-4);
 
     // Export STL and STEP.
-    let dir = std::env::temp_dir().join(format!("solidcraft-test-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("polykrom-test-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     let stl = dir.join("part.stl");
     run(&mut s, "file.export", json!({"path": stl.to_string_lossy()}));
@@ -1129,7 +1129,7 @@ fn timeline_edits_reresolve_references() {
 
 /// A 40 × 30 × 20 box exported to a STEP file in a fresh temp directory.
 fn step_box_file(tag: &str) -> std::path::PathBuf {
-    let dir = std::env::temp_dir().join(format!("solidcraft-step-{tag}-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("polykrom-step-{tag}-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     let mut s = Session::default();
     run(&mut s, "solid.box", json!({"length": 40, "width": 30, "height": 20}));
@@ -1182,7 +1182,7 @@ fn step_open_then_model_on_it() {
 
     // The design saves and reopens without the STEP file.
     let before = volume(&mut s);
-    let design = p.with_extension("solidcraft");
+    let design = p.with_extension("polykrom");
     run(&mut s, "file.save_as", json!({"path": design.to_string_lossy()}));
     std::fs::remove_file(&p).unwrap();
     let mut s2 = Session::default();
@@ -1195,7 +1195,7 @@ fn step_open_then_model_on_it() {
 /// join was refused past the comparison budget.
 #[test]
 fn join_onto_a_finely_faceted_import() {
-    let dir = std::env::temp_dir().join(format!("solidcraft-step-faceted-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("polykrom-step-faceted-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     let n = 4000;
     let mut pts: Vec<[f64; 2]> =
@@ -1267,7 +1267,7 @@ fn body_volume(st: &polykrom_doc::ModelState) -> f64 {
 /// Deleting an inserted assembly frees its body names without leaving assembly ownership behind.
 #[test]
 fn step_insert_delete_removes_assembly_and_undo_restores_it() {
-    let dir = std::env::temp_dir().join(format!("solidcraft-step-delete-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("polykrom-step-delete-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     let path = dir.join("parts.step");
     let mut source = Session::default();
@@ -1682,7 +1682,7 @@ fn extrude_a_body_face() {
 /// solid features.
 #[test]
 fn threemf_export_open_insert() {
-    let dir = std::env::temp_dir().join(format!("solidcraft-3mf-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("polykrom-3mf-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     let mut s = Session::default();
     run(&mut s, "solid.box", json!({"length": 40, "width": 30, "height": 20}));
@@ -2154,7 +2154,7 @@ fn rolling_back_and_forward_leaves_no_projection_warnings() {
 
 /// Export STEP, validate the file, read it back: no warnings, same volume, area and faces.
 fn step_round_trip(s: &mut Session, tag: &str) -> polycore::StepImport {
-    let p = std::env::temp_dir().join(format!("solidcraft-steprt-{tag}-{}.step", std::process::id()));
+    let p = std::env::temp_dir().join(format!("polykrom-steprt-{tag}-{}.step", std::process::id()));
     run(s, "file.export", json!({"path": p.to_string_lossy()}));
     let text = std::fs::read_to_string(&p).unwrap();
     let _ = std::fs::remove_file(&p);
@@ -2210,7 +2210,7 @@ fn material_and_appearance_colours_export_to_step() {
     };
     check(&step_round_trip(&mut s, "colours"));
     // Open the export and export again: the file's colours are kept.
-    let p = std::env::temp_dir().join(format!("solidcraft-colours-{}.step", std::process::id()));
+    let p = std::env::temp_dir().join(format!("polykrom-colours-{}.step", std::process::id()));
     run(&mut s, "file.export", json!({"path": p.to_string_lossy()}));
     let mut s2 = Session::default();
     run(&mut s2, "doc.open", json!({"path": p.to_string_lossy()}));
@@ -2236,7 +2236,7 @@ fn face_colours_and_opacity_export() {
     assert_eq!(paint.faces[0].face, top);
     assert!((paint.faces[0].color[0] - 1.0).abs() < 1e-3 && paint.faces[0].color[1].abs() < 1e-3, "{paint:?}");
     // Opened again, the face keeps its colour (shown and exported).
-    let p = std::env::temp_dir().join(format!("solidcraft-facecol-{}.step", std::process::id()));
+    let p = std::env::temp_dir().join(format!("polykrom-facecol-{}.step", std::process::id()));
     run(&mut s, "file.export", json!({"path": p.to_string_lossy()}));
     let mut s2 = Session::default();
     run(&mut s2, "doc.open", json!({"path": p.to_string_lossy()}));
@@ -2256,7 +2256,7 @@ fn iges_export_and_open() {
     run(&mut s, "solid.cylinder", json!({"radius": 4, "height": 20, "base": [10, 10, 5], "body_name": "Pin"}));
     run(&mut s, "appearance.assign", json!({"bodies": ["Pin"], "color": "#ff0000"}));
     let want: Vec<f64> = s.world_state().bodies.iter().map(|b| polycore::measure(&b.body).unwrap().volume).collect();
-    let p = std::env::temp_dir().join(format!("solidcraft-iges-{}.igs", std::process::id()));
+    let p = std::env::temp_dir().join(format!("polykrom-iges-{}.igs", std::process::id()));
     run(&mut s, "file.export", json!({"path": p.to_string_lossy()}));
     let mut s2 = Session::default();
     run(&mut s2, "doc.open", json!({"path": p.to_string_lossy()}));
@@ -3078,7 +3078,7 @@ fn appearances_survive_later_features() {
     // Exported with a body colour and the red face, then opened: the colours come in as the
     // body's own; a hole afterwards keeps them.
     run(&mut s, "appearance.assign", json!({"bodies": ["B"], "color": "#2050c0"}));
-    let dir = std::env::temp_dir().join(format!("solidcraft-paint-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("polykrom-paint-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     let step = dir.join("painted.step");
     run(&mut s, "file.export", json!({"path": step.to_string_lossy()}));
@@ -3099,7 +3099,7 @@ fn appearances_survive_later_features() {
 /// The original #2 RGB import acceptance, including later topology and placement edits.
 #[test]
 fn imported_rgb_appearances_survive_edits_reopen_and_step_export() {
-    let dir = std::env::temp_dir().join(format!("solidcraft-imported-rgb-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("polykrom-imported-rgb-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     let input = dir.join("rgb.step");
     let saved = dir.join("edited.solidcraft");
@@ -3510,7 +3510,7 @@ fn special_files_are_refused_by_every_file_command() {
         assert!(r.as_ref().is_err_and(|e| e.to_string().contains("not a regular file")), "{cmd}: {r:?}");
     }
     // The commands that check the extension first need a special file with the right name.
-    let dir = std::env::temp_dir().join(format!("solidcraft-special-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("polykrom-special-{}", std::process::id()));
     let _ = std::fs::create_dir_all(&dir);
     for (cmd, name) in [("file.insert_step", "x.step"), ("file.insert_mesh", "x.3mf"), ("sketch.insert_dxf", "x.dxf")] {
         let p = dir.join(name);
@@ -3660,7 +3660,7 @@ fn renaming_a_pattern_copy_keeps_the_other_copies_names() {
 /// Three solids in one STEP file that carry the same label: the file written for three boxes, each
 /// named `X`.
 fn step_three_solids_labelled_x(tag: &str) -> std::path::PathBuf {
-    let dir = std::env::temp_dir().join(format!("solidcraft-step-{tag}-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("polykrom-step-{tag}-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     let mut s = Session::default();
     for (i, label) in ["Aa", "Bb", "Cc"].iter().enumerate() {
@@ -3884,7 +3884,7 @@ fn a_design_saved_before_format_14_keeps_generic_names_past_body_name() {
     legacy["format"] = json!("solidcraft/13");
     let extrude = legacy["features"].as_array_mut().unwrap().iter_mut().find(|f| f["type"] == "extrude").unwrap();
     extrude["body_names"] = json!(["Ribs"]);
-    let dir = std::env::temp_dir().join(format!("solidcraft-373-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("polykrom-373-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     let design = dir.join("ribs.solidcraft");
     std::fs::write(&design, legacy.to_string()).unwrap();
@@ -4271,7 +4271,7 @@ fn a_tapered_side_drawn_in_two_collinear_pieces_is_one_face() {
 /// model evaluating the renamed design gives; undo does the same.
 #[test]
 fn renaming_an_imported_assembly_body_reads_nothing_again() {
-    let dir = std::env::temp_dir().join(format!("solidcraft-step-rename-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("polykrom-step-rename-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     let mut a = Session::default();
     run(&mut a, "solid.box", json!({"length": 10, "width": 10, "height": 10, "body_name": "Cube"}));

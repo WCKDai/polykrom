@@ -415,8 +415,8 @@ jobs:
       # Pictures (snapshots, screenshots, ui.render, the viewport's offscreen tests) are drawn on
       # the GPU. The runner has none: Mesa's lavapipe (software Vulkan) draws them, and a test that
       # would skip for want of an adapter fails instead.
-      SOLIDCRAFT_GPU: software
-      SOLIDCRAFT_REQUIRE_GPU: "1"
+      POLYKROM_GPU: software
+      POLYKROM_REQUIRE_GPU: "1"
       ACTION_MATRIX_JOBS: "12"
       CARGO_INCREMENTAL: "0"
       RUSTC_WRAPPER: sccache
@@ -719,8 +719,8 @@ jobs:
       WGPU_BACKEND: dx12
       WGPU_DX12_COMPILER: fxc
       # WARP is a software (Cpu) adapter.
-      SOLIDCRAFT_GPU: software
-      SOLIDCRAFT_REQUIRE_GPU: "1"
+      POLYKROM_GPU: software
+      POLYKROM_REQUIRE_GPU: "1"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: dtolnay/rust-toolchain@stable

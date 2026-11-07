@@ -2,7 +2,7 @@
 //! silhouettes, the section and its cap, surface analysis) and that bad requests are errors.
 //! GPU output differs a little between drivers, so the checks count pixels of a kind rather than
 //! compare bytes. Skipped, with the reason printed, on a machine without a GPU adapter
-//! (`SOLIDCRAFT_REQUIRE_GPU=1` makes that a failure).
+//! (`POLYKROM_REQUIRE_GPU=1` makes that a failure).
 
 use polykrom_engine::Session;
 use polykrom_engine::geom::Vec3;
@@ -18,7 +18,7 @@ fn capturer() -> Option<&'static Capturer> {
             eprintln!("GPU: {} ({}x MSAA)", c.adapter_name(), c.samples());
             Some(c)
         }
-        Err(e @ GpuError::NoAdapter(_)) if std::env::var_os("SOLIDCRAFT_REQUIRE_GPU").is_none() => {
+        Err(e @ GpuError::NoAdapter(_)) if std::env::var_os("POLYKROM_REQUIRE_GPU").is_none() => {
             eprintln!("skipping: {e}");
             None
         }
@@ -54,7 +54,7 @@ fn opengl_viewport_pipelines_render_a_model() {
     let adapter = match pollster::block_on(instance.request_adapter(&Default::default())) {
         Ok(adapter) => adapter,
         Err(e) => {
-            let required = std::env::var_os("SOLIDCRAFT_REQUIRE_GPU").is_some() && wgpu::Backends::from_env() == Some(wgpu::Backends::GL);
+            let required = std::env::var_os("POLYKROM_REQUIRE_GPU").is_some() && wgpu::Backends::from_env() == Some(wgpu::Backends::GL);
             assert!(!required, "OpenGL is required here: {e}");
             eprintln!("skipping the OpenGL regression: {e}");
             return;

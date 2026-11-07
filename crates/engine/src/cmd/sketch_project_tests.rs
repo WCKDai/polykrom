@@ -152,7 +152,7 @@ fn auto_project_can_be_turned_off() {
 /// next design started or opened in the session (`doc.recover` replaces the session the same way).
 #[test]
 fn auto_project_off_holds_for_designs_started_and_opened() {
-    let dir = std::env::temp_dir().join(format!("solidcraft-auto-project-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("polykrom-auto-project-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
     let file = dir.join("box.solidcraft");

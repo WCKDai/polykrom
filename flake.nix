@@ -25,8 +25,8 @@
       # that is the driver stack the compositor runs on. Verified on an Intel LNL iGPU under
       # Wayland: wgpu picks the GL backend through this loader and draws.
       # The X11 libraries are the ones the app actually uses on a Wayland desktop: with `DISPLAY`
-      # set and `SOLIDCRAFT_WAYLAND` unset, winit runs through XWayland (file drag and drop exists
-      # only there). The Wayland ones are for `SOLIDCRAFT_WAYLAND=1`, and both are needed under
+      # set and `POLYKROM_WAYLAND` unset, winit runs through XWayland (file drag and drop exists
+      # only there). The Wayland ones are for `POLYKROM_WAYLAND=1`, and both are needed under
       # `xvfb-run` on a machine with no display at all.
       runtimeLibs =
         pkgs:
@@ -69,6 +69,8 @@
           export XDG_DATA_DIRS="${driverShareDir pkgs}:''${XDG_DATA_DIRS:-/usr/local/share:/usr/share}"
         ''}
       '';
+      # The reverse-DNS app id: desktop entry, MIME file and icon names (packaging/env.sh).
+      appId = "app.polykrom.Polykrom";
     in
     {
       devShells = forAllSystems (pkgs: {
@@ -77,7 +79,7 @@
         # second rustc — or mkShell's second gcc, with another glibc behind it — would make every
         # `cargo build` produce binaries from somewhere else.
         default = pkgs.mkShellNoCC {
-          name = "solidcraft";
+          name = "polykrom";
           LD_LIBRARY_PATH = libraryPath pkgs;
           shellHook = shellHook pkgs;
         };
@@ -85,7 +87,7 @@
         # For a machine with no Rust at all: `nix develop .#rust`. Its own target directory, so
         # switching between this toolchain and the system one does not thrash the cache.
         rust = pkgs.mkShell {
-          name = "solidcraft-rust";
+          name = "polykrom-rust";
           packages = [
             pkgs.cargo
             pkgs.rustc
@@ -104,8 +106,6 @@
 
       packages = forAllSystems (pkgs: rec {
         default = polykrom;
-        # The package's earlier name (#304), so `nix run .#solidcraft` keeps working.
-        solidcraft = polykrom;
         polykrom = assert pkgs.lib.assertMsg
           (pkgs.lib.versionAtLeast pkgs.rustc.version (pkgs.lib.importTOML ./Cargo.toml).workspace.package.rust-version)
           "Polykrom requires the Rust version advertised in Cargo.toml; update the pinned nixpkgs input.";
@@ -137,14 +137,14 @@
 
           postInstall = ''
             ${pkgs.lib.optionalString pkgs.stdenv.isLinux ''
-              install -Dm644 assets/platforms/linux/ai.storyteller.solidcraft.desktop \
-                $out/share/applications/ai.storyteller.solidcraft.desktop
-              install -Dm644 assets/platforms/linux/ai.storyteller.solidcraft.mime.xml \
-                $out/share/mime/packages/ai.storyteller.solidcraft.xml
+              install -Dm644 assets/platforms/linux/${appId}.desktop \
+                $out/share/applications/${appId}.desktop
+              install -Dm644 assets/platforms/linux/${appId}.mime.xml \
+                $out/share/mime/packages/${appId}.xml
               for size in 16 24 32 48 64 128 256 512; do
-                icon=$out/share/icons/hicolor/''${size}x''${size}/apps/ai.storyteller.solidcraft.png
+                icon=$out/share/icons/hicolor/''${size}x''${size}/apps/${appId}.png
                 mkdir -p "$(dirname "$icon")"
-                cp assets/icons/app/linux/exports/hicolor/''${size}x''${size}/apps/ai.storyteller.solidcraft.png "$icon" >/dev/null
+                cp assets/icons/app/linux/exports/hicolor/''${size}x''${size}/apps/${appId}.png "$icon" >/dev/null
               done
             ''}
           '';
@@ -152,7 +152,7 @@
           # Linux only: the app reaches the window through dlopen'd libraries, so the packaged
           # binary needs the same LD_LIBRARY_PATH the shell exports. macOS needs no wrapper.
           postFixup = pkgs.lib.optionalString pkgs.stdenv.isLinux ''
-            wrapProgram $out/bin/solidcraft \
+            wrapProgram $out/bin/polykrom \
               --prefix LD_LIBRARY_PATH : "${libraryPath pkgs}" \
               --set-default XDG_DATA_DIRS /usr/local/share:/usr/share \
               --prefix XDG_DATA_DIRS : "$out/share:${driverShareDir pkgs}"
@@ -165,18 +165,18 @@
               mit
               asl20
             ];
-            mainProgram = "solidcraft";
+            mainProgram = "polykrom";
           };
         };
       });
 
       apps = forAllSystems (pkgs: let
-        package = self.packages.${pkgs.stdenv.hostPlatform.system}.solidcraft;
-        desktop = { type = "app"; program = "${package}/bin/solidcraft"; };
+        package = self.packages.${pkgs.stdenv.hostPlatform.system}.polykrom;
+        desktop = { type = "app"; program = "${package}/bin/polykrom"; };
       in {
         default = desktop;
-        solidcraft = desktop;
-        cli = { type = "app"; program = "${package}/bin/solidcraft-cli"; };
+        polykrom = desktop;
+        cli = { type = "app"; program = "${package}/bin/polykrom-cli"; };
       });
     };
 }

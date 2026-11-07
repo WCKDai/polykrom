@@ -16,7 +16,7 @@ fn step_file(name: &str, count: usize) -> String {
         })
         .collect();
     let text = polycore::step_export(&bodies.iter().collect::<Vec<_>>(), name).unwrap();
-    let path = std::env::temp_dir().join(format!("solidcraft-883-{}-{name}.step", std::process::id()));
+    let path = std::env::temp_dir().join(format!("polykrom-883-{}-{name}.step", std::process::id()));
     std::fs::write(&path, text).unwrap();
     path.to_string_lossy().to_string()
 }

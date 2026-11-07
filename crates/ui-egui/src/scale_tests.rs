@@ -71,12 +71,12 @@ fn frame_and_cheap_command_cost_by_body_count() {
     }
 }
 
-/// A design from a file (`SOLIDCRAFT_SCALE_DESIGN`), every browser folder open: the time of an
+/// A design from a file (`POLYKROM_SCALE_DESIGN`), every browser folder open: the time of an
 /// idle frame and of the cheap commands, as [`frame_and_cheap_command_cost_by_body_count`].
 #[test]
 #[ignore = "manual measurement on a design file"]
 fn frame_cost_of_a_design_file() {
-    let Some(path) = std::env::var_os("SOLIDCRAFT_SCALE_DESIGN") else { return };
+    let Some(path) = std::env::var_os("POLYKROM_SCALE_DESIGN") else { return };
     let bytes = std::fs::read(&path).unwrap();
     let doc = polykrom_engine::io::read_design(&bytes).unwrap();
     let mut h = Harness::new();
@@ -101,7 +101,7 @@ fn frame_cost_of_a_design_file() {
         "DESIGN bodies={bodies} idle_frame_ms={idle:.2} expanded_frame_ms={expanded:.2} scene_ms={scene:.2} scene_again_ms={scene_again:.2} rename_ms={rename:.2} scene_renamed_ms={scene_renamed:.2}"
     );
     let t = std::time::Instant::now();
-    while t.elapsed().as_secs() < std::env::var("SOLIDCRAFT_SCALE_LOOP").ok().and_then(|v| v.parse().ok()).unwrap_or(0) {
+    while t.elapsed().as_secs() < std::env::var("POLYKROM_SCALE_LOOP").ok().and_then(|v| v.parse().ok()).unwrap_or(0) {
         h.frame();
     }
 }

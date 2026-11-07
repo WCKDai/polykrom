@@ -2,7 +2,7 @@
 //! design or one the script applies itself, and without the ground grid and the origin's axes
 //! when asked (the grid lies on Z 0 and cuts through a part that straddles it). Pictures are drawn
 //! on the GPU and compared with a tolerance; without a GPU adapter the tests that draw are skipped
-//! with the reason printed (`SOLIDCRAFT_REQUIRE_GPU=1` makes that a failure).
+//! with the reason printed (`POLYKROM_REQUIRE_GPU=1` makes that a failure).
 
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
@@ -24,7 +24,7 @@ fn gpu() -> bool {
             }));
             true
         }
-        Err(e @ polykrom_gpu::GpuError::NoAdapter(_)) if std::env::var_os("SOLIDCRAFT_REQUIRE_GPU").is_none() => {
+        Err(e @ polykrom_gpu::GpuError::NoAdapter(_)) if std::env::var_os("POLYKROM_REQUIRE_GPU").is_none() => {
             eprintln!("skipping: {e}");
             false
         }
@@ -69,7 +69,7 @@ struct Scratch(PathBuf);
 
 impl Scratch {
     fn new() -> Self {
-        let dir = std::env::temp_dir().join(format!("solidcraft-snapshot-camera-{}-{}", std::process::id(), NEXT.fetch_add(1, Ordering::Relaxed)));
+        let dir = std::env::temp_dir().join(format!("polykrom-snapshot-camera-{}-{}", std::process::id(), NEXT.fetch_add(1, Ordering::Relaxed)));
         std::fs::create_dir(&dir).unwrap();
         Self(dir)
     }
@@ -306,10 +306,10 @@ fn a_snapshot_shows_the_part_where_the_camera_puts_it() {
     }
 }
 
-/// `snapshot` under a `SOLIDCRAFT_GPU` policy: its reply and stderr.
+/// `snapshot` under a `POLYKROM_GPU` policy: its reply and stderr.
 fn snapshot_under(dir: &Scratch, script: &Path, out: &str, policy: &str) -> Output {
     Command::new(env!("CARGO_BIN_EXE_polykrom-cli"))
-        .env("SOLIDCRAFT_GPU", policy)
+        .env("POLYKROM_GPU", policy)
         .arg("snapshot")
         .arg(script)
         .arg("--out")
@@ -319,7 +319,7 @@ fn snapshot_under(dir: &Scratch, script: &Path, out: &str, policy: &str) -> Outp
         .unwrap()
 }
 
-/// The last tier: `SOLIDCRAFT_GPU=cpu` draws with the CPU rasterizer whatever adapters there are,
+/// The last tier: `POLYKROM_GPU=cpu` draws with the CPU rasterizer whatever adapters there are,
 /// says so (`renderer: cpu` and a warning that overlays are not drawn), and the picture is the
 /// rasterizer's own.
 #[test]

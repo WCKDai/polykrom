@@ -3,7 +3,7 @@
 //!
 //! - **Panics** are caught by a hook. One inside a command becomes a report with the design as
 //!   it was before the command and the command itself, so `polykrom-cli run replay.json --in
-//!   design.solidcraft` reproduces it. Panics the third-party kernel raises (and
+//!   design.polykrom` reproduces it. Panics the third-party kernel raises (and
 //!   `polycore::guard` turns into errors) are reported the same way, marked recovered.
 //! - **Crashes no hook sees** (an abort, a stack overflow, a segfault, the process being killed)
 //!   are found at the next start: every running app keeps a small, locked command journal; a
@@ -25,7 +25,7 @@
 //!   the next start puts both into the unclean exit's report.
 //!
 //! Reports are folders `crashes/<time>-<signature>/` holding `report.json`, and when known
-//! `design.solidcraft`, `replay.json` and `minidump.dmp`. Nothing is ever sent anywhere.
+//! `design.polykrom`, `replay.json` and `minidump.dmp`. Nothing is ever sent anywhere.
 
 use std::backtrace::Backtrace;
 use std::cell::{Cell, RefCell};
@@ -87,7 +87,7 @@ pub struct Summary {
     pub version: String,
     /// The report's folder.
     pub path: String,
-    /// `replay.json` and `design.solidcraft` are there: the crash can be replayed.
+    /// `replay.json` and `design.polykrom` are there: the crash can be replayed.
     pub replayable: bool,
 }
 
@@ -125,16 +125,16 @@ pub fn enabled() -> bool {
     STATE.get().is_some()
 }
 
-/// The crash folder, next to the recovery folder. `SOLIDCRAFT_CRASH_DIR` overrides it.
+/// The crash folder, next to the recovery folder. `POLYKROM_CRASH_DIR` overrides it.
 pub fn default_dir() -> Option<PathBuf> {
     if let Some(s) = STATE.get() {
         return Some(s.dir.clone());
     }
     // Tests never touch the user's real crash folder.
     if cfg!(test) {
-        return Some(std::env::temp_dir().join(format!("solidcraft-test-crashes-{}", std::process::id())));
+        return Some(std::env::temp_dir().join(format!("polykrom-test-crashes-{}", std::process::id())));
     }
-    if let Some(d) = polycore_geom::env::var_os("CRASH_DIR").filter(|d| !d.is_empty()) {
+    if let Some(d) = crate::env::var_os("CRASH_DIR").filter(|d| !d.is_empty()) {
         return Some(PathBuf::from(d));
     }
     crate::recovery::default_dir().and_then(|d| d.parent().map(|p| p.join("crashes")))
@@ -975,8 +975,8 @@ fn write_report(state: &State, kind: &str, p: Option<&Panic>, extra: Extra) -> O
         let mut notes = extra.notes;
         if let Some(d) = &extra.design {
             if d.len() <= MAX_DESIGN_BYTES {
-                if polykrom_io::write_atomic(&folder.join("design.solidcraft"), d, false).is_ok() {
-                    files.insert("design".into(), json!("design.solidcraft"));
+                if polykrom_io::write_atomic(&folder.join("design.polykrom"), d, false).is_ok() {
+                    files.insert("design".into(), json!("design.polykrom"));
                 }
             } else {
                 notes.push(format!("the design is larger than {} MB and was not copied", MAX_DESIGN_BYTES >> 20));
@@ -1151,7 +1151,7 @@ pub fn read(dir: &Path, id: &str) -> std::result::Result<Value, String> {
     let folder = dir.join(id);
     let mut v = read_report_file(&folder.join("report.json")).ok_or_else(|| format!("no crash report `{id}`"))?;
     v["path"] = json!(folder.to_string_lossy());
-    for (k, f) in [("design_path", "design.solidcraft"), ("replay_path", "replay.json"), ("minidump_path", "minidump.dmp")] {
+    for (k, f) in [("design_path", "design.polykrom"), ("replay_path", "replay.json"), ("minidump_path", "minidump.dmp")] {
         if folder.join(f).is_file() {
             v[k] = json!(folder.join(f).to_string_lossy());
         }

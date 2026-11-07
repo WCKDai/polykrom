@@ -68,7 +68,7 @@ fn indexes_follow_the_model_state() {
 }
 
 /// Timing, not a check (`cargo test --release -p polykrom-ui-egui --lib pick_timing -- --ignored
-/// --nocapture`; `SOLIDCRAFT_BENCH_MESH=part.stl` adds 25 placements of that mesh): picks over a
+/// --nocapture`; `POLYKROM_BENCH_MESH=part.stl` adds 25 placements of that mesh): picks over a
 /// grid of a 1400 × 900 view, scanning every triangle and edge versus through the indexes, on many
 /// curved bodies, on one body with many curved faces, and on eight layers of bodies seen from
 /// above (rays passing near many hidden edges). Release, Apple M2 Max: tens of microseconds a
@@ -106,7 +106,7 @@ fn pick_timing_on_curved_models() {
         ("one body", SolveApp::new(one, crate::Services::default()), 0.6),
     ];
     scenes.push(("eight layers", SolveApp::new(deep, crate::Services::default()), 1.2));
-    if let Some(path) = std::env::var_os("SOLIDCRAFT_BENCH_MESH") {
+    if let Some(path) = std::env::var_os("POLYKROM_BENCH_MESH") {
         let mut app = SolveApp::new(polykrom_engine::Session::default(), crate::Services::default());
         let component = app.run("file.insert_mesh", json!({"path": path.to_string_lossy()})).unwrap()["component"].clone();
         app.run("component.activate", json!({"component":"root"})).unwrap();

@@ -91,7 +91,7 @@ const USAGE_CRASHES: &str = "  polykrom-cli crashes [list [--json] | show <id> |
 /// `licences`'s lines in the usage.
 const USAGE_LICENCES: &str = "  polykrom-cli licences\n";
 /// `gpu`'s lines in the usage.
-const USAGE_GPU: &str = "  polykrom-cli gpu [--policy auto|hardware|software|cpu]\n      (the GPU adapters a headless render can open, best first, the one the policy picks and the tier it\n       lands on: gpu, gpu-software, or the CPU rasterizer (auto with no adapter, or cpu); the policy defaults\n       to SOLIDCRAFT_GPU, else auto; exits with an error when hardware or software finds no such adapter)\n";
+const USAGE_GPU: &str = "  polykrom-cli gpu [--policy auto|hardware|software|cpu]\n      (the GPU adapters a headless render can open, best first, the one the policy picks and the tier it\n       lands on: gpu, gpu-software, or the CPU rasterizer (auto with no adapter, or cpu); the policy defaults\n       to POLYKROM_GPU, else auto; exits with an error when hardware or software finds no such adapter)\n";
 /// `icon`'s lines in the usage.
 const USAGE_ICON: &str = "  polykrom-cli icon --out icon.png [--size 256] | --out icon.ico\n";
 /// `fuzz-one`'s lines in the usage: a seed and the flags of one fuzz run.
@@ -533,7 +533,7 @@ fn cmd_gpu(args: &[String]) -> Result<(), String> {
 }
 
 /// Draw this process's pictures (snapshots, MCP screenshots, saved thumbnails) on the GPU with the
-/// viewport's pipelines: the headless device the `SOLIDCRAFT_GPU` policy picks, opened on the first
+/// viewport's pipelines: the headless device the `POLYKROM_GPU` policy picks, opened on the first
 /// picture; under `auto` with no qualifying adapter (or `cpu`), the CPU rasterizer, and the
 /// picture says so. Under `hardware` or `software` with no such adapter a picture fails with an
 /// error that names the policy.
@@ -659,14 +659,14 @@ fn cmd_mcp(args: &[String]) -> Result<(), String> {
     if let Some(s) = &scope {
         let roots: Vec<String> = s.roots().iter().map(|r| r.display().to_string()).collect();
         eprintln!(
-            "solidcraft mcp: files limited to {} and the open design's folder (--allow-path DIR adds one, --allow-any-path lifts the limit)",
+            "polykrom mcp: files limited to {} and the open design's folder (--allow-path DIR adds one, --allow-any-path lifts the limit)",
             roots.join(", ")
         );
         let design_dir = flag(args, "--in")
             .and_then(|p| std::path::Path::new(p).parent())
             .map(|d| if d.as_os_str().is_empty() { std::path::Path::new(".") } else { d });
         if let Some(why) = design_dir.and_then(polykrom_engine::io::vfs::design_folder_refusal) {
-            eprintln!("solidcraft mcp: the design's folder is left out because {why}; add it with --allow-path if you mean it");
+            eprintln!("polykrom mcp: the design's folder is left out because {why}; add it with --allow-path if you mean it");
         }
     }
     // How a headless session treats calls that break a command's parameter contract (docs/mcp.md).
@@ -676,7 +676,7 @@ fn cmd_mcp(args: &[String]) -> Result<(), String> {
         Some(v) => polykrom_engine::schema::ParamCheck::parse(v).ok_or_else(|| format!("mcp: --param-check wants off, warn or strict, not `{v}`"))?,
     };
     if param_check != polykrom_engine::schema::ParamCheck::Off && flag(args, "--connect").is_some() {
-        eprintln!("solidcraft mcp: --param-check applies to headless sessions; calls to the app are not checked yet");
+        eprintln!("polykrom mcp: --param-check applies to headless sessions; calls to the app are not checked yet");
     }
     let backend: Box<dyn polykrom_mcp::Backend> = match (flag(args, "--connect"), flag(args, "--in")) {
         (Some(_), Some(_)) => return Err("mcp: use either --connect or --in, not both".into()),
@@ -688,8 +688,8 @@ fn cmd_mcp(args: &[String]) -> Result<(), String> {
             let mut remote = polykrom_mcp::Remote::new(addr, flag(args, "--token"));
             if let Err(e) = remote.try_connect() {
                 eprintln!(
-                    "solidcraft mcp: no Polykrom app at {addr} yet ({e}); start it with `solidcraft --control {port}` \
-                     (or SOLIDCRAFT_CONTROL_PORT={port}), tool calls connect once it runs"
+                    "polykrom mcp: no Polykrom app at {addr} yet ({e}); start it with `polykrom --control {port}` \
+                     (or POLYKROM_CONTROL_PORT={port}), tool calls connect once it runs"
                 );
             }
             Box::new(remote)
@@ -701,7 +701,7 @@ fn cmd_mcp(args: &[String]) -> Result<(), String> {
             if !args.iter().any(|a| a == "--headless")
                 && let Some(port) = discover_app()
             {
-                eprintln!("solidcraft mcp: bridged to the running app at 127.0.0.1:{port} (--headless starts a session of its own)");
+                eprintln!("polykrom mcp: bridged to the running app at 127.0.0.1:{port} (--headless starts a session of its own)");
                 return serve_mcp(Box::new(polykrom_mcp::Remote::new(&format!("127.0.0.1:{port}"), flag(args, "--token"))), scope);
             }
             let mut headless = polykrom_mcp::Headless::default();
@@ -851,7 +851,7 @@ pub(crate) fn cmd_bench_open(args: &[String]) -> Result<(), String> {
     let t = std::time::Instant::now();
     let s = Session::opened(doc, saved.as_ref());
     drop(read);
-    // Taken from the file: nothing evaluated (SOLIDCRAFT_NO_MODEL_CACHE evaluates anyway), or
+    // Taken from the file: nothing evaluated (POLYKROM_NO_MODEL_CACHE evaluates anyway), or
     // only the features whose state a thinned file left out.
     let adopted = saved.is_some() && s.model.last_recomputed == 0;
     println!("{}", json!({"step": "evaluate", "ms": t.elapsed().as_secs_f64() * 1000.0, "adopted": adopted, "recomputed": s.model.last_recomputed}));
@@ -869,13 +869,13 @@ pub(crate) fn cmd_bench_open(args: &[String]) -> Result<(), String> {
         json!({"step": "mesh", "ms": t.elapsed().as_secs_f64() * 1000.0, "place_ms": place_ms, "bodies": st.bodies.len(), "triangles": triangles})
     );
     let flag = |name: &str| args.iter().position(|a| a == name);
-    // `--save PATH`: save the opened design without its model cache (to PATH.plain.solidcraft) and
+    // `--save PATH`: save the opened design without its model cache (to PATH.plain.polykrom) and
     // as the app does, with it, then read the cache back.
     let s = match flag("--save").and_then(|i| args.get(i + 1)) {
         Some(out) => {
             let mut s = s;
             // Without the cache first, for comparison.
-            let plain = format!("{out}.plain.solidcraft");
+            let plain = format!("{out}.plain.polykrom");
             let t = std::time::Instant::now();
             s.execute("file.save_as", &json!({"path": plain, "cache": false})).map_err(|e| e.to_string())?;
             let plain_ms = t.elapsed().as_secs_f64() * 1000.0;

@@ -13,7 +13,7 @@ use crate::*;
 /// named after the last feature that made them (`Cut-Extrude3`), and the posts are two
 /// occurrences of one part. As written the frame spans x 0..40, y 0..34, z 0..20.
 fn frame_file(tag: &str) -> String {
-    let dir = std::env::temp_dir().join(format!("solidcraft-step-options-{tag}-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("polykrom-step-options-{tag}-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     let plate = box_solid(Vec3::ZERO, Vec3::new(40.0, 4.0, 20.0)).unwrap();
     let post = box_solid(Vec3::ZERO, Vec3::new(4.0, 30.0, 4.0)).unwrap();
@@ -277,7 +277,7 @@ fn automatic_part_names_and_assembly_survive_reopening() {
 
 #[test]
 fn step_replies_include_originating_system() -> std::result::Result<(), Box<dyn std::error::Error>> {
-    let dir = std::env::temp_dir().join(format!("solidcraft-step-system-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("polykrom-step-system-{}", std::process::id()));
     std::fs::create_dir_all(&dir)?;
     let path = dir.join("box.step");
     let mut source = Session::default();
@@ -300,7 +300,7 @@ fn step_replies_include_originating_system() -> std::result::Result<(), Box<dyn 
 /// says nothing (synthetic headers only).
 #[test]
 fn step_replies_name_a_y_up_exporter() -> std::result::Result<(), Box<dyn std::error::Error>> {
-    let dir = std::env::temp_dir().join(format!("solidcraft-step-exporter-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("polykrom-step-exporter-{}", std::process::id()));
     std::fs::create_dir_all(&dir)?;
     let path = dir.join("box.step");
     let mut source = Session::default();

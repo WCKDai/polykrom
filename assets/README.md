@@ -73,13 +73,13 @@ The CLI still supports arbitrary PNG/ICO exports with `polykrom-cli icon`.
 | Platform | Resources and output paths |
 | --- | --- |
 | macOS | Composer master and paired exports; bundle installs `Assets.car` and `Polykrom.icns` |
-| Windows executable | `solidcraft-executable.ico`: original DIB/mask representations at 16/24/32/48/64/128/256 px |
-| Windows installer | `solidcraft.ico`: PNG representations at 16/20/24/32/40/48/64/128/256 px; `SOLIDCRAFT_ICONS` override retained |
-| Linux, Nix, deb/rpm, tar, Flatpak, Snap | Copy canonical hicolor images; icon name stays `ai.storyteller.solidcraft` |
+| Windows executable | `polykrom-executable.ico`: original DIB/mask representations at 16/24/32/48/64/128/256 px |
+| Windows installer | `polykrom.ico`: PNG representations at 16/20/24/32/40/48/64/128/256 px; `POLYKROM_ICONS` override retained |
+| Linux, Nix, deb/rpm, tar, Flatpak, Snap | Copy canonical hicolor images; icon name stays `app.polykrom.Polykrom` |
 | AppImage | Uses the Linux 256 px image and `.DirIcon` alias |
 | FreeBSD | Shares Linux hicolor images and freedesktop metadata |
 | Web | HTML/Trunk and `manifest.webmanifest` stay in `apps/polykrom-web/`; copies Japanese font/licence to `fonts/`, uses the collected CSS, and copies the Linux 32/256/512 px images to `icons/` for the favicon and installed app |
-| Docs and link previews | `xtask book` copies the shared card to the existing `/solidcraft/og.png` public path |
+| Docs and link previews | `xtask book` copies the shared card to the book's `og.png` |
 
 ## Code and provenance
 

@@ -143,7 +143,7 @@ mod web {
     use super::{HANDLE_MAX_AGE_MS, is_abort, make_id, opens_design, parse, path, plan_prune, save_type};
     use crate::files::{Files, err, read_handle};
 
-    const DB: &str = "solidcraft-disk-handles";
+    const DB: &str = "polykrom-disk-handles";
     const STORE: &str = "handles";
 
     thread_local! {
@@ -567,7 +567,7 @@ mod tests {
     #[test]
     fn writes_to_opfs_paths_still_go_to_opfs() {
         for p in
-            ["/opfs/Bracket.solidcraft", "/opfs/Bracket (2).solidcraft", "/opfs/recovery.solidcraft", "/opfs/recovery.json", "/opfs/old.solvecraft"]
+            ["/opfs/Bracket.solidcraft", "/opfs/Bracket (2).solidcraft", "/opfs/recovery.polykrom", "/opfs/recovery.json", "/opfs/old.solvecraft"]
         {
             assert_eq!(route(p), WriteTo::Opfs, "{p}");
         }

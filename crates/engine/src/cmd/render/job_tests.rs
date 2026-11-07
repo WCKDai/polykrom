@@ -91,10 +91,10 @@ fn unsupported_intent_is_rejected_and_export_preserves_existing_files() {
         assert_eq!(host.admitted_bytes(), 0);
     }
     let id = start(&mut s);
-    let path = std::env::temp_dir().join(format!("solidcraft-job-{}-{}.png", std::process::id(), id.session));
+    let path = std::env::temp_dir().join(format!("polykrom-job-{}-{}.png", std::process::id(), id.session));
     assert!(s.execute("render.export", &json!({"job":id,"path":path})).is_err());
     finish(&host);
-    let missing = path.with_file_name("solidcraft-render-missing-directory").join("image.png");
+    let missing = path.with_file_name("polykrom-render-missing-directory").join("image.png");
     assert!(s.execute("render.export", &json!({"job":id,"path":missing})).is_err());
     assert!(s.render_jobs.frame(id).is_ok());
     s.execute("render.export", &json!({"job":id,"path":path})).unwrap();
@@ -110,7 +110,7 @@ fn unsupported_intent_is_rejected_and_export_preserves_existing_files() {
 #[test]
 fn open_close_and_host_replacement_cancel_work_and_reject_old_ids() {
     let (mut s, host) = session();
-    let path = std::env::temp_dir().join(format!("solidcraft-job-open-{}.solidcraft", std::process::id()));
+    let path = std::env::temp_dir().join(format!("polykrom-job-open-{}.solidcraft", std::process::id()));
     s.execute("file.save", &json!({"path":path})).unwrap();
     let id = start(&mut s);
     let handle = s.render_job_handle(id).unwrap();

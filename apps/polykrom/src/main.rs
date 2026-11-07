@@ -1,14 +1,14 @@
 //! Polykrom desktop app.
 //!
-//! Usage: `solidcraft [--control <port>] [--sample] [--crash-log] [--safe-mode] [design.polykrom | part.step]`
+//! Usage: `polykrom [--control <port>] [--sample] [--crash-log] [--safe-mode] [design.polykrom | part.step]`
 //!
-//! `--safe-mode` (or `SOLIDCRAFT_SAFE_MODE=1`) starts with default settings, no recovery offer and
+//! `--safe-mode` (or `POLYKROM_SAFE_MODE=1`) starts with default settings, no recovery offer and
 //! the software renderer; see `startup` and docs/book/src/guide/troubleshooting.md.
 //!
 //! A `.step`/`.stp` file opens as a new design holding the file's bodies (an Import feature); a
 //! `.3mf`/`.stl`/`.obj`/`.glb`/`.gltf` file as a new design holding mesh bodies.
 //!
-//! `--control <port>` (or `SOLIDCRAFT_CONTROL_PORT`) starts a localhost JSON-lines control
+//! `--control <port>` (or `POLYKROM_CONTROL_PORT`) starts a localhost JSON-lines control
 //! server: `{"id":1,"method":"engine.execute","params":{"command":"solid.box","params":{…}}}`.
 //! Without them the channel still opens, on the default port, unless Preferences turns it off.
 //! See `polykrom_ui_egui::control` and docs/control-protocol.md.
@@ -63,10 +63,10 @@ fn fit_window_to_work_area(ctx: &egui::Context, frame: &eframe::Frame) {
     }
 }
 
-/// `SOLIDCRAFT_PROFILE_STARTUP=1` prints the time since launch at each startup step.
+/// `POLYKROM_PROFILE_STARTUP=1` prints the time since launch at each startup step.
 fn mark(step: &str) {
     static START: std::sync::OnceLock<(std::time::Instant, bool)> = std::sync::OnceLock::new();
-    let (start, on) = START.get_or_init(|| (std::time::Instant::now(), polykrom_engine::geom::env::var_os("PROFILE_STARTUP").is_some()));
+    let (start, on) = START.get_or_init(|| (std::time::Instant::now(), polykrom_engine::env::var_os("PROFILE_STARTUP").is_some()));
     if *on {
         eprintln!("startup {:>6.0} ms  {step}", start.elapsed().as_secs_f64() * 1000.0);
     }
@@ -393,12 +393,12 @@ fn agent_http(r: &polykrom_ui_egui::agent_chat::backend::HttpRequest) -> Result<
     Ok((status, body))
 }
 
-/// API keys in the system keychain (service "SolidCraft agent chat", one entry per agent; the name stays until the settings migration).
+/// API keys in the system keychain (service "Polykrom agent chat", one entry per agent).
 struct Keychain;
 
 impl Keychain {
     fn entry(id: &str) -> Result<keyring::Entry, String> {
-        keyring::Entry::new("SolidCraft agent chat", id).map_err(|e| e.to_string())
+        keyring::Entry::new("Polykrom agent chat", id).map_err(|e| e.to_string())
     }
 }
 
@@ -460,49 +460,13 @@ fn http_call(url: &str, timeout: std::time::Duration) -> Result<ureq::http::Resp
 
 /// The per-user settings folder: eframe's storage (`app.ron`) and the anti-aliasing preference.
 fn settings_dir() -> Option<std::path::PathBuf> {
-    eframe::storage_dir("SolidCraft")
+    eframe::storage_dir(polykrom_engine::io::DATA_DIR_TITLE)
 }
 
 /// The anti-aliasing preference, kept next to eframe's storage (it is needed before the
 /// window opens).
 fn graphics_path() -> Option<std::path::PathBuf> {
     settings_dir().map(|d| d.join("graphics.json"))
-}
-
-/// Compatibility shim (docs/compatibility.md): on the first launch after the rename, copy the
-/// settings of earlier releases into the new folder. They kept `graphics.json` (and, on Linux
-/// and macOS, the recovery folder) under the old product name, and eframe's `app.ron` under the
-/// window's old app id. In the Flatpak sandbox, releases before 0.8 kept everything under the
-/// old app id's `~/.var/app` folder; that copy comes first, as it is the newest. The old folders
-/// are never changed.
-fn adopt_legacy_settings() {
-    let (Some(current), Some(legacy)) = (settings_dir(), eframe::storage_dir("SolveCraft")) else { return };
-    let legacy_eframe = eframe::storage_dir(polykrom_engine::io::LEGACY_APP_ID);
-    let old_flatpak = polykrom_engine::io::legacy_flatpak_path(&current);
-    if let Err(e) = adopt_settings(&current, old_flatpak.as_deref(), &legacy, legacy_eframe.as_deref()) {
-        log::warn!("settings: could not copy the previous release's settings into {}: {e}", current.display());
-    }
-}
-
-fn adopt_settings(
-    current: &std::path::Path,
-    old_flatpak: Option<&std::path::Path>,
-    legacy: &std::path::Path,
-    legacy_eframe: Option<&std::path::Path>,
-) -> std::io::Result<()> {
-    let fresh = !current.exists();
-    if let Some(old) = old_flatpak {
-        polykrom_engine::io::adopt_legacy_dir(current, old)?;
-    }
-    polykrom_engine::io::adopt_legacy_dir(current, legacy)?;
-    if let Some(old) = legacy_eframe.map(|d| d.join("app.ron")).filter(|p| fresh && p.is_file()) {
-        std::fs::create_dir_all(current)?;
-        let new = current.join("app.ron");
-        if !new.exists() {
-            std::fs::copy(old, new)?;
-        }
-    }
-    Ok(())
 }
 
 /// `graphics.json`, read before the window opens.
@@ -574,11 +538,10 @@ const APP_ID: &str = polykrom_engine::io::APP_ID;
 
 fn main() -> eframe::Result {
     #[cfg(target_os = "macos")]
-    objc2_foundation::NSProcessInfo::processInfo().setProcessName(objc2_foundation::ns_string!("SolidCraft"));
+    objc2_foundation::NSProcessInfo::processInfo().setProcessName(objc2_foundation::ns_string!("Polykrom"));
     mark("main");
-    adopt_legacy_settings();
     let mut safe_mode = startup::env_on(std::env::var(startup::SAFE_MODE_ENV).ok().as_deref());
-    let mut control_port: Option<u16> = polykrom_engine::geom::env::var("CONTROL_PORT").and_then(|p| p.parse().ok());
+    let mut control_port: Option<u16> = polykrom_engine::env::var("CONTROL_PORT").and_then(|p| p.parse().ok());
     let mut files = Vec::new();
     let mut sample = false;
     let mut args = std::env::args().skip(1);
@@ -588,7 +551,7 @@ fn main() -> eframe::Result {
             "--sample" => sample = true,
             "--safe-mode" => safe_mode = true,
             "--version" | "-V" => {
-                println!("solidcraft {}", env!("CARGO_PKG_VERSION"));
+                println!("polykrom {}", env!("CARGO_PKG_VERSION"));
                 return Ok(());
             }
             "--crash-log" => {
@@ -598,14 +561,14 @@ fn main() -> eframe::Result {
                         for r in polykrom_engine::crash::list(&dir).iter().take(5) {
                             println!("  {}  {}  {}", r.id, r.kind, r.message);
                         }
-                        println!("more: solidcraft-cli crashes");
+                        println!("more: polykrom-cli crashes");
                     }
                     None => println!("no crash folder on this system"),
                 }
                 return Ok(());
             }
             "--help" | "-h" => {
-                println!("usage: solidcraft [--control PORT] [--sample] [--crash-log] [--safe-mode] [design.solidcraft | part.step]");
+                println!("usage: polykrom [--control PORT] [--sample] [--crash-log] [--safe-mode] [design.polykrom | part.step]");
                 return Ok(());
             }
             _ => files.push(a),
@@ -617,7 +580,7 @@ fn main() -> eframe::Result {
     let mut notes: Vec<String> = Vec::new();
     let mut failed_starts = 0;
     if let Some(dir) = &settings {
-        notes.extend(startup::check_settings(dir, &[polykrom_ui_egui::prefs::STORAGE_KEY, polykrom_ui_egui::prefs::LEGACY_STORAGE_KEY]));
+        notes.extend(startup::check_settings(dir, &[polykrom_ui_egui::prefs::STORAGE_KEY]));
         failed_starts = startup::begin(dir);
     }
     if failed_starts >= startup::FAILED_STARTS_FOR_SAFE_MODE && !safe_mode {
@@ -663,7 +626,7 @@ fn main() -> eframe::Result {
         // Kept with the other settings, not in a folder named after the app id. Safe mode reads
         // and writes a scratch copy, leaving the user's settings as they were.
         persistence_path: if safe_mode {
-            let scratch = std::env::temp_dir().join(format!("solidcraft-safe-mode-{}.ron", std::process::id()));
+            let scratch = std::env::temp_dir().join(format!("polykrom-safe-mode-{}.ron", std::process::id()));
             let _ = std::fs::remove_file(&scratch);
             Some(scratch)
         } else {
@@ -677,8 +640,8 @@ fn main() -> eframe::Result {
     let mut options = options;
     #[cfg(all(unix, not(target_os = "macos")))]
     let x11 = {
-        // SOLIDCRAFT_WAYLAND wins over Preferences › Graphics › Window system (#3083).
-        let environment = polykrom_engine::geom::env::var("WAYLAND");
+        // POLYKROM_WAYLAND wins over Preferences › Graphics › Window system (#3083).
+        let environment = polykrom_engine::env::var("WAYLAND");
         let preference = window_system_preference();
         let wayland_override = environment.as_deref().or(window_system_override(preference.as_deref()));
         let wayland_display = std::env::var_os("WAYLAND_DISPLAY").is_some();
@@ -707,8 +670,8 @@ fn main() -> eframe::Result {
     let starting = settings.clone();
     mark("run_native");
     let result = eframe::run_native(
-        // The settings folder keeps the SolidCraft name until it moves with a migration.
-        "SolidCraft",
+        // eframe keeps the window state and preferences under this name (the settings folder).
+        polykrom_engine::io::DATA_DIR_TITLE,
         options,
         Box::new(move |cc| {
             created_in_app.store(true, std::sync::atomic::Ordering::SeqCst);
@@ -923,7 +886,7 @@ fn window_system_preference() -> Option<String> {
     graphics().and_then(|v| v.get("window_system").and_then(serde_json::Value::as_str).map(str::to_string))
 }
 
-/// The window system preference as the `SOLIDCRAFT_WAYLAND` value it stands for: `wayland` is
+/// The window system preference as the `POLYKROM_WAYLAND` value it stands for: `wayland` is
 /// `1`, `x11` is `0`, and `auto` (or anything else) leaves the choice to [`prefer_x11`].
 #[cfg(all(unix, not(target_os = "macos")))]
 fn window_system_override(preference: Option<&str>) -> Option<&'static str> {
@@ -938,7 +901,7 @@ fn window_system_override(preference: Option<&str>) -> Option<&'static str> {
 /// on Wayland (only on X11), so dropping files from the file manager showed a "no" cursor: use
 /// XWayland when it's there. Except on niri, whose XWayland (xwayland-satellite) breaks window
 /// management (maximize/restore), so it stays on native Wayland and gives up file drops.
-/// `SOLIDCRAFT_WAYLAND=1` keeps native Wayland, `SOLIDCRAFT_WAYLAND=0` forces XWayland.
+/// `POLYKROM_WAYLAND=1` keeps native Wayland, `POLYKROM_WAYLAND=0` forces XWayland.
 #[cfg(all(unix, not(target_os = "macos")))]
 fn prefer_x11(display: bool, wayland_display: bool, desktop: Option<&str>, wayland_override: Option<&str>) -> bool {
     match wayland_override.map(str::trim) {
@@ -965,7 +928,7 @@ mod backend_tests {
         assert!(!prefer_x11(true, true, Some("niri:GNOME"), None));
         // niri without a Wayland socket (nested X session) still uses X11.
         assert!(prefer_x11(true, false, Some("niri"), None));
-        // SOLIDCRAFT_WAYLAND: anything but 0 keeps Wayland, 0 forces XWayland (when present).
+        // POLYKROM_WAYLAND: anything but 0 keeps Wayland, 0 forces XWayland (when present).
         assert!(!prefer_x11(true, true, Some("GNOME"), Some("1")));
         assert!(!prefer_x11(true, true, Some("GNOME"), Some("")));
         assert!(prefer_x11(true, true, Some("niri"), Some("0")));
@@ -1009,26 +972,13 @@ mod icon_tests {
 
 #[cfg(test)]
 mod msaa_tests {
+    /// The settings folder is Polykrom's own (PK-100): nothing is read from any other name.
     #[test]
-    fn first_launch_adopts_the_previous_release_settings() {
-        let d = std::env::temp_dir().join(format!("solidcraft-adopt-settings-{}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&d);
-        let (current, legacy, legacy_eframe) = (d.join("solidcraft"), d.join("solvecraft"), d.join("ai.storyteller.solvecraft"));
-        std::fs::create_dir_all(&legacy).unwrap();
-        std::fs::create_dir_all(&legacy_eframe).unwrap();
-        std::fs::write(legacy.join("graphics.json"), r#"{"msaa":8}"#).unwrap();
-        std::fs::write(legacy_eframe.join("app.ron"), "(prefs)").unwrap();
-        super::adopt_settings(&current, None, &legacy, Some(&legacy_eframe)).unwrap();
-        assert_eq!(std::fs::read_to_string(current.join("graphics.json")).unwrap(), r#"{"msaa":8}"#);
-        assert_eq!(std::fs::read_to_string(current.join("app.ron")).unwrap(), "(prefs)");
-        assert!(legacy.join("graphics.json").is_file() && legacy_eframe.join("app.ron").is_file());
-        // Later launches leave the current settings alone.
-        std::fs::write(current.join("app.ron"), "(mine)").unwrap();
-        std::fs::remove_file(current.join("graphics.json")).unwrap();
-        super::adopt_settings(&current, None, &legacy, Some(&legacy_eframe)).unwrap();
-        assert_eq!(std::fs::read_to_string(current.join("app.ron")).unwrap(), "(mine)");
-        assert!(!current.join("graphics.json").exists());
-        let _ = std::fs::remove_dir_all(&d);
+    fn the_settings_folder_is_polykroms() {
+        // eframe spells the folder the platform's way (lower case under ~/.local/share).
+        let dir = super::settings_dir().map(|d| d.to_string_lossy().to_ascii_lowercase()).unwrap_or_default();
+        assert!(dir.is_empty() || dir.ends_with(&polykrom_engine::io::DATA_DIR_TITLE.to_ascii_lowercase()), "{dir}");
+        assert!(!dir.contains("solidcraft") && !dir.contains("solvecraft"), "{dir}");
     }
 
     #[test]

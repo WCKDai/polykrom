@@ -333,7 +333,7 @@ fn a_fillet_edge_is_an_arc() {
 /// A plate with holes through STEP: the holes come back as cylinders, and measure the same.
 #[test]
 fn step_round_trip_of_a_plate_with_holes() {
-    let dir = std::env::temp_dir().join(format!("solidcraft-measure-1392-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("polykrom-measure-1392-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     let path = dir.join("Plate.step");
     let mut s = Session::default();

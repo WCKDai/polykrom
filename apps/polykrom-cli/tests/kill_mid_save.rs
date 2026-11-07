@@ -13,10 +13,10 @@ fn round_of(path: &std::path::Path) -> Option<String> {
 #[test]
 fn killed_mid_save_the_old_file_survives() {
     let exe = env!("CARGO_BIN_EXE_polykrom-cli");
-    let dir = std::env::temp_dir().join(format!("solidcraft-kill-mid-save-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("polykrom-kill-mid-save-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
-    let path = dir.join("design.solidcraft");
+    let path = dir.join("design.polykrom");
     let ok = Command::new(exe).args(["save-stress", &path.to_string_lossy(), "1"]).status().unwrap();
     assert!(ok.success());
     assert_eq!(round_of(&path).as_deref(), Some("0"));

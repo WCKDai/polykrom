@@ -24,12 +24,6 @@ neg_cmp_op_on_partial_ord = "allow"
 name = "polykrom"
 path = "src/main.rs"
 
-# SolidCraft's name for the desktop app, kept so scripts and shortcuts that start it keep working:
-# it runs `polykrom` (docs/compatibility.md).
-[[bin]]
-name = "solidcraft"
-path = "src/solidcraft.rs"
-
 [dependencies]
 polykrom-engine = { workspace = true }
 polykrom-ui-egui = { workspace = true }

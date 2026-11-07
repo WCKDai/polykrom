@@ -11,11 +11,12 @@ Polykrom is a fork of SolidCraft (github.com/tangency-labs/solidcraft). Say Poly
 everything: the UI, messages, docs, MCP descriptions, packaging, crates and code. The second
 rename stage (#304) is under way, one step at a time: release files, crates (`polykrom-*`, and
 PolyCore's `polycore` and `polycore-geom`), apps (`apps/polykrom*`) and the design format tag
-(`polykrom/N`; `solidcraft/N` and `solvecraft/N` still open) are renamed. Still on SolidCraft's
-names until their steps land: settings and recovery folders (step 4), `SOLIDCRAFT_*` variables
-(step 5) and the bundle and package IDs (step 6). The programs are `polykrom` and `polykrom-cli`; `solidcraft` and `solidcraft-cli` are alias
-programs that run them. Variables read through `polycore_geom::env` are `POLYKROM_*`, with
-`SOLIDCRAFT_*` and `SOLVECRAFT_*` fallbacks; read new ones that way. Designs are saved as
+(`polykrom/N`; `solidcraft/N` and `solvecraft/N` still open), the settings and recovery folders
+(`Polykrom`/`polykrom`), the `POLYKROM_*` variables and the bundle and package IDs
+(`app.polykrom.Polykrom`) are renamed. The programs are `polykrom` and `polykrom-cli`, with no
+alias programs. Variables are read through `polykrom_doc::env` (re-exported as
+`polykrom_engine::env`) and are `POLYKROM_*` only, with no `SOLIDCRAFT_*` or `SOLVECRAFT_*`
+fallbacks; read new ones that way. Designs are saved as
 `.polykrom` (`polykrom_io::DESIGN_EXT`); `.solidcraft` and `.solvecraft` still open
 (`DESIGN_EXTS`). Don't rename outside a step of #304; `docs/compatibility.md` lists what is kept
 and the shims for what moved. Credit SolidCraft wherever its work is described.
@@ -63,7 +64,7 @@ People trust Polykrom with their designs; a crash loses their work. **This outra
   When someone says the app crashed, look there first: `polykrom-cli crashes`, `crashes show <id>`,
   `crashes replay <id>` (or the `diagnostics.crash_reports` command / MCP `crash_reports` tool).
 - **Prove it:** every crash fix lands with a regression test (see `hostile_params_never_panic`); a
-  crash report's `design.solidcraft` + `replay.json` is the test's starting point.
+  crash report's `design.polykrom` + `replay.json` is the test's starting point.
 - **Where tests go:** a regression test goes into the existing test file for its area (booleans, blends,
   shell, sweep, STEP, naming…), never a new file named after the bug (#3226).
 - Every production crate root carries
@@ -126,7 +127,7 @@ People trust Polykrom with their designs; a crash loses their work. **This outra
   Keep them minimal; `cargo xtask web-offline-test` covers the service worker.
 - **Quality gates** before every commit: `cargo xtask ci` (fmt, clippy -D warnings, tests,
   assets, layers). Commit after every feature arc that builds.
-- **Publishing**: the repository is github.com/wckdboy/polykrom. Changes land through
+- **Publishing**: the repository is github.com/WCKDai/polykrom. Changes land through
   **pull requests**: push a branch and open a PR against `main`. A fix that also applies to
   SolidCraft goes upstream first, as a PR to tangency-labs/solidcraft following that project's
   rules, and comes to Polykrom with the next merge from upstream. Keep each PR to one topic and one issue, and never
@@ -232,8 +233,8 @@ before the draft is verified.
   Pick a free port. Without a display, run it under `Xvfb :99` with `DISPLAY=:99`.
 - Drive it with JSON lines on `127.0.0.1:PORT` (see `docs/control-protocol.md`). The first
   request on a connection carries the launch's token as `"token"`: read it from
-  `~/.local/share/solidcraft/control/PORT.token`, or start the app with
-  `SOLIDCRAFT_CONTROL_TOKEN=$(openssl rand -hex 32)` and send that.
+  `~/.local/share/polykrom/control/PORT.token`, or start the app with
+  `POLYKROM_CONTROL_TOKEN=$(openssl rand -hex 32)` and send that.
   - `{"id":1,"method":"engine.execute","params":{"command":"solid.extrude","params":{"distance":20}}}`
   - `{"id":2,"method":"ui.start","params":{"command":"sketch.create"}}` then `ui.click {x, y}`
   - `{"id":3,"method":"ui.screenshot","params":{"path":"/tmp/shot.png"}}` then read the PNG.

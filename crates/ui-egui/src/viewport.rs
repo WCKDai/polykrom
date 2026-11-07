@@ -2706,13 +2706,13 @@ pub(crate) fn build_highlight(app: &SolveApp) -> GpuScene {
         sc.selected_instanced = selected_instanced;
     }
 
-    if polykrom_engine::geom::env::var_os("PROFILE_FRAMES").is_some() {
+    if polykrom_engine::env::var_os("PROFILE_FRAMES").is_some() {
         let in_blocks = |f: fn(&crate::gpu::SceneBlock) -> usize| sc.blocks.iter().map(f).sum::<usize>();
         let tris = sc.tris.len() + in_blocks(|b| b.bytes.tris.len());
         let lines = sc.lines.len() + in_blocks(|b| b.bytes.lines.len());
         let hidden = sc.hidden.len() + in_blocks(|b| b.bytes.hidden.len());
         eprintln!(
-            "SolidCraft highlight: {:.0} ms, hovered {} bodies, planned {} hover + {} selected, blocks {} hover + {} selected, instanced {} hover + {} selected, CPU triangles {tris} B, lines {lines} B, hidden {hidden} B",
+            "Polykrom highlight: {:.0} ms, hovered {} bodies, planned {} hover + {} selected, blocks {} hover + {} selected, instanced {} hover + {} selected, CPU triangles {tris} B, lines {lines} B, hidden {hidden} B",
             crate::now_ms() - began,
             hovered.len(),
             sc.hover_planned.len(),
@@ -4692,7 +4692,7 @@ mod tests {
     /// against the sides and four against the top face. The tool lit the face under the pointer,
     /// though its click takes only edges, and the face's outline covered the colours of its
     /// edges. Rendered offscreen with bodies built on the CPU and evaluated on the GPU (skipped
-    /// without a GPU adapter); with `SOLIDCRAFT_CONTINUITY_TOP_SHOT` set, the pictures are
+    /// without a GPU adapter); with `POLYKROM_CONTINUITY_TOP_SHOT` set, the pictures are
     /// written there (`-cpu.png`, `-gpu.png`).
     #[cfg(not(target_arch = "wasm32"))]
     #[test]
@@ -4752,7 +4752,7 @@ mod tests {
                 eprintln!("skipping: no GPU adapter");
                 return;
             };
-            if let Ok(path) = std::env::var("SOLIDCRAFT_CONTINUITY_TOP_SHOT")
+            if let Ok(path) = std::env::var("POLYKROM_CONTINUITY_TOP_SHOT")
                 && let Some(png) = image::RgbaImage::from_raw(SIZE, SIZE, img.clone())
             {
                 png.save(path.replace(".png", if tess { "-gpu.png" } else { "-cpu.png" })).unwrap();
@@ -5411,16 +5411,16 @@ mod tests {
         assert_eq!(merged.lines.len(), 3 * segments * crate::gpu::LINE_SIZE);
     }
 
-    /// Manual GPU benchmark: 25 placements of the mesh `SOLIDCRAFT_BENCH_MESH` (an STL, OBJ or
-    /// 3MF) drawn offscreen at 3600 × 2190 px (divided by `SOLIDCRAFT_BENCH_DIV`) with 4× MSAA
+    /// Manual GPU benchmark: 25 placements of the mesh `POLYKROM_BENCH_MESH` (an STL, OBJ or
+    /// 3MF) drawn offscreen at 3600 × 2190 px (divided by `POLYKROM_BENCH_DIV`) with 4× MSAA
     /// while the camera turns, each frame waited for: the placements' own triangles (`merged`, as
     /// before instancing) and as instances. Prints the median frame time of each.
     #[cfg(not(target_arch = "wasm32"))]
     #[test]
-    #[ignore = "manual: SOLIDCRAFT_BENCH_MESH=part.stl cargo test --release -p polykrom-ui-egui --lib -- --ignored instanced_scene_gpu_benchmark --nocapture"]
+    #[ignore = "manual: POLYKROM_BENCH_MESH=part.stl cargo test --release -p polykrom-ui-egui --lib -- --ignored instanced_scene_gpu_benchmark --nocapture"]
     fn instanced_scene_gpu_benchmark() {
         use egui_wgpu::wgpu;
-        let Some(path) = std::env::var_os("SOLIDCRAFT_BENCH_MESH") else { return };
+        let Some(path) = std::env::var_os("POLYKROM_BENCH_MESH") else { return };
         let mut app = SolveApp::new(polykrom_engine::Session::default(), crate::Services::default());
         app.ui.ground_shadow = false;
         app.ui.show_origin = false;
@@ -5431,15 +5431,15 @@ mod tests {
         for k in 1..25 {
             app.run("occurrence.copy", json!({"component":component,"translate":[f64::from(k % 5) * step, f64::from(k / 5) * step, 0.0]})).unwrap();
         }
-        // `SOLIDCRAFT_BENCH_OPACITY=0.5`: every placement see-through.
-        if let Some(opacity) = std::env::var("SOLIDCRAFT_BENCH_OPACITY").ok().and_then(|v| v.parse::<f64>().ok()) {
+        // `POLYKROM_BENCH_OPACITY=0.5`: every placement see-through.
+        if let Some(opacity) = std::env::var("POLYKROM_BENCH_OPACITY").ok().and_then(|v| v.parse::<f64>().ok()) {
             app.run("appearance.assign", json!({"components": [component.to_string()], "color": "#b4b8bc", "opacity": opacity})).unwrap();
         }
         let Some((_, device, queue)) = crate::gpu::offscreen_device() else {
             eprintln!("skipping: no GPU adapter");
             return;
         };
-        let scale: u32 = std::env::var("SOLIDCRAFT_BENCH_DIV").ok().and_then(|v| v.parse().ok()).unwrap_or(1).max(1);
+        let scale: u32 = std::env::var("POLYKROM_BENCH_DIV").ok().and_then(|v| v.parse().ok()).unwrap_or(1).max(1);
         let (w, h, samples) = (3600u32 / scale, 2190u32 / scale, 4u32);
         let depth = polykrom_gpu::depth_format(&device, true);
         let format = wgpu::TextureFormat::Rgba8Unorm;
@@ -5470,8 +5470,8 @@ mod tests {
         let st = app.session.world_state();
         let seen = st.bodies.iter().filter(|b| proj.to_screen(b.mesh_bounds().center()).is_some_and(|p| rect.contains(p))).count();
         eprintln!("{w} x {h} px: {seen} of {} placements in view", st.bodies.len());
-        // `SOLIDCRAFT_BENCH_CLOSE=1`: close up on the middle placement, most of the others out of view.
-        if std::env::var("SOLIDCRAFT_BENCH_CLOSE").is_ok_and(|v| v == "1") {
+        // `POLYKROM_BENCH_CLOSE=1`: close up on the middle placement, most of the others out of view.
+        if std::env::var("POLYKROM_BENCH_CLOSE").is_ok_and(|v| v == "1") {
             let middle = st.bodies.iter().map(|b| b.mesh_bounds()).nth(12).unwrap_or_default();
             app.cam.target = middle.center();
             app.cam.distance = middle.diagonal() * 1.5;
@@ -5491,9 +5491,9 @@ mod tests {
             t.elapsed().as_secs_f64(),
             lod.instanced.iter().map(|m| m.levels.iter().map(|(t, e)| (t.indices.len() / 3, *e)).collect::<Vec<_>>()).collect::<Vec<_>>()
         );
-        // `SOLIDCRAFT_BENCH_PNG=dir`: the view drawn from each placement's own triangles, in full
-        // as instances, and from the levels (`SOLIDCRAFT_BENCH_PNG_ONLY=1`: then stop).
-        if let Some(dir) = std::env::var_os("SOLIDCRAFT_BENCH_PNG") {
+        // `POLYKROM_BENCH_PNG=dir`: the view drawn from each placement's own triangles, in full
+        // as instances, and from the levels (`POLYKROM_BENCH_PNG_ONLY=1`: then stop).
+        if let Some(dir) = std::env::var_os("POLYKROM_BENCH_PNG") {
             const SIDE: u32 = 1024;
             let rect = Rect::from_min_size(Pos2::ZERO, vec2(SIDE as f32, SIDE as f32));
             let proj = projection(&app, rect);
@@ -5516,7 +5516,7 @@ mod tests {
                 }
             }
         }
-        if std::env::var_os("SOLIDCRAFT_BENCH_PNG_ONLY").is_some() {
+        if std::env::var_os("POLYKROM_BENCH_PNG_ONLY").is_some() {
             return;
         }
         for (label, scene) in [("own triangles", scene.clone().merged()), ("instanced", scene), ("instanced, levels of detail", lod)] {
@@ -6833,7 +6833,7 @@ mod tests {
         let cpu = polykrom_engine::view::scene(&app.session, &cam);
         let actual_edges = cpu.lines.iter().filter(|line| line.color == polykrom_engine::view::colors::EDGE).count();
         assert_eq!(actual_edges, mesh.edges.iter().enumerate().filter(|(i, _)| mesh.shaded_edge_visible(*i)).count());
-        if let Ok(directory) = polykrom_engine::geom::env::var("SMOOTH_SCREENSHOTS").ok_or(()) {
+        if let Ok(directory) = polykrom_engine::env::var("SMOOTH_SCREENSHOTS").ok_or(()) {
             std::fs::create_dir_all(&directory).unwrap();
             for (name, old_edges, wireframe) in [("after", false, false), ("before", true, false), ("wireframe", true, true)] {
                 let mut scene = polykrom_engine::view::scene(&app.session, &cam);

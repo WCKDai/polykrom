@@ -14,9 +14,7 @@
 #
 # The main installers are also attached without the version in their names
 # (polykrom-windows-x64.msi, polykrom-linux-x86_64.AppImage, ...) so that
-# releases/latest/download/<name> links in the README keep working across releases, and again
-# under SolidCraft's names (solidcraft-windows-x64.msi, ...) for links and installs from before
-# the rename (docs/compatibility.md).
+# releases/latest/download/<name> links in the README keep working across releases.
 #
 # A dry run: dispatch with draft=false (the default). Only the release branch may create drafts.
 name: Release
@@ -85,7 +83,7 @@ jobs:
           { echo "version=$VERSION"; echo "date=$(date -u +%Y-%m-%d)"; echo "prerelease=$pre"; } >>"$GITHUB_OUTPUT"
           echo "### Polykrom v$VERSION (\`${GITHUB_SHA::9}\`)" >>"$GITHUB_STEP_SUMMARY"
 
-  # The app icon in every size, drawn by solidcraft-cli (no image files are committed), for the
+  # The app icon in every size, drawn by polykrom-cli (no image files are committed), for the
   # Windows jobs: the ARM64 build is cross-compiled and can't run there to draw its own.
   icons:
     needs: version
@@ -120,8 +118,8 @@ jobs:
           - { arch: x86_64, runner: ubuntu-22.04, deb: amd64 }
           - { arch: aarch64, runner: ubuntu-22.04-arm, deb: arm64 }
     env:
-      SOLIDCRAFT_VERSION: ${{ needs.version.outputs.version }}
-      SOLIDCRAFT_BUILD_DATE: ${{ needs.version.outputs.date }}
+      POLYKROM_VERSION: ${{ needs.version.outputs.version }}
+      POLYKROM_BUILD_DATE: ${{ needs.version.outputs.date }}
       NFPM_VERSION: 2.47.0
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -144,11 +142,12 @@ jobs:
           dpkg-deb --contents dist/release/*.deb | grep -E 'usr/bin/polykrom$|usr/bin/polykrom-cli$|metainfo|applications|THIRD-PARTY-LICENSES.txt'
           dpkg-deb --contents dist/release/*.deb | grep -E 'usr/bin/polykrom$'
           dpkg-deb --contents dist/release/*.deb | grep -E 'usr/bin/polykrom-cli$'
-          # Compatibility shims (docs/compatibility.md): the earlier names and the package rename.
-          for alias in solidcraft solidcraft-cli solvecraft-cli; do
-            dpkg-deb --contents dist/release/*.deb | grep -E "usr/bin/$alias\$"
-          done
-          dpkg-deb --field dist/release/*.deb Replaces Conflicts Provides | grep -F solvecraft
+          # Nothing under any earlier name: the package is polykrom and ships its two programs.
+          if dpkg-deb --contents dist/release/*.deb | grep -E -i 'solid[c]raft|solve[c]raft'; then
+            echo "::error::the deb carries a file under a name other than Polykrom's"
+            exit 1
+          fi
+          test "$(dpkg-deb --field dist/release/*.deb Package)" = polykrom
           rpm -qip dist/release/*.rpm
           rpm -qlp dist/release/*.rpm | grep -E '/usr/bin/polykrom$'
           tar -tzf dist/release/*.tar.gz | grep -E '/bin/polykrom$'
@@ -159,8 +158,14 @@ jobs:
             "$appimage" --appimage-updateinformation | grep -F 'gh-releases-zsync|' | grep -F '|polykrom-*-linux-'
             test -s "$appimage.zsync"
           done
-          # Legacy AppImage update aliases (docs/compatibility.md).
-          ls dist/release/solvecraft-*-linux-*.AppImage.zsync dist/release/solidcraft-*-linux-*.AppImage.zsync
+          # Every file carries Polykrom's name and no other.
+          for f in dist/release/*; do
+            name="${f##*/}"
+            case "${name,,}" in
+              polykrom-*) ;;
+              *) echo "::error::$name does not carry Polykrom's name"; exit 1 ;;
+            esac
+          done
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: release-linux-${{ matrix.arch }}
@@ -181,8 +186,8 @@ jobs:
           - { arch: x86_64, runner: ubuntu-24.04 }
           - { arch: aarch64, runner: ubuntu-24.04-arm }
     env:
-      SOLIDCRAFT_VERSION: ${{ needs.version.outputs.version }}
-      SOLIDCRAFT_BUILD_DATE: ${{ needs.version.outputs.date }}
+      POLYKROM_VERSION: ${{ needs.version.outputs.version }}
+      POLYKROM_BUILD_DATE: ${{ needs.version.outputs.date }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
@@ -196,7 +201,7 @@ jobs:
           # Ubuntu 24.04's AppArmor blocks the unprivileged user namespaces bubblewrap needs.
           sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
       - name: Build the Flatpak bundle
-        run: packaging/linux/flatpak-bundle.sh "dist/linux/polykrom-$SOLIDCRAFT_VERSION-linux-${{ matrix.arch }}.tar.gz"
+        run: packaging/linux/flatpak-bundle.sh "dist/linux/polykrom-$POLYKROM_VERSION-linux-${{ matrix.arch }}.tar.gz"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: release-flatpak-${{ matrix.arch }}
@@ -221,8 +226,8 @@ jobs:
           - { arch: x86_64, runner: ubuntu-24.04 }
           - { arch: aarch64, runner: ubuntu-24.04-arm }
     env:
-      SOLIDCRAFT_VERSION: ${{ needs.version.outputs.version }}
-      SOLIDCRAFT_BUILD_DATE: ${{ needs.version.outputs.date }}
+      POLYKROM_VERSION: ${{ needs.version.outputs.version }}
+      POLYKROM_BUILD_DATE: ${{ needs.version.outputs.date }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
@@ -236,16 +241,16 @@ jobs:
           sudo apt-get install -y --no-install-recommends xvfb xauth weston dbus-x11
       - name: Build the snap
         run: |
-          sudo --preserve-env=SOLIDCRAFT_VERSION,SOLIDCRAFT_BUILD_DATE env "PATH=$PATH" \
-            packaging/linux/snap-pack.sh --destructive-mode "dist/linux/polykrom-$SOLIDCRAFT_VERSION-linux-${{ matrix.arch }}.tar.gz"
+          sudo --preserve-env=POLYKROM_VERSION,POLYKROM_BUILD_DATE env "PATH=$PATH" \
+            packaging/linux/snap-pack.sh --destructive-mode "dist/linux/polykrom-$POLYKROM_VERSION-linux-${{ matrix.arch }}.tar.gz"
           sudo chown -R "$(id -u):$(id -g)" dist target
       - name: Install it and start the app on headless X11 and Wayland
         run: |
-          snap_file="dist/release/polykrom-$SOLIDCRAFT_VERSION-linux-${{ matrix.arch }}.snap"
+          snap_file="dist/release/polykrom-$POLYKROM_VERSION-linux-${{ matrix.arch }}.snap"
           sudo snap install --dangerous "$snap_file"
           snap info --verbose "$snap_file" | head -n 12
-          snap connections solidcraft
-          solidcraft.cli --version
+          snap connections polykrom
+          polykrom.cli --version
           # Snaps expect the login session's runtime directory, which runners don't create.
           sudo install -d -m 700 -o "$(id -u)" -g "$(id -g)" "/run/user/$(id -u)"
           python3 packaging/linux/snap-smoke.py --out snap-smoke
@@ -268,8 +273,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 180
     env:
-      SOLIDCRAFT_VERSION: ${{ needs.version.outputs.version }}
-      SOLIDCRAFT_BUILD_DATE: ${{ needs.version.outputs.date }}
+      POLYKROM_VERSION: ${{ needs.version.outputs.version }}
+      POLYKROM_BUILD_DATE: ${{ needs.version.outputs.date }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Build and package in a FreeBSD VM (tar.gz)
@@ -281,7 +286,7 @@ jobs:
           cpu: 4
           mem: 12288
           # Passed into the VM by name; never templated into the script below.
-          envs: "SOLIDCRAFT_VERSION SOLIDCRAFT_BUILD_DATE"
+          envs: "POLYKROM_VERSION POLYKROM_BUILD_DATE"
           prepare: |
             pkg install -y bash git curl pkgconf libxkbcommon wayland libX11 libXcursor libXrandr libXi libxcb mesa-libs vulkan-loader
             curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain stable
@@ -291,10 +296,11 @@ jobs:
             git config --global --add safe.directory "$PWD"
             # Build outside the checkout so only dist/ is copied back out of the VM. 4 jobs: more
             # runs the VM out of memory.
-            export CARGO_TARGET_DIR=/var/tmp/solidcraft-target CARGO_BUILD_JOBS=4
+            export CARGO_TARGET_DIR=/var/tmp/polykrom-target CARGO_BUILD_JOBS=4
             bash packaging/freebsd/package.sh
-            tar -tzf dist/release/polykrom-*-freebsd-x86_64.tar.gz \
-              | grep -E '/bin/polykrom$|/bin/polykrom-cli$|/bin/solidcraft$|/bin/solidcraft-cli$|/share/applications/ai\.storyteller\.solvecraft\.desktop$|/share/doc/solidcraft/THIRD-PARTY-LICENSES\.txt$'
+            for want in '/bin/polykrom$' '/bin/polykrom-cli$' '/share/applications/app\.polykrom\.Polykrom\.desktop$' '/share/doc/polykrom/THIRD-PARTY-LICENSES\.txt$'; do
+              tar -tzf dist/release/polykrom-*-freebsd-x86_64.tar.gz | grep -E "$want"
+            done
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: release-freebsd-x86_64
@@ -309,8 +315,8 @@ jobs:
     # The deployment target stays 11.0 (packaging/macos/package.sh), whatever the runner's SDK.
     runs-on: macos-15
     env:
-      SOLIDCRAFT_VERSION: ${{ needs.version.outputs.version }}
-      SOLIDCRAFT_BUILD_DATE: ${{ needs.version.outputs.date }}
+      POLYKROM_VERSION: ${{ needs.version.outputs.version }}
+      POLYKROM_BUILD_DATE: ${{ needs.version.outputs.date }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: dtolnay/rust-toolchain@stable
@@ -341,7 +347,7 @@ jobs:
           # Windows on ARM: cross-compiled on the x64 runner.
           - { arch: arm64, target: aarch64-pc-windows-msvc }
     env:
-      SOLIDCRAFT_VERSION: ${{ needs.version.outputs.version }}
+      POLYKROM_VERSION: ${{ needs.version.outputs.version }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
@@ -362,7 +368,7 @@ jobs:
       - name: Build and package (msi, portable zip)
         shell: pwsh
         env:
-          SOLIDCRAFT_ICONS: ${{ github.workspace }}/icons
+          POLYKROM_ICONS: ${{ github.workspace }}/icons
         run: ./packaging/windows/package.ps1 -Arch ${{ matrix.arch }}
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -376,7 +382,7 @@ jobs:
     if: needs.version.outputs.build == 'true'
     runs-on: ubuntu-latest
     env:
-      SOLIDCRAFT_VERSION: ${{ needs.version.outputs.version }}
+      POLYKROM_VERSION: ${{ needs.version.outputs.version }}
       TRUNK_VERSION: 0.21.14
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -420,10 +426,8 @@ jobs:
       - name: Version-less copies for permanent download links
         # The README links to releases/latest/download/<name>, which must not change between
         # releases: polykrom-<version>-windows-x64.msi is also uploaded as
-        # polykrom-windows-x64.msi, and so on for the main installers. Each is uploaded once more
-        # under SolidCraft's name (solidcraft-windows-x64.msi): download links from before the
-        # rename, and the update check of builds from before it, ask for those
-        # (docs/compatibility.md).
+        # polykrom-windows-x64.msi, and so on for the main installers. Nothing is attached under
+        # any other name (PK-100).
         working-directory: artifacts
         run: |
           shopt -s nullglob
@@ -431,17 +435,21 @@ jobs:
             case "$f" in
               *.msi | *-portable.zip | *.dmg | *.AppImage | *.deb | *.rpm | *.flatpak | *.snap)
                 rest="${f#"polykrom-$VERSION-"}"
-                cp -- "$f" "polykrom-$rest"
-                cp -- "$f" "solidcraft-$rest" ;;
+                cp -- "$f" "polykrom-$rest" ;;
             esac
           done
           for f in polykrom-windows-x64.msi polykrom-macos-universal.dmg \
-            polykrom-linux-x86_64.AppImage polykrom-linux-x86_64.deb polykrom-linux-x86_64.rpm \
-            solidcraft-windows-x64.msi solidcraft-macos-universal.dmg \
-            solidcraft-linux-x86_64.AppImage solidcraft-linux-x86_64.deb solidcraft-linux-x86_64.rpm; do
+            polykrom-linux-x86_64.AppImage polykrom-linux-x86_64.deb polykrom-linux-x86_64.rpm; do
             test -s "$f" || { echo "::error::missing version-less copy $f"; exit 1; }
           done
-          ls -l polykrom-[!0-9]* solidcraft-[!0-9]*
+          ls -l polykrom-[!0-9]*
+          for f in *; do
+            case "${f,,}" in
+              *solid[c]raft* | *solve[c]raft*)
+                echo "::error::a release asset carries a name other than Polykrom's: $f"
+                exit 1 ;;
+            esac
+          done
       - name: Checksums and notes
         run: |
           (cd artifacts && sha256sum -- * | tee SHA256SUMS.txt)

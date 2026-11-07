@@ -530,7 +530,7 @@ mod contribution_tests {
 
     #[test]
     fn expanded_catalogue_public_plate_evidence_uses_only_headless_model_rendering() {
-        let Some(dir) = std::env::var_os("SOLIDCRAFT_CATALOGUE_EVIDENCE") else { return };
+        let Some(dir) = std::env::var_os("POLYKROM_CATALOGUE_EVIDENCE") else { return };
         crate::gpu::install_cpu_picture_renderer();
         let mut h = crate::scenario::Harness::new();
         h.app.run("solid.box", json!({"length":50,"width":25,"height":6,"body_name":"ThreadPlate"})).unwrap();

@@ -11,7 +11,7 @@ const BLOCK_3DM: &[u8] = include_bytes!("../../../io/src/native_cad/fixtures/blo
 
 /// `bytes` saved as `name` in a fresh temp directory.
 fn file(tag: &str, name: &str, bytes: &[u8]) -> (std::path::PathBuf, String) {
-    let dir = std::env::temp_dir().join(format!("solidcraft-native-cad-{tag}-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("polykrom-native-cad-{tag}-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     let path = dir.join(name);
     std::fs::write(&path, bytes).unwrap();

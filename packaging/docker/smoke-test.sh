@@ -7,8 +7,8 @@
 # and the wasm: their status, types and caching (nginx.conf).
 set -euo pipefail
 
-IMAGE="${1:-solidcraft-web:test}"
-NAME="solidcraft-smoke-$$"
+IMAGE="${1:-polykrom-web:test}"
+NAME="polykrom-smoke-$$"
 docker run -d --rm --name "$NAME" --read-only --tmpfs /tmp --cap-drop ALL -p 127.0.0.1::8080 "$IMAGE" >/dev/null
 trap 'docker rm -f "$NAME" >/dev/null 2>&1 || true' EXIT
 PORT="$(docker port "$NAME" 8080/tcp | head -n1 | sed 's/.*://')"
@@ -24,7 +24,7 @@ fail() { echo "error: $*" >&2; docker logs "$NAME" >&2 || true; exit 1; }
 # header URL NAME: the value of response header NAME for URL ("" when missing).
 header() { curl -fsI "$1" | tr -d '\r' | awk -v h="$(echo "$2" | tr '[:upper:]' '[:lower:]')" -F': ' 'tolower($1) == h { print $2 }'; }
 
-curl -fs "$BASE/" | grep -q 'solidcraft_canvas' || fail "index.html is not the app"
+curl -fs "$BASE/" | grep -q 'polykrom_canvas' || fail "index.html is not the app"
 [ "$(header "$BASE/" Cache-Control)" = no-cache ] || fail "index.html must not be cached"
 [ "$(header "$BASE/sw.js" Cache-Control)" = no-cache ] || fail "sw.js must not be cached"
 curl -fs "$BASE/sw.js" | grep -q 'const VERSION = "dev"' && fail "sw.js is the unbuilt template (not a release build)"

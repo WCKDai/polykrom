@@ -39,8 +39,8 @@ mod web {
     use crate::files::{self, Files, Intent};
     use crate::space_mouse::SpaceMouse;
 
-    const CANVAS_ID: &str = "solidcraft_canvas";
-    const LOADING_ID: &str = "solidcraft_loading";
+    const CANVAS_ID: &str = "polykrom_canvas";
+    const LOADING_ID: &str = "polykrom_loading";
     /// A 32-bit float depth buffer (no stencil): WebGPU and WebGL2 both have it, and the viewport
     /// draws it with reversed depth, whose precision follows the distance from the eye (#1434).
     const DEPTH_BITS: u8 = 32;
@@ -542,7 +542,7 @@ mod web {
 
     /// Where `?webgl` is remembered. The installed app starts from its manifest's start URL, which
     /// has no query, so the choice has to outlive the page it was made on.
-    const WEBGL_KEY: &str = "solidcraft.webgl";
+    const WEBGL_KEY: &str = "polykrom.webgl";
 
     /// Render with WebGL2: asked for now (`?webgl`, remembered) or before (until `?webgpu`).
     fn webgl() -> bool {

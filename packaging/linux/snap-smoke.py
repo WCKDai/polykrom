@@ -88,11 +88,11 @@ def run_backend(backend, out):
     runtime = Path(f"/run/user/{os.getuid()}")
     if not runtime.is_dir():
         raise RuntimeError(f"{runtime} is missing: snaps expect the login session's runtime directory")
-    env = dict(os.environ, XDG_RUNTIME_DIR=str(runtime), SOLIDCRAFT_CONTROL_TOKEN=TOKEN)
-    for name in ("WAYLAND_DISPLAY", "WAYLAND_SOCKET", "DISPLAY", "SOLIDCRAFT_WAYLAND", "SOLVECRAFT_WAYLAND"):
+    env = dict(os.environ, XDG_RUNTIME_DIR=str(runtime), POLYKROM_CONTROL_TOKEN=TOKEN)
+    for name in ("WAYLAND_DISPLAY", "WAYLAND_SOCKET", "DISPLAY", "POLYKROM_WAYLAND"):
         env.pop(name, None)
     # The snap can write to the (non-hidden) home folder, not to the host's /tmp.
-    work = Path(tempfile.mkdtemp(prefix="solidcraft-snap-smoke-", dir=Path.home()))
+    work = Path(tempfile.mkdtemp(prefix="polykrom-snap-smoke-", dir=Path.home()))
     compositor = None
     log = (work / "app.log").open("wb")
     try:
@@ -116,7 +116,7 @@ def run_backend(backend, out):
             if probe.connect_ex(("127.0.0.1", PORTS[backend])) == 0:
                 raise RuntimeError(f"port {PORTS[backend]} is already in use (another Polykrom?)")
         # Its own process group, so stopping it also stops the app under xvfb-run.
-        app = subprocess.Popen(prefix + ["/snap/bin/solidcraft", "--control", str(PORTS[backend])],
+        app = subprocess.Popen(prefix + ["/snap/bin/polykrom", "--control", str(PORTS[backend])],
                                env=env, stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
         try:
             renderer, stats = drive(app, PORTS[backend], work / "frame.png")

@@ -19,7 +19,7 @@ import tempfile
 import time
 import zlib
 
-APP_ID = "ai.storyteller.solidcraft"
+APP_ID = "app.polykrom.Polykrom"
 MAX_PIXELS = 16_000_000
 MAX_PNG_BYTES = 70_000_000
 SANDBOX_PROBE = r'''
@@ -28,12 +28,12 @@ work=$(mktemp -d)
 export XDG_CONFIG_HOME="$work/config" XDG_DATA_HOME="$work/data" XDG_CACHE_HOME="$work/cache"
 mkdir -p "$XDG_CONFIG_HOME" "$XDG_DATA_HOME" "$XDG_CACHE_HOME"
 unset WGPU_BACKEND WGPU_BACKENDS
-export SOLIDCRAFT_PROFILE_STARTUP=1
+export POLYKROM_PROFILE_STARTUP=1
 # The control channel's token (docs/control-protocol.md), set here so this client knows it.
-SOLIDCRAFT_CONTROL_TOKEN=$(od -An -N32 -tx1 /dev/urandom | tr -d ' \n')
-export SOLIDCRAFT_CONTROL_TOKEN
+POLYKROM_CONTROL_TOKEN=$(od -An -N32 -tx1 /dev/urandom | tr -d ' \n')
+export POLYKROM_CONTROL_TOKEN
 # App logs go to stderr, so a timeout still shows where startup stopped; stdout is the protocol.
-solidcraft --control 18837 1>&2 2>&1 &
+polykrom --control 18837 1>&2 2>&1 &
 app=$!
 cleanup() {
   kill "$app" 2>/dev/null || true
@@ -49,7 +49,7 @@ for ((attempt=0; attempt<300; attempt++)); do
 done
 test "$ready" = 1
 # The control port opens before the first frame, so ui.inspect has no viewport yet; poll until it does.
-inspect="{\"id\":1,\"method\":\"ui.inspect\",\"params\":{},\"token\":\"$SOLIDCRAFT_CONTROL_TOKEN\"}"
+inspect="{\"id\":1,\"method\":\"ui.inspect\",\"params\":{},\"token\":\"$POLYKROM_CONTROL_TOKEN\"}"
 deadline=$((SECONDS + 60))
 until printf '%s\n' "$inspect" >&3 && IFS= read -r -t 30 reply <&3 && [[ "$reply" =~ \"viewport\":\ *\[ ]]; do
   if ! kill -0 "$app" 2>/dev/null || ((SECONDS >= deadline)); then
@@ -180,10 +180,10 @@ def frame_statistics(png):
 def probe(gl_saved_four=False):
     shell = SANDBOX_PROBE
     if gl_saved_four:
-        shell = shell.replace('solidcraft --control',
-                              'mkdir -p "$XDG_DATA_HOME/solidcraft"\n'
-                              'printf \'{"msaa":4}\' >"$XDG_DATA_HOME/solidcraft/graphics.json"\n'
-                              'export WGPU_BACKEND=gl\nsolidcraft --control')
+        shell = shell.replace('polykrom --control',
+                              'mkdir -p "$XDG_DATA_HOME/polykrom"\n'
+                              'printf \'{"msaa":4}\' >"$XDG_DATA_HOME/polykrom/graphics.json"\n'
+                              'export WGPU_BACKEND=gl\npolykrom --control')
     try:
         result = subprocess.run(["flatpak", "run", "--user", "--command=bash", APP_ID, "-c", shell],
                                 text=True, capture_output=True, timeout=125)
@@ -215,15 +215,14 @@ def run_backend(backend):
     for tool in tools:
         if not shutil.which(tool):
             raise RuntimeError(f"{tool} missing: install flatpak, dbus-x11, xvfb, xauth and weston")
-    with tempfile.TemporaryDirectory(prefix="solidcraft-flatpak-smoke-") as temporary:
+    with tempfile.TemporaryDirectory(prefix="polykrom-flatpak-smoke-") as temporary:
         runtime = Path(temporary) / "runtime"
         runtime.mkdir(mode=0o700)
         env = dict(os.environ, XDG_RUNTIME_DIR=str(runtime))
         env.pop("WAYLAND_DISPLAY", None)
         env.pop("WAYLAND_SOCKET", None)
         env.pop("DISPLAY", None)
-        env.pop("SOLIDCRAFT_WAYLAND", None)
-        env.pop("SOLVECRAFT_WAYLAND", None)  # the legacy name is still read
+        env.pop("POLYKROM_WAYLAND", None)
         command = ["dbus-run-session", "--"]
         compositor = None
         with (Path(temporary) / "weston.log").open("wb") as log:
@@ -231,12 +230,12 @@ def run_backend(backend):
                 if backend == "x11":
                     command += ["xvfb-run", "-a", "-s", "-screen 0 1600x1000x24 -nolisten tcp"]
                 else:
-                    env["WAYLAND_DISPLAY"] = "solidcraft-smoke"
+                    env["WAYLAND_DISPLAY"] = "polykrom-smoke"
                     compositor = subprocess.Popen(["weston", "--backend=headless", "--renderer=pixman", "--no-config",
-                                                   "--socket=solidcraft-smoke", "--width=1600", "--height=1000"],
+                                                   "--socket=polykrom-smoke", "--width=1600", "--height=1000"],
                                                   env=env, stdout=log, stderr=subprocess.STDOUT)
                     deadline = time.monotonic() + 20
-                    while not (runtime / "solidcraft-smoke").exists():
+                    while not (runtime / "polykrom-smoke").exists():
                         if compositor.poll() is not None or time.monotonic() >= deadline:
                             raise RuntimeError("headless Weston failed: " + (Path(temporary) / "weston.log").read_text())
                         time.sleep(.1)

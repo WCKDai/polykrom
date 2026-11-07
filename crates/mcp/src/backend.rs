@@ -132,7 +132,7 @@ fn outcome(v: &Value) -> Result<Value, String> {
 }
 
 /// A running Polykrom app reached through its loopback control port
-/// (`solidcraft --control PORT`).
+/// (`polykrom --control PORT`).
 pub struct Remote {
     addr: String,
     port: u16,
@@ -176,7 +176,7 @@ pub(crate) const NOT_RUNNING: &str = "no Polykrom app is listening at";
 
 impl Remote {
     /// Connect to the app at `addr`, with its control token found the usual way
-    /// (`SOLIDCRAFT_CONTROL_TOKEN`, else the app's token file for that port).
+    /// (`POLYKROM_CONTROL_TOKEN`, else the app's token file for that port).
     pub fn connect(addr: &str) -> std::io::Result<Self> {
         Self::connect_with_token(addr, None)
     }
@@ -256,12 +256,12 @@ impl Remote {
         let (addr, port) = (&self.addr, self.port);
         if e.kind() == std::io::ErrorKind::NotConnected {
             format!(
-                "{NOT_RUNNING} {addr} ({e}): it is not running, or it quit. Start it with `solidcraft --control {port}` \
+                "{NOT_RUNNING} {addr} ({e}): it is not running, or it quit. Start it with `polykrom --control {port}` \
                  (or ask the user to); the next call connects to it"
             )
         } else {
             format!(
-                "the Polykrom app at {addr} did not answer ({e}): it may have quit or crashed during this call, after                  running it or not. Inspect the design before sending a change again; if the app quit, start it with                  `solidcraft --control {port}`"
+                "the Polykrom app at {addr} did not answer ({e}): it may have quit or crashed during this call, after                  running it or not. Inspect the design before sending a change again; if the app quit, start it with                  `polykrom --control {port}`"
             )
         }
     }
@@ -536,7 +536,7 @@ impl Backend for Remote {
             // Still "connected to the Polykrom app": the skills tell bridged from headless by it.
             format!(
                 "connected to the Polykrom app at {} once it runs (the user watches the viewport). It was not running \
-                 when this server started; until it is (`solidcraft --control {}`), tool calls say so",
+                 when this server started; until it is (`polykrom --control {}`), tool calls say so",
                 self.addr, self.port
             )
         }

@@ -4,7 +4,7 @@
 //! that grow with the number of bodies after every feature show up (#255, #662).
 //!
 //! The test keeps it small. The benchmark times the open phases at any size:
-//! `SOLIDCRAFT_BENCH_PARTS=400 cargo test --release -p polykrom-engine bench_generated_assembly -- --ignored --nocapture`
+//! `POLYKROM_BENCH_PARTS=400 cargo test --release -p polykrom-engine bench_generated_assembly -- --ignored --nocapture`
 
 use polycore_geom::Vec3;
 use polykrom_doc::BodyName;
@@ -94,11 +94,11 @@ fn generated_assembly_opens_with_every_body_in_place() {
     assert_eq!(measured(&mut Session::new(reopened)), after);
 }
 
-/// Open-phase timings of a generated assembly (`SOLIDCRAFT_BENCH_PARTS` parts, default 200).
+/// Open-phase timings of a generated assembly (`POLYKROM_BENCH_PARTS` parts, default 200).
 #[test]
 #[ignore = "benchmark: run with --release --ignored --nocapture"]
 fn bench_generated_assembly() {
-    let parts = std::env::var("SOLIDCRAFT_BENCH_PARTS").ok().and_then(|v| v.parse().ok()).unwrap_or(200);
+    let parts = std::env::var("POLYKROM_BENCH_PARTS").ok().and_then(|v| v.parse().ok()).unwrap_or(200);
     let bytes = polykrom_io::write_design(&generated_assembly(parts));
     let ms = |t: std::time::Instant| t.elapsed().as_secs_f64() * 1000.0;
     let t = std::time::Instant::now();

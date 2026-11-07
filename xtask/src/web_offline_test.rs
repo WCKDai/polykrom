@@ -1,10 +1,10 @@
 //! `cargo xtask web-offline-test [--site DIR]`: prove that the web app works offline and updates.
 //!
 //! Serves six release builds, a site without the app and a development build at
-//! `/solidcraft/app/` (as on GitHub Pages, with its 10-minute HTTP caching) from a local server
+//! `/polykrom/app/` (as on GitHub Pages, with its 10-minute HTTP caching) from a local server
 //! that can also act offline, flaky, hung or mid-deployment, or hold chosen responses until the
 //! test lets them go (nothing here depends on how fast the network or the machine is), plus another copy of the app at
-//! `/solidcraft/elsewhere/` on the same origin, and drives headless Chrome through the DevTools
+//! `/polykrom/elsewhere/` on the same origin, and drives headless Chrome through the DevTools
 //! protocol through these steps (twenty-two page launches, which failures are numbered by):
 //!
 //! 1. online, build v1: the page loads, the service worker takes over and keeps every file;
@@ -63,9 +63,9 @@ use serde_json::{Value, json};
 
 use crate::web_offline;
 
-const PREFIX: &str = "/solidcraft/app/";
+const PREFIX: &str = "/polykrom/app/";
 /// Another copy of the app on the same origin.
-const ELSEWHERE: &str = "/solidcraft/elsewhere/";
+const ELSEWHERE: &str = "/polykrom/elsewhere/";
 /// How long one launch may take (a real build compiles ~30 MB of wasm). Generous: the CI
 /// runners that take fork pull requests run several jobs per machine under gVisor, where one
 /// launch has taken over 90 s.
@@ -94,7 +94,7 @@ pub fn run_api(site: &str) -> Result<(), String> {
     // The page has the keyboard, as a tab the user is looking at does (for KEYS_TEST).
     cdp.call("Emulation.setFocusEmulationEnabled", json!({"enabled": true}))?;
     cdp.call("Page.navigate", json!({"url": format!("http://127.0.0.1:{}{PREFIX}?webgl", server.port)}))?;
-    wait_for(&mut cdp, "!!window.solidcraft && !document.getElementById('solidcraft_loading')", "the browser API is ready", |v| v == true)?;
+    wait_for(&mut cdp, "!!window.polykrom && !document.getElementById('polykrom_loading')", "the browser API is ready", |v| v == true)?;
     let result = cdp.eval(API_TEST)?;
     println!("web-api-test: {result}");
     let keys = cdp.eval(KEYS_TEST)?;
@@ -106,7 +106,7 @@ pub fn run_api(site: &str) -> Result<(), String> {
 /// default action isn't cancelled, while Tab's is (the app moves between its fields with it).
 const KEYS_TEST: &str = r#"(async () => {
     const check = (condition, message) => { if (!condition) throw new Error(message); };
-    const canvas = document.getElementById('solidcraft_canvas');
+    const canvas = document.getElementById('polykrom_canvas');
     canvas.focus();
     canvas.dispatchEvent(new FocusEvent('focus'));
     const cancelled = init => {
@@ -121,7 +121,7 @@ const KEYS_TEST: &str = r#"(async () => {
 })()"#;
 
 const API_TEST: &str = r#"(async () => {
-    const app = window.solidcraft;
+    const app = window.polykrom;
     const check = (condition, message) => { if (!condition) throw new Error(message); };
     const rejects = async (call, message) => {
         try { await call(); } catch (error) {
@@ -182,7 +182,7 @@ pub fn run(root: &Path, site: Option<&str>, required: bool) -> Result<(), String
                 std::fs::write(&index, mark(&html, build)?).map_err(|e| format!("{}: {e}", index.display()))?;
             }
             // The wasm ran: the loading message is gone (started) or says why it couldn't start.
-            "(() => { const el = document.getElementById('solidcraft_loading'); return !el || !el.innerText.startsWith('Loading'); })()"
+            "(() => { const el = document.getElementById('polykrom_loading'); return !el || !el.innerText.startsWith('Loading'); })()"
         }
         None => {
             let registration = registration_script(root)?;
@@ -317,7 +317,7 @@ pub fn run(root: &Path, site: Option<&str>, required: bool) -> Result<(), String
     // Every page was remembered long ago.
     let age = "caches.keys().then((ks) => Promise.all(ks.map(async (k) => {
       const c = await caches.open(k);
-      if (k.startsWith('solidcraft-app-pages ')) for (const r of await c.keys()) {
+      if (k.startsWith('polykrom-app-pages ')) for (const r of await c.keys()) {
         const page = await (await c.match(r)).json();
         await c.put(r, new Response(JSON.stringify({ ...page, at: 0 })));
       }
@@ -436,7 +436,7 @@ pub fn run(root: &Path, site: Option<&str>, required: bool) -> Result<(), String
 /// What a launch shows: the page, which build it is, whether it started, the worker's caches.
 const STATE_JS: &str = "(async () => {
   const scope = new URL('.', location.href).href;
-  const prefix = 'solidcraft-app ' + new URL(scope).pathname + ' ';
+  const prefix = 'polykrom-app ' + new URL(scope).pathname + ' ';
   const caches_ = {}, kept = {}, retired = [], complete = [];
   // Each cache is read with `caches.match`, never opened: opening a cache that a worker has just
   // deleted makes it again (empty), and nothing would delete it after that.
@@ -468,7 +468,7 @@ fn only_in(build: &Path, other: &Path) -> Result<usize, String> {
 }
 
 fn cache_name(path: &str, version: &str) -> String {
-    format!("solidcraft-app {path} {version}")
+    format!("polykrom-app {path} {version}")
 }
 
 /// A real build must hold what the generator writes for its files: `build.json`, and a `sw.js`
@@ -558,7 +558,7 @@ struct TempDir(PathBuf);
 
 impl TempDir {
     fn new() -> Result<TempDir, String> {
-        let dir = std::env::temp_dir().join(format!("solidcraft-web-offline-test-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("polykrom-web-offline-test-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).map_err(|e| format!("{}: {e}", dir.display()))?;
         Ok(TempDir(dir))

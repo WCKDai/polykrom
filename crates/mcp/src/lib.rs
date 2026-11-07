@@ -50,7 +50,7 @@ pub fn agent_scope_with(recovery: Option<PathBuf>, allowed: impl IntoIterator<It
 }
 
 /// This server's own folder for screenshots it reads back and deletes (`screenshot` without a
-/// `path`): a new `<temp>/solidcraft-mcp-<pid>-<n>` made on first use (never one that was there
+/// `path`): a new `<temp>/polykrom-mcp-<pid>-<n>` made on first use (never one that was there
 /// already, which could be someone else's), private to the user on Unix. `<temp>` is spelled with
 /// long names (`vfs::temp_dir`), since the scope refuses short (8.3) ones.
 pub fn scratch_dir() -> Option<PathBuf> {
@@ -63,7 +63,7 @@ pub fn scratch_dir() -> Option<PathBuf> {
         std::os::unix::fs::DirBuilderExt::mode(&mut b, 0o700);
         let seed = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.subsec_nanos()).unwrap_or(0);
         (0..16u32).find_map(|i| {
-            let d = vfs::temp_dir().join(format!("solidcraft-mcp-{}-{:x}", std::process::id(), seed.wrapping_add(i)));
+            let d = vfs::temp_dir().join(format!("polykrom-mcp-{}-{:x}", std::process::id(), seed.wrapping_add(i)));
             b.create(&d).ok().map(|()| d)
         })
     })

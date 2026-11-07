@@ -4,13 +4,11 @@
 #
 # Exports:
 #   ROOT                    workspace root
-#   VERSION                 [workspace.package] version from Cargo.toml (override: SOLIDCRAFT_VERSION)
-#
-# Every SOLIDCRAFT_* override also accepts the pre-rename SOLVECRAFT_* name when the new one is
-# unset (compatibility shim, see docs/compatibility.md).
+#   VERSION                 [workspace.package] version from Cargo.toml (override: POLYKROM_VERSION)
 #   DIST                    output directory for release artifacts (default: $ROOT/dist/release)
-#   SOLIDCRAFT_BUILD_DATE   UTC build date, YYYY-MM-DD
+#   POLYKROM_BUILD_DATE     UTC build date, YYYY-MM-DD
 #   CARGO_TARGET_DIR        cargo's target dir (default: $ROOT/target)
+#   APP_ID                  the reverse-DNS app id (see below)
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 export ROOT
@@ -23,7 +21,7 @@ workspace_version() {
   ' "$ROOT/Cargo.toml"
 }
 
-VERSION="${SOLIDCRAFT_VERSION:-${SOLVECRAFT_VERSION:-$(workspace_version)}}"
+VERSION="${POLYKROM_VERSION:-$(workspace_version)}"
 if [ -z "$VERSION" ]; then
   echo "error: could not read [workspace.package] version from $ROOT/Cargo.toml" >&2
   exit 1
@@ -35,12 +33,11 @@ mkdir -p "$DIST"
 DIST="$(cd "$DIST" && pwd)"
 export DIST
 
-export SOLIDCRAFT_BUILD_DATE="${SOLIDCRAFT_BUILD_DATE:-${SOLVECRAFT_BUILD_DATE:-$(date -u +%Y-%m-%d)}}"
+export POLYKROM_BUILD_DATE="${POLYKROM_BUILD_DATE:-$(date -u +%Y-%m-%d)}"
 export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$ROOT/target}"
-# The reverse-DNS id: Flatpak app id, desktop, metainfo and MIME file names, icon name and the
-# window's Wayland app_id / X11 class. Releases before 0.8 used ai.storyteller.solvecraft; the
-# Flatpak repository rebases that id to this one (packaging/flatpak-site.sh, docs/compatibility.md).
-APP_ID=ai.storyteller.solidcraft
+# The reverse-DNS id: Flatpak app id, desktop, metainfo and MIME file names, icon name, the
+# window's Wayland app_id / X11 class and the macOS bundle id (crates/io/src/identity.rs).
+APP_ID=app.polykrom.Polykrom
 export APP_ID
 
 # Emit a GitHub Actions warning (plain stderr outside Actions).
@@ -49,7 +46,7 @@ warn() {
 }
 
 # Copy the licence, notice and readme files into a package directory. The programs also carry
-# them (Help > About > Licences, `solidcraft-cli licences`).
+# them (Help > About > Licences, `polykrom-cli licences`).
 copy_docs() {
   local dest="$1" f
   for f in README.md LICENSE-MIT LICENSE-APACHE NOTICE THIRD-PARTY-LICENSES.txt; do
@@ -64,5 +61,5 @@ make_icons() {
     mkdir -p "$out/hicolor/${s}x${s}/apps"
     cp "$ROOT/assets/icons/app/linux/exports/hicolor/${s}x${s}/apps/$APP_ID.png" "$out/hicolor/${s}x${s}/apps/$APP_ID.png" || return
   done
-  cp "$ROOT/assets/icons/app/windows/exports/solidcraft.ico" "$out/solidcraft.ico"
+  cp "$ROOT/assets/icons/app/windows/exports/polykrom.ico" "$out/polykrom.ico"
 }

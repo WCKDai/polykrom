@@ -13,18 +13,6 @@ workspace = true
 name = "polykrom-cli"
 path = "src/main.rs"
 
-# SolidCraft's name for the CLI, kept so scripts and MCP registrations (`solidcraft-cli mcp`)
-# keep working: it runs polykrom-cli (docs/compatibility.md).
-[[bin]]
-name = "solidcraft-cli"
-path = "src/solidcraft.rs"
-
-# Compatibility alias for the CLI's first name: forwards to polykrom-cli with a deprecation
-# note on stderr.
-[[bin]]
-name = "solvecraft-cli"
-path = "src/alias.rs"
-
 [dependencies]
 polykrom-engine = { workspace = true }
 polykrom-gpu = { workspace = true }

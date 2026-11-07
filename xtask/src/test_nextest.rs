@@ -11,11 +11,11 @@ use crate::cargo;
 
 /// Select the full-CI runner without changing `xtask test`'s argument forwarding.
 pub fn run_selected(side: Vec<(String, Command)>) -> Result<(), String> {
-    match std::env::var("SOLIDCRAFT_TEST_RUNNER") {
+    match std::env::var("POLYKROM_TEST_RUNNER") {
         Err(std::env::VarError::NotPresent) => crate::test::run(&[], &[], side),
         Ok(value) if value == "libtest" => crate::test::run(&[], &[], side),
         Ok(value) if value == "nextest" => run(side),
-        _ => Err("SOLIDCRAFT_TEST_RUNNER must be libtest or nextest".into()),
+        _ => Err("POLYKROM_TEST_RUNNER must be libtest or nextest".into()),
     }
 }
 
@@ -172,16 +172,16 @@ mod tests {
 
     #[test]
     fn subprocess_fixture() {
-        let Some(path) = std::env::var_os("SOLIDCRAFT_XTASK_TEST_MARKER") else { return };
+        let Some(path) = std::env::var_os("POLYKROM_XTASK_TEST_MARKER") else { return };
         std::fs::write(path, b"ran").unwrap();
-        assert_ne!(std::env::var("SOLIDCRAFT_XTASK_TEST_FAIL").ok().as_deref(), Some("1"), "intentional child-process failure");
+        assert_ne!(std::env::var("POLYKROM_XTASK_TEST_FAIL").ok().as_deref(), Some("1"), "intentional child-process failure");
     }
 
     fn fixture(path: &std::path::Path, fail: bool) -> Command {
         let mut c = Command::new(std::env::current_exe().unwrap());
         c.args(["--exact", "test_nextest::tests::subprocess_fixture", "--test-threads=1"])
-            .env("SOLIDCRAFT_XTASK_TEST_MARKER", path)
-            .env("SOLIDCRAFT_XTASK_TEST_FAIL", if fail { "1" } else { "0" })
+            .env("POLYKROM_XTASK_TEST_MARKER", path)
+            .env("POLYKROM_XTASK_TEST_FAIL", if fail { "1" } else { "0" })
             // Keep nested libtest reports out of the parent harness transcript.
             .stdout(Stdio::null())
             .stderr(Stdio::null());
@@ -204,7 +204,7 @@ mod tests {
     fn failures_propagate_without_skipping_later_side_gates() {
         static NEXT: AtomicU64 = AtomicU64::new(0);
         for (native_fails, side_fails, expected) in [(true, false, Some("native")), (false, true, Some("first")), (false, false, None)] {
-            let dir = std::env::temp_dir().join(format!("solidcraft-xtask-nextest-{}-{}", std::process::id(), NEXT.fetch_add(1, Ordering::Relaxed)));
+            let dir = std::env::temp_dir().join(format!("polykrom-xtask-nextest-{}-{}", std::process::id(), NEXT.fetch_add(1, Ordering::Relaxed)));
             std::fs::create_dir_all(&dir).unwrap();
             let native = dir.join("native");
             let first = dir.join("first");

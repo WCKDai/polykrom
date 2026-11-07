@@ -19,7 +19,7 @@
 //! - `{"choose_file": "part.step"}`: the next Open picker returns that file of the scenario's
 //!   folder (Save pickers save there)
 //! - `{"shot": "name"}`: a screenshot when run in a window; headless, a render of the model
-//!   into `$SOLIDCRAFT_SCENARIO_SHOTS` when that is set; `{"debug": 1}`
+//!   into `$POLYKROM_SCENARIO_SHOTS` when that is set; `{"debug": 1}`
 //!   prints the UI state (`"widgets"`: also every widget's text; `"handles"`: every published
 //!   handle, browser rows as `row:<label>` and their fold arrows as `fold:<label>`)
 //! - `{"camera": {"yaw": rad, "pitch": rad}}` puts the camera at an orbit; `{"view_anim": "top",
@@ -134,7 +134,7 @@ fn with_dir(v: Value, dir: &str) -> Value {
 fn scratch_dir() -> PathBuf {
     use std::sync::atomic::{AtomicUsize, Ordering};
     static N: AtomicUsize = AtomicUsize::new(0);
-    let d = polykrom_engine::io::vfs::temp_dir().join(format!("solidcraft-scenario-{}-{}", std::process::id(), N.fetch_add(1, Ordering::Relaxed)));
+    let d = polykrom_engine::io::vfs::temp_dir().join(format!("polykrom-scenario-{}-{}", std::process::id(), N.fetch_add(1, Ordering::Relaxed)));
     let _ = std::fs::create_dir_all(&d);
     d
 }
@@ -168,9 +168,9 @@ impl Default for Harness {
 }
 
 impl Drop for Harness {
-    /// The scenario's files go with it (kept with SOLIDCRAFT_SCENARIO_KEEP set).
+    /// The scenario's files go with it (kept with POLYKROM_SCENARIO_KEEP set).
     fn drop(&mut self) {
-        if polykrom_engine::geom::env::var_os("SCENARIO_KEEP").is_none() {
+        if polykrom_engine::env::var_os("SCENARIO_KEEP").is_none() {
             let _ = std::fs::remove_dir_all(&self.dir);
         }
     }
@@ -529,8 +529,8 @@ impl Harness {
             } else if s.get("note").is_some() || s.get("pending").is_some() {
                 return Ok(());
             } else if let Some(name) = s.get("shot").and_then(Value::as_str) {
-                // With SOLIDCRAFT_SCENARIO_SHOTS set: a render of the model as the camera sees it.
-                if let Ok(dir) = polykrom_engine::geom::env::var("SCENARIO_SHOTS").ok_or(()) {
+                // With POLYKROM_SCENARIO_SHOTS set: a render of the model as the camera sees it.
+                if let Ok(dir) = polykrom_engine::env::var("SCENARIO_SHOTS").ok_or(()) {
                     // Drawn on the GPU: the headless device, as the CLI draws.
                     #[cfg(not(target_arch = "wasm32"))]
                     if polykrom_engine::capture::installed().is_none() {

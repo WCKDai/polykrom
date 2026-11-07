@@ -1,4 +1,4 @@
-//! The control channel's per-launch token (docs/control-protocol.md). `solidcraft --control PORT`
+//! The control channel's per-launch token (docs/control-protocol.md). `polykrom --control PORT`
 //! makes a random token, writes it to a file only the user can read
 //! ([`token_path`]) and refuses every connection whose first request doesn't carry it, so other
 //! users on the same machine (loopback is shared, on Windows across remote-desktop sessions too)
@@ -7,10 +7,10 @@
 use std::io::{Error, ErrorKind, Result, Write};
 use std::path::{Path, PathBuf};
 
-/// Shortest token accepted from `SOLIDCRAFT_CONTROL_TOKEN` (hex characters).
+/// Shortest token accepted from `POLYKROM_CONTROL_TOKEN` (hex characters).
 pub const MIN_TOKEN_LEN: usize = 32;
 
-/// The port the control channel tries first when `--control` and `SOLIDCRAFT_CONTROL_PORT` give none.
+/// The port the control channel tries first when `--control` and `POLYKROM_CONTROL_PORT` give none.
 /// Below the ephemeral ranges of Linux (32768+) and Windows/macOS (49152+), so the system never
 /// hands it to an outgoing connection.
 pub const DEFAULT_PORT: u16 = 27878;
@@ -22,7 +22,7 @@ pub const PORT_TRIES: u16 = 16;
 /// "Let AI agents connect" preference.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Listen {
-    /// Exactly this port (`--control PORT`, `SOLIDCRAFT_CONTROL_PORT`); no fallback.
+    /// Exactly this port (`--control PORT`, `POLYKROM_CONTROL_PORT`); no fallback.
     Exact(u16),
     /// [`DEFAULT_PORT`], or the next free one of [`PORT_TRIES`].
     Default,
@@ -53,16 +53,16 @@ pub fn bind_with_fallback(first: u16, tries: u16) -> Result<std::net::TcpListene
     Err(last)
 }
 
-/// The folder of the token files: `<data folder>/control` (`SOLIDCRAFT_CONTROL_DIR` replaces it).
+/// The folder of the token files: `<data folder>/control` (`POLYKROM_CONTROL_DIR` replaces it).
 fn control_dir() -> Option<PathBuf> {
-    match polycore_geom::env::var_os("CONTROL_DIR").filter(|d| !d.is_empty()) {
+    match crate::env::var_os("CONTROL_DIR").filter(|d| !d.is_empty()) {
         Some(d) => Some(PathBuf::from(d)),
         None => Some(crate::recovery::data_dir()?.join("control")),
     }
 }
 
 /// The token file of the app listening on `port`: `<data folder>/control/<port>.token`
-/// (`SOLIDCRAFT_CONTROL_DIR` replaces the folder).
+/// (`POLYKROM_CONTROL_DIR` replaces the folder).
 pub fn token_path(port: u16) -> Option<PathBuf> {
     Some(control_dir()?.join(format!("{port}.token")))
 }
@@ -98,14 +98,14 @@ pub fn remove_current_port(port: u16) {
     }
 }
 
-/// A token set on purpose with `SOLIDCRAFT_CONTROL_TOKEN` (test harnesses, sandboxed packages
+/// A token set on purpose with `POLYKROM_CONTROL_TOKEN` (test harnesses, sandboxed packages
 /// whose data folder the client can't see), if it is long enough.
 pub fn env_token() -> Option<String> {
-    polycore_geom::env::var("CONTROL_TOKEN").map(|t| t.trim().to_string()).filter(|t| t.len() >= MIN_TOKEN_LEN)
+    crate::env::var("CONTROL_TOKEN").map(|t| t.trim().to_string()).filter(|t| t.len() >= MIN_TOKEN_LEN)
 }
 
 /// The token a client sends to the app on `port`: `explicit` (`--token`), else
-/// `SOLIDCRAFT_CONTROL_TOKEN`, else the app's token file.
+/// `POLYKROM_CONTROL_TOKEN`, else the app's token file.
 pub fn client_token(port: u16, explicit: Option<&str>) -> Option<String> {
     if let Some(t) = explicit.map(str::trim).filter(|t| !t.is_empty()) {
         return Some(t.to_string());
@@ -214,7 +214,7 @@ mod tests {
         assert_eq!(parse_port("0"), None);
         assert_eq!(parse_port("70000"), None);
         assert_eq!(parse_port("nope"), None);
-        let dir = std::env::temp_dir().join(format!("solidcraft-current-port-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("polykrom-current-port-{}", std::process::id()));
         let path = dir.join("current.port");
         write_token_file(&path, "27881").unwrap();
         assert_eq!(parse_port(&std::fs::read_to_string(&path).unwrap()), Some(27881));
@@ -226,7 +226,7 @@ mod tests {
     #[test]
     fn the_token_file_is_private_to_the_user() {
         use std::os::unix::fs::PermissionsExt;
-        let dir = std::env::temp_dir().join(format!("solidcraft-control-auth-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("polykrom-control-auth-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         let path = dir.join("control/7878.token");
         std::fs::create_dir_all(dir.join("control")).unwrap();

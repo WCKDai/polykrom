@@ -154,7 +154,7 @@ mod tests {
     use std::path::PathBuf;
 
     fn fixture(name: &str) -> (SolveApp, u64, u64, PathBuf, PathBuf) {
-        let folder = std::env::temp_dir().join(format!("solidcraft-relink-ui-{name}-{}", std::process::id()));
+        let folder = std::env::temp_dir().join(format!("polykrom-relink-ui-{name}-{}", std::process::id()));
         std::fs::create_dir_all(&folder).unwrap();
         let source = folder.join("source.solidcraft");
         let moved = folder.join("moved.solidcraft");
@@ -250,7 +250,7 @@ mod tests {
 
     #[test]
     fn extract_menu_asks_where_to_save_and_links_the_component_there() {
-        let folder = std::env::temp_dir().join(format!("solidcraft-extract-ui-{}", std::process::id()));
+        let folder = std::env::temp_dir().join(format!("polykrom-extract-ui-{}", std::process::id()));
         std::fs::create_dir_all(&folder).unwrap();
         let mut app = SolveApp::new(Session::default(), Default::default());
         let made = app.run("component.create", json!({"name": "Bracket", "grounded": false})).unwrap();
@@ -286,7 +286,7 @@ mod tests {
 
     #[test]
     fn extract_offers_to_link_identical_copies() {
-        let folder = std::env::temp_dir().join(format!("solidcraft-extract-copies-ui-{}", std::process::id()));
+        let folder = std::env::temp_dir().join(format!("polykrom-extract-copies-ui-{}", std::process::id()));
         std::fs::create_dir_all(&folder).unwrap();
         let mut app = SolveApp::new(Session::default(), Default::default());
         let made = app.run("component.create", json!({"name": "Bracket"})).unwrap();

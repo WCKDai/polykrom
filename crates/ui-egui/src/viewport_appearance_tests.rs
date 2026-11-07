@@ -71,7 +71,7 @@ fn theme_switches_refresh_cached_viewport_colours_without_remeshing() {
     let revision = h.app.session.revision;
     let mesh = h.app.session.world_state().bodies[0].cached_mesh().unwrap();
     let mut previous: Option<(u64, u64, u64)> = None;
-    for theme in ["dark", "gruvbox-dark", "blueprint", "dark", "light", "solidcraft-95", "cupertino", "light"] {
+    for theme in ["dark", "gruvbox-dark", "blueprint", "dark", "light", "polykrom-95", "cupertino", "light"] {
         let result = h.call("ui.prefs", json!({"theme": theme}));
         assert!(result.get("error").is_none(), "{result}");
         h.frame();
@@ -94,7 +94,7 @@ fn theme_switches_refresh_cached_viewport_colours_without_remeshing() {
         assert!(h.app.viewport.slot.lock().unwrap().is_none(), "an unchanged theme reuses its scene");
     }
     h.app.run("appearance.assign", json!({"bodies": [body], "color": "#336699"})).unwrap();
-    for theme in ["gruvbox-dark", "blueprint", "solidcraft-95"] {
+    for theme in ["gruvbox-dark", "blueprint", "polykrom-95"] {
         h.call("ui.prefs", json!({"theme": theme}));
         h.frame();
         let scene = h.app.viewport.slot.lock().unwrap().take().unwrap().merged();

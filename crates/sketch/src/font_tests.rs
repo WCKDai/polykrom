@@ -144,7 +144,7 @@ struct Folder(PathBuf);
 
 impl Folder {
     fn new(name: &str) -> Folder {
-        let dir = std::env::temp_dir().join(format!("solidcraft-font-tests-{}-{name}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("polykrom-font-tests-{}-{name}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(dir.join("nested")).unwrap();
         std::fs::write(dir.join("nested").join("tiny.ttf"), tiny_font()).unwrap();

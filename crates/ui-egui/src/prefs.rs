@@ -8,14 +8,11 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 
 /// The key the apps keep the preferences under in eframe's storage.
-pub const STORAGE_KEY: &str = "solidcraft.prefs";
-/// The key earlier releases used. Compatibility shim (docs/compatibility.md): read when the
-/// current key is missing, never written.
-pub const LEGACY_STORAGE_KEY: &str = "solvecraft.prefs";
+pub const STORAGE_KEY: &str = "polykrom.prefs";
 
-/// The stored preferences, from the current key or else the legacy one.
+/// The stored preferences.
 pub fn stored(get: impl Fn(&str) -> Option<String>) -> Option<String> {
-    get(STORAGE_KEY).or_else(|| get(LEGACY_STORAGE_KEY))
+    get(STORAGE_KEY)
 }
 
 mod design;
@@ -622,7 +619,7 @@ preference_settings! {
     /// the window thread, and the window waits for each, as before (the default).
     agent_off_thread: bool = false, PAGE_AI;
     /// Let AI agents connect: the localhost control channel (MCP) opens on the default port at
-    /// start-up, unless `--control`/`SOLIDCRAFT_CONTROL_PORT` name one. Read at start-up.
+    /// start-up, unless `--control`/`POLYKROM_CONTROL_PORT` name one. Read at start-up.
     agent_control: bool = true, PAGE_AI;
     /// Agents the user added (the installed ones are found by themselves). API keys are never
     /// here: they live in the system keychain.
@@ -1486,7 +1483,7 @@ fn space_mouse_rows(app: &mut SolveApp, ui: &mut egui::Ui) {
         });
         if app.space_mouse.device.is_none() {
             if found_but_not_allowed(app.space_mouse.drivers) {
-                // Wiggling will not help: the device is there and SolidCraft may not read it.
+                // Wiggling will not help: the device is there and Polykrom may not read it.
                 hint_under_controls(ui, app.tr("ui.3d_mouse_denied"), "space_mouse_denied");
             } else {
                 hint_under_controls(ui, app.tr("ui.3d_mouse_wiggle"), "space_mouse_wiggle");
@@ -3483,12 +3480,12 @@ mod tests {
     }
 
     #[test]
-    fn stored_prefs_fall_back_to_the_legacy_key() {
-        let only_old = |k: &str| (k == super::LEGACY_STORAGE_KEY).then(|| "old".to_string());
-        assert_eq!(super::stored(only_old).as_deref(), Some("old"));
-        let both = |k: &str| Some(if k == super::STORAGE_KEY { "new" } else { "old" }.to_string());
-        assert_eq!(super::stored(both).as_deref(), Some("new"));
-        assert_eq!(super::stored(|_| None), None);
+    fn stored_prefs_come_from_polykroms_key_only() {
+        let other = |k: &str| (k == "solvecraft.prefs").then(|| "old".to_string());
+        assert_eq!(super::stored(other), None);
+        let mine = |k: &str| (k == super::STORAGE_KEY).then(|| "new".to_string());
+        assert_eq!(super::stored(mine).as_deref(), Some("new"));
+        assert!(super::STORAGE_KEY.starts_with("polykrom."));
     }
 
     use super::*;
@@ -3961,7 +3958,7 @@ mod tests {
     /// A STEP file opened Z-up is offered to be stood up: a quarter turn about X, undoable.
     #[test]
     fn a_y_up_step_file_can_be_stood_up() {
-        let dir = std::env::temp_dir().join(format!("solidcraft-standup-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("polykrom-standup-{}", std::process::id()));
         let _ = std::fs::create_dir_all(&dir);
         let path = dir.join("tall_in_y.step").to_string_lossy().to_string();
         let mut src = SolveApp::new(polykrom_engine::Session::default(), Default::default());

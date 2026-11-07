@@ -15,7 +15,7 @@ struct Stderr {
 
 impl Log for Stderr {
     fn enabled(&self, m: &Metadata) -> bool {
-        m.level() <= if m.target().starts_with("solidcraft") { self.ours } else { self.others }
+        m.level() <= if m.target().starts_with("polykrom") { self.ours } else { self.others }
     }
 
     fn log(&self, r: &Record) {

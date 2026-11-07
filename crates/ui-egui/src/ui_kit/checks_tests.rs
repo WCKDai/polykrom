@@ -208,7 +208,7 @@ fn surface(
 #[test]
 fn actual_config_appearance_preferences_and_menu_boxes_and_ticks_match_at_1x_2x() {
     let previous = crate::theme::is_dark();
-    let evidence = std::env::var_os("SOLIDCRAFT_CHECKBOX_EVIDENCE").map(std::path::PathBuf::from);
+    let evidence = std::env::var_os("POLYKROM_CHECKBOX_EVIDENCE").map(std::path::PathBuf::from);
     for dark in [false, true] {
         crate::theme::set_dark(dark);
         for ppp in [1.0, 2.0] {

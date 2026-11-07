@@ -3,7 +3,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const paused = require('./kernel-paused.js');
 
-const repo = { owner: 'tangency-labs', repo: 'solidcraft' };
+const repo = { owner: 'WCKDai', repo: 'polykrom' };
 
 // A fake github-script client that records writes. `world` describes the repo.
 function fake(world = {}) {

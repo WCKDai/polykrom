@@ -2,7 +2,7 @@ use super::*;
 use crate::Session;
 
 fn fresh_dir(name: &str) -> PathBuf {
-    let d = std::env::temp_dir().join(format!("solidcraft-crash-test-{name}-{}", std::process::id()));
+    let d = std::env::temp_dir().join(format!("polykrom-crash-test-{name}-{}", std::process::id()));
     let _ = fs::remove_dir_all(&d);
     d
 }
@@ -12,10 +12,10 @@ fn build() -> Build {
 }
 
 /// The child half of the process tests: does nothing unless a parent asks, then installs the
-/// hook and crashes the way `SOLIDCRAFT_CRASH_CHILD` says.
+/// hook and crashes the way `POLYKROM_CRASH_CHILD` says.
 #[test]
 fn child() {
-    let (Some(dir), Some(mode)) = (polycore_geom::env::var_os("CRASH_CHILD_DIR"), polycore_geom::env::var("CRASH_CHILD")) else {
+    let (Some(dir), Some(mode)) = (crate::env::var_os("CRASH_CHILD_DIR"), crate::env::var("CRASH_CHILD")) else {
         return;
     };
     let fresh = install(PathBuf::from(dir), build());
@@ -93,9 +93,9 @@ fn child() {
 fn run_child(dir: &Path, mode: &str) -> (String, bool) {
     let out = std::process::Command::new(std::env::current_exe().unwrap())
         .args(["--exact", "crash::tests::child", "--test-threads=1", "--nocapture"])
-        .env("SOLIDCRAFT_CRASH_CHILD_DIR", dir)
-        .env("SOLIDCRAFT_CRASH_CHILD", mode)
-        .env("SOLIDCRAFT_CRASH_TEST", "1")
+        .env("POLYKROM_CRASH_CHILD_DIR", dir)
+        .env("POLYKROM_CRASH_CHILD", mode)
+        .env("POLYKROM_CRASH_TEST", "1")
         .env("RUST_BACKTRACE", "0")
         .output()
         .unwrap();

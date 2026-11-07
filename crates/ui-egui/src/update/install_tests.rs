@@ -12,7 +12,7 @@ const SIGNED_SUMS: &str = "aaaa  solidcraft-linux-x86_64.AppImage\n";
 const SIGNATURE: &str = "untrusted comment: signature from minisign secret key\nRUSnDqhIJ/zGKEyvbowsT8vEGvdv2OL9Rwv4bo2m7pJC54t2UQWXjU0+V7ayPB0Okk1teY53qZSTugz2Dnko35A3Xc1jdNFZCwU=\ntrusted comment: SolidCraft v9.9.9\npCRA0RNYxyt4SSqLbfI3p00xsCE4Rt8ixJWAQfoyb226cz/XdS7A2PRdG7hFmRmfg4h6zmtIt3iRLSKjk6RsAQ==\n";
 
 fn scratch(name: &str) -> PathBuf {
-    let dir = std::env::temp_dir().join(format!("solidcraft-update-test-{}-{name}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("polykrom-update-test-{}-{name}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
     dir
@@ -46,7 +46,7 @@ fn signatures_must_match_the_key_the_list_and_the_release() {
 
 #[test]
 fn methods_per_installation() {
-    let exe = Path::new("/x/solidcraft.exe");
+    let exe = Path::new("/x/polykrom.exe");
     assert_eq!(method(&InstallKind::AppImage("/a/S.AppImage".into()), Some(exe)), Some(Method::AppImage("/a/S.AppImage".into())));
     assert_eq!(method(&InstallKind::WindowsMsi, Some(exe)), Some(Method::Msi));
     assert_eq!(method(&InstallKind::WindowsPortable, Some(exe)), Some(Method::PortableZip(exe.into())));
@@ -103,7 +103,7 @@ fn net(files: Vec<(String, Vec<u8>)>) -> Net {
 #[test]
 fn an_appimage_is_replaced_only_when_it_verifies() {
     let dir = scratch("appimage");
-    let target = dir.join("SolidCraft.AppImage");
+    let target = dir.join("Polykrom.AppImage");
     std::fs::write(&target, b"old version").unwrap();
     let new = b"new version".to_vec();
     let name = "polykrom-linux-x86_64.AppImage";
@@ -117,7 +117,7 @@ fn an_appimage_is_replaced_only_when_it_verifies() {
     let err = run(&r, &kind, &m, "x86_64", &n, &dir.join("staging"), &Progress::default()).unwrap_err();
     assert!(err.contains("doesn't match"), "{err}");
     assert_eq!(std::fs::read(&target).unwrap(), b"old version");
-    assert!(!dir.join("SolidCraft.AppImage.update").exists(), "the bad download is deleted");
+    assert!(!dir.join("Polykrom.AppImage.update").exists(), "the bad download is deleted");
 
     // Not listed at all.
     let n = net(vec![(name.into(), new.clone()), (SUMS.into(), b"".to_vec())]);
@@ -150,15 +150,15 @@ fn an_appimage_is_replaced_only_when_it_verifies() {
 #[test]
 fn the_portable_zip_swaps_both_executables() {
     let dir = scratch("portable");
-    let exe = dir.join("solidcraft.exe");
+    let exe = dir.join("polykrom.exe");
     std::fs::write(&exe, b"old app").unwrap();
-    std::fs::write(dir.join("solidcraft-cli.exe"), b"old cli").unwrap();
+    std::fs::write(dir.join("polykrom-cli.exe"), b"old cli").unwrap();
     let mut zip_bytes = Vec::new();
     {
         let mut z = zip::ZipWriter::new(std::io::Cursor::new(&mut zip_bytes));
         let o = zip::write::SimpleFileOptions::default();
         z.add_directory("polykrom-9.9.9-windows-x64-portable/", o).unwrap();
-        for (n, b) in [("solidcraft.exe", &b"new app"[..]), ("solidcraft-cli.exe", b"new cli"), ("README.md", b"readme")] {
+        for (n, b) in [("polykrom.exe", &b"new app"[..]), ("polykrom-cli.exe", b"new cli"), ("README.md", b"readme")] {
             z.start_file(format!("polykrom-9.9.9-windows-x64-portable/{n}"), o).unwrap();
             z.write_all(b).unwrap();
         }
@@ -171,7 +171,7 @@ fn the_portable_zip_swaps_both_executables() {
         run(&r, &InstallKind::WindowsPortable, &Method::PortableZip(exe.clone()), "x86_64", &n, &dir.join("staging"), &Progress::default()).unwrap();
     assert_eq!(out, Outcome::Restart(exe.clone()));
     assert_eq!(std::fs::read(&exe).unwrap(), b"new app");
-    assert_eq!(std::fs::read(dir.join("solidcraft-cli.exe")).unwrap(), b"new cli");
+    assert_eq!(std::fs::read(dir.join("polykrom-cli.exe")).unwrap(), b"new cli");
     assert!(!dir.join("staging").join(name).exists(), "the zip is removed");
     // A zip without the app is refused and changes nothing.
     std::fs::write(dir.join("empty.zip"), {
@@ -183,9 +183,9 @@ fn the_portable_zip_swaps_both_executables() {
     assert!(apply(&Method::PortableZip(exe.clone()), &dir.join("empty.zip")).is_err());
     assert_eq!(std::fs::read(&exe).unwrap(), b"new app");
     // The moved-aside executable of an update goes at the next start.
-    std::fs::write(dir.join("solidcraft.exe.old"), b"x").unwrap();
+    std::fs::write(dir.join("polykrom.exe.old"), b"x").unwrap();
     clean_up_after_update(Some(&exe));
-    assert!(!dir.join("solidcraft.exe.old").exists());
+    assert!(!dir.join("polykrom.exe.old").exists());
     let _ = std::fs::remove_dir_all(&dir);
 }
 
@@ -204,14 +204,14 @@ fn installers_and_disk_images_are_handed_over() {
 
 #[test]
 fn windows_installer_is_followed_by_the_new_version() {
-    let args = vec!["/i".to_string(), r"C:\Users\a b\Temp\solidcraft-update\x.msi".to_string(), "/passive".to_string()];
-    let (program, out) = relaunch_after(Path::new("msiexec"), &args, Path::new(r"C:\Program Files\SolidCraft\it's.exe"));
+    let args = vec!["/i".to_string(), r"C:\Users\a b\Temp\polykrom-update\x.msi".to_string(), "/passive".to_string()];
+    let (program, out) = relaunch_after(Path::new("msiexec"), &args, Path::new(r"C:\Program Files\Polykrom\it's.exe"));
     assert_eq!(program, PathBuf::from("powershell"));
     assert_eq!(
         out.last().unwrap(),
         &concat!(
-            r#"Start-Process -FilePath 'msiexec' -ArgumentList '/i','"C:\Users\a b\Temp\solidcraft-update\x.msi"','/passive' -Wait; "#,
-            r"Start-Process -FilePath 'C:\Program Files\SolidCraft\it''s.exe'"
+            r#"Start-Process -FilePath 'msiexec' -ArgumentList '/i','"C:\Users\a b\Temp\polykrom-update\x.msi"','/passive' -Wait; "#,
+            r"Start-Process -FilePath 'C:\Program Files\Polykrom\it''s.exe'"
         )
     );
     assert!(out.iter().any(|a| a == "-Command"));

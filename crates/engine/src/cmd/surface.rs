@@ -1319,7 +1319,7 @@ mod tests {
         let mut s = Session::default();
         plate_with_three_holes(&mut s);
         let step = polycore::step_export(&[&s.world_state().body("Plate").unwrap().body], "untrim test").unwrap();
-        let path = std::env::temp_dir().join(format!("solidcraft-untrim-{}.step", std::process::id()));
+        let path = std::env::temp_dir().join(format!("polykrom-untrim-{}.step", std::process::id()));
         std::fs::write(&path, step).unwrap();
         let mut s = Session::default();
         run(&mut s, "file.insert_step", json!({"path": path.to_string_lossy()}));

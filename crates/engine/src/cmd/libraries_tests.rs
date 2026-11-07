@@ -11,7 +11,7 @@ impl File {
         static NEXT: AtomicU64 = AtomicU64::new(0);
         Self(
             polykrom_io::vfs::temp_dir()
-                .join(format!("solidcraft-catalog-{}-{}.json", std::process::id(), NEXT.fetch_add(1, Ordering::Relaxed)))
+                .join(format!("polykrom-catalog-{}-{}.json", std::process::id(), NEXT.fetch_add(1, Ordering::Relaxed)))
                 .to_string_lossy()
                 .into_owned(),
         )

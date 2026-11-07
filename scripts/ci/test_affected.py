@@ -72,7 +72,7 @@ class Synthetic(unittest.TestCase):
             self.assertEqual(affected.select(SYNTH, [p]), (False, []), p)
 
     def test_windows_metadata_selects_packages_and_preserves_triggers(self):
-        for root in [r"C:\work space\solidcraft", r"\\server\shared work\solidcraft"]:
+        for root in [r"C:\work space\polykrom", r"\\server\shared work\polykrom"]:
             for trailing in ["", "\\", "/"]:
                 with self.subTest(root=root, trailing=trailing):
                     meta = windows_metadata(root + trailing)
@@ -83,7 +83,7 @@ class Synthetic(unittest.TestCase):
                         self.assertEqual(affected.select(meta, [path]), (True, []), path)
 
     def test_windows_metadata_rejects_a_manifest_in_a_sibling_workspace(self):
-        for root in [r"C:\work space\solidcraft", r"\\server\shared work\solidcraft"]:
+        for root in [r"C:\work space\polykrom", r"\\server\shared work\polykrom"]:
             with self.subTest(root=root):
                 meta = windows_metadata(root + "\\")
                 sibling = root.replace("\\", "/") + "-sibling/crates/base/Cargo.toml"

@@ -3,7 +3,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const info = require('./needs-info.js');
 
-const repo = { owner: 'tangency-labs', repo: 'solidcraft' };
+const repo = { owner: 'WCKDai', repo: 'polykrom' };
 const NOW = Date.parse('2026-10-18T12:00:00Z');
 const DAY = 24 * 3600 * 1000;
 const ago = (ms) => new Date(NOW - ms).toISOString();

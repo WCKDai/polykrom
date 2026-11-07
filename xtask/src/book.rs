@@ -24,9 +24,9 @@ pub fn run(root: &Path, build: bool) -> Result<(), String> {
     c.args(["build", "-q", "--release", "-p", "polykrom-cli"]);
     crate::run(c, "cargo build -p polykrom-cli")?;
 
-    let out = cli().arg("commands").output().map_err(|e| format!("solidcraft-cli: {e}"))?;
+    let out = cli().arg("commands").output().map_err(|e| format!("polykrom-cli: {e}"))?;
     if !out.status.success() {
-        return Err(format!("solidcraft-cli commands failed:\n{}", String::from_utf8_lossy(&out.stderr)));
+        return Err(format!("polykrom-cli commands failed:\n{}", String::from_utf8_lossy(&out.stderr)));
     }
     let cmds: Value = serde_json::from_slice(&out.stdout).map_err(|e| format!("commands JSON: {e}"))?;
     let md = reference(cmds.as_array().map(Vec::as_slice).unwrap_or_default());
@@ -41,7 +41,7 @@ pub fn run(root: &Path, build: bool) -> Result<(), String> {
         let png = gen_dir.join(format!("{stem}.png"));
         let mut c = cli();
         c.arg("snapshot").arg(s).arg("--out").arg(&png).args(["--width", SNAPSHOT_SIZE.0, "--height", SNAPSHOT_SIZE.1]);
-        let o = c.output().map_err(|e| format!("solidcraft-cli snapshot: {e}"))?;
+        let o = c.output().map_err(|e| format!("polykrom-cli snapshot: {e}"))?;
         if !o.status.success() {
             return Err(format!("snapshot of {} failed:\n{}", s.display(), String::from_utf8_lossy(&o.stderr)));
         }
@@ -59,7 +59,7 @@ pub fn run(root: &Path, build: bool) -> Result<(), String> {
     Ok(())
 }
 
-/// The release solidcraft-cli just built.
+/// The release polykrom-cli just built.
 fn cli() -> std::process::Command {
     let mut c = cargo();
     c.args(["run", "-q", "--release", "-p", "polykrom-cli", "--"]);

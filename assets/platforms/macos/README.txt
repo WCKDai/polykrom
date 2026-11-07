@@ -1,16 +1,12 @@
 Install Polykrom
 
-Drag SolidCraft.app onto Applications.
+Drag Polykrom.app onto Applications.
 
-Updating an older installation
+Updating an installation
 
 1. Quit the app.
-2. Drag SolidCraft.app from this disk image onto Applications and choose Replace.
+2. Drag Polykrom.app from this disk image onto Applications and choose Replace.
 
-Some earlier releases were installed as SolveCraft.app. Move that one to the Trash
-once SolidCraft.app is in Applications, and replace any Dock shortcut with the
-old name (open SolidCraft.app, then choose Options > Keep in Dock).
-
-Designs saved as .solvecraft still open, and Polykrom copies your settings
-and recovery files from the old SolveCraft folder on its first launch.
-New designs are saved as .solidcraft.
+Designs saved by SolidCraft, which Polykrom is forked from (.solidcraft, and
+.solvecraft from its earliest releases), still open. New designs are saved as
+.polykrom.

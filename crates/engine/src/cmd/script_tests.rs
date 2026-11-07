@@ -227,7 +227,7 @@ fn a_recorded_feature_that_does_not_fit_is_refused_and_changes_nothing() {
 fn the_script_is_written_to_a_file_that_replays() {
     let mut s = Session::default();
     plate(&mut s);
-    let dir = std::env::temp_dir().join(format!("solidcraft-script-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("polykrom-script-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     let path = dir.join("repro.json");
     let r = run(&mut s, "timeline.export_script", json!({"path": path.to_string_lossy()}));

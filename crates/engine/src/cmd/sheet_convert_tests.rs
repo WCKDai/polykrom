@@ -881,7 +881,7 @@ fn plate_step(loops: &[Vec<Wall>], t: f64) -> String {
 
 /// The plate inserted from a STEP file and converted, picked on its top face at `pick`.
 fn convert_step_plate(tag: &str, loops: &[Vec<Wall>], t: f64, pick: [f64; 2]) -> Session {
-    let path = std::env::temp_dir().join(format!("solidcraft-split-walls-{tag}-{}.step", std::process::id()));
+    let path = std::env::temp_dir().join(format!("polykrom-split-walls-{tag}-{}.step", std::process::id()));
     std::fs::write(&path, plate_step(loops, t)).unwrap();
     let mut s = Session::default();
     run(&mut s, "file.insert_step", json!({"path": path.to_string_lossy()}));

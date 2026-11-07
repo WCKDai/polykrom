@@ -644,7 +644,7 @@ mod card_tests {
         assert!(h.app.agent_chat.settings.add.as_ref().unwrap().error.is_some());
         let add = h.app.agent_chat.settings.add.as_mut().unwrap();
         add.name = "Local fixture".into();
-        add.command = "solidcraft-fixture-agent --acp".into();
+        add.command = "polykrom-fixture-agent --acp".into();
         h.frames(3);
         h.step(&json!({"click":{"handle":"ai_add:add"}})).unwrap();
         assert!(h.app.agent_chat.settings.add.is_none());

@@ -63,7 +63,7 @@ fn positive_extrude_from_xz_goes_plus_y() {
 
 #[test]
 fn format_5_xz_design_opens_where_it_was_saved() {
-    let dir = std::env::temp_dir().join(format!("solidcraft-xz78-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("polykrom-xz78-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     let path = dir.join("old-xz.solidcraft");
     let mut s = Session::default();

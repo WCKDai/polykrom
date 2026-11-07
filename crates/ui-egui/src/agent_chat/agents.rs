@@ -61,7 +61,7 @@ impl Kind {
             Kind::Anthropic => "anthropic",
         }
     }
-    /// Whether the agent is an endpoint SolidCraft talks to itself (either protocol).
+    /// Whether the agent is an endpoint Polykrom talks to itself (either protocol).
     pub fn is_api(self) -> bool {
         matches!(self, Kind::Api | Kind::Anthropic)
     }
@@ -296,9 +296,9 @@ mod tests {
         p.agent_permissions.insert("codex".into(), Mode::Ask);
         assert_eq!(mode_for(&p, "codex"), Mode::Ask);
         assert_eq!(mode_for(&p, "claude"), Mode::Edits);
-        remember(&mut p, "claude", "mcp__solidcraft__save");
-        remember(&mut p, "claude", "mcp__solidcraft__save");
-        assert!(always_allowed(&p, "claude", "mcp__solidcraft__save") && !always_allowed(&p, "codex", "mcp__solidcraft__save"));
+        remember(&mut p, "claude", "mcp__polykrom__save");
+        remember(&mut p, "claude", "mcp__polykrom__save");
+        assert!(always_allowed(&p, "claude", "mcp__polykrom__save") && !always_allowed(&p, "codex", "mcp__polykrom__save"));
         assert_eq!(p.agent_always_allow["claude"].len(), 1);
         p.agents.push(AgentConfig { id: "api-1".into(), ..Default::default() });
         assert_eq!(new_id(&p, "api"), "api-2");

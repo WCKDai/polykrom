@@ -6,7 +6,7 @@ use serde_json::{Value, json};
 use crate::Session;
 
 fn nightfall() -> bool {
-    crate::geom::env::var_os(super::NF).is_some_and(|v| !v.is_empty())
+    crate::env::var_os(super::NF).is_some_and(|v| !v.is_empty())
 }
 
 /// An aluminium cantilever 200 mm long, 10 x 10 mm, along X from the origin.

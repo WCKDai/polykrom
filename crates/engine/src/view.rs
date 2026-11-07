@@ -850,7 +850,7 @@ mod tests {
         assert_eq!((a.mode, a.colors), (polykrom_render::AnalysisMode::Curvature { radius: 5.0 }, Palette::DEFAULT.analysis));
     }
 
-    /// The CPU rasterizer (the last tier of headless pictures, `SOLIDCRAFT_GPU=cpu` or no adapter
+    /// The CPU rasterizer (the last tier of headless pictures, `POLYKROM_GPU=cpu` or no adapter
     /// under `auto`): curved surfaces get a dark silhouette line where they turn away.
     #[test]
     fn cpu_pictures_draw_silhouettes_on_curved_surfaces() {

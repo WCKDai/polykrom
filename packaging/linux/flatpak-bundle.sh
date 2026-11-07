@@ -12,7 +12,7 @@
 # installed per-user from Flathub. Unless --no-test, the bundle is installed per-user, the CLI
 # is checked, and the desktop creates/measures a box on headless X11 and Wayland. The desktop
 # check also needs python3, dbus-x11, xvfb, xauth and weston; no screenshots are produced.
-# Manifest: packaging/linux/flatpak/ai.storyteller.solidcraft.bundle.yml.
+# Manifest: packaging/linux/flatpak/app.polykrom.Polykrom.bundle.yml.
 # Adapted from PhotoCraft's (storytold/photocraft, Apache-2.0; see ATTRIBUTION.md).
 set -euo pipefail
 # shellcheck source=../env.sh
@@ -67,8 +67,7 @@ if [ "$TEST" = 1 ]; then
   flatpak install --user -y --noninteractive --reinstall "$OUT"
   flatpak info --user "$APP_ID"
   flatpak run --command=polykrom-cli "$APP_ID" --version
-  flatpak run --command=solidcraft-cli "$APP_ID" --version
-  flatpak run --command=sh "$APP_ID" -c 'ls /app/share/applications /app/share/metainfo /app/share/mime/packages /app/share/icons/hicolor/256x256/apps /app/share/doc/solidcraft'
+  flatpak run --command=sh "$APP_ID" -c 'ls /app/share/applications /app/share/metainfo /app/share/mime/packages /app/share/icons/hicolor/256x256/apps /app/share/doc/polykrom'
   python3 "$HERE/flatpak-smoke.py" --backend both
 fi
 echo "==> done"

@@ -457,7 +457,7 @@ mod tests {
     #[test]
     fn new_packages_examples_and_nested_modules_cannot_escape_the_gate() {
         let unique = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos();
-        let root = std::env::temp_dir().join(format!("solidcraft-container-guard-{}-{unique}", std::process::id()));
+        let root = std::env::temp_dir().join(format!("polykrom-container-guard-{}-{unique}", std::process::id()));
         let source = root.join("crates/future-ui/src/nested/panel.rs");
         let example = root.join("apps/future-platform/examples/viewer.rs");
         let implementation = root.join("crates/ui-egui/src/ui_kit/container.rs");

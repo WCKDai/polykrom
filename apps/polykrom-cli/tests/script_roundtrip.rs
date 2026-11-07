@@ -89,7 +89,7 @@ fn corpus_designs_replay_from_their_scripts() {
 /// keeping the names: the replayed design's own script has the same steps.
 #[test]
 fn a_design_naming_a_sketch_and_its_extrude_alike_replays_from_its_script() {
-    let dir = std::env::temp_dir().join(format!("solidcraft-shared-names-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("polykrom-shared-names-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     let cli = |args: &[&std::ffi::OsStr]| {
         let out = std::process::Command::new(env!("CARGO_BIN_EXE_polykrom-cli")).args(args).output().unwrap();

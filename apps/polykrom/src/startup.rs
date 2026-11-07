@@ -6,17 +6,17 @@
 //!   being dropped silently or stopping the start.
 //! - **Launches that die before the window is up**: a marker file counts them; after two in a
 //!   row the next launch starts in safe mode by itself.
-//! - **Safe mode** (`--safe-mode` or `SOLIDCRAFT_SAFE_MODE=1`): default settings (the saved ones
+//! - **Safe mode** (`--safe-mode` or `POLYKROM_SAFE_MODE=1`): default settings (the saved ones
 //!   are left untouched), no recovery offer, the software renderer and CPU meshing.
 //! - **No usable graphics device**: one retry on the software renderer
-//!   (`SOLIDCRAFT_RENDERER=cpu`), then a message box saying what failed and what to try.
+//!   (`POLYKROM_RENDERER=cpu`), then a message box saying what failed and what to try.
 
 use std::path::{Path, PathBuf};
 
 /// The environment variable that starts safe mode (any value but `0` or empty).
-pub const SAFE_MODE_ENV: &str = "SOLIDCRAFT_SAFE_MODE";
-/// `SOLIDCRAFT_RENDERER=cpu` picks the software renderer (WARP, lavapipe, llvmpipe).
-pub const RENDERER_ENV: &str = "SOLIDCRAFT_RENDERER";
+pub const SAFE_MODE_ENV: &str = "POLYKROM_SAFE_MODE";
+/// `POLYKROM_RENDERER=cpu` picks the software renderer (WARP, lavapipe, llvmpipe).
+pub const RENDERER_ENV: &str = "POLYKROM_RENDERER";
 /// Consecutive launches that died before the window was up, after which safe mode starts.
 pub const FAILED_STARTS_FOR_SAFE_MODE: u32 = 2;
 const MARKER: &str = "starting";
@@ -26,7 +26,7 @@ pub fn env_on(v: Option<&str>) -> bool {
     v.map(str::trim).is_some_and(|v| !v.is_empty() && v != "0" && !v.eq_ignore_ascii_case("false"))
 }
 
-/// Whether `SOLIDCRAFT_RENDERER` asks for the software renderer.
+/// Whether `POLYKROM_RENDERER` asks for the software renderer.
 pub fn cpu_renderer_env(v: Option<&str>) -> bool {
     v.map(str::trim).is_some_and(|v| v.eq_ignore_ascii_case("cpu") || v.eq_ignore_ascii_case("software"))
 }
@@ -197,9 +197,9 @@ pub fn no_window_message(error: &str, settings: Option<&Path>) -> String {
          The software renderer was tried too. Things to try:\n\
          - Install or update the graphics driver (on Windows, from the GPU maker's site rather than Windows Update).\n\
          - Over Remote Desktop or in a virtual machine, enable 3D acceleration or run it on the machine itself.\n\
-         - Start it once with `solidcraft --safe-mode`.\n\
+         - Start it once with `polykrom --safe-mode`.\n\
          - Rename the settings folder: {folder}\n\n\
-         More: https://github.com/wckdboy/polykrom/blob/main/docs/book/src/guide/troubleshooting.md"
+         More: https://github.com/WCKDai/polykrom/blob/main/docs/book/src/guide/troubleshooting.md"
     )
 }
 
@@ -208,7 +208,7 @@ mod tests {
     use super::*;
 
     fn scratch(name: &str) -> PathBuf {
-        let d = std::env::temp_dir().join(format!("solidcraft-startup-{name}-{}", std::process::id()));
+        let d = std::env::temp_dir().join(format!("polykrom-startup-{name}-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&d);
         std::fs::create_dir_all(&d).unwrap();
         d
@@ -222,17 +222,17 @@ mod tests {
 
     #[test]
     fn settings_that_do_not_read_are_moved_aside_and_good_ones_stay() {
-        let keys = ["solidcraft.prefs", "solvecraft.prefs"];
+        let keys = ["polykrom.prefs"];
         let d = scratch("check");
         // Good files (and an empty one) stay where they are.
-        std::fs::write(d.join("app.ron"), r#"{"solidcraft.prefs": "{\"grid\":true}", "egui": "(anything)"}"#).unwrap();
+        std::fs::write(d.join("app.ron"), r#"{"polykrom.prefs": "{\"grid\":true}", "egui": "(anything)"}"#).unwrap();
         std::fs::write(d.join("graphics.json"), r#"{"msaa":4}"#).unwrap();
         assert!(check_settings(&d, &keys).is_empty());
         assert!(d.join("app.ron").is_file() && d.join("graphics.json").is_file());
         // Damaged RON, preferences that aren't JSON, a truncated graphics.json, non-UTF-8 bytes.
         for (name, text) in [
-            ("app.ron", b"{\"solidcraft.prefs\": \"{\\\"gr".as_slice()),
-            ("app.ron", br#"{"solvecraft.prefs": "not json"}"#.as_slice()),
+            ("app.ron", b"{\"polykrom.prefs\": \"{\\\"gr".as_slice()),
+            ("app.ron", br#"{"polykrom.prefs": "not json"}"#.as_slice()),
             ("graphics.json", br#"{"msaa":"#.as_slice()),
             ("graphics.json", b"\xff\xfe\x00".as_slice()),
         ] {

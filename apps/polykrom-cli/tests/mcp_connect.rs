@@ -20,12 +20,12 @@ fn mcp_connect_serves_before_the_app_runs_and_reaches_it_once_it_does() {
         })
         .expect("an unused non-ephemeral test port");
     let addr = format!("127.0.0.1:{port}");
-    let control_dir = std::env::temp_dir().join(format!("solidcraft-mcp-connect-{}-{port}", std::process::id()));
+    let control_dir = std::env::temp_dir().join(format!("polykrom-mcp-connect-{}-{port}", std::process::id()));
     std::fs::create_dir_all(&control_dir).unwrap();
     let mut child = Command::new(env!("CARGO_BIN_EXE_polykrom-cli"))
         .args(["mcp", "--connect", &addr, "--allow-any-path"])
-        .env("SOLIDCRAFT_CONTROL_DIR", &control_dir)
-        .env_remove("SOLIDCRAFT_CONTROL_TOKEN")
+        .env("POLYKROM_CONTROL_DIR", &control_dir)
+        .env_remove("POLYKROM_CONTROL_TOKEN")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::null())
@@ -52,7 +52,7 @@ fn mcp_connect_serves_before_the_app_runs_and_reaches_it_once_it_does() {
     // A tool call says the app is not running and how to start it.
     let r = ask(3, "tools/call", measure.clone());
     assert_eq!(r["result"]["isError"], true, "{r}");
-    assert!(text(&r).contains("not running") && text(&r).contains(&format!("solidcraft --control {port}")), "{r}");
+    assert!(text(&r).contains("not running") && text(&r).contains(&format!("polykrom --control {port}")), "{r}");
 
     // The app starts: a token file for this launch, and its control port.
     let token = "0123456789abcdef".repeat(4);
@@ -96,7 +96,7 @@ fn mcp_connect_without_a_port_is_refused_at_start() {
 fn mcp_without_arguments_finds_the_running_app() {
     let listener = TcpListener::bind("127.0.0.1:0").unwrap();
     let port = listener.local_addr().unwrap().port();
-    let control_dir = std::env::temp_dir().join(format!("solidcraft-mcp-discover-{}-{port}", std::process::id()));
+    let control_dir = std::env::temp_dir().join(format!("polykrom-mcp-discover-{}-{port}", std::process::id()));
     std::fs::create_dir_all(&control_dir).unwrap();
     let token = "fedcba9876543210".repeat(4);
     std::fs::write(control_dir.join(format!("{port}.token")), &token).unwrap();
@@ -118,8 +118,8 @@ fn mcp_without_arguments_finds_the_running_app() {
     });
     let mut child = Command::new(env!("CARGO_BIN_EXE_polykrom-cli"))
         .args(["mcp", "--allow-any-path"])
-        .env("SOLIDCRAFT_CONTROL_DIR", &control_dir)
-        .env_remove("SOLIDCRAFT_CONTROL_TOKEN")
+        .env("POLYKROM_CONTROL_DIR", &control_dir)
+        .env_remove("POLYKROM_CONTROL_TOKEN")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -144,7 +144,7 @@ fn mcp_without_arguments_finds_the_running_app() {
     std::fs::write(control_dir.join("current.port"), format!("{dead}\n")).unwrap();
     let out = Command::new(env!("CARGO_BIN_EXE_polykrom-cli"))
         .args(["mcp", "--allow-any-path"])
-        .env("SOLIDCRAFT_CONTROL_DIR", &control_dir)
+        .env("POLYKROM_CONTROL_DIR", &control_dir)
         .stdin(Stdio::null())
         .output()
         .unwrap();

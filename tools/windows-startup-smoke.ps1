@@ -23,7 +23,7 @@ foreach ($case in $cases) {
     Remove-Item -Recurse -Force $root -ErrorAction SilentlyContinue
     # eframe asks Windows for the roaming folder (not %APPDATA%), so the settings go in the
     # runner's real one, emptied for each case.
-    $settings = Join-Path ([Environment]::GetFolderPath('ApplicationData')) 'SolidCraft\data'
+    $settings = Join-Path ([Environment]::GetFolderPath('ApplicationData')) 'Polykrom\data'
     Remove-Item -Recurse -Force $settings -ErrorAction SilentlyContinue
     $local = Join-Path $root 'local'
     $crashes = Join-Path $root 'crashes'
@@ -38,8 +38,8 @@ foreach ($case in $cases) {
     $psi.RedirectStandardError = $true
     $psi.RedirectStandardOutput = $true
     $psi.Environment['LOCALAPPDATA'] = $local
-    $psi.Environment['SOLIDCRAFT_CRASH_DIR'] = $crashes
-    $psi.Environment['SOLIDCRAFT_CONTROL_TOKEN'] = $token
+    $psi.Environment['POLYKROM_CRASH_DIR'] = $crashes
+    $psi.Environment['POLYKROM_CONTROL_TOKEN'] = $token
     $psi.Environment.Remove('WGPU_BACKEND') | Out-Null
     $psi.Environment.Remove('WGPU_DX12_COMPILER') | Out-Null
     foreach ($k in $case.Env.Keys) { $psi.Environment[$k] = $case.Env[$k] }

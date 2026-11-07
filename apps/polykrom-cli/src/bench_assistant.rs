@@ -69,7 +69,7 @@ impl Control {
             return Err("--connect requires a loopback address and a nonzero port (the app listens on 127.0.0.1)".into());
         }
         let token = polykrom_engine::control_auth::client_token(addr.port(), token)
-            .ok_or("no control token: pass --token, set SOLIDCRAFT_CONTROL_TOKEN, or run on the app's computer (its token file)")?;
+            .ok_or("no control token: pass --token, set POLYKROM_CONTROL_TOKEN, or run on the app's computer (its token file)")?;
         if token.len() > 4096 {
             return Err("the control token is longer than 4096 bytes".into());
         }
@@ -319,7 +319,7 @@ pub(super) fn markdown(model: &str, version: &str, results: &[Value], run: u64) 
     let rows: Vec<&Value> = results.iter().filter(|r| r["repeat"] == run).collect();
     let passed = rows.iter().filter(|r| r["passed"] == true).count();
     let mut out = format!(
-        "### {} (<quant>, <download size>)\nRuntime: <Ollama/LM Studio/... version>, context <num_ctx if changed>\nSolidCraft: {}\nResult: {passed}/11\n| # | pass/fail | how it failed |\n|---|---|---|\n",
+        "### {} (<quant>, <download size>)\nRuntime: <Ollama/LM Studio/... version>, context <num_ctx if changed>\nPolykrom: {}\nResult: {passed}/11\n| # | pass/fail | how it failed |\n|---|---|---|\n",
         clean(model),
         clean(version)
     );
@@ -459,7 +459,7 @@ fn run_tasks(control: &mut Control, o: &Options, tasks: &[Value], version: &str)
     let mut kept = 0;
     let mut stdout = std::io::stdout().lock();
     let mut say = |line: String| writeln!(stdout, "{line}").map_err(|e| format!("stdout: {e}"));
-    say(format!("bench-assistant v1: {} on SolidCraft {version}", o.model))?;
+    say(format!("bench-assistant v1: {} on Polykrom {version}", o.model))?;
     say("| run | # | task | pass/fail | how it failed | seconds |\n|---|---|---|---|---|---|".into())?;
     for run in 1..=o.repeat {
         for &n in &o.tasks {
@@ -509,7 +509,7 @@ fn run_tasks(control: &mut Control, o: &Options, tasks: &[Value], version: &str)
             results.push(result);
             // Written after every task, so an interrupted run keeps what it measured.
             if let Some(path) = o.json {
-                let all = json!({"test": "v1", "model": o.model, "base_url": o.base_url, "solidcraft": version, "results": results});
+                let all = json!({"test": "v1", "model": o.model, "base_url": o.base_url, "polykrom": version, "results": results});
                 write(path, &serde_json::to_string_pretty(&all).map_err(|e| e.to_string())?)?;
             }
             if let Some(path) = o.markdown {
@@ -664,7 +664,7 @@ mod tests {
             (1..=11).map(|n| json!({"task": n, "repeat": 1, "passed": n != 2, "failure": if n == 2 { "an empty reply" } else { "" }})).collect();
         let report = markdown("qwen2.5:7b", "0.19.0", &rows, 1);
         assert!(report.starts_with(
-            "### qwen2.5:7b (<quant>, <download size>)\nRuntime: <Ollama/LM Studio/... version>, context <num_ctx if changed>\nSolidCraft: 0.19.0\nResult: 10/11\n| # | pass/fail | how it failed |\n|---|---|---|\n| 1 | pass | |\n| 2 | fail | an empty reply |\n"
+            "### qwen2.5:7b (<quant>, <download size>)\nRuntime: <Ollama/LM Studio/... version>, context <num_ctx if changed>\nPolykrom: 0.19.0\nResult: 10/11\n| # | pass/fail | how it failed |\n|---|---|---|\n| 1 | pass | |\n| 2 | fail | an empty reply |\n"
         ));
         assert!(report.ends_with("| 11 | pass | |\nNotes: <anything odd, e.g. very slow, needed a retry>\n"));
         let partial = markdown("m|x", "v", &rows[..1], 1);

@@ -506,7 +506,7 @@ fn save_prompt_frames_dont_save_and_clicking_it_discards_for_close_and_quit() {
             });
         }
         assert!(framed, "Don't Save needs a visible secondary button frame before hover or selection");
-        if let Ok(dir) = std::env::var("SOLIDCRAFT_SAVE_PROMPT_EVIDENCE") {
+        if let Ok(dir) = std::env::var("POLYKROM_SAVE_PROMPT_EVIDENCE") {
             let bounds = scenario::rect_of("dialog:header").unwrap().union(scenario::rect_of("dialog:footer").unwrap()).expand(t.space_24);
             let image = super::super::checks::tests::raster(&h.ctx, output.shapes, output.pixels_per_point, bounds, &textures);
             std::fs::create_dir_all(&dir).unwrap();
@@ -727,7 +727,7 @@ fn theme_shape_changes_preserve_panel_geometry_and_dock_contacts() {
     use crate::{frame::Side, shell::LayoutMode};
     let ctx = crate::fonts::test_context();
     let mut results = Vec::new();
-    for name in ["solidcraft-95", "blueprint", "cupertino"] {
+    for name in ["polykrom-95", "blueprint", "cupertino"] {
         let t = crate::theme_files::resolve(crate::theme_files::find(name, &[]).unwrap());
         let _theme = crate::theme::scoped_tokens(t);
         for surface in [Surface::Panel, Surface::Feature, Surface::Window, Surface::Popup, Surface::Navigation, Surface::Toast] {

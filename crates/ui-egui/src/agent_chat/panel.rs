@@ -1043,7 +1043,7 @@ fn connect_button(app: &mut SolveApp, ui: &mut egui::Ui) {
 }
 
 #[cfg(not(target_arch = "wasm32"))]
-const FLATPAK_OVERRIDE: &str = "flatpak override --user ai.storyteller.solidcraft --filesystem=~/.nvm:ro --filesystem=~/.local/bin:ro --filesystem=~/.local/share/claude:ro --filesystem=~/.claude --filesystem=~/.claude.json --share=network";
+const FLATPAK_OVERRIDE: &str = "flatpak override --user app.polykrom.Polykrom --filesystem=~/.nvm:ro --filesystem=~/.local/bin:ro --filesystem=~/.local/share/claude:ro --filesystem=~/.claude --filesystem=~/.claude.json --share=network";
 
 #[cfg(not(target_arch = "wasm32"))]
 fn no_agents_message() -> String {
@@ -1861,7 +1861,7 @@ mod tests {
 
     #[test]
     fn empty_discovery_explains_flatpak_permissions() {
-        const CHILD: &str = "SOLIDCRAFT_TEST_FLATPAK_MESSAGE";
+        const CHILD: &str = "POLYKROM_TEST_FLATPAK_MESSAGE";
         if let Ok(case) = std::env::var(CHILD) {
             let mut app = SolveApp::new(polykrom_engine::Session::default(), crate::Services::default());
             app.agent_chat.detection = Some(discover::Detection::default());
@@ -1901,7 +1901,7 @@ mod tests {
             child.args(["--exact", "agent_chat::panel::tests::empty_discovery_explains_flatpak_permissions", "--nocapture"]);
             child.env(CHILD, case);
             if case == "flatpak" {
-                child.env("FLATPAK_ID", "ai.storyteller.solidcraft");
+                child.env("FLATPAK_ID", "app.polykrom.Polykrom");
             } else {
                 child.env_remove("FLATPAK_ID");
             }

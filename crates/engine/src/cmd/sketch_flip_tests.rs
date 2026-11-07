@@ -75,7 +75,7 @@ fn a_flipped_sketch_extrudes_the_other_way_and_offsets_along_the_planes_own_norm
     assert!((bounds.min.y - 2.0).abs() < 1e-9 && (bounds.max.y - 5.0).abs() < 1e-9, "{bounds:?}");
     assert!((bounds.min.z).abs() < 1e-9 && (bounds.max.z - 4.0).abs() < 1e-9, "{bounds:?}");
     // Saved and opened again, it is the same.
-    let path = std::env::temp_dir().join(format!("solidcraft-flip-{}.solidcraft", std::process::id()));
+    let path = std::env::temp_dir().join(format!("polykrom-flip-{}.solidcraft", std::process::id()));
     run(&mut s, "file.save", json!({"path": path}));
     let mut reopened = Session::default();
     run(&mut reopened, "doc.open", json!({"path": path}));
@@ -125,7 +125,7 @@ fn older_designs_open_rebuild_and_save_unchanged() {
             assert!(close(p.origin, Vec3::ZERO) && close(p.x, Vec3::X) && close(p.y, Vec3::Z), "{p:?}");
         }
         let bodies = measured(&mut s);
-        let path = std::env::temp_dir().join(format!("solidcraft-old-{}.solidcraft", std::process::id()));
+        let path = std::env::temp_dir().join(format!("polykrom-old-{}.solidcraft", std::process::id()));
         run(&mut s, "file.save", json!({"path": path}));
         let mut reopened = Session::default();
         run(&mut reopened, "doc.open", json!({"path": path}));

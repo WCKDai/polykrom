@@ -917,7 +917,7 @@ pub fn save_screenshot(image: &egui::ColorImage, path: Option<&str>) -> Value {
         buf.extend_from_slice(&c.to_array());
     }
     let Some(img) = image::RgbaImage::from_raw(w as u32, h as u32, buf) else { return json!({"ok": false, "error": "bad image"}) };
-    let path = path.map(str::to_string).unwrap_or_else(|| std::env::temp_dir().join("solidcraft-shot.png").to_string_lossy().to_string());
+    let path = path.map(str::to_string).unwrap_or_else(|| std::env::temp_dir().join("polykrom-shot.png").to_string_lossy().to_string());
     match img.save(&path) {
         Ok(()) => json!({"ok": true, "result": {"path": path, "width": w, "height": h}}),
         Err(e) => json!({"ok": false, "error": e.to_string()}),
@@ -1138,7 +1138,7 @@ mod tests {
         let mut s = Session::default();
         s.execute("solid.box", &json!({"length": 40, "width": 30, "height": 20})).unwrap();
         let mut app = SolveApp::new(s, Services::default());
-        let dir = std::env::temp_dir().join(format!("solidcraft-render-theme-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("polykrom-render-theme-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         for dark in [false, true, false] {
             app.ui.dark = dark;
@@ -1167,7 +1167,7 @@ mod tests {
         let mut s = Session::default();
         s.execute("solid.box", &json!({"length": 40, "width": 30, "height": 20})).unwrap();
         let mut app = SolveApp::new(s, Services::default());
-        let dir = std::env::temp_dir().join(format!("solidcraft-render-section-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("polykrom-render-section-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         let whole = render(&mut app, &dir.join("whole.png"));
         app.session.selection = vec![Sel::Plane { name: "XZ".into() }];
@@ -1210,7 +1210,7 @@ mod tests {
         s.execute("solid.box", &json!({"length": 40, "width": 30, "height": 20, "corner": [10, -15, -10]})).unwrap();
         let mut app = SolveApp::new(s, Services::default());
         app.cam.set_view(polykrom_engine::render::StandardView::Front);
-        let dir = std::env::temp_dir().join(format!("solidcraft-render-guides-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("polykrom-render-guides-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         let path = dir.join("shot.png");
         let shot = |app: &mut SolveApp, extra: serde_json::Value| render_with(app, &path, extra);
@@ -1487,7 +1487,7 @@ mod tests {
     #[test]
     fn engine_batch_stays_inside_allow_paths() {
         let mut h = crate::scenario::Harness::new();
-        let base = vfs::temp_dir().join(format!("solidcraft-batch-scope-{}", std::process::id()));
+        let base = vfs::temp_dir().join(format!("polykrom-batch-scope-{}", std::process::id()));
         let (root, out) = (base.join("root"), base.join("out"));
         std::fs::create_dir_all(&root).unwrap();
         std::fs::create_dir_all(&out).unwrap();
@@ -1512,7 +1512,7 @@ mod tests {
     #[test]
     fn file_loads_stay_inside_allow_paths() {
         let mut h = crate::scenario::Harness::new();
-        let base = vfs::temp_dir().join(format!("solidcraft-load-scope-{}", std::process::id()));
+        let base = vfs::temp_dir().join(format!("polykrom-load-scope-{}", std::process::id()));
         let (root, out) = (base.join("root"), base.join("out"));
         std::fs::create_dir_all(&root).unwrap();
         std::fs::create_dir_all(&out).unwrap();
@@ -1559,7 +1559,7 @@ mod tests {
         let mut s = Session::default();
         s.execute("solid.box", &json!({"length": 10, "width": 10, "height": 10})).unwrap();
         let mut app = SolveApp::new(s, Services::default());
-        let base = vfs::temp_dir().join(format!("solidcraft-control-scope-{}", std::process::id()));
+        let base = vfs::temp_dir().join(format!("polykrom-control-scope-{}", std::process::id()));
         let (root, out) = (base.join("root"), base.join("out"));
         std::fs::create_dir_all(&root).unwrap();
         std::fs::create_dir_all(&out).unwrap();

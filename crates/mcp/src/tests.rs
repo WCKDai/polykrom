@@ -21,7 +21,7 @@ fn renders() -> bool {
             }));
             true
         }
-        Err(e @ polykrom_gpu::GpuError::NoAdapter(_)) if std::env::var_os("SOLIDCRAFT_REQUIRE_GPU").is_none() => {
+        Err(e @ polykrom_gpu::GpuError::NoAdapter(_)) if std::env::var_os("POLYKROM_REQUIRE_GPU").is_none() => {
             eprintln!("screenshots left out: {e}");
             false
         }
@@ -178,7 +178,7 @@ fn handshake_and_tools_list() {
     let init =
         call(&mut s, 1, "initialize", json!({"protocolVersion": "2025-03-26", "capabilities": {}, "clientInfo": {"name": "t", "version": "0"}}));
     assert_eq!(init["result"]["protocolVersion"], "2025-03-26");
-    assert_eq!(init["result"]["serverInfo"]["name"], "solidcraft");
+    assert_eq!(init["result"]["serverInfo"]["name"], "polykrom");
     assert!(init["result"]["capabilities"]["tools"].is_object());
     assert!(init["result"]["instructions"].as_str().unwrap().contains("headless"));
     // An unknown version gets ours.
@@ -231,9 +231,9 @@ fn handshake_and_tools_list() {
 
     let res = call(&mut s, 5, "resources/list", json!({}));
     assert_eq!(res["result"]["resources"].as_array().unwrap().len(), 2);
-    let d = call(&mut s, 6, "resources/read", json!({"uri": "solidcraft://design"}));
+    let d = call(&mut s, 6, "resources/read", json!({"uri": "polykrom://design"}));
     assert!(d["result"]["contents"][0]["text"].as_str().unwrap().contains("timeline"));
-    assert_eq!(call(&mut s, 7, "resources/read", json!({"uri": "solidcraft://nope"}))["error"]["code"], -32002);
+    assert_eq!(call(&mut s, 7, "resources/read", json!({"uri": "polykrom://nope"}))["error"]["code"], -32002);
     assert_eq!(call(&mut s, 8, "nope/nope", json!({}))["error"]["code"], -32601);
 }
 
@@ -375,7 +375,7 @@ fn skill_reference_is_advertised_as_read_only() {
 fn export_tool_writes_a_urdf_package() {
     let mut s = server();
     tool(&mut s, "execute", json!({"command": "solid.box", "params": {"length": 10, "width": 10, "height": 10}}));
-    let dir = std::env::temp_dir().join(format!("solidcraft-mcp-urdf-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("polykrom-mcp-urdf-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     let urdf = dir.join("robot.urdf");
     let r = tool(&mut s, "export", json!({"path": urdf.to_string_lossy(), "mesh_prefix": "package://robot/meshes/"}));
@@ -461,7 +461,7 @@ fn agent_builds_box_fillet_hole() {
     }
 
     // Export, save, start over, open.
-    let dir = std::env::temp_dir().join(format!("solidcraft-mcp-test-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("polykrom-mcp-test-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     let step = dir.join("part.step");
     tool(&mut s, "export", json!({"path": step.to_string_lossy()}));
@@ -492,7 +492,7 @@ fn agent_builds_box_fillet_hole() {
 fn open_stands_a_y_up_step_file_up() {
     let mut s = server();
     tool(&mut s, "execute", json!({"command": "solid.box", "params": {"length": 10, "width": 40, "height": 5}}));
-    let dir = std::env::temp_dir().join(format!("solidcraft-mcp-up-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("polykrom-mcp-up-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     let step = dir.join("tall.step").to_string_lossy().to_string();
     tool(&mut s, "export", json!({"path": step}));
@@ -519,7 +519,7 @@ fn open_stands_a_y_up_step_file_up() {
 fn save_selects_container_or_json_and_reopens_by_contents() {
     let mut s = server();
     tool(&mut s, "execute", json!({"command": "solid.box", "params": {"length": 10, "width": 20, "height": 30}}));
-    let dir = std::env::temp_dir().join(format!("solidcraft-mcp-encodings-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("polykrom-mcp-encodings-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     for (name, format, is_json) in [
         ("default.solidcraft", None, false),
@@ -893,20 +893,24 @@ fn list_commands_filter_by_a_command_id_matches_ids() {
     assert!(ids.iter().all(|id| id.contains("sketch.delete")), "{} commands matched: {ids:?}", ids.len());
 }
 
-/// Compatibility shims (docs/compatibility.md): a design saved before the rename (legacy
-/// extension and format tag) opens through MCP, and the legacy resource URIs still read.
+/// A design saved by SolidCraft's earliest releases (their extension and format tag) opens
+/// through MCP (docs/compatibility.md); the resources are listed under Polykrom's URIs only.
 #[test]
 fn legacy_design_files_and_resource_uris() {
     let mut s = server();
     let saved = String::from_utf8(polykrom_engine::io::write_design(&polykrom_engine::doc::Document::default())).unwrap();
     assert!(saved.contains("\"polykrom/"), "{saved}");
-    let legacy = saved.replace("\"solidcraft/", "\"solvecraft/");
-    let path = std::env::temp_dir().join(format!("solidcraft-mcp-legacy-{}.solvecraft", std::process::id()));
+    let legacy = saved.replace("\"polykrom/", "\"solvecraft/");
+    assert!(legacy.contains("\"solvecraft/"), "{legacy}");
+    let path = std::env::temp_dir().join(format!("polykrom-mcp-legacy-{}.solvecraft", std::process::id()));
     std::fs::write(&path, legacy).unwrap();
     tool(&mut s, "open", json!({"path": path.to_string_lossy()}));
     let _ = std::fs::remove_file(&path);
-    let d = call(&mut s, 1, "resources/read", json!({"uri": "solvecraft://design"}));
+    let d = call(&mut s, 1, "resources/read", json!({"uri": "polykrom://design"}));
     assert!(d["result"]["contents"][0]["text"].as_str().unwrap().contains("timeline"));
+    for old in ["solidcraft://design", "solvecraft://design"] {
+        assert_eq!(call(&mut s, 2, "resources/read", json!({"uri": old}))["error"]["code"], -32002, "{old}");
+    }
 }
 
 /// The default folders (#205): the recovery folder works out of the box, `screenshot` without a
@@ -914,7 +918,7 @@ fn legacy_design_files_and_resource_uris() {
 /// design is open there, without its hidden files. The working folder doesn't count at all.
 #[test]
 fn the_default_folders_are_the_designs_the_recovery_folder_and_the_scratch_folder() {
-    let base = polykrom_engine::io::vfs::temp_dir().join(format!("solidcraft-mcp-defaults-{}", std::process::id()));
+    let base = polykrom_engine::io::vfs::temp_dir().join(format!("polykrom-mcp-defaults-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&base);
     let (proj, other, recovery) = (base.join("proj"), base.join("other"), base.join("recovery"));
     std::fs::create_dir_all(&proj).unwrap();
@@ -962,7 +966,7 @@ fn the_default_folders_are_the_designs_the_recovery_folder_and_the_scratch_folde
 #[test]
 fn tool_calls_stay_inside_the_agents_folders() {
     use polykrom_engine::io::vfs::PathScope;
-    let base = polykrom_engine::io::vfs::temp_dir().join(format!("solidcraft-mcp-scope-{}", std::process::id()));
+    let base = polykrom_engine::io::vfs::temp_dir().join(format!("polykrom-mcp-scope-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&base);
     let (root, out) = (base.join("root"), base.join("out"));
     std::fs::create_dir_all(&root).unwrap();
@@ -1022,11 +1026,11 @@ fn short_spelling(path: &std::path::Path) -> Option<std::path::PathBuf> {
 /// `NAME~1.XYZ` when its name is long). The server's own folders are spelled with long names
 /// there, so `screenshot` without a `path` (the scratch folder) and `doc.recovery_list` (the
 /// recovery folder) work; on such a machine both were refused as short names. Run in a child
-/// process whose `TMP`, `TEMP` and `SOLIDCRAFT_RECOVERY_DIR` are short spellings.
+/// process whose `TMP`, `TEMP` and `POLYKROM_RECOVERY_DIR` are short spellings.
 #[cfg(windows)]
 #[test]
 fn the_servers_own_folders_work_when_the_temporary_folder_has_a_short_name() {
-    let base = polykrom_engine::io::vfs::temp_dir().join(format!("solidcraft-mcp-short-names-{}", std::process::id()));
+    let base = polykrom_engine::io::vfs::temp_dir().join(format!("polykrom-mcp-short-names-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&base);
     let (temp, recovery) = (base.join("temporary"), base.join("recovery folder"));
     std::fs::create_dir_all(&temp).unwrap();
@@ -1040,8 +1044,8 @@ fn the_servers_own_folders_work_when_the_temporary_folder_has_a_short_name() {
         .args(["--exact", "tests::short_names_child", "--test-threads=1", "--nocapture"])
         .env("TMP", &short_temp)
         .env("TEMP", &short_temp)
-        .env("SOLIDCRAFT_RECOVERY_DIR", &short_recovery)
-        .env("SOLIDCRAFT_MCP_SHORT_NAMES_CHILD", "1")
+        .env("POLYKROM_RECOVERY_DIR", &short_recovery)
+        .env("POLYKROM_MCP_SHORT_NAMES_CHILD", "1")
         .output()
         .unwrap();
     let text = format!("{}{}", String::from_utf8_lossy(&out.stdout), String::from_utf8_lossy(&out.stderr));
@@ -1053,7 +1057,7 @@ fn the_servers_own_folders_work_when_the_temporary_folder_has_a_short_name() {
 #[cfg(windows)]
 #[test]
 fn short_names_child() {
-    if std::env::var_os("SOLIDCRAFT_MCP_SHORT_NAMES_CHILD").is_none() {
+    if std::env::var_os("POLYKROM_MCP_SHORT_NAMES_CHILD").is_none() {
         return;
     }
     use polykrom_engine::io::vfs::windows_refusal;
@@ -1192,7 +1196,7 @@ fn bridged_screenshots_with_grid_or_axes_are_model_renders() {
             "app".into()
         }
     }
-    let dir = std::env::temp_dir().join(format!("solidcraft-mcp-guides-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("polykrom-mcp-guides-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     let path = dir.join("shot.png").to_string_lossy().to_string();
     let shoot = |extra: Value| {
@@ -1248,7 +1252,7 @@ fn a_hidden_window_screenshot_says_so() {
             "app".into()
         }
     }
-    let dir = std::env::temp_dir().join(format!("solidcraft-mcp-hidden-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("polykrom-mcp-hidden-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     let path = dir.join("shot.png").to_string_lossy().to_string();
     let shoot = |extra: Value| {
@@ -1341,7 +1345,7 @@ fn hidden_body_stays_hidden_after_save_and_reopen() {
     };
     assert_eq!(visible(&mut s, "Variant"), false);
 
-    let dir = std::env::temp_dir().join(format!("solidcraft-mcp-visibility-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("polykrom-mcp-visibility-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     let design = dir.join("variants.solidcraft");
     tool(&mut s, "save", json!({"path": design.to_string_lossy()}));
@@ -2109,7 +2113,7 @@ fn a_bridge_made_before_the_app_runs_connects_once_it_does() {
     // Still "connected to the Polykrom app", which the skills read as bridged.
     assert!(remote.describe().starts_with("connected to the Polykrom app") && remote.describe().contains("not running"), "{}", remote.describe());
     let e = remote.call("engine.execute", json!({"command": "inspect.measure"})).unwrap_err();
-    assert!(e.starts_with(crate::backend::NOT_RUNNING) && e.contains(&format!("solidcraft --control {port}")), "{e}");
+    assert!(e.starts_with(crate::backend::NOT_RUNNING) && e.contains(&format!("polykrom --control {port}")), "{e}");
     let batch = crate::call_tool(&mut remote, "batch", &json!({"commands": [{"command": "solid.box"}]}));
     let text = batch["content"][0]["text"].as_str().unwrap_or_default();
     assert_eq!(batch["isError"], true);

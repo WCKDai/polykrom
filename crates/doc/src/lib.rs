@@ -21,6 +21,7 @@ pub mod construct;
 pub mod display_quality;
 pub mod display_units;
 mod document;
+pub mod env;
 mod eval;
 pub mod expr;
 pub mod face_anchor;

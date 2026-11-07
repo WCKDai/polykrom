@@ -478,7 +478,7 @@ fn a_roller_pressed_into_a_large_plate_is_reported() {
 
 /// Two STL copies of a cube inserted into a design. Returns the names of the two mesh bodies.
 fn insert_two_mesh_cubes(s: &mut Session, tag: &str) -> Vec<String> {
-    let dir = std::env::temp_dir().join(format!("solidcraft-mesh-unchecked-{tag}-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("polykrom-mesh-unchecked-{tag}-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
     let stl = dir.join("cube.stl");

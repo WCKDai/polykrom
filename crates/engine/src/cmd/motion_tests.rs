@@ -409,7 +409,7 @@ fn joint_pose_save_and_reopen_keep_definitions_at_new_angles() {
     let mut s = joined_motion_part(PartAuthoring::RootThenTransfer, JoinSelection::Named);
     run(&mut s, "joint.drive", json!({"joint":"Turn","value":5}));
     let directory = std::env::temp_dir().join(format!(
-        "solidcraft-joint-pose-{}-{}",
+        "polykrom-joint-pose-{}-{}",
         std::process::id(),
         std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()
     ));
@@ -622,7 +622,7 @@ fn motion_study_plays_and_exports() {
     // The B occurrence's origin moves by the slider value (it starts at 0 offset with value 0 at 10 mm… so 10 → −5).
     assert!((bx(&rows[1]) - bx(&rows[0]) + 3.75).abs() < 1e-6, "{e}");
     assert!(rows[4]["stopped_by_contact"].is_object());
-    let dir = polykrom_io::vfs::temp_dir().join(format!("solidcraft-motion-{}", std::process::id()));
+    let dir = polykrom_io::vfs::temp_dir().join(format!("polykrom-motion-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     let csv = dir.join("push.csv");
     run(&mut s, "motion.export", json!({"study": "Push", "samples": 3, "path": csv.to_string_lossy()}));
@@ -673,7 +673,7 @@ fn cpu(scene: &crate::render::Scene, cam: &crate::render::Camera, w: u32, h: u32
 
 /// A folder of its own for one test's files.
 fn out_dir(test: &str) -> std::path::PathBuf {
-    let dir = polykrom_io::vfs::temp_dir().join(format!("solidcraft-anim-{test}-{}", std::process::id()));
+    let dir = polykrom_io::vfs::temp_dir().join(format!("polykrom-anim-{test}-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
     dir

@@ -10,6 +10,7 @@ mod features;
 mod fonts;
 mod i18n;
 mod icons;
+mod identity;
 mod kernel_cases;
 mod kernel_ladder;
 mod layers;
@@ -32,6 +33,8 @@ commands:
   layers          enforce the crate dependency layering (plan/architecture.md §3)
   assets          check that every non-code asset file is attributed in ATTRIBUTION.md
   app-icons       regenerate shared app-icon exports for Linux, FreeBSD and Windows
+  identity        check that release assets, app ids, package names, binaries and settings paths
+                  say Polykrom (packaging, platform files, workflows, manifests)
   icons           validate UI icon standards, discovery and review-tool behavior (Python 3.11+)
   features        list Polykrom's commands by area in docs/features.md (from the registry)
   i18n [--check | --add-missing]
@@ -94,6 +97,7 @@ fn main() -> ExitCode {
         Some("assets") => assets::run(&root()),
         Some("icons") => icons::run(&root()),
         Some("app-icons") => app_icons::run(&root()),
+        Some("identity") => identity::run(&root()),
         Some("features") => features::run(&root()),
         Some("i18n") => i18n::run(&root(), &rest),
         Some("kernel-cases") => kernel_cases::run(&rest),
@@ -270,7 +274,7 @@ fn cmd_oracle(cli: Option<&str>) -> Result<(), String> {
     for c in &cases {
         cmd.arg(c.strip_prefix(root()).unwrap_or(c));
     }
-    let out = cmd.output().map_err(|e| format!("solidcraft-cli: {e}"))?;
+    let out = cmd.output().map_err(|e| format!("polykrom-cli: {e}"))?;
     let results: serde_json::Value =
         serde_json::from_slice(&out.stdout).map_err(|e| format!("oracle JSON: {e}\n{}", String::from_utf8_lossy(&out.stderr)))?;
     let list = results.as_array().cloned().unwrap_or_default();
