@@ -2,6 +2,7 @@
 
 use crate::Session;
 use polycore_geom::Vec3;
+use polycore_geom::pmath;
 use polykrom_doc::{Document, FeatureKind, RevolveConvention};
 use serde_json::{Value, json};
 use std::f64::consts::{FRAC_PI_2, PI, SQRT_2};
@@ -33,8 +34,8 @@ fn check_centered(s: &Session, opposed: bool) {
     for sign in if opposed { vec![1.0, -1.0] } else { vec![1.0] } {
         let body = &state.bodies.iter().find(|mb| mb.body.contains(Vec3::new(sign * 3.0, 5.0, 0.0))).unwrap().body;
         assert!(!body.contains(Vec3::new(0.0, 5.0, 3.0)));
-        assert!(body.contains(Vec3::new(sign * 3.0 * (PI / 6.0).cos(), 5.0, 1.5)));
-        assert!(body.contains(Vec3::new(sign * 3.0 * (PI / 6.0).cos(), 5.0, -1.5)));
+        assert!(body.contains(Vec3::new(sign * 3.0 * pmath::cos(PI / 6.0), 5.0, 1.5)));
+        assert!(body.contains(Vec3::new(sign * 3.0 * pmath::cos(PI / 6.0), 5.0, -1.5)));
         let bounds = body.tessellate(1e-4).unwrap().bounds();
         assert!((bounds.min.z + 2.0 * SQRT_2).abs() < 1e-6, "{bounds:?}");
         assert!((bounds.max.z - 2.0 * SQRT_2).abs() < 1e-6, "{bounds:?}");
@@ -42,7 +43,7 @@ fn check_centered(s: &Session, opposed: bool) {
         assert!((inner_x - SQRT_2).abs() < 1e-6, "{bounds:?}");
         let centroid = polycore::measure(body).unwrap().centroid;
         let radial = (2.0 / 3.0) * (64.0 - 8.0) / (16.0 - 4.0);
-        let want_x = radial * (PI / 4.0).sin() / (PI / 4.0);
+        let want_x = radial * pmath::sin(PI / 4.0) / (PI / 4.0);
         assert!((centroid.x - sign * want_x).abs() < 0.005, "{centroid:?}");
         assert!((centroid.y - 5.0).abs() < 1e-6);
         assert!(centroid.z.abs() < 1e-6);
@@ -294,10 +295,10 @@ fn curved_targets_keep_only_the_material_before_the_post_for_both_axis_signs() {
             let arcs: Vec<_> = state.bodies.iter().filter(|mb| mb.name != "Post").collect();
             assert_eq!(arcs.len(), if opposed { 2 } else { 1 });
             for side in if opposed { vec![1.0, -1.0] } else { vec![1.0] } {
-                let probe = Vec3::new(side * 12.0 * (PI / 6.0).cos(), 6.0, -2.5);
+                let probe = Vec3::new(side * 12.0 * pmath::cos(PI / 6.0), 6.0, -2.5);
                 let arc = &arcs.iter().find(|mb| mb.body.contains(probe)).unwrap().body;
-                assert!(!arc.contains(Vec3::new(-side * 12.0 * (PI / 6.0).cos(), 6.0, -2.5)));
-                assert!(!arc.contains(Vec3::new(side * 12.0 * (PI / 6.0).cos(), -6.0, -2.5)));
+                assert!(!arc.contains(Vec3::new(-side * 12.0 * pmath::cos(PI / 6.0), 6.0, -2.5)));
+                assert!(!arc.contains(Vec3::new(side * 12.0 * pmath::cos(PI / 6.0), -6.0, -2.5)));
                 let full = PI * (225.0 - 100.0) * 5.0;
                 let angle = polycore::measure(arc).unwrap().volume / full * 360.0;
                 assert!(angle > 60.0 && angle < 90.0, "{angle}");

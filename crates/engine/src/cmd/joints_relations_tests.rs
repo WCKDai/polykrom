@@ -3,6 +3,7 @@
 //! parts are, and they keep holding as the parts change size.
 
 use polycore_geom::Vec3;
+use polycore_geom::pmath;
 use serde_json::{Value, json};
 
 use super::tests::{occ, place, run};
@@ -114,7 +115,7 @@ fn an_angle_relation_holds_its_tilt_and_follows_an_edit() {
     relation(&mut s, "point_on_plane", "Top", "Corner", json!({}));
     let tilt = |s: &Session| {
         let n = place(s, "Bracket", Vec3::new(10.0, 505.0, 0.0)) - place(s, "Bracket", Vec3::new(10.0, 505.0, 1.0));
-        n.normalized().map_or(f64::NAN, |n| n.dot(Vec3::Z).acos().to_degrees())
+        n.normalized().map_or(f64::NAN, |n| pmath::acos(n.dot(Vec3::Z)).to_degrees())
     };
     // 0 deg is mated: the bracket's bottom against the top, its outward normal straight down.
     let r = relation(&mut s, "angle", "Top", "Bottom", json!({"angle": "30 deg"}));

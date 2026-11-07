@@ -1,3 +1,4 @@
+use polycore_geom::pmath;
 use std::f64::consts::{FRAC_PI_2, PI};
 
 use serde_json::{Value, json};
@@ -688,8 +689,8 @@ fn a_notch_whose_arc_ends_on_a_grid_border_refolds() {
     // circle's centre (a, a) from the corner is as far from (0.6, 0.6) as from the arc's ends.
     let a = (t * t - 0.72) / (2.0 * t - 2.4);
     let r2 = 2.0 * (a - 0.6) * (a - 0.6);
-    let angle = 2.0 * (t * 2f64.sqrt() / (2.0 * r2.sqrt())).asin();
-    let notch = t * t / 2.0 - r2 / 2.0 * (angle - angle.sin());
+    let angle = 2.0 * pmath::asin(t * 2f64.sqrt() / (2.0 * r2.sqrt()));
+    let notch = t * t / 2.0 - r2 / 2.0 * (angle - pmath::sin(angle));
     assert!((notch - 0.88421).abs() < 1e-5, "{notch}");
     let mut s = Session::default();
     run(&mut s, "sheet.manage_rules", json!({"name": "Rule", "active": true, "thickness": "2 mm", "k_factor": "0.5", "bend_radius": "2 mm"}));
@@ -728,7 +729,7 @@ fn an_inside_flange_on_a_turned_plate_closes_at_every_turn() {
     let mut failed = Vec::new();
     for k in 0..90 {
         let turn = (k as f64).to_radians();
-        let at = |x: f64, y: f64| [x * turn.cos() - y * turn.sin(), x * turn.sin() + y * turn.cos()];
+        let at = |x: f64, y: f64| [x * pmath::cos(turn) - y * pmath::sin(turn), x * pmath::sin(turn) + y * pmath::cos(turn)];
         let mut s = Session::default();
         run(&mut s, "sheet.manage_rules", json!({"name": "R", "thickness": "2 mm", "k_factor": "0.5", "bend_radius": "1 mm", "active": true}));
         run(&mut s, "sketch.create", json!({"plane": "XY", "name": "Outline"}));
@@ -1004,7 +1005,7 @@ fn a_sketch_on_a_flange_face_attaches_to_its_panel() {
     assert!(!cut.is_empty(), "{f}");
     for p in &cut {
         let (x, y) = (p[0].as_f64().unwrap_or(f64::NAN), p[1].as_f64().unwrap_or(f64::NAN));
-        assert!(((x - 30.0).hypot(y - (5.0 - ba - 7.0)) - 1.8).abs() < 1e-3, "({x}, {y})");
+        assert!((pmath::hypot(x - 30.0, y - (5.0 - ba - 7.0)) - 1.8).abs() < 1e-3, "({x}, {y})");
     }
     // `fixed: true` still freezes the picked plane instead of attaching to the panel.
     let frozen = circle_sketch(&mut s, "Frozen", json!({"face": [50, 2.5, 12], "fixed": true}), [0.0, 0.0], 1.0);
@@ -1215,7 +1216,7 @@ fn a_flange_beside_a_slightly_bent_edge_unfolds_at_any_turn() {
     let mut failed = Vec::new();
     for k in 0..90 {
         let turn = (k as f64).to_radians();
-        let at = |x: f64, y: f64| [x * turn.cos() - y * turn.sin(), x * turn.sin() + y * turn.cos()];
+        let at = |x: f64, y: f64| [x * pmath::cos(turn) - y * pmath::sin(turn), x * pmath::sin(turn) + y * pmath::cos(turn)];
         let mut s = Session::default();
         run(&mut s, "sheet.manage_rules", json!({"name": "R", "thickness": "2 mm", "k_factor": "0.5", "bend_radius": "1 mm", "active": true}));
         run(&mut s, "sketch.create", json!({"plane": "XY", "name": "Outline"}));
@@ -1437,8 +1438,8 @@ fn an_edge_flange_beside_a_ledge_as_tall_as_its_setback_or_a_little_taller_folds
     // sliver above the bend line, and the bend runs on under it, x 0 … 100. Both used to fail
     // with "sew: a degenerate edge": the first square to the axes, the second turned off them
     // (a 5-12-13 slope) in the middle.
-    for turn in [0.0, (5.0f64 / 13.0).asin()] {
-        let at = |x: f64, y: f64| [x * turn.cos() - y * turn.sin(), x * turn.sin() + y * turn.cos()];
+    for turn in [0.0, pmath::asin(5.0f64 / 13.0)] {
+        let at = |x: f64, y: f64| [x * pmath::cos(turn) - y * pmath::sin(turn), x * pmath::sin(turn) + y * pmath::cos(turn)];
         for (position, setback) in [("inside", 3.0), ("middle", 3.0 / 2.0)] {
             for (taller, len) in [(0.0, 97.0), (0.05, 100.0)] {
                 let what = format!("{position}, ledge {setback} + {taller}, turned {turn:.4}");
@@ -1544,7 +1545,7 @@ fn a_flange_bent_inside_keeps_the_base_sketchs_arcs_in_the_flat_pattern_and_the_
     // millimetre long, where the bend outside gives 8 LINEs and 4 ARCs.
     let h = 8.0 * (1.0 - 0.5f64.sqrt());
     // ∫ √(64 − z²): the area under an arc of radius 8, from its centre's height on.
-    let under = |z: f64| z / 2.0 * (64.0 - z * z).sqrt() + 32.0 * (z / 8.0).asin();
+    let under = |z: f64| z / 2.0 * (64.0 - z * z).sqrt() + 32.0 * pmath::asin(z / 8.0);
     for (position, setback) in [("outside", 0.0f64), ("middle", 3.0 / 2.0), ("inside", 3.0)] {
         let mut s = Session::default();
         run(&mut s, "sheet.manage_rules", json!({"name": "R", "thickness": "2 mm", "k_factor": "0.5", "bend_radius": "1 mm", "active": true}));
@@ -1883,7 +1884,7 @@ fn overlapping_round_cuts_keep_exact_union_in_export_and_roundtrip() {
         run(&mut s, "sketch.finish", json!({}));
         run(&mut s, "solid.extrude", json!({"sketch": name, "through_all": true, "operation": "cut", "direction": "symmetric"}));
     }
-    let intersection = 50.0 * (0.2f64).acos() - (96.0f64).sqrt();
+    let intersection = 50.0 * pmath::acos(0.2f64) - (96.0f64).sqrt();
     let expected = (6000.0 - (50.0 * PI - intersection)) * 2.5;
     assert!((volume(&mut s) - expected).abs() < 0.1);
     assert_eq!(flat(&mut s)["cutouts"].as_array().map(Vec::len), Some(1));
@@ -2800,7 +2801,8 @@ fn hole_beside_a_bend_with_a_round_cut_out_cuts_and_the_bend_stays_guarded() {
 /// Whether the flat pattern has a cut-out whose points all lie on the circle of radius `r` about `c`.
 fn has_round_cutout(f: &Value, c: [f64; 2], r: f64) -> bool {
     f["cutouts"].as_array().into_iter().flatten().any(|cut| {
-        let on_circle = |p: &Value| ((p[0].as_f64().unwrap_or(f64::NAN) - c[0]).hypot(p[1].as_f64().unwrap_or(f64::NAN) - c[1]) - r).abs() < 1e-3;
+        let on_circle =
+            |p: &Value| (pmath::hypot(p[0].as_f64().unwrap_or(f64::NAN) - c[0], p[1].as_f64().unwrap_or(f64::NAN) - c[1]) - r).abs() < 1e-3;
         cut.as_array().is_some_and(|points| !points.is_empty() && points.iter().all(on_circle))
     })
 }
@@ -3024,8 +3026,8 @@ fn closed_corners_reach_the_flat_pattern_and_the_dxf() {
         // The end of the flange on y = 0 at the corner at the origin, by hand (see the doc tests):
         // x(w) = g/√2 + T·sinθ − w·cosθ at flat y = s0 − BA − (w − s0), for w = s0 and w = 38.6.
         let th = deg.to_radians();
-        let (s0, ba) = (3.0 * (th / 2.0).tan(), th * 2.0);
-        let x_end = |w: f64| 0.5 / SQRT_2 + 2.0 * th.sin() - w * th.cos();
+        let (s0, ba) = (3.0 * pmath::tan(th / 2.0), th * 2.0);
+        let x_end = |w: f64| 0.5 / SQRT_2 + 2.0 * pmath::sin(th) - w * pmath::cos(th);
         let f = flat(&mut s);
         let outline: Vec<(f64, f64)> = f["outline"][0]
             .as_array()
@@ -3065,7 +3067,7 @@ fn corner_reliefs_of_the_rule_reach_the_part_the_flat_pattern_and_the_dxf() {
     // edges, and are BA = 2θ wide in the flat. A relief 8 mm across reaches r = 4 mm along both edges
     // and takes, at each corner, r²·π/4 (round) or r² (rectangular) of the base and r of two bends.
     let th = 72f64.to_radians();
-    let (s0, ba) = (3.0 * (th / 2.0).tan(), th * 2.0);
+    let (s0, ba) = (3.0 * pmath::tan(th / 2.0), th * 2.0);
     let corners = [(s0, s0), (120.0 - s0, s0), (120.0 - s0, 90.0 - s0), (s0, 90.0 - s0)];
     let export = |s: &mut Session| run(s, "sheet.export_dxf", json!({}))["dxf"].as_str().unwrap_or_default().to_string();
     let mut notch = Session::default();
@@ -3153,9 +3155,9 @@ fn rhombus_sheet(s: &mut Session, rule: Value) {
 /// directions `dirs`: the two bend lines, each `s0` in from its edge, meet there.
 fn trimmed_corner(c: (f64, f64), dirs: [(f64, f64); 2], s0: f64) -> (f64, f64) {
     let (d0, d1) = (dirs[0], dirs[1]);
-    let alpha = (d0.0 * d1.1 - d0.1 * d1.0).atan2(d0.0 * d1.0 + d0.1 * d1.1).abs();
+    let alpha = pmath::atan2(d0.0 * d1.1 - d0.1 * d1.0, d0.0 * d1.0 + d0.1 * d1.1).abs();
     let (bx, by) = (d0.0 + d1.0, d0.1 + d1.1);
-    let k = s0 / (alpha / 2.0).sin() / (bx * bx + by * by).sqrt();
+    let k = s0 / pmath::sin(alpha / 2.0) / (bx * bx + by * by).sqrt();
     (c.0 + bx * k, c.1 + by * k)
 }
 
@@ -3234,7 +3236,7 @@ fn corner_reliefs_at_non_orthogonal_corners_reach_the_flat_pattern_and_the_dxf()
                     assert!(ends.iter().any(|p| (p.x - x.0).abs() < 1e-6 && (p.y - x.1).abs() < 1e-6), "{shape}: no kite at {c:?}: {ends:?}");
                 }
                 let ba = std::f64::consts::PI;
-                let want = 2.0 * (16.0 * (PI / 6.0).tan()) + 2.0 * (16.0 * (PI / 3.0).tan()) + 4.0 * 2.0 * 4.0 * ba;
+                let want = 2.0 * (16.0 * pmath::tan(PI / 6.0)) + 2.0 * (16.0 * pmath::tan(PI / 3.0)) + 4.0 * 2.0 * 4.0 * ba;
                 assert!((area0 - area - want).abs() < 0.1, "{shape}: {} vs {want}", area0 - area);
             }
             "tear" => {
@@ -3267,10 +3269,10 @@ fn a_tear_of_the_rule_reaches_the_part_the_flat_pattern_and_the_dxf() {
     // bend and back along the flange's edge (the notch's step).
     for deg in [90.0f64, 72.0] {
         let th = deg.to_radians();
-        let (s0, ba) = (3.0 * (th / 2.0).tan(), th * 2.0);
-        let x_end = |w: f64| 0.5 / SQRT_2 + 2.0 * th.sin() - w * th.cos();
+        let (s0, ba) = (3.0 * pmath::tan(th / 2.0), th * 2.0);
+        let x_end = |w: f64| 0.5 / SQRT_2 + 2.0 * pmath::sin(th) - w * pmath::cos(th);
         let grow = s0 - x_end(s0);
-        assert!((grow - (th.sin() - 0.5 / SQRT_2)).abs() < 1e-12);
+        assert!((grow - (pmath::sin(th) - 0.5 / SQRT_2)).abs() < 1e-12);
         let points = |f: &Value| -> Vec<(f64, f64)> {
             let line = f["outline"][0].as_array();
             line.map(|l| l.iter().map(|p| (p[0].as_f64().unwrap_or(f64::NAN), p[1].as_f64().unwrap_or(f64::NAN))).collect()).unwrap_or_default()
@@ -3666,10 +3668,10 @@ fn hand_panels() -> Vec<Vec<(f64, f64)>> {
         .map(|i| {
             let (o, d, v, len) = frames[i];
             let (th, h) = (FOUR_ANGLES[i].to_radians(), FOUR_HEIGHTS[i]);
-            let (s0, ba) = (3.0 * (th / 2.0).tan(), th * 2.0);
+            let (s0, ba) = (3.0 * pmath::tan(th / 2.0), th * 2.0);
             let x_end = |phi: f64, w: f64| {
-                let c = th.cos() * phi.cos();
-                (0.25 * (2.0 - 2.0 * c).sqrt() + 2.0 * (1.0 - c) - w * th.sin() * phi.cos()) / phi.sin()
+                let c = pmath::cos(th) * pmath::cos(phi);
+                (0.25 * (2.0 - 2.0 * c).sqrt() + 2.0 * (1.0 - c) - w * pmath::sin(th) * pmath::cos(phi)) / pmath::sin(phi)
             };
             let (prev, next) = (FOUR_ANGLES[(i + 3) % 4].to_radians(), FOUR_ANGLES[(i + 1) % 4].to_radians());
             let at = |u: f64, w: f64| {
@@ -3695,7 +3697,7 @@ fn edge_flanges_take_their_own_angle_and_height_per_edge() {
     // The bends: each edge's own angle, as long as the base's edge between its neighbours' bend
     // start lines (each s0 in from the original edge).
     assert_eq!(bend_angles(&mut one), FOUR_ANGLES);
-    let s0 = FOUR_ANGLES.map(|a| 3.0 * (a.to_radians() / 2.0).tan());
+    let s0 = FOUR_ANGLES.map(|a| 3.0 * pmath::tan(a.to_radians() / 2.0));
     let ba = FOUR_ANGLES.map(|a| a.to_radians() * 2.0);
     let (w, h) = (120.0 - s0[3] - s0[1], 90.0 - s0[0] - s0[2]);
     let lengths: Vec<f64> = f1["bends"].as_array().cloned().unwrap_or_default().iter().map(|b| b["length"].as_f64().unwrap_or(f64::NAN)).collect();
@@ -3814,10 +3816,10 @@ fn tray_with_returns(top: f64, deg: f64, gap: &str, returns: &[usize]) -> Sessio
     // A wall's inner face 20 up its outer face from the base's edge: that far in from the edge
     // and that high (see the doc tests).
     let th = deg.to_radians();
-    let (into, up) = (-20.0 * th.cos() + 2.0 * th.sin(), 20.0 * th.sin() + 2.0 * th.cos());
+    let (into, up) = (-20.0 * pmath::cos(th) + 2.0 * pmath::sin(th), 20.0 * pmath::sin(th) + 2.0 * pmath::cos(th));
     let pick = |k: usize, into: f64, z: f64| {
         let (a, b) = (pts[k], pts[(k + 1) % 4]);
-        let l = (b.0 - a.0).hypot(b.1 - a.1);
+        let l = pmath::hypot(b.0 - a.0, b.1 - a.1);
         json!([(a.0 + b.0) / 2.0 - (b.1 - a.1) / l * into, (a.1 + b.1) / 2.0 + (b.0 - a.0) / l * into, z])
     };
     let edges: Vec<Value> = (0..4).map(|k| pick(k, 0.0, 2.0)).collect();
@@ -3904,9 +3906,9 @@ fn returns_on_leaning_walls_stay_inside_the_walls() {
     // in from its wall's edge, and at a base corner of angle α its bend stops
     // x_b = (g/2 + v·cos(α/2)) / sin(α/2) along the edge from the corner.
     let th = 110f64.to_radians();
-    let v = 3.0 * th.sin() - (20.0 - 3.0 * 35f64.to_radians().tan()) * th.cos();
-    let x_b = |alpha: f64| (0.25 + v * (alpha / 2.0).cos()) / (alpha / 2.0).sin();
-    let (acute, side) = ((90.0f64 / 20.0).atan(), 20f64.hypot(90.0));
+    let v = 3.0 * pmath::sin(th) - (20.0 - 3.0 * pmath::tan(35f64.to_radians())) * pmath::cos(th);
+    let x_b = |alpha: f64| (0.25 + v * pmath::cos(alpha / 2.0)) / pmath::sin(alpha / 2.0);
+    let (acute, side) = (pmath::atan(90.0f64 / 20.0), pmath::hypot(20f64, 90.0));
     let want = [120.0 - 2.0 * x_b(acute), side - x_b(acute) - x_b(PI - acute), 80.0 - 2.0 * x_b(PI - acute), side - x_b(acute) - x_b(PI - acute)];
     let lengths = bend_lengths(&mut s);
     assert_eq!(lengths.len(), 8, "{lengths:?}");
@@ -3944,7 +3946,7 @@ fn a_return_alone_on_a_leaning_wall_keeps_out_of_the_walls_beside_it() {
     // 20·sin 110° up, where their inner faces are 2/sin 110° + 20·cos 70° in from the base's edges.
     // The return stops square g/√2 short of them at both ends: 120 − 2·9.322312 = 101.355376.
     let th = 110f64.to_radians();
-    let want = 120.0 - 2.0 * (0.5 / SQRT_2 + 2.0 / th.sin() - 20.0 * th.cos());
+    let want = 120.0 - 2.0 * (0.5 / SQRT_2 + 2.0 / pmath::sin(th) - 20.0 * pmath::cos(th));
     let lengths = bend_lengths(&mut s);
     assert!(lengths.len() == 5 && (lengths[4] - want).abs() < 1e-6 && (want - 101.355376).abs() < 1e-6, "{lengths:?} vs {want}");
     // One outline in the flat, and the folded part holds its material.
@@ -3976,7 +3978,7 @@ fn returns_follow_the_rules_gap_and_stay_open_with_a_warning_when_it_is_zero() {
     assert!(s.model.results.iter().all(|r| r.error.is_none()) && warnings.len() == 2, "{:?}", s.model.results);
     assert!(warnings.iter().all(|w| w.matches("left open").count() == 4), "{warnings:?}");
     let lengths = bend_lengths(&mut s);
-    assert!((lengths[4] - lengths[0]).abs() < 1e-9 && (lengths[0] - (120.0 - 6.0 * 55f64.to_radians().tan())).abs() < 1e-6, "{lengths:?}");
+    assert!((lengths[4] - lengths[0]).abs() < 1e-9 && (lengths[0] - (120.0 - 6.0 * pmath::tan(55f64.to_radians()))).abs() < 1e-6, "{lengths:?}");
 }
 
 #[test]
@@ -4656,7 +4658,7 @@ fn perforate_supports_a_square_pattern_and_refuses_impossible_values() {
 fn tray_with_a_45_degree_flange(s: &mut Session, with_return: bool) -> f64 {
     base(s, 100.0, 60.0);
     run(s, "sheet.flange", json!({"edges": [[50, 0, 2.5]], "height": 40, "angle": 45}));
-    let (setback, ba) = (5.0 * (PI / 8.0).tan(), PI / 4.0 * (2.5 + 0.44 * 2.5));
+    let (setback, ba) = (5.0 * pmath::tan(PI / 8.0), PI / 4.0 * (2.5 + 0.44 * 2.5));
     if with_return {
         run(s, "sheet.flange", json!({"edges": [[50, -27.5, 26.5]], "height": 10, "angle": 45}));
         return setback - ba - (40.0 - 2.0 * setback) - ba - (10.0 - setback);
@@ -4788,7 +4790,7 @@ fn a_hole_that_parts_a_flange_from_the_base_names_it() {
     base(&mut s, 10.0, 60.0);
     run(&mut s, "sheet.flange", json!({"edges": [[5, 0, 2.5]], "height": 40}));
     let out = run(&mut s, "solid.hole", json!({"position": [5, 0, 15], "diameter": 12}));
-    let area = 250.0 - (5.0 * 11f64.sqrt() + 36.0 * (5.0f64 / 6.0).asin());
+    let area = 250.0 - (5.0 * 11f64.sqrt() + 36.0 * pmath::asin(5.0f64 / 6.0));
     let warning = out["warning"].as_str().unwrap_or_default();
     assert!(warning.starts_with(&format!("1 piece of `Body1` is no longer joined to its base ({area:.2} mm², near (5.0, ")), "{warning}");
     assert_eq!(out["warning"], json!(last_warning(&s)));

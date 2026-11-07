@@ -1,6 +1,11 @@
 //! Bounded RGB matrix/TRC profile admission before calling the existing permissive CMS.
 //! Header/tag layout follows the public ICC.1 profile specification, not another CAD tool.
 
+// UI only: this file draws, animates, converts colours or places the camera, and feeds nothing
+// into a design, so it keeps the platform's transcendental functions (listed with its reason in
+// crates/engine/tests/pmath_gate.rs; everything that reaches a command goes through pmath).
+#![allow(clippy::disallowed_methods)]
+
 use crate::texture_input::{Result, guarded, invalid};
 use moxcms::{ColorProfile, DataColorSpace, Layout, ParsingOptions, ProfileClass, RenderingIntent, TransformF64Executor, TransformOptions};
 use std::sync::Arc;

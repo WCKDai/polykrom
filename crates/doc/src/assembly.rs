@@ -8,6 +8,7 @@
 //! gathered for display, measuring and export (`world_bodies`). Commands take world coordinates
 //! and the engine maps a new feature's geometry into the active component's frame.
 
+use polycore_geom::pmath;
 use polycore_geom::{Plane, Vec3};
 use serde::{Deserialize, Serialize};
 
@@ -87,7 +88,7 @@ pub fn mat_inverse(m: &Mat) -> Option<Mat> {
 /// A rigid transform: rotation by `angle` about `axis` through `origin`, then a translation.
 pub fn rigid(translate: Vec3, origin: Vec3, axis: Vec3, angle: f64) -> Mat {
     let k = axis.normalized().unwrap_or(Vec3::Z);
-    let (s, c) = angle.sin_cos();
+    let (s, c) = pmath::sin_cos(angle);
     let t = 1.0 - c;
     let r = [
         [t * k.x * k.x + c, t * k.x * k.y + s * k.z, t * k.x * k.z - s * k.y],

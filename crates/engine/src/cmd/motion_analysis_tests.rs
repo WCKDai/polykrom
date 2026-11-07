@@ -2,6 +2,7 @@
 //! `motion.interference` on two blocks pushed through each other at a known step.
 
 use polycore_geom::Vec3;
+use polycore_geom::pmath;
 use serde_json::{Value, json};
 
 use super::{four_bar, occ, part, pin, rocker_pin, run, slider_crank};
@@ -37,7 +38,7 @@ fn four_bar_rocker_velocity_matches_its_analytic_derivative() {
         assert!((w - 50.0).abs() < 1e-6 && a.abs() < 1e-6, "{v}°: {w} deg/s, {a} deg/s²");
     }
     let (value, velocity) = (nums(&rocker["value"]), nums(&rocker["velocity"]));
-    let start = q0.y.atan2(q0.x - 45.0);
+    let start = pmath::atan2(q0.y, q0.x - 45.0);
     let (mut q, mut peak, mut worst) = (q0, 0.0f64, 0.0f64);
     for k in 0..181 {
         let v = 2.0 * k as f64;
@@ -45,12 +46,12 @@ fn four_bar_rocker_velocity_matches_its_analytic_derivative() {
             q = rocker_pin(v - 2.0, v, q);
         }
         let th2 = (90.0 + v).to_radians();
-        let p = Vec3::new(20.0 * th2.cos(), 20.0 * th2.sin(), 0.0);
-        let (th3, th4) = ((q - p).y.atan2((q - p).x), q.y.atan2(q.x - 45.0));
+        let p = Vec3::new(20.0 * pmath::cos(th2), 20.0 * pmath::sin(th2), 0.0);
+        let (th3, th4) = (pmath::atan2((q - p).y, (q - p).x), pmath::atan2(q.y, q.x - 45.0));
         // The rocker's value is its turn from where it was assembled, made continuous.
         let turned = (th4 - start).to_degrees();
         assert!(((value[k] - turned + 540.0).rem_euclid(360.0) - 180.0).abs() < 1e-6, "{v}°: {} wants {turned}", value[k]);
-        let w4 = 50.0 * 20.0 * (th2 - th3).sin() / (40.0 * (th4 - th3).sin());
+        let w4 = 50.0 * 20.0 * pmath::sin(th2 - th3) / (40.0 * pmath::sin(th4 - th3));
         peak = peak.max(w4.abs());
         worst = worst.max((velocity[k] - w4).abs());
     }
@@ -75,9 +76,11 @@ fn slider_crank_piston_acceleration_matches_its_analytic_form() {
     let (mut peak, mut worst) = (0.0f64, 0.0f64);
     for k in 0..181 {
         let th = (90.0 + 2.0 * k as f64).to_radians();
-        let root = (b * b - (a * th.sin()).powi(2)).sqrt();
-        assert!((at("position", k, 0) - (a * th.cos() + root)).abs() < 1e-6, "{k}");
-        let want = w * w * (-a * th.cos() - a * a * (2.0 * th).cos() / root - a.powi(4) * (th.sin() * th.cos()).powi(2) / root.powi(3));
+        let root = (b * b - (a * pmath::sin(th)).powi(2)).sqrt();
+        assert!((at("position", k, 0) - (a * pmath::cos(th) + root)).abs() < 1e-6, "{k}");
+        let want = w
+            * w
+            * (-a * pmath::cos(th) - a * a * pmath::cos(2.0 * th) / root - a.powi(4) * (pmath::sin(th) * pmath::cos(th)).powi(2) / root.powi(3));
         peak = peak.max(want.abs());
         // The ends take one-sided differences; inside, central ones.
         let tolerance = if k == 0 || k == 180 { 2e-2 } else { 2e-3 };

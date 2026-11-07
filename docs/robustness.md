@@ -81,6 +81,20 @@ six were checked again on main `e9490093`. GNU builds (`x86_64-pc-windows-gnu`)
 use the shared records unless an explicit GNU override exists, so MSVC-only outcomes
 do not leak into GNU validation (#4104).
 
+Polykrom's own crates compute through the same portable math (PK-98): every sine, cosine,
+arc, exponential, logarithm, `powf`, `hypot` and `cbrt` in the sketch, doc, io, render, gpu
+and engine crates (and in the UI code that feeds a command: sketch tools, snapping, gizmo
+drags, text handles) calls `pmath` (`polycore_geom::pmath`, `polykrom_engine::geom::pmath`
+above the engine), so the arcs, patterns and transforms a design is built from are the same
+bits on every platform before they reach the kernel. `sqrt` and `powi` stay (IEEE and
+compiler-rt on every target). `clippy.toml` carries PolyCore's `disallowed-methods` list and
+`cargo clippy --workspace --all-targets -- -D warnings` enforces it; the engine's `pmath_gate`
+test (`crates/engine/tests/pmath_gate.rs`) checks that the list is still a superset of
+PolyCore's, that a planted call fails, and that the UI-only code allowed to keep the platform's
+functions (camera, animation, colour, layout; it draws and feeds nothing into a design) is
+exactly its allow-list, each entry with a reason. Routing Polykrom's calls through `pmath` moved
+no shared record on Linux.
+
 To record an intended change, give the reason:
 
 ```

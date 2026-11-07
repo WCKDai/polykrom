@@ -1,6 +1,7 @@
 //! Modelled threads: the ISO metric profile cut along a helix, inside and outside,
 //! including fine pitches on large shafts and the sample flange.
 
+use polycore_geom::pmath;
 use std::f64::consts::PI;
 
 use polycore_geom::Vec3;
@@ -42,7 +43,7 @@ fn faceted_flange_thread_preserves_thin_crest_boundaries() {
     let height = pitch * 3f64.sqrt() / 2.0;
     let root = 22.0 - 5.0 * height / 8.0;
     let outer = 22.0 + 0.05 * pitch;
-    let half_width = (pitch / 4.0 + 2.0 * (outer - root) * (PI / 6.0).tan()) / 2.0;
+    let half_width = (pitch / 4.0 + 2.0 * (outer - root) * pmath::tan(PI / 6.0)) / 2.0;
     let section = [Vec2::new(root, -pitch / 8.0), Vec2::new(outer, -half_width), Vec2::new(outer, half_width), Vec2::new(root, pitch / 8.0)];
     let (start, end) = (cylinder.start - pitch, cylinder.end + pitch);
     let base = cylinder.axis_point + cylinder.axis * start;
@@ -87,7 +88,7 @@ fn modelled_full_length_fine_threads_on_large_shafts() {
         let body = &state.body("Shaft").unwrap().body;
         assert!(body.validity().is_empty(), "M{d}x{p}: {:?}", body.validity());
         let root = d / 2.0 - 5.0 * p * 3f64.sqrt() / 16.0;
-        let want = per_turn(root, d / 2.0, |r| p / 4.0 + 2.0 * (r - root) * (PI / 6.0).tan()) * len / p;
+        let want = per_turn(root, d / 2.0, |r| p / 4.0 + 2.0 * (r - root) * pmath::tan(PI / 6.0)) * len / p;
         let got = before - volume(&mut s, "Shaft");
         assert!((got - want).abs() < want * 0.04, "M{d}x{p}: removed {got}, ISO profile {want}");
     }
@@ -101,7 +102,7 @@ fn modelled_full_length_fine_threads_on_large_shafts() {
 fn a_shaft_thicker_than_a_modelled_thread_is_turned_down_to_it() {
     let (p, len) = (1.0, 8.0);
     let root = 3.0 - 5.0 * p * 3f64.sqrt() / 16.0;
-    let groove = per_turn(root, 3.0, |r| p / 4.0 + 2.0 * (r - root) * (PI / 6.0).tan()) * len / p;
+    let groove = per_turn(root, 3.0, |r| p / 4.0 + 2.0 * (r - root) * pmath::tan(PI / 6.0)) * len / p;
     for (shaft, turned) in [(8.0, true), (6.0, false)] {
         let mut s = Session::default();
         run(&mut s, "solid.cylinder", json!({"radius": shaft / 2.0, "height": 12, "body_name": "Shaft"}));
@@ -115,7 +116,7 @@ fn a_shaft_thicker_than_a_modelled_thread_is_turned_down_to_it() {
         assert!(b.body.validity().is_empty(), "{shaft} mm: {:?}", b.body.validity());
         // Nothing past the major diameter over the threaded length; the stub keeps its size.
         let round = |z: f64, r: f64| {
-            (0..24).filter(|i| b.body.contains(Vec3::new(r * (PI * *i as f64 / 12.0).cos(), r * (PI * *i as f64 / 12.0).sin(), z))).count()
+            (0..24).filter(|i| b.body.contains(Vec3::new(r * pmath::cos(PI * *i as f64 / 12.0), r * pmath::sin(PI * *i as f64 / 12.0), z))).count()
         };
         assert_eq!(round(8.0, 3.05), 0, "{shaft} mm: the threaded part is turned to 6 mm");
         assert_eq!(round(2.0, shaft / 2.0 - 0.05), 24, "{shaft} mm: the stub is whole");
@@ -131,7 +132,7 @@ fn a_shaft_thicker_than_a_modelled_thread_is_turned_down_to_it() {
     run(&mut s, "solid.cylinder", json!({"radius": 4.5, "height": 10, "body_name": "Shaft"}));
     run(&mut s, "solid.thread", json!({"face": [4.5, 0, 5], "designation": "M8", "modeled": true}));
     let root = 4.0 - 5.0 * 1.25 * 3f64.sqrt() / 16.0;
-    let groove = per_turn(root, 4.0, |r| 1.25 / 4.0 + 2.0 * (r - root) * (PI / 6.0).tan()) * 10.0 / 1.25;
+    let groove = per_turn(root, 4.0, |r| 1.25 / 4.0 + 2.0 * (r - root) * pmath::tan(PI / 6.0)) * 10.0 / 1.25;
     let (want, got) = (PI * 16.0 * 10.0 - groove, volume(&mut s, "Shaft"));
     assert!((got - want).abs() < groove * 0.03, "M8 on 9 mm: {got} mm³, want {want}");
 }
@@ -198,7 +199,7 @@ fn per_turn(a: f64, b: f64, width: impl Fn(f64) -> f64) -> f64 {
 #[test]
 fn modelled_external_threads_m3_to_m20() {
     let h = |p: f64| p * 3f64.sqrt() / 2.0;
-    let slope = (PI / 6.0).tan();
+    let slope = pmath::tan(PI / 6.0);
     for (d, p) in SIZES {
         let mut s = Session::default();
         let len = 4.0 * p;
@@ -216,7 +217,7 @@ fn modelled_external_threads_m3_to_m20() {
 #[test]
 fn modelled_internal_threads_m3_to_m20() {
     let h = |p: f64| p * 3f64.sqrt() / 2.0;
-    let slope = (PI / 6.0).tan();
+    let slope = pmath::tan(PI / 6.0);
     for (d, p) in SIZES {
         let mut s = Session::default();
         let len = 4.0 * p;
@@ -339,7 +340,7 @@ fn fillet_beside_a_modelled_thread_finishes() {
     let top: Vec<Value> = (0..6)
         .map(|i| {
             let a = (30.0 + 60.0 * i as f64).to_radians();
-            json!([2.0 * a.cos(), 2.0 * a.sin(), 13])
+            json!([2.0 * pmath::cos(a), 2.0 * pmath::sin(a), 13])
         })
         .collect();
     let started = std::time::Instant::now();

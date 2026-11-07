@@ -1,6 +1,7 @@
 //! Sketch modify tools: trim, extend, break, fillet, chamfer, offset, mirror, circular and
 //! rectangular patterns, move/copy and scale.
 
+use polycore_geom::pmath;
 use std::f64::consts::TAU;
 
 use polycore_geom::Vec2;
@@ -1039,16 +1040,16 @@ fn fillet_corner(sk: &mut Sketch, p: &Value, r: f64, cmd: &str) -> Result<(usize
     let (pc, pa, pb) = (sk.point(c).unwrap_or_default(), sk.point(fa).unwrap_or_default(), sk.point(fb).unwrap_or_default());
     let u = (pa - pc).normalized().ok_or_else(|| bad(cmd, "degenerate line"))?;
     let v = (pb - pc).normalized().ok_or_else(|| bad(cmd, "degenerate line"))?;
-    let half = 0.5 * u.cross(v).atan2(u.dot(v)).abs();
+    let half = 0.5 * pmath::atan2(u.cross(v), u.dot(v)).abs();
     if !(1e-6..=std::f64::consts::FRAC_PI_2 - 1e-9).contains(&half) {
         return Err(bad(cmd, "the lines are parallel"));
     }
-    let d = r / half.tan();
+    let d = r / pmath::tan(half);
     if d >= pa.dist(pc) - 1e-9 || d >= pb.dist(pc) - 1e-9 {
         return Err(bad(cmd, format!("the radius is too large for that corner (it needs {d:.3} mm of each line)")));
     }
     let bis = (u + v).normalized().ok_or_else(|| bad(cmd, "the lines are parallel"))?;
-    let center = pc + bis * (r / half.sin());
+    let center = pc + bis * (r / pmath::sin(half));
     let (ta, tb, _, kept) = cut_corner(sk, la, lb, c, fa, fb, d, d, cmd)?;
     let (qa, qb) = (sk.point(ta).unwrap_or_default(), sk.point(tb).unwrap_or_default());
     let ccw = (qa - center).cross(qb - center) > 0.0;
@@ -1145,7 +1146,7 @@ fn chamfer(s: &mut Session, p: &Value, cmd: &str, dists: impl FnOnce(f64) -> Res
         let (la, lb, c, fa, fb) = corner(sk, p, cmd)?;
         let (pc, pa, pb) = (sk.point(c).unwrap_or_default(), sk.point(fa).unwrap_or_default(), sk.point(fb).unwrap_or_default());
         let (u, v) = ((pa - pc).normalized().unwrap_or(Vec2::X), (pb - pc).normalized().unwrap_or(Vec2::Y));
-        let corner_angle = u.cross(v).atan2(u.dot(v)).abs();
+        let corner_angle = pmath::atan2(u.cross(v), u.dot(v)).abs();
         let (da, db) = dists(corner_angle)?;
         let (ta, tb, _, kept) = cut_corner(sk, la, lb, c, fa, fb, da, db, cmd)?;
         let l = sk.add_line_pts(ta, tb, None)?;
@@ -1178,7 +1179,7 @@ fn chamfer_dist_angle(s: &mut Session, p: &Value) -> Result<Value> {
         if !(a > 1e-6 && opp > 1e-6) {
             return Err(bad(cmd, "that angle does not meet the other line"));
         }
-        Ok((d, d * a.sin() / opp.sin()))
+        Ok((d, d * pmath::sin(a) / pmath::sin(opp)))
     })
 }
 
@@ -2000,7 +2001,7 @@ fn point_or_ref(sk: &Sketch, p: &Value, k: &str, cmd: &str) -> Result<Vec2> {
 fn rotate(c: Vec2, ang: f64) -> impl Fn(Vec2) -> Vec2 {
     move |q: Vec2| {
         let d = q - c;
-        let (s, co) = ang.sin_cos();
+        let (s, co) = pmath::sin_cos(ang);
         c + Vec2::new(d.x * co - d.y * s, d.x * s + d.y * co)
     }
 }

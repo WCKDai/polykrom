@@ -3,6 +3,7 @@
 //! when the part changes (also after the design is saved and reopened), and a bad reference is
 //! refused with an error.
 
+use polycore_geom::pmath;
 use std::f64::consts::PI;
 
 use polycore_geom::Vec3;
@@ -29,7 +30,7 @@ fn bore_at(s: &Session, x: f64, y: f64, top: f64) {
     let at = Vec3::new(x, y, top - 2.0);
     for k in 0..8 {
         let a = PI / 4.0 * f64::from(k);
-        let p = |r: f64| at + Vec3::new(a.cos(), a.sin(), 0.0) * r;
+        let p = |r: f64| at + Vec3::new(pmath::cos(a), pmath::sin(a), 0.0) * r;
         assert!(!solid_at(s, p(0.0)) && !solid_at(s, p(2.0)), "the bore about ({x}, {y}) is empty {a} rad from +x");
         assert!(solid_at(s, p(3.0)), "the wall about ({x}, {y}) is solid {a} rad from +x");
     }

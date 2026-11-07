@@ -7,6 +7,7 @@
 //! (`2` for an inch parameter is 2 in). Trigonometric functions take an angle; a unit-less
 //! argument is read as degrees.
 
+use polycore_geom::pmath;
 use std::collections::BTreeMap;
 
 use crate::DocError;
@@ -779,7 +780,7 @@ fn pow(base: Value, e: Value) -> Result<Value, DocError> {
     if !base.unitless() && k == 0 {
         return Err(DocError::Expr("a value with units needs a small whole-number exponent".into()));
     }
-    Ok(Value { v: base.v.powf(n), len: dims(0, base.len.saturating_mul(k), false)?, ang: dims(0, base.ang.saturating_mul(k), false)? })
+    Ok(Value { v: pmath::powf(base.v, n), len: dims(0, base.len.saturating_mul(k), false)?, ang: dims(0, base.ang.saturating_mul(k), false)? })
 }
 
 fn call(f: &str, args: &[Value], d: Defaults) -> Result<Value, DocError> {
@@ -809,24 +810,24 @@ fn call(f: &str, args: &[Value], d: Defaults) -> Result<Value, DocError> {
     };
     let unit_fn = |x: f64, a: Value| Value { v: x, ..a };
     Ok(match f {
-        "sin" => Value::num(rad(one()?)?.sin()),
-        "cos" => Value::num(rad(one()?)?.cos()),
-        "tan" => Value::num(rad(one()?)?.tan()),
+        "sin" => Value::num(pmath::sin(rad(one()?)?)),
+        "cos" => Value::num(pmath::cos(rad(one()?)?)),
+        "tan" => Value::num(pmath::tan(rad(one()?)?)),
         "asin" | "acos" => {
             let x = num(one()?)?;
             if !(-1.0..=1.0).contains(&x) {
                 return Err(DocError::Expr(format!("`{f}` needs a number between -1 and 1")));
             }
-            Value::angle(if f == "asin" { x.asin() } else { x.acos() })
+            Value::angle(if f == "asin" { pmath::asin(x) } else { pmath::acos(x) })
         }
-        "atan" => Value::angle(num(one()?)?.atan()),
+        "atan" => Value::angle(pmath::atan(num(one()?)?)),
         "atan2" => {
             let (y, x) = two()?;
             let (y, x) = same(y, x)?;
             if y.len != x.len || y.ang != x.ang {
                 return Err(DocError::Expr("`atan2` needs two values with the same units".into()));
             }
-            Value::angle(y.v.atan2(x.v))
+            Value::angle(pmath::atan2(y.v, x.v))
         }
         "sqrt" => {
             let a = one()?;
@@ -856,13 +857,13 @@ fn call(f: &str, args: &[Value], d: Defaults) -> Result<Value, DocError> {
             };
             unit_fn(r * if scale != 0.0 { scale } else { 1.0 }, a)
         }
-        "exp" => Value::num(num(one()?)?.exp()),
+        "exp" => Value::num(pmath::exp(num(one()?)?)),
         "ln" | "log" | "log10" => {
             let x = num(one()?)?;
             if x <= 0.0 {
                 return Err(DocError::Expr(format!("`{f}` needs a positive number")));
             }
-            Value::num(if f == "ln" { x.ln() } else { x.log10() })
+            Value::num(if f == "ln" { pmath::ln(x) } else { pmath::log10(x) })
         }
         "hypot" => {
             let (a, b) = two()?;
@@ -870,7 +871,7 @@ fn call(f: &str, args: &[Value], d: Defaults) -> Result<Value, DocError> {
             if a.len != b.len || a.ang != b.ang {
                 return Err(DocError::Expr("`hypot` needs two values with the same units".into()));
             }
-            unit_fn(a.v.hypot(b.v), a)
+            unit_fn(pmath::hypot(a.v, b.v), a)
         }
         "pow" => {
             let (a, b) = two()?;

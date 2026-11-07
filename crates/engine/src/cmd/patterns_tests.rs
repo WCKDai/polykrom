@@ -1,3 +1,4 @@
+use polycore_geom::pmath;
 use std::f64::consts::PI;
 
 use serde_json::{Value, json};
@@ -158,9 +159,9 @@ fn feature_circular_center_flip_uses_partial_arc_endpoints_and_full_circle_spaci
             let st = s.world_state();
             for slot in [0.0, 1.0, -1.0, 2.0, -2.0, 3.0] {
                 let a = (step * slot * if flipped { -1.0 } else { 1.0 }).to_radians();
-                let p = Vec3::new(40.0 + 20.0 * a.cos(), 60.0 + 20.0 * a.sin(), 2.5);
+                let p = Vec3::new(40.0 + 20.0 * pmath::cos(a), 60.0 + 20.0 * pmath::sin(a), 2.5);
                 assert!(!st.bodies[0].body.contains(p), "hole at {p:?}");
-                assert!(st.bodies[0].body.contains(p + Vec3::new(2.0 * a.cos(), 2.0 * a.sin(), 0.0)));
+                assert!(st.bodies[0].body.contains(p + Vec3::new(2.0 * pmath::cos(a), 2.0 * pmath::sin(a), 0.0)));
             }
             assert!(rel(volume(&mut s), 120.0 * 120.0 * 5.0 - 6.0 * PI * 5.0) < 1e-5);
             let saved = s.doc.to_json();

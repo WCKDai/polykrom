@@ -6,6 +6,7 @@
 //! vertex the names of the edges that meet there, so they follow the model when earlier features
 //! change; the picked point is the fallback.
 
+use polycore_geom::pmath;
 use std::collections::BTreeMap;
 
 use polycore::{self as kernel, FaceSurface};
@@ -417,8 +418,8 @@ fn surface_normal(s: FaceSurface, p: Vec3) -> Option<(Vec3, Vec3)> {
             let w = p - apex;
             let radial = (w - axis * w.dot(axis)).normalized()?;
             // The generator through p's side, and the normal square to it in the axial plane.
-            let line = axis * half_angle.cos() + radial * half_angle.sin();
-            let n = (radial * half_angle.cos() - axis * half_angle.sin()).normalized()?;
+            let line = axis * pmath::cos(half_angle) + radial * pmath::sin(half_angle);
+            let n = (radial * pmath::cos(half_angle) - axis * pmath::sin(half_angle)).normalized()?;
             Some((apex + line * w.dot(line), n))
         }
         FaceSurface::Torus { center, axis, major, minor } => {

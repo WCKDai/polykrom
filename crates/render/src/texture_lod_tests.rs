@@ -1,4 +1,5 @@
 use super::*;
+use polycore_geom::pmath;
 
 fn close(a: f64, b: f64) {
     assert!((a - b).abs() <= 1e-12 * b.abs().max(1.0), "{a} != {b}");
@@ -48,7 +49,7 @@ fn shear_uses_singular_value_rather_than_smaller_max_column_norm() {
 #[test]
 fn rotation_sign_and_screen_axis_swap_preserve_the_footprint() {
     let angle = 0.37_f64;
-    let (s, c) = angle.sin_cos();
+    let (s, c) = pmath::sin_cos(angle);
     // Rotated texel-space axes with singular values4 and2, rectangular base.
     let x = [4. * c / 512., 4. * s / 128.];
     let y = [-2. * s / 512., 2. * c / 128.];

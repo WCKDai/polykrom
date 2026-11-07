@@ -6,6 +6,7 @@
 //! supported yet: a curved seam where the edge chain turns"); now the contact is held on the curved
 //! seam itself.
 
+use polycore_geom::pmath;
 use std::f64::consts::PI;
 
 use polycore_geom::Vec3;
@@ -25,7 +26,7 @@ fn bent_tube(s: &mut Session) {
     for i in 0..5 {
         let t = TURN * i as f64 / 4.0;
         let name = format!("S{i}");
-        let plane = json!({"origin": [BEND * t.sin(), BEND * (1.0 - t.cos()), 0], "x_dir": [0, 0, 1], "y_dir": [t.sin(), -t.cos(), 0]});
+        let plane = json!({"origin": [BEND * pmath::sin(t), BEND * (1.0 - pmath::cos(t)), 0], "x_dir": [0, 0, 1], "y_dir": [pmath::sin(t), -pmath::cos(t), 0]});
         run(s, "sketch.create", json!({"plane": plane, "name": name}));
         run(s, "sketch.circle.center", json!({"center": [0, 0], "radius": TUBE}));
         run(s, "sketch.finish", json!({}));
@@ -38,12 +39,12 @@ fn bent_tube(s: &mut Session) {
 /// which are in that plane's perpendicular, the seams' ends).
 fn start_circle() -> Value {
     let a = PI / 4.0;
-    json!([[0.0, -TUBE * a.cos(), TUBE * a.sin()]])
+    json!([[0.0, -TUBE * pmath::cos(a), TUBE * pmath::sin(a)]])
 }
 
 /// The tube's distance from the axis to a point: how far it is from the core circle of the bend.
 fn core(p: Vec3) -> f64 {
-    ((p.x.hypot(p.y - BEND) - BEND).hypot(p.z)).abs()
+    (pmath::hypot(pmath::hypot(p.x, p.y - BEND) - BEND, p.z)).abs()
 }
 
 /// What a ball of radius `round` rolling along the start circle makes: it touches the end plane
@@ -56,8 +57,8 @@ fn off_the_ball(s: &Session, round: f64) -> (usize, f64) {
     let centres: Vec<Vec3> = (0..720)
         .map(|i| {
             let a = 2.0 * PI * i as f64 / 720.0;
-            let rho = BEND + (TUBE - round) * a.cos();
-            Vec3::new(round, BEND - (rho * rho - round * round).sqrt(), (TUBE - round) * a.sin())
+            let rho = BEND + (TUBE - round) * pmath::cos(a);
+            Vec3::new(round, BEND - (rho * rho - round * round).sqrt(), (TUBE - round) * pmath::sin(a))
         })
         .collect();
     let (mut count, mut worst) = (0, 0.0_f64);

@@ -1,6 +1,7 @@
 //! What the application draws of a large sheet with small bends and holes, and that what
 //! reads the same mesh (bounds, picks, inside tests) answers as before.
 
+use polycore_geom::pmath;
 use std::f64::consts::{FRAC_PI_2, TAU};
 
 use polycore::{DISPLAY_ANGLE, FaceSurface, face_surface};
@@ -49,7 +50,7 @@ fn steps_around(m: &Mesh, face: usize, origin: Vec3, axis: Vec3) -> (usize, f64)
         .filter(|(_, f)| **f as usize == face)
         .flat_map(|(t, _)| t.iter())
         .map(|k| m.positions[*k as usize] - origin)
-        .map(|d| d.dot(v).atan2(d.dot(u)))
+        .map(|d| pmath::atan2(d.dot(v), d.dot(u)))
         .collect();
     a.sort_by(f64::total_cmp);
     a.dedup_by(|x, y| (*x - *y).abs() < 1e-7);
@@ -88,18 +89,22 @@ fn a_large_sheet_shows_its_small_bends_and_holes_round() {
     // The edges the viewport draws: every hole's rim is round, on both sides of the sheet.
     for [x, y] in HOLES {
         for z in [0.0, 2.0] {
-            let on = |p: &Vec3| (p.z - z).abs() < 1e-6 && ((p.x - x).hypot(p.y - y) - 2.0).abs() < 1e-6;
+            let on = |p: &Vec3| (p.z - z).abs() < 1e-6 && (pmath::hypot(p.x - x, p.y - y) - 2.0).abs() < 1e-6;
             let rim: Vec<&Vec<Vec3>> = m.edges.iter().filter(|e| e.iter().all(on)).collect();
             let segments: usize = rim.iter().map(|e| e.len() - 1).sum();
             assert!(segments >= (TAU / DISPLAY_ANGLE).ceil() as usize, "{segments} segments around the rim at {x}, {y}, {z}");
-            let widest = rim.iter().flat_map(|e| e.windows(2)).map(|w| 2.0 * (w[0].dist(w[1]) / 4.0).asin()).fold(0.0, f64::max);
+            let widest = rim.iter().flat_map(|e| e.windows(2)).map(|w| 2.0 * pmath::asin(w[0].dist(w[1]) / 4.0)).fold(0.0, f64::max);
             assert!(widest <= DISPLAY_ANGLE * 1.001, "a rim segment spans {} degrees", widest.to_degrees());
         }
     }
     // And the scene the renderers take draws those same polylines.
     let scene = crate::view::scene(&s, &crate::view::home_camera(&s));
-    let drawn: usize =
-        scene.lines.iter().filter(|l| l.points.iter().all(|p| ((p.x - 30.0).hypot(p.y - 20.0) - 2.0).abs() < 1e-6)).map(|l| l.points.len() - 1).sum();
+    let drawn: usize = scene
+        .lines
+        .iter()
+        .filter(|l| l.points.iter().all(|p| (pmath::hypot(p.x - 30.0, p.y - 20.0) - 2.0).abs() < 1e-6))
+        .map(|l| l.points.len() - 1)
+        .sum();
     assert!(drawn >= 2 * (TAU / DISPLAY_ANGLE).ceil() as usize, "{drawn} rim segments in the scene");
 }
 

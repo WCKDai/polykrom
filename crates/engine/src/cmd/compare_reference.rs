@@ -6,6 +6,7 @@
 //! scales and places the reference on the design first: uniform scale and translation, by
 //! bounding box or by principal axes.
 
+use polycore_geom::pmath;
 use std::collections::{BTreeMap, VecDeque};
 
 use polycore_geom::Vec3;
@@ -498,8 +499,8 @@ fn principal(m: [[f64; 3]; 3]) -> [(f64, Vec3); 3] {
         if big < 1e-12 {
             break;
         }
-        let theta = 0.5 * (2.0 * a[p][q]).atan2(a[q][q] - a[p][p]);
-        let (sn, cs) = theta.sin_cos();
+        let theta = 0.5 * pmath::atan2(2.0 * a[p][q], a[q][q] - a[p][p]);
+        let (sn, cs) = pmath::sin_cos(theta);
         for row in &mut a {
             let (akp, akq) = (row[p], row[q]);
             row[p] = cs * akp - sn * akq;
@@ -551,7 +552,7 @@ fn fit(s: &mut Session, p: &Value) -> Result<Value> {
                 .iter()
                 .map(|(_, d)| {
                     let (_, r) = ra.iter().max_by(|x, y| x.1.dot(*d).abs().total_cmp(&y.1.dot(*d).abs())).copied().unwrap_or((0.0, *d));
-                    let angle = r.dot(*d).abs().clamp(-1.0, 1.0).acos().to_degrees();
+                    let angle = pmath::acos(r.dot(*d).abs().clamp(-1.0, 1.0)).to_degrees();
                     json!({"design": [round(d.x), round(d.y), round(d.z)], "reference": [round(r.x), round(r.y), round(r.z)], "angle_deg": round(angle)})
                 })
                 .collect::<Vec<_>>());
@@ -576,7 +577,7 @@ fn fit(s: &mut Session, p: &Value) -> Result<Value> {
         Vec3::new(t.x.abs(), t.y.abs(), t.z.abs())
     };
     let ratios = |e: Vec3| [(ds.x, e.x), (ds.y, e.y), (ds.z, e.z)].map(|(d, r)| if r > 0.0 { d / (r * scale) } else { 0.0 });
-    let badness = |axis: usize| ratios(extents(axis)).iter().filter(|r| **r > 0.0).map(|r| r.ln().abs()).sum::<f64>();
+    let badness = |axis: usize| ratios(extents(axis)).iter().filter(|r| **r > 0.0).map(|r| pmath::ln(*r).abs()).sum::<f64>();
     let best = (0..4).min_by(|a, b| badness(*a).total_cmp(&badness(*b))).unwrap_or(0);
     let turn = (best != 0 && badness(best) + 0.2 < badness(0)).then_some(best);
     let origin = turn.map_or(origin, |t| turned(t, origin));

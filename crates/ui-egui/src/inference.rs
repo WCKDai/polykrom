@@ -4,6 +4,7 @@
 //! the centre of a circle or arc). A dashed guide and a label show it; placing the point adds
 //! the matching constraint.
 
+use polykrom_engine::geom::pmath;
 use std::cell::RefCell;
 
 use egui::{Shape, Stroke};
@@ -91,7 +92,7 @@ pub fn tangent(sk: &Sketch, prev: Vec2, lp: Vec2, tol: f64) -> Option<Inference>
         }
         // The two tangent points seen from `prev`.
         let base = (prev - o).angle();
-        let half = (r / d).acos();
+        let half = pmath::acos(r / d);
         for s in [-1.0, 1.0] {
             let t = o + Vec2::from_angle(base + s * half) * r;
             let on_arc = sk.shape(i).is_none_or(|sh| sh.dist(t) < 1e-6);
@@ -285,7 +286,7 @@ mod tests {
         let s = sk();
         let prev = Vec2::new(30.0, 20.0);
         // Tangent points from (30, 20) to the circle at (30, 0) r 5.
-        let half = (5.0f64 / 20.0).acos();
+        let half = pmath::acos(5.0f64 / 20.0);
         let t = Vec2::new(30.0, 0.0) + Vec2::from_angle(std::f64::consts::FRAC_PI_2 + half) * 5.0;
         let i = tangent(&s, prev, t + Vec2::new(0.2, 0.1), 0.5).expect("tangent");
         assert_eq!(i.kind, Kind::Tangent);

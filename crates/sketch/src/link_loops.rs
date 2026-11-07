@@ -2,6 +2,7 @@
 //! Endpoint walks exclude support centres. Crossings/touches refuse before nesting.
 use super::{LCurve, curve_points};
 use crate::{Shape, intersections};
+use polycore_geom::pmath;
 use polycore_geom::{Aabb2, Vec2};
 use std::f64::consts::TAU;
 
@@ -116,11 +117,11 @@ fn contains(boundary: &Boundary, p: Vec2, tol: f64) -> Option<bool> {
                     return None;
                 }
                 if y.abs() < 1.0 {
-                    let angle = y.asin();
+                    let angle = pmath::asin(y);
                     for theta in [angle, std::f64::consts::PI - angle] {
                         let off = (theta - start).rem_euclid(TAU);
                         if off < sweep {
-                            let x = c.x + r * theta.cos();
+                            let x = c.x + r * pmath::cos(theta);
                             if (x - p.x).abs() <= tol {
                                 return None;
                             }

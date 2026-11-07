@@ -1,4 +1,5 @@
 use polycore::Continuity;
+use polycore_geom::pmath;
 use polycore_geom::{Plane, Vec2, Vec3};
 use polykrom_sketch::Sketch;
 use serde::{Deserialize, Serialize};
@@ -3552,7 +3553,7 @@ impl Document {
                 let b = self.resolve_plane_in(vals, base, depth + 1, st)?;
                 let a = Self::eval_in(vals, angle, Kind::Angle)?;
                 let d = axis_dir.normalized().ok_or_else(|| DocError::Invalid("rotation axis".into()))?;
-                let rot = |v: Vec3| v * a.cos() + d.cross(v) * a.sin() + d * (d.dot(v) * (1.0 - a.cos()));
+                let rot = |v: Vec3| v * pmath::cos(a) + d.cross(v) * pmath::sin(a) + d * (d.dot(v) * (1.0 - pmath::cos(a)));
                 let o = *axis_origin + rot(b.origin - *axis_origin);
                 Plane::new(o, rot(b.x), rot(b.y)).ok_or_else(|| DocError::Invalid("degenerate plane".into()))
             }

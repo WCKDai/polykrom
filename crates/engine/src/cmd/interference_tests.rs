@@ -1,5 +1,6 @@
 //! `inspect.interference`: the mesh pre-filter, the bodies it must not clear, and the budget.
 
+use polycore_geom::pmath;
 use serde_json::{Value, json};
 
 use crate::Session;
@@ -40,7 +41,7 @@ fn separated_curved_bodies_are_cleared_without_a_boolean() {
     assert_eq!(i["pairs_intersected"], 1, "{i}");
     // The lens of two r5 circles 7 apart, 10 high.
     let (r, d): (f64, f64) = (5.0, 7.0);
-    let lens = 2.0 * r * r * (d / (2.0 * r)).acos() - d / 2.0 * (4.0 * r * r - d * d).sqrt();
+    let lens = 2.0 * r * r * pmath::acos(d / (2.0 * r)) - d / 2.0 * (4.0 * r * r - d * d).sqrt();
     let got = f(&i["interferences"][0]["volume_mm3"]);
     assert!((got - 10.0 * lens).abs() < 1e-3 * 10.0 * lens, "{got} against {}: {i}", 10.0 * lens);
 }

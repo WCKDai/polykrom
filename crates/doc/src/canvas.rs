@@ -1,6 +1,7 @@
 //! Canvases: reference images placed on a plane (Insert Canvas), kept in the design.
 //! The image bytes travel inside the design file (base64), so it reopens without the original.
 
+use polycore_geom::pmath;
 use polycore_geom::{Plane, Vec2, Vec3};
 use serde::{Deserialize, Serialize};
 
@@ -60,7 +61,7 @@ impl Canvas {
     /// top-left of the image.
     pub fn corners(&self) -> [Vec2; 4] {
         let (hw, hh) = (self.width / 2.0, self.height() / 2.0);
-        let (s, c) = self.angle.sin_cos();
+        let (s, c) = pmath::sin_cos(self.angle);
         let rot = |x: f64, y: f64| self.center + Vec2::new(x * c - y * s, x * s + y * c);
         let f = if self.flip { -1.0 } else { 1.0 };
         [rot(-hw * f, -hh), rot(hw * f, -hh), rot(hw * f, hh), rot(-hw * f, hh)]

@@ -2,6 +2,7 @@
 //! text that follows a curve of its sketch.
 
 use polycore_geom::Vec2;
+use polycore_geom::pmath;
 
 use super::*;
 use crate::{CurveKind, Sketch};
@@ -78,7 +79,7 @@ fn italic_without_an_italic_face_slants_and_bold_without_a_bold_face_is_an_error
     // The built-in font has neither: its I leans 12 degrees, its top moved right by the height times tan 12°.
     let upright = extent(&styled("I", &TextStyle::default(), None));
     let slanted = extent(&styled("I", &TextStyle { italic: true, ..TextStyle::default() }, None));
-    assert!((slanted.1.x - upright.1.x - 10.0 * 12_f64.to_radians().tan()).abs() < 1e-6, "{upright:?} {slanted:?}");
+    assert!((slanted.1.x - upright.1.x - 10.0 * pmath::tan(12_f64.to_radians())).abs() < 1e-6, "{upright:?} {slanted:?}");
     assert!((slanted.0.x - upright.0.x).abs() < 1e-9, "the baseline stays");
     let e = text_geometry_styled(None, "I", Vec2::ZERO, 10.0, 0.0, &TextStyle { bold: true, ..TextStyle::default() }, None).unwrap_err();
     assert!(e.to_string().contains("no bold face"), "{e}");
@@ -108,7 +109,7 @@ fn text_on_a_straight_path_stands_on_it_reading_left_to_right_whichever_way_it_w
 #[test]
 fn text_on_a_circle_stands_outside_it_centred_on_top_and_inside_reversed() {
     let r = 30.0;
-    let circle: Vec<Vec2> = (0..=360).map(|i| v(r * (i as f64).to_radians().cos(), r * (i as f64).to_radians().sin())).collect();
+    let circle: Vec<Vec2> = (0..=360).map(|i| v(r * pmath::cos((i as f64).to_radians()), r * pmath::sin((i as f64).to_radians()))).collect();
     let style = TextStyle { path: Some("c".into()), align: TextAlign::Center, ..TextStyle::default() };
     let outside = styled("TOP", &style, Some(&circle));
     // Every outline point is outside the circle (but for the O dipping below its baseline), and the text is about the top.
@@ -190,7 +191,7 @@ fn a_style_is_saved_only_when_it_is_not_plain_and_reads_back() {
 #[test]
 fn on_a_closed_curve_left_alignment_starts_at_the_top() {
     let r = 30.0;
-    let circle: Vec<Vec2> = (0..=360).map(|i| v(r * (i as f64).to_radians().cos(), r * (i as f64).to_radians().sin())).collect();
+    let circle: Vec<Vec2> = (0..=360).map(|i| v(r * pmath::cos((i as f64).to_radians()), r * pmath::sin((i as f64).to_radians()))).collect();
     let (lo, hi) = extent(&styled("START", &TextStyle { path: Some("c".into()), ..TextStyle::default() }, Some(&circle)));
     // It runs clockwise from the top: to the right of it, coming down.
     assert!(lo.x > -1.0 && hi.x > 10.0 && hi.y > r, "{lo:?} {hi:?}");

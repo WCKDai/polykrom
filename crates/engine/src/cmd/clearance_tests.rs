@@ -1,3 +1,4 @@
+use polycore_geom::pmath;
 use serde_json::{Value, json};
 
 use crate::Session;
@@ -390,7 +391,8 @@ fn a_pin_seated_line_to_line_in_its_bushing_is_measured() {
 /// The crescent the pin shares with the plate is reported, against the lens of two circles.
 #[test]
 fn a_pin_a_hair_off_its_hole_shares_its_crescent() {
-    let crescent = |r: f64, e: f64| std::f64::consts::PI * r * r - (2.0 * r * r * (e / (2.0 * r)).acos() - e / 2.0 * (4.0 * r * r - e * e).sqrt());
+    let crescent =
+        |r: f64, e: f64| std::f64::consts::PI * r * r - (2.0 * r * r * pmath::acos(e / (2.0 * r)) - e / 2.0 * (4.0 * r * r - e * e).sqrt());
     for offset in [5.9e-4, 1e-2] {
         let mut s = Session::default();
         run(&mut s, "solid.box", json!({"length": 20, "width": 20, "height": 5, "corner": [-10, -10, 0], "body_name": "Plate"}));
@@ -472,7 +474,7 @@ fn a_roller_pressed_into_a_large_plate_is_reported() {
     let overlaps = res["overlaps"].as_array().cloned().unwrap_or_default();
     assert_eq!(overlaps.len(), 1, "{res}");
     assert_eq!(pair(&overlaps[0]), ["Plate", "Roller"]);
-    let want = (r * r * ((r - depth) / r).acos() - (r - depth) * (r * r - (r - depth) * (r - depth)).sqrt()) * length;
+    let want = (r * r * pmath::acos((r - depth) / r) - (r - depth) * (r * r - (r - depth) * (r - depth)).sqrt()) * length;
     assert!((f(&overlaps[0]["volume_mm3"]) - want).abs() < 0.01 * want, "{want} {res}");
 }
 
@@ -569,7 +571,7 @@ fn a_pin_through_a_d_bore_of_its_size_overlaps_the_flat() {
     run(&mut s, "solid.box", json!({"length": 1, "width": 2, "height": length, "corner": [flat, -1, 0], "operation": "join", "targets": ["Tube"]}));
     run(&mut s, "solid.cylinder", json!({"radius": r, "height": length + 6.0, "base": [0, 0, -3], "operation": "new", "body_name": "Pin"}));
     let res = run(&mut s, "inspect.clearance", json!({"bodies": ["Pin"], "against": ["Tube"], "clearance": 1e-6}));
-    let want = (r * r * (flat / r).acos() - flat * (r * r - flat * flat).sqrt()) * length;
+    let want = (r * r * pmath::acos(flat / r) - flat * (r * r - flat * flat).sqrt()) * length;
     let overlaps = res["overlaps"].as_array().cloned().unwrap_or_default();
     assert!(res["near"].as_array().is_none_or(|n| n.is_empty()), "{res}");
     assert_eq!(res["unchecked"].as_array().map(Vec::len), Some(0), "{res}");

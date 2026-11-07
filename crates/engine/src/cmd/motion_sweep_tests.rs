@@ -3,6 +3,7 @@
 //! linkage solved with circle intersections and a separating-axis test of the parts' outlines.
 
 use polycore_geom::Vec3;
+use polycore_geom::pmath;
 use serde_json::{Value, json};
 
 use super::{five_bar, four_bar, joint_angle, meet, occ, part, pin, run};
@@ -43,7 +44,7 @@ fn hinge(s: &Session) -> f64 {
 #[test]
 fn a_door_swings_until_it_meets_the_block() {
     let mut s = door();
-    let corner = |x: f64, y: f64| y.atan2(x) - (4.0 / x.hypot(y)).asin();
+    let corner = |x: f64, y: f64| pmath::atan2(y, x) - pmath::asin(4.0 / pmath::hypot(x, y));
     let expected =
         [(60.0, 30.0), (80.0, 30.0), (60.0, 50.0), (80.0, 50.0)].iter().map(|(x, y)| corner(*x, *y)).fold(f64::INFINITY, f64::min).to_degrees();
     let before = s.doc.clone();
@@ -128,7 +129,7 @@ fn a_thin_part_just_inside_a_limit_is_met() {
     );
     run(&mut s, "joint.limits", json!({"joint": "Hinge", "min": -30, "max": 10}));
     // The door's face through the hinge meets the plate's far upper corner (80.5, -26).
-    let expected = (-26.0f64).atan2(80.5).to_degrees();
+    let expected = pmath::atan2(-26.0f64, 80.5).to_degrees();
     let r = run(&mut s, "joint.sweep", json!({"joint": "Hinge", "from": 0, "to": -1800}));
     let by = &r["stopped_by"];
     assert!(by.is_object() && [&by["a"], &by["b"]].contains(&&json!("Plate:1")), "the plate stops it, not the limit: {r}");
@@ -157,7 +158,7 @@ fn a_motion_too_long_to_sample_finely_takes_the_finest_step_the_budget_allows() 
         "joint.create",
         json!({"type": "revolute", "a": {"occurrence": 0, "point": [0, 0, 0]}, "b": {"occurrence": "Door", "point": [0, 0, 0]}, "flip": true, "name": "Hinge"}),
     );
-    let corner = |x: f64, y: f64| y.atan2(x) - (0.1 / x.hypot(y)).asin();
+    let corner = |x: f64, y: f64| pmath::atan2(y, x) - pmath::asin(0.1 / pmath::hypot(x, y));
     let expected =
         [(500.0, 60.0), (520.0, 60.0), (500.0, 80.0), (520.0, 80.0)].iter().map(|(x, y)| corner(*x, *y)).fold(f64::INFINITY, f64::min).to_degrees();
     let r = run(&mut s, "joint.sweep", json!({"joint": "Hinge", "from": 0, "to": 90}));
@@ -194,7 +195,7 @@ fn a_sweep_refuses_what_it_cannot_do() {
 
 /// A point turned about `c` by `a` radians in the XY plane.
 fn turn(p: Vec3, c: Vec3, a: f64) -> Vec3 {
-    let (sin, cos) = a.sin_cos();
+    let (sin, cos) = pmath::sin_cos(a);
     let d = p - c;
     Vec3::new(c.x + d.x * cos - d.y * sin, c.y + d.x * sin + d.y * cos, p.z)
 }
@@ -247,7 +248,7 @@ fn four_bar_at(v: f64, q0: Vec3) -> (Vec3, Vec3) {
     let (mut p, mut q) = (Vec3::new(0.0, 20.0, 0.0), q0);
     for k in 1..=n {
         let th = (90.0 + v * k as f64 / n as f64).to_radians();
-        p = Vec3::new(20.0 * th.cos(), 20.0 * th.sin(), 0.0);
+        p = Vec3::new(20.0 * pmath::cos(th), 20.0 * pmath::sin(th), 0.0);
         let [m1, m2] = meet(p, 50.0, O4, 40.0);
         q = if m1.dist(q) <= m2.dist(q) { m1 } else { m2 };
     }
@@ -255,7 +256,7 @@ fn four_bar_at(v: f64, q0: Vec3) -> (Vec3, Vec3) {
 }
 
 fn angle(d: Vec3) -> f64 {
-    d.y.atan2(d.x)
+    pmath::atan2(d.y, d.x)
 }
 
 /// The four-bar's rocker swings into a stop: the crank stops where the rocker's box first
@@ -283,7 +284,7 @@ fn a_four_bar_rocker_meets_a_stop() {
 #[test]
 fn a_four_bar_sweep_stops_where_its_loop_cannot_close() {
     let (mut s, _, q0) = four_bar();
-    let limit = ((900.0f64 - 3625.0) / 3600.0).acos().to_degrees() - q0.y.atan2(q0.x - 45.0).to_degrees();
+    let limit = pmath::acos((900.0f64 - 3625.0) / 3600.0).to_degrees() - pmath::atan2(q0.y, q0.x - 45.0).to_degrees();
     let r = run(&mut s, "joint.sweep", json!({"joint": "Rocker", "from": 0, "to": 100, "occurrences": ["Rocker"], "against": ["Ground"]}));
     assert_eq!(r["stopped_by"].as_str(), Some("loop"), "{r}");
     let at = num(&r["stopped_at"]);

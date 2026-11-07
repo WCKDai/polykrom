@@ -1,3 +1,4 @@
+use polycore_geom::pmath;
 use serde_json::{Value, json};
 
 use crate::{EngineError, Session};
@@ -134,7 +135,7 @@ fn unit_errors_and_cycles_are_refused() {
     assert_eq!(s.doc.param("tilt").map(|p| p.unit.as_str()), Some("deg"));
     assert_eq!(s.doc.param("n").map(|p| p.unit.as_str()), Some(""));
     let r = run(&mut s, "expr.evaluate", json!({"expression": "atan2(b; a) + tilt", "kind": "angle"}));
-    assert!((r["display_value"].as_f64().unwrap_or(0.0) - (2.0f64.atan().to_degrees() + 30.0)).abs() < 1e-9, "{r}");
+    assert!((r["display_value"].as_f64().unwrap_or(0.0) - (pmath::atan(2.0f64).to_degrees() + 30.0)).abs() < 1e-9, "{r}");
     let r = run(&mut s, "expr.evaluate", json!({"expression": "a + tilt"}));
     assert_eq!(r["ok"], false);
     assert!(r["error"].as_str().unwrap_or("").contains("cannot add"), "{r}");

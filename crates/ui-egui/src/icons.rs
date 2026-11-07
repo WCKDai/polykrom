@@ -164,14 +164,19 @@ fn supplied_look(look: Look, finish: Finish) -> Look {
 
 // The drawn brand mark (`brand_mark`) is superseded in the application bar by the design kit's
 // supplied logo; the glyph source stays complete for the asset tooling that shares it.
+// The icon sources draw icon pixels only, so they keep the platform's transcendental functions
+// (UI only; listed with the reason in crates/engine/tests/pmath_gate.rs).
 #[path = "../../../assets/icons/ui/source/glyphs.rs"]
-#[allow(dead_code)]
+#[allow(dead_code, clippy::disallowed_methods)]
 pub(crate) mod glyphs;
 #[path = "../../../assets/icons/ui/source/markers.rs"]
+#[allow(clippy::disallowed_methods)]
 pub(crate) mod markers;
 #[path = "../../../assets/icons/ui/source/navigation.rs"]
+#[allow(clippy::disallowed_methods)]
 pub(crate) mod navigation;
 #[path = "../../../assets/icons/ui/source/pointer.rs"]
+#[allow(clippy::disallowed_methods)]
 pub(crate) mod pointer;
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]

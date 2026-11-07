@@ -1,6 +1,7 @@
 use super::{Tool, polygon_outline, preview_curve};
 use crate::scenario::Harness;
 use crate::viewport::Proj;
+use polykrom_engine::geom::pmath;
 use polykrom_engine::geom::{Plane, Vec2, Vec3};
 use polykrom_engine::render::{Camera, Mat4};
 use polykrom_engine::sketch::Sketch;
@@ -132,7 +133,7 @@ fn pixel_preview_fully_offscreen_circle_is_clipped_without_false_connections() {
     let curve = preview_curve(&tool("sketch.circle.center", &[[0., 0.]]), Vec2::X, None, None, None).unwrap();
     let proj = projection(1000.0);
     // The viewport half diagonal is about 832px: a 1000px circle never enters it.
-    assert!((proj.rect.width() * 0.5).hypot(proj.rect.height() * 0.5) < 1000.0);
+    assert!((pmath::hypot(f64::from(proj.rect.width() * 0.5), f64::from(proj.rect.height() * 0.5)) as f32) < 1000.0);
     assert!(crate::sketch_display::curve_parts(&curve, 0, &Plane::XY, &proj, 1.0).is_empty());
 }
 

@@ -1,3 +1,4 @@
+use polycore_geom::pmath;
 use serde_json::{Value, json};
 
 use crate::Session;
@@ -355,7 +356,7 @@ fn cylinder_emboss_persists_selection_and_replays_radial_depth() {
     let body = &state.body("Sleeve").unwrap().body;
     assert_eq!(body.shell_count(), 1);
     let mesh = body.tessellate_with(0.001, true).unwrap();
-    assert!(mesh.contains(Vec3::new(-10.5 * 0.15_f64.sin(), 10.5 * 0.15_f64.cos(), 7.5)));
+    assert!(mesh.contains(Vec3::new(-10.5 * pmath::sin(0.15_f64), 10.5 * pmath::cos(0.15_f64), 7.5)));
     let feature = s.doc.find_feature("Raised Badge").unwrap();
     assert!(
         matches!(&feature.kind,polykrom_doc::FeatureKind::Emboss{face:Some(face),..} if face.body=="Sleeve"&&face.at.dist(Vec3::new(0.,10.,7.5))<1e-10)
@@ -784,7 +785,7 @@ fn cylinder_auto_inference_saves_a_profile_anchor_and_replays_both_depth_signs()
         assert_eq!(targets, &["Sleeve"]);
         assert_eq!(face.body, "Sleeve");
         assert!(face.at.z > 0. && face.at.z < 20.);
-        assert!((face.at.x.hypot(face.at.y) - 10.).abs() < 1e-10);
+        assert!((pmath::hypot(face.at.x, face.at.y) - 10.).abs() < 1e-10);
         assert!(!feature.face_names.first().unwrap().is_empty());
         let expected = if mode == "emboss" { 21. } else { -19. };
         assert!((exact_cylinder_volume(&s) - before - expected).abs() < 0.02);
@@ -855,7 +856,10 @@ fn cylinder_auto_inference_retains_selected_holes_and_nested_islands() {
         for (s, raised) in [(0., true), (0.75, false), (1.5, true)] {
             let theta = s / 10.0_f64;
             let radius = if mode == "emboss" { 10.5 } else { 9.5 };
-            assert_eq!(mesh.contains(Vec3::new(-radius * theta.sin(), radius * theta.cos(), 7.5)), if mode == "emboss" { raised } else { !raised });
+            assert_eq!(
+                mesh.contains(Vec3::new(-radius * pmath::sin(theta), radius * pmath::cos(theta), 7.5)),
+                if mode == "emboss" { raised } else { !raised }
+            );
         }
     }
 }
@@ -1061,7 +1065,7 @@ fn a_tapered_foot_under_a_part_joins_as_drawn() {
     // (round, the foot's half width: the whole face, or just inside its edge)
     for (round, half) in [(false, 15.0), (true, 15.0), (false, 14.9)] {
         for taper in [-20.0f64, 20.0] {
-            let t = taper.to_radians().tan();
+            let t = pmath::tan(taper.to_radians());
             let mut s = Session::default();
             run(&mut s, "sketch.create", json!({"plane":"XY"}));
             if round {
@@ -1097,7 +1101,7 @@ fn a_tapered_foot_under_a_part_joins_as_drawn() {
             let state = s.model.state();
             let mesh = state.body("B").unwrap().mesh();
             // Beside the part, above the foot's start: nothing.
-            let out = |x: f64, y: f64| if round { x.hypot(y) } else { x.abs().max(y.abs()) } > 15.0 + 1e-6;
+            let out = |x: f64, y: f64| if round { pmath::hypot(x, y) } else { x.abs().max(y.abs()) } > 15.0 + 1e-6;
             let beside = mesh.positions.iter().filter(|p| p.z > 1e-6 && out(p.x, p.y)).count();
             assert_eq!(beside, 0, "round {round}, half {half}, taper {taper}: {:?}", mesh.bounds());
         }
@@ -1129,12 +1133,12 @@ fn a_drafted_extrude_starts_at_an_offset() {
     let frustum = |t: f64| w * d * h + (w + d) * t * h * h + 4.0 / 3.0 * t * t * h * h * h;
     // The two caps plus four trapezoid walls, each (base + top)/2 by the slant height h/cos a.
     let area_of = |a: f64| {
-        let t = a.tan();
-        w * d + (w + 2.0 * h * t) * (d + 2.0 * h * t) + 2.0 * h / a.cos() * ((w + h * t) + (d + h * t))
+        let t = pmath::tan(a);
+        w * d + (w + 2.0 * h * t) * (d + 2.0 * h * t) + 2.0 * h / pmath::cos(a) * ((w + h * t) + (d + h * t))
     };
 
     // Control: the taper alone, from the sketch plane.
-    let want = frustum(6f64.to_radians().tan());
+    let want = frustum(pmath::tan(6f64.to_radians()));
     let mut s = part(json!({"distance":h,"taper":"6 deg","body_name":"B"}));
     let v = volume(&mut s);
     assert!(rel(v, want) < 1e-9, "taper alone: {v} mm3 for {want}");
@@ -1151,7 +1155,7 @@ fn a_drafted_extrude_starts_at_an_offset() {
     // normal and drafted either outward or inward.
     for deg in [6.0f64, -6.0] {
         for (dir, sign) in [("positive", 1.0f64), ("negative", -1.0)] {
-            let (ang, t) = (deg.to_radians(), deg.to_radians().tan());
+            let (ang, t) = (deg.to_radians(), pmath::tan(deg.to_radians()));
             let (v_want, a_want) = (frustum(t), area_of(ang));
             let at = format!("{deg} deg {dir}");
             let mut s = part(json!({"distance":h,"direction":dir,"start_offset":off,"taper":format!("{deg} deg"),"body_name":"B"}));
@@ -1186,7 +1190,12 @@ fn a_drafted_extrude_starts_at_an_offset() {
                     }
                     Some(FaceSurface::Plane { normal, .. }) => {
                         walls += 1;
-                        assert!((normal.z + sign * ang.sin()).abs() < 1e-9, "{at}: a wall leaning {}, not {}", normal.z, -sign * ang.sin());
+                        assert!(
+                            (normal.z + sign * pmath::sin(ang)).abs() < 1e-9,
+                            "{at}: a wall leaning {}, not {}",
+                            normal.z,
+                            -sign * pmath::sin(ang)
+                        );
                     }
                     other => panic!("{at}: face {i} is {other:?}"),
                 }
@@ -1213,7 +1222,7 @@ fn a_drafted_extrude_starts_at_an_offset() {
 fn a_drafted_offset_cut_into_a_body_with_history() {
     use polycore::{FaceSurface, face_surface, measure as measure_body};
     let (w, d, h, off) = (30.0, 20.0, 12.0, 18.0);
-    let (ang, t) = (6f64.to_radians(), 6f64.to_radians().tan());
+    let (ang, t) = (6f64.to_radians(), pmath::tan(6f64.to_radians()));
     let frustum = w * d * h + (w + d) * t * h * h + 4.0 / 3.0 * t * t * h * h * h;
     let unnamed = |b: &polycore::Body| (0..b.face_count()).filter(|i| face_surface(b, *i).is_none()).count();
 
@@ -1252,7 +1261,7 @@ fn a_drafted_offset_cut_into_a_body_with_history() {
     let (mut walls, mut floor) = (0, 0);
     for i in 0..b.face_count() {
         let Some(FaceSurface::Plane { normal, point }) = face_surface(b, i) else { continue };
-        if (normal.z - ang.sin()).abs() < 1e-9 {
+        if (normal.z - pmath::sin(ang)).abs() < 1e-9 {
             walls += 1;
         } else if normal.z > 1.0 - 1e-9 && (point.z - off).abs() < 1e-9 {
             floor += 1;
@@ -1317,7 +1326,7 @@ fn fillet_an_arc_that_runs_into_a_knife_edge_tip() {
     let [x, y] = KNIFE_ARC_MID;
     run(&mut s, "solid.fillet", json!({"edges": [[x, y, 0.0]], "radius": 2}));
     run(&mut s, "solid.fillet", json!({"edges": [[x, y, 10.0]], "radius": 2}));
-    let removed = round_along(|rho| rho * (21.0 / rho).asin());
+    let removed = round_along(|rho| rho * pmath::asin(21.0 / rho));
     let after = planned(&s);
     assert!(rel(before - after, 2.0 * removed) < 2e-3, "removed {} vs {}", before - after, 2.0 * removed);
 }
@@ -1335,11 +1344,11 @@ fn fillet_a_run_over_a_corner_rounded_with_the_same_radius() {
     let [x, y] = KNIFE_ARC_MID;
     // The corner round: about (62.17 - √(23² - 2²), -19), its arc's middle 2 from there.
     let cx = 62.166666666666664 - (23.0f64 * 23.0 - 4.0).sqrt();
-    let joint = 2.0f64.atan2((23.0f64 * 23.0 - 4.0).sqrt());
+    let joint = pmath::atan2(2.0f64, (23.0f64 * 23.0 - 4.0).sqrt());
     let theta = std::f64::consts::FRAC_PI_2 - joint;
-    let corner_mid = [cx + 2.0 * (theta / 2.0).sin(), -19.0 - 2.0 * (theta / 2.0).cos()];
+    let corner_mid = [cx + 2.0 * pmath::sin(theta / 2.0), -19.0 - 2.0 * pmath::cos(theta / 2.0)];
     run(&mut s, "solid.fillet", json!({"edges": [[x, y, 0.0], [corner_mid[0], corner_mid[1], 0.0], [20.0, -21.0, 0.0]], "radius": 2}));
-    let removed = (1.0 - std::f64::consts::FRAC_PI_4) * 4.0 * cx + theta * 8.0 / 6.0 + round_along(|rho| rho * ((21.0 / rho).asin() - joint));
+    let removed = (1.0 - std::f64::consts::FRAC_PI_4) * 4.0 * cx + theta * 8.0 / 6.0 + round_along(|rho| rho * (pmath::asin(21.0 / rho) - joint));
     let after = planned(&s);
     assert!(rel(before - after, removed) < 1e-3, "removed {} vs {removed}", before - after);
 }
@@ -1379,8 +1388,8 @@ fn fillet_the_knife_edge_at_the_tip() {
         for j in 0..((0.0 - lo) / hy).ceil() as usize {
             let (y0, y1) = (lo + j as f64 * hy, (lo + (j + 1) as f64 * hy).min(0.0));
             let y = (y0 + y1) * 0.5;
-            let a = (y - ky).atan2(x - kx);
-            if (x - kx).hypot(y - ky) > 2.0 && a >= (-21.0 - ky).atan2(cx - kx) {
+            let a = pmath::atan2(y - ky, x - kx);
+            if pmath::hypot(x - kx, y - ky) > 2.0 && a >= pmath::atan2(-21.0 - ky, cx - kx) {
                 area += (y1 - y0) * hx;
             }
         }

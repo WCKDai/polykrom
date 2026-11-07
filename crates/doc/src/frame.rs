@@ -13,6 +13,7 @@
 //! of the profile's bounding box at the origin. The outline runs counter-clockwise and holes
 //! clockwise, as [`Region2`] expects.
 
+use polycore_geom::pmath;
 use std::collections::BTreeMap;
 
 use polycore_geom::{Loop2, Region2, Seg2, Vec2, Vec3};
@@ -549,7 +550,7 @@ pub fn rounded_polygon(pts: &[Vec2], radii: &[f64]) -> Result<Loop2> {
         let (Some(d1), Some(d2)) = ((v - prev).normalized(), (next - v).normalized()) else {
             return Err(invalid("a profile polygon has two corners in one place"));
         };
-        let turn = d1.cross(d2).atan2(d1.dot(d2));
+        let turn = pmath::atan2(d1.cross(d2), d1.dot(d2));
         if r <= 0.0 || turn.abs() < 1e-12 {
             corners.push((v, v, None));
             continue;
@@ -557,7 +558,7 @@ pub fn rounded_polygon(pts: &[Vec2], radii: &[f64]) -> Result<Loop2> {
         if turn.abs() > std::f64::consts::PI - 1e-9 {
             return Err(invalid("a profile polygon turns back on itself"));
         }
-        let l = r * (turn.abs() / 2.0).tan();
+        let l = r * pmath::tan(turn.abs() / 2.0);
         let (t1, t2) = (v - d1 * l, v + d2 * l);
         let side = if turn > 0.0 { d1.perp() } else { d1.perp() * -1.0 };
         let center = t1 + side * r;
@@ -736,14 +737,14 @@ pub fn member_axes(d: Vec3, angle: f64) -> Option<(Vec3, Vec3)> {
         Some(y) => (y.cross(d), y),
         None => (Vec3::X, d.cross(Vec3::X)),
     };
-    let (c, s) = (angle.cos(), angle.sin());
+    let (c, s) = (pmath::cos(angle), pmath::sin(angle));
     Some((x * c + y * s, y * c - x * s))
 }
 
 /// `region` turned by `angle` (radians, counter-clockwise) about its `anchor` point and moved so
 /// that point lands on `at`.
 pub fn placed(region: &Region2, anchor: Vec2, at: Vec2, angle: f64) -> Region2 {
-    let (c, s) = (angle.cos(), angle.sin());
+    let (c, s) = (pmath::cos(angle), pmath::sin(angle));
     let map = |p: Vec2| {
         let q = p - anchor;
         at + Vec2::new(c * q.x - s * q.y, s * q.x + c * q.y)

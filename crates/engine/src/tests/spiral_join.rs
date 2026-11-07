@@ -1,5 +1,6 @@
 //! Two interleaved spiral walls, joined (the case a of #844: 22 mm pitch, 0.75 turn).
 
+use polycore_geom::pmath;
 use std::f64::consts::TAU;
 
 use super::*;
@@ -16,7 +17,7 @@ fn two_interleaved_spiral_walls_join_into_one_body() {
             .map(|i| {
                 let a = end * i as f64 / (points - 1) as f64;
                 let r = start + k * a;
-                [sign * r * a.cos(), sign * r * a.sin()]
+                [sign * r * pmath::cos(a), sign * r * pmath::sin(a)]
             })
             .collect()
     };

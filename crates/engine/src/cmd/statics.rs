@@ -5,6 +5,7 @@
 //! up: the grounded parts (and the root), or the feet named as `support`, each pushing up at the
 //! centre of its contact. Occurrences hang on their parent's unless a joint places them.
 
+use polycore_geom::pmath;
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
 use polycore_geom::{Vec2, Vec3};
@@ -323,7 +324,7 @@ fn driving(doc: &Document, group: &BTreeSet<u64>, a: u64, frame: &Mat) -> Option
             let place = joints::occurrence_world(doc, *o);
             let (p, d) = (apply_point(&place, point) - at, apply_vector(&place, direction).normalized()?);
             let off = (p - axis * p.dot(axis)).len();
-            (off <= AXIS_TOL_MM && d.cross(axis).len() <= AXIS_TOL_RAD.sin()).then_some((off, torque))
+            (off <= AXIS_TOL_MM && d.cross(axis).len() <= pmath::sin(AXIS_TOL_RAD)).then_some((off, torque))
         })
         .min_by(|x, y| x.0.total_cmp(&y.0))
         .map(|x| x.1)

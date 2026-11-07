@@ -6,6 +6,7 @@
 //! face are faces of the loft, which curve and lean: the faces cannot be pushed apart, and the join failed with "Union: no result".
 //! (With a 40 degree bend the retry with the tool displaced joins it; with this bend that retry fails too.)
 
+use polycore_geom::pmath;
 use std::f64::consts::PI;
 
 use super::*;
@@ -29,9 +30,9 @@ fn r9(x: f64) -> f64 {
 
 /// The plane of the section at the bend angle `a`, moved `over` along the axis (the sketch's x is up, its y across the tube).
 fn plane(a: f64, over: f64) -> Value {
-    let (tx, ty) = (a.cos(), a.sin());
+    let (tx, ty) = (pmath::cos(a), pmath::sin(a));
     json!({
-        "origin": [r9(BEND * a.sin() + over * tx), r9(BEND * (1.0 - a.cos()) + over * ty), 0],
+        "origin": [r9(BEND * pmath::sin(a) + over * tx), r9(BEND * (1.0 - pmath::cos(a)) + over * ty), 0],
         "x_dir": [0, 0, 1],
         "y_dir": [r9(ty), r9(-tx), 0],
     })
@@ -92,7 +93,8 @@ fn a_flange_flush_with_the_end_of_a_bent_tapered_tube_joins() {
     let body = &state.bodies[0].body;
     assert!(body.validity().is_empty(), "{:?}", body.validity());
     assert_eq!(body.lumps().unwrap().len(), 1);
-    let (origin, normal) = (Vec3::new(BEND * TURN.sin(), BEND * (1.0 - TURN.cos()), 0.0), Vec3::new(TURN.cos(), TURN.sin(), 0.0));
+    let (origin, normal) =
+        (Vec3::new(BEND * pmath::sin(TURN), BEND * (1.0 - pmath::cos(TURN)), 0.0), Vec3::new(pmath::cos(TURN), pmath::sin(TURN), 0.0));
     let mesh = body.tessellate(0.05).unwrap();
     let beyond = mesh.positions.iter().map(|p| (*p - origin).dot(normal)).fold(f64::MIN, f64::max);
     assert!(beyond < 1e-3, "the join reaches {beyond} mm past the end plane");

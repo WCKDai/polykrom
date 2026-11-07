@@ -5,6 +5,7 @@
 //! points of the intersection curves lie on the seam between the two halves of a loft's circle,
 //! where truck's search for their parameters (from the previous point's) failed.
 
+use polycore_geom::pmath;
 use std::f64::consts::PI;
 
 use super::*;
@@ -16,7 +17,7 @@ fn tube(s: &mut Session, body: &str, radius: f64, path: f64, angle: f64, section
     let mut stations: Vec<[f64; 4]> = (0..sections)
         .map(|i| {
             let t = angle * i as f64 / (sections - 1) as f64;
-            [path * t.cos(), path * t.sin(), -t.sin(), t.cos()]
+            [path * pmath::cos(t), path * pmath::sin(t), -pmath::sin(t), pmath::cos(t)]
         })
         .collect();
     if over > 0.0 {

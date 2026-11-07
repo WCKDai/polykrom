@@ -12,6 +12,7 @@
 //! oscillating one from its arm pointing away from the cam's axis) and stops where it first
 //! touches the profile: the follower stays in contact, as a spring would hold it.
 
+use polycore_geom::pmath;
 use std::f64::consts::TAU;
 
 use polycore_geom::{Aabb2, Aabb3, Ring, Vec2, Vec3};
@@ -101,7 +102,7 @@ pub fn lift_at(table: &[f64], x: f64) -> f64 {
 }
 
 fn rot(v: Vec2, a: f64) -> Vec2 {
-    let (s, c) = a.sin_cos();
+    let (s, c) = pmath::sin_cos(a);
     Vec2::new(v.x * c - v.y * s, v.x * s + v.y * c)
 }
 
@@ -180,7 +181,7 @@ fn touches_turning(poly: &Ring<Vec2>, pivot: Vec2, arm: f64, r: f64, start: f64,
         if len <= 0.0 || !(h / len).is_finite() || (h / len).abs() > 1.0 {
             return Vec::new();
         }
-        let (base, spread) = (w.angle(), (h / len).clamp(-1.0, 1.0).acos());
+        let (base, spread) = (w.angle(), pmath::acos((h / len).clamp(-1.0, 1.0)));
         vec![base + spread, base - spread]
     };
     for (&p, &q) in poly.edges() {
@@ -807,14 +808,14 @@ mod tests {
             let (d, at) = (rot(Vec2::X, -th), |h: f64| rot(Vec2::new(0.0, h), -th));
             for h in [0.0, 6.0, -12.0] {
                 let knife = first_contact_along(&poly, at(h), d, 0.0, false).unwrap_or(f64::NAN);
-                let want = e * th.cos() + (r * r - (h - e * th.sin()).powi(2)).sqrt();
+                let want = e * pmath::cos(th) + (r * r - (h - e * pmath::sin(th)).powi(2)).sqrt();
                 assert!((knife - want).abs() < 1e-4, "knife θ {th} h {h}: {knife} vs {want}");
                 let roller = first_contact_along(&poly, at(h), d, 5.0, false).unwrap_or(f64::NAN);
-                let want = e * th.cos() + ((r + 5.0).powi(2) - (h - e * th.sin()).powi(2)).sqrt();
+                let want = e * pmath::cos(th) + ((r + 5.0).powi(2) - (h - e * pmath::sin(th)).powi(2)).sqrt();
                 assert!((roller - want).abs() < 1e-4, "roller θ {th} h {h}: {roller} vs {want}");
             }
             let flat = first_contact_along(&poly, Vec2::ZERO, d, 0.0, true).unwrap_or(f64::NAN);
-            assert!((flat - (e * th.cos() + r)).abs() < 1e-4, "flat θ {th}: {flat}");
+            assert!((flat - (e * pmath::cos(th) + r)).abs() < 1e-4, "flat θ {th}: {flat}");
         }
         // A line past the cam misses it.
         assert_eq!(first_contact_along(&poly, Vec2::new(0.0, 50.0), Vec2::X, 0.0, false), None);
@@ -891,7 +892,7 @@ mod tests {
         let lobes: Ring<Vec2> = (0..240)
             .map(|k| {
                 let t = TAU * f64::from(k) / 240.0;
-                Vec2::from_angle(t) * (28.0 + 2.0 / 3.0 + 13.0 * (3.0 * t).cos())
+                Vec2::from_angle(t) * (28.0 + 2.0 / 3.0 + 13.0 * pmath::cos(3.0 * t))
             })
             .collect();
         let e = arm_round(&lobes, Vec2::new(35.0, 0.0), 20.0).map_err(|e| e.to_string()).err().unwrap_or_default();
@@ -904,9 +905,9 @@ mod tests {
     /// from an empty table or at a non-finite angle.
     #[test]
     fn a_table_reads_smoothly_between_its_samples() {
-        let t: Vec<f64> = (0..CAM_SAMPLES).map(|k| (TAU * k as f64 / CAM_SAMPLES as f64).cos()).collect();
+        let t: Vec<f64> = (0..CAM_SAMPLES).map(|k| pmath::cos(TAU * k as f64 / CAM_SAMPLES as f64)).collect();
         for x in [0.0, 0.0123, 1.0, 3.1, -2.5, 6.2, 40.0, -1e5] {
-            assert!((lift_at(&t, x) - x.cos()).abs() < 1e-6, "{x}: {}", lift_at(&t, x));
+            assert!((lift_at(&t, x) - pmath::cos(x)).abs() < 1e-6, "{x}: {}", lift_at(&t, x));
         }
         assert!(lift_at(&[], 1.0).is_nan() && lift_at(&t, f64::NAN).is_nan() && lift_at(&t, f64::INFINITY).is_nan());
         // A dwell up to a rise reads flat up to the rise: never below the dwell, nor past the rise.
@@ -984,7 +985,7 @@ mod tests {
         // A loop of many short edges goes round from one of them, found by their ends; past the
         // point cap it is refused, without going on round it.
         let ring = |n: usize| -> Vec<Vec<Vec3>> {
-            let at = |k: usize| Vec3::new((TAU * k as f64 / n as f64).cos(), (TAU * k as f64 / n as f64).sin(), 0.0) * 100.0;
+            let at = |k: usize| Vec3::new(pmath::cos(TAU * k as f64 / n as f64), pmath::sin(TAU * k as f64 / n as f64), 0.0) * 100.0;
             (0..n).map(|k| vec![at(k), at(k + 1)]).collect()
         };
         let small = ring(10_000);

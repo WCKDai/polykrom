@@ -3,6 +3,7 @@
 //! sketch's own geometry. Round items report their diameter and radius, and a pair with a
 //! round item measures from its centre or axis, with the closest and farthest distances too.
 
+use polycore_geom::pmath;
 use polycore_geom::{UnitVec3, Vec3};
 use serde_json::{Value, json};
 
@@ -90,7 +91,7 @@ pub(crate) fn coverage(center: Vec3, axis: UnitVec3, pts: &[Vec3]) -> f64 {
         .filter_map(|p| {
             let d = *p - center;
             let r = d - axis * d.dot(axis);
-            (r.len() > 1e-12).then(|| r.dot(y).atan2(r.dot(x)))
+            (r.len() > 1e-12).then(|| pmath::atan2(r.dot(y), r.dot(x)))
         })
         .collect();
     if angles.len() < 2 {
@@ -191,8 +192,8 @@ fn from_round(a: &Shape, b: &Shape) -> Option<Centre> {
                     let gap = (loa.max(b0) - hia.min(b1)).max(0.0);
                     let reach = (hia - b0).abs().max((b1 - loa).abs());
                     let (near, far) = rims(d, ra, rb);
-                    min = Some(near.hypot(gap));
-                    max = Some(far.hypot(reach));
+                    min = Some(pmath::hypot(near, gap));
+                    max = Some(pmath::hypot(far, reach));
                 }
             }
             Centre { distance: from.dist(to), from, to, min, max }
@@ -222,7 +223,7 @@ fn from_round(a: &Shape, b: &Shape) -> Option<Centre> {
                 let offset = to - ca;
                 let height = offset.dot(na);
                 let radial = (offset - na * height).len();
-                let min = (full_a && across && radial >= ra).then(|| (radial - ra).hypot(height));
+                let min = (full_a && across && radial >= ra).then(|| pmath::hypot(radial - ra, height));
                 Centre { distance: ca.dist(to), from: ca, to, min, max: None }
             } else {
                 let (p, q) = line_line(ca, na, la, dir);
@@ -358,8 +359,8 @@ mod tests {
         let c = centre(&circle(a, 4.0), &circle(b, 4.0)).unwrap();
         assert_eq!((c.from, c.to), (a, b));
         assert!((c.distance - 2001_f64.sqrt()).abs() < 1e-12);
-        assert!((c.min.unwrap() - (1517_f64.sqrt() - 8.0).hypot(22.0)).abs() < 1e-12);
-        assert!((c.max.unwrap() - (1517_f64.sqrt() + 8.0).hypot(22.0)).abs() < 1e-12);
+        assert!((c.min.unwrap() - pmath::hypot(1517_f64.sqrt() - 8.0, 22.0)).abs() < 1e-12);
+        assert!((c.max.unwrap() - pmath::hypot(1517_f64.sqrt() + 8.0, 22.0)).abs() < 1e-12);
         let swapped = centre(&circle(b, 4.0), &circle(a, 4.0)).unwrap();
         assert_eq!((swapped.from, swapped.to, swapped.distance), (b, a, c.distance));
     }
@@ -427,9 +428,9 @@ mod tests {
             let round = Shape::Round { center: Vec3::new(34.0, 25.0, 20.0), axis: UnitVec3::Z, radius: 12.0, angle, planar: true, lo: 0.0, hi: 0.0 };
             let c = centre(&round, &edge).unwrap();
             assert_eq!((c.from, c.to), (Vec3::new(34.0, 25.0, 20.0), Vec3::new(34.0, 0.0, 6.0)));
-            assert!((c.distance - 25_f64.hypot(14.0)).abs() < 1e-12);
+            assert!((c.distance - pmath::hypot(25_f64, 14.0)).abs() < 1e-12);
             if angle == TAU {
-                assert!((c.min.unwrap() - 13_f64.hypot(14.0)).abs() < 1e-12);
+                assert!((c.min.unwrap() - pmath::hypot(13_f64, 14.0)).abs() < 1e-12);
             } else {
                 assert!(c.min.is_none());
             }
@@ -465,7 +466,7 @@ mod tests {
     #[test]
     fn coverage_of_a_half_and_a_whole_ring() {
         let ring = |n: usize, span: f64| -> Vec<Vec3> {
-            (0..=n).map(|i| Vec3::new((span * i as f64 / n as f64).cos(), (span * i as f64 / n as f64).sin(), 0.0)).collect()
+            (0..=n).map(|i| Vec3::new(pmath::cos(span * i as f64 / n as f64), pmath::sin(span * i as f64 / n as f64), 0.0)).collect()
         };
         assert!((coverage(Vec3::ZERO, UnitVec3::Z, &ring(32, PI)) - PI).abs() < 1e-9);
         assert_eq!(coverage(Vec3::ZERO, UnitVec3::Z, &ring(32, TAU)), TAU);

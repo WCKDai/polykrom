@@ -1,6 +1,7 @@
 //! Convert to Sheet Metal: solid and shelled bodies with bend edges (with holes and round edges in
 //! their faces), plates read from STEP files whose walls come in pieces, and plates with recesses.
 
+use polycore_geom::pmath;
 use std::f64::consts::{FRAC_PI_2, PI, SQRT_2};
 
 use serde_json::{Value, json};
@@ -64,7 +65,7 @@ fn rule(s: &mut Session, name: &str, t: f64, k: f64, r: f64, gap: f64) {
 
 /// Bend deduction: twice the outside setback less the allowance.
 fn deduction(theta: f64, r: f64, t: f64, k: f64) -> f64 {
-    2.0 * (r + t) * (theta / 2.0).tan() - theta * (r + k * t)
+    2.0 * (r + t) * pmath::tan(theta / 2.0) - theta * (r + k * t)
 }
 
 const BOTTOM_EDGES: [[f64; 3]; 4] = [[50.0, 0.0, 0.0], [100.0, 30.0, 0.0], [50.0, 60.0, 0.0], [0.0, 30.0, 0.0]];
@@ -92,7 +93,7 @@ fn section(s: &mut Session, outer: &[(f64, f64)], t: f64, len: f64) -> Vec<[f64;
     let n = outer.len();
     let dir = |i: usize| {
         let (a, b) = (outer[i], outer[i + 1]);
-        let l = (b.0 - a.0).hypot(b.1 - a.1);
+        let l = pmath::hypot(b.0 - a.0, b.1 - a.1);
         ((b.0 - a.0) / l, (b.1 - a.1) / l)
     };
     let shift = |p: (f64, f64), d: (f64, f64)| (p.0 - d.1 * t, p.1 + d.0 * t);
@@ -114,7 +115,7 @@ fn section(s: &mut Session, outer: &[(f64, f64)], t: f64, len: f64) -> Vec<[f64;
 
 /// A base 200 wide with walls 40 long at 72° and returns 15 long at 108° more, 300 long.
 fn trapezoid_section(s: &mut Session, t: f64) -> Vec<[f64; 3]> {
-    let (c, sn) = (72f64.to_radians().cos(), 72f64.to_radians().sin());
+    let (c, sn) = (pmath::cos(72f64.to_radians()), pmath::sin(72f64.to_radians()));
     let (x, y) = (100.0 + 40.0 * c, 40.0 * sn);
     section(s, &[(-x + 15.0, y), (-x, y), (-100.0, 0.0), (100.0, 0.0), (x, y), (x - 15.0, y)], t, 300.0)
 }
@@ -275,10 +276,10 @@ fn a_trapezoid_section_unfolds_through_72_and_108_degree_bends() {
     // stays; the widest point is on the round of the 108° bend (outer radius R + T), whose
     // centre lies (R + T) / sin 36° from the sharp corner along the corner's bisector.
     let (lo, hi) = bbox(&mut s);
-    let (c72, s72) = (a72.cos(), a72.sin());
+    let (c72, s72) = (pmath::cos(a72), pmath::sin(a72));
     let rho = r + t;
-    let bisector_x = (-c72 - 1.0) / (-c72 - 1.0).hypot(-s72);
-    let wide = 2.0 * (100.0 + 40.0 * c72 + bisector_x * rho / 36f64.to_radians().sin() + rho);
+    let bisector_x = (-c72 - 1.0) / pmath::hypot(-c72 - 1.0, -s72);
+    let wide = 2.0 * (100.0 + 40.0 * c72 + bisector_x * rho / pmath::sin(36f64.to_radians()) + rho);
     // (The box is measured on the tessellation: the round comes out a chord's sag inside.)
     assert!((hi[0] - lo[0] - wide).abs() < 2e-3 && (hi[1] - 40.0 * s72).abs() < 1e-6 && (hi[2] - lo[2] - 300.0).abs() < 1e-6, "{lo:?} {hi:?} {wide}");
     run(&mut s, "sheet.unfold", json!({}));
@@ -330,14 +331,14 @@ fn a_tapered_tray_converts_with_72_degree_walls_and_slanted_corners() {
     run(&mut s, "sheet.convert", json!({"body": "Tray", "face": [100, 60, 0], "bends": [[100, 0, 0], [200, 60, 0], [100, 120, 0], [0, 60, 0]]}));
     let rows = bend_rows(&mut s);
     assert!(rows.len() == 4 && rows.iter().all(|row| row.0 == 72 && row.1 == "up"), "{rows:?}");
-    let slant = 40.0 / 72f64.to_radians().sin();
+    let slant = 40.0 / pmath::sin(72f64.to_radians());
     let bd = deduction(72f64.to_radians(), r, t, k);
     assert!(same_size(flat_size(&mut s), (200.0 + 2.0 * slant - 2.0 * bd, 120.0 + 2.0 * slant - 2.0 * bd), 1e-6), "{:?}", flat_size(&mut s));
     // The outside stays; the rim is cut square to the sheet, as a blank is, so the inside edge
     // of a wall leaning out 18° stands T sin 18° above the solid's level rim.
     let (lo2, hi2) = bbox(&mut s);
     assert!((0..2).all(|i| (lo2[i] - lo[i]).abs() < 1e-6 && (hi2[i] - hi[i]).abs() < 1e-6) && lo2[2].abs() < 1e-6, "{lo2:?} {hi2:?}");
-    assert!((hi2[2] - 40.0 - t * 18f64.to_radians().sin()).abs() < 1e-6, "{hi2:?}");
+    assert!((hi2[2] - 40.0 - t * pmath::sin(18f64.to_radians())).abs() < 1e-6, "{hi2:?}");
     let v = volume(&mut s);
     run(&mut s, "sheet.unfold", json!({}));
     run(&mut s, "sheet.refold", json!({}));
@@ -500,7 +501,7 @@ fn bent_section(s: &mut Session, outer: &[(f64, f64)], t: f64, ri: f64, len: f64
     let n = outer.len();
     let dir = |i: usize| {
         let (a, b) = (outer[i], outer[i + 1]);
-        let l = (b.0 - a.0).hypot(b.1 - a.1);
+        let l = pmath::hypot(b.0 - a.0, b.1 - a.1);
         ((b.0 - a.0) / l, (b.1 - a.1) / l)
     };
     let left = |d: (f64, f64)| (-d.1, d.0);
@@ -511,14 +512,14 @@ fn bent_section(s: &mut Session, outer: &[(f64, f64)], t: f64, ri: f64, len: f64
     for (i, &c) in outer.iter().enumerate().take(n - 1).skip(1) {
         let (d0, d1) = (dir(i - 1), dir(i));
         let (cross, dot) = (d0.0 * d1.1 - d0.1 * d1.0, d0.0 * d1.0 + d0.1 * d1.1);
-        let theta = cross.abs().atan2(dot);
+        let theta = pmath::atan2(cross.abs(), dot);
         // Turning toward the material, this skin is the bend's outside.
         let (rp, ro) = if cross > 0.0 { (ri + t, ri) } else { (ri, ri + t) };
-        let a = at(c, d0, -rp * (theta / 2.0).tan());
-        let b = at(c, d1, rp * (theta / 2.0).tan());
+        let a = at(c, d0, -rp * pmath::tan(theta / 2.0));
+        let b = at(c, d1, rp * pmath::tan(theta / 2.0));
         let centre = at(a, left(d0), if cross > 0.0 { rp } else { -rp });
         let (ai, bi) = (at(a, left(d0), t), at(b, left(d1), t));
-        let l = (c.0 - centre.0).hypot(c.1 - centre.1);
+        let l = pmath::hypot(c.0 - centre.0, c.1 - centre.1);
         let mid = |r: f64| (centre.0 + (c.0 - centre.0) / l * r, centre.1 + (c.1 - centre.1) / l * r);
         corners.push((a, b, ai, bi, mid(rp), mid(ro), (mid(ri + t), mid(ri))));
     }
@@ -731,7 +732,7 @@ impl Wall {
 fn hole(c: [f64; 2], r: f64, pieces: usize, seam: f64) -> Vec<Wall> {
     let at = |i: usize| {
         let a = (seam - 360.0 * i as f64 / pieces as f64).to_radians();
-        [c[0] + r * a.cos(), c[1] + r * a.sin()]
+        [c[0] + r * pmath::cos(a), c[1] + r * pmath::sin(a)]
     };
     (0..pieces).map(|i| Wall::Round(at(i), at(i + 1), c, false)).collect()
 }
@@ -801,7 +802,7 @@ impl Step {
             Wall::Flat(..) => self.line([a[0], a[1], z], [b[0], b[1], z], va, vb),
             Wall::Round(_, _, c, ccw) => {
                 let frame = self.frame([c[0], c[1], z], [0.0, 0.0, 1.0], [1.0, 0.0, 0.0]);
-                let r = (a[0] - c[0]).hypot(a[1] - c[1]);
+                let r = pmath::hypot(a[0] - c[0], a[1] - c[1]);
                 let circle = self.add(format!("CIRCLE('',#{frame},{r:.12})"));
                 self.add(format!("EDGE_CURVE('',#{va},#{vb},#{circle},{})", if ccw { ".T." } else { ".F." }))
             }
@@ -844,14 +845,14 @@ fn plate_step(loops: &[Vec<Wall>], t: f64) -> String {
             let bound = s.add(format!("FACE_OUTER_BOUND('',#{lp},.T.)"));
             let (surface, sense) = match *wall {
                 Wall::Flat(a, b) => {
-                    let l = (b[0] - a[0]).hypot(b[1] - a[1]);
+                    let l = pmath::hypot(b[0] - a[0], b[1] - a[1]);
                     let (dx, dy) = ((b[0] - a[0]) / l, (b[1] - a[1]) / l);
                     let frame = s.frame([a[0], a[1], 0.0], [dy, -dx, 0.0], [dx, dy, 0.0]);
                     (s.add(format!("PLANE('',#{frame})")), true)
                 }
                 Wall::Round(a, _, c, ccw) => {
                     let frame = s.frame([c[0], c[1], 0.0], [0.0, 0.0, 1.0], [1.0, 0.0, 0.0]);
-                    let r = (a[0] - c[0]).hypot(a[1] - c[1]);
+                    let r = pmath::hypot(a[0] - c[0], a[1] - c[1]);
                     (s.add(format!("CYLINDRICAL_SURFACE('',#{frame},{r:.12})")), ccw)
                 }
             };
@@ -922,7 +923,7 @@ fn a_plate_whose_hole_walls_are_half_cylinders_converts_with_round_holes() {
     assert_eq!(circles.len(), 4, "{circles:?}");
     assert!(circles.iter().all(|(radius, _)| (radius - r).abs() < 1e-9), "{circles:?}");
     // The holes keep their places: 18 apart along the sides, 18·√2 across.
-    let d = |a: [f64; 2], b: [f64; 2]| (a[0] - b[0]).hypot(a[1] - b[1]);
+    let d = |a: [f64; 2], b: [f64; 2]| pmath::hypot(a[0] - b[0], a[1] - b[1]);
     let mut gaps: Vec<f64> = (0..4).flat_map(|i| (i + 1..4).map(move |j| (i, j))).map(|(i, j)| d(circles[i].1, circles[j].1)).collect();
     gaps.sort_by(f64::total_cmp);
     assert!(gaps[..4].iter().all(|g| (g - 18.0).abs() < 1e-9) && gaps[4..].iter().all(|g| (g - 18.0 * SQRT_2).abs() < 1e-9), "{gaps:?}");
@@ -955,7 +956,7 @@ fn rounded_corners_slot_ends_and_split_sides_convert_as_single_arcs_and_lines() 
     let quarter = |c: [f64; 2], from: f64, pieces: usize| -> Vec<Wall> {
         let at = |i: usize| {
             let a = (from + 90.0 * i as f64 / pieces as f64).to_radians();
-            [c[0] + rc * a.cos(), c[1] + rc * a.sin()]
+            [c[0] + rc * pmath::cos(a), c[1] + rc * pmath::sin(a)]
         };
         (0..pieces).map(|i| Wall::Round(at(i), at(i + 1), c, true)).collect()
     };

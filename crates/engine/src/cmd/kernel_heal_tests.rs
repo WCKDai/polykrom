@@ -1,5 +1,6 @@
 //! Delete Face and shells/offsets on cones and spheres, through the engine.
 
+use polycore_geom::pmath;
 use serde_json::{Value, json};
 
 use crate::Session;
@@ -27,13 +28,13 @@ fn shell_a_box_with_a_drilled_hole() {
     let (r, t) = (4.0, 2.0);
     let a = (59.0f64).to_radians();
     // Cylinder depth from the measured body: 24000 − π r² h − π r² (r / tan α) / 3.
-    let h = (24000.0 - v_body - PI * r * r * (r / a.tan()) / 3.0) / (PI * r * r);
+    let h = (24000.0 - v_body - PI * r * r * (r / pmath::tan(a)) / 3.0) / (PI * r * r);
     assert!(h > 9.0 && h < 11.0, "{h}");
     run(&mut s, "solid.shell", json!({"faces": [[5, 5, 20]], "thickness": t}));
     let v_shell = volume(&mut s);
-    let apex = 20.0 - h - r / a.tan() - t / a.sin();
+    let apex = 20.0 - h - r / pmath::tan(a) - t / pmath::sin(a);
     let big_r = r + t;
-    let joint = apex + big_r / a.tan();
+    let joint = apex + big_r / pmath::tan(a);
     let grown = PI * big_r * big_r * (20.0 - joint) + PI * big_r * big_r * (joint - apex) / 3.0;
     let cavity = 36.0 * 26.0 * 18.0 - grown;
     let want = v_body - cavity;

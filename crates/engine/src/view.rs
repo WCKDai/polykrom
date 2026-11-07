@@ -2,6 +2,7 @@
 //! grid and the origin. Used by the headless snapshot renderer; the GPU viewport draws the same
 //! content.
 
+use polycore_geom::pmath;
 use std::sync::Arc;
 
 use polycore_geom::{Aabb3, Plane, Vec3};
@@ -201,7 +202,7 @@ pub fn grid_plane(back: Vec3, last: GridPlane) -> GridPlane {
 /// Grid spacing (minor, major) for a view of the given half height.
 pub fn grid_step(half_height: f64) -> (f64, f64) {
     let raw = (half_height / 10.0).max(1e-3);
-    let p = 10f64.powf(raw.log10().floor());
+    let p = pmath::powf(10f64, pmath::log10(raw).floor());
     let minor = if raw / p < 2.0 {
         p
     } else if raw / p < 5.0 {

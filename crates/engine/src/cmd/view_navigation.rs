@@ -1,4 +1,5 @@
 //! Stateless camera commands shared by the navigation cube and programmatic callers.
+use polycore_geom::pmath;
 use polykrom_render::{Camera, StandardView};
 use serde_json::{Value, json};
 
@@ -132,7 +133,7 @@ fn navigate(_s: &mut Session, p: &Value) -> Result<Value> {
             Some(d) => d
                 .as_f64()
                 .filter(|d| d.is_finite() && *d > 0.0 && *d <= 180.0)
-                .map(|d| if d == 90.0 { (1.0, 0.0) } else { d.to_radians().sin_cos() })
+                .map(|d| if d == 90.0 { (1.0, 0.0) } else { pmath::sin_cos(d.to_radians()) })
                 .ok_or_else(|| bad(cmd, "degrees must be a number above 0 and at most 180"))?,
         };
         let turn = |toward: polycore_geom::Vec3| cam.looking_from(b * cos + toward * sin);
@@ -402,7 +403,7 @@ mod tests {
             p["free_orbit"] = json!(true);
             let result = s.execute("view.navigate", &p).unwrap();
             let free: Camera = serde_json::from_value(result["camera"].clone()).unwrap();
-            assert!((free.back().dot(cam.back()) - 0.64_f64.cos()).abs() < 1e-8);
+            assert!((free.back().dot(cam.back()) - pmath::cos(0.64_f64)).abs() < 1e-8);
             assert_eq!((free.target, free.distance, free.fov), (cam.target, cam.distance, cam.fov));
             assert_eq!(s.doc.to_json(), design);
             assert!(s.undo.is_empty() && s.selection.is_empty());

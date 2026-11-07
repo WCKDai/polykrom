@@ -3,6 +3,7 @@
 
 use egui::{Pos2, Stroke};
 use polykrom_engine::geom::Vec2;
+use polykrom_engine::geom::pmath;
 use serde_json::{Value, json};
 
 use crate::SolveApp;
@@ -896,10 +897,10 @@ pub(crate) fn polygon_outline(t: &Tool, hover: Vec2, sides: f64) -> Option<Vec<V
     }
     let (centre, radius, start) = match t.cmd {
         "sketch.polygon.inscribed" => (a, distance, (hover - a).angle()),
-        "sketch.polygon.circumscribed" => (a, distance / half.cos(), (hover - a).angle() + half),
+        "sketch.polygon.circumscribed" => (a, distance / pmath::cos(half), (hover - a).angle() + half),
         "sketch.polygon.edge" => {
-            let radius = distance / (2.0 * half.sin());
-            let centre = (a + hover) * 0.5 + (hover - a).normalized()?.perp() * (radius * half.cos());
+            let radius = distance / (2.0 * pmath::sin(half));
+            let centre = (a + hover) * 0.5 + (hover - a).normalized()?.perp() * (radius * pmath::cos(half));
             (centre, radius, (a - centre).angle())
         }
         _ => return None,

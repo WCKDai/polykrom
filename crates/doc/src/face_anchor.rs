@@ -3,6 +3,7 @@
 use crate::config::ConfigFaceTarget;
 use crate::{DocError, Document, EmbossFace, FeatureKind, Model, ModelBody, ModelState, PlaneRef, Result};
 use polycore_geom::Plane;
+use polycore_geom::pmath;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -49,7 +50,7 @@ impl FaceAnchor {
             || (self.component != 0 && self.path.is_empty())
             || self.coordinates.iter().any(|value| !value.is_finite() || value.abs() > 1e9)
             || self.x_axis.iter().any(|value| !value.is_finite())
-            || (self.x_axis[0].hypot(self.x_axis[1]) - 1.).abs() > 1e-6
+            || (pmath::hypot(self.x_axis[0], self.x_axis[1]) - 1.).abs() > 1e-6
         {
             return Err(DocError::Invalid("invalid exact face attachment".into()));
         }
@@ -398,7 +399,7 @@ pub fn validate_face_anchor_json(value: &Value) -> Result<()> {
         if values.iter().any(|value| value.as_f64().is_none_or(|value| !value.is_finite() || value.abs() > 1e9)) {
             return Err(DocError::Invalid("face anchor vector is invalid".into()));
         }
-        if key == "x_axis" && (values[0].as_f64().unwrap_or(0.).hypot(values[1].as_f64().unwrap_or(0.)) - 1.).abs() > 1e-6 {
+        if key == "x_axis" && (pmath::hypot(values[0].as_f64().unwrap_or(0.), values[1].as_f64().unwrap_or(0.)) - 1.).abs() > 1e-6 {
             return Err(DocError::Invalid("face anchor basis must be normalized".into()));
         }
     }

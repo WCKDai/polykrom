@@ -1,5 +1,6 @@
 //! Pixel-bounded display paths. CAD segments remain untouched; positive homogeneous
 //! control hulls bound perspective projection, including looping and rational curves.
+use polycore_geom::pmath;
 use polycore_geom::{Plane, Seg2, Vec2, Vec3};
 
 use crate::Mat4;
@@ -127,8 +128,8 @@ fn controls(segment: &Seg2, plane: &Plane) -> Option<(Vec<Vec<H>>, H)> {
                     let a = start + sweep * i as f64 / count as f64;
                     let b = start + sweep * (i + 1) as f64 / count as f64;
                     let mid = (a + b) * 0.5;
-                    let w = ((b - a) * 0.5).cos();
-                    let p = |t: f64, r: f64| center + Vec2::new(t.cos(), t.sin()) * r;
+                    let w = pmath::cos((b - a) * 0.5);
+                    let p = |t: f64, r: f64| center + Vec2::new(pmath::cos(t), pmath::sin(t)) * r;
                     vec![h(p(a, radius), 1.0), h(p(mid, radius / w), w), h(p(b, radius), 1.0)]
                 })
                 .collect()
@@ -223,7 +224,7 @@ fn sample(segment: &Seg2, plane: &Plane, view: &PixelCurveView, budget: &mut Sam
                         }
                         let x = (e[0] + (p[0] / p[3]).abs() * e[3]) / safe_w * view.width_px * 0.5;
                         let y = (e[1] + (p[1] / p[3]).abs() * e[3]) / safe_w * view.height_px * 0.5;
-                        x.hypot(y)
+                        pmath::hypot(x, y)
                     })
                     .fold(0.0, f64::max);
                 let allowance = projection_error + magnitude * f64::EPSILON * 128.0;

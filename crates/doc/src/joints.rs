@@ -14,6 +14,7 @@
 //! linkage, a slider-crank) are met by moving the values of the other joints around the loop;
 //! those that still disagree are reported.
 
+use polycore_geom::pmath;
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
 use polycore_geom::{Aabb3, Vec3};
@@ -685,15 +686,15 @@ fn frame(o: Vec3, z: Vec3, x: Option<Vec3>) -> Option<Mat> {
 }
 
 fn rot_z(a: f64) -> Mat {
-    let (s, c) = a.sin_cos();
+    let (s, c) = pmath::sin_cos(a);
     [[c, s, 0.0, 0.0], [-s, c, 0.0, 0.0], [0.0, 0.0, 1.0, 0.0], [0.0, 0.0, 0.0, 1.0]]
 }
 fn rot_x(a: f64) -> Mat {
-    let (s, c) = a.sin_cos();
+    let (s, c) = pmath::sin_cos(a);
     [[1.0, 0.0, 0.0, 0.0], [0.0, c, s, 0.0], [0.0, -s, c, 0.0], [0.0, 0.0, 0.0, 1.0]]
 }
 fn rot_y(a: f64) -> Mat {
-    let (s, c) = a.sin_cos();
+    let (s, c) = pmath::sin_cos(a);
     [[c, 0.0, -s, 0.0], [0.0, 1.0, 0.0, 0.0], [s, 0.0, c, 0.0], [0.0, 0.0, 0.0, 1.0]]
 }
 fn shift(x: f64, y: f64, z: f64) -> Mat {
@@ -924,7 +925,7 @@ fn mismatch(a: &Mat, b: &Mat) -> (f64, f64) {
     // angles to rounding.
     let c = |i: usize, k: usize| (0..3).map(|n| a[i][n] * b[k][n]).sum::<f64>();
     let sin2 = Vec3::new(c(1, 2) - c(2, 1), c(2, 0) - c(0, 2), c(0, 1) - c(1, 0)).len();
-    (t, sin2.atan2(c(0, 0) + c(1, 1) + c(2, 2) - 1.0))
+    (t, pmath::atan2(sin2, c(0, 0) + c(1, 1) + c(2, 2) - 1.0))
 }
 
 /// Passes over the motion links at most: a chain of up to this many links carries its value

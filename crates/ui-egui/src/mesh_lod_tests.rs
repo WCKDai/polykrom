@@ -1,13 +1,17 @@
 use super::*;
+use polykrom_engine::geom::pmath;
 
 /// A sphere mesh of about `2 n²` triangles, each corner its own point.
 fn sphere(n: u32) -> Arc<Mesh> {
     use polykrom_engine::geom::Vec3;
     let at = |i: u32, j: u32| {
         let (t, p) = (std::f64::consts::PI * f64::from(i) / f64::from(n), std::f64::consts::TAU * f64::from(j) / f64::from(2 * n));
-        let (st, sp, cp) =
-            (if i == 0 || i == n { 0.0 } else { t.sin() }, if j == 2 * n { 0.0 } else { p.sin() }, if j == 2 * n { 1.0 } else { p.cos() });
-        Vec3::new(50.0 * st * cp, 50.0 * st * sp, 50.0 * t.cos())
+        let (st, sp, cp) = (
+            if i == 0 || i == n { 0.0 } else { pmath::sin(t) },
+            if j == 2 * n { 0.0 } else { pmath::sin(p) },
+            if j == 2 * n { 1.0 } else { pmath::cos(p) },
+        );
+        Vec3::new(50.0 * st * cp, 50.0 * st * sp, 50.0 * pmath::cos(t))
     };
     let mut m = Mesh::default();
     for i in 0..n {

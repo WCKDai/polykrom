@@ -1,5 +1,6 @@
 use crate::Session;
 use polycore_geom::Vec3;
+use polycore_geom::pmath;
 use polykrom_doc::{
     FeatureKind,
     config::{Column, FaceCertificate},
@@ -26,7 +27,7 @@ fn painted_radius(session: &Session, name: &str, radius: f64) -> usize {
         if painted.iter().any(|(index, _)| *index == *face as usize) {
             for vertex in mesh.tri(triangle).unwrap() {
                 let vertex = polykrom_doc::apply_point(&inverse, vertex);
-                assert!((vertex.x.hypot(vertex.y) - radius).abs() < 1e-7, "{name}: {vertex:?}");
+                assert!((pmath::hypot(vertex.x, vertex.y) - radius).abs() < 1e-7, "{name}: {vertex:?}");
             }
         }
     }

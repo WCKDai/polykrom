@@ -1,5 +1,6 @@
 // Exact occurrence workflows through the same commands used by the Browser.
 use crate::Session;
+use polycore_geom::pmath;
 use serde_json::{Value, json};
 
 fn run(s: &mut Session, command: &str, p: Value) -> Value {
@@ -730,7 +731,7 @@ fn a_stood_up_nested_step_part_is_cut_and_joined_from_its_face() {
 fn matrix_move_orthonormalises_rounding_and_refuses_what_is_not_rigid() {
     let mut s = Session::default();
     let (_, occ) = created(&mut s, "Block");
-    let (sin, cos) = 30f64.to_radians().sin_cos();
+    let (sin, cos) = pmath::sin_cos(30f64.to_radians());
     let e = 3e-10;
     let nearly = json!([cos + e, -sin, 0, 5, sin, cos - e, e, 0, 0, -e, 1.0 + e, 0]);
     let r = run(&mut s, "occurrence.move", json!({"occurrence": occ, "matrix": nearly, "space": "world"}));

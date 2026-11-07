@@ -1,5 +1,6 @@
 use crate::scenario::Harness;
 use polykrom_engine::doc::{FeatureKind, kernel};
+use polykrom_engine::geom::pmath;
 use serde_json::{Value, json};
 
 fn fixture(mut h: Harness, extra: Value) -> Harness {
@@ -21,12 +22,12 @@ fn open(h: &mut Harness) {
 }
 fn at_angle(degrees: f64) -> Value {
     let a = degrees.to_radians();
-    json!([12.5 * a.cos(), 2.5, 12.5 * a.sin()])
+    json!([12.5 * pmath::cos(a), 2.5, 12.5 * pmath::sin(a)])
 }
 fn handle_at(h: &mut Harness, name: &str, world: Value) {
     let actual = h.at(&json!({"handle":name})).unwrap();
     let expected = h.at(&json!({"world":world})).unwrap();
-    assert!((actual[0] - expected[0]).hypot(actual[1] - expected[1]) < 1.0, "{actual:?} != {expected:?}");
+    assert!(pmath::hypot(actual[0] - expected[0], actual[1] - expected[1]) < 1.0, "{actual:?} != {expected:?}");
 }
 fn volume(h: &Harness) -> f64 {
     kernel::measure(&h.app.session.world_state().body("Main").unwrap().body).unwrap().volume
@@ -154,7 +155,7 @@ fn selected_second_placement_custom_axis_handle_and_preview_stay_in_its_frame() 
     let frame = h.app.session.active_component_frame();
     let world = |degrees: f64| {
         let a = degrees.to_radians();
-        let p = polykrom_engine::doc::apply_point(&frame, polykrom_engine::geom::Vec3::new(12.5 * a.cos(), 2.5, 12.5 * a.sin()));
+        let p = polykrom_engine::doc::apply_point(&frame, polykrom_engine::geom::Vec3::new(12.5 * pmath::cos(a), 2.5, 12.5 * pmath::sin(a)));
         json!([p.x, p.y, p.z])
     };
     let axis = match &h.app.session.doc.find_feature("Turn").unwrap().kind {
@@ -300,7 +301,7 @@ fn canonical_symmetric_ring_preview_drag_and_reopen_match_material() {
         open(&mut h);
         let at = |degrees: f64| {
             let a = degrees.to_radians();
-            json!([3.0 * a.cos(), 5.0, 3.0 * a.sin()])
+            json!([3.0 * pmath::cos(a), 5.0, 3.0 * pmath::sin(a)])
         };
         handle_at(&mut h, "revolve", at(45.0));
         handle_at(&mut h, "revolve2", at(-45.0));

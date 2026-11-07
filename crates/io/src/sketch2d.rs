@@ -2,6 +2,7 @@
 //! plain 2D geometry in millimetres; the engine turns it into sketch curves.
 
 use polycore_geom::Vec2;
+use polycore_geom::pmath;
 
 /// One imported 2D entity (millimetres, y up).
 #[derive(Clone, Debug, PartialEq)]
@@ -58,11 +59,11 @@ pub(crate) fn bulge_arc(p0: Vec2, p1: Vec2, b: f64) -> Option<Geom2> {
     if l < 1e-12 {
         return None;
     }
-    let theta = 4.0 * b.atan();
-    let r = l / (2.0 * (theta / 2.0).sin()).abs();
+    let theta = 4.0 * pmath::atan(b);
+    let r = l / (2.0 * pmath::sin(theta / 2.0)).abs();
     // Centre on the perpendicular bisector, to the left for counter-clockwise bulges.
     let mid = (p0 + p1) * 0.5;
-    let h = r * (theta / 2.0).cos().abs();
+    let h = r * pmath::cos(theta / 2.0).abs();
     let left = chord.perp() / l;
     let sign = if theta.abs() > std::f64::consts::PI { -1.0 } else { 1.0 };
     let c = if b > 0.0 { mid + left * (h * sign) } else { mid - left * (h * sign) };

@@ -1,6 +1,7 @@
 #![allow(clippy::unwrap_used, clippy::panic)]
 use super::*;
 use crate::find_profiles;
+use polycore_geom::pmath;
 
 fn rounded(radius: f64) -> (Sketch, Vec<(String, bool)>) {
     let mut sk = Sketch::new();
@@ -205,7 +206,7 @@ fn convex_rotated_translated_support_is_independent_of_world_origin() {
     let (mut sk, sources) = rounded(1.);
     let angle: f64 = 0.317;
     let offset = Vec2::new(1e6, -2e6);
-    let map = |p: Vec2| Vec2::new(p.x * angle.cos() - p.y * angle.sin(), p.x * angle.sin() + p.y * angle.cos()) + offset;
+    let map = |p: Vec2| Vec2::new(p.x * pmath::cos(angle) - p.y * pmath::sin(angle), p.x * pmath::sin(angle) + p.y * pmath::cos(angle)) + offset;
     for p in &mut sk.points {
         p.pos = map(p.pos);
     }
@@ -217,7 +218,7 @@ fn convex_rotated_translated_support_is_independent_of_world_origin() {
         for i in 0..=10 {
             let world = sk.points[a].pos * (1. - i as f64 / 10.) + sk.points[b].pos * (i as f64 / 10.);
             let q = world - offset;
-            let local = Vec2::new(q.x * angle.cos() + q.y * angle.sin(), -q.x * angle.sin() + q.y * angle.cos());
+            let local = Vec2::new(q.x * pmath::cos(angle) + q.y * pmath::sin(angle), -q.x * pmath::sin(angle) + q.y * pmath::cos(angle));
             assert!(local.x.abs() <= 36.6 + 1e-8 && local.y.abs() <= 31.6 + 1e-8);
         }
     }

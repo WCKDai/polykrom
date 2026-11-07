@@ -2,6 +2,7 @@
 //! inference for interactive tools.
 
 use polycore_geom::Vec2;
+use polycore_geom::pmath;
 use polykrom_sketch::{ConstraintKind, CurveKind, Sketch};
 use serde_json::{Value, json};
 
@@ -183,8 +184,8 @@ fn run_auto(sk: &mut Sketch, doc: &mut polykrom_doc::Document, p: &Value, datum:
             && let (Some(pa), Some(pb)) = (sk.point(a), sk.point(b))
         {
             let ang = (pb - pa).angle();
-            let off_h = ang.sin().abs().asin();
-            let off_v = ang.cos().abs().asin();
+            let off_h = pmath::asin(pmath::sin(ang).abs());
+            let off_v = pmath::asin(pmath::cos(ang).abs());
             if off_h <= atol {
                 attempt(sk, doc, Horizontal { l: i }, false, &mut dof);
             } else if off_v <= atol {
@@ -211,7 +212,7 @@ fn run_auto(sk: &mut Sketch, doc: &mut polykrom_doc::Document, p: &Value, datum:
                 }
             };
             if let (Some(u), Some(v)) = (dir(i), dir(j))
-                && u.cross(v).abs() <= atol.sin()
+                && u.cross(v).abs() <= pmath::sin(atol)
             {
                 attempt(sk, doc, Tangent { a: i, b: j }, false, &mut dof);
             }

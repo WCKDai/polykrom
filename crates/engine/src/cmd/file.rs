@@ -6,6 +6,7 @@ mod thumbnail;
 #[path = "file_import.rs"]
 pub(crate) mod import;
 
+use polycore_geom::pmath;
 use polykrom_doc::Document;
 use polykrom_io::Format;
 use serde_json::{Value, json};
@@ -664,7 +665,7 @@ fn export_mjcf(s: &Session, path: &str, p: &Value) -> Result<Value> {
         if x == 0.0 || !x.is_finite() {
             return x;
         }
-        let k = 10f64.powi(8 - x.abs().log10().floor() as i32);
+        let k = 10f64.powi(8 - pmath::log10(x.abs()).floor() as i32);
         (x * k).round() / k
     };
     let actuators: Vec<Value> = m

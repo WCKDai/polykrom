@@ -1,4 +1,10 @@
 //! Analytic rounded annular sectors, following the board's offset-and-round construction.
+
+// UI only: this file draws, animates, converts colours or places the camera, and feeds nothing
+// into a design, so it keeps the platform's transcendental functions (listed with its reason in
+// crates/engine/tests/pmath_gate.rs; everything that reaches a command goes through pmath).
+#![allow(clippy::disallowed_methods)]
+
 use crate::{context_menu::Item, theme::Tokens};
 use egui::{Align2, Color32, FontId, Pos2, Rect, Sense, Stroke, Ui, Vec2, vec2};
 use std::f32::consts::{FRAC_PI_2, FRAC_PI_4, PI, TAU};

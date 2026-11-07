@@ -5,6 +5,7 @@
 //! oscillating follower's roller sits where its arm's circle meets the circle of radius R + r.
 
 use super::*;
+use polycore_geom::pmath;
 use polykrom_doc::joints::Coupling;
 use polykrom_doc::joints::cam::CamProfile;
 
@@ -27,7 +28,7 @@ fn shown(s: &mut Session, joint: &str) -> f64 {
 /// cam's centre turned by `deg`.
 fn knife(deg: f64, h: f64, r: f64) -> f64 {
     let t = deg.to_radians();
-    E * t.cos() + (r * r - (h - E * t.sin()).powi(2)).sqrt()
+    E * pmath::cos(t) + (r * r - (h - E * pmath::sin(t)).powi(2)).sqrt()
 }
 
 /// A grounded base, and a cam: a disc of radius `rc` (a parameter, 30 mm) about (10, 0), 5 mm thick,
@@ -138,12 +139,12 @@ fn rollers_and_flat_faces_ride_their_offset_circles() {
     run(&mut s, "joint.cam", json!({"a": "Cam", "b": "Tappet", "profile": {"sketch": "CamSketch"}, "follower": "flat"}));
     for deg in [60.0f64, 150.0, 250.0] {
         run(&mut s, "joint.drive", json!({"joint": "Cam", "value": deg}));
-        let want = E * deg.to_radians().cos() - E;
+        let want = E * pmath::cos(deg.to_radians()) - E;
         assert!(close(shown(&mut s, "Tappet"), want, 1e-3), "flat θ {deg}: {} vs {want}", shown(&mut s, "Tappet"));
     }
     // Editing the profile: the table is worked out again.
     run(&mut s, "parameters.change", json!({"name": "rc", "expression": "32 mm"}));
-    let want = E * 250f64.to_radians().cos() - E + 2.0;
+    let want = E * pmath::cos(250f64.to_radians()) - E + 2.0;
     assert!(close(shown(&mut s, "Tappet"), want, 1e-3), "after the edit: {} vs {want}", shown(&mut s, "Tappet"));
 }
 
@@ -192,12 +193,12 @@ fn picked_edges_give_the_sketch_s_table() {
 #[test]
 fn an_oscillating_roller_follower_swings_to_the_offset_circle() {
     let (pivot, arm, roller) = (Vec3::new(-50.0, 40.0, 2.5), 50.0, 5.0);
-    let away = pivot.y.atan2(pivot.x);
+    let away = pmath::atan2(pivot.y, pivot.x);
     let wrap = |a: f64| (a + std::f64::consts::PI).rem_euclid(std::f64::consts::TAU) - std::f64::consts::PI;
-    let angle = |p: Vec3| (p.y - pivot.y).atan2(p.x - pivot.x);
+    let angle = |p: Vec3| pmath::atan2(p.y - pivot.y, p.x - pivot.x);
     // Where the roller's centre is at cam angle `deg`, turning the way `turn` says.
     let centre = |deg: f64, turn: f64| {
-        let c = Vec3::new(E * deg.to_radians().cos(), E * deg.to_radians().sin(), 2.5);
+        let c = Vec3::new(E * pmath::cos(deg.to_radians()), E * pmath::sin(deg.to_radians()), 2.5);
         let [p, q] = meet(pivot, arm, c, R + roller);
         let swept = |x: Vec3| (turn * (angle(x) - away)).rem_euclid(std::f64::consts::TAU);
         if swept(p) < swept(q) { p } else { q }

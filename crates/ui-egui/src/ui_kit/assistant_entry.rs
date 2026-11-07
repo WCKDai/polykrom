@@ -1,4 +1,10 @@
 //! Assistant entry point and its status mark, shared by application chrome and previews.
+
+// UI only: this file draws, animates, converts colours or places the camera, and feeds nothing
+// into a design, so it keeps the platform's transcendental functions (listed with its reason in
+// crates/engine/tests/pmath_gate.rs; everything that reaches a command goes through pmath).
+#![allow(clippy::disallowed_methods)]
+
 use crate::{icons, theme::Tokens};
 use egui::{FontId, Rect, Response, Stroke, pos2, vec2};
 

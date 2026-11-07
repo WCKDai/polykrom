@@ -1,5 +1,6 @@
 use crate::scenario::Harness;
 use polykrom_engine::doc::{FeatureKind, FilletStyle, kernel};
+use polykrom_engine::geom::pmath;
 use serde_json::{Value, json};
 
 /// A plate whose top narrows from 20 to 2 mm along 40 mm, its top front edge rounded at 3 mm
@@ -50,7 +51,7 @@ fn dragging_a_taper_handle_makes_the_fillet_a_spline() {
         let k = if taper.spline == law { k } else { g.len() - 1 - k };
         let shown = h.at(&json!({"handle": format!("fillet_r{k}")})).unwrap();
         let want = h.at(&json!({"world": at(*u, *r)})).unwrap();
-        assert!((shown[0] - want[0]).hypot(shown[1] - want[1]) < 1.0, "handle {k}: {shown:?} vs {want:?}");
+        assert!(pmath::hypot(shown[0] - want[0], shown[1] - want[1]) < 1.0, "handle {k}: {shown:?} vs {want:?}");
     }
     // The middle control radius pulled out to 4 mm (free drag): the fillet keeps the taper's
     // spline as its own with that radius changed.
@@ -127,7 +128,7 @@ fn every_edge_of_a_spline_fillet_has_handles_for_its_one_spline() {
         for (name, y) in [(format!("fillet_r{k}"), 0.0), (format!("fillet_e1_r{k}"), 30.0)] {
             let shown = h.at(&json!({"handle": name})).unwrap();
             let want = h.at(&into_box(*u, y, *r)).unwrap();
-            assert!((shown[0] - want[0]).hypot(shown[1] - want[1]) < 1.0, "{name}: {shown:?} vs {want:?}");
+            assert!(pmath::hypot(shown[0] - want[0], shown[1] - want[1]) < 1.0, "{name}: {shown:?} vs {want:?}");
         }
     }
     // The back edge's middle handle pulled to 5 mm: the shared spline's middle radius.

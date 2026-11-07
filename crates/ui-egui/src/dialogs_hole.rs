@@ -4,6 +4,11 @@
 //! schematic: its widths follow the diameters loosely, its heights line up with the fields.
 //! Hovering a field, or typing in it, lights its dimension.
 
+// UI only: this file draws, animates, converts colours or places the camera, and feeds nothing
+// into a design, so it keeps the platform's transcendental functions (listed with its reason in
+// crates/engine/tests/pmath_gate.rs; everything that reaches a command goes through pmath).
+#![allow(clippy::disallowed_methods)]
+
 use egui::{Color32, Pos2, Rect, Shape, Stroke, pos2, vec2};
 use polykrom_engine::doc::expr::Kind as ValueKind;
 

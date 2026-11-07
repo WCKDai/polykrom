@@ -3,6 +3,7 @@
 //! A recipe lists features with sketch entities in sketch-local coordinates; point references
 //! (`l1.end`) share points. Each feature becomes one or more commands.
 
+use polykrom_engine::geom::pmath;
 use serde_json::{Value, json};
 
 fn plane_param(pl: &Value) -> Value {
@@ -215,17 +216,17 @@ fn helix_path(features: &[Value], f: &Value) -> Option<([f64; 3], f64, f64, f64,
     }
     let n = pts.len() as f64;
     let (cx, cy) = circle_fit(&pts)?;
-    let r: Vec<f64> = pts.iter().map(|p| (p[0] - cx).hypot(p[1] - cy)).collect();
+    let r: Vec<f64> = pts.iter().map(|p| pmath::hypot(p[0] - cx, p[1] - cy)).collect();
     let rm = r.iter().sum::<f64>() / n;
     if rm <= 0.0 || r.iter().any(|x| (x - rm).abs() > 1e-3 * rm) {
         return None;
     }
     // Unwrapped angle and height: both linear along a helix.
     let mut total = 0.0;
-    let mut prev = (pts[0][1] - cy).atan2(pts[0][0] - cx);
+    let mut prev = pmath::atan2(pts[0][1] - cy, pts[0][0] - cx);
     let start = prev;
     for p in pts.iter().skip(1) {
-        let a = (p[1] - cy).atan2(p[0] - cx);
+        let a = pmath::atan2(p[1] - cy, p[0] - cx);
         let mut d = a - prev;
         while d > std::f64::consts::PI {
             d -= std::f64::consts::TAU;

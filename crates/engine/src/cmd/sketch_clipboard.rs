@@ -5,6 +5,7 @@
 //! the copied geometry (to the origin, to projected edges, to other curves) are left behind, as
 //! are fixes, so the pasted geometry can be moved straight away.
 
+use polycore_geom::pmath;
 use std::collections::BTreeMap;
 
 use polycore_geom::{Aabb2, Vec2};
@@ -233,7 +234,7 @@ fn cut(s: &mut Session, p: &Value) -> Result<Value> {
 /// or 5 times a power of ten (at least 1 mm).
 fn paste_step(extent: f64) -> f64 {
     let want = (extent * 0.1).max(1.0);
-    let mag = 10f64.powf(want.log10().floor());
+    let mag = pmath::powf(10f64, pmath::log10(want).floor());
     [1.0, 2.0, 5.0, 10.0].iter().map(|k| k * mag).find(|x| *x >= want - 1e-9).unwrap_or(want)
 }
 

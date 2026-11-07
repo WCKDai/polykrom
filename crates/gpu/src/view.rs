@@ -2666,6 +2666,7 @@ pub fn analysis_colors(c: &polykrom_render::AnalysisColors) -> [f32; 36] {
 
 #[cfg(test)]
 mod tests {
+    use polycore_geom::pmath;
     /// A placed box is kept while any of it may be in view, and left out only when it lies
     /// wholly past one side of the view: in an orthographic view and a perspective one, behind
     /// the eye too.
@@ -2709,7 +2710,7 @@ mod tests {
         let size = [200.0, 200.0];
         assert!((placement_scale(&at(0.0, 0.0, 0.0), &unit, &ortho, size) - 10.0).abs() < 1e-3);
         assert!((placement_scale(&at(5.0, -3.0, 0.0), &unit, &ortho, size) - 10.0).abs() < 1e-3);
-        let (c, s) = (0.6f32.cos(), 0.6f32.sin());
+        let (c, s) = (pmath::cos(f64::from(0.6f32)) as f32, pmath::sin(f64::from(0.6f32)) as f32);
         let turned = [[c, -s, 0.0, 0.0], [s, c, 0.0, 0.0], [0.0, 0.0, 1.0, 0.0]];
         assert!((placement_scale(&turned, &unit, &ortho, size) - 10.0).abs() < 1e-2);
         // Perspective looking down -z from the origin (w = -z), 90° over 200 px.

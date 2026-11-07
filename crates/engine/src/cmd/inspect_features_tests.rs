@@ -2,6 +2,7 @@
 //! every feature naming its faces, and nothing about the design touched.
 
 use polycore_geom::Vec3;
+use polycore_geom::pmath;
 use serde_json::{Value, json};
 
 use crate::Session;
@@ -214,7 +215,7 @@ fn a_blind_hole_a_counterbore_a_countersink_and_a_drilled_hole() {
     assert_eq!(d["through"], false, "{d}");
     exact(&d["depth"], 12.0);
     exact(&d["tip"]["angle_deg"], 118.0);
-    let tip = 3.0 / (59.0_f64.to_radians()).tan();
+    let tip = 3.0 / pmath::tan(59.0_f64.to_radians());
     assert!((num(&d["tip"]["depth"]) - tip).abs() < 1e-9, "{d}");
     assert_eq!(names(&d["tip"]["faces"]).len(), 3, "{d}");
     assert_eq!(names(&d["faces"]).len(), 6, "{d}");
@@ -307,7 +308,7 @@ fn a_filleted_edge_chain_and_a_chamfer() {
     assert_eq!(c["joins"], json!(["F1:+y", "F1:-z"]), "{c}");
     exact(&c["distance"], 2.0);
     exact(&c["distance2"], 4.0);
-    assert!((num(&c["angle_deg"]) - (4.0_f64 / 2.0).atan().to_degrees()).abs() < 1e-9, "{c}");
+    assert!((num(&c["angle_deg"]) - pmath::atan(4.0_f64 / 2.0).to_degrees()).abs() < 1e-9, "{c}");
     assert_eq!(names(&c["faces"]).len(), 1, "{c}");
     assert!(list(&b["patterns"]).is_empty(), "{b}");
 
@@ -361,7 +362,7 @@ fn a_partial_circular_pattern_of_three_holes_in_any_member_order() {
         let mut s = Session::default();
         run(&mut s, "solid.cylinder", json!({"base": [0, 0, 0], "diameter": 100, "height": 10, "body_name": "Disc"}));
         for a in order.map(|a: f64| a.to_radians()) {
-            run(&mut s, "solid.hole", json!({"position": [30.0 * a.cos(), 30.0 * a.sin(), 10], "diameter": 6}));
+            run(&mut s, "solid.hole", json!({"position": [30.0 * pmath::cos(a), 30.0 * pmath::sin(a), 10], "diameter": 6}));
         }
         let b = features(&mut s, "Disc");
         assert_eq!(of_type(&b, "hole").len(), 3, "{order:?}: {b}");
@@ -378,7 +379,9 @@ fn a_partial_circular_pattern_of_three_holes_in_any_member_order() {
         assert_eq!(p["members"], json!([0, 1, 2]), "{order:?}: {p}");
     }
     // The fit itself, on bare points: any order, and the wrap step counted.
-    let pts = |degs: &[f64]| -> Vec<Vec3> { degs.iter().map(|d| Vec3::new(30.0 * d.to_radians().cos(), 30.0 * d.to_radians().sin(), 0.0)).collect() };
+    let pts = |degs: &[f64]| -> Vec<Vec3> {
+        degs.iter().map(|d| Vec3::new(30.0 * pmath::cos(d.to_radians()), 30.0 * pmath::sin(d.to_radians()), 0.0)).collect()
+    };
     for degs in [[0.0, 60.0, 120.0], [120.0, 0.0, 60.0], [60.0, 0.0, 120.0]] {
         let c = super::circle(&pts(&degs), Some(Vec3::new(0.0, 0.0, 1.0)), 1e-6).unwrap_or_else(|| panic!("{degs:?}"));
         assert!((c.step - 60.0_f64.to_radians()).abs() < 1e-9, "{degs:?}: {}", c.step);
@@ -421,9 +424,10 @@ fn a_free_form_face_is_unrecognised_with_no_false_feature() {
 /// is no chamfer however its normal lies between theirs.
 #[test]
 fn two_chamfers_leave_the_face_between_them_unrecognised() {
-    for (params, want) in
-        [(json!({"distance": 2}), (2.0, 2.0, 45.0)), (json!({"distance": 2, "angle": "30 deg"}), (2.0, 2.0 * 30.0_f64.to_radians().tan(), 30.0))]
-    {
+    for (params, want) in [
+        (json!({"distance": 2}), (2.0, 2.0, 45.0)),
+        (json!({"distance": 2, "angle": "30 deg"}), (2.0, 2.0 * pmath::tan(30.0_f64.to_radians()), 30.0)),
+    ] {
         let mut s = Session::default();
         run(&mut s, "solid.box", json!({"length": 60, "width": 40, "height": 20, "corner": [0, 0, 0], "body_name": "Block"}));
         let mut p = params.clone();
@@ -496,7 +500,7 @@ fn a_hex_prism_a_drafted_box_and_a_wedge_have_no_chamfer() {
     let edge = chamfers.iter().find(|c| c["joins"][0] == "F1:+z").unwrap_or_else(|| panic!("{b}"));
     assert_eq!(edge["joins"], json!(["F1:+z", "F1:-y"]), "{edge}");
     exact(&edge["distance"], 1.0);
-    assert!((num(&edge["distance2"]) - 30.0_f64.to_radians().tan()).abs() < 1e-9, "{edge}");
+    assert!((num(&edge["distance2"]) - pmath::tan(30.0_f64.to_radians())).abs() < 1e-9, "{edge}");
     exact(&edge["angle_deg"], 30.0);
 }
 
@@ -836,7 +840,7 @@ fn a_grid_beside_a_lone_feature_is_the_grid_and_the_feature() {
     let mut centres = grid_centres(3, 3, 30.0, 30.0);
     centres.extend((0..6).map(|k| {
         let a = std::f64::consts::PI / 3.0 * k as f64;
-        (150.0 + 30.0 * a.cos(), 150.0 + 30.0 * a.sin())
+        (150.0 + 30.0 * pmath::cos(a), 150.0 + 30.0 * pmath::sin(a))
     }));
     let mut s = plate_with("hole", &centres);
     let b = features(&mut s, "Plate");

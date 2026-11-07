@@ -4,6 +4,7 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
+use polycore_geom::pmath;
 use std::f64::consts::PI;
 
 use serde_json::{Value, json};
@@ -22,7 +23,7 @@ const C: f64 = 15.0 - R;
 
 /// ∫ √(R² − u²) du over the rail's height (u from −20 to 20).
 fn root_integral() -> f64 {
-    20.0 * (R * R - 400.0).sqrt() + R * R * (20.0 / R).asin()
+    20.0 * (R * R - 400.0).sqrt() + R * R * pmath::asin(20.0 / R)
 }
 
 /// Circles `Base` (z = 0) and `Top` (z = 40) of radius 10, lines `Low` and `High` across them

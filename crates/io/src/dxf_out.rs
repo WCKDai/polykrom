@@ -10,6 +10,7 @@
 //! root dictionary. Layers can be dashed and a drawing can carry TEXT (for annotations). Group
 //! codes follow Autodesk's public DXF reference.
 
+use polycore_geom::pmath;
 use std::f64::consts::TAU;
 use std::fmt::Write as _;
 
@@ -185,14 +186,14 @@ fn conic_ellipse(a: Vec2, apex: Vec2, b: Vec2, w: f64) -> Option<EllipseArc> {
     }
     let m = (a + b) * 0.5;
     let c = m - (apex - m) * (w * w / (1.0 - w * w));
-    let alpha = w.acos();
-    let (u, v) = ((m - c) / w, (b - m) / alpha.sin());
+    let alpha = pmath::acos(w);
+    let (u, v) = ((m - c) / w, (b - m) / pmath::sin(alpha));
     if !(c.is_finite() && u.is_finite() && v.is_finite()) || u.cross(v).abs() < 1e-18 {
         return None;
     }
-    let t = 0.5 * (2.0 * u.dot(v)).atan2(u.dot(u) - v.dot(v));
-    let major = u * t.cos() + v * t.sin();
-    let minor = v * t.cos() - u * t.sin();
+    let t = 0.5 * pmath::atan2(2.0 * u.dot(v), u.dot(u) - v.dot(v));
+    let major = u * pmath::cos(t) + v * pmath::sin(t);
+    let minor = v * pmath::cos(t) - u * pmath::sin(t);
     if !(major.len() > 1e-12) {
         return None;
     }
@@ -225,7 +226,7 @@ impl DxfShape {
                 let (minor, sweep) = (major.perp() * *ratio, if (t1 - t0 - TAU).abs() < 1e-12 { TAU } else { (t1 - t0).rem_euclid(TAU) });
                 out.extend((0..=128).map(|i| {
                     let t = t0 + sweep * i as f64 / 128.0;
-                    *c + *major * t.cos() + minor * t.sin()
+                    *c + *major * pmath::cos(t) + minor * pmath::sin(t)
                 }));
             }
             // A spline lies within the hull of its control points.
@@ -567,7 +568,7 @@ mod tests {
 
     fn ellipse_point(e: &DxfShape, t: f64) -> Vec2 {
         let DxfShape::Ellipse { c, major, ratio, .. } = e else { panic!("{e:?}") };
-        *c + *major * t.cos() + major.perp() * (*ratio * t.sin())
+        *c + *major * pmath::cos(t) + major.perp() * (*ratio * pmath::sin(t))
     }
 
     /// A DXF text as (group code, value) pairs.

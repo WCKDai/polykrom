@@ -2,6 +2,7 @@
 //! merges must keep their whole surface, so the body reads back as the same solid.
 
 use polycore::{measure, step_export, step_import};
+use polycore_geom::pmath;
 use polykrom_engine::Session;
 use serde_json::{Value, json};
 
@@ -63,7 +64,7 @@ fn shelled_thin_wide_tube_keeps_its_volume() {
                 {"command":"sketch.rectangle.two_point","params":{"p0":[10.0,0],"p1":[12.5,27.5]}},
                 {"command":"sketch.finish","params":{}},
                 {"command":"solid.revolve","params":{"angle":format!("{turn} deg"),"axis":"Z"}},
-                {"command":"solid.shell","params":{"faces":[[11.0 * mid.cos(), 11.0 * mid.sin(), 0.0]],"thickness":1.0}}
+                {"command":"solid.shell","params":{"faces":[[11.0 * pmath::cos(mid), 11.0 * pmath::sin(mid), 0.0]],"thickness":1.0}}
             ]),
         );
         let st = s.model.state();

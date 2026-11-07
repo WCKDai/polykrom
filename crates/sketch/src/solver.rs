@@ -13,6 +13,7 @@
 //! the dense matrices: values the constructive seed placed stay constants for LM, and the rank
 //! analysis runs only on what remains.
 
+use polycore_geom::pmath;
 use polycore_geom::{Seg2, Vec2};
 use serde::{Deserialize, Serialize};
 
@@ -282,7 +283,7 @@ impl State<'_> {
                 let delta = q - center;
                 let x = delta.dot(u) / (a * a);
                 let y = delta.cross(u) / (a * r);
-                return (x.hypot(y) - 1.0) * a.min(r);
+                return (pmath::hypot(x, y) - 1.0) * a.min(r);
             }
             Some(CurveKind::Spline { pts, control, degree, periodic }) => {
                 let p = self.spline_points(pts, *periodic);
@@ -440,7 +441,7 @@ fn residuals(s: &State, k: &ConstraintKind, out: &mut Vec<f64>) {
             }
             let c = center.map(|c| s.p(c)).unwrap_or(Vec2::ZERO);
             let d = s.p(p) - c;
-            let (sin, cos) = angle.sin_cos();
+            let (sin, cos) = pmath::sin_cos(angle);
             let delta = s.p(q) - c - Vec2::new(d.x * cos - d.y * sin, d.x * sin + d.y * cos) - offset;
             out.extend([delta.x, delta.y]);
         }
@@ -580,7 +581,7 @@ fn residuals(s: &State, k: &ConstraintKind, out: &mut Vec<f64>) {
             let (a0, a1) = s.line(a);
             let (b0, b1) = s.line(b);
             let (da, db) = (a1 - a0, b1 - b0);
-            let ang = da.cross(db).atan2(da.dot(db));
+            let ang = pmath::atan2(da.cross(db), da.dot(db));
             let scale = 0.5 * (da.len() + db.len());
             let target = if flip { value + std::f64::consts::PI } else { value };
             out.push(wrap_angle(ang - target) * scale.max(1e-6));
@@ -637,7 +638,7 @@ fn measure(s: &State, k: &ConstraintKind) -> Option<f64> {
             let (a0, a1) = s.line(a);
             let (b0, b1) = s.line(b);
             let (da, db) = (a1 - a0, b1 - b0);
-            let ang = da.cross(db).atan2(da.dot(db)) - if flip { std::f64::consts::PI } else { 0.0 };
+            let ang = pmath::atan2(da.cross(db), da.dot(db)) - if flip { std::f64::consts::PI } else { 0.0 };
             ang.rem_euclid(std::f64::consts::TAU)
         }
         ArcLength { c, .. } => s.arc_length(c),

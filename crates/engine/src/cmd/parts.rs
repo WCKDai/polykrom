@@ -28,6 +28,7 @@
 //! publish is null.
 
 use polycore_geom::Vec3;
+use polycore_geom::pmath;
 use serde_json::{Value, json};
 
 use polykrom_doc::joints::{JointOrigin, NamedOrigin, Snap};
@@ -581,15 +582,15 @@ fn teeth_outline(teeth: u32, o: f64) -> Vec<[f64; 2]> {
     let (r, depth) = (0.555, 0.75);
     let c = o + r - depth;
     // Where the space's arc meets the outside circle, as an angle about the pulley's axis.
-    let phi = ((o * o + c * c - r * r) / (2.0 * o * c)).clamp(-1.0, 1.0).acos();
+    let phi = pmath::acos(((o * o + c * c - r * r) / (2.0 * o * c)).clamp(-1.0, 1.0));
     let step = std::f64::consts::TAU / f64::from(teeth);
     let mut out = Vec::new();
     for i in 0..teeth {
         let a = step * f64::from(i);
         // The space, from its leading edge round its deepest point to its trailing edge.
-        let (sx, sy) = ((a - phi).cos() * o - c * a.cos(), (a - phi).sin() * o - c * a.sin());
-        let (ex, ey) = ((a + phi).cos() * o - c * a.cos(), (a + phi).sin() * o - c * a.sin());
-        let (from, mut to) = (sy.atan2(sx), ey.atan2(ex));
+        let (sx, sy) = (pmath::cos(a - phi) * o - c * pmath::cos(a), pmath::sin(a - phi) * o - c * pmath::sin(a));
+        let (ex, ey) = (pmath::cos(a + phi) * o - c * pmath::cos(a), pmath::sin(a + phi) * o - c * pmath::sin(a));
+        let (from, mut to) = (pmath::atan2(sy, sx), pmath::atan2(ey, ex));
         // The long way round, through the side facing the axis.
         if to < from {
             to += std::f64::consts::TAU;
@@ -597,12 +598,12 @@ fn teeth_outline(teeth: u32, o: f64) -> Vec<[f64; 2]> {
         let to = to - std::f64::consts::TAU;
         for k in 0..=8 {
             let t = from + (to - from) * f64::from(k) / 8.0;
-            out.push([c * a.cos() + r * t.cos(), c * a.sin() + r * t.sin()]);
+            out.push([c * pmath::cos(a) + r * pmath::cos(t), c * pmath::sin(a) + r * pmath::sin(t)]);
         }
         // The land up to the next space.
         for k in 1..4 {
             let t = a + phi + (step - 2.0 * phi) * f64::from(k) / 4.0;
-            out.push([o * t.cos(), o * t.sin()]);
+            out.push([o * pmath::cos(t), o * pmath::sin(t)]);
         }
     }
     out
@@ -889,7 +890,7 @@ fn bldc_top(r: &Bldc) -> f64 {
 /// `n` holes of Ø `d` evenly round a bolt circle of Ø `bc` about z, the first on +x.
 fn circle_holes(bc: f64, n: u32, d: f64) -> Vec<([f64; 2], f64)> {
     let step = std::f64::consts::TAU / f64::from(n.max(1));
-    (0..n).map(|i| ([bc / 2.0 * (step * f64::from(i)).cos(), bc / 2.0 * (step * f64::from(i)).sin()], d / 2.0)).collect()
+    (0..n).map(|i| ([bc / 2.0 * pmath::cos(step * f64::from(i)), bc / 2.0 * pmath::sin(step * f64::from(i))], d / 2.0)).collect()
 }
 
 /// An actuator's output: the height of its horn's or flange's top face on the z axis, the face a
@@ -1286,8 +1287,12 @@ fn insert(s: &mut Session, p: &Value) -> Result<Value> {
     } else if let Some(pt) = p.get("point").and_then(vec3) {
         // Placed at a point, its +z along `direction`.
         let dir = p.get("direction").and_then(vec3).and_then(|d| d.normalized()).unwrap_or(Vec3::Z);
-        let m =
-            polykrom_doc::rigid(Vec3::ZERO, Vec3::ZERO, Vec3::Z.cross(dir).normalized().unwrap_or(Vec3::X), Vec3::Z.dot(dir).clamp(-1.0, 1.0).acos());
+        let m = polykrom_doc::rigid(
+            Vec3::ZERO,
+            Vec3::ZERO,
+            Vec3::Z.cross(dir).normalized().unwrap_or(Vec3::X),
+            pmath::acos(Vec3::Z.dot(dir).clamp(-1.0, 1.0)),
+        );
         let mut m = m;
         m[3] = [pt.x, pt.y, pt.z, 1.0];
         if let Some(o) = s.doc_mut().occurrences.iter_mut().find(|o| o.id == occ) {
@@ -1536,6 +1541,7 @@ fn resize(s: &mut Session, p: &Value) -> Result<Value> {
 
 #[cfg(test)]
 mod tests {
+    use polycore_geom::pmath;
     use serde_json::{Value, json};
 
     use crate::Session;
@@ -1589,7 +1595,7 @@ mod tests {
         run(&mut n, "parts.insert", json!({"family": "hex_nut", "size": "M8"}));
         let (lo, hi) = bbox(&n, "Hex Nut M8");
         let (w, h) = ((hi.x - lo.x).max(hi.y - lo.y), hi.z - lo.z);
-        assert!((w - 13.0 / (std::f64::consts::PI / 6.0).cos()).abs() < 1e-6 && (h - 6.8).abs() < 1e-6, "{w} {h}");
+        assert!((w - 13.0 / pmath::cos(std::f64::consts::PI / 6.0)).abs() < 1e-6 && (h - 6.8).abs() < 1e-6, "{w} {h}");
         // A 608 bearing: 8 x 22 x 7.
         let mut b = Session::default();
         run(&mut b, "parts.insert", json!({"family": "bearing", "size": "608"}));

@@ -3,6 +3,7 @@
 //! dimension edits from its previous solved state, with every failure that remains proven
 //! infeasible; and the solve without continuation when nothing it could help with changed.
 use polycore_geom::Vec2;
+use polycore_geom::pmath;
 
 use crate::construct::switch;
 use crate::model::{ConstraintKind, Sketch};
@@ -103,7 +104,8 @@ fn feasible(d: &[f64], keep: Option<[bool; 2]>, near: Option<(&[Vec2], f64)>) ->
             }
             for q5 in tops.into_iter().filter(|q5| keep.is_none_or(|k| (q4.cross(*q5) > 0.0) == k[1])) {
                 let miss = |phi: f64, theta: f64, w: f64| {
-                    let rot = |q: Vec2| Vec2::new(q.x * theta.cos() - q.y * theta.sin(), q.x * theta.sin() + q.y * theta.cos());
+                    let rot =
+                        |q: Vec2| Vec2::new(q.x * pmath::cos(theta) - q.y * pmath::sin(theta), q.x * pmath::sin(theta) + q.y * pmath::cos(theta));
                     let p3 = Vec2::from_angle(phi) * d03;
                     let (p4, p5) = (p3 + rot(q4), p3 + rot(q5));
                     if far(3, p3, lip * w) || far(4, p4, lip * w) || far(5, p5, lip * w) {

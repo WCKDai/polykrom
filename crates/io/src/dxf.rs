@@ -5,6 +5,7 @@
 //! arcs and points (free-form curves as polylines); the flat pattern's drawing, with ELLIPSE and SPLINE, is
 //! [`crate::write_dxf_drawing`].
 
+use polycore_geom::pmath;
 use std::collections::HashMap;
 
 use polycore_geom::{MAX_BEZIER_DEGREE, Vec2};
@@ -257,7 +258,7 @@ fn convert(ents: &[Ent], k: f64, blocks: &HashMap<String, (Vec2, Vec<Ent>)>, dep
                         let pts = (0..=n)
                             .map(|j| {
                                 let t = t0 + sweep * j as f64 / n as f64;
-                                c + u * (a * t.cos()) + v * t.sin()
+                                c + u * (a * pmath::cos(t)) + v * pmath::sin(t)
                             })
                             .collect();
                         out.push(Geom2::Spline { pts, control: false, degree: 3 });
@@ -298,7 +299,7 @@ struct Affine {
 impl Affine {
     /// A block placed at `ins`: its base point moves there, scaled then rotated.
     fn insert(ins: Vec2, base: Vec2, sx: f64, sy: f64, rot: f64) -> Affine {
-        let (s, c) = rot.sin_cos();
+        let (s, c) = pmath::sin_cos(rot);
         let m = [c * sx, -s * sy, s * sx, c * sy];
         let mb = Vec2::new(m[0] * base.x + m[1] * base.y, m[2] * base.x + m[3] * base.y);
         Affine { m, t: ins - mb }
@@ -359,7 +360,7 @@ impl Affine {
                 let w = u.perp() * (minor / u.len().max(1e-300));
                 match self.uniform() {
                     Some(s) => Geom2::Ellipse { c: self.p(*c), major: self.p(*major), minor: minor * s },
-                    None => sampled(&|t| *c + u * (t * std::f64::consts::TAU).cos() + w * (t * std::f64::consts::TAU).sin(), true),
+                    None => sampled(&|t| *c + u * pmath::cos(t * std::f64::consts::TAU) + w * pmath::sin(t * std::f64::consts::TAU), true),
                 }
             }
             Geom2::Spline { pts, control, degree } => {

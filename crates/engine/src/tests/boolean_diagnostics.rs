@@ -1,9 +1,10 @@
 use super::*;
 use polycore::BooleanStrategy;
+use polycore_geom::pmath;
 
 #[test]
 fn boolean_retry_warning_and_details_survive_cache_undo_and_reopen() {
-    let slope = 1f64.to_radians().tan();
+    let slope = pmath::tan(1f64.to_radians());
     let mut session = Session::default();
     run(&mut session, "sketch.create", json!({"plane":"XZ","name":"Floor section"}));
     run(&mut session, "sketch.line", json!({"points":[[0,0],[100,0],[100,-10.-slope*100.],[0,-10.]],"closed":true}));

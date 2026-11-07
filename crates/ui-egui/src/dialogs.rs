@@ -3,6 +3,7 @@
 //! changes the design itself. Things selected before the command starts become its input.
 
 use crate::ui_kit::choice_row;
+use polykrom_engine::geom::pmath;
 use std::hash::{Hash, Hasher};
 
 use egui::{RichText, vec2};
@@ -3061,7 +3062,7 @@ fn look_at_sketch_from(app: &mut SolveApp, again: bool) {
         // Keep the sketch's own x axis to the right when looking straight down or up.
         if n.z.abs() > 0.999 {
             let x = ss.plane.x;
-            to.yaw = if n.z > 0.0 { (-x.y).atan2(x.x) } else { x.y.atan2(x.x) };
+            to.yaw = if n.z > 0.0 { pmath::atan2(-x.y, x.x) } else { pmath::atan2(x.y, x.x) };
         }
         app.animate_to(onto_sketch(to, ss));
     }

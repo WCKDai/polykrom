@@ -2,6 +2,7 @@
 //! out of reach, limits, and a four-bar reached through its rocker.
 
 use polycore_geom::Vec3;
+use polycore_geom::pmath;
 use serde_json::{Value, json};
 
 use super::tests::{four_bar, meet, occ, part, pin, place, run};
@@ -54,8 +55,8 @@ fn got(r: &Value) -> Vec3 {
 /// shoulder and elbow angles in degrees.
 fn two_link(x: f64, y: f64, l1: f64, l2: f64) -> (f64, f64) {
     let c2 = (x * x + y * y - l1 * l1 - l2 * l2) / (2.0 * l1 * l2);
-    let t2 = c2.acos();
-    let t1 = y.atan2(x) - (l2 * t2.sin()).atan2(l1 + l2 * t2.cos());
+    let t2 = pmath::acos(c2);
+    let t1 = pmath::atan2(y, x) - pmath::atan2(l2 * pmath::sin(t2), l1 + l2 * pmath::cos(t2));
     (t1.to_degrees(), t2.to_degrees())
 }
 
@@ -134,13 +135,13 @@ fn a_limited_elbow_stops_the_reach_and_says_so() {
     assert_eq!(r["reached"], false, "{r}");
     assert_eq!(r["stopped_by_limit"], json!([{"joint": "Elbow", "value": "angle", "limit": "max"}]), "{r}");
     assert!((value(&mut s, "Elbow") - 30.0).abs() < 1e-9, "{r}");
-    let span = (60f64.powi(2) + 40f64.powi(2) + 2.0 * 60.0 * 40.0 * 30f64.to_radians().cos()).sqrt();
+    let span = (60f64.powi(2) + 40f64.powi(2) + 2.0 * 60.0 * 40.0 * pmath::cos(30f64.to_radians())).sqrt();
     let d = 50.0 * 2f64.sqrt();
     assert!(r["error_mm"].as_f64().is_some_and(|e| (e - (span - d)).abs() < 1e-4), "{r}");
     // Only the shoulder moves when only it is given: the tip swings on its circle.
     let mut s = arm(false, 30.0);
     let r = reach(&mut s, "Fore", tip, json!({"point": [0, 100, 0], "joints": ["Shoulder"]}));
-    let span = (60f64.powi(2) + 40f64.powi(2) + 2.0 * 60.0 * 40.0 * 30f64.to_radians().cos()).sqrt();
+    let span = (60f64.powi(2) + 40f64.powi(2) + 2.0 * 60.0 * 40.0 * pmath::cos(30f64.to_radians())).sqrt();
     assert!(r["error_mm"].as_f64().is_some_and(|e| (e - (100.0 - span)).abs() < 1e-4), "{r}");
     assert!((value(&mut s, "Elbow") - 30.0).abs() < 1e-12, "{r}");
 }
@@ -153,7 +154,7 @@ fn a_linked_joint_follows_the_reach() {
     let mut s = arm(false, 0.0);
     run(&mut s, "joint.motion_link", json!({"a": "Shoulder", "b": "Elbow", "ratio": -1}));
     let th = 40f64.to_radians();
-    let to = json!([40.0 + 60.0 * th.cos(), 60.0 * th.sin(), 0.0]);
+    let to = json!([40.0 + 60.0 * pmath::cos(th), 60.0 * pmath::sin(th), 0.0]);
     let r = reach(&mut s, "Fore", tip, json!({"point": to}));
     assert_eq!(r["reached"], true, "{r}");
     assert!((value(&mut s, "Shoulder") - 40.0).abs() < 1e-6 && (value(&mut s, "Elbow") + 40.0).abs() < 1e-6, "{r}");
@@ -260,15 +261,15 @@ fn a_lone_slider_travels_all_the_way() {
 fn a_four_bar_reaches_with_its_rocker() {
     let (mut s, _, q0) = four_bar();
     let o4 = Vec3::new(45.0, 0.0, 0.0);
-    let start = q0.y.atan2(q0.x - 45.0);
-    let swing = |deg: f64| o4 + Vec3::new((start + deg.to_radians()).cos(), (start + deg.to_radians()).sin(), 0.0) * 40.0;
+    let start = pmath::atan2(q0.y, q0.x - 45.0);
+    let swing = |deg: f64| o4 + Vec3::new(pmath::cos(start + deg.to_radians()), pmath::sin(start + deg.to_radians()), 0.0) * 40.0;
     let r = run(&mut s, "joint.reach", json!({"occurrence": "Rocker", "at": pt(q0), "point": pt(swing(-10.0))}));
     assert_eq!((&r["reached"], &r["stopped_by_loop"]), (&json!(true), &Value::Null), "{r}");
     assert_eq!(r["conflicts"].as_array().map(Vec::len), Some(0), "{r}");
     assert!(place(&s, "Rocker", q0).dist(swing(-10.0)) < 1e-6 && place(&s, "Coupler", q0).dist(swing(-10.0)) < 1e-6, "{r}");
     // The crank turned to where the loop closes with the rocker there (its pin on the coupler's circle).
     let th = (90.0 + value(&mut s, "Crank")).to_radians();
-    let crank_pin = Vec3::new(20.0 * th.cos(), 20.0 * th.sin(), 0.0);
+    let crank_pin = Vec3::new(20.0 * pmath::cos(th), 20.0 * pmath::sin(th), 0.0);
     assert!((crank_pin.dist(swing(-10.0)) - 50.0).abs() < 1e-6 && place(&s, "Coupler", Vec3::new(0.0, 20.0, 0.0)).dist(crank_pin) < 1e-6, "{r}");
     // Past its toggle position (|Q| = 30) the loop stops it there.
     let (mut s, _, q0) = four_bar();
@@ -277,7 +278,7 @@ fn a_four_bar_reaches_with_its_rocker() {
     // Its joints have no limits, so none is named.
     assert_eq!(r["stopped_by_limit"], Value::Null, "{r}");
     assert_eq!(r["conflicts"].as_array().map(Vec::len), Some(0), "{r}");
-    let limit = ((900.0f64 - 3625.0) / 3600.0).acos().to_degrees() - start.to_degrees();
+    let limit = pmath::acos((900.0f64 - 3625.0) / 3600.0).to_degrees() - start.to_degrees();
     let at = value(&mut s, "Rocker");
     assert!(at > limit - 0.5 && at <= limit + 1e-6, "stopped at {at}°, the toggle is at {limit}°: {r}");
     let [m1, m2] = meet(o4, 40.0, Vec3::ZERO, 30.0);
@@ -320,10 +321,10 @@ fn reach_refuses_bad_params_and_says_why_nothing_moves() {
 fn reach_preserves_full_diagnostics_without_repeating_dof_analysis() {
     let (mut s, _, q0) = four_bar();
     let o4 = Vec3::new(45.0, 0.0, 0.0);
-    let start = q0.y.atan2(q0.x - 45.0);
+    let start = pmath::atan2(q0.y, q0.x - 45.0);
     for (angle, quiet) in [(-10.0_f64, false), (-5.0, true), (-5.0, true), (100.0, false)] {
         let a = start + angle.to_radians();
-        let to = o4 + Vec3::new(40.0 * a.cos(), 40.0 * a.sin(), 0.0);
+        let to = o4 + Vec3::new(40.0 * pmath::cos(a), 40.0 * pmath::sin(a), 0.0);
         super::solve_counts::take();
         let r = reach(&mut s, "Rocker", q0, json!({"point":pt(to), "continuous":true, "quiet":quiet}));
         assert_eq!(super::solve_counts::take().1, usize::from(!quiet));

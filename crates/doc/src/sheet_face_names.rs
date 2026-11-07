@@ -5,6 +5,7 @@
 //! neighbouring flange), the rim along the bend there, `<flange>:rim.ext0` and `rim.ext1`. A panel is `base` or a flange's tag (`F<feature>.<k>`), so the names
 //! say what each face is and stay with it when sizes change or other flanges come and go.
 
+use polycore_geom::pmath;
 use polycore_geom::{Vec2, Vec3};
 
 use super::SheetBody;
@@ -81,7 +82,7 @@ impl SheetBody {
             } else {
                 continue;
             };
-            let phi = radial.dot(toward).atan2(radial.dot(start));
+            let phi = pmath::atan2(radial.dot(toward), radial.dot(start));
             if phi < -1e-6 || phi > f.angle.abs() + 1e-6 {
                 continue;
             }

@@ -3,6 +3,7 @@
 //! (fixed LCG seeds), no timing.
 
 use polycore_geom::Vec2;
+use polycore_geom::pmath;
 
 use crate::construct::{Placement, seed};
 use crate::decompose::Budget;
@@ -26,7 +27,7 @@ fn fan(rnd: &mut Lcg, k: usize, lo: f64, hi: f64, on: bool) -> (usize, usize) {
             .map(|i| {
                 let t = i as f64 / k as f64 * std::f64::consts::TAU;
                 let r = 30.0 + rnd.next() * 10.0;
-                sk.add_point(v(r * t.cos(), r * t.sin()), None).unwrap()
+                sk.add_point(v(r * pmath::cos(t), r * pmath::sin(t)), None).unwrap()
             })
             .collect();
         let pos = |sk: &Sketch, i: usize| sk.points[ids[i]].pos;

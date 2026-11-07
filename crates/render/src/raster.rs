@@ -2,6 +2,7 @@
 //! lines, rendered at 2× and downsampled for anti-aliasing.
 
 use polycore_geom::Vec3;
+use polycore_geom::pmath;
 
 use crate::Camera;
 use crate::scene::{Rgb, SECTION_CAP, Scene, png};
@@ -152,7 +153,7 @@ pub fn render(scene: &Scene, cam: &Camera, w: usize, h: usize) -> Canvas {
                 }
                 let gx = ((b[2] - a[2]) * (cc[1] - a[1]) - (cc[2] - a[2]) * (b[1] - a[1])) / area;
                 let gy = ((cc[2] - a[2]) * (b[0] - a[0]) - (b[2] - a[2]) * (cc[0] - a[0])) / area;
-                let tri_slope = gx.hypot(gy) as f32;
+                let tri_slope = pmath::hypot(gx, gy) as f32;
                 for y in y0 as usize..=y1 as usize {
                     for x in x0 as usize..=x1 as usize {
                         let (px, py) = (x as f64 + 0.5, y as f64 + 0.5);
@@ -221,7 +222,7 @@ pub fn render(scene: &Scene, cam: &Camera, w: usize, h: usize) -> Canvas {
             }
         }
     }
-    let cap_slope = cap_z.map_or(0.0, |[a, b, _]| a.hypot(b) as f32);
+    let cap_slope = cap_z.map_or(0.0, |[a, b, _]| pmath::hypot(a, b) as f32);
     for ((d, s), cz) in c.depth.iter_mut().zip(slope.iter_mut()).zip(&cap_depth) {
         if cz.is_finite() {
             *d = *cz;
@@ -474,11 +475,11 @@ mod tests {
     /// A sheet facing the front camera, turned back by `tilt` about X: the plane y = z·tan(tilt)
     /// over x in ±15, z in ±`h`.
     fn sheet(tilt: f64, h: f64) -> Mesh {
-        let t = tilt.tan();
+        let t = pmath::tan(tilt);
         let c = [(-15.0, -h), (15.0, -h), (15.0, h), (-15.0, h)].map(|(x, z)| Vec3::new(x, z * t, z));
         Mesh {
             positions: c.to_vec(),
-            normals: vec![Vec3::new(0.0, -tilt.cos(), tilt.sin()); 4],
+            normals: vec![Vec3::new(0.0, -pmath::cos(tilt), pmath::sin(tilt)); 4],
             triangles: vec![[0, 1, 2], [0, 2, 3]],
             tri_face: vec![0, 0],
             ..Default::default()
@@ -489,7 +490,7 @@ mod tests {
     /// radius `radius`.
     fn close_view(mesh: Mesh, lines: Vec<SceneLine>, radius: f64, fov: f64) -> (Scene, Camera) {
         let scene = Scene { meshes: vec![SceneMesh::solid(Arc::new(mesh), Rgb(160, 165, 175))], lines, radius, ..Default::default() };
-        let mut cam = Camera { distance: if fov > 0.0 { 20.0 / (fov * 0.5).tan() } else { 50.0 }, fov, ..Default::default() };
+        let mut cam = Camera { distance: if fov > 0.0 { 20.0 / pmath::tan(fov * 0.5) } else { 50.0 }, fov, ..Default::default() };
         cam.set_view(StandardView::Front);
         (scene, cam)
     }
@@ -510,7 +511,7 @@ mod tests {
         for fov in [0.0, 0.6] {
             for tilt in [0.0, 45f64.to_radians()] {
                 // 1 mm behind the sheet, along its normal, across the middle.
-                let back = Vec3::new(0.0, tilt.cos(), -tilt.sin());
+                let back = Vec3::new(0.0, pmath::cos(tilt), -pmath::sin(tilt));
                 let edge = SceneLine {
                     points: vec![Vec3::new(-10.0, 0.0, 0.0) + back, Vec3::new(10.0, 0.0, 0.0) + back],
                     color: Rgb(255, 0, 0),
@@ -532,7 +533,7 @@ mod tests {
     #[test]
     fn edges_on_a_steep_face_draw_whole() {
         let tilt = 70f64.to_radians();
-        let on = |x: f64, z: f64| Vec3::new(x, z * tilt.tan(), z);
+        let on = |x: f64, z: f64| Vec3::new(x, z * pmath::tan(tilt), z);
         let line = |points: Vec<Vec3>| SceneLine { points, color: Rgb(255, 0, 0), width: 1.2, on_top: false };
         for fov in [0.0, 0.6] {
             for radius in [30.0, 1200.0] {

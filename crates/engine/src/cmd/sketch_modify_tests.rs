@@ -1,4 +1,5 @@
 use polycore_geom::Vec2;
+use polycore_geom::pmath;
 use polykrom_sketch::{ConstraintKind, CurveKind};
 use serde_json::{Value, json};
 
@@ -1193,7 +1194,7 @@ fn periodic_closed_offset_chain_break_drag_reopen_and_material_volume() {
     let perimeter = (0..=n)
         .map(|i| {
             let t = i as f64 * h;
-            (144.0 * t.sin().powi(2) + 25.0 * t.cos().powi(2)).sqrt()
+            (144.0 * pmath::sin(t).powi(2) + 25.0 * pmath::cos(t).powi(2)).sqrt()
                 * if i == 0 || i == n {
                     1.0
                 } else if i % 2 == 0 {
@@ -1303,8 +1304,8 @@ fn periodic_offset_extrusion_survives_post_extrude_span_changes_and_cold_reopen(
         let u = axis / axis.len();
         let v = Vec2::new(-u.y, u.x);
         let t: f64 = 0.2;
-        let ellipse = centre + u * (major * t.cos()) + v * (5.0 * t.sin());
-        let gradient = u * (t.cos() / major) + v * (t.sin() / 5.0);
+        let ellipse = centre + u * (major * pmath::cos(t)) + v * (5.0 * pmath::sin(t));
+        let gradient = u * (pmath::cos(t) / major) + v * (pmath::sin(t) / 5.0);
         let normal = gradient / gradient.len();
         eprintln!("major={major} centre={centre:?} axis={axis:?}");
         assert!(ring.region.contains(ellipse + normal * 1.25), "major={major}, ring area={}", ring.area);
@@ -1315,7 +1316,7 @@ fn periodic_offset_extrusion_survives_post_extrude_span_changes_and_cold_reopen(
         let perimeter = (0..=n)
             .map(|i| {
                 let t = i as f64 * h;
-                (major * major * t.sin().powi(2) + 25.0 * t.cos().powi(2)).sqrt()
+                (major * major * pmath::sin(t).powi(2) + 25.0 * pmath::cos(t).powi(2)).sqrt()
                     * if i == 0 || i == n {
                         1.0
                     } else if i % 2 == 0 {

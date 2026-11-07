@@ -1,3 +1,4 @@
+use polycore_geom::pmath;
 use std::f64::consts::PI;
 
 use serde_json::{Value, json};
@@ -248,8 +249,8 @@ fn disc_overlap(r1: f64, r2: f64, d: f64) -> f64 {
     if d <= (r1 - r2).abs() {
         return PI * r1.min(r2) * r1.min(r2);
     }
-    let a = ((d * d + r1 * r1 - r2 * r2) / (2.0 * d * r1)).acos();
-    let b = ((d * d + r2 * r2 - r1 * r1) / (2.0 * d * r2)).acos();
+    let a = pmath::acos((d * d + r1 * r1 - r2 * r2) / (2.0 * d * r1));
+    let b = pmath::acos((d * d + r2 * r2 - r1 * r1) / (2.0 * d * r2));
     r1 * r1 * a + r2 * r2 * b - 0.5 * ((-d + r1 + r2) * (d + r1 - r2) * (d - r1 + r2) * (d + r1 + r2)).sqrt()
 }
 
@@ -334,7 +335,7 @@ mod xz_plane;
 /// (c2, r2) cross: the triangle of its contacts and the corner, less the three circular segments.
 fn round_gap(c1: [f64; 2], r1: f64, c2: [f64; 2], r2: f64, x: [f64; 2], r: f64) -> f64 {
     let (a, b) = (r1 + r, r2 + r);
-    let d = (c2[0] - c1[0]).hypot(c2[1] - c1[1]);
+    let d = pmath::hypot(c2[0] - c1[0], c2[1] - c1[1]);
     let u = [(c2[0] - c1[0]) / d, (c2[1] - c1[1]) / d];
     let along = (a * a - b * b + d * d) / (2.0 * d);
     let side = if (x[0] - c1[0]) * -u[1] + (x[1] - c1[1]) * u[0] < 0.0 { -1.0 } else { 1.0 };
@@ -344,9 +345,9 @@ fn round_gap(c1: [f64; 2], r1: f64, c2: [f64; 2], r2: f64, x: [f64; 2], r: f64) 
     let t2 = [c2[0] + (f[0] - c2[0]) * r2 / b, c2[1] + (f[1] - c2[1]) * r2 / b];
     let angle = |c: [f64; 2], p: [f64; 2], q: [f64; 2]| {
         let (v, w) = ([p[0] - c[0], p[1] - c[1]], [q[0] - c[0], q[1] - c[1]]);
-        ((v[0] * w[0] + v[1] * w[1]) / (v[0].hypot(v[1]) * w[0].hypot(w[1]))).clamp(-1.0, 1.0).acos()
+        pmath::acos(((v[0] * w[0] + v[1] * w[1]) / (pmath::hypot(v[0], v[1]) * pmath::hypot(w[0], w[1]))).clamp(-1.0, 1.0))
     };
-    let segment = |r: f64, t: f64| r * r * (t - t.sin()) / 2.0;
+    let segment = |r: f64, t: f64| r * r * (t - pmath::sin(t)) / 2.0;
     let triangle = ((x[0] - t1[0]) * (t2[1] - t1[1]) - (t2[0] - t1[0]) * (x[1] - t1[1])).abs() / 2.0;
     triangle - segment(r1, angle(c1, t1, x)) - segment(r2, angle(c2, x, t2)) - segment(r, angle(f, t2, t1))
 }
@@ -410,7 +411,7 @@ fn fillet_and_chamfer_the_top_loop_of_rounded_overlapping_cylinders() {
     let half = big / 2.0;
     let yb = ((big + round).powi(2) - half * half).sqrt();
     run(&mut s, "solid.fillet", json!({"edges": [[-half, half * 3f64.sqrt(), 5], [-half, -half * 3f64.sqrt(), 5]], "radius": round}));
-    let (a1, th) = (yb.atan2(half), 2.0 * (half / (big + round)).asin());
+    let (a1, th) = (pmath::atan2(yb, half), 2.0 * pmath::asin(half / (big + round)));
     let base = volume(&mut s);
     let top = [[big, 0.0, h], [-2.0 * big, 0.0, h], [-half, yb - round, h], [-half, round - yb, h]];
     // Removed volume by Pappus: the corner's section swept along the loop at its centroid's offset.
@@ -526,7 +527,7 @@ fn revolved_planar_faces_come_out_whole() {
         run(&mut s, "sketch.finish", json!({}));
         run(&mut s, "solid.revolve", json!({"axis": "Z", "angle": angle}));
         // Picks at 170°, in the last patch, which 240° covers whichever way it turns.
-        let at = |r: f64, z: f64| json!([r * 170f64.to_radians().cos(), r * 170f64.to_radians().sin(), z]);
+        let at = |r: f64, z: f64| json!([r * pmath::cos(170f64.to_radians()), r * pmath::sin(170f64.to_radians()), z]);
         // The flange's top annulus (z = 6, r 18…30), well inside it.
         let sk = run(&mut s, "sketch.create", json!({"plane": {"face": at(24.0, 6.0)}}));
         assert_eq!(sk["attachment"], "exact_face", "{angle}°: {sk}");
@@ -1199,7 +1200,7 @@ fn join_onto_a_finely_faceted_import() {
     std::fs::create_dir_all(&dir).unwrap();
     let n = 4000;
     let mut pts: Vec<[f64; 2]> =
-        (0..n).map(|i| std::f64::consts::TAU * f64::from(i) / f64::from(n)).map(|a| [20.0 * a.cos(), 20.0 * a.sin()]).collect();
+        (0..n).map(|i| std::f64::consts::TAU * f64::from(i) / f64::from(n)).map(|a| [20.0 * pmath::cos(a), 20.0 * pmath::sin(a)]).collect();
     pts.push(pts[0]);
     let mut s = Session::default();
     run(&mut s, "sketch.create", json!({"plane": "XY", "name": "P"}));
@@ -2946,7 +2947,7 @@ fn unequal_chamfers() {
     assert!(rel(volume(&mut s), 24000.0 - 0.5 * 2.0 * 4.0 * 40.0) < 1e-6, "{}", volume(&mut s));
     // Bottom back edge: 3 along the bottom, at 30° from it (down the back face 3·tan 30°).
     run(&mut s, "solid.chamfer", json!({"edges": [[20, 30, 0]], "distance": 3, "angle": "30 deg", "flip": true}));
-    let d2 = 3.0 * (30f64).to_radians().tan();
+    let d2 = 3.0 * pmath::tan((30f64).to_radians());
     assert!(rel(volume(&mut s), 24000.0 - 160.0 - 0.5 * 3.0 * d2 * 40.0) < 1e-6, "{}", volume(&mut s));
     assert!(s.execute("solid.chamfer", &json!({"edges": [[0, 15, 20]], "distance": 1, "distance2": 2, "angle": "30 deg"})).is_err());
 }
@@ -2968,7 +2969,7 @@ fn unequal_chamfers_on_circular_rims() {
     assert!(rel(full - volume(&mut s), top) < 5e-3, "{} vs {top}", full - volume(&mut s));
     // Bottom rim: 2 along the bottom at 30° from it (flipped: the wall would be first).
     run(&mut s, "solid.chamfer", json!({"edges": [[10, 0, 0]], "distance": 2, "angle": "30 deg", "flip": true}));
-    let d2 = 2.0 * 30f64.to_radians().tan();
+    let d2 = 2.0 * pmath::tan(30f64.to_radians());
     let bottom = ring([10.0, 8.0, 10.0], (2.0, d2));
     assert!(rel(full - volume(&mut s), top + bottom) < 5e-3, "{} vs {}", full - volume(&mut s), top + bottom);
     // Flipped on the top rim instead: 2 down the wall, 3 across the top (a different solid).
@@ -4129,7 +4130,7 @@ fn tapered_extrude_of_a_profile_mixing_lines_and_an_arc() {
     run(&mut s, "sketch.arc.center_point", json!({"center": [0, 0], "start": [0, -4.6], "end": [0, 4.6]}));
     run(&mut s, "sketch.finish", json!({}));
     run(&mut s, "solid.extrude", json!({"sketch": "D", "distance": 10, "taper": "5 deg"}));
-    let (t, h) = (5f64.to_radians().tan(), 10.0);
+    let (t, h) = (pmath::tan(5f64.to_radians()), 10.0);
     let (a0, p, k) = (7.4 * 9.2 + PI * 4.6 * 4.6 / 2.0, 2.0 * 7.4 + 9.2 + PI * 4.6, 2.0 + PI / 2.0);
     let expect = a0 * h + p * t * h * h / 2.0 + k * t * t * h.powi(3) / 3.0;
     assert!(rel(volume(&mut s), expect) < 1e-3, "{} vs {expect}", volume(&mut s));
@@ -4177,7 +4178,7 @@ fn draft_on_a_cylinder_side_makes_a_frustum() {
     run(&mut s, "solid.cylinder", json!({"radius": 10, "height": 20}));
     run(&mut s, "solid.draft", json!({"faces": [[10, 0, 10]], "angle": "5 deg", "neutral": "XY"}));
     let (big, h) = (10.0, 20.0);
-    let small = big - h * 5f64.to_radians().tan();
+    let small = big - h * pmath::tan(5f64.to_radians());
     let expect = PI * h / 3.0 * (big * big + big * small + small * small);
     assert!(rel(volume(&mut s), expect) < 1e-3, "{} vs {expect}", volume(&mut s));
 }

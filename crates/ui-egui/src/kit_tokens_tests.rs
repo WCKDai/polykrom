@@ -4,6 +4,7 @@
 //! `tokens/observed-current.json`, where the views put them), so a drifted palette or a newer kit
 //! fails here. The light theme keeps the accent's hue and its text reads at WCAG AA.
 
+use polykrom_engine::geom::pmath;
 use std::collections::BTreeMap;
 
 use egui::Color32;
@@ -185,15 +186,15 @@ fn text_reads_on_the_dark_shell_in_every_colour_vision_mode() {
 fn oklch_hue(c: Color32) -> f64 {
     let lin = |v: u8| {
         let v = f64::from(v) / 255.0;
-        if v <= 0.04045 { v / 12.92 } else { ((v + 0.055) / 1.055).powf(2.4) }
+        if v <= 0.04045 { v / 12.92 } else { pmath::powf((v + 0.055) / 1.055, 2.4) }
     };
     let (r, g, b) = (lin(c.r()), lin(c.g()), lin(c.b()));
-    let l = (0.412_221_470_8 * r + 0.536_332_536_3 * g + 0.051_445_992_9 * b).cbrt();
-    let m = (0.211_903_498_2 * r + 0.680_699_545_1 * g + 0.107_396_956_6 * b).cbrt();
-    let s = (0.088_302_461_9 * r + 0.281_718_837_6 * g + 0.629_978_700_5 * b).cbrt();
+    let l = pmath::cbrt(0.412_221_470_8 * r + 0.536_332_536_3 * g + 0.051_445_992_9 * b);
+    let m = pmath::cbrt(0.211_903_498_2 * r + 0.680_699_545_1 * g + 0.107_396_956_6 * b);
+    let s = pmath::cbrt(0.088_302_461_9 * r + 0.281_718_837_6 * g + 0.629_978_700_5 * b);
     let a = 1.977_998_495_1 * l - 2.428_592_205 * m + 0.450_593_709_9 * s;
     let b = 0.025_904_037_1 * l + 0.782_771_766_2 * m - 0.808_675_766 * s;
-    b.atan2(a).to_degrees().rem_euclid(360.0)
+    pmath::atan2(b, a).to_degrees().rem_euclid(360.0)
 }
 
 /// The light theme's accent is the kit's lime, deepened: the same hue, and 4.5:1 or better as

@@ -6,6 +6,7 @@
 //! The default font is embedded (Liberation Sans, SIL OFL 1.1; see `assets/fonts/liberation-sans/OFL.txt` and
 //! ATTRIBUTION.md); [`crate::fonts`] finds others by file path or installed family name.
 
+use polycore_geom::pmath;
 use polycore_geom::{Ring, Vec2};
 use serde::{Deserialize, Serialize};
 
@@ -204,7 +205,7 @@ pub fn text_geometry_styled(
     let k = height / cap_height(&face);
     let line_gap = f64::from(face.ascender()) - f64::from(face.descender()) + f64::from(face.line_gap());
     let line_gap = if line_gap > 0.0 { line_gap * k } else { height * 1.5 } * style.line_spacing;
-    let shear = if slant { SLANT_DEG.to_radians().tan() } else { 0.0 };
+    let shear = if slant { pmath::tan(SLANT_DEG.to_radians()) } else { 0.0 };
     // Each line's glyphs (glyph, where its origin is along the line, its advance) and width.
     let lines: Vec<(Vec<(ttf_parser::GlyphId, f64, f64)>, f64)> = text
         .split('\n')
@@ -223,7 +224,7 @@ pub fn text_geometry_styled(
         .collect();
     let along = path.map(|pts| Path::new(pts, style.reverse)).transpose()?;
     let anchor = along.as_ref().map(|p| p.anchor(style.align)).unwrap_or(0.0);
-    let (sin, cos) = angle.sin_cos();
+    let (sin, cos) = pmath::sin_cos(angle);
     let mut out = Vec::new();
     for (row, (glyphs, width)) in lines.iter().enumerate() {
         let base_y = -(row as f64) * line_gap;

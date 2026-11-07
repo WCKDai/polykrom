@@ -47,6 +47,7 @@
 //! edges that end at a bend or a cut edge, loops of bends, two faces that meet along more than
 //! one edge, a wall on part of an edge of a face other than the fixed one.
 
+use polycore_geom::pmath;
 use std::collections::BTreeMap;
 use std::f64::consts::{FRAC_PI_2, PI, TAU};
 
@@ -798,7 +799,7 @@ pub fn convert_body(
             let child =
                 face_of(to).map_err(|e| DocError::Invalid(format!("the face across the bend at {} can't be a face of the sheet: {e}", at(p))))?;
             let Some(parent) = panels.get(&from) else { continue };
-            let theta = parent.face.n.dot(child.n).clamp(-1.0, 1.0).acos();
+            let theta = pmath::acos(parent.face.n.dot(child.n).clamp(-1.0, 1.0));
             if !(theta > 1e-6 && theta < std::f64::consts::PI - 1e-6) {
                 return err(format!("the faces at the bend at {} must meet at an angle between 0 and 180°", at(p)));
             }
@@ -806,7 +807,7 @@ pub fn convert_body(
             let o = parent.face.pts.first().copied().unwrap_or_default();
             let lift = child.pts.iter().map(|q| (*q - o).dot(parent.face.n)).fold(0.0, |m: f64, h| if h.abs() > m.abs() { h } else { m });
             let (angle, sharp) = if lift < 0.0 { (theta, r + t) } else { (-theta, r) };
-            panels.insert(to, Panel { face: child, parent: Some(from), angle, setback: sharp * (theta / 2.0).tan() });
+            panels.insert(to, Panel { face: child, parent: Some(from), angle, setback: sharp * pmath::tan(theta / 2.0) });
             order.push(to);
         }
         todo = rest;
