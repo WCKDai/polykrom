@@ -778,6 +778,86 @@ fn the_actions_and_the_footer_stay_at_the_cards_bottom_and_only_the_body_scrolls
     }
 }
 
+/// The floating card is as tall as its content, and no taller than its room (the v0.21.0
+/// picture checks: with a feature of three parameters and no dependents selected, a large empty
+/// gap stood between "No dependent features" and the pinned Edit feature / Edit sketch buttons).
+/// At 1600 × 1000, where the content fits its room: the body is as tall as its content, the
+/// actions follow it at their spacing, the footer stands at the card's bottom, and the card ends
+/// above the history strip, a shorter card for short content (a counterbore hole: its diameter,
+/// the counterbore's diameter and depth, no dependents) than for long (the hole with its
+/// dependents, edited in place). At 1366 × 768, where either content is taller than the room
+/// between the view cube and the strip: the card fills its room down to the strip, the body is
+/// shorter than its content and scrolls, and the actions and the footer stay in sight at the
+/// card's bottom, as before.
+#[test]
+fn the_floating_card_is_as_tall_as_short_content_and_no_taller_than_its_room() {
+    use crate::scenario::{count_of, rect_of};
+    let t = crate::theme::Tokens::get();
+    let gap = crate::shell::SHELL_GAP;
+    let mut h = mount();
+    h.app
+        .run(
+            "solid.hole",
+            json!({"position": [60, 40, 8], "diameter": "6 mm", "type": "counterbore", "cb_diameter": "11 mm", "cb_depth": "3 mm", "name": "Counterbored hole"}),
+        )
+        .unwrap();
+    h.frames(2);
+    let rect = |name: &str, case: &str| rect_of(name).unwrap_or_else(|| panic!("{case}: {name}"));
+    for (width, height) in [(1600.0_f32, 1000.0_f32), (1366.0, 768.0)] {
+        h.call("ui.resize", json!({"width": width, "height": height}));
+        let mut heights = Vec::new();
+        for editor in [false, true] {
+            select(&mut h, if editor { "Mounting hole" } else { "Counterbored hole" });
+            if editor {
+                h.step(&json!({"widget": "Edit feature"})).unwrap();
+            }
+            h.frames(3);
+            let case = format!("{width}×{height}, {}", if editor { "the hole edited in place" } else { "the counterbore hole" });
+            assert_eq!(h.app.properties.editor.is_some(), editor, "{case}");
+            assert_eq!(h.widget("No dependent features").is_some(), !editor, "{case}: short content");
+            let card = rect("properties:panel", &case);
+            let body = rect("properties:body", &case);
+            let content = count_of("properties:body_content_height").unwrap_or_else(|| panic!("{case}: the body's content height")) as f32;
+            let first_action = rect(if editor { "properties:apply" } else { "properties:edit" }, &case);
+            let footer = rect("dialog:note:properties_footer", &case);
+            let history = h.app.shell.history.unwrap_or_else(|| panic!("{case}: the history strip"));
+            let room = history.top() - gap;
+            // At the kit's size the content fits its room; in the laptop window it is taller.
+            let fits = height == 1000.0;
+            heights.push(card.height());
+            assert!(
+                card.contains_rect(first_action) && card.contains_rect(footer),
+                "{case}: {first_action:?} and the footer {footer:?} are in sight in {card:?}"
+            );
+            assert!(card.bottom() - footer.bottom() <= t.space_24, "{case}: the footer {footer:?} stands at the card's bottom {card:?}");
+            assert!(body.top() - card.top() <= t.space_24, "{case}: the body {body:?} starts at the card's top {card:?}");
+            assert!(
+                first_action.top() - body.bottom() <= t.space_8 + 2.0 * t.form_gap_y + 1.0,
+                "{case}: an empty gap between the body {body:?} and the first action {first_action:?}"
+            );
+            if fits {
+                assert!((body.height() - content).abs() <= 2.0, "{case}: the body {body:?} is as tall as its content, {content}");
+                assert!(card.bottom() < room - 1.0, "{case}: the card {card:?} ends above the history strip {history:?}");
+            } else {
+                assert!(body.height() < content - 2.0, "{case}: the body {body:?} is shorter than its content, {content}, and scrolls");
+                assert!((card.bottom() - room).abs() <= 1.0, "{case}: the card {card:?} fills its room down to the strip {history:?}");
+            }
+            if editor {
+                super::cancel(&mut h.app);
+                h.frames(2);
+            }
+        }
+        if height == 1000.0 {
+            assert!(
+                heights[0] < heights[1] - t.space_24,
+                "{width}×{height}: the short content's card is shorter than the long content's: {heights:?}"
+            );
+        } else {
+            assert!((heights[0] - heights[1]).abs() <= 1.0, "{width}×{height}: both cards fill the room: {heights:?}");
+        }
+    }
+}
+
 #[test]
 fn the_panel_gives_way_to_the_inspector_the_review_panel_dialogs_and_tools() {
     let mut h = mount();

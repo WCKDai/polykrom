@@ -8,7 +8,11 @@
 //! the engine's headless picture path as `review-model-before.png` (before Apply, the Ø8 holes)
 //! and `review-model-after.png` (after it, Ø10). The card is also painted in 1366 × 768 and
 //! 1280 × 720 windows, and at 1366 × 768 in Japanese and Chinese, where its body scrolls under
-//! the pinned actions. Written to `target/review-media/<surface>-<mode>-<stage>.png`, where
+//! the pinned actions. A short proposal (the edge fillet's radius: one changed value, no
+//! dependents) is painted at 1600 × 1000 and 1366 × 768 (`review-card-short-…`,
+//! `review-card-short-1366-…`): the card is as tall as its content where that fits, and no
+//! taller than the room between the view cube and the history strip where it does not. Written
+//! to `target/review-media/<surface>-<mode>-<stage>.png`, where
 //! the stage is `REVIEW_MEDIA_STAGE` (default `after`); the same test on the base commit paints
 //! the app as it was (`before`). Nothing here is committed: the pictures are evidence for a review.
 
@@ -206,6 +210,37 @@ fn review_flow_pictures() {
         h.call("ui.agent_chat", json!({"stop": true}));
         h.frames(2);
         // The stop's status toast is not part of the next picture.
+        h.app.status = None;
+
+        // A short proposal (the edge fillet's radius: one changed value, no dependent feature) at
+        // the kit's size and in a laptop window: the card is as tall as its content where that
+        // fits, and no taller than its room where it does not; the actions and the footer are in
+        // view either way.
+        h.call("ui.review", json!({"prompt": "Round the edges to R3."}));
+        let short = json!({"command": "timeline.edit", "params": {"feature": "Edge finish", "set": {"radius": "3 mm"}}});
+        let r = h.call("ui.review", json!({"propose": {"commands": [short], "label": "Resize edge fillet"}}));
+        assert_eq!(r["ok"], true, "{r}");
+        settle_preview(&mut h);
+        for (size, name) in [(WINDOW, "review-card-short"), (egui::vec2(1366.0, 768.0), "review-card-short-1366")] {
+            h.call("ui.resize", json!({"width": size.x, "height": size.y}));
+            h.frames(3);
+            let (shot, ppp) = paint_in(&mut h, &file(name, mode), size, "en");
+            let card = scenario::rect_of("review:panel").expect("the Review changes card");
+            crop(&shot, card, 4.0, ppp, &file(&format!("{name}-only"), mode));
+            if after {
+                let window = Rect::from_min_size(egui::Pos2::ZERO, size);
+                let cube = scenario::rect_of("axis_view:outer").expect("the view cube");
+                assert!(card.top() >= cube.bottom(), "{mode} {name}: the card {card:?} covers the view cube {cube:?}");
+                for handle in ["review:apply", "review:cancel", "dialog:note:review_footer"] {
+                    let r = scenario::rect_of(handle).unwrap_or_else(|| panic!("{handle}"));
+                    assert!(card.contains_rect(r) && window.contains_rect(r), "{mode} {name}: {handle} {r:?} is not in view in the card {card:?}");
+                }
+            }
+        }
+        h.call("ui.resize", json!({"width": WINDOW.x, "height": WINDOW.y}));
+        let r = h.call("ui.review", json!({"cancel": true}));
+        assert_eq!(r["ok"], true, "{r}");
+        h.frames(2);
         h.app.status = None;
 
         // View 04: the proposal (the Ø10 holes) under review, the request still in the row.

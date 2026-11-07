@@ -13,8 +13,9 @@
 //! a scratch copy of the session rolled back to just before the feature ([`build_dialog`]).
 //! Features whose dialog has no plain value fields (or no dialog at all) keep their existing way
 //! of editing, and the panel says which it is ([`Edits`]). The actions, their note and the
-//! footer line stand at the card's bottom; the body above them scrolls when the window is short
-//! ([`contents`]).
+//! footer line stand at the card's bottom; the floating card is as tall as its content and no
+//! taller than the room between the view cube and the history strip, where the body above them
+//! scrolls ([`contents`]).
 //!
 //! With nothing selected the panel shows the design's properties (project, part number,
 //! revision, author, organization, description and licence) in the same layout; **Edit
@@ -682,6 +683,7 @@ pub fn panel(app: &mut SolveApp, ui: &mut egui::Ui) {
         // Floating, the card is glass over the canvas like the other floating cards.
         let frame = container.glass_frame(ui.ctx(), t.panel, crate::frame::Side::Right).inner_margin(t.space_10 as i8);
         let inner = PANEL_WIDTH - frame.total_margin().sum().x;
+        // The room: the card is as tall as its content, and no taller than this (`contents`).
         let height = (bottom - top - frame.total_margin().sum().y).max(0.0);
         // Over the canvas (the panels' layer) but under every floating window and card, in any
         // frame order: the background order, which egui keeps below the middle order the windows
@@ -692,8 +694,8 @@ pub fn panel(app: &mut SolveApp, ui: &mut egui::Ui) {
                 |ui| {
                     container.show_frame(ui, frame, available, |ui| {
                         ui.set_width(inner);
-                        ui.set_min_height(height);
-                        ui_kit::scope(ui, |ui| contents(app, ui, height));
+                        ui.set_max_height(height);
+                        ui_kit::scope(ui, |ui| contents(app, ui, height, true));
                     });
                 },
             );
@@ -706,7 +708,7 @@ pub fn panel(app: &mut SolveApp, ui: &mut egui::Ui) {
             .frame(container.edge_frame(t.panel))
             .show(ui, |ui| {
                 let height = ui.available_height();
-                ui_kit::scope(ui, |ui| contents(app, ui, height))
+                ui_kit::scope(ui, |ui| contents(app, ui, height, false))
             });
         app.properties.rect = Some(r.response.rect);
     }
@@ -715,11 +717,15 @@ pub fn panel(app: &mut SolveApp, ui: &mut egui::Ui) {
     }
 }
 
-/// The card's body in a scroll area `height` tall, whatever the body holds, so what stands under
-/// it keeps its place: a short window scrolls the body rather than clipping the card. The
-/// scrollbar shows while the body overflows, as plainly as it does under the pointer, and the
-/// rows are inset from it.
-fn scrolled<R>(ui: &mut egui::Ui, height: f32, add: impl FnOnce(&mut egui::Ui) -> R) -> R {
+/// The card's body in a scroll area at most `height` tall, so what stands under it keeps its
+/// place: a short window scrolls the body rather than clipping the card. With `fit` (the
+/// floating card) the area is as tall as the body when the body is shorter, so the actions
+/// follow it with no empty room between; without it (the docked panel) the area takes the whole
+/// `height`, and the actions stay at the panel's bottom. The scrollbar shows while the body
+/// overflows, as plainly as it does under the pointer, and the rows are inset from it. The body's
+/// rect and the height of its content are published as `properties:body` and
+/// `properties:body_content_height`.
+fn scrolled<R>(ui: &mut egui::Ui, height: f32, fit: bool, add: impl FnOnce(&mut egui::Ui) -> R) -> R {
     let t = Tokens::get();
     ui.scope(|ui| {
         let scroll = &mut ui.style_mut().spacing.scroll;
@@ -728,13 +734,21 @@ fn scrolled<R>(ui: &mut egui::Ui, height: f32, add: impl FnOnce(&mut egui::Ui) -
         scroll.floating_allocated_width = t.space_8;
         scroll.dormant_background_opacity = 0.0;
         scroll.dormant_handle_opacity = scroll.active_handle_opacity;
-        egui::ScrollArea::vertical()
+        let out = egui::ScrollArea::vertical()
             .id_salt("sc_properties_scroll")
             .max_height(height.max(0.0))
-            .auto_shrink([false, false])
+            .min_scrolled_height(0.0)
+            .auto_shrink([false, fit])
             .scroll_bar_visibility(egui::scroll_area::ScrollBarVisibility::VisibleWhenNeeded)
-            .show(ui, add)
-            .inner
+            .show(ui, add);
+        // The area's rect as laid out: egui reports the rect before it shrinks to the content.
+        let mut body = out.inner_rect;
+        if fit {
+            body.set_height(body.height().min(out.content_size.y));
+        }
+        crate::scenario::publish_rect("properties:body", body);
+        crate::scenario::publish_count("properties:body_content_height", f64::from(out.content_size.y));
+        out.inner
     })
     .inner
 }
@@ -769,12 +783,15 @@ fn pinned_height(ui: &egui::Ui, pinned: &Pinned, footer: &str) -> f32 {
     gap + t.space_8 + pinned.actions as f32 * (t.form_button_height + gap) + pinned.note.map_or(0.0, |text| note(text) + gap) + note(footer)
 }
 
-/// The card's content, `height` tall: the body (the heading, the rows, the dependents or the
-/// consequences) scrolls in the room above the actions, their note and the footer line, which
+/// The card's content, at most `height` tall: the body (the heading, the rows, the dependents or
+/// the consequences) scrolls in the room above the actions, their note and the footer line, which
 /// stand at the card's bottom whatever the body holds, as the AI review card's do, so they are
 /// in sight in a window too short for the whole card (the r6 review: at 1366 × 768 the card was
-/// cut off at the window's bottom).
-fn contents(app: &mut SolveApp, ui: &mut egui::Ui, height: f32) {
+/// cut off at the window's bottom). With `fit` (the floating card) a body shorter than its room
+/// takes only its own height, so the card is as tall as its content (the v0.21.0 picture checks:
+/// a feature with three parameters and no dependents left a large empty gap between "No
+/// dependent features" and the actions); without it (the docked panel) the content fills `height`.
+fn contents(app: &mut SolveApp, ui: &mut egui::Ui, height: f32, fit: bool) {
     let t = Tokens::get();
     let view = if app.properties.editor.is_some() {
         View::Editor
@@ -797,7 +814,7 @@ fn contents(app: &mut SolveApp, ui: &mut egui::Ui, height: f32) {
     // The label column fits the widest label of the rows shown (the kit's proportion at least).
     let labels = row_labels(app);
     let labels: Vec<&str> = labels.iter().map(String::as_str).collect();
-    let editor = scrolled(ui, body_height, |ui| {
+    let editor = scrolled(ui, body_height, fit, |ui| {
         ui_kit::labelled_form(ui, &labels, LABEL_SHARE, |ui| match view {
             View::Editor => editor_body(app, ui),
             View::Feature(id) => {

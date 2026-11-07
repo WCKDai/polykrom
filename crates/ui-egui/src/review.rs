@@ -923,15 +923,15 @@ pub fn panel(app: &mut SolveApp, ui: &mut egui::Ui) {
         let top = under_row.max(cube).min(bottom);
         let frame = container.glass_frame(ui.ctx(), t.panel, crate::frame::Side::Right).inner_margin(t.space_10 as i8);
         let inner = PANEL_WIDTH - frame.total_margin().sum().x;
+        // The room: the card is as tall as its content, and no taller than this (`contents`).
         let height = (bottom - top - frame.total_margin().sum().y).max(0.0);
         let card = container.area(Id::new("sc_review_card")).pivot(Align2::RIGHT_TOP).fixed_pos(pos2(right, top)).order(egui::Order::Middle).show(
             ui.ctx(),
             |ui| {
                 container.show_frame(ui, frame, available, |ui| {
                     ui.set_width(inner);
-                    ui.set_min_height(height);
                     ui.set_max_height(height);
-                    ui_kit::scope(ui, |ui| contents(app, ui, height));
+                    ui_kit::scope(ui, |ui| contents(app, ui, height, true));
                 });
             },
         );
@@ -944,7 +944,7 @@ pub fn panel(app: &mut SolveApp, ui: &mut egui::Ui) {
             .frame(container.edge_frame(t.panel))
             .show(ui, |ui| {
                 let height = ui.available_height();
-                ui_kit::scope(ui, |ui| contents(app, ui, height))
+                ui_kit::scope(ui, |ui| contents(app, ui, height, false))
             });
         app.review.rect = Some(r.response.rect);
     }
@@ -953,11 +953,15 @@ pub fn panel(app: &mut SolveApp, ui: &mut egui::Ui) {
     }
 }
 
-/// The card's contents in `height` points: the body (the header down to the references note,
-/// the warnings and errors), then Apply & rebuild and Cancel command, then the footer line at the
-/// bottom. The actions and the footer are always in view: the body gets the height they leave,
-/// and scrolls when its content is taller, with a scroll bar that shows whenever it does.
-fn contents(app: &mut SolveApp, ui: &mut egui::Ui, height: f32) {
+/// The card's contents in at most `height` points: the body (the header down to the references
+/// note, the warnings and errors), then Apply & rebuild and Cancel command, then the footer line
+/// at the bottom. The actions and the footer are always in view: the body gets at most the
+/// height they leave, and scrolls when its content is taller, with a scroll bar that shows
+/// whenever it does. With `fit` (the floating card) a shorter body takes only its own height and
+/// the footer follows the actions, so the card is as tall as its content (the v0.21.0 picture
+/// checks: short content left an empty gap above the actions); without it (the docked panel)
+/// the footer stands at the bottom of `height`.
+fn contents(app: &mut SolveApp, ui: &mut egui::Ui, height: f32, fit: bool) {
     let Some(open) = app.review.open.clone() else { return };
     let t = Tokens::get();
     let top = ui.cursor().top();
@@ -965,9 +969,9 @@ fn contents(app: &mut SolveApp, ui: &mut egui::Ui, height: f32) {
     let footer_text = tr("review.none_applied");
     let footer = ui.painter().layout(footer_text.to_string(), egui::FontId::proportional(t.font_small), t.text_dim, ui.available_width()).size().y
         + 2.0 * t.space_4;
-    // What the body leaves: the space before the buttons, the two buttons, the footer line and
-    // the room under it, with the item spacing after the body and after each button.
-    let pinned = t.space_8 + 2.0 * t.form_button_height + footer + t.space_8 + 3.0 * gap;
+    // What the body leaves: the space before the buttons, the two buttons, the footer line and,
+    // docked, the room under it, with the item spacing after the body and after each button.
+    let pinned = t.space_8 + 2.0 * t.form_button_height + footer + if fit { 0.0 } else { t.space_8 } + 3.0 * gap;
     let body_height = (height - pinned).max(0.0);
     // A solid bar in the card's colours (the track the dividers' line, the handle the dim text):
     // it shows in both themes whenever the body overflows, not only under the pointer. The bar
@@ -991,7 +995,12 @@ fn contents(app: &mut SolveApp, ui: &mut egui::Ui, height: f32) {
             body(app, ui, &open, &mut close)
         });
     ui.set_style(style);
-    crate::scenario::publish_rect("review:body", scrolled.inner_rect);
+    // The body's rect as laid out: egui reports the rect before it shrinks to the content.
+    let mut body_rect = scrolled.inner_rect;
+    if fit {
+        body_rect.set_height(body_rect.height().min(scrolled.content_size.y));
+    }
+    crate::scenario::publish_rect("review:body", body_rect);
     crate::scenario::publish_count("review:body_content_height", f64::from(scrolled.content_size.y));
     ui.add_space(t.space_8);
     // Apply & rebuild, Cancel command.
@@ -1005,9 +1014,10 @@ fn contents(app: &mut SolveApp, ui: &mut egui::Ui, height: f32) {
         )
         .inner;
     crate::scenario::publish_target("review:cancel", cancel_button.rect);
-    // The footer line sits at the bottom of the card, after the room the body left.
+    // Docked, the footer line sits at the bottom of the panel, after the room the body left; the
+    // floating card has no such room, its footer follows the actions.
     let spare = height - (ui.cursor().top() - top) - footer - t.space_8;
-    if spare > 0.0 {
+    if !fit && spare > 0.0 {
         ui.add_space(spare);
     }
     ui_kit::text(ui, footer_text, ui_kit::Text::Note("review_footer"));
