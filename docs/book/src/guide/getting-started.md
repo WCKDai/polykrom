@@ -37,14 +37,26 @@ start the AppImage with `POLYKROM_NO_DESKTOP_INTEGRATION=1`.
 
 ### Linux Flatpak
 
-Install Flatpak using your distribution's package manager, then download the release's
+Install Flatpak using your distribution's package manager. Polykrom's own repository at
+<https://polykrom.app/flatpak/> serves the latest stable release, and `flatpak update` follows it; Flathub provides the
+Freedesktop runtime it needs. Add both remotes to the same user installation, then install:
+
+```sh
+flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+flatpak remote-add --user --if-not-exists polykrom https://polykrom.app/flatpak/polykrom.flatpakrepo
+flatpak install --user polykrom app.polykrom.Polykrom
+flatpak run app.polykrom.Polykrom
+```
+
+`flatpak update` then brings each new release. Alternatively, download the release's
 `.flatpak` file for your architecture and run
 `flatpak install --user ./polykrom-VERSION-linux-ARCH.flatpak`. The bundle supplies the
 Flathub runtime repository address; installation still needs internet access to fetch any
-missing runtime. Launch with `flatpak run app.polykrom.Polykrom`, rather than looking for
+missing runtime. A bundle has no update feed: install the next release's bundle the same way.
+
+Launch with `flatpak run app.polykrom.Polykrom`, rather than looking for
 a host `polykrom` binary. Files chosen through Open/Save use the desktop file-chooser portal;
 command-line paths outside Documents may need a specific additional filesystem permission.
-A bundle has no update feed: install the next release's bundle the same way.
 
 ### Linux Snap
 

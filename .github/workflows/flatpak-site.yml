@@ -1,0 +1,43 @@
+# A published release reaches the Flatpak repository at https://polykrom.app/flatpak/ through a
+# site deployment (site.yml assembles the repository from the release's bundles). This requests
+# that deployment with the release's tag, so it does not wait for the next push to main.
+name: Publish Flatpak repository
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Published GitHub release tag to publish (for example, v1.2.3)"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: write
+
+concurrency:
+  group: flatpak-site-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Request the site deployment with the Flatpak repository
+    # Release candidates and nightlies are published as prereleases; only stable releases reach
+    # the stable Flatpak channel.
+    if: github.repository == 'WCKDai/polykrom' && (github.event_name != 'release' || !github.event.release.prerelease)
+    runs-on: ubuntu-24.04
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_TAG: ${{ github.event.release.tag_name || inputs.release_tag }}
+    steps:
+      - name: Deploy through the site workflow
+        run: |
+          set -euo pipefail
+          published="$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG" \
+            --jq 'select(.draft == false and .prerelease == false and .published_at != null) | .tag_name')"
+          test "$published" = "$RELEASE_TAG"
+          gh workflow run site.yml --repo "$GITHUB_REPOSITORY" --ref main \
+            -f release_tag="$RELEASE_TAG"
+          echo "Requested the polykrom.app deployment with the Flatpak repository for $RELEASE_TAG" >>"$GITHUB_STEP_SUMMARY"

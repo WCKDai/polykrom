@@ -1,6 +1,9 @@
 # polykrom.app (and cad.polykrom.app): the landing page and showcases (site/build.py), the browser
-# app at /app/ and the book at /docs/, deployed to the Cloudflare Worker polykrom-cad-site
-# (site/wrangler.jsonc). Only main deploys; the Cloudflare secrets are WCKDai org secrets.
+# app at /app/, the book at /docs/ and the Flatpak repository at /flatpak/
+# (packaging/flatpak-site.sh, from the latest published release's bundles), deployed to the
+# Cloudflare Worker polykrom-cad-site (site/wrangler.jsonc). Only main deploys; the Cloudflare
+# secrets are WCKDai org secrets. A release publication dispatches this workflow with its tag
+# (flatpak-site.yml), so the repository is updated without waiting for the next push.
 name: Site
 
 on:
@@ -9,6 +12,12 @@ on:
     # Test data and the GitHub bots' scripts change nothing on the site.
     paths-ignore: ["tests/**", "scripts/claim/**", "scripts/triage/**"]
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Published release for the Flatpak repository (empty: latest stable release)"
+        type: string
+        required: false
+        default: ""
 
 permissions:
   contents: read
@@ -60,6 +69,18 @@ jobs:
         env:
           POLYKROM_GPU: software
         run: python3 site/build.py
+      - name: Install Flatpak repository tools
+        run: sudo apt-get install -y --no-install-recommends flatpak ostree
+      - name: Include the published Flatpak repository
+        # The repository polykrom.app serves now is mirrored first (previous releases stay).
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag || '' }}
+          SITE_BASE_URL: https://polykrom.app
+        run: bash packaging/flatpak-site.sh dist/site
+      - name: Split the objects over Cloudflare's per-file limit
+        # site/worker.js joins them again on the way out.
+        run: python3 site/parts.py dist/site/flatpak
       - name: Deploy polykrom.app
         if: env.CLOUDFLARE_API_TOKEN != ''
         run: npx --yes wrangler@4.156.0 deploy --config site/wrangler.jsonc

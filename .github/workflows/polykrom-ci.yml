@@ -297,3 +297,6 @@ jobs:
           python3 site/tests/fixture.py "$fixture"
           python3 site/meshpack.py "$fixture" "$fixture/pack.bin" "$fixture/pack.json"
           FIXTURE="$fixture" deno test -A --import-map=site/tests/import_map.json site/tests/viewer_test.ts
+      - name: The Worker serves split files whole (site/parts.py, site/worker.js)
+        if: hashFiles('site/tests/worker_test.mjs') != ''
+        run: node --test site/tests/worker_test.mjs

@@ -54,8 +54,9 @@ so the binaries' embedded Cargo version remains the workspace version. Nightlies
 replace the latest stable release or advance the `release` branch. The normal deliberate
 release process below continues to create drafts for separate verification and publication.
 
-Nightly publication uses `GITHUB_TOKEN`, so it does not trigger the downstream Flatpak Pages
-deployment. The stable Flatpak repository is not automatically updated with nightly builds.
+Nightly publication uses `GITHUB_TOKEN`, so it does not trigger the downstream Flatpak site
+deployment. The stable Flatpak repository is not automatically updated with nightly builds
+(it takes only published releases that are not prereleases).
 
 ## Choose and prepare the version
 
@@ -185,16 +186,19 @@ another branch is rejected. A rerun must still use an unpublished, untagged vers
 
 ## Flatpak repository coordination
 
-The Flatpak repository proposed in PR #39 consumes **published** releases, not these drafts.
-Keep that deployment separate from building the application. A publication made with an
-Actions `GITHUB_TOKEN` does not trigger downstream `release: published` workflows; in that
-case explicitly dispatch the Flatpak workflow with the published tag, or use an appropriately
-authorized maintainer/App token for publication. Do not assume the repository updated: check
-the deployment run. The Flatpak workflow requests the shared Pages workflow with that tag;
-Pages assembles the documentation, browser app, and Flatpak repository together. Ordinary
-docs updates include the latest stable Flatpak release too. Verify the resulting Pages run,
-not only the dispatch job, so a release cannot erase the docs or app and docs updates cannot
-erase the package repository.
+The Flatpak repository at <https://polykrom.app/flatpak/> (`packaging/flatpak-site.sh`)
+consumes **published** releases, not these drafts. Keep that deployment separate from building
+the application. A publication made with an Actions `GITHUB_TOKEN` does not trigger downstream
+`release: published` workflows; in that case explicitly dispatch the Flatpak workflow
+(`flatpak-site.yml`) with the published tag, or use an appropriately authorized maintainer/App
+token for publication. Do not assume the repository updated: check the deployment run. The
+Flatpak workflow requests the site workflow (`site.yml`) with that tag; the site deployment
+assembles the landing page, documentation, browser app and Flatpak repository together, and
+every ordinary deployment (any push to main) includes the latest stable release too, mirroring
+the repository already served so refs a release does not replace stay. The mirror keeps only
+the commit each ref points to, so the repository serves the latest stable release. Verify the resulting Site run, not only
+the dispatch job, so a release cannot erase the docs or app and docs updates cannot erase the
+package repository.
 
 ## Snap package and Snap Store
 
