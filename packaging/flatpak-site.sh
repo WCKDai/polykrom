@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
-# All Pages deployments include the book, web app, and published Flatpak repository.
-# Shared by docs updates and release publication; no other workflow replaces the site.
+# The Flatpak repository of polykrom.app: flatpak-site.sh SITE_DIR adds SITE_DIR/flatpak/ (the
+# OSTree repository under repo/, polykrom.flatpakrepo and an index page) to the assembled site,
+# from the .flatpak bundles of the latest published release (or RELEASE_TAG). The repository
+# already served at SITE_BASE_URL (https://polykrom.app) is mirrored first, so earlier releases
+# stay and `flatpak update` keeps working. Every site deployment (.github/workflows/site.yml) runs
+# it, and no other workflow replaces the site. Objects over Cloudflare's per-file limit are split
+# afterwards by site/parts.py and joined again by site/worker.js.
 set -euo pipefail
 trap 'echo "flatpak-site.sh: line $LINENO: \"$BASH_COMMAND\" failed (exit $?)" >&2' ERR
 
@@ -29,7 +34,8 @@ gh release download "$tag" --repo "$GITHUB_REPOSITORY" --pattern SHA256SUMS.txt 
 repo_dir="$site/flatpak/repo"
 mkdir -p "$repo_dir"
 ostree --repo="$repo_dir" init --mode=archive-z2
-base_url="${PAGES_BASE_URL%/}"
+base_url="${SITE_BASE_URL:-https://polykrom.app}"
+base_url="${base_url%/}"
 previous_url="$base_url/flatpak/repo"
 if curl --fail --silent --location --output /dev/null "$previous_url/summary"; then
   ostree --repo="$repo_dir" remote add --no-gpg-verify previous "$previous_url"
@@ -58,7 +64,7 @@ for arch in x86_64 aarch64; do
 done
 flatpak build-update-repo --title="Polykrom" --comment='Official Polykrom releases' \
   --description='Official Flatpak repository for Polykrom' \
-  --homepage="https://github.com/$GITHUB_REPOSITORY" --default-branch=stable "$repo_dir"
+  --homepage="$base_url" --default-branch=stable "$repo_dir"
 test -s "$repo_dir/summary"
 cat >"$site/flatpak/polykrom.flatpakrepo" <<META
 [Flatpak Repo]
@@ -66,7 +72,7 @@ Title=Polykrom
 Comment=Official Polykrom releases
 Description=Official Flatpak repository for Polykrom
 Url=$base_url/flatpak/repo/
-Homepage=https://github.com/$GITHUB_REPOSITORY
+Homepage=$base_url
 META
 cat >"$site/flatpak/index.html" <<HTML
 <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Polykrom Flatpak repository</title></head><body><main><h1>Polykrom Flatpak repository</h1><p>Latest published release: <strong>$tag</strong></p><p><a href="polykrom.flatpakrepo">Add the Polykrom repository</a></p><p>Flathub provides the required Freedesktop runtime. Add both remotes to the same user installation:</p><pre>flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
@@ -74,4 +80,3 @@ flatpak remote-add --user --if-not-exists polykrom $base_url/flatpak/polykrom.fl
 flatpak install --user polykrom $app_id
 flatpak run $app_id</pre></main></body></html>
 HTML
-touch "$site/.nojekyll"
