@@ -642,6 +642,74 @@ fn the_actions_and_the_footer_stay_in_view_while_the_body_scrolls_in_a_short_win
     }
 }
 
+/// A short proposal: the edge fillet's radius, the last feature: one changed value, no pattern
+/// and no feature after it to be affected.
+fn resize_fillet() -> Vec<(String, Value)> {
+    vec![("timeline.edit".into(), json!({"feature": "Edge finish", "set": {"radius": "3 mm"}}))]
+}
+
+/// The floating card is as tall as its content, and no taller than its room (the v0.21.0
+/// picture checks: short content left an empty gap above Apply & rebuild). At 1600 × 1000, where
+/// the content fits its room: the body is as tall as its content, Apply & rebuild follows it at
+/// its spacing, the footer stands at the card's bottom, and the card ends above the history strip,
+/// a shorter card for short content (the fillet resized: one changed value, no dependents) than
+/// for long (the mounting holes resized, with their pitch and dependent fillet). At 1366 × 768,
+/// where either content is taller than the room between the view cube and the strip: the card
+/// fills its room down to the strip, the body is shorter than its content and scrolls, and the
+/// actions and the footer stay in sight at the card's bottom, as before.
+#[test]
+fn the_floating_card_is_as_tall_as_short_content_and_no_taller_than_its_room() {
+    let t = crate::theme::Tokens::get();
+    let gap = crate::shell::SHELL_GAP;
+    let rect = |name: &str, case: &str| scenario::rect_of(name).unwrap_or_else(|| panic!("{case}: {name}"));
+    for (w, hgt) in [(1600.0, 1000.0), (1366.0, 768.0)] {
+        let mut heights = Vec::new();
+        for short in [true, false] {
+            let mut h = mount();
+            h.call("ui.resize", json!({"width": w, "height": hgt}));
+            h.frames(2);
+            let (commands, label) = if short { (resize_fillet(), "Resize edge fillet") } else { (resize_holes(), "Resize mounting holes") };
+            super::propose(&mut h.app, commands, Some(label), Source::Control).unwrap();
+            h.frames(3);
+            let case = format!("{w}×{hgt}, {label}");
+            assert_eq!(shows(&h, "No dependent features"), short, "{case}: {:?}", h.app.review.open.as_ref().map(|o| &o.report["timeline"]));
+            let card = rect("review:panel", &case);
+            let body = rect("review:body", &case);
+            let content = scenario::count_of("review:body_content_height").unwrap_or_else(|| panic!("{case}: the body's content height")) as f32;
+            let apply = rect("review:apply", &case);
+            let footer = rect("dialog:note:review_footer", &case);
+            let history = h.app.shell.history.unwrap_or_else(|| panic!("{case}: the history strip"));
+            let room = history.top() - gap;
+            let cube = rect("axis_view:outer", &case);
+            assert!(card.top() >= cube.bottom(), "{case}: the card {card:?} is below the view cube {cube:?}");
+            assert!(
+                card.contains_rect(apply) && card.contains_rect(footer),
+                "{case}: Apply {apply:?} and the footer {footer:?} are in sight in {card:?}"
+            );
+            assert!(card.bottom() - footer.bottom() <= t.space_24, "{case}: the footer {footer:?} stands at the card's bottom {card:?}");
+            assert!(body.top() - card.top() <= t.space_24, "{case}: the body {body:?} starts at the card's top {card:?}");
+            assert!(
+                apply.top() - body.bottom() <= t.space_8 + 2.0 * t.form_gap_y + 1.0,
+                "{case}: an empty gap between the body {body:?} and Apply & rebuild {apply:?}"
+            );
+            heights.push(card.height());
+            // At the kit's size the content fits its room; in the laptop window it is taller.
+            if hgt == 1000.0 {
+                assert!((body.height() - content).abs() <= 2.0, "{case}: the body {body:?} is as tall as its content, {content}");
+                assert!(card.bottom() < room - 1.0, "{case}: the card {card:?} ends above the history strip {history:?}");
+            } else {
+                assert!(body.height() < content - 2.0, "{case}: the body {body:?} is shorter than its content, {content}, and scrolls");
+                assert!((card.bottom() - room).abs() <= 1.0, "{case}: the card {card:?} fills its room down to the strip {history:?}");
+            }
+        }
+        if hgt == 1000.0 {
+            assert!(heights[0] < heights[1] - t.space_24, "{w}×{hgt}: the short content's card is shorter than the long content's: {heights:?}");
+        } else {
+            assert!((heights[0] - heights[1]).abs() <= 1.0, "{w}×{hgt}: both cards fill the room: {heights:?}");
+        }
+    }
+}
+
 /// Pending: the spinner is an item of the row with the row's spacing on both sides, the key chip
 /// (its border included) before it, the button after it.
 #[test]

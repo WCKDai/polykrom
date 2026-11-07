@@ -8,9 +8,12 @@
 //! activity list and a status toast showing (`properties-toast-…`: a short one, and `…-long-…`
 //! an error as wide as a toast gets), where the list, the toast, the card and the viewport's
 //! controls must all stand clear of one another. In a 1366 × 768 and a 1280 × 720 window, the
-//! hole selected (`properties-selected-<size>-…`) and edited in place (`properties-editor-<size>-…`):
-//! the card's actions and footer stand at its bottom and the body above them scrolls, shown
-//! scrolled to its end in `…-<size>-scrolled-…-panel.png`. The raster draws the window's own shapes, not
+//! counterbore hole selected (`properties-counterbore-selected-<size>-…`: short content, three
+//! parameters and no dependents; the card is as tall as its content, and no taller than the room
+//! between the view cube and the history strip), the hole selected (`properties-selected-<size>-…`)
+//! and edited in place (`properties-editor-<size>-…`): the card's actions and footer stand at its
+//! bottom and the body above them scrolls, shown scrolled to its end in
+//! `…-<size>-scrolled-…-panel.png`. The raster draws the window's own shapes, not
 //! the viewport's GPU scene (nor the preview scene), so the model is rendered by the engine's
 //! headless picture path separately as `properties-model-<stage>.png`. Written to
 //! `target/review-media/`, where the stage is `REVIEW_MEDIA_STAGE` (default `after`); the same
@@ -303,6 +306,10 @@ fn properties_panel_pictures() {
         for size in [LAPTOP, SMALL] {
             let tag = format!("{}x{}", size.x, size.y);
             h.call("ui.resize", json!({"width": size.x, "height": size.y}));
+            // Short content first: the counterbore hole, three parameters and no dependents.
+            h.call("engine.execute", json!({"command": "select.set", "params": {"items": [{"type": "feature", "id": counterbore}]}}));
+            h.frames(3);
+            paint(&mut h, &dir, &format!("properties-counterbore-selected-{tag}-{mode}-{stage}"), Act::Nothing, size, true);
             h.call("engine.execute", json!({"command": "select.set", "params": {"items": [{"type": "feature", "id": hole}]}}));
             h.frames(3);
             paint(&mut h, &dir, &format!("properties-selected-{tag}-{mode}-{stage}"), Act::Nothing, size, true);
