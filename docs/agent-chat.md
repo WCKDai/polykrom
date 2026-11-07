@@ -241,7 +241,7 @@ Whatever you typed before signing in is sent once the agent is ready.
 
 The agent reaches the open design only through Polykrom's own tools (the
 [MCP server](mcp.md)), which Polykrom hands it when the chat starts. That server is named
-`solidcraft-app`, so an MCP server you set up yourself under the name `polykrom` (as in
+`polykrom-app`, so an MCP server you set up yourself under the name `polykrom` (as in
 [client configuration](mcp.md#client-configuration)) doesn't take its place:
 
 - **Read the design:** list commands, inspect features, sketches and parameters, measure,

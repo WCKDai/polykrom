@@ -216,7 +216,7 @@ respectively. The first four style small accents through large surfaces; `contro
 styles form controls, and `sketch_mode_radius` styles sketch creation buttons. Themes own
 these settings, with matching shapes across light and dark variants. Dock joins remain
 square, circular controls remain circular, and control sizes and spacing stay the same.
-Platinum 9 and the phosphor themes use square corners, SolidCraft 95 uses subtle 3-point
+Platinum 9 and the phosphor themes use square corners, Polykrom 95 uses subtle 3-point
 corners, Blueprint uses the standard radii, and Cupertino uses softer corners. Other built-in
 themes retain the defaults.
 
@@ -277,7 +277,7 @@ inside panel chrome, with a `gap` from 0 to 12 points. Missing settings keep exi
 Blueprint uses a single white outer outline, dotted section lines and dark minor dividers. Secondary rules optionally accept `pattern: "dotted"`; the default is `solid`. Focus, selection and
 error outlines retain their semantic colours. See the UI-kit border hierarchy for the schema.
 
-SolidCraft 95 also defines optional `borders.bevel`: a per-band `width` and the
+Polykrom 95 also defines optional `borders.bevel`: a per-band `width` and the
 `highlight`, `light`, `shadow` and `dark_shadow` colours. The shared UI uses these
 for raised panels/buttons, recessed fields and reversed pressed-button lighting.
 Themes that omit this setting keep their existing flat borders.

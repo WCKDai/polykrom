@@ -32,7 +32,7 @@ This work stacks on the theme radii and border changes (#4923, #4954).
 | Graphite, Platinum 9 | Muted, distinct workspace colours over neutral chrome |
 | Solarized Light | Solarized workspace hues and warm neutral icon faces |
 | High Contrast | Strong outlines and readable saturated workspace colours |
-| SolidCraft 95 | Classic grey icon geometry; navy, brown, olive, purple, teal, burgundy and green workspace accents |
+| Polykrom 95 | Classic grey icon geometry; navy, brown, olive, purple, teal, burgundy and green workspace accents |
 | Amber/Green Phosphor | Deliberately single-hue palettes, with different intensities for workspace groups |
 
 Shared utility tabs (Assemble, Insert, Inspect, Manage, View) retain the Model

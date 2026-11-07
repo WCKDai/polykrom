@@ -136,7 +136,7 @@ Tool calls read, write and delete files only inside the server's folders:
   inside the design's folder (`.env`, `.git`) are out of reach too;
 - Polykrom's own recovery folder, so `doc.recovery_list`, `doc.recover` and
   `doc.recovery_discard` work out of the box (discarding deletes only real recovery entries);
-- the server's own scratch folder (a new private `solidcraft-mcp-*` folder in the temporary
+- the server's own scratch folder (a new private `polykrom-mcp-*` folder in the temporary
   folder), where `screenshot` without a `path` goes;
 - every `--allow-path DIR` (repeat it for more). A folder named here is reached in full,
   hidden files included.
@@ -311,8 +311,9 @@ To change a feature after it is made, read its definition with `execute` `timeli
 `{"extent": {"distance": "30"}}`). The fields per feature type are listed in the book's
 *Solid features* chapter.
 
-Resources: `solidcraft://design` (inspect JSON with measurements) and `solidcraft://commands`
-(the catalog).
+Resources: `polykrom://design` (inspect JSON with measurements) and `polykrom://commands`
+(the catalog). The `solidcraft://` and `solvecraft://` URIs of earlier builds are refused as
+unknown resources.
 
 Errors: an unknown tool or arguments that don't match the tool's schema are JSON-RPC
 `-32602` errors (an unknown argument's error lists the tool's arguments); an engine failure

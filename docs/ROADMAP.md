@@ -2,7 +2,7 @@
 
 Polykrom is a professional, AI-native CAD app for people and their AI companions building things for the physical world and for simulation. This roadmap is the plan of record. It is mirrored by the [GitHub milestones](https://github.com/WCKDai/polykrom/milestones) (one per phase, an issue per item) and by the Plane project **PK · Polykrom**. When a plan changes, change all three in the same sitting.
 
-Status words: **in review** (a PR is open), **in progress**, **next** (planned for this phase), **later** (in the phase, not yet scheduled).
+Status words: **done** (merged), **in review** (a PR is open), **in progress**, **next** (planned for this phase), **later** (in the phase, not yet scheduled).
 
 ## Where it stands (2026-10-24)
 
@@ -25,9 +25,9 @@ Polykrom stands on its own: its own name, look, icons, file type, site and a fir
 - **Inspector: mass, volume, size and last stress result per body**: in review · [#12](https://github.com/WCKDai/polykrom/issues/12) · design  
   PR #5. Docked or floating; staleness by body fingerprint.
 - **.polykrom design files (.solidcraft/.solvecraft still open)**: in review · [#13](https://github.com/WCKDai/polykrom/issues/13) · platform  
-  PR #6. Format tag stays solidcraft/N for compatibility.
-- **Rebrand stage 2: crate names, bundle ids, settings migration, updater key**: later · [#14](https://github.com/WCKDai/polykrom/issues/14) · platform  
-  Deferred until P0 PRs merge; needs a settings-folder migration and a new minisign release key.
+  PR #6. The format tag is now `polykrom/N`; `solidcraft/N` and `solvecraft/N` still open (#393).
+- **Rebrand stage 2: crate names, bundle ids, settings folders, env vars**: done for 0.21.0 · [#14](https://github.com/WCKDai/polykrom/issues/14) · platform  
+  #393 renamed the crates, programs, bundle and package IDs (`app.polykrom.Polykrom`), settings folders and `POLYKROM_*` variables in one step, with no settings migration and no alias programs: there were no users before 0.21.0 ([compatibility](compatibility.md)).
 
 ## P1 · AI companion (target 2026-11-21)
 

@@ -22,7 +22,7 @@ Windows builds: `cargo xwin build --release --target x86_64-pc-windows-msvc -p p
 In the browser: `cd apps/polykrom-web && trunk build --release --public-url ./` (WebGPU, or
 WebGL2 with `?webgl`; `?sample` opens the sample part).
 
-Agents can control the document open in a browser tab through `window.solidcraft.execute(...)`
-and `window.solidcraft.request(...)`; see the [browser command API](browser-api.md).
+Agents can control the document open in a browser tab through `window.polykrom.execute(...)`
+and `window.polykrom.request(...)`; see the [browser command API](browser-api.md).
 
 See [CONTRIBUTING](../CONTRIBUTING.md) for the test and review workflow.

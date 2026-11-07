@@ -35,7 +35,7 @@ does; fixes that help both go upstream as pull requests to
 - **Kernel robustness**: trimmed faces whose boundary crosses itself mesh instead of crashing,
   and moved bodies keep their edges on STEP export.
 
-Releases are on [polykrom.app](https://polykrom.app) and the
+Releases and nightly builds are on the
 [releases page](https://github.com/WCKDai/polykrom/releases) ([every package](docs/downloads.md)):
 `Polykrom.app` on macOS, the `polykrom` packages on Linux, the Windows installer, and the browser
 app at [polykrom.app/app](https://polykrom.app/app/). The programs are `polykrom` and
